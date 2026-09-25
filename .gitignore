@@ -1,0 +1,9 @@
+.superpowers/
+.venv/
+.idea/
+__pycache__/
+*.pyc
+node_modules/
+dist/
+build/
+assets/phones/*.webp
