@@ -99,3 +99,35 @@ def test_fake_adb_host_run_and_shell_via_run():
     fake = FakeAdb({"getprop": "p"}, host={"devices -l": "List of devices attached\n"})
     assert fake.run(["devices", "-l"]).startswith("List")
     assert fake.run(["shell", "getprop"]) == "p"
+
+
+def test_fake_adb_with_serial_returns_new_instance():
+    """Verify with_serial returns a new instance with independent calls but shared responses."""
+    original = FakeAdb({"getprop": "value"}, serial="ORIG", host={"devices -l": "list"})
+
+    # Make a call on original to verify calls tracking works
+    original.shell("getprop")
+    assert original.calls == ["getprop"]
+    assert original.serial == "ORIG"
+
+    # Create derived instance with different serial
+    derived = original.with_serial("NEW")
+
+    # Verify original unchanged
+    assert original.serial == "ORIG"
+    assert original.calls == ["getprop"]
+
+    # Verify derived has new serial and empty calls
+    assert derived.serial == "NEW"
+    assert derived.calls == []
+
+    # Verify derived can answer from shared responses
+    assert derived.shell("getprop") == "value"
+
+    # Verify calls lists are independent
+    assert derived.calls == ["getprop"]
+    assert original.calls == ["getprop"]  # Original unchanged
+
+    # Verify responses are shared (mutation visible through derived)
+    original.responses["new_cmd"] = "new_value"
+    assert derived.shell("new_cmd") == "new_value"
