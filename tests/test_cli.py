@@ -5,6 +5,7 @@ from conftest import SERIAL, make_synthetic_adb
 from demalware.cli.main import main
 from demalware.engine.adb.fake import FakeAdb
 from demalware.engine.adb.transport import AdbError
+from demalware.engine.apk.analyze import ApkReport
 
 
 def test_devices_lists_entries(capsys):
@@ -59,3 +60,38 @@ def test_adb_missing(capsys):
     host = FakeAdb(host={"devices -l": AdbError("adb_missing", "adb executable not found")})
     assert main(["devices"], host=host) == 4
     assert "adb" in capsys.readouterr().err
+
+
+SIX_SDKS = ["admob", "applovin", "meta", "mintegral", "pangle", "vungle"]
+
+
+class _FakeDeviceProvider:
+    def __init__(self, adb, *args, **kwargs):
+        pass
+
+    def reports_for(self, apps, progress=None):
+        for i, f in enumerate(apps, start=1):
+            if progress:
+                progress(i, len(apps), f.package)
+        return {"com.wlive.forecast": ApkReport(
+            "com.wlive.forecast", 31, label="Weather\u202e Live", label_padded=True,
+            ad_sdks=SIX_SDKS, class_count=500)}
+
+
+def test_scan_apk_shows_labels_and_progress(capsys, monkeypatch):
+    monkeypatch.setattr("demalware.cli.main.DeviceApkProvider", _FakeDeviceProvider)
+    assert main(["scan", "--apk"], host=make_synthetic_adb()) == 0
+    captured = capsys.readouterr()
+    assert "Weather Live (com.wlive.forecast)" in captured.out  # oczyszczona etykieta
+    assert "Podejrzana" in captured.out
+    assert "Analiza APK 2/2" in captured.err
+
+
+def test_scan_apk_lists_failures(capsys, monkeypatch):
+    class Failing(_FakeDeviceProvider):
+        def reports_for(self, apps, progress=None):
+            return {"com.clean.pro.boost": ApkReport("com.clean.pro.boost", error="timeout")}
+
+    monkeypatch.setattr("demalware.cli.main.DeviceApkProvider", Failing)
+    assert main(["scan", "--apk"], host=make_synthetic_adb()) == 0
+    assert "[apk] com.clean.pro.boost: timeout" in capsys.readouterr().out

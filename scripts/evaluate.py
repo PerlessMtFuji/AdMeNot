@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from demalware.engine.adb.fake import FakeAdb
+from demalware.engine.apk.providers import StoredApkProvider
 from demalware.engine.evaluation import LABELS_FILE, evaluate, format_evaluation, load_labels
 from demalware.engine.session import run_scan
 
@@ -22,7 +23,9 @@ def main(argv: list[str]) -> int:
         if labels is None:
             print(f"{d.name}: brak {LABELS_FILE}, pomijam.", file=sys.stderr)
             continue
-        report = run_scan(FakeAdb.from_capture(d))
+        apk_dir = d / "apk"
+        provider = StoredApkProvider(apk_dir) if apk_dir.is_dir() else None
+        report = run_scan(FakeAdb.from_capture(d), apk=provider)
         print(f"== {d.name}")
         print(format_evaluation(evaluate(report.results, labels)))
     return 0

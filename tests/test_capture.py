@@ -182,3 +182,18 @@ def test_capture_roundtrip(tmp_path, capsys):
     assert verdicts["com.clean.pro.boost"] == "malicious"
     assert verdicts["com.wlive.forecast"] == "review"
     assert all(s.ok for s in report.collectors.values())
+
+
+def test_capture_with_apk_reports_roundtrip(tmp_path, capsys, monkeypatch):
+    from test_cli import _FakeDeviceProvider
+
+    from demalware.engine.apk.providers import StoredApkProvider
+
+    monkeypatch.setattr("demalware.cli.main.DeviceApkProvider", _FakeDeviceProvider)
+    out_dir = tmp_path / "a14"
+    assert main(["capture", "--apk", "--out", str(out_dir)], host=make_synthetic_adb()) == 0
+    stored = out_dir / "apk" / "com.wlive.forecast.json"
+    assert stored.exists()
+    report = run_scan(FakeAdb.from_capture(out_dir), apk=StoredApkProvider(out_dir / "apk"))
+    verdicts = {r.facts.package: r.verdict for r in report.results}
+    assert verdicts["com.wlive.forecast"] == "suspicious"
