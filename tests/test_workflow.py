@@ -1,6 +1,7 @@
 import pytest
 from fakephone import make_cli_phone
 
+from demalware.engine.actions import commands as C
 from demalware.engine.actions.executor import ExecOptions, resume, run_order
 from demalware.engine.actions.planner import Blocked
 from demalware.engine.journal.db import Journal
@@ -125,3 +126,25 @@ def test_targeted_actions_filters_by_package_and_action_id(tmp_path):
     assert one == [all_actions[0]]
 
     assert targeted_actions(journal, order.id, package="com.does.not.exist") == []
+
+
+def test_certain_error_from_the_admin_fallback_still_interrupts_the_order(tmp_path):
+    """`_Admin.apply` opens the admin-settings screen, falling back to security settings when
+    that fails; when BOTH fail with a "certain" (non-uncertain) error, the error escapes
+    `run_order` uncaught (executor.py: `_recover` -> `_admin_path` -> `S.apply` isn't guarded
+    there). `execute_order` must still turn it into `OrderInterrupted`, not let it leak out as a
+    bare `ActionError` — the CLI only knows how to report `OrderInterrupted` as "disconnected"."""
+    phone = make_cli_phone()  # com.clean.pro.boost is a device admin; disabling it needs the screen
+    phone.fail[C.ADMIN_SETTINGS] = "Error: could not start admin settings.\n"
+    phone.fail[C.SECURITY_SETTINGS] = "Error: could not start security settings.\n"
+    report = run_scan(phone)
+    plan = plan_order(phone, report, {"com.clean.pro.boost": "disable"})
+    journal = Journal(tmp_path / "j.db")
+    order = start(journal, plan, None)
+
+    with pytest.raises(OrderInterrupted) as info:
+        execute_order(phone, journal, order, ExecOptions())
+
+    assert info.value.order.number == order.number
+    assert info.value.order.status == "running"
+    assert [o.number for o in journal.interrupted_orders(phone.serial)] == [order.number]
