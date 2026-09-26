@@ -67,3 +67,11 @@ def test_trust_list_prefixes_and_source_requirement():
 def test_default_trust_list_loads():
     trust = load_default_trust_list()
     assert trust.matches("com.whatsapp") and trust.matches("com.google.android.youtube")
+
+
+def test_trusted_app_never_malicious():
+    findings = [F("DM-ADMIN-01", "position", 25), F("DM-A11Y-01", "position", 20),
+                F("DM-OVERLAY-01", "behavior", 25), F("DM-NOTIF-02", "behavior", 25),
+                F("DM-FSI-01", "behavior", 15)]
+    result = score_app(AppFacts("com.x"), findings, trusted=True, low_behavior_data=False)
+    assert result.score == 60 and result.verdict == "suspicious"
