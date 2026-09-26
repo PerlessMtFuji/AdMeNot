@@ -1,5 +1,7 @@
+from demalware.engine.parsers.common import parse_components
 from demalware.engine.parsers.system import (
     parse_device_admins,
+    parse_resolved_component,
     parse_resolved_home,
     parse_role_holders,
 )
@@ -42,3 +44,22 @@ def test_parse_resolved_home_skips_resolver():
     assert parse_resolved_home(
         "priority=0\n  android/com.android.internal.app.ResolverActivity\n"
     ) == set()
+
+
+RESOLVED_HOME_OPPO = (
+    "priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n"
+    "com.intelli.clean/com.star.james.ui.activity.launcher.LauncherActivity\n"
+)
+
+
+def test_parse_resolved_component():
+    assert parse_resolved_component(RESOLVED_HOME_OPPO) == (
+        "com.intelli.clean/com.star.james.ui.activity.launcher.LauncherActivity")
+    no_default = "priority=0\nandroid/com.android.internal.app.ResolverActivity\n"
+    assert parse_resolved_component(no_default) is None
+
+
+def test_parse_components_keeps_class_names_with_dollar():
+    text = ("priority=0 preferredOrder=0\n  com.android.launcher/.Launcher\n"
+            "  com.x/com.x.Outer$Inner\n")
+    assert parse_components(text) == ["com.android.launcher/.Launcher", "com.x/com.x.Outer$Inner"]
