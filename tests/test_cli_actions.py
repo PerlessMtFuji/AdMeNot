@@ -97,3 +97,15 @@ def test_history_by_serial_works_without_the_phone(capsys):
     offline = FakeAdb(host={"devices -l": "List of devices attached\n\n"})
     assert main(["history", "--serial", SERIAL], host=offline) == 0
     assert "com.whatsapp" in capsys.readouterr().out
+
+
+def test_fix_treats_closed_stdin_as_no(capsys, monkeypatch):
+    phone = make_cli_phone()
+
+    def closed(prompt):
+        raise EOFError
+
+    monkeypatch.setattr("builtins.input", closed)
+    assert main(["fix", "--app", "com.wlive.forecast=disable"], host=phone) == 1
+    assert "Anulowano" in capsys.readouterr().out
+    assert phone.apps["com.wlive.forecast"].enabled

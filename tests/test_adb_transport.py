@@ -131,3 +131,16 @@ def test_fake_adb_with_serial_returns_new_instance():
     # Verify responses are shared (mutation visible through derived)
     original.responses["new_cmd"] = "new_value"
     assert derived.shell("new_cmd") == "new_value"
+
+
+def test_real_adb_does_not_share_the_console_stdin(monkeypatch):
+    # `adb shell` przekazuje stdin na telefon — bez DEVNULL skan zjada odpowiedź na „Wykonać? [t/N]”.
+    seen = {}
+
+    def fake_run(cmd, **kw):
+        seen.update(kw)
+        return _Proc(stdout=b"ok\n")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    RealAdb(serial="R58T", adb_path="adb.exe").shell("getprop")
+    assert seen.get("stdin") is subprocess.DEVNULL
