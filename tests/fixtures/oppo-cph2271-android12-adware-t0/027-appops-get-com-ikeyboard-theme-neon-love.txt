@@ -1,0 +1,6 @@
+Uid mode: CAMERA: ignore
+READ_EXTERNAL_STORAGE: ignore
+WRITE_EXTERNAL_STORAGE: ignore
+LEGACY_STORAGE: ignore
+SYSTEM_ALERT_WINDOW: ignore; rejectTime=+56m41s991ms ago
+WAKE_LOCK: allow; time=+56m45s99ms ago; duration=+3s128ms

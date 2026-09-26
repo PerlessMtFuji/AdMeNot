@@ -1,0 +1,5 @@
+Uid mode: COARSE_LOCATION: ignore
+FINE_LOCATION: ignore
+READ_CONTACTS: ignore
+CAMERA: foreground
+CAMERA: allow; time=+1h7m43s182ms ago; duration=+937ms

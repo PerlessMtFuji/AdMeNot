@@ -1,0 +1,12 @@
+Uid mode: READ_CONTACTS: ignore
+WRITE_CONTACTS: ignore
+WRITE_EXTERNAL_STORAGE: ignore
+LEGACY_STORAGE: ignore
+VIBRATE: allow; time=+1h13m27s838ms ago; duration=+1s530ms
+SYSTEM_ALERT_WINDOW: default; rejectTime=+57m57s449ms ago
+WAKE_LOCK: allow; time=+1h12m58s264ms ago; duration=+86ms
+READ_MEDIA_AUDIO: allow; time=+1h12m58s305ms ago
+READ_MEDIA_VIDEO: allow; time=+1h12m58s188ms ago
+READ_MEDIA_IMAGES: allow; time=+1h12m58s203ms ago
+MANAGE_EXTERNAL_STORAGE: default; rejectTime=+1h12m58s191ms ago
+NO_ISOLATED_STORAGE: deny; rejectTime=+1h12m58s190ms ago

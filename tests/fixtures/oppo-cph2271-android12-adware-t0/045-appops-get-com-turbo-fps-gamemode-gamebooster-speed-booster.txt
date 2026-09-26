@@ -1,0 +1,5 @@
+SYSTEM_ALERT_WINDOW: ignore; rejectTime=+8m36s847ms ago
+TAKE_AUDIO_FOCUS: allow; time=+46m55s613ms ago
+WAKE_LOCK: allow; time=+53m36s876ms ago; duration=+3s406ms
+MANAGE_EXTERNAL_STORAGE: default; rejectTime=+53m22s43ms ago
+NO_ISOLATED_STORAGE: deny; rejectTime=+53m22s26ms ago

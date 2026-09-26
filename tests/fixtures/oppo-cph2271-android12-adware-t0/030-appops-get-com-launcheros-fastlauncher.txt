@@ -1,0 +1,22 @@
+Uid mode: COARSE_LOCATION: foreground
+FINE_LOCATION: foreground
+READ_CONTACTS: ignore
+READ_CALENDAR: ignore
+CAMERA: ignore
+WRITE_EXTERNAL_STORAGE: ignore
+LEGACY_STORAGE: ignore
+ACCESS_MEDIA_LOCATION: ignore
+MANAGE_MEDIA: allow
+FINE_LOCATION: allow; time=+1h0m38s569ms ago
+SYSTEM_ALERT_WINDOW: default; rejectTime=+1h0m32s917ms ago
+TAKE_AUDIO_FOCUS: allow; time=+1h3m54s484ms ago
+WAKE_LOCK: allow; time=+1h4m20s458ms ago; duration=+3s599ms
+MONITOR_LOCATION: allow; time=+1h0m33s106ms ago; duration=+3s56ms
+READ_MEDIA_AUDIO: allow; time=+1h1m31s991ms ago
+WRITE_MEDIA_AUDIO: deny; rejectTime=+1h1m34s445ms ago
+READ_MEDIA_VIDEO: allow; time=+1h1m31s988ms ago
+WRITE_MEDIA_VIDEO: deny; rejectTime=+1h1m34s438ms ago
+READ_MEDIA_IMAGES: allow; time=+1h1m31s986ms ago
+WRITE_MEDIA_IMAGES: deny; rejectTime=+1h1m34s436ms ago
+MANAGE_EXTERNAL_STORAGE: default; rejectTime=+1h1m31s996ms ago
+NO_ISOLATED_STORAGE: deny; rejectTime=+1h1m31s993ms ago

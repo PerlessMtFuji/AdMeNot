@@ -1,0 +1,2 @@
+Uid mode: RECORD_AUDIO: ignore
+VIBRATE: allow; time=+36m2s831ms ago; duration=+53ms

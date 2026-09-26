@@ -1,0 +1,9 @@
+Uid mode: CAMERA: ignore
+READ_EXTERNAL_STORAGE: ignore
+WRITE_EXTERNAL_STORAGE: ignore
+LEGACY_STORAGE: ignore
+SYSTEM_ALERT_WINDOW: ignore
+TAKE_AUDIO_FOCUS: allow; time=+1h11m37s583ms ago
+WAKE_LOCK: allow; time=+1h12m12s457ms ago; duration=+4s626ms
+GET_USAGE_STATS: default; rejectTime=+1h10m50s236ms ago
+START_FOREGROUND: allow; time=+32m44s835ms ago (running)

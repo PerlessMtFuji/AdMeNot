@@ -1,0 +1,11 @@
+Uid mode: COARSE_LOCATION: ignore
+FINE_LOCATION: ignore
+CAMERA: ignore
+RECORD_AUDIO: ignore
+LEGACY_STORAGE: ignore
+ACCESS_MEDIA_LOCATION: ignore
+WAKE_LOCK: allow; time=+33m16s918ms ago; duration=+19s433ms
+READ_MEDIA_VIDEO: allow; time=+33m35s396ms ago
+READ_MEDIA_IMAGES: allow; time=+33m35s12ms ago
+MANAGE_EXTERNAL_STORAGE: default; rejectTime=+33m35s15ms ago
+NO_ISOLATED_STORAGE: deny; rejectTime=+33m35s14ms ago

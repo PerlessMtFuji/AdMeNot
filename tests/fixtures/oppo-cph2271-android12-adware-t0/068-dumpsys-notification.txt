@@ -1,0 +1,226 @@
+Current Notification Manager state:
+  Notification List:
+    NotificationRecord(0x0296b5f3: pkg=com.intelli.clean)
+      uid=10267 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x04ebb9ba: pkg=com.google.android.setupwizard)
+      uid=10176 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x0601519d: pkg=com.lite.cpu.battery.monitor)
+      uid=10230 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x0eaae20c: pkg=com.lite.cpu.battery.monitor)
+      uid=10230 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x069dd7c2: pkg=com.lite.cpu.battery.monitor)
+      uid=10230 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x0de07fc5: pkg=life.channel.accurate.local.weather.forecast)
+      uid=10248 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x07c42a28: pkg=life.channel.accurate.local.weather.forecast)
+      uid=10248 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x0845c0d4: pkg=life.channel.accurate.local.weather.forecast)
+      uid=10248 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x0e8a455a: pkg=com.heytap.accessory)
+      uid=10080 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x05d92979: pkg=smart.cleaner.clean.master.booster.free)
+      uid=10244 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x0db18eb1: pkg=com.techpro.livevideo.wallpaper)
+      uid=10241 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x06c50704: pkg=com.wallpaper3d.parallax.hd)
+      uid=10240 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x0e6d0db3: pkg=com.oplus.ota)
+      uid=10162 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x0c7fdc88: pkg=com.volumecontrol.volumebassbooster.android2023)
+      uid=10254 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x01c6f407: pkg=com.ezt.pdfreader.pdfviewer)
+      uid=10226 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x0494d859: pkg=smart.cleaner.clean.master.booster.free)
+      uid=10244 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x06977acc: pkg=com.intelli.clean)
+      uid=10267 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x0180e0f6: pkg=com.lite.cpu.battery.monitor)
+      uid=10230 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x0a5585d0: pkg=com.google.android.gm)
+      uid=10122 userId=0
+            fullscreenIntent=null
+            fullscreenIntent=null
+    NotificationRecord(0x0e87f3da: pkg=com.google.android.gm)
+      uid=10122 userId=0
+            fullscreenIntent=null
+            fullscreenIntent=null
+    NotificationRecord(0x03412432: pkg=com.google.android.gm)
+      uid=10122 userId=0
+            fullscreenIntent=null
+            fullscreenIntent=null
+    NotificationRecord(0x0435078a: pkg=com.google.android.gm)
+      uid=10122 userId=0
+            fullscreenIntent=null
+            fullscreenIntent=null
+    NotificationRecord(0x01a6fde2: pkg=com.google.android.gm)
+      uid=10122 userId=0
+            fullscreenIntent=null
+            fullscreenIntent=null
+    NotificationRecord(0x04e6673a: pkg=com.google.android.gm)
+      uid=10122 userId=0
+            fullscreenIntent=null
+            fullscreenIntent=null
+    NotificationRecord(0x05cea392: pkg=com.google.android.gm)
+      uid=10122 userId=0
+            fullscreenIntent=null
+            fullscreenIntent=null
+    NotificationRecord(0x004712ea: pkg=com.google.android.gm)
+      uid=10122 userId=0
+            fullscreenIntent=null
+            fullscreenIntent=null
+    NotificationRecord(0x09c31542: pkg=com.google.android.gm)
+      uid=10122 userId=0
+            fullscreenIntent=null
+            fullscreenIntent=null
+    NotificationRecord(0x06c20a9a: pkg=com.google.android.gm)
+      uid=10122 userId=0
+            fullscreenIntent=null
+            fullscreenIntent=null
+    NotificationRecord(0x004f52f2: pkg=com.google.android.gm)
+      uid=10122 userId=0
+            fullscreenIntent=null
+            fullscreenIntent=null
+    NotificationRecord(0x09824e4a: pkg=com.google.android.gm)
+      uid=10122 userId=0
+            fullscreenIntent=null
+            fullscreenIntent=null
+    NotificationRecord(0x04fe5ca2: pkg=com.google.android.gm)
+      uid=10122 userId=0
+            fullscreenIntent=null
+            fullscreenIntent=null
+    NotificationRecord(0x0a72ddfa: pkg=com.google.android.gm)
+      uid=10122 userId=0
+            fullscreenIntent=null
+            fullscreenIntent=null
+    NotificationRecord(0x0c1b3252: pkg=com.google.android.gm)
+      uid=10122 userId=0
+            fullscreenIntent=null
+            fullscreenIntent=null
+    NotificationRecord(0x0c3eb9aa: pkg=com.google.android.gm)
+      uid=10122 userId=0
+            fullscreenIntent=null
+            fullscreenIntent=null
+    NotificationRecord(0x02b0d402: pkg=com.google.android.gm)
+      uid=10122 userId=0
+            fullscreenIntent=null
+            fullscreenIntent=null
+    NotificationRecord(0x08a39481: pkg=com.clean.smart.cleanpro)
+      uid=10253 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x028e6503: pkg=com.pextor.batterychargeralarm)
+      uid=10231 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x0a876175: pkg=android)
+      uid=1000 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x0a6efb98: pkg=com.android.vending)
+      uid=10084 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x0177aa57: pkg=com.android.vending)
+      uid=10084 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x0ce294f3: pkg=com.google.android.permissioncontroller)
+      uid=10205 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x0340ebae: pkg=com.freevpnplanet)
+      uid=10266 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x04f491e5: pkg=com.android.systemui)
+      uid=10157 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x0fe47ac8: pkg=com.android.systemui)
+      uid=10157 userId=0
+            fullscreenIntent=null
+  <section>
+  <section>
+  <section>
+  <section>
+  <section>
+  <section>
+  <section>
+  <section>
+  <section>
+  <section>
+  <section>
+  Snoozed notifications:
+ <section>
+  <section>
+ <section>
+<section>
+<section>
+  <section>
+  <section>
+  <section>
+  <section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+  <section>
+  <section>
+  <section>

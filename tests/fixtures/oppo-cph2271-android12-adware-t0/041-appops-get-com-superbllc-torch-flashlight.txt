@@ -1,0 +1,5 @@
+Uid mode: CAMERA: ignore
+SYSTEM_ALERT_WINDOW: allow; time=+15m30s107ms ago
+WAKE_LOCK: allow; time=+1h5m47s121ms ago; duration=+2s723ms
+GET_USAGE_STATS: default; rejectTime=+1h5m11s874ms ago
+READ_PHONE_STATE: allow; time=+16m43s147ms ago

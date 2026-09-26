@@ -1,0 +1,7 @@
+Uid mode: COARSE_LOCATION: ignore
+FINE_LOCATION: ignore
+READ_EXTERNAL_STORAGE: ignore
+WRITE_EXTERNAL_STORAGE: ignore
+LEGACY_STORAGE: ignore
+SYSTEM_ALERT_WINDOW: default; rejectTime=+48m56s776ms ago
+WAKE_LOCK: allow; time=+1h4m34s580ms ago; duration=+4s163ms

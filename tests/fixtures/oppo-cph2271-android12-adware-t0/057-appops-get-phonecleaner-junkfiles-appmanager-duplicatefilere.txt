@@ -1,0 +1,7 @@
+Uid mode: READ_EXTERNAL_STORAGE: ignore
+WRITE_EXTERNAL_STORAGE: ignore
+LEGACY_STORAGE: ignore
+MANAGE_EXTERNAL_STORAGE: allow
+WAKE_LOCK: allow; time=+1h12m54s496ms ago; duration=+2s491ms
+MANAGE_EXTERNAL_STORAGE: default; time=+1h12m21s557ms ago
+NO_ISOLATED_STORAGE: deny; rejectTime=+1h12m21s560ms ago

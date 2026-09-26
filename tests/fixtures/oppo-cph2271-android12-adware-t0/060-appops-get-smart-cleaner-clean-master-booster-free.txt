@@ -1,0 +1,12 @@
+Uid mode: COARSE_LOCATION: ignore
+FINE_LOCATION: ignore
+READ_PHONE_STATE: ignore
+READ_EXTERNAL_STORAGE: ignore
+LEGACY_STORAGE: ignore
+MANAGE_EXTERNAL_STORAGE: allow
+BLUETOOTH_CONNECT: ignore
+SYSTEM_ALERT_WINDOW: default; rejectTime=+4m15s897ms ago
+WAKE_LOCK: allow; time=+55m13s701ms ago; duration=+3s37ms
+GET_USAGE_STATS: allow; time=+4m19s429ms ago
+MANAGE_EXTERNAL_STORAGE: default; time=+54m0s555ms ago
+NO_ISOLATED_STORAGE: deny; rejectTime=+54m0s553ms ago

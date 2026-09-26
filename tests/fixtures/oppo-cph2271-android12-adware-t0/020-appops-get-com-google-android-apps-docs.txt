@@ -1,0 +1,8 @@
+Uid mode: READ_CONTACTS: ignore
+CAMERA: ignore
+READ_EXTERNAL_STORAGE: ignore
+WRITE_EXTERNAL_STORAGE: ignore
+GET_ACCOUNTS: ignore
+LEGACY_STORAGE: ignore
+SYSTEM_ALERT_WINDOW: default; rejectTime=+1h24m13s153ms ago
+WAKE_LOCK: allow; time=+1h30m33s119ms ago; duration=+1s331ms

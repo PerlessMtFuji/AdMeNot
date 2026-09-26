@@ -1,0 +1,2 @@
+Uid mode: CAMERA: foreground
+CAMERA: allow; time=+1h7m28s267ms ago; duration=+6s81ms

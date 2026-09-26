@@ -1,0 +1,7 @@
+WRITE_MEDIA_AUDIO: deny; rejectTime=+37m34s330ms ago
+WRITE_MEDIA_VIDEO: deny; rejectTime=+37m34s329ms ago
+WRITE_MEDIA_IMAGES: deny; rejectTime=+37m34s329ms ago
+READ_DEVICE_IDENTIFIERS: deny; rejectTime=+37m37s690ms ago
+MANAGE_EXTERNAL_STORAGE: default; rejectTime=+37m34s351ms ago
+NO_ISOLATED_STORAGE: deny; rejectTime=+37m34s344ms ago
+USE_ICC_AUTH_WITH_DEVICE_IDENTIFIER: default; rejectTime=+37m37s692ms ago

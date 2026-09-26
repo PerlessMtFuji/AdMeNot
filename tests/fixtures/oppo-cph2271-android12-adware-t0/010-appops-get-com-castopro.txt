@@ -1,0 +1,3 @@
+Uid mode: COARSE_LOCATION: ignore
+FINE_LOCATION: ignore
+WAKE_LOCK: allow; time=+35m56s988ms ago; duration=+2s284ms
