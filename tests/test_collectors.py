@@ -1,4 +1,7 @@
+import threading
+import time
 from datetime import datetime
+from unittest import mock
 
 from demalware.engine.adb.fake import FakeAdb
 from demalware.engine.adb.transport import AdbError
@@ -109,6 +112,56 @@ def test_broken_collector_does_not_stop_others():
     assert not status["exploding"].ok
     assert "IndexError" in status["exploding"].error
     assert status["notifications"].ok
+
+
+def test_appops_collector_handles_parser_errors():
+    """Malformed appops output for one package doesn't fail the collector."""
+    original_parse_appops = __import__('demalware.engine.parsers.appops', fromlist=['parse_appops']).parse_appops
+
+    def patched_parse(text):
+        if "BROKEN" in text:
+            raise ValueError("malformed appops output")
+        return original_parse_appops(text)
+
+    with mock.patch('demalware.engine.collectors.behavior.parse_appops', side_effect=patched_parse):
+        adb = FakeAdb({
+            APPOPS_GET.format(package="com.a"): "SYSTEM_ALERT_WINDOW: allow; time=+10s ago\n",
+            APPOPS_GET.format(package="com.b"): "BROKEN\n",
+        })
+        facts = _facts()
+        status = run_collectors(adb, facts, [AppOpsCollector()])
+        assert status["appops"].ok
+        assert facts["com.a"].overlay_last_access_s == 10
+        assert facts["com.b"].appops == {}
+
+
+def test_run_collectors_respects_deadline():
+    """Timeout is an overall deadline; timed-out collectors don't apply."""
+    event = threading.Event()
+
+    class BlockingCollector:
+        name = "blocking"
+
+        def collect(self, adb, apps):
+            event.wait(timeout=5.0)  # Wait up to 5 seconds
+            return "data"
+
+        def apply(self, facts, data):
+            raise AssertionError("apply must not run if collect timed out")
+
+    adb = FakeAdb({NOTIFICATIONS: "  Notification List:\n"})
+    start = time.monotonic()
+    status = run_collectors(
+        adb, _facts(), [BlockingCollector(), NotificationsCollector()], timeout=0.3
+    )
+    elapsed = time.monotonic() - start
+
+    assert elapsed < 2.0, f"function took {elapsed}s, should return quickly"
+    assert not status["blocking"].ok
+    assert status["blocking"].error == "timeout"
+    assert status["notifications"].ok
+
+    event.set()  # Let the blocking thread exit
 
 
 def test_default_collectors_names():
