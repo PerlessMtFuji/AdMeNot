@@ -6,4 +6,6 @@ __pycache__/
 node_modules/
 dist/
 build/
-assets/phones/*.webp
+src/demalware/assets/phones/
+src/demalware/assets/phones.db
+src/demalware/assets/phones.db.tmp
