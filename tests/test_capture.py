@@ -49,12 +49,30 @@ def test_anonymize_notification_whitelist():
     assert "  Snoozed notifications:" in output
 
 
+def test_anonymize_notification_header_rule_fails_closed():
+    """Header rule: indent <= 2 and matches ^[A-Za-z][A-Za-z ]*:$ to prevent leakage."""
+    output = anonymize(
+        "dumpsys notification",
+        "  Notification List:\n"
+        "    NotificationRecord(0x1: pkg=com.a user=0):\n"
+        "      Anna:\n"
+        "  Snoozed notifications:\n"
+        "        Hey Anna, see you at 5:\n",
+        None,
+    )
+    # Leakage lines should be dropped
+    assert "Anna" not in output
+    # Valid headers should be kept
+    assert "  Notification List:" in output
+    assert "  Snoozed notifications:" in output
+
+
 def test_anonymize_notification_preserves_parsing():
     """Anonymized notification output parses to same result as original."""
     anon = anonymize("dumpsys notification", NOTIFICATIONS_OUT, None)
     original = parse_notifications(NOTIFICATIONS_OUT)
     anonymized = parse_notifications(anon)
-    assert original.keys() == anonymized.keys()
+    assert original == anonymized
 
 
 def test_anonymize_emails_everywhere():
