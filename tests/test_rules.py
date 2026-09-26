@@ -104,6 +104,14 @@ def test_rule_name_mimic_ignores_system_apps():
     assert rule_name_mimic(AppFacts("com.android.systemupdate", is_system=True)) is None
 
 
+def test_rule_name_mimic_ignores_play_store_apps():
+    assert rule_name_mimic(AppFacts("com.avast.android.mobilesecurity", installer="com.android.vending")) is None
+
+
+def test_rule_name_mimic_hits_sideloaded_system_like():
+    assert rule_name_mimic(AppFacts("com.android.systemupdate", installer="com.android.chrome")) is not None
+
+
 @pytest.mark.parametrize(("package", "hit"), [
     ("com.xkcdqwrtz.plmnbv", True),
     ("com.a8f3k2j9x1.app", True),
@@ -112,3 +120,7 @@ def test_rule_name_mimic_ignores_system_apps():
 ])
 def test_rule_random_name(package, hit):
     assert (rule_random_name(AppFacts(package)) is not None) == hit
+
+
+def test_rule_random_name_ignores_play_store_apps():
+    assert rule_random_name(AppFacts("com.nordvpn.android", installer="com.android.vending")) is None
