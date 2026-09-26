@@ -73,6 +73,46 @@ def test_anonymize_notification_header_rule_fails_closed():
     assert "  Notification List:" in output
 
 
+def test_anonymize_notification_record_drops_injected_name():
+    """Injected text mimicking NotificationRecord with a non-hex id must be dropped entirely."""
+    output = anonymize(
+        "dumpsys notification",
+        "  Notification List:\n"
+        "    NotificationRecord(0x1: pkg=com.a):\n"
+        "      NotificationRecord(Anna Kowalski: pkg=com.a)\n",
+        None,
+    )
+    assert "Kowalski" not in output
+    assert "Anna" not in output
+    assert "NotificationRecord(0x1: pkg=com.a)" in output
+
+
+def test_anonymize_notification_record_known_packages():
+    """With known_packages, only ids matching 0x... and pkg in the whitelist survive."""
+    output = anonymize(
+        "dumpsys notification",
+        "  Notification List:\n"
+        "    NotificationRecord(0x2: pkg=Kowalski.evil user=0):\n"
+        "    NotificationRecord(0x1: pkg=com.legit.app user=0):\n",
+        None,
+        known_packages=frozenset({"com.legit.app"}),
+    )
+    assert "Kowalski" not in output
+    assert "NotificationRecord(0x1: pkg=com.legit.app)" in output
+    assert "NotificationRecord(0x2:" not in output
+
+
+def test_anonymize_notification_record_no_known_packages_requires_dotted_pkg():
+    """Without known_packages, pkg must fully match the dotted-name pattern."""
+    output = anonymize(
+        "dumpsys notification",
+        "  Notification List:\n    NotificationRecord(0x3: pkg=Kowalski user=0):\n",
+        None,
+    )
+    assert "Kowalski" not in output
+    assert "NotificationRecord(0x3:" not in output
+
+
 def test_anonymize_notification_enqueued_section():
     """Unknown section headers at indent ≤ 2 become <section> boundary marker."""
     output = anonymize(
