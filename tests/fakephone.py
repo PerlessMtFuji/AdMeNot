@@ -321,7 +321,7 @@ def make_cli_phone() -> FakePhone:
         FakeApp("com.sec.android.app.launcher", system=True, version_code=150000,
                 home_activity=launcher, keeps_apk=True),
     ]
-    return FakePhone(
+    phone = FakePhone(
         apps,
         sdk=34,
         serial=SERIAL,
@@ -330,3 +330,7 @@ def make_cli_phone() -> FakePhone:
         static=make_synthetic_adb().responses,
         host={"devices -l": SYNTHETIC_DEVICES},
     )
+    # com.clean.pro.boost jest aktywnym administratorem: wyłączenie też jest blokowane, nie tylko usunięcie.
+    phone.fail[C.PM_DISABLE.format(package="com.clean.pro.boost")] = AdbError(
+        "command_failed", "java.lang.SecurityException: Cannot disable a device admin")
+    return phone
