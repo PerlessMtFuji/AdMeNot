@@ -98,6 +98,34 @@ def test_missing_images_dir_does_not_touch_assets(tmp_path):
     assert len(list((assets / "phones").glob("*.webp"))) == 9
 
 
+def test_empty_images_dir_does_not_touch_assets(tmp_path):
+    assets = make_phone_assets(tmp_path)
+    before = (assets / "phones.db").read_bytes()
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    with pytest.raises(FileNotFoundError):
+        build_phone_db(RECORDS, empty, None, assets)
+    assert len(list((assets / "phones").glob("*.webp"))) == 9
+    assert (assets / "phones.db").read_bytes() == before
+    assert not (assets / "phones.db.tmp").exists()
+
+
+def test_interrupted_sync_keeps_previous_db(tmp_path, monkeypatch):
+    assets = make_phone_assets(tmp_path)
+    before = (assets / "phones.db").read_bytes()
+
+    def broken(*args, **kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(build, "_sync_images", broken)
+    source = tmp_path / "szklodo"
+    with pytest.raises(KeyboardInterrupt):
+        build_phone_db(RECORDS, source / "public" / "assets" / "phones",
+                       source / "supported_devices.csv", assets)
+    assert (assets / "phones.db").read_bytes() == before
+    assert not (assets / "phones.db.tmp").exists()
+
+
 def test_assets_dir_env_override(monkeypatch, tmp_path):
     monkeypatch.setenv("DEMALWARE_ASSETS", str(tmp_path))
     assert paths.assets_dir() == tmp_path
