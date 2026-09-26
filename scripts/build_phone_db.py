@@ -23,6 +23,11 @@ DEFAULT_GPLAY = ROOT / "data" / "supported_devices.csv"
 
 
 def main(argv: list[str]) -> int:
+    for stream in (sys.stdout, sys.stderr):  # konsola Windows (cp1250) nie zna np. „→”
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError, OSError):
+            pass
     parser = argparse.ArgumentParser(prog="build_phone_db")
     parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
     parser.add_argument("--gplay", type=Path, default=DEFAULT_GPLAY)
@@ -34,7 +39,11 @@ def main(argv: list[str]) -> int:
         if not path.exists():
             print(f"Brak {path}", file=sys.stderr)
             return 1
-    records = json.loads(data.read_text("utf-8"))
+    try:
+        records = json.loads(data.read_text("utf-8"))
+    except ValueError as exc:
+        print(f"Błąd w {data}: {exc}", file=sys.stderr)
+        return 1
     try:
         s = build_phone_db(records, images, args.gplay, args.out)
     except FileNotFoundError as exc:

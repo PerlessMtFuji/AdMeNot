@@ -1,4 +1,6 @@
 import importlib.util
+import io
+import sys
 from pathlib import Path
 
 from phonedb import write_sources
@@ -43,3 +45,26 @@ def test_script_reports_empty_images_dir(tmp_path, capsys):
     assert _script().main(argv) == 1
     assert "Brak" in capsys.readouterr().err
     assert not out.exists()
+
+
+def test_script_reports_malformed_json(tmp_path, capsys):
+    _, gplay = write_sources(tmp_path / "szklodo")
+    data = tmp_path / "szklodo" / "data" / "phones_full_data.json"
+    data.write_text("[{", encoding="utf-8")
+    out = tmp_path / "assets"
+    argv = ["--source", str(tmp_path / "szklodo"), "--gplay", str(gplay), "--out", str(out)]
+    assert _script().main(argv) == 1
+    assert "Błąd" in capsys.readouterr().err
+    assert not out.exists()
+
+
+def test_script_output_survives_cp1250_console(tmp_path, monkeypatch):
+    _, gplay = write_sources(tmp_path / "szklodo")
+    out = tmp_path / "assets"
+    argv = ["--source", str(tmp_path / "szklodo"), "--gplay", str(gplay), "--out", str(out)]
+    fake_stdout = io.TextIOWrapper(io.BytesIO(), encoding="cp1250")
+    monkeypatch.setattr(sys, "stdout", fake_stdout)
+    assert _script().main(argv) == 0
+    fake_stdout.flush()
+    printed = fake_stdout.buffer.getvalue().decode("utf-8")
+    assert "Zdjęcia: skopiowane 9" in printed
