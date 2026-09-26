@@ -4,8 +4,8 @@ from demalware.engine.adb.transport import AdbError
 from demalware.engine.apk.analyze import ApkReport, report_to_json
 from demalware.engine.apk.providers import StoredApkProvider
 from demalware.engine.collectors.behavior import USAGESTATS
-from demalware.engine.device.info import UPTIME
-from demalware.engine.session import report_to_dict, run_scan
+from demalware.engine.device.info import UPTIME, read_device_info
+from demalware.engine.session import SCAN_STAGES, analyze_apks, report_to_dict, run_scan
 
 
 def _by_pkg(report):
@@ -109,3 +109,57 @@ def test_stored_provider_roundtrip_and_json(synthetic_adb, tmp_path):
 def test_synthetic_adware_wakes_phone(synthetic_adb):
     adware = _by_pkg(run_scan(synthetic_adb))["com.clean.pro.boost"]
     assert "DM-ALARM-01" in {f.rule_id for f in adware.findings}
+
+
+class _OneReport:
+    def __init__(self, reports):
+        self.reports = reports
+
+    def reports_for(self, apps, progress=None):
+        for i, facts in enumerate(apps, start=1):
+            if progress:
+                progress(i, len(apps), facts.package)
+        return {p: r for p, r in self.reports.items() if p in {a.package for a in apps}}
+
+
+def test_run_scan_reports_stages_and_reuses_device(synthetic_adb):
+    stages = []
+    run_scan(synthetic_adb, on_stage=stages.append)
+    assert stages == list(SCAN_STAGES)
+    device = read_device_info(synthetic_adb)
+    synthetic_adb.calls.clear()
+    stages.clear()
+    report = run_scan(synthetic_adb, device=device, on_stage=stages.append)
+    assert stages == ["packages", "collectors", "score"]
+    assert "getprop" not in synthetic_adb.calls and report.device == device
+
+
+def test_analyze_apks_rescores_without_touching_the_first_report(synthetic_adb):
+    report = run_scan(synthetic_adb)
+    before = {r.facts.package: r.score for r in report.results}
+    provider = _OneReport({"com.wlive.forecast": ApkReport(
+        "com.wlive.forecast", 31, class_count=100, ad_sdks=["s1", "s2", "s3", "s4", "s5"])})
+    progress = []
+    after = analyze_apks(report, provider, lambda d, t, p: progress.append(p))
+    assert after.apk is not None and after.apk.analyzed == 1
+    assert "com.wlive.forecast" in progress
+    scores = {r.facts.package: r.score for r in after.results}
+    assert scores["com.wlive.forecast"] > before["com.wlive.forecast"]
+    assert report.apk is None
+
+
+def test_exception_from_progress_stops_the_analysis(synthetic_adb):
+    report = run_scan(synthetic_adb)
+
+    class Stop(Exception):
+        pass
+
+    def progress(done, total, package):
+        raise Stop
+
+    try:
+        analyze_apks(report, _OneReport({}), progress)
+    except Stop:
+        pass
+    else:
+        raise AssertionError("Stop not raised")
