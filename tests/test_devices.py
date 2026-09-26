@@ -64,3 +64,8 @@ def test_read_device_info_uses_vendor_marketname_fallback():
 
 def test_read_device_info_without_marketname():
     assert read_device_info(_device()).market_name is None
+
+
+def test_read_device_info_uses_huawei_marketing_name():
+    info = read_device_info(_device("[ro.config.marketing_name]: [HUAWEI P30 lite]\n"))
+    assert info.market_name == "HUAWEI P30 lite"
