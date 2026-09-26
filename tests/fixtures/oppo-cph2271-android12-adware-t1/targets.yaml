@@ -1,0 +1,6 @@
+# Progi regresji dla korpusu T1 (strojenie Planu 4). Podnosić po poprawie, nigdy nie obniżać bez uzasadnienia.
+# strojenie T1 (2026-09-26): wagi bez zmian. 2 FP (ai.character.app, com.linecorp.b612.android:
+# 12 sieci reklamowych, „Do sprawdzenia”, 26 pkt) mają ten sam zestaw sygnałów co 11 adware —
+# FP = 0 obniżyłoby czułość do 27%. Decyzja człowieka: dopuszczamy 2 FP do czasu sygnału, który je rozdzieli.
+min_recall: 0.60
+max_false_positives: 2
