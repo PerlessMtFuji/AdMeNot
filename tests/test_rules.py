@@ -124,3 +124,35 @@ def test_rule_random_name(package, hit):
 
 def test_rule_random_name_ignores_play_store_apps():
     assert rule_random_name(AppFacts("com.nordvpn.android", installer="com.android.vending")) is None
+
+
+def _ids(facts):
+    return {f.rule_id for f in load_default_ruleset().evaluate(facts)}
+
+
+def test_ad_sdk_rules_thresholds():
+    few = AppFacts("com.x", installer="com.android.vending", ad_sdks={"admob", "meta"})
+    many = AppFacts("com.x", installer="com.android.vending",
+                    ad_sdks={"admob", "meta", "applovin", "mintegral", "pangle"})
+    four = AppFacts("com.x", installer="com.android.vending",
+                    ad_sdks={"admob", "meta", "applovin", "mintegral"})
+    assert "DM-ADSDK-01" in _ids(few) and "DM-ADSDK-02" not in _ids(few)
+    assert "DM-ADSDK-01" in _ids(four) and "DM-ADSDK-02" not in _ids(four)
+    assert "DM-ADSDK-02" in _ids(many) and "DM-ADSDK-01" not in _ids(many)
+
+
+def test_apk_rules_do_not_fire_without_analysis():
+    ids = _ids(AppFacts("com.x", installer="com.android.vending"))
+    assert not ids & {"DM-ADSDK-01", "DM-ADSDK-02", "DM-DYNDEX-01", "DM-LABEL-01"}
+
+
+def test_apk_rules_skip_system_apps():
+    f = AppFacts("com.x", is_system=True, ad_sdks={"a", "b", "c", "d", "e"},
+                 dynamic_code=True, label_padded=True, label="X")
+    assert not _ids(f) & {"DM-ADSDK-02", "DM-DYNDEX-01", "DM-LABEL-01"}
+
+
+def test_label_rule_evidence():
+    f = AppFacts("com.x", installer="com.android.vending", label="IntelliClean", label_padded=True)
+    finding = next(x for x in load_default_ruleset().evaluate(f) if x.rule_id == "DM-LABEL-01")
+    assert "IntelliClean" in finding.text("pl")

@@ -7,12 +7,14 @@ from dexutil import make_apk, make_dex
 from demalware.engine.apk.analyze import (
     ApkReport,
     analyze_apk,
+    apply_apk_report,
     clean_label,
     report_from_json,
     report_to_json,
 )
 from demalware.engine.apk.manifest import ManifestInfo
 from demalware.engine.apk.sdks import load_default_ad_sdks, parse_ad_sdks
+from demalware.engine.facts import AppFacts
 
 AD_CLASSES = [
     "com.applovin.sdk.AppLovinSdk", "com.mbridge.msdk.out.MBridgeSDKFactory",
@@ -110,3 +112,20 @@ def test_report_json_roundtrip():
 def test_report_from_json_rejects_unknown_version():
     with pytest.raises(ValueError):
         report_from_json({"version": 99, "package": "com.x"})
+
+
+def test_apply_apk_report_sets_facts():
+    f = AppFacts("com.clean.x")
+    apply_apk_report(f, ApkReport("com.clean.x", 42, "f" * 64, "Cleaner", True, ["aa"],
+                                  ["admob", "applovin"], True, 100, 0.3, None))
+    assert (f.label, f.label_padded, f.ad_sdks, f.dynamic_code) == (
+        "Cleaner", True, {"admob", "applovin"}, True)
+    assert (f.ad_sdk_count, f.ad_sdk_list, f.cert_sha256, f.apk_error) == (
+        2, "admob, applovin", ("aa",), None)
+
+
+def test_apply_failed_report_keeps_facts_unknown():
+    f = AppFacts("com.clean.x")
+    apply_apk_report(f, ApkReport("com.clean.x", error="pull: remote object does not exist"))
+    assert f.apk_error.startswith("pull")
+    assert (f.ad_sdks, f.ad_sdk_count, f.dynamic_code, f.label_padded) == (None, None, None, None)

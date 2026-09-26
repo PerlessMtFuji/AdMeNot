@@ -75,3 +75,13 @@ def test_trusted_app_never_malicious():
                 F("DM-FSI-01", "behavior", 15)]
     result = score_app(AppFacts("com.x"), findings, trusted=True, low_behavior_data=False)
     assert result.score == 60 and result.verdict == "suspicious"
+
+
+def test_combo_03_many_ad_networks_plus_behavior():
+    facts = AppFacts("com.x", installer="com.android.vending")
+    alone = score_app(facts, [F("DM-ADSDK-02", "apk", 20)], trusted=False,
+                      low_behavior_data=False)
+    assert alone.score == 20 and "DM-COMBO-03" not in {f.rule_id for f in alone.findings}
+    both = score_app(facts, [F("DM-ADSDK-02", "apk", 20), F("DM-NOTIF-01", "behavior", 15)],
+                     trusted=False, low_behavior_data=False)
+    assert both.score == 50 and "DM-COMBO-03" in {f.rule_id for f in both.findings}
