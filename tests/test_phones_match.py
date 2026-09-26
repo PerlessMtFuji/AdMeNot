@@ -47,6 +47,12 @@ def test_gplay_marketing_name(provider):
     assert _summary(m) == ("exact", "gplay", "xiaomi-redmi-note-13")
 
 
+def test_vendor_market_name_is_matched_exactly(provider):
+    m = provider.match(make_device("CPH2247X", brand="OPPO", manufacturer="OPPO",
+                                   market_name="OPPO Reno6 Pro 5G (Snapdragon)"))
+    assert _summary(m) == ("exact", "market_name", "oppo-reno6-pro-5g-snapdragon")
+
+
 def test_gplay_name_matches_slug_variant(provider):
     m = provider.match(make_device("SM-A576E", device="A57X"))  # wielkość liter bez znaczenia
     assert _summary(m) == ("exact", "gplay", "samsung-galaxy-a57-5g")

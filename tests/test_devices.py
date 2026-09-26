@@ -69,3 +69,13 @@ def test_read_device_info_without_marketname():
 def test_read_device_info_uses_huawei_marketing_name():
     info = read_device_info(_device("[ro.config.marketing_name]: [HUAWEI P30 lite]\n"))
     assert info.market_name == "HUAWEI P30 lite"
+
+
+def test_read_device_info_uses_oppo_market_name():
+    info = read_device_info(_device("[ro.oppo.market.name]: [OPPO A16s]\n"))
+    assert info.market_name == "OPPO A16s"
+
+
+def test_read_device_info_uses_oplus_market_name():
+    info = read_device_info(_device("[ro.vendor.oplus.market.name]: [OnePlus Nord CE 3 Lite 5G]\n"))
+    assert info.market_name == "OnePlus Nord CE 3 Lite 5G"
