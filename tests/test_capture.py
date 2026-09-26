@@ -1,25 +1,77 @@
-from conftest import SERIAL, make_synthetic_adb
+from conftest import NOTIFICATIONS_OUT, SERIAL, make_synthetic_adb
 
 from demalware.cli.main import main
 from demalware.engine.adb.fake import FakeAdb
 from demalware.engine.capture import anonymize
 from demalware.engine.device.info import GETPROP
+from demalware.engine.parsers.notifications import parse_notifications
 from demalware.engine.session import run_scan
 
 
-def test_anonymize_getprop_and_notifications():
-    props = anonymize(GETPROP, "[ro.serialno]: [R58T00TEST]\n[persist.sys.device_name]: [Telefon Anny]\n"
-                               "[ro.product.model]: [SM-A145R]\n", "R58T00TEST")
-    assert "R58T00TEST" not in props and "Telefon Anny" not in props
-    assert "[ro.product.model]: [SM-A145R]" in props
+def test_anonymize_getprop_whitelist():
+    """getprop: keep only ro.* properties that don't match _SENSITIVE_PROP."""
+    output = anonymize(
+        GETPROP,
+        "[ro.serialno]: [R58T00TEST]\n"
+        "[persist.sys.device_name]: [Telefon Anny]\n"
+        "[ro.product.model]: [SM-A145R]\n"
+        "[ro.build.version.release]: [14]\n",
+        "R58T00TEST",
+    )
+    # ro.serialno is ro.* but matches serial → redacted
+    assert "[ro.serialno]: [<redacted>]" in output
+    # persist.sys.device_name doesn't start with ro. → redacted
+    assert "[persist.sys.device_name]: [<redacted>]" in output
+    # ro.product.model is ro.* and doesn't match sensitive → kept
+    assert "[ro.product.model]: [SM-A145R]" in output
+    # ro.build.version.release is ro.* and doesn't match sensitive → kept
+    assert "[ro.build.version.release]: [14]" in output
 
-    notif = anonymize("dumpsys notification",
-                      "      tickerText=Anna: hej\n      android.title=Anna\n      uid=1\n", None)
-    assert "Anna" not in notif and "uid=1" in notif
+
+def test_anonymize_notification_whitelist():
+    """dumpsys notification: whitelist keeps headers, record, fullscreen, uid lines; drops rest."""
+    output = anonymize(
+        "dumpsys notification",
+        "  Notification List:\n"
+        "    NotificationRecord(0x1: pkg=com.a user=0 text=secret):\n"
+        "      fullscreenIntent=PendingIntent{123}\n"
+        "      uid=10001\n"
+        "      tickerText=hidden\n"
+        "  Snoozed notifications:\n",
+        None,
+    )
+    assert "  Notification List:" in output
+    assert "NotificationRecord(0x1: pkg=com.a)" in output
+    assert "text=secret" not in output
+    assert "fullscreenIntent=PendingIntent{<redacted>}" in output
+    assert "uid=10001" in output
+    assert "tickerText" not in output
+    assert "  Snoozed notifications:" in output
+
+
+def test_anonymize_notification_preserves_parsing():
+    """Anonymized notification output parses to same result as original."""
+    anon = anonymize("dumpsys notification", NOTIFICATIONS_OUT, None)
+    original = parse_notifications(NOTIFICATIONS_OUT)
+    anonymized = parse_notifications(anon)
+    assert original.keys() == anonymized.keys()
 
 
 def test_anonymize_emails_everywhere():
     assert anonymize("dumpsys usagestats", "user anna.k@example.com x", None) == "user <email> x"
+
+
+def test_anonymize_serial_as_token():
+    """Serial replacement only for whole tokens, and only if len >= 6."""
+    # 6+ chars, replaced as token
+    output = anonymize("getprop", "sn R58T00TEST x", "R58T00TEST")
+    assert output == "sn SERIAL x"
+    # 6+ chars, not replaced when adjacent to alphanumeric
+    output = anonymize("getprop", "sn R58T00TESTX x", "R58T00TEST")
+    assert "R58T00TEST" in output
+    # < 6 chars, never replaced
+    output = anonymize("getprop", "sn AB12 x", "AB12")
+    assert output == "sn AB12 x"
 
 
 def test_capture_roundtrip(tmp_path, capsys):
