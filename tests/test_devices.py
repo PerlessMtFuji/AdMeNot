@@ -3,7 +3,11 @@ from datetime import datetime
 from demalware.engine.adb.devices import DeviceEntry, list_devices, parse_devices
 from demalware.engine.adb.fake import FakeAdb
 from demalware.engine.device.info import (
-    GETPROP, LOCAL_NOW, UPTIME, parse_getprop, read_device_info,
+    GETPROP,
+    LOCAL_NOW,
+    UPTIME,
+    parse_getprop,
+    read_device_info,
 )
 
 DEVICES = """* daemon not running; starting now at tcp:5037

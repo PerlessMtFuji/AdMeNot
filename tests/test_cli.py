@@ -1,6 +1,7 @@
 import json
 
 from conftest import SERIAL, make_synthetic_adb
+
 from demalware.cli.main import main
 from demalware.engine.adb.fake import FakeAdb
 from demalware.engine.adb.transport import AdbError

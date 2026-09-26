@@ -25,3 +25,7 @@ addopts = "-q"
 [tool.ruff]
 line-length = 100
 target-version = "py313"
+
+[tool.ruff.lint]
+# Czasy są lokalnym zegarem telefonu (`date`) i porównywane tylko ze sobą — celowo bez strefy.
+ignore = ["DTZ"]

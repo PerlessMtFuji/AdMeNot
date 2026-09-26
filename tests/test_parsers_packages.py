@@ -3,7 +3,10 @@ from datetime import datetime
 import pytest
 
 from demalware.engine.parsers.common import (
-    component_packages, parse_duration, parse_package_list, split_components,
+    component_packages,
+    parse_duration,
+    parse_package_list,
+    split_components,
 )
 from demalware.engine.parsers.packages import parse_dumpsys_packages, parse_pm_list
 

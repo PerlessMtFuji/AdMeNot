@@ -1,5 +1,7 @@
 from demalware.engine.parsers.system import (
-    parse_device_admins, parse_resolved_home, parse_role_holders,
+    parse_device_admins,
+    parse_resolved_home,
+    parse_role_holders,
 )
 
 POLICY_SECTION = """Current Device Policy Manager state:

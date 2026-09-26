@@ -7,16 +7,29 @@ from demalware.engine.adb.fake import FakeAdb
 from demalware.engine.adb.transport import AdbError
 from demalware.engine.collectors.base import run_collectors
 from demalware.engine.collectors.behavior import (
-    APPOPS_GET, NOTIFICATIONS, USAGESTATS, AppOpsCollector, NotificationsCollector,
+    APPOPS_GET,
+    NOTIFICATIONS,
+    USAGESTATS,
+    AppOpsCollector,
+    NotificationsCollector,
     UsageStatsCollector,
 )
 from demalware.engine.collectors.components import (
-    BOOT_QUERY, HOME_QUERY, LAUNCHER_QUERY, ComponentsCollector,
+    BOOT_QUERY,
+    HOME_QUERY,
+    LAUNCHER_QUERY,
+    ComponentsCollector,
 )
 from demalware.engine.collectors.registry import default_collectors
 from demalware.engine.collectors.system import (
-    A11Y_SERVICES, DEVICE_POLICY, NOTIF_LISTENERS, RESOLVE_HOME, ROLE_HOME,
-    DevicePolicyCollector, HomeRoleCollector, SecureSettingsCollector,
+    A11Y_SERVICES,
+    DEVICE_POLICY,
+    NOTIF_LISTENERS,
+    RESOLVE_HOME,
+    ROLE_HOME,
+    DevicePolicyCollector,
+    HomeRoleCollector,
+    SecureSettingsCollector,
 )
 from demalware.engine.facts import AppFacts
 

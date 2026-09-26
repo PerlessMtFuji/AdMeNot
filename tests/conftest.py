@@ -9,10 +9,16 @@ from demalware.engine.adb.fake import FakeAdb
 from demalware.engine.collectors.behavior import APPOPS_GET, NOTIFICATIONS, USAGESTATS
 from demalware.engine.collectors.components import BOOT_QUERY, HOME_QUERY, LAUNCHER_QUERY
 from demalware.engine.collectors.packages import (
-    DUMPSYS_PACKAGES, PM_DISABLED, PM_LIST, PM_SYSTEM,
+    DUMPSYS_PACKAGES,
+    PM_DISABLED,
+    PM_LIST,
+    PM_SYSTEM,
 )
 from demalware.engine.collectors.system import (
-    A11Y_SERVICES, DEVICE_POLICY, NOTIF_LISTENERS, ROLE_HOME,
+    A11Y_SERVICES,
+    DEVICE_POLICY,
+    NOTIF_LISTENERS,
+    ROLE_HOME,
 )
 from demalware.engine.device.info import GETPROP, LOCAL_NOW, UPTIME
 

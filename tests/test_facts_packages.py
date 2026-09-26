@@ -5,7 +5,11 @@ import pytest
 from demalware.engine.adb.fake import FakeAdb
 from demalware.engine.adb.transport import AdbError
 from demalware.engine.collectors.packages import (
-    DUMPSYS_PACKAGES, PM_DISABLED, PM_LIST, PM_SYSTEM, collect_packages,
+    DUMPSYS_PACKAGES,
+    PM_DISABLED,
+    PM_LIST,
+    PM_SYSTEM,
+    collect_packages,
 )
 from demalware.engine.facts import FACT_NAMES, AppFacts
 from demalware.engine.parsers.appops import AppOpState
