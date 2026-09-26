@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from demalware.engine.adb.fake import FakeAdb
-from demalware.engine.collectors.behavior import APPOPS_GET, NOTIFICATIONS, USAGESTATS
+from demalware.engine.collectors.behavior import ALARM, APPOPS_GET, NOTIFICATIONS, USAGESTATS
 from demalware.engine.collectors.components import BOOT_QUERY, HOME_QUERY, LAUNCHER_QUERY
 from demalware.engine.collectors.packages import (
     DUMPSYS_PACKAGES,
@@ -161,6 +161,12 @@ def make_synthetic_adb(devices_output: str = SYNTHETIC_DEVICES) -> FakeAdb:
         APPOPS_GET.format(package="com.wlive.forecast"): "POST_NOTIFICATION: allow; time=+2m ago\n",
         NOTIFICATIONS: NOTIFICATIONS_OUT,
         USAGESTATS: _usagestats(),
+        ALARM: ("Current Alarm Manager state:\n  Alarm Stats:\n"
+                "  u0a301:com.clean.pro.boost +1m2s running, 600 wakeups:\n"
+                "    +1m2s 600 wakes 600 alarms, last -2m1s12ms:\n"
+                "      *walarm*:com.clean.pro.boost/.AdReceiver\n"
+                "  u0a250:com.whatsapp +3s running, 20 wakeups:\n"
+                "    +3s 20 wakes 25 alarms, last -1h2m:\n"),
         DEVICE_POLICY: ("Current Device Policy Manager state:\n  User 0:\n"
                         "    Enabled Device Admins (User 0, provisioningState: 0):\n"
                         "      com.clean.pro.boost/.AdminReceiver:\n"

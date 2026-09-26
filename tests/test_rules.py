@@ -156,3 +156,11 @@ def test_label_rule_evidence():
     f = AppFacts("com.x", installer="com.android.vending", label="IntelliClean", label_padded=True)
     finding = next(x for x in load_default_ruleset().evaluate(f) if x.rule_id == "DM-LABEL-01")
     assert "IntelliClean" in finding.text("pl")
+
+
+def test_alarm_rule_uses_rate_per_hour():
+    noisy = AppFacts("com.x", alarm_wakeups=600, alarm_window_h=77.8)
+    quiet = AppFacts("com.x", alarm_wakeups=20, alarm_window_h=77.8)
+    assert noisy.alarm_wakeups_per_hour > 6 and "DM-ALARM-01" in _ids(noisy)
+    assert "DM-ALARM-01" not in _ids(quiet)
+    assert AppFacts("com.x").alarm_wakeups_per_hour is None

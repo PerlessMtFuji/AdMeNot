@@ -7,9 +7,11 @@ from demalware.engine.adb.fake import FakeAdb
 from demalware.engine.adb.transport import AdbError
 from demalware.engine.collectors.base import run_collectors
 from demalware.engine.collectors.behavior import (
+    ALARM,
     APPOPS_GET,
     NOTIFICATIONS,
     USAGESTATS,
+    AlarmCollector,
     AppOpsCollector,
     NotificationsCollector,
     UsageStatsCollector,
@@ -178,6 +180,23 @@ def test_run_collectors_respects_deadline():
 
 
 def test_default_collectors_names():
-    names = [c.name for c in default_collectors(NOW)]
-    assert names == ["components", "appops", "notifications", "usagestats",
+    names = [c.name for c in default_collectors(NOW, uptime_s=3600)]
+    assert names == ["components", "appops", "notifications", "usagestats", "alarm",
                      "device_policy", "home_role", "secure_settings"]
+
+
+def test_alarm_collector_window_uses_uptime_and_install_age():
+    adb = FakeAdb({ALARM: "  Alarm Stats:\n  u0a1:com.a +1s running, 30 wakeups:\n"
+                          "  u0a2:com.b +1s running, 30 wakeups:\n"})
+    facts = _facts()
+    facts["com.b"].installed_days = 0.01  # 14 min temu → okno ograniczone do 1 h
+    status = run_collectors(adb, facts, [AlarmCollector(uptime_s=10 * 3600)])
+    assert status["alarm"].ok
+    assert facts["com.a"].alarm_wakeups_per_hour == 3.0
+    assert facts["com.b"].alarm_wakeups_per_hour == 30.0
+    assert facts["com.sys"].alarm_wakeups == 0
+
+
+def test_alarm_collector_unknown_format_is_not_ok():
+    status = run_collectors(FakeAdb({ALARM: "garbage\n"}), _facts(), [AlarmCollector(3600)])
+    assert not status["alarm"].ok

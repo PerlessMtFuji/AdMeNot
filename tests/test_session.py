@@ -104,3 +104,8 @@ def test_stored_provider_roundtrip_and_json(synthetic_adb, tmp_path):
     weather = next(r for r in data["results"] if r["package"] == "com.wlive.forecast")
     assert weather["label"] == "Weather Live" and weather["ad_sdks"] == SIX_SDKS
     assert data["apk"]["requested"] == 2
+
+
+def test_synthetic_adware_wakes_phone(synthetic_adb):
+    adware = _by_pkg(run_scan(synthetic_adb))["com.clean.pro.boost"]
+    assert "DM-ALARM-01" in {f.rule_id for f in adware.findings}
