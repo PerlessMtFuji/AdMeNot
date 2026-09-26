@@ -1,0 +1,6 @@
+Uid mode: READ_CONTACTS: ignore
+CAMERA: ignore
+READ_EXTERNAL_STORAGE: ignore
+WRITE_EXTERNAL_STORAGE: ignore
+GET_ACCOUNTS: ignore
+LEGACY_STORAGE: ignore

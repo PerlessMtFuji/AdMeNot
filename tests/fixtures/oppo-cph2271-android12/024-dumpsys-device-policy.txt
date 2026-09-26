@@ -1,0 +1,187 @@
+Current Device Policy Manager state:
+  Immutable state:
+    mHasFeature=true
+    mIsWatch=false
+    mIsAutomotive=false
+    mHasTelephonyFeature=true
+    mSafetyChecker=null
+  
+  
+  
+  Enabled Device Admins (User 0, provisioningState: 0):
+  
+    mPasswordOwner=-1
+    mUserControlDisabledPackages=[]
+    mAppsSuspended=false
+    mUserSetupComplete=true
+    mAffiliationIds={}
+    mNewUserDisclaimer=null
+  
+    PersonalAppsSuspensionHelper
+      critical packages: 1 app
+        0: com.google.android.apps.wellbeing
+      launcher packages: 2 apps
+        0: com.android.launcher
+        1: com.android.settings
+      accessibility services: empty
+      input method packages: 3 apps
+        0: com.google.android.inputmethod.latin
+        1: com.google.android.googlequicksearchbox
+        2: com.google.android.tts
+      SMS package: com.google.android.apps.messaging
+      Settings package: com.android.settings
+      Packages subject to suspension: 41 apps
+        0: com.coloros.backuprestore
+        1: com.amazon.mShop.android.shopping
+        2: com.google.android.apps.subscriptions.red
+        3: com.google.android.youtube
+        4: com.coloros.onekeylockscreen
+        5: com.google.android.apps.googleassistant
+        6: com.heytap.music
+        7: com.google.android.apps.podcasts
+        8: com.amazon.mp3
+        9: com.google.android.gm
+        10: com.google.android.apps.tachyon
+        11: com.google.android.apps.nbu.files
+        12: com.google.android.apps.docs
+        13: com.google.android.apps.maps
+        14: com.coloros.weather2
+        15: com.amazon.appmanager
+        16: com.google.android.contacts
+        17: com.android.chrome
+        18: com.coloros.compass2
+        19: com.google.android.apps.walletnfcrel
+        20: com.google.android.videos
+        21: com.coloros.calculator
+        22: com.zhiliaoapp.musically
+        23: com.google.android.apps.photos
+        24: com.google.android.calendar
+        25: com.facebook.katana
+        26: com.amazon.avod.thirdpartyclient
+        27: com.coloros.alarmclock
+        28: com.oplus.games
+        29: com.coloros.phonemanager
+        30: com.linkedin.android
+        31: com.coloros.video
+        32: com.color.otaassistant
+        33: com.coloros.filemanager
+        34: com.google.android.keep
+        35: com.coloros.soundrecorder
+        36: com.oplus.camera
+        37: com.google.android.apps.youtube.music
+        38: com.oplus.melody
+        39: com.coloros.gallery3d
+        40: com.google.android.apps.magazines
+  
+  
+  Constants:
+    DAS_DIED_SERVICE_RECONNECT_BACKOFF_SEC: 3600
+    DAS_DIED_SERVICE_RECONNECT_BACKOFF_INCREASE: 2.0
+    DAS_DIED_SERVICE_RECONNECT_MAX_BACKOFF_SEC: 86400
+    DAS_DIED_SERVICE_STABLE_CONNECTION_THRESHOLD_SEC: 120
+  
+  Stats:
+    LockGuard.guard(): count=23805, total=229,8ms, avg=0,010ms, max calls/s=919 max dur/s=41,4ms max time=18,3ms
+  
+  Encryption Status: per-user
+  
+  no pending user created callback tokens
+  
+  Device policy cache:
+    Screen capture disabled: {0=false}
+    Password quality: {0=0}
+    Permission policy: {0=0}
+    Admin can grant sensors permission: {0=false}
+  
+  Device state cache:
+    Device provisioned: true
+  
+  OverlayPackagesProvider
+    required_apps_managed_device: 6 apps
+      0: com.android.settings
+      1: com.android.contacts
+      2: com.android.stk
+      3: com.google.android.documentsui
+      4: jp.softbank.mb.plusmessage
+      5: jp.co.yahoo.android.ymobile.mail
+    required_apps_managed_user: 8 apps
+      0: com.android.settings
+      1: com.android.systemui
+      2: com.android.contacts
+      3: com.android.dialer
+      4: com.android.stk
+      5: com.android.providers.downloads
+      6: com.android.providers.downloads.ui
+      7: com.android.documentsui
+    required_apps_managed_profile: 3 apps
+      0: com.android.contacts
+      1: com.android.settings
+      2: com.google.android.documentsui
+    disallowed_apps_managed_device: 3 apps
+      0: jp.softbank.mb.flcrlap
+      1: com.sprint.ce.updater
+      2: jp.co.yahoo.android.ymsetupcore
+    disallowed_apps_managed_user: empty
+    disallowed_apps_managed_device: 3 apps
+      0: jp.softbank.mb.flcrlap
+      1: com.sprint.ce.updater
+      2: jp.co.yahoo.android.ymsetupcore
+    vendor_required_apps_managed_device: 17 apps
+      0: com.android.vending
+      1: com.google.android.gms
+      2: com.google.android.contacts
+      3: com.google.android.apps.wellbeing
+      4: com.google.android.googlequicksearchbox
+      5: com.android.launcher
+      6: com.google.android.dialer
+      7: com.google.android.apps.messaging
+      8: com.google.android.setupwizard
+      9: com.google.android.apps.nbu.files
+      10: com.google.android.apps.assistant
+      11: com.google.android.apps.searchlite
+      12: com.google.android.projection.gearhead
+      13: com.google.android.cellbroadcastreceiver
+      14: com.oppo.camera
+      15: com.oplus.camera
+      16: com.android.mms
+    vendor_required_apps_managed_user: 10 apps
+      0: com.android.vending
+      1: com.google.android.gms
+      2: com.google.android.contacts
+      3: com.google.android.apps.wellbeing
+      4: com.google.android.googlequicksearchbox
+      5: com.android.launcher
+      6: com.google.android.dialer
+      7: com.google.android.apps.messaging
+      8: com.google.android.documentsui
+      9: com.google.android.cellbroadcastreceiver
+    vendor_required_apps_managed_profile: 9 apps
+      0: com.android.vending
+      1: com.google.android.gms
+      2: com.google.android.contacts
+      3: com.google.android.apps.wellbeing
+      4: com.google.android.googlequicksearchbox
+      5: com.google.android.apps.assistant
+      6: com.google.android.apps.searchlite
+      7: com.google.android.apps.nbu.files
+      8: com.google.android.projection.gearhead
+    vendor_disallowed_apps_managed_user: empty
+    vendor_disallowed_apps_managed_device: empty
+    vendor_disallowed_apps_managed_profile: 5 apps
+      0: com.oplus.synergy
+      1: com.oplus.linker
+      2: com.android.bips
+      3: com.android.nfc
+      4: com.google.android.documentsui
+  
+  Other overlayable app resources
+    cross_profile_apps: empty
+    vendor_cross_profile_apps: 3 apps
+      0: com.google.android.googlequicksearchbox
+      1: com.google.android.inputmethod.latin
+      2: com.google.android.projection.gearhead
+    config_packagesExemptFromSuspension: 1 app
+      0: com.google.android.apps.wellbeing
+    policy_exempt_apps: empty
+    vendor_policy_exempt_apps: empty
+  

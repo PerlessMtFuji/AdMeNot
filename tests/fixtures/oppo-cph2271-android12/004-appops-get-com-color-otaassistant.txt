@@ -1,0 +1,2 @@
+SYSTEM_ALERT_WINDOW: ignore
+START_FOREGROUND: allow; time=+1d16h0m31s936ms ago; duration=+12h50m47s77ms

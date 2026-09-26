@@ -1,0 +1,86 @@
+Current Notification Manager state:
+  Notification List:
+    NotificationRecord(0x01f0459e: pkg=com.google.android.setupwizard)
+      uid=10176 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x0e8a455a: pkg=com.heytap.accessory)
+      uid=10080 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x0b862714: pkg=com.oplus.battery)
+      uid=1000 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x073386b9: pkg=com.android.systemui)
+      uid=10157 userId=0
+            fullscreenIntent=null
+    NotificationRecord(0x0db744ac: pkg=com.android.systemui)
+      uid=10157 userId=0
+            fullscreenIntent=null
+  <section>
+  <section>
+  <section>
+  <section>
+  <section>
+  <section>
+  <section>
+  <section>
+  <section>
+  <section>
+  <section>
+  Snoozed notifications:
+ <section>
+  <section>
+ <section>
+<section>
+<section>
+  <section>
+  <section>
+  <section>
+  <section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+<section>
+  <section>
+  <section>
+  <section>

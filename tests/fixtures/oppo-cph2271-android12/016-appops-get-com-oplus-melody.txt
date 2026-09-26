@@ -1,0 +1,5 @@
+Uid mode: RECORD_AUDIO: ignore
+READ_PHONE_STATE: ignore
+BLUETOOTH_SCAN: ignore
+BLUETOOTH_CONNECT: ignore
+SYSTEM_ALERT_WINDOW: allow; time=+2d16h13m1s516ms ago

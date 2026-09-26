@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "commands": {
+    "appops get com.amazon.appmanager": "000-appops-get-com-amazon-appmanager.txt",
+    "appops get com.amazon.avod.thirdpartyclient": "001-appops-get-com-amazon-avod-thirdpartyclient.txt",
+    "appops get com.amazon.mShop.android.shopping": "002-appops-get-com-amazon-mshop-android-shopping.txt",
+    "appops get com.amazon.mp3": "003-appops-get-com-amazon-mp3.txt",
+    "appops get com.color.otaassistant": "004-appops-get-com-color-otaassistant.txt",
+    "appops get com.coloros.backuprestore": "005-appops-get-com-coloros-backuprestore.txt",
+    "appops get com.coloros.onekeylockscreen": "006-appops-get-com-coloros-onekeylockscreen.txt",
+    "appops get com.facebook.katana": "007-appops-get-com-facebook-katana.txt",
+    "appops get com.google.android.apps.docs": "008-appops-get-com-google-android-apps-docs.txt",
+    "appops get com.google.android.apps.magazines": "009-appops-get-com-google-android-apps-magazines.txt",
+    "appops get com.google.android.apps.podcasts": "010-appops-get-com-google-android-apps-podcasts.txt",
+    "appops get com.google.android.apps.subscriptions.red": "011-appops-get-com-google-android-apps-subscriptions-red.txt",
+    "appops get com.google.android.apps.tachyon": "012-appops-get-com-google-android-apps-tachyon.txt",
+    "appops get com.google.android.apps.youtube.music": "013-appops-get-com-google-android-apps-youtube-music.txt",
+    "appops get com.google.android.videos": "014-appops-get-com-google-android-videos.txt",
+    "appops get com.linkedin.android": "015-appops-get-com-linkedin-android.txt",
+    "appops get com.oplus.melody": "016-appops-get-com-oplus-melody.txt",
+    "appops get com.zhiliaoapp.musically": "017-appops-get-com-zhiliaoapp-musically.txt",
+    "cat /proc/uptime": "018-cat-proc-uptime.txt",
+    "cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME": "019-cmd-package-query-activities-brief-a-android-intent-action-m.txt",
+    "cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER": "020-cmd-package-query-activities-brief-a-android-intent-action-m.txt",
+    "cmd package query-receivers --brief -a android.intent.action.BOOT_COMPLETED": "021-cmd-package-query-receivers-brief-a-android-intent-action-bo.txt",
+    "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME": "022-cmd-package-resolve-activity-brief-a-android-intent-action-m.txt",
+    "date \"+%Y-%m-%d %H:%M:%S\"": "023-date-y-m-d-h-m-s.txt",
+    "dumpsys device_policy": "024-dumpsys-device-policy.txt",
+    "dumpsys notification": "025-dumpsys-notification.txt",
+    "dumpsys package packages": "026-dumpsys-package-packages.txt",
+    "dumpsys usagestats": "027-dumpsys-usagestats.txt",
+    "getprop": "028-getprop.txt",
+    "pm list packages -d --user 0": "029-pm-list-packages-d-user-0.txt",
+    "pm list packages -f -i -U --user 0": "030-pm-list-packages-f-i-u-user-0.txt",
+    "pm list packages -s --user 0": "031-pm-list-packages-s-user-0.txt",
+    "settings get secure enabled_accessibility_services": "032-settings-get-secure-enabled-accessibility-services.txt",
+    "settings get secure enabled_notification_listeners": "033-settings-get-secure-enabled-notification-listeners.txt"
+  },
+  "errors": {
+    "cmd role get-role-holders android.app.role.HOME": "command_failed"
+  }
+}

@@ -1,0 +1,550 @@
+183 receivers found:
+  Receiver #0:
+    priority=2147483647 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.android.traceur/.Receiver
+  Receiver #1:
+    priority=1001 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.oplus.atlas/.OplusAtlasBootReceiver
+  Receiver #2:
+    priority=1000 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    android/com.android.server.BootReceiver
+  Receiver #3:
+    priority=1000 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.coloros.alarmclock/.AlarmInitReceiver
+  Receiver #4:
+    priority=999 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.appusage.impl.AppUsageBootCompletedBroadcastReceiver_Receiver
+  Receiver #5:
+    priority=999 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.autodnd.impl.AutoDndBootCompletedBroadcastReceiver_Receiver
+  Receiver #6:
+    priority=999 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.fences.BootCompletedReceiver_Receiver
+  Receiver #7:
+    priority=999 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.powerstate.impl.PowerStateBootCompletedBroadcastReceiver_Receiver
+  Receiver #8:
+    priority=999 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.dialer/com.android.dialer.bootreceiver.DialerBootReceiver
+  Receiver #9:
+    priority=999 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.mediatek.location.lppe.main/.LPPeBootUpReceiver
+  Receiver #10:
+    priority=998 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.appconfig.limit.impl.RefreshStateBroadcastReceiver_Receiver
+  Receiver #11:
+    priority=500 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.winddown.impl.WindDownRefreshStateBroadcastReceiver_Receiver
+  Receiver #12:
+    priority=100 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.android.systemui/com.oplusos.systemui.notification.usb.UsbstartReceiver
+  Receiver #13:
+    priority=100 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.dialer/com.android.dialer.app.calllog.CallLogReceiver
+  Receiver #14:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true
+    com.debug.loggerui/.framework.LogReceiver
+  Receiver #15:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true
+    com.google.android.marvin.talkback/com.google.android.accessibility.talkback.BootReceiver
+  Receiver #16:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true
+    com.oplus.cota/.main.receiver.BootReceiver
+  Receiver #17:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true
+    com.oplus.securitypermission/com.oplusos.securitypermission.permission.PermissionReceiver
+  Receiver #18:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.android.dynsystem/.BootCompletedReceiver
+  Receiver #19:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.android.managedprovisioning/.BootReminder
+  Receiver #20:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.android.mtp/.MtpReceiver
+  Receiver #21:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.android.phone/com.mediatek.settings.network.SprintRoamingSettingsReceiver
+  Receiver #22:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.android.providers.calendar/.CalendarReceiver
+  Receiver #23:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.android.providers.downloads/.DownloadReceiver
+  Receiver #24:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.android.settings/com.oplus.settings.receiver.SettingsReceiver
+  Receiver #25:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.android.settings/.sim.receivers.SimCompleteBootReceiver
+  Receiver #26:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.android.settings/.fuelgauge.batterytip.AnomalyConfigReceiver
+  Receiver #27:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.android.shell/.HeapDumpReceiver
+  Receiver #28:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.android.statementservice/.domain.BootCompletedReceiver
+  Receiver #29:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.android.statementservice/androidx.work.impl.background.systemalarm.RescheduleReceiver
+  Receiver #30:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.android.stk/.BootCompletedReceiver
+  Receiver #31:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.android.systemui/com.oplusos.systemui.common.receiver.BootRegBootCompleteReceiver
+  Receiver #32:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.android.vending/com.google.android.finsky.boothandler.BootCompletedReceiver
+  Receiver #33:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.coloros.activation/.receiver.BootReceiver
+  Receiver #34:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.coloros.healthcheck/.diagnosis.receiver.BootReceiver
+  Receiver #35:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.coloros.lockassistant/.polling.SourceCommonReceiver
+  Receiver #36:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.facebook.appmanager/com.facebook.oxygen.common.boot.OnBootCompleteReceiver
+  Receiver #37:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.facebook.services/com.facebook.oxygen.common.boot.OnBootCompleteReceiver
+  Receiver #38:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.maps/com.google.android.apps.gmm.geofence.RestartDetectionBroadcastReceiver
+  Receiver #39:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.maps/com.google.android.apps.gmm.navigation.service.detection.StartDetectionReceiver
+  Receiver #40:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.maps/com.google.android.apps.gmm.notification.channels.NotificationChannelBroadcastReceiver
+  Receiver #41:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.maps/com.google.android.apps.gmm.cloudmessage.chime.ChimeCloudMessageReceiver
+  Receiver #42:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.maps/com.google.android.apps.gmm.parkinglocation.ParkingLocationNotificationReceiver
+  Receiver #43:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.maps/com.google.android.apps.gmm.locationsharing.reporting.RestartDetectionBroadcastReceiver
+  Receiver #44:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.maps/com.google.android.apps.gmm.plugins.serverrecovery.PhenotypeServerRecoveryHandlerImpl
+  Receiver #45:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.maps/com.google.android.apps.gmm.offline.update.StartAutoUpdatesCheckingReceiver
+  Receiver #46:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.maps/androidx.work.impl.background.systemalarm.RescheduleReceiver
+  Receiver #47:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.messaging/com.google.android.libraries.internal.growth.growthkit.tiktok.GrowthKitBootCompletedListener_Receiver
+  Receiver #48:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.messaging/androidx.work.impl.background.systemalarm.RescheduleReceiver
+  Receiver #49:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.messaging/.receiver.PhoneBootAndPackageReplacedReceiver
+  Receiver #50:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.nbu.files/.gateway.pdf.DisablePdfPreviewActivityReceiver_Receiver
+  Receiver #51:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.nbu.files/.gateway.share.DisableShareActivityReceiver_Receiver
+  Receiver #52:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.nbu.files/.mediastore.receiver.ContentChangeListenerBootCompleteReceiver_Receiver
+  Receiver #53:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.nbu.files/.notifications.receiver.BootCompleteReceiver_Receiver
+  Receiver #54:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.nbu.files/com.google.android.libraries.internal.growth.growthkit.tiktok.GrowthKitBootCompletedListener_Receiver
+  Receiver #55:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.nbu.files/androidx.work.impl.background.systemalarm.RescheduleReceiver
+  Receiver #56:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.photos/.actionqueue.impl.SystemReceiver
+  Receiver #57:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.photos/.metasync.periodic.PackageUpdatedReceiver
+  Receiver #58:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.photos/.pixel.offer.full.PixelOfferReceiver
+  Receiver #59:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.photos/.scheduler.LpbjWorkSchedulerOnBroadcast
+  Receiver #60:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.photos/com.google.android.libraries.notifications.entrypoints.restart.RestartReceiver
+  Receiver #61:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.photos/com.google.android.libraries.social.jobscheduler.JobSchedulerOnBootComplete
+  Receiver #62:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.photos/androidx.work.impl.background.systemalarm.RescheduleReceiver
+  Receiver #63:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.setupwizard.searchselector/.notification.NotificationShowUpReceiver
+  Receiver #64:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.walletnfcrel/com.google.android.libraries.notifications.entrypoints.restart.RestartReceiver
+  Receiver #65:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.walletnfcrel/com.google.commerce.tapandpay.android.account.RefreshActiveAccountReceiver
+  Receiver #66:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.walletnfcrel/com.google.commerce.tapandpay.android.migration.FeatureMigrationReceiver
+  Receiver #67:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.walletnfcrel/com.google.commerce.tapandpay.android.security.storagekey.StorageKeyCheckReceiver
+  Receiver #68:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.walletnfcrel/androidx.work.impl.background.systemalarm.RescheduleReceiver
+  Receiver #69:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.alarm.BootCompleteReceiver_Receiver
+  Receiver #70:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.autodnd.discovery.RefreshStateReceiver_Receiver
+  Receiver #71:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.autodnd.ui.AutoDndUiBootCompletedBroadcastReceiver_Receiver
+  Receiver #72:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.focusmode.growth.OnAppStartedReceiver_Receiver
+  Receiver #73:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.focusmode.growth.NotificationAlarmAdjustReceiver_Receiver
+  Receiver #74:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.focusmode.manager.impl.FocusModeRefreshStateBroadcastReceiver_Receiver
+  Receiver #75:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.screen.impl.ScreenBootCompletedBroadcastReceiver_Receiver
+  Receiver #76:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.settings.LauncherShortcutRefreshStateBroadcastReceiver_Receiver
+  Receiver #77:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.settings.RefreshSettingsEntryPointAvailabilityReceiver_Receiver
+  Receiver #78:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.sleepdetection.RefreshSleepDetectionRegistrationBroadcastReceiver_Receiver
+  Receiver #79:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.time.delta.CheckTimeDeltaBroadcastReceiver_Receiver
+  Receiver #80:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.time.zone.RefreshTimeZoneSnapshotBroadcastReceiver_Receiver
+  Receiver #81:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.walkingdetection.WalkingDetectionBootCompleteReceiver_Receiver
+  Receiver #82:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.widget.FlagCheckReceiver_Receiver
+  Receiver #83:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.winddown.discovery.DayOfWeekNotificationRefreshStateReceiver_Receiver
+  Receiver #84:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/.workscheduler.manager.WorkSchedulerRestoreSchedules_Receiver
+  Receiver #85:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.wellbeing/androidx.work.impl.background.systemalarm.RescheduleReceiver
+  Receiver #86:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.calendar/com.google.android.apps.calendar.sync.SyncOnUnlockReceiver
+  Receiver #87:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.calendar/com.google.android.apps.calendar.usernotificationsframework.common.UserNotificationBroadcastReceiver
+  Receiver #88:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.calendar/com.google.android.apps.calendar.vitals.notification.impl.AlarmBroadcastReceiver
+  Receiver #89:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.calendar/com.google.android.libraries.internal.growth.growthkit.inject.GrowthKitBootCompletedBroadcastReceiver
+  Receiver #90:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.calendar/com.google.android.libraries.notifications.entrypoints.restart.RestartReceiver
+  Receiver #91:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.cellbroadcastreceiver/com.android.cellbroadcastreceiver.CellBroadcastReceiver
+  Receiver #92:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.configupdater/.MainReceiver
+  Receiver #93:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.configupdater/.CertPin.CertPinUpdateRequestReceiver
+  Receiver #94:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.configupdater/.IntentFirewall.IntentFirewallUpdateRequestReceiver
+  Receiver #95:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.configupdater/.SmsShortCodes.SmsShortCodesUpdateRequestReceiver
+  Receiver #96:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.configupdater/.NetworkWatchlist.NetworkWatchlistUpdateRequestReceiver
+  Receiver #97:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.configupdater/.ApnDb.ApnDbUpdateRequestReceiver
+  Receiver #98:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.configupdater/.CarrierProvisioningUrls.CarrierProvisioningUrlsUpdateRequestReceiver
+  Receiver #99:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.configupdater/.CTLogs.CTLogsUpdateRequestReceiver
+  Receiver #100:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.configupdater/.LangId.LangIdUpdateRequestReceiver
+  Receiver #101:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.configupdater/.SmartSelection.SmartSelectionUpdateRequestReceiver
+  Receiver #102:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.configupdater/.ConversationActions.ConversationActionsUpdateRequestReceiver
+  Receiver #103:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.configupdater/.CarrierId.CarrierIdUpdateRequestReceiver
+  Receiver #104:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.configupdater/.EmergencyNumberDb.EmergencyNumberDbUpdateRequestReceiver
+  Receiver #105:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.configupdater/.PhenotypeBroadcastReceiver
+  Receiver #106:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.contacts/com.google.android.apps.contacts.receiver.OnBootOrUpgradeReceiver
+  Receiver #107:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.contacts/com.google.android.libraries.internal.growth.growthkit.inject.GrowthKitBootCompletedBroadcastReceiver
+  Receiver #108:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.contacts/androidx.work.impl.background.systemalarm.RescheduleReceiver
+  Receiver #109:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.dialer/com.google.android.libraries.internal.growth.growthkit.tiktok.GrowthKitBootCompletedListener_Receiver
+  Receiver #110:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.dialer/androidx.work.impl.background.systemalarm.RescheduleReceiver
+  Receiver #111:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.dialer/com.android.dialer.businessvoice.verifiedcall.impl.registration.RestartCompletedReceiver_Receiver
+  Receiver #112:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.dialer/com.android.voicemail.VoicemailPowerCycleReceiver
+  Receiver #113:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.gm/.GoogleMailDeviceStartupReceiver
+  Receiver #114:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.gm/com.android.email.task.notification.TaskReminderReceiver
+  Receiver #115:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.gm/com.android.email.timezone.TimeZoneDataBaseUpgradeReceiver
+  Receiver #116:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.gm/.MailIntentReceiver
+  Receiver #117:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.gm/com.android.email.service.EmailBroadcastReceiver
+  Receiver #118:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.gm/.utils.ExchangeUpgradeReceiver
+  Receiver #119:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.gm/com.google.android.libraries.notifications.entrypoints.restart.RestartReceiver
+  Receiver #120:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.gm/androidx.work.impl.background.systemalarm.RescheduleReceiver
+  Receiver #121:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.gms/.games.chimera.GamesSystemBroadcastReceiverProxy
+  Receiver #122:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.gms/.chimera.GmsIntentOperationService$PersistentTrustedReceiver
+  Receiver #123:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.googlequicksearchbox/androidx.work.impl.background.systemalarm.RescheduleReceiver
+  Receiver #124:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.googlequicksearchbox/com.google.android.apps.gsa.googlequicksearchbox.GelStubAppWatcher
+  Receiver #125:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.googlequicksearchbox/com.google.android.apps.gsa.startup.StartUpReceiver
+  Receiver #126:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.googlequicksearchbox/com.google.android.libraries.notifications.entrypoints.restart.RestartReceiver
+  Receiver #127:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.googlequicksearchbox/com.google.android.apps.search.assistant.platform.contexttrigger.impl.ContextTriggerBroadcastReceiver_Receiver
+  Receiver #128:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.googlequicksearchbox/com.google.android.apps.search.assistant.platform.pcp.validity.ValidityController_Receiver
+  Receiver #129:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.ims/.receivers.BootCompletedReceiver
+  Receiver #130:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.ims/.receivers.RcsAutoStartReceiver
+  Receiver #131:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.inputmethod.latin/com.google.android.libraries.inputmethod.launchericon.LauncherIconVisibilityInitializer
+  Receiver #132:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.keep/.notification.ReminderNotificationReceiver
+  Receiver #133:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.keep/.sharing.SharingRepostNotificationReceiver
+  Receiver #134:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.keep/.notification.NotificationChannelReceiver
+  Receiver #135:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.keep/.syncadapter.RefreshSyncReceiver
+  Receiver #136:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.keep/com.google.android.libraries.internal.growth.growthkit.inject.GrowthKitBootCompletedBroadcastReceiver
+  Receiver #137:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.keep/com.google.android.libraries.notifications.entrypoints.restart.RestartReceiver
+  Receiver #138:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.onetimeinitializer/.OneTimeInitializerReceiver
+  Receiver #139:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.packageinstaller/com.android.packageinstaller.TemporaryFileManager
+  Receiver #140:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.partnersetup/.GooglePartnerSetup
+  Receiver #141:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.partnersetup/.RlzPingBroadcastReceiver
+  Receiver #142:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.permissioncontroller/com.android.permissioncontroller.permission.service.LocationAccessCheck$SetupPeriodicBackgroundLocationAccessCheck
+  Receiver #143:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.permissioncontroller/com.android.permissioncontroller.hibernation.HibernationOnBootReceiver
+  Receiver #144:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.projection.gearhead/com.google.android.apps.auto.components.app.fzero.FzeroReceiver
+  Receiver #145:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.providers.media.module/com.android.providers.media.MediaReceiver
+  Receiver #146:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.setupwizard/.deferred.PostSetupLifecycleBootReceiver
+  Receiver #147:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.youtube/com.google.android.libraries.notifications.entrypoints.restart.RestartReceiver
+  Receiver #148:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.youtube/com.google.android.libraries.youtube.mdx.background.MdxBackgroundScanBootReceiver
+  Receiver #149:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.youtube/com.google.android.libraries.youtube.mdx.notification.continueontv.ContinueWatchingOnTvNotificationBroadcastReceiver
+  Receiver #150:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.youtube/androidx.work.impl.background.systemalarm.RescheduleReceiver
+  Receiver #151:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.mediatek.capctrl.service/.MtkCapCtrlReceiver
+  Receiver #152:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.mediatek.engineermode/.boot.EmBootupReceiver
+  Receiver #153:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.mediatek.ims/.rcse.DeviceBoot
+  Receiver #154:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.mediatek.omacp/.message.OmacpReceiver
+  Receiver #155:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.mediatek.telephony/.MtkPhoneAssistBroadcastReceiver
+  Receiver #156:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.oplus.appplatform/.providers.BootCompleteReceiver
+  Receiver #157:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.oplus.battery/com.oplus.performance.GTModeBroadcastReceiver
+  Receiver #158:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.oplus.cosa/.autostart.OplusBootComplete
+  Receiver #159:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.oplus.cosa/androidx.work.impl.background.systemalarm.RescheduleReceiver
+  Receiver #160:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.oplus.eyeprotect/.receiver.TimeChangeReceiver
+  Receiver #161:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.oplus.healthservice/.broadcast.BootCompleteReceiver
+  Receiver #162:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.oplus.notificationmanager/.receiver.StatictisReceiver
+  Receiver #163:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.oplus.powermonitor/.BootCompletedRecevier
+  Receiver #164:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.oplus.romupdate/com.oplusos.romupdate.receiver.UpdateReceiver
+  Receiver #165:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.oplus.statistics.rom/.receiver.Receiver
+  Receiver #166:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.oplus.uxdesign/.language.appname.AppNameChangeReceiver
+  Receiver #167:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.amazon.mp3/.store.receiver.FirstBootReceiver
+  Receiver #168:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.amazon.mp3/com.amazon.music.push.BootReceiver
+  Receiver #169:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.docs/com.google.android.libraries.internal.growth.growthkit.inject.GrowthKitBootCompletedBroadcastReceiver
+  Receiver #170:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.docs/com.google.android.libraries.notifications.entrypoints.restart.RestartReceiver
+  Receiver #171:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.magazines/com.google.apps.dots.android.newsstand.receiver.BootReceiver
+  Receiver #172:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.magazines/com.google.android.libraries.internal.growth.growthkit.inject.GrowthKitBootCompletedBroadcastReceiver
+  Receiver #173:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.podcasts/com.google.android.libraries.notifications.entrypoints.restart.RestartReceiver
+  Receiver #174:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.subscriptions.red/.ppn.BootCompletedPpnStateCheckReceiver_Receiver
+  Receiver #175:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.subscriptions.red/com.google.android.libraries.internal.growth.growthkit.tiktok.GrowthKitBootCompletedListener_Receiver
+  Receiver #176:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.subscriptions.red/com.google.android.libraries.notifications.entrypoints.restart.RestartReceiver
+  Receiver #177:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.tachyon/.common.applifecycle.BootReceiver
+  Receiver #178:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.tachyon/com.google.android.libraries.internal.growth.growthkit.inject.GrowthKitBootCompletedBroadcastReceiver
+  Receiver #179:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.apps.tachyon/androidx.work.impl.background.systemalarm.RescheduleReceiver
+  Receiver #180:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.videos/com.google.android.apps.play.movies.common.service.pinning.TransferService$Receiver
+  Receiver #181:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.videos/com.google.android.apps.play.movies.common.service.contentnotification.base.NotificationChannelManager$SystemUpgradedInitialize
+  Receiver #182:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=false
+    com.google.android.videos/com.google.android.libraries.notifications.entrypoints.restart.RestartReceiver
