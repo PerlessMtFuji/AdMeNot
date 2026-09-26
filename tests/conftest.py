@@ -18,7 +18,9 @@ from demalware.engine.collectors.system import (
     A11Y_SERVICES,
     DEVICE_POLICY,
     NOTIF_LISTENERS,
+    ROLE_BROWSER,
     ROLE_HOME,
+    ROLE_SMS,
 )
 from demalware.engine.device.info import GETPROP, LOCAL_NOW, UPTIME
 
@@ -173,6 +175,8 @@ def make_synthetic_adb(devices_output: str = SYNTHETIC_DEVICES) -> FakeAdb:
                         "        uid=10301\n        testOnlyAdmin=false\n"
                         "    mPasswordOwner=-1\n"),
         ROLE_HOME: "com.sec.android.app.launcher\n",
+        ROLE_BROWSER: "com.android.chrome\n",
+        ROLE_SMS: "com.google.android.apps.messaging\n",
         A11Y_SERVICES: "null\n",
         NOTIF_LISTENERS: "com.whatsapp/com.whatsapp.NotificationListener\n",
     }

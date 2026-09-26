@@ -28,9 +28,11 @@ from demalware.engine.collectors.system import (
     DEVICE_POLICY,
     NOTIF_LISTENERS,
     RESOLVE_HOME,
+    ROLE_BROWSER,
     ROLE_HOME,
+    ROLE_SMS,
     DevicePolicyCollector,
-    HomeRoleCollector,
+    RolesCollector,
     SecureSettingsCollector,
 )
 from demalware.engine.facts import AppFacts
@@ -104,7 +106,7 @@ def test_system_collectors_with_home_fallback():
     })
     facts = _facts()
     status = run_collectors(
-        adb, facts, [DevicePolicyCollector(), HomeRoleCollector(), SecureSettingsCollector()]
+        adb, facts, [DevicePolicyCollector(), RolesCollector(), SecureSettingsCollector()]
     )
     assert all(s.ok for s in status.values())
     assert facts["com.b"].is_device_admin and facts["com.b"].is_home_holder
@@ -182,7 +184,7 @@ def test_run_collectors_respects_deadline():
 def test_default_collectors_names():
     names = [c.name for c in default_collectors(NOW, uptime_s=3600)]
     assert names == ["components", "appops", "notifications", "usagestats", "alarm",
-                     "device_policy", "home_role", "secure_settings"]
+                     "device_policy", "roles", "secure_settings"]
 
 
 def test_alarm_collector_window_uses_uptime_and_install_age():
@@ -200,3 +202,21 @@ def test_alarm_collector_window_uses_uptime_and_install_age():
 def test_alarm_collector_unknown_format_is_not_ok():
     status = run_collectors(FakeAdb({ALARM: "garbage\n"}), _facts(), [AlarmCollector(3600)])
     assert not status["alarm"].ok
+
+
+def test_roles_collector_reads_browser_and_sms():
+    adb = FakeAdb({ROLE_HOME: "com.sys\n", ROLE_BROWSER: "com.a\n", ROLE_SMS: "com.b\n"})
+    facts = _facts()
+    status = run_collectors(adb, facts, [RolesCollector()])
+    assert status["roles"].ok
+    assert facts["com.sys"].is_home_holder
+    assert facts["com.a"].is_browser_holder and not facts["com.a"].is_sms_holder
+    assert facts["com.b"].is_sms_holder
+
+
+def test_roles_collector_tolerates_missing_browser_and_sms():
+    adb = FakeAdb({ROLE_HOME: "com.sys\n"})  # starsze nagranie / Android < 10
+    facts = _facts()
+    status = run_collectors(adb, facts, [RolesCollector()])
+    assert status["roles"].ok and facts["com.sys"].is_home_holder
+    assert not any(f.is_browser_holder or f.is_sms_holder for f in facts.values())

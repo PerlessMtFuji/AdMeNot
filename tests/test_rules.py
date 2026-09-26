@@ -173,3 +173,28 @@ def test_unlock_rule_needs_two_events_and_skips_home():
     assert "DM-BGACT-01" not in _ids(once)
     assert "DM-BGACT-01" in _ids(twice)
     assert "DM-BGACT-01" not in _ids(home)
+
+
+def test_role_rules():
+    assert "DM-SMS-01" in _ids(AppFacts("com.x", is_sms_holder=True))
+    assert "DM-BROWSER-01" in _ids(AppFacts("com.x", is_browser_holder=True))
+    assert not _ids(AppFacts("com.x", is_system=True, is_sms_holder=True,
+                             is_browser_holder=True)) & {"DM-SMS-01", "DM-BROWSER-01"}
+
+
+def test_plan4_rule_texts_format_with_real_evidence():
+    samples = [
+        AppFacts("com.x", ad_sdks={"admob", "meta"}, dynamic_code=True, label="X",
+                 label_padded=True, alarm_wakeups=600, alarm_window_h=10.0,
+                 unlock_launches_24h=3, is_sms_holder=True, is_browser_holder=True),
+        AppFacts("com.y", ad_sdks={"admob", "meta", "applovin", "mintegral", "pangle"}),
+    ]
+    fired = set()
+    for facts in samples:
+        for finding in load_default_ruleset().evaluate(facts):
+            fired.add(finding.rule_id)
+            for lang in ("pl", "en"):
+                for expert in (False, True):
+                    assert "{" not in finding.text(lang, expert), finding.rule_id
+    assert {"DM-ADSDK-01", "DM-ADSDK-02", "DM-DYNDEX-01", "DM-LABEL-01", "DM-ALARM-01",
+            "DM-BGACT-01", "DM-SMS-01", "DM-BROWSER-01"} <= fired
