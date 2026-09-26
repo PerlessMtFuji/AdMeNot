@@ -145,3 +145,18 @@ def test_verify_reports_setting_the_app_restored(journal, tmp_path):
     run_order(phone, journal, order.id)
     phone.apps["com.ad"].appops["SYSTEM_ALERT_WINDOW"] = "allow"
     assert verify(phone, journal, order.id) == {"com.ad": ["appop"]}
+
+
+def test_undo_after_user_uninstalled_the_app(journal, tmp_path):
+    phone = _phone()
+    order = _order(phone, journal, tmp_path, {"com.ad": "silence"})
+    run_order(phone, journal, order.id)
+    phone.apps["com.ad"].installed = False  # użytkownik sam ją odinstalował
+    secure_before_undo = dict(phone.secure)
+    assert undo(phone, journal, order.id) == []
+    assert phone.secure == secure_before_undo  # nie dopisujemy komponentów nieistniejącej aplikacji
+    assert phone.home == "com.android.launcher/.Launcher"
+    rows = journal.actions(order.id)
+    assert {a.status for a in rows} == {"undone"}
+    assert {a.error for a in rows if a.inverse is not None} == {"app_gone"}
+    assert journal.order(order.id).status == "undone"
