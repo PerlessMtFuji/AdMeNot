@@ -1,0 +1,22 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "ironsource",
+    "mintegral",
+    "unity"
+  ],
+  "cert_sha256": [
+    "15ba904c82d176fe233a0fc4158f295e1a3f34823d230d01db94fab884a92f69"
+  ],
+  "class_count": 24574,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Cleanup",
+  "label_padded": false,
+  "obfuscation_ratio": 0.589,
+  "package": "com.storage.androidcleaner",
+  "sha256": "3ca7f3dc8ed4be2029e8236fc89bbb3b9a8081a026dd97485f52c671ab849344",
+  "version": 1,
+  "version_code": 735
+}

@@ -1,0 +1,28 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "dt_fyber",
+    "inmobi",
+    "ironsource",
+    "meta",
+    "mintegral",
+    "moloco",
+    "pangle",
+    "unity",
+    "vungle"
+  ],
+  "cert_sha256": [
+    "74aaffb36dbbf0e71a6a3ef3732a3c42771a3f2b6f09d759c40056d363ca9116"
+  ],
+  "class_count": 84402,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Remini",
+  "label_padded": false,
+  "obfuscation_ratio": 0.446,
+  "package": "com.bigwinepot.nwdn.international",
+  "sha256": "ea8096c6faa6fc32f35af647a0b5c1d530aafbcfe2fac2bc4ef2adc7e5f98768",
+  "version": 1,
+  "version_code": 202524746
+}

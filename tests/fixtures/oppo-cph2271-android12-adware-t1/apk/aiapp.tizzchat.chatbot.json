@@ -1,0 +1,16 @@
+{
+  "ad_sdks": [],
+  "cert_sha256": [
+    "8c50606d7905367b260900e9d9dd47fdc2c10d20122a04114198a268dbffae33"
+  ],
+  "class_count": 7294,
+  "dynamic_code": false,
+  "error": null,
+  "label": "TizzChat",
+  "label_padded": false,
+  "obfuscation_ratio": 0.727,
+  "package": "aiapp.tizzchat.chatbot",
+  "sha256": "a7f3f8720f0122ad9a7269cb00a28a039d4672c01f546c193b83a09108ba7635",
+  "version": 1,
+  "version_code": 430
+}

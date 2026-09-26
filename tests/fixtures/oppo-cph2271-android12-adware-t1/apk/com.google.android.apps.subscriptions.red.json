@@ -1,0 +1,16 @@
+{
+  "ad_sdks": [],
+  "cert_sha256": [
+    "e357f022ab8edb771e374e586808e268c914eb34dc6c7a068c0e0a05c8128953"
+  ],
+  "class_count": 11210,
+  "dynamic_code": false,
+  "error": null,
+  "label": "Google One",
+  "label_padded": false,
+  "obfuscation_ratio": 0.065,
+  "package": "com.google.android.apps.subscriptions.red",
+  "sha256": "07afdd4541dbcc40134ddf83508ffb28f09232ee5bdf9c8a1cebffc897078a8d",
+  "version": 1,
+  "version_code": 196383
+}

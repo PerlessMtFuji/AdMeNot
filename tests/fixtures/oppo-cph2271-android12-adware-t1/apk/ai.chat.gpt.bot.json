@@ -1,0 +1,18 @@
+{
+  "ad_sdks": [
+    "admob"
+  ],
+  "cert_sha256": [
+    "ed890c4fa3ef5f76eb4d3200e188712b70cf9d09258a1bdc7cfb099589b32d65"
+  ],
+  "class_count": 43181,
+  "dynamic_code": false,
+  "error": null,
+  "label": "ChatOn",
+  "label_padded": false,
+  "obfuscation_ratio": 0.059,
+  "package": "ai.chat.gpt.bot",
+  "sha256": "d901484e53805a6998d543e179e65c5bbd098ed9b53526f43d9fde927b716632",
+  "version": 1,
+  "version_code": 930
+}

@@ -1,0 +1,29 @@
+{
+  "ad_sdks": [
+    "admob",
+    "amazon_aps",
+    "applovin",
+    "chartboost",
+    "dt_fyber",
+    "inmobi",
+    "ironsource",
+    "meta",
+    "mintegral",
+    "moloco",
+    "pangle",
+    "vungle"
+  ],
+  "cert_sha256": [
+    "e682fe0bcd60907dfed515e0b8a4de03aa1c281d111a07833986602b6098afd2"
+  ],
+  "class_count": 169879,
+  "dynamic_code": true,
+  "error": null,
+  "label": "B612",
+  "label_padded": false,
+  "obfuscation_ratio": 0.151,
+  "package": "com.linecorp.b612.android",
+  "sha256": "8785d6d295ef7039237326f593998da507eb20a20c8ccdbba807525d57b46c9e",
+  "version": 1,
+  "version_code": 91150400
+}

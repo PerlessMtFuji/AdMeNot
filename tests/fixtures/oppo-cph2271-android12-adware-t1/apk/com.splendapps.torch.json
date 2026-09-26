@@ -1,0 +1,19 @@
+{
+  "ad_sdks": [
+    "admob",
+    "meta"
+  ],
+  "cert_sha256": [
+    "00c476a2b511016eb38b03f01b645549f34cf49bfc69d1d4c9362e7333f6d00b"
+  ],
+  "class_count": 7178,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Flashlight",
+  "label_padded": false,
+  "obfuscation_ratio": 0.198,
+  "package": "com.splendapps.torch",
+  "sha256": "662e544a8479b1aae99fb6f1575858449e6ec94ce89cc7d1634d3fb8a35965ad",
+  "version": 1,
+  "version_code": 121
+}

@@ -1,0 +1,134 @@
+Current Alarm Manager state:
+  Alarm Stats:
+  1000:com.oplus.powermonitor +13s571ms running, 68 wakeups:
+    +13s571ms 68 wakes 68 alarms, last -50m44s978ms:
+  1000:com.oplus.sau +27ms running, 0 wakeups:
+    +27ms 0 wakes 1 alarms, last -2h42m50s582ms:
+  1000:android +2m35s65ms running, 659 wakeups:
+    +1m40s860ms 0 wakes 136 alarms, last -24m54s838ms:
+    +33s416ms 0 wakes 542 alarms, last -4m2s707ms:
+    +27s523ms 0 wakes 435 alarms, last -4m2s707ms:
+    +19s578ms 0 wakes 147 alarms, last -1h32m4s586ms:
+    +13s897ms 239 wakes 239 alarms, last -35m53s329ms:
+    +12s219ms 0 wakes 319 alarms, last -4m2s707ms:
+    +11s723ms 119 wakes 119 alarms, last -2h40m51s651ms:
+    +10s21ms 4 wakes 4 alarms, last -2h47m53s678ms:
+    +6s529ms 194 wakes 194 alarms, last -1h2m38s100ms:
+    +5s878ms 0 wakes 3 alarms, last -3h0m57s305ms:
+    +5s809ms 0 wakes 66 alarms, last -1h55m25s756ms:
+    +4s830ms 3 wakes 3 alarms, last -2h47m47s973ms:
+    +4s816ms 1 wakes 1 alarms, last -2h47m47s973ms:
+    +4s529ms 0 wakes 39 alarms, last -1h2m38s100ms:
+    +2s173ms 18 wakes 18 alarms, last -7h40m7s821ms:
+    +2s80ms 20 wakes 20 alarms, last -1h32m4s586ms:
+    +1s727ms 6 wakes 6 alarms, last -2h47m53s678ms:
+    +1s586ms 3 wakes 3 alarms, last -2h47m53s678ms:
+    +761ms 14 wakes 14 alarms, last -1h16m29s934ms:
+    +658ms 4 wakes 4 alarms, last -2h47m53s678ms:
+    +656ms 4 wakes 4 alarms, last -2h47m53s678ms:
+    +647ms 0 wakes 3 alarms, last -2h47m53s678ms:
+    +641ms 3 wakes 3 alarms, last -2h47m53s678ms:
+    +568ms 6 wakes 6 alarms, last -31m3s706ms:
+    +409ms 0 wakes 3 alarms, last -4h11m22s823ms:
+    +372ms 0 wakes 3 alarms, last -1h37m3s605ms:
+    +270ms 3 wakes 3 alarms, last -50m44s978ms:
+    +219ms 3 wakes 3 alarms, last -15h36m22s827ms:
+    +193ms 0 wakes 5 alarms, last -1h28m23s613ms:
+    +186ms 4 wakes 4 alarms, last -57m27s15ms:
+    +157ms 1 wakes 1 alarms, last -2d19h54m19s396ms:
+    +125ms 0 wakes 2 alarms, last -1d14h52m52s476ms:
+    +63ms 2 wakes 2 alarms, last -2h13m16s333ms:
+    +40ms 5 wakes 5 alarms, last -1d16h55m8s257ms:
+    +32ms 1 wakes 1 alarms, last -2h23m24s837ms:
+    +22ms 1 wakes 1 alarms, last -2h47m38s631ms:
+    +5ms 1 wakes 1 alarms, last -2h16m45s474ms:
+  1000:com.oplus.exsystemservice +1m41s80ms running, 26 wakeups:
+    +1m38s339ms 2 wakes 2 alarms, last -2h47m53s678ms:
+    +8s719ms 3 wakes 3 alarms, last -2h47m53s678ms:
+    +5s319ms 2 wakes 2 alarms, last -2h47m47s973ms:
+    +1s109ms 8 wakes 8 alarms, last -46m14s443ms:
+    +641ms 3 wakes 3 alarms, last -2h47m53s678ms:
+    +379ms 7 wakes 7 alarms, last -1h1m57s710ms:
+    +146ms 1 wakes 1 alarms, last -2d9h26m21s825ms:
+  1000:com.heytap.mcs +8s899ms running, 74 wakeups:
+    +8s899ms 74 wakes 74 alarms, last -4m2s707ms:
+  1000:com.oplus.battery +41s731ms running, 21 wakeups:
+    +30s547ms 0 wakes 136 alarms, last -20m5s642ms:
+    +25s494ms 0 wakes 98 alarms, last -13m57s837ms:
+    +9s551ms 4 wakes 4 alarms, last -2h47m53s678ms:
+    +8s888ms 4 wakes 4 alarms, last -2h47m53s678ms:
+    +2s580ms 0 wakes 15 alarms, last -1h37m3s605ms:
+    +912ms 10 wakes 10 alarms, last -1h32m4s586ms:
+    +511ms 3 wakes 3 alarms, last -3h26m22s841ms:
+  1000:com.oplus.athena +4s874ms running, 3 wakeups:
+    +4s874ms 3 wakes 3 alarms, last -2h47m47s973ms:
+  1001:com.oplus.nhs +49s901ms running, 134 wakeups:
+    +43s738ms 0 wakes 308 alarms, last -4m2s707ms:
+    +13s483ms 68 wakes 68 alarms, last -50m44s978ms:
+    +9s780ms 66 wakes 66 alarms, last -5h41m22s822ms:
+  u0a78:com.google.android.configupdater +405ms running, 0 wakeups:
+    +405ms 0 wakes 1 alarms, last -2d19h38m56s195ms:
+  u0a81:com.oplus.cota +1s66ms running, 0 wakeups:
+    +1s66ms 0 wakes 2 alarms, last -7h40m7s821ms:
+  u0a82:com.oplus.statistics.rom +3s587ms running, 5 wakeups:
+    +3s587ms 5 wakes 5 alarms, last -2h47m47s973ms:
+  u0a102:com.google.android.gms +40s494ms running, 141 wakeups:
+    +13s826ms 0 wakes 79 alarms, last -13m57s837ms:
+    +11s792ms 81 wakes 81 alarms, last -24m54s838ms:
+    +7s643ms 0 wakes 49 alarms, last -2h38m25s543ms:
+    +6s683ms 0 wakes 16 alarms, last -3h0m57s305ms:
+    +6s365ms 0 wakes 15 alarms, last -3h0m57s305ms:
+    +6s241ms 0 wakes 42 alarms, last -2h30m52s675ms:
+    +3s890ms 0 wakes 22 alarms, last -44m36s353ms:
+    +2s8ms 0 wakes 18 alarms, last -57m27s15ms:
+    +1s847ms 18 wakes 18 alarms, last -21h23m4s822ms:
+    +1s826ms 0 wakes 15 alarms, last -5h11m22s826ms:
+    +1s716ms 0 wakes 1 alarms, last -1d23h9m5s827ms:
+    +1s676ms 15 wakes 15 alarms, last -4h26m22s823ms:
+    +1s489ms 0 wakes 13 alarms, last -24m54s838ms:
+    +1s21ms 3 wakes 3 alarms, last -7h40m7s821ms:
+    +824ms 6 wakes 6 alarms, last -3h0m49s698ms:
+    +584ms 0 wakes 2 alarms, last -16h6m19s829ms:
+    +584ms 2 wakes 2 alarms, last -16h6m19s829ms:
+    +570ms 0 wakes 5 alarms, last -7h11m22s827ms:
+    +527ms 6 wakes 6 alarms, last -11h40m9s365ms:
+    +525ms 0 wakes 5 alarms, last -46m14s443ms:
+    +384ms 3 wakes 3 alarms, last -3h26m22s841ms:
+    +311ms 0 wakes 13 alarms, last -1h2m38s100ms:
+    +269ms 0 wakes 1 alarms, last -1h32m4s586ms:
+    +119ms 5 wakes 5 alarms, last -1d16h54m58s216ms:
+    +101ms 0 wakes 1 alarms, last -1h38m56s859ms:
+    +61ms 1 wakes 1 alarms, last -2h35m51s568ms:
+    +56ms 0 wakes 1 alarms, last -1h43m56s920ms:
+    +54ms 0 wakes 1 alarms, last -1h53m57s257ms:
+    +53ms 0 wakes 2 alarms, last -2h39m22s233ms:
+    +44ms 1 wakes 1 alarms, last -2d19h53m36s785ms:
+    +35ms 0 wakes 1 alarms, last -2h39m55s566ms:
+  u0a140:com.oplus.romupdate +7s850ms running, 5 wakeups:
+    +6s195ms 0 wakes 50 alarms, last -1h5m4s27ms:
+    +1s968ms 5 wakes 5 alarms, last -13h56m22s823ms:
+  u0a146:com.android.providers.calendar +4s288ms running, 14 wakeups:
+    +4s270ms 13 wakes 13 alarms, last -1h55m31s82ms:
+    +18ms 1 wakes 1 alarms, last -2h44m11s713ms:
+  u0a147:com.oplus.deepthinker +1s354ms running, 0 wakeups:
+    +1s354ms 0 wakes 2 alarms, last -1h43m56s920ms:
+  u0a157:com.android.systemui +3s928ms running, 13 wakeups:
+    +3s907ms 12 wakes 12 alarms, last -1h2m22s706ms:
+    +21ms 1 wakes 1 alarms, last -2d19h54m9s306ms:
+  u0a162:com.oplus.ota +127ms running, 2 wakeups:
+    +127ms 2 wakes 2 alarms, last -2h44m28s721ms:
+  u0a164:com.oplus.eyeprotect +5s257ms running, 10 wakeups:
+    +5s257ms 10 wakes 10 alarms, last -1h37m3s605ms:
+  u0a184:com.google.android.apps.nbu.files +3s797ms running, 1 wakeups:
+    +3s797ms 1 wakes 1 alarms, last -2h47m47s973ms:
+  u0a187:com.google.android.apps.messaging +3s465ms running, 3 wakeups:
+    +3s465ms 3 wakes 3 alarms, last -2h47m47s973ms:
+  u0a190:com.facebook.appmanager +6s569ms running, 0 wakeups:
+    +6s569ms 0 wakes 3 alarms, last -2h47m47s973ms:
+  u0a227:pdfreader.pdfviewer.officetool.pdfscanner +11s808ms running, 5 wakeups:
+    +11s808ms 5 wakes 5 alarms, last -26m13s498ms:
+  u0a244:smart.cleaner.clean.master.booster.free +12s704ms running, 4 wakeups:
+    +12s704ms 4 wakes 4 alarms, last -4m2s707ms:
+  u0a245:com.turbo.fps.gamemode.gamebooster.speed.booster +45s264ms running, 25 wakeups:
+    +44s31ms 25 wakes 25 alarms, last -4m2s707ms:
+    +1s233ms 0 wakes 2 alarms, last -1h4m24s15ms:

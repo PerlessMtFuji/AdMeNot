@@ -1,0 +1,10 @@
+Uid mode: CAMERA: ignore
+READ_PHONE_STATE: ignore
+WRITE_EXTERNAL_STORAGE: ignore
+LEGACY_STORAGE: ignore
+TAKE_AUDIO_FOCUS: allow; time=+1h44m18s795ms ago
+READ_MEDIA_AUDIO: allow; time=+1h43m55s135ms ago
+READ_MEDIA_VIDEO: allow; time=+1h43m55s134ms ago
+READ_MEDIA_IMAGES: allow; time=+1h43m55s132ms ago
+MANAGE_EXTERNAL_STORAGE: default; rejectTime=+1h43m55s149ms ago
+NO_ISOLATED_STORAGE: deny; rejectTime=+1h43m55s143ms ago

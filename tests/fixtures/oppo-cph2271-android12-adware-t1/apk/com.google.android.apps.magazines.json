@@ -1,0 +1,18 @@
+{
+  "ad_sdks": [
+    "admob"
+  ],
+  "cert_sha256": [
+    "f0fd6c5b410f25cb25c3b53346c8972fae30f8ee7411df910480ad6b2d60db83"
+  ],
+  "class_count": 24879,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Google News",
+  "label_padded": false,
+  "obfuscation_ratio": 0.045,
+  "package": "com.google.android.apps.magazines",
+  "sha256": "d9fc877e1ad0e1f7d4c0766225987f77f03d13c5e77df42831819ed4d6f5ddf8",
+  "version": 1,
+  "version_code": 2022034746
+}

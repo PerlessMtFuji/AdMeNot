@@ -1,0 +1,21 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "meta",
+    "yandex"
+  ],
+  "cert_sha256": [
+    "4b1c5862471c57c3c3f03e056f97f13295f49aa19fd5d7a9e5cb9b31f7606c3a"
+  ],
+  "class_count": 29140,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Flashlight",
+  "label_padded": false,
+  "obfuscation_ratio": 0.623,
+  "package": "apps.r.flashlight",
+  "sha256": "1d3ceed81356f18b8e56973ff2a398f911ef8dc5d9e83b8fb8ade9b2861c9c73",
+  "version": 1,
+  "version_code": 210091074
+}

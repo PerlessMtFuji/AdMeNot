@@ -1,0 +1,21 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "meta",
+    "yandex"
+  ],
+  "cert_sha256": [
+    "0dce37d46e7475d55428a9ab53452d98f48ed5a753bb4e96e8c25b30fd58a84b"
+  ],
+  "class_count": 31542,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Battery Life",
+  "label_padded": false,
+  "obfuscation_ratio": 0.6,
+  "package": "com.pextor.batterychargeralarm",
+  "sha256": "543c239f0ac0e376bb4b1f8ad3fe49a5a54ce2103e185b218d670ccc649cc85b",
+  "version": 1,
+  "version_code": 533
+}

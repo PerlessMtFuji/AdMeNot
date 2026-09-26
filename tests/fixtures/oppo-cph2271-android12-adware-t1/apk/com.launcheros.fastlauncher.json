@@ -1,0 +1,24 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "dt_fyber",
+    "inmobi",
+    "meta",
+    "mintegral",
+    "pangle"
+  ],
+  "cert_sha256": [
+    "f6563befc7b9c4c622ae2c2ccd28bcdb6f1dcbc1e83a9556fe3bf3a7456bd1d7"
+  ],
+  "class_count": 43755,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Launcher OS 2026",
+  "label_padded": false,
+  "obfuscation_ratio": 0.65,
+  "package": "com.launcheros.fastlauncher",
+  "sha256": "bf6b7b1015a6e9be23db9cc5b30bd2006aff2d0dca59dd5c61c0376229923e11",
+  "version": 1,
+  "version_code": 37
+}

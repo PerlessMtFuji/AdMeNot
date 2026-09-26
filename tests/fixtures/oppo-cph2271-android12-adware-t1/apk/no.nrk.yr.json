@@ -1,0 +1,17 @@
+{
+  "ad_sdks": [],
+  "cert_sha256": [
+    "80be6cc260b047e5f389ace35f7e1892f574e8fe78d9f8db9775b5f554e7e81e",
+    "d089503a8ca23d1a796762f07d1dd4d2d7e4e2a1b9fa29d113ce48e929970b1e"
+  ],
+  "class_count": 27930,
+  "dynamic_code": false,
+  "error": null,
+  "label": "Yr",
+  "label_padded": false,
+  "obfuscation_ratio": 0.79,
+  "package": "no.nrk.yr",
+  "sha256": "e1180ab092f5d0d36a7815a65f187453501a768cb9d92bde4677e736e6824a21",
+  "version": 1,
+  "version_code": 1100009065
+}

@@ -1,0 +1,16 @@
+{
+  "ad_sdks": [],
+  "cert_sha256": [
+    "64aafaf1d5bc9155a9e417a849e4f8eda1d0d1341667c28ed7c443c76f820b9a"
+  ],
+  "class_count": 13830,
+  "dynamic_code": false,
+  "error": null,
+  "label": "Clone Phone",
+  "label_padded": false,
+  "obfuscation_ratio": 0.262,
+  "package": "com.coloros.backuprestore",
+  "sha256": "d7d7ef20c12be1812aef49d7143a60d787abd117eacd41c0ca5fc05b634090e5",
+  "version": 1,
+  "version_code": 122103
+}

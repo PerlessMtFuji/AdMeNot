@@ -1,0 +1,31 @@
+{
+  "ad_sdks": [
+    "admob",
+    "amazon_aps",
+    "applovin",
+    "dt_fyber",
+    "inmobi",
+    "ironsource",
+    "meta",
+    "mintegral",
+    "moloco",
+    "pangle",
+    "startio",
+    "unity",
+    "verve",
+    "vungle"
+  ],
+  "cert_sha256": [
+    "dd1064c4fe4b825bd2c5736686b8f159056f1d19349a9dceb8602fd71b629a23"
+  ],
+  "class_count": 58784,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Cleaner",
+  "label_padded": false,
+  "obfuscation_ratio": 0.418,
+  "package": "smart.cleaner.clean.master.booster.free",
+  "sha256": "a7f1955013884de586571a88ab25f21eda198aa24312bd1495c234ca4c1497ad",
+  "version": 1,
+  "version_code": 200
+}

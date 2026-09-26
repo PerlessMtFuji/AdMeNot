@@ -1,0 +1,20 @@
+{
+  "ad_sdks": [
+    "admob",
+    "meta",
+    "vungle"
+  ],
+  "cert_sha256": [
+    "48ecff8f95a8b8c35100c2adb87d3ad1635555c02a6a7e90fed912833b112042"
+  ],
+  "class_count": 20820,
+  "dynamic_code": true,
+  "error": null,
+  "label": "QR & Barcode Scanner",
+  "label_padded": false,
+  "obfuscation_ratio": 0.248,
+  "package": "com.gamma.scan",
+  "sha256": "082dda23e09866ea7db76b46cff9b8a55976191ba0859fb893176e8bce09ebb4",
+  "version": 1,
+  "version_code": 224
+}

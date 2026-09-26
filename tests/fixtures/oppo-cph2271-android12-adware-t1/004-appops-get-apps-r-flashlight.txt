@@ -1,0 +1,2 @@
+Uid mode: CAMERA: foreground
+WAKE_LOCK: allow; time=+2h21m56s557ms ago; duration=+2s984ms

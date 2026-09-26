@@ -1,0 +1,16 @@
+{
+  "ad_sdks": [],
+  "cert_sha256": [
+    "3b6a403ca91d56ab854517720203176640816d3f923f92cca16138f5cc3d0727"
+  ],
+  "class_count": 533,
+  "dynamic_code": false,
+  "error": null,
+  "label": "LinkedIn",
+  "label_padded": false,
+  "obfuscation_ratio": 0.002,
+  "package": "com.linkedin.android",
+  "sha256": "3c14cd23e0d5cdcf59c697223d1a24895900e54c697483091abd6e481836f0fc",
+  "version": 1,
+  "version_code": 1
+}

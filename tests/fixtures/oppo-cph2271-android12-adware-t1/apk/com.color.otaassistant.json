@@ -1,0 +1,16 @@
+{
+  "ad_sdks": [],
+  "cert_sha256": [
+    "fc98dae63ad39626c8c67fbe83f2f06f74932a9cd146b92cecfc6a047a904386"
+  ],
+  "class_count": 5364,
+  "dynamic_code": false,
+  "error": null,
+  "label": "Update Assistant",
+  "label_padded": false,
+  "obfuscation_ratio": 0.176,
+  "package": "com.color.otaassistant",
+  "sha256": "f69280617e056b2f909551130c116883ed150eb48cd76d4dd9c99bb08cb3a535",
+  "version": 1,
+  "version_code": 1002004
+}

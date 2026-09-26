@@ -1,0 +1,20 @@
+{
+  "ad_sdks": [
+    "admob",
+    "mytarget",
+    "pangle"
+  ],
+  "cert_sha256": [
+    "868aa1a8470b4214e88a5c9e65a1dbe475a32e1da7a23079ba6e0be0bd50b621"
+  ],
+  "class_count": 24510,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Collage Maker - GridArt",
+  "label_padded": false,
+  "obfuscation_ratio": 0.146,
+  "package": "photoeditor.layout.collagemaker",
+  "sha256": "a591d582f43d22c55f6ef36b0b3803a2c0ab6a8acaa895797941e80669f87193",
+  "version": 1,
+  "version_code": 220000
+}

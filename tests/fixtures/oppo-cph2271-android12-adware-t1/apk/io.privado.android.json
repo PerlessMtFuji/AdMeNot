@@ -1,0 +1,16 @@
+{
+  "ad_sdks": [],
+  "cert_sha256": [
+    "63d9adf895d5e3aa38ee0c98d842015007131bf7bde9eb9e65d366c292ae52b8"
+  ],
+  "class_count": 36647,
+  "dynamic_code": false,
+  "error": null,
+  "label": "PrivadoVPN",
+  "label_padded": false,
+  "obfuscation_ratio": 0.029,
+  "package": "io.privado.android",
+  "sha256": "ebb4df9b8333a2fe60027fa37636680d480c61af9498572808bcfa0c1743110d",
+  "version": 1,
+  "version_code": 2083482915
+}

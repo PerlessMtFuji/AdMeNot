@@ -1,0 +1,25 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "dt_fyber",
+    "meta",
+    "mintegral",
+    "moloco",
+    "pangle",
+    "vungle"
+  ],
+  "cert_sha256": [
+    "a81b8111a768107ff2f8bb72034bd6565e1d71374a436060e3414722d1968adb"
+  ],
+  "class_count": 62105,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Neon Love",
+  "label_padded": false,
+  "obfuscation_ratio": 0.549,
+  "package": "com.ikeyboard.theme.neon.love",
+  "sha256": "f3e0dd42e2e2f5e6c753d1232f6a6a1c95a0469f365c2359bbab6822292ff7d5",
+  "version": 1,
+  "version_code": 1371
+}

@@ -1,0 +1,21 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "mintegral"
+  ],
+  "cert_sha256": [
+    "bfb8d9fcf8e1c0dcaee2d5129f7bb589a1ed1cc0fee893e31b58c60993a7fbe8",
+    "dc3a93e821240e903881debd22522adad9c57798312a10edc7ba987fb8f194bc"
+  ],
+  "class_count": 48964,
+  "dynamic_code": true,
+  "error": null,
+  "label": "PixVerse",
+  "label_padded": false,
+  "obfuscation_ratio": 0.084,
+  "package": "com.pixverseai.pixverse",
+  "sha256": "cb9e1a52144eddef76e3feb0b71bb37f961987460e12d292e5074f53b11c78de",
+  "version": 1,
+  "version_code": 408
+}

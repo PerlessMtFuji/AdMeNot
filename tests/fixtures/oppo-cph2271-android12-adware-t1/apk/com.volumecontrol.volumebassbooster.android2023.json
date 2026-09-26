@@ -1,0 +1,25 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "dt_fyber",
+    "inmobi",
+    "meta",
+    "pangle",
+    "unity",
+    "vungle"
+  ],
+  "cert_sha256": [
+    "915e055db782f039b3865e607d65a19fa002bc41d1c808c5a12a353ba027160a"
+  ],
+  "class_count": 44635,
+  "dynamic_code": true,
+  "error": null,
+  "label": "AI Hit Music Maker",
+  "label_padded": false,
+  "obfuscation_ratio": 0.457,
+  "package": "com.volumecontrol.volumebassbooster.android2023",
+  "sha256": "e5e2e74e0e2a210659fb099f89b88c7418c037ef7732be9ff0900a4e4ffe37cd",
+  "version": 1,
+  "version_code": 33
+}

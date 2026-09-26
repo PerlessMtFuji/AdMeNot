@@ -1,0 +1,19 @@
+{
+  "ad_sdks": [
+    "admob",
+    "meta"
+  ],
+  "cert_sha256": [
+    "afdf8e1a6226f3fc22c0070150b72772637b58e00bab418c209d72049f163a96"
+  ],
+  "class_count": 5159,
+  "dynamic_code": true,
+  "error": null,
+  "label": "QR Scanner",
+  "label_padded": false,
+  "obfuscation_ratio": 0.877,
+  "package": "com.teacapps.barcodescanner",
+  "sha256": "803115da1c8100b983cb377271ef43115182f219b0cc5c90b75ab3dd7583e5da",
+  "version": 1,
+  "version_code": 206
+}

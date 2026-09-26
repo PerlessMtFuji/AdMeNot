@@ -1,0 +1,20 @@
+{
+  "ad_sdks": [
+    "admob",
+    "inmobi",
+    "pangle"
+  ],
+  "cert_sha256": [
+    "ffd16b1f005e2ed77e138f3e7e7137f61fae8ecc2ec1e82d6c57ca48db9d7d48"
+  ],
+  "class_count": 25854,
+  "dynamic_code": true,
+  "error": null,
+  "label": "InCollage - Collage Maker",
+  "label_padded": false,
+  "obfuscation_ratio": 0.18,
+  "package": "photocollage.photoeditor.collagemaker",
+  "sha256": "896f507f07e4692238be4bafe558d8b06b2a471dc10fc2e68163f09ec88be53f",
+  "version": 1,
+  "version_code": 276000
+}

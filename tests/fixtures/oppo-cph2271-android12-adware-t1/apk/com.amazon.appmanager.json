@@ -1,0 +1,16 @@
+{
+  "ad_sdks": [],
+  "cert_sha256": [
+    "2f19adeb284eb36f7f07786152b9a1d14b21653203ad0b04ebbf9c73ab6d7625"
+  ],
+  "class_count": 477,
+  "dynamic_code": false,
+  "error": null,
+  "label": "Mobile Device Information Provider",
+  "label_padded": false,
+  "obfuscation_ratio": 0.0,
+  "package": "com.amazon.appmanager",
+  "sha256": "c1c1bdc2b373094bf18092057c681c91cf398e4a5da2ba396994edc933c23b41",
+  "version": 1,
+  "version_code": 112710
+}

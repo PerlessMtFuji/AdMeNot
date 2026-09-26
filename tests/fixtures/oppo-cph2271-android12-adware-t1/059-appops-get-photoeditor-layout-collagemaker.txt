@@ -1,0 +1,5 @@
+Uid mode: LEGACY_STORAGE: ignore
+WAKE_LOCK: allow; time=+1h50m15s152ms ago; duration=+4s455ms
+READ_MEDIA_IMAGES: allow; time=+1h49m51s444ms ago
+MANAGE_EXTERNAL_STORAGE: default; rejectTime=+1h49m51s451ms ago
+NO_ISOLATED_STORAGE: deny; rejectTime=+1h49m51s447ms ago

@@ -1,0 +1,27 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "bigo",
+    "inmobi",
+    "ironsource",
+    "meta",
+    "mintegral",
+    "pangle",
+    "unity",
+    "yandex"
+  ],
+  "cert_sha256": [
+    "13bce2fd178331c2239d3217eaea92b8ad117fdc4ec63279076dd8833ccedb34"
+  ],
+  "class_count": 53841,
+  "dynamic_code": true,
+  "error": null,
+  "label": "PDF Reader Home App",
+  "label_padded": true,
+  "obfuscation_ratio": 0.488,
+  "package": "com.pdf.pdfviewer.reader.allfile",
+  "sha256": "4280d18d6217275c2187004b56c59c74cd02e4fef315f0a1a49e8daa2601dd39",
+  "version": 1,
+  "version_code": 106
+}

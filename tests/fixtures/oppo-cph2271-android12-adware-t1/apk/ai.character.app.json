@@ -1,0 +1,29 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "dt_fyber",
+    "inmobi",
+    "ironsource",
+    "meta",
+    "mintegral",
+    "moloco",
+    "pangle",
+    "unity",
+    "vungle",
+    "yandex"
+  ],
+  "cert_sha256": [
+    "e5081939b16dfa672bc3d4a02b47399205480445350e8f138730badd9fe25a5c"
+  ],
+  "class_count": 124934,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Character.AI",
+  "label_padded": false,
+  "obfuscation_ratio": 0.149,
+  "package": "ai.character.app",
+  "sha256": "41c3c41f9eb89aac896884cdcd5a4533fe19e9e8bf429eb37418a49dee3f5f7d",
+  "version": 1,
+  "version_code": 161
+}

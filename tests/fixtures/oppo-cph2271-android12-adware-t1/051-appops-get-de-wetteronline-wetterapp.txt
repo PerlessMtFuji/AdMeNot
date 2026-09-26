@@ -1,0 +1,9 @@
+Uid mode: COARSE_LOCATION: foreground
+FINE_LOCATION: foreground
+CAMERA: ignore
+RECORD_AUDIO: ignore
+FINE_LOCATION: allow; time=+1h58m56s828ms ago
+SYSTEM_ALERT_WINDOW: default; rejectTime=+13m54s379ms ago
+WAKE_LOCK: allow; time=+1h59m19s647ms ago; duration=+5s348ms
+MONITOR_LOCATION: allow; time=+1h58m58s375ms ago; duration=+1s958ms
+MONITOR_HIGH_POWER_LOCATION: allow; time=+1h58m58s369ms ago; duration=+1s941ms

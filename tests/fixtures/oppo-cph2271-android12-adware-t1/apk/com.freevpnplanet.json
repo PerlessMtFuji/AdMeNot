@@ -1,0 +1,30 @@
+{
+  "ad_sdks": [
+    "admob",
+    "bigo",
+    "chartboost",
+    "dt_fyber",
+    "inmobi",
+    "ironsource",
+    "meta",
+    "mintegral",
+    "mytarget",
+    "pangle",
+    "unity",
+    "vungle",
+    "yandex"
+  ],
+  "cert_sha256": [
+    "9092a306dd004cb9c14b8e6c4a60e64ca60af34155ba15eb7c66ee983f77ac72"
+  ],
+  "class_count": 73825,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Planet VPN",
+  "label_padded": false,
+  "obfuscation_ratio": 0.365,
+  "package": "com.freevpnplanet",
+  "sha256": "515f4cc0884a850493ba85848dbcb2baf6f69381ed09cec8ba29d308bfac070c",
+  "version": 1,
+  "version_code": 1249
+}

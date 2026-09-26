@@ -1,0 +1,21 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "meta",
+    "vungle"
+  ],
+  "cert_sha256": [
+    "289eb9c74fcf89ae544575ee202f364e0832a40ccf032fd127ed1df3b4cc0b80"
+  ],
+  "class_count": 48172,
+  "dynamic_code": true,
+  "error": null,
+  "label": "VideoShow",
+  "label_padded": false,
+  "obfuscation_ratio": 0.352,
+  "package": "com.xvideostudio.videoeditor",
+  "sha256": "493f0bcf55ad079ba687a3532905cd2bf3a818a460c8c1491cd6976dae6f5a2f",
+  "version": 1,
+  "version_code": 1846
+}

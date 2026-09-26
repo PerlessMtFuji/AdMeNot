@@ -1,0 +1,25 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "meta",
+    "mintegral",
+    "pangle",
+    "unity",
+    "vungle",
+    "yandex"
+  ],
+  "cert_sha256": [
+    "60ff3f3c7d2e44a86f0f60bc84aa4f9bc5260fc016c1fbdbed6b3acabb59f9cf"
+  ],
+  "class_count": 77614,
+  "dynamic_code": true,
+  "error": null,
+  "label": "All PDF Reader",
+  "label_padded": false,
+  "obfuscation_ratio": 0.443,
+  "package": "pdfreader.pdfviewer.officetool.pdfscanner",
+  "sha256": "32004aa2cf723cb27c2da1408a1cfa21280fc3529bba1c9c455d7010050566b9",
+  "version": 1,
+  "version_code": 95
+}

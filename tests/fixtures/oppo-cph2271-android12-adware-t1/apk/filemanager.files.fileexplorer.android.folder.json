@@ -1,0 +1,22 @@
+{
+  "ad_sdks": [
+    "admob",
+    "inmobi",
+    "meta",
+    "pangle",
+    "vungle"
+  ],
+  "cert_sha256": [
+    "2c43f43b6505342a0d263dfa1d998651996741b1906440f72082f5650d87c48e"
+  ],
+  "class_count": 60770,
+  "dynamic_code": true,
+  "error": null,
+  "label": "File manager",
+  "label_padded": false,
+  "obfuscation_ratio": 0.355,
+  "package": "filemanager.files.fileexplorer.android.folder",
+  "sha256": "3eb23f164c4d16a75d93d3f305b0558ffeb4ddc34509be557bd7211d0be27ca5",
+  "version": 1,
+  "version_code": 618
+}

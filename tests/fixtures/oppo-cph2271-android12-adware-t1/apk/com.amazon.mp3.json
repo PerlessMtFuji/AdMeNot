@@ -1,0 +1,19 @@
+{
+  "ad_sdks": [
+    "admob",
+    "amazon_aps"
+  ],
+  "cert_sha256": [
+    "2f19adeb284eb36f7f07786152b9a1d14b21653203ad0b04ebbf9c73ab6d7625"
+  ],
+  "class_count": 36413,
+  "dynamic_code": false,
+  "error": null,
+  "label": "Amazon Music",
+  "label_padded": false,
+  "obfuscation_ratio": 0.05,
+  "package": "com.amazon.mp3",
+  "sha256": "f12479f4e27b54e06a8bfd781beda2446ba476a7397f66d817015daa679bf68f",
+  "version": 1,
+  "version_code": 517020210
+}

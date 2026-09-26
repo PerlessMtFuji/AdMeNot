@@ -1,0 +1,16 @@
+{
+  "ad_sdks": [],
+  "cert_sha256": [
+    "b0a9bbfc05eee5e7d0a2c97c030586e15bb3301152078f54473bb82df6d8c818"
+  ],
+  "class_count": 9098,
+  "dynamic_code": false,
+  "error": null,
+  "label": "Wireless Earphones",
+  "label_padded": false,
+  "obfuscation_ratio": 0.667,
+  "package": "com.oplus.melody",
+  "sha256": "1537f93d807a9a0caec3e0a5e0bbd3cbe1ff9d86834c74f21ff3e8c95fd6ddf1",
+  "version": 1,
+  "version_code": 4001282
+}

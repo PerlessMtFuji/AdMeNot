@@ -1,0 +1,29 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "bigo",
+    "dt_fyber",
+    "inmobi",
+    "ironsource",
+    "meta",
+    "mintegral",
+    "moloco",
+    "pangle",
+    "unity",
+    "vungle"
+  ],
+  "cert_sha256": [
+    "0f1f72bfee9f05f05d08d3767f6a3b00c1f7d14299a7c3957fa454aeb84e0ccf"
+  ],
+  "class_count": 78600,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Live Wallpapers HD 4K",
+  "label_padded": false,
+  "obfuscation_ratio": 0.247,
+  "package": "com.techpro.livevideo.wallpaper",
+  "sha256": "3d61695dcd40ca5f92f9b99a21ea43f52aace1ec3be4b32ba2120e14e1597ba5",
+  "version": 1,
+  "version_code": 296
+}

@@ -1,0 +1,24 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "dt_fyber",
+    "meta",
+    "mintegral",
+    "pangle",
+    "vungle"
+  ],
+  "cert_sha256": [
+    "e8c60250c9ac13997bf6390028a4d919396fc96cc80a936555c8e3d218451a14"
+  ],
+  "class_count": 47891,
+  "dynamic_code": true,
+  "error": null,
+  "label": "CPU Monitor",
+  "label_padded": false,
+  "obfuscation_ratio": 0.513,
+  "package": "com.lite.cpu.battery.monitor",
+  "sha256": "2091244528fe0e6403ee3b2f41ecda979baec597c224dbfa8ba83b7995d6ecd2",
+  "version": 1,
+  "version_code": 29
+}

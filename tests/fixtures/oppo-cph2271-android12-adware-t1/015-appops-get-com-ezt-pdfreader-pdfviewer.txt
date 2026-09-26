@@ -1,0 +1,12 @@
+Uid mode: CAMERA: ignore
+READ_EXTERNAL_STORAGE: ignore
+WRITE_EXTERNAL_STORAGE: ignore
+LEGACY_STORAGE: ignore
+MANAGE_EXTERNAL_STORAGE: allow
+SYSTEM_ALERT_WINDOW: default; rejectTime=+8m22s787ms ago
+WAKE_LOCK: allow; time=+2h31m10s370ms ago; duration=+3s146ms
+WRITE_MEDIA_AUDIO: deny; rejectTime=+2h30m28s319ms ago
+WRITE_MEDIA_VIDEO: deny; rejectTime=+2h30m28s316ms ago
+WRITE_MEDIA_IMAGES: deny; rejectTime=+2h30m28s305ms ago
+MANAGE_EXTERNAL_STORAGE: default; time=+2h30m22s382ms ago; rejectTime=+2h30m28s385ms ago
+NO_ISOLATED_STORAGE: deny; rejectTime=+2h30m22s384ms ago

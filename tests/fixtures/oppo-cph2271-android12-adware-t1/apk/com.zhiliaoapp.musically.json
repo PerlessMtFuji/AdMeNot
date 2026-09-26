@@ -1,0 +1,18 @@
+{
+  "ad_sdks": [
+    "admob"
+  ],
+  "cert_sha256": [
+    "9041803e91bcb814b4b4399fb5c85a91640b755e5e8ba76813814bf4cf2ab5ba"
+  ],
+  "class_count": 109488,
+  "dynamic_code": true,
+  "error": null,
+  "label": "TikTok",
+  "label_padded": false,
+  "obfuscation_ratio": 0.011,
+  "package": "com.zhiliaoapp.musically",
+  "sha256": "d7236e50351f5854f2f4b4243403851bd92eeb3306ea1fae1d8a78f9984a883f",
+  "version": 1,
+  "version_code": 2022208000
+}

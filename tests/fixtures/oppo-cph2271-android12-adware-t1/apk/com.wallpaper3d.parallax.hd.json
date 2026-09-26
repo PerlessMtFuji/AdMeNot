@@ -1,0 +1,29 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "bigo",
+    "dt_fyber",
+    "inmobi",
+    "ironsource",
+    "meta",
+    "mintegral",
+    "moloco",
+    "pangle",
+    "unity",
+    "vungle"
+  ],
+  "cert_sha256": [
+    "57e6e389a64fd5e2d2617a800ca0bc82461e1cd304a275d4d74ab400a5ca6a5c"
+  ],
+  "class_count": 48701,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Wallpaper 3D Live",
+  "label_padded": false,
+  "obfuscation_ratio": 0.366,
+  "package": "com.wallpaper3d.parallax.hd",
+  "sha256": "8912da357157a4f4a3663de76d1d702f11f6b8d1066fad7604a6610ebd3b6be7",
+  "version": 1,
+  "version_code": 175
+}

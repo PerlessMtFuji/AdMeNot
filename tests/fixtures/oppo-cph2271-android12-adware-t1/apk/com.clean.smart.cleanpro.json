@@ -1,0 +1,24 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "bigo",
+    "meta",
+    "mintegral",
+    "moloco",
+    "pangle"
+  ],
+  "cert_sha256": [
+    "86a21c23b80dc47f1fa00abe68b02d64623279006144b0ff77bf592c72521b4f"
+  ],
+  "class_count": 40974,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Smart Clean Pro",
+  "label_padded": false,
+  "obfuscation_ratio": 0.25,
+  "package": "com.clean.smart.cleanpro",
+  "sha256": "6fac574892174289debda3a53f1cc7178ae17bc707597ab856ed4c44c067a255",
+  "version": 1,
+  "version_code": 1201
+}

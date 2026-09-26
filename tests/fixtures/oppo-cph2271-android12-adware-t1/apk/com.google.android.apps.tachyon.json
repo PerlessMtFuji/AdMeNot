@@ -1,0 +1,16 @@
+{
+  "ad_sdks": [],
+  "cert_sha256": [
+    "7caab6e6ba700e0ddcf75cca52b8c3b19a3c7d23308f7eb177a64eb2476197bd"
+  ],
+  "class_count": 19829,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Duo",
+  "label_padded": false,
+  "obfuscation_ratio": 0.056,
+  "package": "com.google.android.apps.tachyon",
+  "sha256": "449c55dc040535d526b9ded5f64141ad3308ff2bdebb24b6d896b80841ff8ab2",
+  "version": 1,
+  "version_code": 3669363
+}

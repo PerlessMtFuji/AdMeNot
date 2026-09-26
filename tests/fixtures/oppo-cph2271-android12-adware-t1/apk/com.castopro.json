@@ -1,0 +1,18 @@
+{
+  "ad_sdks": [
+    "admob"
+  ],
+  "cert_sha256": [
+    "2be3d467b0138c39e8ff6ac578c04fd751fc431ab0bb61baa3d93c4421bb2b96"
+  ],
+  "class_count": 26554,
+  "dynamic_code": false,
+  "error": null,
+  "label": "CastoPro",
+  "label_padded": false,
+  "obfuscation_ratio": 0.32,
+  "package": "com.castopro",
+  "sha256": "5ec30a2444c1f34b8b7a1bed1331a40d1d9fa4f7742f21e06c55467e0f489829",
+  "version": 1,
+  "version_code": 138
+}

@@ -1,0 +1,16 @@
+{
+  "ad_sdks": [],
+  "cert_sha256": [
+    "64aafaf1d5bc9155a9e417a849e4f8eda1d0d1341667c28ed7c443c76f820b9a"
+  ],
+  "class_count": 248,
+  "dynamic_code": false,
+  "error": null,
+  "label": "Screen Lock",
+  "label_padded": false,
+  "obfuscation_ratio": 0.645,
+  "package": "com.coloros.onekeylockscreen",
+  "sha256": "741b70ffbe90767a1ed57d728f3fdb52f25b5662d50efbc36e108a5fc51d83e9",
+  "version": 1,
+  "version_code": 13000000
+}

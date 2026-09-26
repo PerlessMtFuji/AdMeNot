@@ -1,0 +1,63 @@
+# Etykiety wzorcowe — ustalone PRZED obejrzeniem werdyktów silnika.
+# harmful: szkodliwa (oszustwo, kradzież danych) | adware: natrętne reklamy / zaśmiecanie — powinna być oznaczona
+# clean: porządna aplikacja — powinna być „Bezpieczna” | unsure: nie wiadomo — pomijana w metrykach
+# Aplikacje fabryczne (bez etykiety) nie wchodzą do metryk.
+
+# Czyszczenie, przyspieszanie, bateria
+com.clean.smart.cleanpro: adware
+com.intelli.clean: adware
+com.storage.androidcleaner: adware
+phonecleaner.junkfiles.appmanager.duplicatefileremover.applock: adware
+smart.cleaner.clean.master.booster.free: adware
+com.gamespeed.booster.fpsgame: adware
+com.turbo.fps.gamemode.gamebooster.speed.booster: adware
+com.lite.cpu.battery.monitor: adware
+com.pextor.batterychargeralarm: unsure
+
+# PDF, pliki, skanery
+com.ezt.pdfreader.pdfviewer: adware
+com.pdf.pdfviewer.reader.allfile: adware
+com.pdfreader.pdf.viewer.pdfeditor: adware
+com.trusted.pdfeditor.pdfreader: adware
+pdfreader.pdfviewer.officetool.pdfscanner: adware
+filemanager.files.fileexplorer.android.folder: adware
+com.gamma.scan: adware
+com.teacapps.barcodescanner: unsure
+
+# Latarki, głośność, casting
+apps.r.flashlight: adware
+com.superbllc.torch.flashlight: adware
+com.splendapps.torch: unsure
+com.volumecontrol.volumebassbooster.android2023: adware
+com.castopro: adware
+
+# Launchery, tapety, klawiatury
+com.launcheros.fastlauncher: adware
+com.techpro.livevideo.wallpaper: adware
+com.wallpaper3d.parallax.hd: adware
+com.ikeyboard.theme.neon.love: adware
+com.ikeyboard.theme.neon.red.heartbeat: adware
+
+# Klony czatów AI
+ai.chat.gpt.bot: adware
+aiapp.tizzchat.chatbot: adware
+
+# Zdjęcia i wideo
+photocollage.photoeditor.collagemaker: adware
+photoeditor.layout.collagemaker: adware
+ai.blurrr.video: unsure
+com.bigwinepot.nwdn.international: unsure
+com.xvideostudio.videoeditor: unsure
+com.pixverseai.pixverse: unsure
+
+# VPN, pogoda
+com.freevpnplanet: adware
+life.channel.accurate.local.weather.forecast: adware
+
+# Grupa kontrolna — znane, porządne aplikacje
+ai.character.app: clean
+com.linecorp.b612.android: clean
+de.axelspringer.yana: clean
+de.wetteronline.wetterapp: clean
+io.privado.android: clean
+no.nrk.yr: clean

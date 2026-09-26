@@ -1,0 +1,16 @@
+{
+  "ad_sdks": [],
+  "cert_sha256": [
+    "f0fd6c5b410f25cb25c3b53346c8972fae30f8ee7411df910480ad6b2d60db83"
+  ],
+  "class_count": 19535,
+  "dynamic_code": false,
+  "error": null,
+  "label": "Drive",
+  "label_padded": false,
+  "obfuscation_ratio": 0.061,
+  "package": "com.google.android.apps.docs",
+  "sha256": "5f5a2788fc3e7c06e67fe446b387e03042df259f5d8db96b4c503d6026468313",
+  "version": 1,
+  "version_code": 212756492
+}

@@ -1,0 +1,20 @@
+Uid mode: COARSE_LOCATION: ignore
+FINE_LOCATION: ignore
+CAMERA: ignore
+RECORD_AUDIO: ignore
+READ_EXTERNAL_STORAGE: ignore
+WRITE_EXTERNAL_STORAGE: ignore
+BLUETOOTH_SCAN: ignore
+LEGACY_STORAGE: ignore
+MANAGE_EXTERNAL_STORAGE: allow
+BLUETOOTH_CONNECT: ignore
+BLUETOOTH_ADVERTISE: ignore
+SYSTEM_ALERT_WINDOW: ignore
+TAKE_AUDIO_FOCUS: allow; time=+2h24m3s853ms ago
+WAKE_LOCK: allow; time=+2h25m0s725ms ago; duration=+4s399ms
+GET_USAGE_STATS: default; rejectTime=+2h23m53s593ms ago
+WRITE_MEDIA_AUDIO: deny; rejectTime=+2h24m55s930ms ago
+WRITE_MEDIA_VIDEO: deny; rejectTime=+2h24m55s927ms ago
+WRITE_MEDIA_IMAGES: deny; rejectTime=+2h24m55s922ms ago
+MANAGE_EXTERNAL_STORAGE: default; time=+2h24m7s921ms ago; rejectTime=+2h24m55s935ms ago
+NO_ISOLATED_STORAGE: deny; rejectTime=+2h24m7s920ms ago

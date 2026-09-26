@@ -1,0 +1,8 @@
+Uid mode: READ_PHONE_STATE: ignore
+READ_EXTERNAL_STORAGE: ignore
+WRITE_EXTERNAL_STORAGE: ignore
+LEGACY_STORAGE: ignore
+COARSE_LOCATION: allow
+FINE_LOCATION: allow; time=+30s171ms ago
+MONITOR_LOCATION: allow; time=+42s408ms ago; duration=+179ms
+START_FOREGROUND: allow; time=+1h58m16s944ms ago (running)

@@ -1,0 +1,16 @@
+{
+  "ad_sdks": [],
+  "cert_sha256": [
+    "fc98dae63ad39626c8c67fbe83f2f06f74932a9cd146b92cecfc6a047a904386"
+  ],
+  "class_count": 5487,
+  "dynamic_code": false,
+  "error": null,
+  "label": "Software update",
+  "label_padded": false,
+  "obfuscation_ratio": 0.787,
+  "package": "com.oplus.ota",
+  "sha256": "099f21aeca57809fe0e05f95bfdc36388b34170f1ec6d3b74db0c0ec5f009b91",
+  "version": 1,
+  "version_code": 9017
+}

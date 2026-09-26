@@ -1,0 +1,19 @@
+{
+  "ad_sdks": [
+    "admob",
+    "meta"
+  ],
+  "cert_sha256": [
+    "d01e2dc75f61211b95aa28a7cdb735208ed6881928c7f88b91515e631b1e3dd8"
+  ],
+  "class_count": 13053,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Turbo Game Speed: Booster",
+  "label_padded": false,
+  "obfuscation_ratio": 0.4,
+  "package": "com.gamespeed.booster.fpsgame",
+  "sha256": "2a81b25006b2f5997c66f7aaf6cd4e3015654602fffd72593db765b4e15f8b85",
+  "version": 1,
+  "version_code": 112
+}

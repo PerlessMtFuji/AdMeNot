@@ -1,0 +1,16 @@
+{
+  "ad_sdks": [],
+  "cert_sha256": [
+    "e3f9e1e0cf99d0e56a055ba65e241b3399f7cea524326b0cdd6ec1327ed0fdc1"
+  ],
+  "class_count": 99,
+  "dynamic_code": false,
+  "error": null,
+  "label": "Facebook",
+  "label_padded": false,
+  "obfuscation_ratio": 0.576,
+  "package": "com.facebook.katana",
+  "sha256": "9385fd8e640d10aaa5c3194ee4419b624f4b1eb8bf9ceaf26f9d73d0aa67542b",
+  "version": 1,
+  "version_code": 1
+}

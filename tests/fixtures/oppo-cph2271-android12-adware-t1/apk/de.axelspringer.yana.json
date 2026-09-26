@@ -1,0 +1,19 @@
+{
+  "ad_sdks": [
+    "admob",
+    "startio"
+  ],
+  "cert_sha256": [
+    "95d51e832108e62eabcb24c7d6f48011e8f11013577fc245c30938a2eaa19338"
+  ],
+  "class_count": 13068,
+  "dynamic_code": true,
+  "error": null,
+  "label": "upday",
+  "label_padded": false,
+  "obfuscation_ratio": 0.859,
+  "package": "de.axelspringer.yana",
+  "sha256": "ed9296208d748896002ff58eda9162238820e1c019192ed0066957143d44663a",
+  "version": 1,
+  "version_code": 40094
+}

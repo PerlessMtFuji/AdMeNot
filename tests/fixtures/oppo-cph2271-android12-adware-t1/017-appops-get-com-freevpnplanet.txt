@@ -1,0 +1,4 @@
+SYSTEM_ALERT_WINDOW: default; rejectTime=+17m14s325ms ago
+WAKE_LOCK: allow; time=+2h17m43s344ms ago; duration=+5s425ms
+ACTIVATE_VPN: allow; time=+2h17m16s262ms ago; rejectTime=+2h17m22s908ms ago
+START_FOREGROUND: allow; time=+2h17m9s372ms ago; duration=+1h59m53s96ms

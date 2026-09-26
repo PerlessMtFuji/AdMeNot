@@ -1,0 +1,3 @@
+SYSTEM_ALERT_WINDOW: default; rejectTime=+1h29m14s380ms ago
+TAKE_AUDIO_FOCUS: allow; time=+1h59m54s887ms ago
+WAKE_LOCK: allow; time=+2h1m25s336ms ago; duration=+4s758ms

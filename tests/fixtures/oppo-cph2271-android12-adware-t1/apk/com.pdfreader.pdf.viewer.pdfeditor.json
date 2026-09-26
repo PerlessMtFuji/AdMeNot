@@ -1,0 +1,21 @@
+{
+  "ad_sdks": [
+    "admob",
+    "meta",
+    "mintegral",
+    "pangle"
+  ],
+  "cert_sha256": [
+    "073c383dc74ae01985a25bc441e37681a439f4259f7b4dd32013a092ef4ab061"
+  ],
+  "class_count": 42088,
+  "dynamic_code": true,
+  "error": null,
+  "label": "PDF Reader: Viewer, PDF Editor",
+  "label_padded": false,
+  "obfuscation_ratio": 0.143,
+  "package": "com.pdfreader.pdf.viewer.pdfeditor",
+  "sha256": "79a429e0308f16b002683baea18b0bff66c1ed9c0d1b84e7fe259e8c8df57ced",
+  "version": 1,
+  "version_code": 24
+}

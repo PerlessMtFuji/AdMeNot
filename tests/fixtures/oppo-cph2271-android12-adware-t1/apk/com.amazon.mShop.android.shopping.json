@@ -1,0 +1,19 @@
+{
+  "ad_sdks": [
+    "admob",
+    "amazon_aps"
+  ],
+  "cert_sha256": [
+    "2f19adeb284eb36f7f07786152b9a1d14b21653203ad0b04ebbf9c73ab6d7625"
+  ],
+  "class_count": 45214,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Amazon Shopping",
+  "label_padded": false,
+  "obfuscation_ratio": 0.091,
+  "package": "com.amazon.mShop.android.shopping",
+  "sha256": "6615ce63f67939d8fa89ff41b1bfa28b7fd59fb221a8c5bbec33c926979d46ea",
+  "version": 1,
+  "version_code": 1241194011
+}

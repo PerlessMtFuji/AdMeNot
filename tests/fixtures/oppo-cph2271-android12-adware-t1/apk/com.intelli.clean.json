@@ -1,0 +1,24 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "bigo",
+    "meta",
+    "mintegral",
+    "pangle",
+    "vungle"
+  ],
+  "cert_sha256": [
+    "47ff86ffda3064545ae7973a72dfe99cd2715c2230c1f2be070e04a8a811792a"
+  ],
+  "class_count": 38432,
+  "dynamic_code": true,
+  "error": null,
+  "label": "IntelliClean",
+  "label_padded": true,
+  "obfuscation_ratio": 0.39,
+  "package": "com.intelli.clean",
+  "sha256": "41903e4d23f63635b1152dc9dde37e478e4e3379ec1475db8617bd79e2f04f7b",
+  "version": 1,
+  "version_code": 25
+}

@@ -1,0 +1,18 @@
+{
+  "ad_sdks": [
+    "admob"
+  ],
+  "cert_sha256": [
+    "a70f599e78cd947140fa2b3ee9e47fa92e005ebd3663f33741ff8c91f1f7dc11"
+  ],
+  "class_count": 11349,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Phone Cleaner",
+  "label_padded": false,
+  "obfuscation_ratio": 0.431,
+  "package": "phonecleaner.junkfiles.appmanager.duplicatefileremover.applock",
+  "sha256": "f37e7c5a90ccd11202f577651494a06b4ab17ea105d629a1e1d6bf04452679a0",
+  "version": 1,
+  "version_code": 35
+}

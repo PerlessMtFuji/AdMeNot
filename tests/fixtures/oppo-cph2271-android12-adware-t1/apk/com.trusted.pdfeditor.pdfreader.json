@@ -1,0 +1,26 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "bigo",
+    "dt_fyber",
+    "inmobi",
+    "ironsource",
+    "meta",
+    "mintegral",
+    "pangle"
+  ],
+  "cert_sha256": [
+    "58e2b34777cf643448e4371a018a9ad5900164eac8f8ecd96815facfa73b2dba"
+  ],
+  "class_count": 69328,
+  "dynamic_code": true,
+  "error": null,
+  "label": "PDF Reader, PDF Viewer",
+  "label_padded": true,
+  "obfuscation_ratio": 0.22,
+  "package": "com.trusted.pdfeditor.pdfreader",
+  "sha256": "fec256ed1c53a22d00aeb008e5f4b5e6a731773f6bef739febd070b2de63e0db",
+  "version": 1,
+  "version_code": 96
+}

@@ -1,0 +1,18 @@
+{
+  "ad_sdks": [
+    "admob"
+  ],
+  "cert_sha256": [
+    "3aa8bc4827d32e03bde5ed12ec41e77dd9ccfe9adc78c45a3bc31da4e7613996"
+  ],
+  "class_count": 32027,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Blurrr",
+  "label_padded": false,
+  "obfuscation_ratio": 0.44,
+  "package": "ai.blurrr.video",
+  "sha256": "6e837e91688a964e36051c712244d9cd17cde59a025757fb21094124ac15df8a",
+  "version": 1,
+  "version_code": 20640
+}

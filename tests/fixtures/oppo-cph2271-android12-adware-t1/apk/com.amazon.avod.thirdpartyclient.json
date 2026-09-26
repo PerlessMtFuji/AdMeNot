@@ -1,0 +1,19 @@
+{
+  "ad_sdks": [
+    "admob",
+    "amazon_aps"
+  ],
+  "cert_sha256": [
+    "2f19adeb284eb36f7f07786152b9a1d14b21653203ad0b04ebbf9c73ab6d7625"
+  ],
+  "class_count": 29471,
+  "dynamic_code": false,
+  "error": null,
+  "label": "Prime Video",
+  "label_padded": false,
+  "obfuscation_ratio": 0.04,
+  "package": "com.amazon.avod.thirdpartyclient",
+  "sha256": "50e8a7bfa957a109bc0757189dc8bfbb4a579cd7a1d5eeea4b613c82023250d7",
+  "version": 1,
+  "version_code": 285022147
+}

@@ -1,0 +1,2 @@
+FINE_LOCATION: allow; time=+1h57m34s672ms ago (running)
+WAKE_LOCK: allow; time=+1h58m10s28ms ago; duration=+3s553ms

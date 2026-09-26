@@ -1,0 +1,16 @@
+5 activities found:
+  Activity #0:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true
+    com.android.launcher/.Launcher
+  Activity #1:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true
+    com.intelli.clean/com.star.james.ui.activity.launcher.LauncherActivity
+  Activity #2:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true
+    com.launcheros.fastlauncher/com.android.launcher3.Launcher
+  Activity #3:
+    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true
+    com.pdf.pdfviewer.reader.allfile/com.android.launcher3.Launcher
+  Activity #4:
+    priority=-1000 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true
+    com.android.settings/.FallbackHome

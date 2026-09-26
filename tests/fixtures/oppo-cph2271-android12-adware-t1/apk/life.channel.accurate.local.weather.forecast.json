@@ -1,0 +1,21 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "pangle",
+    "unity"
+  ],
+  "cert_sha256": [
+    "a50df058c3aa7515602b5c32df8b87a2fc22c8a71ff9796e8ab7720fb4f13761"
+  ],
+  "class_count": 22685,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Weather",
+  "label_padded": false,
+  "obfuscation_ratio": 0.202,
+  "package": "life.channel.accurate.local.weather.forecast",
+  "sha256": "707f393bb823708c62dc017ab15ac79915d3b9c5f16ce93b1042b41a50646a4e",
+  "version": 1,
+  "version_code": 71
+}

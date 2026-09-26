@@ -1,0 +1,23 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "dt_fyber",
+    "meta",
+    "pangle",
+    "vungle"
+  ],
+  "cert_sha256": [
+    "302c4cae98d4485b51b5e8f9813de56277197db557dab0f3f8c4bc028a40cae2"
+  ],
+  "class_count": 49556,
+  "dynamic_code": true,
+  "error": null,
+  "label": "All PDF Reader",
+  "label_padded": false,
+  "obfuscation_ratio": 0.307,
+  "package": "com.ezt.pdfreader.pdfviewer",
+  "sha256": "f5f72a217239192c79022f3cda87040975e759578b2b49b854e0efffa0cc71a3",
+  "version": 1,
+  "version_code": 154
+}

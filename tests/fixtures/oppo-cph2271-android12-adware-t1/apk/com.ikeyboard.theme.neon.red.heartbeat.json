@@ -1,0 +1,23 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "bigo",
+    "meta",
+    "mintegral",
+    "vungle"
+  ],
+  "cert_sha256": [
+    "a81b8111a768107ff2f8bb72034bd6565e1d71374a436060e3414722d1968adb"
+  ],
+  "class_count": 41706,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Neon Red Heartbeat",
+  "label_padded": false,
+  "obfuscation_ratio": 0.479,
+  "package": "com.ikeyboard.theme.neon.red.heartbeat",
+  "sha256": "373fd587114bc11f487fbf49d8701a74068cdc6362468b47bd0213ee8d472274",
+  "version": 1,
+  "version_code": 173
+}

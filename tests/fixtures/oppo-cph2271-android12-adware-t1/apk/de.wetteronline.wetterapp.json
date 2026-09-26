@@ -1,0 +1,20 @@
+{
+  "ad_sdks": [
+    "admob",
+    "amazon_aps",
+    "meta"
+  ],
+  "cert_sha256": [
+    "7bf4ea7a5cdc7309e1c9984ceff666e99852599be0b8b8ab5c83e0656fdf7a7e"
+  ],
+  "class_count": 27429,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Weather&Radar",
+  "label_padded": false,
+  "obfuscation_ratio": 0.122,
+  "package": "de.wetteronline.wetterapp",
+  "sha256": "cc931b1da70ed05f65b9efc33a81d53c0c241f22a8810e9819857f6275c4a869",
+  "version": 1,
+  "version_code": 2301500
+}

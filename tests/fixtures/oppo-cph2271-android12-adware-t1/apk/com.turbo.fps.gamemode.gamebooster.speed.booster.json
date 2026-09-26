@@ -1,0 +1,24 @@
+{
+  "ad_sdks": [
+    "admob",
+    "ironsource",
+    "meta",
+    "mintegral",
+    "pangle",
+    "unity",
+    "vungle"
+  ],
+  "cert_sha256": [
+    "b1885cdf6116e90469854ce3272dc18887b877a82784e3dbfa9c3fb9faaa3b25"
+  ],
+  "class_count": 30771,
+  "dynamic_code": true,
+  "error": null,
+  "label": "TurboSpeed Game Booster",
+  "label_padded": false,
+  "obfuscation_ratio": 0.393,
+  "package": "com.turbo.fps.gamemode.gamebooster.speed.booster",
+  "sha256": "b755296f9da64960c2e0cd97169cc09dfb1e29b041fdb292e55504b97ed23c4e",
+  "version": 1,
+  "version_code": 46
+}

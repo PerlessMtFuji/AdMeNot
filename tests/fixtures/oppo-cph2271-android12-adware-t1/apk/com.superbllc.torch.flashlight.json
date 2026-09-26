@@ -1,0 +1,21 @@
+{
+  "ad_sdks": [
+    "admob",
+    "applovin",
+    "meta",
+    "vungle"
+  ],
+  "cert_sha256": [
+    "36a15454e5719cce11902ecf4839638f9c9235f4e4d88589e9ecb2418367270f"
+  ],
+  "class_count": 14034,
+  "dynamic_code": true,
+  "error": null,
+  "label": "Flashlight",
+  "label_padded": false,
+  "obfuscation_ratio": 0.499,
+  "package": "com.superbllc.torch.flashlight",
+  "sha256": "0a603df442e1b9ca3a2377d5e81db7730e334dcc563c06c7e443d223174b07e0",
+  "version": 1,
+  "version_code": 37
+}

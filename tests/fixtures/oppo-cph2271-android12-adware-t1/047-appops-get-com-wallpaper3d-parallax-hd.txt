@@ -1,0 +1,6 @@
+Uid mode: READ_EXTERNAL_STORAGE: ignore
+WRITE_EXTERNAL_STORAGE: ignore
+LEGACY_STORAGE: ignore
+SYSTEM_ALERT_WINDOW: default; rejectTime=+9m52s283ms ago
+WAKE_LOCK: allow; time=+2h15m51s34ms ago; duration=+6s955ms
+GET_USAGE_STATS: default; rejectTime=+2h14m53s998ms ago

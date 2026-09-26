@@ -1,0 +1,16 @@
+{
+  "ad_sdks": [],
+  "cert_sha256": [
+    "44c0ea55df8580979682a2240877013a1358fa47dc9572ccd553d3d33148f9e5"
+  ],
+  "class_count": 6792,
+  "dynamic_code": false,
+  "error": null,
+  "label": "Google Podcasts",
+  "label_padded": false,
+  "obfuscation_ratio": 0.005,
+  "package": "com.google.android.apps.podcasts",
+  "sha256": "1c38912c2e970bfa02d559a949f86db7cb0296d09e5af363d5c524d081cb9a4c",
+  "version": 1,
+  "version_code": 100002557
+}
