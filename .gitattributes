@@ -1,0 +1,2 @@
+# Lista Google w UTF-16: bez konwersji końców linii i bez diffu tekstowego.
+data/supported_devices.csv -text -diff
