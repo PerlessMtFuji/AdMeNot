@@ -50,21 +50,54 @@ def test_anonymize_notification_whitelist():
 
 
 def test_anonymize_notification_header_rule_fails_closed():
-    """Header rule: indent <= 2 and matches ^[A-Za-z][A-Za-z ]*:$ to prevent leakage."""
+    """Whitelist-only headers prevent all leakage (indent, tabs, formatting controlled by attacker)."""
     output = anonymize(
         "dumpsys notification",
         "  Notification List:\n"
-        "    NotificationRecord(0x1: pkg=com.a user=0):\n"
+        "    NotificationRecord(0x1: pkg=com.a):\n"
         "      Anna:\n"
-        "  Snoozed notifications:\n"
-        "        Hey Anna, see you at 5:\n",
+        "    NotificationRecord(0x2: pkg=com.b):\n"
+        "        Hey Anna, see you at 5:\n"
+        "    NotificationRecord(0x3: pkg=com.c):\n"
+        "Anna:\n"
+        "    NotificationRecord(0x4: pkg=com.d):\n"
+        "  Anna Kowalski:\n"
+        "    NotificationRecord(0x5: pkg=com.e):\n"
+        "\t\tAnna:\n",
         None,
     )
-    # Leakage lines should be dropped
+    # All leak inputs should be dropped
     assert "Anna" not in output
-    # Valid headers should be kept
+    assert "Kowalski" not in output
+    # Valid header should be kept
     assert "  Notification List:" in output
-    assert "  Snoozed notifications:" in output
+
+
+def test_anonymize_notification_enqueued_section():
+    """Unknown section headers at indent ≤ 2 become <section> boundary marker."""
+    output = anonymize(
+        "dumpsys notification",
+        "  Notification List:\n"
+        "    NotificationRecord(0x1: pkg=com.a):\n"
+        "      uid=1\n"
+        "  Enqueued Notification List:\n"
+        "    NotificationRecord(0x2: pkg=com.b):\n"
+        "      uid=2\n",
+        None,
+    )
+    # "Enqueued Notification List:" is not in whitelist, so becomes <section>
+    assert "<section>" in output
+    # Original packages should parse identically
+    original = parse_notifications(
+        "  Notification List:\n"
+        "    NotificationRecord(0x1: pkg=com.a):\n"
+        "      uid=1\n"
+        "  Enqueued Notification List:\n"
+        "    NotificationRecord(0x2: pkg=com.b):\n"
+        "      uid=2\n"
+    )
+    anonymized = parse_notifications(output)
+    assert original == anonymized
 
 
 def test_anonymize_notification_preserves_parsing():
