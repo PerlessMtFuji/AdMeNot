@@ -1,6 +1,8 @@
 import json
 
 from demalware.engine.adb.transport import AdbError
+from demalware.engine.apk.analyze import ApkReport, report_to_json
+from demalware.engine.apk.providers import StoredApkProvider
 from demalware.engine.collectors.behavior import USAGESTATS
 from demalware.engine.device.info import UPTIME
 from demalware.engine.session import report_to_dict, run_scan
@@ -55,3 +57,50 @@ def test_report_to_dict_is_json_serializable(synthetic_adb):
     assert first["verdict"] == "malicious"
     assert any("administrator" in f["text"] for f in first["findings"])
     assert "Anna: hej" not in text  # treść powiadomień nie trafia do wyników
+
+
+class _RecordingProvider:
+    def __init__(self, reports):
+        self.reports = reports
+        self.asked = []
+
+    def reports_for(self, apps, progress=None):
+        self.asked = [f.package for f in apps]
+        return {p: r for p, r in self.reports.items() if p in self.asked}
+
+
+SIX_SDKS = ["admob", "applovin", "meta", "mintegral", "pangle", "vungle"]
+
+
+def test_apk_analysis_rescores_targets(synthetic_adb):
+    provider = _RecordingProvider({"com.wlive.forecast": ApkReport(
+        "com.wlive.forecast", 31, label="Weather Live", ad_sdks=SIX_SDKS, class_count=500)})
+    report = run_scan(synthetic_adb, apk=provider)
+    assert provider.asked == ["com.clean.pro.boost", "com.wlive.forecast"]  # bez WhatsAppa i systemu
+    weather = _by_pkg(report)["com.wlive.forecast"]
+    assert weather.facts.label == "Weather Live"
+    assert {"DM-NOTIF-02", "DM-ADSDK-02", "DM-COMBO-03"} <= {f.rule_id for f in weather.findings}
+    assert (weather.score, weather.verdict) == (60, "suspicious")
+    assert report.apk.requested == 2 and report.apk.analyzed == 1 and report.apk.failed == {}
+
+
+def test_apk_failures_are_reported_not_fatal(synthetic_adb):
+    provider = _RecordingProvider({"com.clean.pro.boost": ApkReport("com.clean.pro.boost",
+                                                                    error="timeout")})
+    report = run_scan(synthetic_adb, apk=provider)
+    assert report.apk.failed == {"com.clean.pro.boost": "timeout"}
+    assert _by_pkg(report)["com.clean.pro.boost"].verdict == "malicious"
+
+
+def test_scan_without_apk_has_no_apk_status(synthetic_adb):
+    assert run_scan(synthetic_adb).apk is None
+
+
+def test_stored_provider_roundtrip_and_json(synthetic_adb, tmp_path):
+    (tmp_path / "com.wlive.forecast.json").write_text(json.dumps(report_to_json(ApkReport(
+        "com.wlive.forecast", label="Weather Live", ad_sdks=SIX_SDKS, class_count=500))))
+    report = run_scan(synthetic_adb, apk=StoredApkProvider(tmp_path))
+    data = json.loads(json.dumps(report_to_dict(report), default=str))
+    weather = next(r for r in data["results"] if r["package"] == "com.wlive.forecast")
+    assert weather["label"] == "Weather Live" and weather["ad_sdks"] == SIX_SDKS
+    assert data["apk"]["requested"] == 2

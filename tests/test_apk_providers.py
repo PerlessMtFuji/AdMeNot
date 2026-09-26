@@ -1,0 +1,87 @@
+import json
+import threading
+
+from demalware.engine.adb.fake import FakeAdb
+from demalware.engine.adb.transport import AdbError
+from demalware.engine.apk.analyze import ApkReport, report_to_json
+from demalware.engine.apk.providers import (
+    DeviceApkProvider,
+    StoredApkProvider,
+    select_apk_targets,
+)
+from demalware.engine.facts import AppFacts
+from demalware.engine.scoring import AppResult
+
+
+def _result(package, verdict="safe", trusted=False, is_system=False):
+    return AppResult(AppFacts(package, is_system=is_system), [], 0, verdict, trusted, False)
+
+
+def test_select_targets_user_untrusted_or_flagged():
+    results = [
+        _result("com.user.app"),
+        _result("com.whatsapp", trusted=True),
+        _result("com.whatsapp.flagged", verdict="review", trusted=True),
+        _result("com.sys.quiet", is_system=True),
+        _result("com.sys.flagged", verdict="review", is_system=True),
+    ]
+    assert [f.package for f in select_apk_targets(results)] == [
+        "com.user.app", "com.whatsapp.flagged", "com.sys.flagged"]
+
+
+def test_stored_provider_reads_existing_reports(tmp_path):
+    (tmp_path / "com.a.json").write_text(json.dumps(report_to_json(ApkReport("com.a", ad_sdks=["admob"]))))
+    reports = StoredApkProvider(tmp_path).reports_for([AppFacts("com.a"), AppFacts("com.b")])
+    assert list(reports) == ["com.a"] and reports["com.a"].ad_sdks == ["admob"]
+
+
+def test_device_provider_fetches_and_analyzes(tmp_path):
+    seen = []
+
+    def fetch(adb, package, version_code, cache_dir):
+        seen.append((package, version_code, cache_dir))
+        return [tmp_path / f"{package}.apk"]
+
+    def analyze(package, paths):
+        return ApkReport(package, class_count=1, ad_sdks=["admob"])
+
+    progress = []
+    provider = DeviceApkProvider(FakeAdb(), cache_dir=tmp_path, fetch=fetch, analyze=analyze)
+    reports = provider.reports_for([AppFacts("com.a", version_code=3), AppFacts("com.b")],
+                                   progress=lambda done, total, pkg: progress.append((done, total, pkg)))
+    assert set(reports) == {"com.a", "com.b"}
+    assert ("com.a", 3, tmp_path) in seen
+    assert [p[:2] for p in progress] == [(1, 2), (2, 2)]
+
+
+def test_device_provider_pull_error_and_crash_become_report_errors(tmp_path):
+    def fetch(adb, package, version_code, cache_dir):
+        if package == "com.gone":
+            raise AdbError("command_failed", "pm path com.gone: no APK (uninstalled?)")
+        return []
+
+    def analyze(package, paths):
+        raise RuntimeError("boom")
+
+    reports = DeviceApkProvider(FakeAdb(), cache_dir=tmp_path, fetch=fetch, analyze=analyze
+                                ).reports_for([AppFacts("com.gone"), AppFacts("com.crash")])
+    assert reports["com.gone"].error.startswith("pull: ")
+    assert reports["com.crash"].error == "RuntimeError: boom"
+
+
+def test_device_provider_timeout_is_incomplete_not_fatal(tmp_path):
+    release = threading.Event()
+
+    def analyze(package, paths):
+        if package == "com.slow":
+            release.wait(5)
+        return ApkReport(package, class_count=1)
+
+    provider = DeviceApkProvider(FakeAdb(), cache_dir=tmp_path, timeout_s=0.2,
+                                 fetch=lambda *a: [], analyze=analyze)
+    try:
+        reports = provider.reports_for([AppFacts("com.slow"), AppFacts("com.fast")])
+    finally:
+        release.set()
+    assert reports["com.slow"].error == "timeout"
+    assert reports["com.fast"].error is None
