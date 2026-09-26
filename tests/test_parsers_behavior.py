@@ -57,3 +57,58 @@ def test_parse_usage_events_dedupes_and_windows():
 
 def test_parse_usage_events_returns_none_without_events():
     assert parse_usage_events("user=0\n  In-memory daily stats\n", NOW) is None
+
+
+UNLOCK_NOW = datetime(2026, 9, 26, 14, 0, 0)
+
+
+def _ev(hms, event_type, package="android"):
+    return f'    time="2026-09-26 {hms}" type={event_type} package={package} flags=0x0'
+
+
+def _usage(*events):
+    body = "\n".join(events)
+    return f"  In-memory daily stats\n    events\n{body}\n  In-memory weekly stats\n    events\n{body}\n"
+
+
+def test_unlock_launch_counted_once_despite_duplicate_sections():
+    text = _usage(
+        _ev("10:00:00", "ACTIVITY_RESUMED", "com.user.chat"),
+        _ev("10:01:00", "SCREEN_NON_INTERACTIVE"),
+        _ev("11:00:00", "SCREEN_INTERACTIVE"),
+        _ev("11:00:02", "ACTIVITY_RESUMED", "com.clean.x"),
+        _ev("11:00:03", "ACTIVITY_RESUMED", "com.other.ad"),  # tylko pierwsza aktywność się liczy
+        _ev("12:00:00", "SCREEN_NON_INTERACTIVE"),
+        _ev("12:30:00", "KEYGUARD_HIDDEN"),
+        _ev("12:30:05", "ACTIVITY_RESUMED", "com.clean.x"),
+    )
+    counts = parse_usage_events(text, UNLOCK_NOW)
+    assert counts["com.clean.x"].unlock_launches == 2
+    assert "com.other.ad" not in counts or counts["com.other.ad"].unlock_launches == 0
+
+
+def test_returning_to_previous_app_after_unlock_is_not_counted():
+    text = _usage(
+        _ev("10:00:00", "ACTIVITY_RESUMED", "com.user.chat"),
+        _ev("10:01:00", "SCREEN_NON_INTERACTIVE"),
+        _ev("11:00:00", "SCREEN_INTERACTIVE"),
+        _ev("11:00:01", "ACTIVITY_RESUMED", "com.user.chat"),
+    )
+    assert parse_usage_events(text, UNLOCK_NOW)["com.user.chat"].unlock_launches == 0
+
+
+def test_late_resume_after_unlock_is_not_counted():
+    text = _usage(
+        _ev("11:00:00", "SCREEN_INTERACTIVE"),
+        _ev("11:00:30", "ACTIVITY_RESUMED", "com.clean.x"),
+    )
+    assert parse_usage_events(text, UNLOCK_NOW)["com.clean.x"].unlock_launches == 0
+
+
+def test_unlock_launches_outside_24h_window_ignored():
+    text = _usage(
+        '    time="2026-09-24 11:00:00" type=SCREEN_INTERACTIVE package=android flags=0x0',
+        '    time="2026-09-24 11:00:01" type=ACTIVITY_RESUMED package=com.clean.x flags=0x0',
+    )
+    counts = parse_usage_events(text, UNLOCK_NOW)
+    assert "com.clean.x" not in counts or counts["com.clean.x"].unlock_launches == 0

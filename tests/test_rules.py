@@ -164,3 +164,12 @@ def test_alarm_rule_uses_rate_per_hour():
     assert noisy.alarm_wakeups_per_hour > 6 and "DM-ALARM-01" in _ids(noisy)
     assert "DM-ALARM-01" not in _ids(quiet)
     assert AppFacts("com.x").alarm_wakeups_per_hour is None
+
+
+def test_unlock_rule_needs_two_events_and_skips_home():
+    once = AppFacts("com.x", unlock_launches_24h=1)   # np. otwarcie z powiadomienia na ekranie blokady
+    twice = AppFacts("com.x", unlock_launches_24h=2)
+    home = AppFacts("com.x", unlock_launches_24h=5, is_home_holder=True)
+    assert "DM-BGACT-01" not in _ids(once)
+    assert "DM-BGACT-01" in _ids(twice)
+    assert "DM-BGACT-01" not in _ids(home)
