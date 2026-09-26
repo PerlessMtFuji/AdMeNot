@@ -93,3 +93,22 @@ def test_fix_writes_session_log(tmp_path):
     (log,) = (tmp_path / "DeMalware" / "logs").glob("*.log")
     lines = log.read_text("utf-8").splitlines()
     assert any(line.split("\t")[2] == "ok" and line.endswith("\t" + DISABLE) for line in lines)
+
+
+def test_resume_of_finished_order_says_nothing_to_do(capsys):
+    phone = make_cli_phone()
+    order = _fix(phone, "com.wlive.forecast=disable")
+    main(["undo", "--order", order.number], host=phone)
+    capsys.readouterr()
+    assert main(["resume", "--order", order.number, "--yes"], host=phone) == 0
+    assert "nie ma kroków do dokończenia" in capsys.readouterr().out
+    assert phone.apps["com.wlive.forecast"].enabled
+    with Journal(journal_path()) as j:
+        assert j.order(order.id).status == "undone"
+
+
+def test_undo_unknown_app_in_order(capsys):
+    phone = make_cli_phone()
+    order = _fix(phone, "com.wlive.forecast=disable")
+    assert main(["undo", "--order", order.number, "--app", "com.wlive.forcast"], host=phone) == 2
+    assert "Nie ma takiej aplikacji ani kroku" in capsys.readouterr().err

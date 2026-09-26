@@ -284,7 +284,7 @@ class FakePhone:
         app = self.apps.get(package)
         if app is None or (not app.installed and not app.keeps_apk):
             raise AdbError("command_failed", f"Package {package} doesn't exist")
-        app.installed = True
+        app.installed, app.enabled = True, True  # nowy stan użytkownika: domyślnie włączona
         return f"Package {package} installed for user: 0\n"
 
     def _pull(self, remote: str, local: Path) -> str:

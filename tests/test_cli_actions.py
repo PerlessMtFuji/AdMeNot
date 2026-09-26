@@ -109,3 +109,14 @@ def test_fix_treats_closed_stdin_as_no(capsys, monkeypatch):
     assert main(["fix", "--app", "com.wlive.forecast=disable"], host=phone) == 1
     assert "Anulowano" in capsys.readouterr().out
     assert phone.apps["com.wlive.forecast"].enabled
+
+
+def test_fix_disconnect_before_planning_is_reported_without_traceback(capsys, monkeypatch):
+    from demalware.engine.actions.errors import ActionError
+
+    def gone(adb, manufacturer=""):
+        raise ActionError("disconnected", "device not found")
+
+    monkeypatch.setattr("demalware.cli.actions_cli.read_phone_context", gone)
+    assert main(["fix", "--app", "com.wlive.forecast=disable", "--yes"], host=make_cli_phone()) == 3
+    assert "Podłącz" in capsys.readouterr().err

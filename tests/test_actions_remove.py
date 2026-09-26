@@ -108,3 +108,31 @@ def test_reinstall_without_backup_is_reported(journal, tmp_path):
     assert (errors[0][0].step["kind"], errors[0][1]) == ("installed", "no_backup")
     assert not phone.apps["com.spam"].installed
     assert journal.order(order.id).status == "partially_undone"
+
+
+def test_undo_remove_keeps_app_disabled_if_it_was_disabled_before(journal, tmp_path):
+    for keeps_apk in (False, True):
+        phone = _phone(keeps_apk=keeps_apk)
+        phone.apps["com.spam"].enabled = False  # wyłączona przed naprawą
+        order, _ = _remove(phone, journal, tmp_path / str(keeps_apk))
+        assert undo(phone, journal, order.id) == []
+        app = phone.apps["com.spam"]
+        assert app.installed and app.enabled is False, keeps_apk
+
+
+def test_failed_restore_keeps_other_steps_for_a_later_undo(journal, tmp_path):
+    phone = FakePhone([
+        FakeApp("com.spam", version_code=7, apks=SPLITS, home_activity=".Home"),
+        FakeApp("com.android.launcher", system=True, home_activity=".Launcher"),
+    ], sdk=31, home="com.spam/.Home")
+    order, _ = _remove(phone, journal, tmp_path)
+    original = phone._install
+    phone._install = lambda files: (_ for _ in ()).throw(
+        AdbError("command_failed", "Failure [INSTALL_FAILED_INSUFFICIENT_STORAGE]"))
+    errors = undo(phone, journal, order.id)
+    assert errors and not phone.apps["com.spam"].installed
+    assert not [a for a in journal.actions(order.id) if a.error == "app_gone"]
+    phone._install = original  # serwisant zwolnił miejsce
+    assert undo(phone, journal, order.id) == []
+    assert phone.apps["com.spam"].installed and phone.home == "com.spam/.Home"
+    assert journal.order(order.id).status == "undone"

@@ -3,7 +3,14 @@ from fakephone import GEARHEAD, LISTENERS, POST, FakeApp, FakePhone
 
 from demalware.engine.actions import commands as C
 from demalware.engine.actions.context import read_phone_context
-from demalware.engine.actions.executor import ExecOptions, run_order, start_order, undo, verify
+from demalware.engine.actions.executor import (
+    ExecOptions,
+    resume,
+    run_order,
+    start_order,
+    undo,
+    verify,
+)
 from demalware.engine.actions.planner import plan_app
 from demalware.engine.adb.transport import AdbError
 from demalware.engine.allowlist.trust import load_protected_list
@@ -161,3 +168,57 @@ def test_undo_after_user_uninstalled_the_app(journal, tmp_path):
     assert {a.status for a in rows} == {"undone"}
     assert {a.error for a in rows if a.inverse is not None} == {"app_gone"}
     assert journal.order(order.id).status == "undone"
+
+
+class _ClosedAfter:
+    """Polecenie dociera do telefonu, ale adb kończy się zwykłym błędem („error: closed”)."""
+
+    def __init__(self, phone, command):
+        self.phone, self.command = phone, command
+        self.serial = phone.serial
+
+    def shell(self, command, timeout=20.0):
+        out = self.phone.shell(command, timeout)
+        if command == self.command:
+            raise AdbError("command_failed", "error: closed")
+        return out
+
+    def run(self, args, timeout=20.0):
+        return self.phone.run(args, timeout)
+
+
+def test_undo_reverts_step_marked_failed_although_it_was_applied(journal, tmp_path):
+    phone = _phone()
+    order = _order(phone, journal, tmp_path, {"com.spam": "disable"})
+    run_order(_ClosedAfter(phone, C.PM_DISABLE.format(package="com.spam")), journal, order.id)
+    assert phone.apps["com.spam"].enabled is False
+    assert undo(phone, journal, order.id) == []
+    assert phone.apps["com.spam"].enabled
+
+
+def test_undo_of_really_failed_step_sends_nothing(journal, tmp_path):
+    phone = _phone()
+    command = C.PM_DISABLE.format(package="com.spam")
+    phone.fail[command] = AdbError("command_failed", "Error: something odd")
+    order = _order(phone, journal, tmp_path, {"com.spam": "disable"})
+    run_order(phone, journal, order.id)
+    assert undo(phone, journal, order.id) == []
+    assert C.PM_ENABLE.format(package="com.spam") not in phone.calls
+
+
+def test_resume_after_undo_keeps_undone_status(journal, tmp_path):
+    phone = _phone()
+    order = _order(phone, journal, tmp_path, {"com.spam": "disable"})
+    run_order(phone, journal, order.id)
+    undo(phone, journal, order.id)
+    resume(phone, journal, order.id)
+    assert journal.order(order.id).status == "undone"
+
+
+def test_undo_with_unknown_package_changes_nothing(journal, tmp_path):
+    phone = _phone()
+    order = _order(phone, journal, tmp_path, {"com.spam": "disable"})
+    run_order(phone, journal, order.id)
+    with pytest.raises(ValueError):
+        undo(phone, journal, order.id, package="com.spma")
+    assert journal.order(order.id).status == "done"
