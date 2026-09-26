@@ -1,4 +1,5 @@
 import struct
+import zipfile
 
 import pytest
 from dexutil import make_apk, make_dex
@@ -56,3 +57,21 @@ def test_read_apk_types_keeps_going_after_broken_dex_and_bad_zip(tmp_path):
     assert len(errors) == 2
     assert any("classes2.dex" in e for e in errors)
     assert any("split_config.xhdpi.apk" in e for e in errors)
+
+
+@pytest.mark.parametrize("compression", [zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED])
+def test_read_apk_types_skips_corrupt_entry_and_keeps_later_dex(tmp_path, compression):
+    path = tmp_path / "base.apk"
+    with zipfile.ZipFile(path, "w", compression=compression) as z:
+        z.writestr("classes.dex", make_dex(["com.a.A"]))
+        z.writestr("classes2.dex", make_dex([f"com.mid.C{i}" for i in range(50)]))
+        z.writestr("classes3.dex", make_dex(["com.c.C"]))
+    info = zipfile.ZipFile(path).getinfo("classes2.dex")
+    raw = bytearray(path.read_bytes())
+    data_start = info.header_offset + 30 + len(info.filename)
+    raw[data_start + 40] ^= 0xFF  # uszkodzony wpis: zły CRC (stored) albo zepsuty strumień deflate
+    raw[data_start + 41] ^= 0xFF
+    path.write_bytes(bytes(raw))
+    types, errors = read_apk_types([path])
+    assert {"com.a.A", "com.c.C"} <= types.defined
+    assert len(errors) == 1 and "classes2.dex" in errors[0]

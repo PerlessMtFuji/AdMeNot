@@ -49,6 +49,8 @@ def test_default_ad_sdks_load():
 
 @pytest.mark.parametrize(("raw", "expected"), [
     ("Super Cleaner", ("Super Cleaner", False)),
+    ("Evil\x1b[2JApp\x07", ("Evil[2JApp", False)),  # sterujące ANSI/C0 nie trafiają do konsoli
+    ("Bad\x9bApp", ("BadApp", False)),                # C1 (CSI)
     ("\xa0 IntelliClean", ("IntelliClean", True)),
     ("\u200b\u200bPDF Reader", ("PDF Reader", True)),
     ("Evil\u202eexe.gpj", ("Evilexe.gpj", False)),  # sterowanie kierunkiem tekstu usuwane
@@ -129,3 +131,8 @@ def test_apply_failed_report_keeps_facts_unknown():
     apply_apk_report(f, ApkReport("com.clean.x", error="pull: remote object does not exist"))
     assert f.apk_error.startswith("pull")
     assert (f.ad_sdks, f.ad_sdk_count, f.dynamic_code, f.label_padded) == (None, None, None, None)
+
+def test_apply_apk_report_cleans_stored_label():
+    f = AppFacts("com.clean.x")
+    apply_apk_report(f, ApkReport("com.clean.x", label="\x1b[31mRed", class_count=1))
+    assert f.label == "[31mRed"
