@@ -60,7 +60,7 @@ def test_collect_packages_merges_sources():
     assert (a.installer, a.uid, a.is_system, a.enabled, a.version_code) == (
         "com.android.chrome", 10301, False, True, 7)
     assert a.installed_days == pytest.approx(6.0)
-    assert a.requested_permissions == {"android.permission.SYSTEM_ALERT_WINDOW"}
+    assert a.requested_permissions == {"android.permission.SYSTEM_ALERT_WINDOW", "android.permission.INTERNET"}
     assert a.granted_permissions == {"android.permission.INTERNET"}
     assert (b.is_system, b.enabled, b.installer) == (True, False, None)
 

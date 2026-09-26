@@ -97,12 +97,43 @@ def test_parse_dumpsys_packages():
     assert clean.first_install == datetime(2026, 9, 20, 10, 0, 0)
     assert clean.last_update == datetime(2026, 9, 21, 11, 0, 0)
     assert clean.installer == "com.android.chrome"
+    # Uprawnienie z sekcji install/runtime też jest żądane, nawet nieprzyznane.
     assert clean.requested == {
         "android.permission.INTERNET",
         "android.permission.SYSTEM_ALERT_WINDOW",
         "android.permission.READ_PHONE_STATE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.CAMERA",
     }
     assert clean.granted == {"android.permission.INTERNET", "android.permission.POST_NOTIFICATIONS"}
     other = dumps["com.other"]
     assert other.installer is None
     assert other.first_install == datetime(2025, 1, 10, 9, 0, 0)
+
+
+# Android 12 (OPPO CPH2271): `dumpsys package packages` nie wypisuje sekcji „requested permissions:”.
+DUMPSYS_NO_REQUESTED = """Packages:
+  Package [com.intelli.clean] (4fd82fa):
+    versionCode=25 minSdk=23 targetSdk=36
+    installerPackageName=com.android.vending
+    declared permissions:
+      com.intelli.clean.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION: prot=signature, INSTALLED
+    install permissions:
+      android.permission.RECEIVE_BOOT_COMPLETED: granted=true
+      android.permission.REQUEST_DELETE_PACKAGES: granted=true
+    User 0: ceDataInode=25959 installed=true hidden=false enabled=0
+      runtime permissions:
+        android.permission.READ_EXTERNAL_STORAGE: granted=false, flags=[ USER_SENSITIVE_WHEN_GRANTED ]
+"""
+
+
+def test_parse_dumpsys_packages_without_requested_section():
+    d = parse_dumpsys_packages(DUMPSYS_NO_REQUESTED)["com.intelli.clean"]
+    assert d.requested == {
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.REQUEST_DELETE_PACKAGES",
+        "android.permission.READ_EXTERNAL_STORAGE",
+    }
+    assert d.granted == {"android.permission.RECEIVE_BOOT_COMPLETED",
+                         "android.permission.REQUEST_DELETE_PACKAGES"}
