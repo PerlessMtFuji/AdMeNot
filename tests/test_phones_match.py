@@ -1,3 +1,4 @@
+import threading
 import xml.etree.ElementTree as ET
 
 import pytest
@@ -99,6 +100,26 @@ def test_corrupted_db(tmp_path):
     (tmp_path / "phones.db").write_bytes(b"to nie jest baza SQLite")
     m = PhoneImageProvider(tmp_path, tmp_path / "o.json").match(make_device("SM-A145R"))
     assert _summary(m) == ("none", "no_db", None)
+
+
+def test_index_is_built_once_under_concurrency(provider):
+    n = 8
+    barrier = threading.Barrier(n)
+    results: list[tuple[str, str, str | None]] = [None] * n
+
+    def run(i):
+        barrier.wait()
+        results[i] = _summary(provider.match(make_device("SM-A145X", device="a14lte")))
+
+    threads = [threading.Thread(target=run, args=(i,)) for i in range(n)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert results == [("approximate", "fuzzy", "samsung-galaxy-a14")] * n
+    entries = provider._by_brand["samsung"]
+    assert len(entries) == len({(tuple(tokens), slug) for tokens, _, slug in entries})
 
 
 def test_to_dict(provider):
