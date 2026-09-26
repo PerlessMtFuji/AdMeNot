@@ -69,3 +69,10 @@ def test_collect_packages_survives_dumpsys_failure():
     facts = collect_packages(_adb(AdbError("timeout", "slow")), NOW)
     assert set(facts) == {"com.a", "com.b"}
     assert facts["com.a"].version_code is None
+
+
+def test_collect_packages_ignores_install_time_after_device_clock():
+    # Zegar telefonu cofnięty (np. 2010): firstInstallTime "w przyszłości" nie może dać ujemnego wieku.
+    facts = collect_packages(_adb(DUMP), datetime(2010, 1, 4, 0, 41, 0))
+    assert facts["com.a"].first_install == datetime(2026, 9, 20, 14, 0, 0)
+    assert facts["com.a"].installed_days is None
