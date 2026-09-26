@@ -10,6 +10,7 @@ from demalware.engine.allowlist.trust import load_protected_list
 from demalware.engine.facts import AppFacts
 from demalware.engine.journal.db import Journal
 
+SAW = "android.permission.SYSTEM_ALERT_WINDOW"  # aplikacje w tych testach mogą rysować nad innymi
 DISABLE = C.PM_DISABLE.format(package="com.spam")
 OVERLAY = C.APPOPS_SET.format(package="com.spam", op="SYSTEM_ALERT_WINDOW", mode="deny")
 
@@ -34,7 +35,7 @@ def _snapshot(phone):
 
 def _order(phone, journal, tmp_path):
     ctx = read_phone_context(phone)
-    plans = [plan_app(package, level, AppFacts(package, version_code=1), ctx,
+    plans = [plan_app(package, level, AppFacts(package, version_code=1, requested_permissions={SAW}), ctx,
                       load_protected_list(), tmp_path / "backups")
              for package, level in (("com.spam", "disable"), ("com.other", "silence"))]
     return start_order(journal, phone.serial, "Test", plans)

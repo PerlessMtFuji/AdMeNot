@@ -14,6 +14,7 @@ AD_LISTENER = f"{AD}/com.star.james.notify.NotifyListenerService"
 LAUNCHER = "com.android.launcher/.Launcher"
 IME = "com.ikeyboard.theme.neon"
 ROOT = Path("backups") / "SERIAL"
+SAW = "android.permission.SYSTEM_ALERT_WINDOW"
 PROTECTED = parse_package_patterns(
     "protected:\n  - com.android.settings\n  - com.android.providers.*\n", "protected")
 
@@ -29,8 +30,8 @@ CTX = PhoneContext(
 )
 
 
-def _plan(package, level, ctx=CTX, version_code=25, unlocked=frozenset()):
-    facts = AppFacts(package, version_code=version_code)
+def _plan(package, level, ctx=CTX, version_code=25, unlocked=frozenset(), requested=(SAW,)):
+    facts = AppFacts(package, version_code=version_code, requested_permissions=set(requested))
     return plan_app(package, level, facts, ctx, PROTECTED, ROOT, unlocked)
 
 
@@ -129,3 +130,11 @@ def test_read_phone_context_from_phone():
     assert ctx.home_candidates == {AD: f"{AD}/.Launcher", "com.android.launcher": LAUNCHER}
     assert ctx.system_launchers == frozenset({"com.android.launcher"})
     assert ctx.secure_lists == {A11Y: "", LISTENERS: AD_LISTENER}
+
+
+def test_overlay_step_only_when_app_can_draw_over_others():
+    # Na Androidzie 12 (OPPO) `appops set … SYSTEM_ALERT_WINDOW deny` dla aplikacji bez tego
+    # uprawnienia kończy się kodem 0, ale tryb zostaje „default” — weryfikacja pokazałaby „nadal aktywna”.
+    plan = _plan(AD, "silence", requested=())
+    assert "SYSTEM_ALERT_WINDOW" not in [s.params.get("op") for s in plan.steps]
+    assert [s.kind for s in plan.steps] == ["home", "secure_list", "appop", "force_stop"]

@@ -11,6 +11,7 @@ from demalware.engine.allowlist.trust import load_protected_list
 from demalware.engine.facts import AppFacts
 from demalware.engine.journal.db import Journal
 
+SAW = "android.permission.SYSTEM_ALERT_WINDOW"  # aplikacje w tych testach mogą rysować nad innymi
 SPLITS = ("base.apk", "split_config.arm64_v8a.apk")
 BACKUP = ("backups", "SERIAL", "com.spam", "7")
 
@@ -30,7 +31,7 @@ def _phone(keeps_apk=False):
 
 def _remove(phone, journal, tmp_path, options=None):
     ctx = read_phone_context(phone)
-    plan = plan_app("com.spam", "remove", AppFacts("com.spam", version_code=7), ctx,
+    plan = plan_app("com.spam", "remove", AppFacts("com.spam", version_code=7, requested_permissions={SAW}), ctx,
                     load_protected_list(), tmp_path / "backups" / "SERIAL")
     order = start_order(journal, phone.serial, "Test", [plan])
     return order, run_order(phone, journal, order.id, options or ExecOptions())

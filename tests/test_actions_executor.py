@@ -11,6 +11,7 @@ from demalware.engine.facts import AppFacts
 from demalware.engine.journal.db import Journal
 
 AD_LISTENER = "com.ad/com.ad.Listener"
+SAW = "android.permission.SYSTEM_ALERT_WINDOW"  # aplikacje w tych testach mogą rysować nad innymi
 WRITES = ("appops set", "pm ", "settings put", "am force-stop", "cmd package set-home")
 
 
@@ -37,7 +38,7 @@ def journal(tmp_path):
 
 def _order(phone, journal, tmp_path, requests):
     ctx = read_phone_context(phone)
-    plans = [plan_app(package, level, AppFacts(package, version_code=1), ctx,
+    plans = [plan_app(package, level, AppFacts(package, version_code=1, requested_permissions={SAW}), ctx,
                       load_protected_list(), tmp_path / "backups")
              for package, level in requests.items()]
     return start_order(journal, phone.serial, "Test", plans)
