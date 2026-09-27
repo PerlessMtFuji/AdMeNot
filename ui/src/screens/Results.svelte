@@ -4,6 +4,7 @@
   import ExpertTable from '../components/ExpertTable.svelte';
   import InterruptedBanner from '../components/InterruptedBanner.svelte';
   import PhoneCard from '../components/PhoneCard.svelte';
+  import PlanPreview from '../components/PlanPreview.svelte';
   import SummaryBanner from '../components/SummaryBanner.svelte';
   import type { Controller } from '../lib/controller';
   import { t } from '../lib/i18n/index.svelte';
@@ -53,3 +54,5 @@
     </span>
   </div>
 {/if}
+
+<PlanPreview />

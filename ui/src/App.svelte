@@ -7,6 +7,7 @@
   import type { Controller } from './lib/controller';
   import { t } from './lib/i18n/index.svelte';
   import Connect from './screens/Connect.svelte';
+  import Execute from './screens/Execute.svelte';
   import Results from './screens/Results.svelte';
 
   let props: { ctl: Controller } = $props();
@@ -25,6 +26,8 @@
       <StageBar />
       {#if s.phase === 'connect' || (s.phase === 'scanning' && !s.device)}
         <Connect />
+      {:else if s.phase === 'executing' || s.phase === 'done'}
+        <Execute />
       {:else}
         <Results />
       {/if}
