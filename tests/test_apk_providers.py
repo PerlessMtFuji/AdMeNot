@@ -18,16 +18,15 @@ def _result(package, verdict="safe", trusted=False, is_system=False):
     return AppResult(AppFacts(package, is_system=is_system), [], 0, verdict, trusted, False)
 
 
-def test_select_targets_user_untrusted_or_flagged():
+def test_select_targets_every_user_app_and_flagged_system_apps():
     results = [
         _result("com.user.app"),
         _result("com.whatsapp", trusted=True),
-        _result("com.whatsapp.flagged", verdict="review", trusted=True),
-        _result("com.sys.quiet", is_system=True),
+        _result("com.sys.quiet", is_system=True, trusted=True),
         _result("com.sys.flagged", verdict="review", is_system=True),
     ]
     assert [f.package for f in select_apk_targets(results)] == [
-        "com.user.app", "com.whatsapp.flagged", "com.sys.flagged"]
+        "com.user.app", "com.whatsapp", "com.sys.flagged"]
 
 
 def test_stored_provider_reads_existing_reports(tmp_path):

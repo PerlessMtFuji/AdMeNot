@@ -1,6 +1,7 @@
 import json
 
 from demalware.engine.adb.transport import AdbError
+from demalware.engine.allowlist.trust import parse_trust_list
 from demalware.engine.apk.analyze import ApkReport, report_to_json
 from demalware.engine.apk.providers import StoredApkProvider
 from demalware.engine.collectors.behavior import USAGESTATS
@@ -28,7 +29,7 @@ def test_synthetic_phone_verdicts(synthetic_adb):
     assert (weather.verdict, weather.score) == ("review", 25)
     assert [f.rule_id for f in weather.findings] == ["DM-NOTIF-02"]
 
-    assert results["com.whatsapp"].verdict == "safe" and results["com.whatsapp"].trusted
+    assert results["com.whatsapp"].verdict == "safe" and not results["com.whatsapp"].trusted
     assert results["com.sec.android.app.launcher"].verdict == "safe"
 
     assert report.results[0].facts.package == "com.clean.pro.boost"  # sortowanie malejąco
@@ -85,12 +86,13 @@ def test_apk_analysis_rescores_targets(synthetic_adb):
     provider = _RecordingProvider({"com.wlive.forecast": ApkReport(
         "com.wlive.forecast", 31, label="Weather Live", ad_sdks=SIX_SDKS, class_count=500)})
     report = run_scan(synthetic_adb, apk=provider)
-    assert provider.asked == ["com.clean.pro.boost", "com.wlive.forecast"]  # bez WhatsAppa i systemu
+    # wszystkie aplikacje użytkownika trafiają do analizy APK — zaufanie wymaga certyfikatu z pliku
+    assert provider.asked == ["com.clean.pro.boost", "com.wlive.forecast", "com.whatsapp"]
     weather = _by_pkg(report)["com.wlive.forecast"]
     assert weather.facts.label == "Weather Live"
     assert {"DM-NOTIF-02", "DM-ADSDK-02", "DM-COMBO-03"} <= {f.rule_id for f in weather.findings}
     assert (weather.score, weather.verdict) == (60, "suspicious")
-    assert report.apk.requested == 2 and report.apk.analyzed == 1 and report.apk.failed == {}
+    assert report.apk.requested == 3 and report.apk.analyzed == 1 and report.apk.failed == {}
 
 
 def test_apk_failures_are_reported_not_fatal(synthetic_adb):
@@ -112,7 +114,8 @@ def test_stored_provider_roundtrip_and_json(synthetic_adb, tmp_path):
     data = json.loads(json.dumps(report_to_dict(report), default=str))
     weather = next(r for r in data["results"] if r["package"] == "com.wlive.forecast")
     assert weather["label"] == "Weather Live" and weather["ad_sdks"] == SIX_SDKS
-    assert data["apk"]["requested"] == 2
+    # wszystkie aplikacje użytkownika (bez systemowego launchera): boost, whatsapp, forecast
+    assert data["apk"]["requested"] == 3
 
 
 def test_synthetic_adware_wakes_phone(synthetic_adb):
@@ -155,6 +158,14 @@ def test_analyze_apks_rescores_without_touching_the_first_report(synthetic_adb):
     scores = {r.facts.package: r.score for r in after.results}
     assert scores["com.wlive.forecast"] > before["com.wlive.forecast"]
     assert report.apk is None
+
+
+def test_trust_comes_from_the_signer_seen_in_the_apk(synthetic_adb, tmp_path):
+    trust = parse_trust_list(f"trusted:\n  - package: com.whatsapp\n    signers: ['{'a1' * 32}']\n")
+    (tmp_path / "com.whatsapp.json").write_text(json.dumps(report_to_json(
+        ApkReport("com.whatsapp", version_code=242000, class_count=5, cert_sha256=["a1" * 32]))))
+    report = run_scan(synthetic_adb, trust=trust, apk=StoredApkProvider(tmp_path))
+    assert _by_pkg(report)["com.whatsapp"].trusted
 
 
 def test_exception_from_progress_stops_the_analysis(synthetic_adb):

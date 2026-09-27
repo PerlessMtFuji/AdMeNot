@@ -84,7 +84,7 @@ def test_scan_apk_shows_labels_and_progress(capsys, monkeypatch):
     captured = capsys.readouterr()
     assert "Weather Live (com.wlive.forecast)" in captured.out  # oczyszczona etykieta
     assert "Podejrzana" in captured.out
-    assert "Analiza APK 2/2" in captured.err
+    assert "Analiza APK 3/3" in captured.err
 
 
 def test_scan_apk_lists_failures(capsys, monkeypatch):

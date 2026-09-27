@@ -1,6 +1,5 @@
 import pytest
 
-from demalware.engine.allowlist.trust import load_default_trust_list, parse_trust_list
 from demalware.engine.facts import AppFacts
 from demalware.engine.rules.model import Finding
 from demalware.engine.scoring import score_app, verdict_for
@@ -60,27 +59,19 @@ def test_low_behavior_data_marks_untrusted_incomplete():
     assert result.incomplete is True
 
 
-def test_trust_list_prefixes_and_source_requirement():
-    trust = parse_trust_list("trusted:\n  - com.whatsapp\n  - com.google.android.*\n")
-    play = "com.android.vending"
-    assert trust.is_trusted(AppFacts("com.whatsapp", installer=play))
-    assert trust.is_trusted(AppFacts("com.google.android.gm", is_system=True))
-    # sideloadowana aplikacja podszywająca się pod zaufaną nazwę — bez zaufania
-    assert not trust.is_trusted(AppFacts("com.whatsapp", installer="com.android.chrome"))
-    assert not trust.is_trusted(AppFacts("com.google.androidx.evil", installer=play))
-
-
-def test_default_trust_list_loads():
-    trust = load_default_trust_list()
-    assert trust.matches("com.whatsapp") and trust.matches("com.google.android.youtube")
-
-
-def test_trusted_app_never_malicious():
+def test_trusted_app_is_scored_on_behavior_only():
     findings = [F("DM-ADMIN-01", "position", 25), F("DM-A11Y-01", "position", 20),
-                F("DM-OVERLAY-01", "behavior", 25), F("DM-NOTIF-02", "behavior", 25),
-                F("DM-FSI-01", "behavior", 15)]
+                F("DM-SRC-01", "context", 8), F("DM-NOTIF-02", "behavior", 25),
+                F("DM-OVERLAY-01", "behavior", 25), F("DM-FSI-01", "behavior", 15)]
     result = score_app(AppFacts("com.x"), findings, trusted=True, low_behavior_data=False)
-    assert result.score == 60 and result.verdict == "suspicious"
+    assert result.score == 60  # zachowanie liczy się w pełni (limit klasy 60), tożsamość nie
+    assert {f.rule_id for f in result.findings} >= {"DM-ADMIN-01", "DM-SRC-01"}  # nadal widoczne
+
+
+def test_trusted_app_with_only_identity_signals_is_safe():
+    findings = [F("DM-NLS-01", "position", 10), F("DM-SRC-01", "context", 8)]
+    result = score_app(AppFacts("com.x"), findings, trusted=True, low_behavior_data=False)
+    assert (result.score, result.verdict) == (0, "safe")
 
 
 def test_combo_findings_carry_category_and_label():

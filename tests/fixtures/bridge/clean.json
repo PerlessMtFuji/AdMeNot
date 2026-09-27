@@ -395,10 +395,10 @@
         {
          "package": "com.whatsapp",
          "name": "com.whatsapp",
-         "score": 0,
+         "score": 10,
          "verdict": "safe",
          "verdict_label": "Bezpieczna",
-         "trusted": true,
+         "trusted": false,
          "incomplete": false,
          "is_system": false,
          "from_play": true,
@@ -455,7 +455,7 @@
      "apk:progress",
      {
       "done": 1,
-      "total": 2,
+      "total": 3,
       "package": "com.clean.pro.boost"
      }
     ],
@@ -463,8 +463,16 @@
      "apk:progress",
      {
       "done": 2,
-      "total": 2,
+      "total": 3,
       "package": "com.wlive.forecast"
+     }
+    ],
+    [
+     "apk:progress",
+     {
+      "done": 3,
+      "total": 3,
+      "package": "com.whatsapp"
      }
     ],
     [
@@ -478,7 +486,7 @@
        },
        "low_behavior_data": false,
        "apk": {
-        "requested": 2,
+        "requested": 3,
         "analyzed": 0,
         "failed": {}
        },
@@ -529,10 +537,10 @@
         {
          "package": "com.whatsapp",
          "name": "com.whatsapp",
-         "score": 0,
+         "score": 10,
          "verdict": "safe",
          "verdict_label": "Bezpieczna",
-         "trusted": true,
+         "trusted": false,
          "incomplete": false,
          "is_system": false,
          "from_play": true,
