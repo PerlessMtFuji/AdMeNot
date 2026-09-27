@@ -207,6 +207,10 @@ export class Controller {
     this.setLevel(app.package, this.state.selection[app.package] ? null : app.default_level ?? 'silence');
   }
 
+  focus(pkg: string | null): void {
+    this.state.focused = pkg;
+  }
+
   toggleExpanded(pkg: string): void {
     const s = this.state;
     s.expanded = s.expanded.includes(pkg) ? s.expanded.filter((p) => p !== pkg) : [...s.expanded, pkg];

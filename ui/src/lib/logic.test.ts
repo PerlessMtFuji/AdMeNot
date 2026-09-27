@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import {
   changedVerdicts,
+  evidenceGroups,
+  focusedApp,
+  moveFocus,
   connectChecklist,
   defaultSelection,
   flaggedApps,
@@ -148,4 +151,25 @@ test('planEntries lists the selected apps in scan order', () => {
   const app = (pkg: string, name: string) => ({ package: pkg, name }) as never;
   expect(planEntries([app('a', 'A'), app('b', 'B'), app('c', 'C')], { c: 'remove', a: 'silence' }))
     .toEqual([{ package: 'a', name: 'A', level: 'silence' }, { package: 'c', name: 'C', level: 'remove' }]);
+});
+
+test('moveFocus stays inside the list and recovers a hidden row', () => {
+  expect(moveFocus([], 'a', 1)).toBeNull();
+  expect(moveFocus(['a', 'b', 'c'], 'a', -1)).toBe('a');
+  expect(moveFocus(['a', 'b', 'c'], 'c', 1)).toBe('c');
+  expect(moveFocus(['a', 'b', 'c'], 'b', 1)).toBe('c');
+  expect(moveFocus(['a', 'b'], 'hidden', 1)).toBe('a');
+  expect(focusedApp(['a', 'b'], 'b')).toBe('b');
+  expect(focusedApp(['a', 'b'], 'x')).toBe('a');
+  expect(focusedApp([], 'x')).toBeNull();
+});
+
+test('evidenceGroups: category order by heaviest rule, combos apart', () => {
+  const f = (rule_id: string, category: string, weight: number) =>
+    ({ rule_id, category, weight, label: rule_id, class: 'behavior', text: '', text_expert: '', evidence: {} }) as never;
+  const out = evidenceGroups([f('S', 'origin', 8), f('O', 'ads', 25), f('A', 'removal', 25),
+    f('H', 'removal', 15), f('C', 'combo', 15)]);
+  expect(out.groups.map((g) => [g.category, g.items.map((i) => i.rule_id)])).toEqual([
+    ['ads', ['O']], ['removal', ['A', 'H']], ['origin', ['S']]]);
+  expect(out.combos.map((c) => c.rule_id)).toEqual(['C']);
 });

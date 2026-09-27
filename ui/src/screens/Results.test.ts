@@ -62,24 +62,36 @@ describe('Results', () => {
     await vi.waitFor(() => expect(s.settings.mode).toBe('expert'));
   });
 
-  test('expert mode: table, search, action select, evidence, show all', async () => {
+  test('expert mode: tiles, filter, search, keyboard, evidence panel', async () => {
     const { s, ctl } = await scanned();
     await ctl.setMode('expert');
     await tick();
-    expect(screen.getByRole('columnheader', { name: 'Aplikacja / pakiet' })).toBeTruthy();
-    const flagged = s.scan!.apps.filter((a) => a.verdict !== 'safe').length;
-    expect(screen.getAllByRole('row')).toHaveLength(flagged + 1);
+    expect(screen.getByRole('columnheader', { name: 'Aplikacja' })).toBeTruthy();
+    const flagged = s.scan!.apps.filter((a) => a.verdict !== 'safe');
+    expect(screen.getAllByRole('row')).toHaveLength(flagged.length + 1);
+    const panel = screen.getByRole('complementary', { name: 'Szczegóły aplikacji' });
+    expect(within(panel).getByText(flagged[0].name)).toBeTruthy();
+    expect(panel.textContent).not.toMatch(/DM-/);
+    const table = screen.getByRole('group', { name: 'Tabela aplikacji' });
+    await fireEvent.keyDown(table, { key: 'ArrowDown' });
+    expect(s.focused).toBe(flagged[1].package);
+    for (let i = 0; i < flagged.length + 2; i++) await fireEvent.keyDown(table, { key: 'ArrowDown' });
+    expect(s.focused).toBe(flagged.at(-1)!.package);
+    const before = s.focused! in s.selection;
+    await fireEvent.keyDown(table, { key: ' ' });
+    expect(s.focused! in s.selection).toBe(!before);
     await fireEvent.input(screen.getByRole('searchbox'), { target: { value: 'forecast' } });
     expect(screen.getAllByRole('row')).toHaveLength(2);
+    expect(within(panel).getByText('com.wlive.forecast')).toBeTruthy();
+    await fireEvent.input(screen.getByRole('searchbox'), { target: { value: 'zzz-nothing' } });
+    expect(screen.getAllByRole('row')).toHaveLength(1);
+    expect(within(panel).getByText('Wybierz aplikację w tabeli.')).toBeTruthy();
+    await fireEvent.keyDown(table, { key: 'ArrowUp' });
+    await fireEvent.input(screen.getByRole('searchbox'), { target: { value: '' } });
     await fireEvent.change(screen.getByRole('combobox', { name: 'Akcja com.wlive.forecast' }),
       { target: { value: 'silence' } });
     expect(s.selection['com.wlive.forecast']).toBe('silence');
-    await fireEvent.click(screen.getByRole('button', { expanded: false }));
-    const wlive = s.scan!.apps.find((a) => a.package === 'com.wlive.forecast')!;
-    expect(screen.getByText(wlive.findings[0].rule_id)).toBeTruthy();
-    await fireEvent.input(screen.getByRole('searchbox'), { target: { value: '' } });
-    await fireEvent.click(screen.getByRole('checkbox', { name: 'Pokaż wszystkie aplikacje' }));
+    await fireEvent.click(screen.getByRole('button', { name: `Wszystkie · ${s.scan!.apps.length}` }));
     expect(screen.getAllByRole('row')).toHaveLength(s.scan!.apps.length + 1);
-    expect(screen.getByRole('button', { name: 'Konsola ADB' })).toBeTruthy();
   });
 });

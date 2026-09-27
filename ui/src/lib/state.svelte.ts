@@ -28,6 +28,7 @@ export class AppState {
   verdictFilter = $state<Verdict | 'all'>('all');
   query = $state('');
   expanded = $state<string[]>([]);
+  focused = $state<string | null>(null);
   plan = $state<PlanView | null>(null);
   job = $state<{ id: string; kind: string } | null>(null);
   order = $state<string | null>(null);

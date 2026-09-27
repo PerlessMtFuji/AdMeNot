@@ -1,4 +1,5 @@
-import type { AppView, DeviceEntry, Level, StepEvent, Verdict } from './types';
+import { CATEGORY_ORDER } from './categories';
+import type { AppView, Category, DeviceEntry, Finding, Level, StepEvent, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done';
 export type StageState = 'done' | 'now' | 'todo' | 'off';
@@ -165,3 +166,36 @@ export function planEntries(apps: AppView[], selection: Record<string, Level>):
   return apps.filter((a) => a.package in selection)
     .map((a) => ({ package: a.package, name: a.name, level: selection[a.package] }));
 }
+
+export function moveFocus(rows: string[], current: string | null, delta: 1 | -1): string | null {
+  if (rows.length === 0) return null;
+  const at = current === null ? -1 : rows.indexOf(current);
+  if (at < 0) return rows[0];
+  return rows[Math.min(rows.length - 1, Math.max(0, at + delta))];
+}
+
+export function focusedApp(rows: string[], focused: string | null): string | null {
+  if (focused !== null && rows.includes(focused)) return focused;
+  return rows[0] ?? null;
+}
+
+export function evidenceGroups(findings: Finding[]):
+  { groups: { category: Category; items: Finding[] }[]; combos: Finding[] } {
+  const byCategory = new Map<Category, Finding[]>();
+  const combos: Finding[] = [];
+  for (const f of findings) {
+    if (f.category === 'combo') combos.push(f);
+    else byCategory.set(f.category, [...(byCategory.get(f.category) ?? []), f]);
+  }
+  const groups = [...byCategory.entries()]
+    .map(([category, items]) => ({ category, items: [...items].sort((a, b) => b.weight - a.weight) }))
+    .sort((a, b) => (b.items[0].weight - a.items[0].weight)
+      || (CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category)));
+  return { groups, combos };
+}
+
+// Progi werdyktu z scoring.verdict_for (25 / 50 / 75).
+export const SCORE_ZONES: { from: number; to: number; verdict: Verdict }[] = [
+  { from: 0, to: 25, verdict: 'safe' }, { from: 25, to: 50, verdict: 'review' },
+  { from: 50, to: 75, verdict: 'suspicious' }, { from: 75, to: 100, verdict: 'malicious' },
+];

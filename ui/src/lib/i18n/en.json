@@ -102,11 +102,18 @@
   "verdict": { "all": "All verdicts", "malicious": "Malicious", "suspicious": "Suspicious", "review": "Review", "safe": "Safe" },
   "expert": {
     "malicious": "Malicious", "suspicious": "Suspicious", "non_play": "Outside Play", "admins": "Device admins", "collectors": "Collectors OK",
-    "col_app": "App / package", "col_score": "Score", "col_signals": "Signals", "col_source": "Source", "col_action": "Action",
+    "col_app": "App", "col_problems": "Problems", "col_score": "Score", "col_signals": "Signals", "col_source": "Source", "col_action": "Action",
     "search": "Search app or package", "show_all": "Show all apps",
     "source_play": "Play", "source_system": "system", "source_sideload": "sideloaded",
     "apk_error": "APK: error", "collector_failed": "Collector {name}: {error}", "ad_sdks": "Ad SDKs: {list}",
+    "table": "Apps table", "filter": "Filter", "filter_attention": "Needs attention · {count}", "filter_all": "All · {count}",
+    "collectors_apk": "collectors {ok}/{total} · APK {analyzed}/{requested}", "collectors_only": "collectors {ok}/{total}", "today": "today", "protected": "Protected app",
     "days": { "one": "{count} day ago", "few": "{count} days ago", "many": "{count} days ago", "other": "{count} days ago" }
+  },
+  "evidence": {
+    "title": "App details", "score": "Score", "why": "Why", "raw": "Raw data from the phone",
+    "none": "Select an app in the table.", "plan": "Plan", "fix": "Fix ({count})",
+    "zone": { "safe": "no issues", "review": "to review", "suspicious": "suspicious", "malicious": "malicious" }
   },
   "actions": { "details": "Show details", "console": "ADB console", "fix": "Fix selected ({count})", "rescan": "Scan again" },
   "plan": { "title": "Repair plan", "confirm_title": "What I will do on the phone", "blocked": "Skipped", "unlock": "Unlock", "undo_hint": "Every change can be undone in History.", "run": "Run ({count})", "nothing": "Nothing to run — all apps are blocked." },

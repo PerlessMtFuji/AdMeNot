@@ -3,13 +3,14 @@
   import { flip } from 'svelte/animate';
   import { fade } from 'svelte/transition';
   import AppCard from '../components/AppCard.svelte';
+  import EvidencePanel from '../components/EvidencePanel.svelte';
   import ExpertTable from '../components/ExpertTable.svelte';
   import InterruptedBanner from '../components/InterruptedBanner.svelte';
   import PlanConfirm from '../components/PlanConfirm.svelte';
   import PlanPanel from '../components/PlanPanel.svelte';
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
-  import { flaggedApps } from '../lib/logic';
+  import { flaggedApps, focusedApp, visibleApps } from '../lib/logic';
   import { DUR, enter, ms, stagger } from '../lib/motion';
   import type { Mode } from '../lib/types';
   import Banner from '../ui/Banner.svelte';
@@ -27,6 +28,9 @@
   const flagged = $derived(flaggedApps(apps));
   const safeApps = $derived(apps.filter((a) => a.verdict === 'safe'));
   let showSafe = $state(false);
+  const rows = $derived(visibleApps(apps, { showAll: s.showAll, verdict: 'all', query: s.query }));
+  const focused = $derived(focusedApp(rows.map((r) => r.package), s.focused));
+  const focusedRow = $derived(rows.find((r) => r.package === focused) ?? null);
   const titleParts = $derived(tp('results.title', flagged.length, { count: '\u0000' }).split('\u0000'));
   const modes = $derived([{ value: 'simple' as Mode, label: t('header.simple') },
     { value: 'expert' as Mode, label: t('header.expert') }]);
@@ -62,7 +66,7 @@
     {#if s.scan?.low_behavior_data}<Banner tone="warn" icon="info" title={t('summary.low_data')} />{/if}
 
     {#if expert}
-      <ExpertTable />
+      <ExpertTable {rows} {focused} />
     {:else if flagged.length === 0}
       <div class="grid place-items-center gap-2 py-10 text-center" in:enter>
         <span class="grid h-16 w-16 place-items-center rounded-full bg-ok text-white shadow-[0_0_0_10px_var(--color-ok-soft)] [animation:pop-in_.6s]">
@@ -91,21 +95,24 @@
       </section>
     {/if}
   </main>
-  {#if !expert || s.plan}
-    <SidePanel label={t('panel.plan')}>
-      <div class="grid flex-1 grid-cols-1 grid-rows-1">
-        {#if s.plan}
-          <div class="col-start-1 row-start-1 flex min-h-0 flex-col gap-3"
-            in:fade={{ duration: ms(DUR.panel) }} out:fade={{ duration: ms(DUR.panel) }}>
-            <PlanConfirm />
-          </div>
-        {:else}
-          <div class="col-start-1 row-start-1 flex flex-col gap-3"
-            in:fade={{ duration: ms(DUR.panel) }} out:fade={{ duration: ms(DUR.panel) }}>
-            <PlanPanel {showSafe} ontoggleSafe={() => (showSafe = !showSafe)} />
-          </div>
-        {/if}
-      </div>
-    </SidePanel>
-  {/if}
+  <SidePanel width={expert ? 340 : undefined} label={expert && !s.plan ? t('evidence.title') : t('panel.plan')}>
+    <div class="grid flex-1 grid-cols-1 grid-rows-1">
+      {#if s.plan}
+        <div class="col-start-1 row-start-1 flex min-h-0 flex-col gap-3"
+          in:fade={{ duration: ms(DUR.panel) }} out:fade={{ duration: ms(DUR.panel) }}>
+          <PlanConfirm />
+        </div>
+      {:else if expert}
+        <div class="col-start-1 row-start-1 flex min-h-0 flex-col gap-3"
+          in:fade={{ duration: ms(DUR.panel) }} out:fade={{ duration: ms(DUR.panel) }}>
+          <EvidencePanel app={focusedRow} />
+        </div>
+      {:else}
+        <div class="col-start-1 row-start-1 flex flex-col gap-3"
+          in:fade={{ duration: ms(DUR.panel) }} out:fade={{ duration: ms(DUR.panel) }}>
+          <PlanPanel {showSafe} ontoggleSafe={() => (showSafe = !showSafe)} />
+        </div>
+      {/if}
+    </div>
+  </SidePanel>
 </div>

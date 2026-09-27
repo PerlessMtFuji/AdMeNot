@@ -102,11 +102,18 @@
   "verdict": { "all": "Wszystkie werdykty", "malicious": "Szkodliwa", "suspicious": "Podejrzana", "review": "Do sprawdzenia", "safe": "Bezpieczna" },
   "expert": {
     "malicious": "Szkodliwe", "suspicious": "Podejrzane", "non_play": "Spoza Play", "admins": "Admin urządz.", "collectors": "Kolektory OK",
-    "col_app": "Aplikacja / pakiet", "col_score": "Wynik", "col_signals": "Sygnały", "col_source": "Źródło", "col_action": "Akcja",
+    "col_app": "Aplikacja", "col_problems": "Problemy", "col_score": "Wynik", "col_signals": "Sygnały", "col_source": "Źródło", "col_action": "Akcja",
     "search": "Szukaj aplikacji lub pakietu", "show_all": "Pokaż wszystkie aplikacje",
     "source_play": "Play", "source_system": "systemowa", "source_sideload": "spoza sklepu",
     "apk_error": "APK: błąd", "collector_failed": "Kolektor {name}: {error}", "ad_sdks": "SDK reklamowe: {list}",
+    "table": "Tabela aplikacji", "filter": "Filtr", "filter_attention": "Wymagające uwagi · {count}", "filter_all": "Wszystkie · {count}",
+    "collectors_apk": "kolektory {ok}/{total} · APK {analyzed}/{requested}", "collectors_only": "kolektory {ok}/{total}", "today": "dziś", "protected": "Aplikacja chroniona",
     "days": { "one": "{count} dzień temu", "few": "{count} dni temu", "many": "{count} dni temu", "other": "{count} dnia temu" }
+  },
+  "evidence": {
+    "title": "Szczegóły aplikacji", "score": "Wynik", "why": "Dlaczego", "raw": "Surowe dane z telefonu",
+    "none": "Wybierz aplikację w tabeli.", "plan": "Plan", "fix": "Napraw ({count})",
+    "zone": { "safe": "bez uwag", "review": "do sprawdzenia", "suspicious": "podejrzana", "malicious": "szkodliwa" }
   },
   "actions": { "details": "Pokaż szczegóły", "console": "Konsola ADB", "fix": "Napraw zaznaczone ({count})", "rescan": "Skanuj ponownie" },
   "plan": { "title": "Plan naprawy", "confirm_title": "Co zrobię na telefonie", "blocked": "Pominięta", "unlock": "Odblokuj", "undo_hint": "Każdą zmianę można cofnąć w Historii.", "run": "Wykonaj ({count})", "nothing": "Nic do wykonania — wszystkie aplikacje są zablokowane." },
