@@ -1,3 +1,5 @@
+import threading
+
 import pytest
 from apphelpers import make_api
 from conftest import SERIAL
@@ -67,11 +69,42 @@ def test_closing_during_an_order_asks_the_ui_then_quit_closes():
     api.execute({"com.clean.pro.boost": "disable"}, [])
     rec.wait_for("exec:question")
     assert api._on_closing() is False
-    assert rec.of("app:close_requested") == [{"kind": "exec"}]
+    assert rec.wait_for("app:close_requested") == {"kind": "exec"}
     assert api.quit() == {"ok": True}
     assert closed == [True] and api._jobs.current() is None
     assert rec.wait_for("exec:done")["apps"][0]["outcome"] == "failed"
     assert api._on_closing() is True
+
+
+class _BlockingEmitter:
+    """Jak `WindowEmitter` na wątku GUI: `app:close_requested` czeka, aż ktoś je puści."""
+
+    def __init__(self, inner):
+        self.inner = inner
+        self.release = threading.Event()
+
+    def emit(self, name, detail=None):
+        if name == "app:close_requested":
+            self.release.wait(10)
+        self.inner.emit(name, detail)
+
+
+def test_closing_during_an_order_does_not_wait_for_the_emitter():
+    _phone, api, rec = _scanned(sync=False, admin_timeout=0)
+    api._attach(pick_folder=lambda: None, close=lambda: None)
+    blocking = _BlockingEmitter(rec)
+    api._emitter = blocking
+    api.execute({"com.clean.pro.boost": "disable"}, [])
+    rec.wait_for("exec:question")
+    result = []
+    closing = threading.Thread(target=lambda: result.append(api._on_closing()), daemon=True)
+    closing.start()
+    closing.join(2)
+    assert result == [False]
+    assert rec.of("app:close_requested") == []
+    blocking.release.set()
+    assert rec.wait_for("app:close_requested") == {"kind": "exec"}
+    assert api.quit() == {"ok": True}
 
 
 def test_closing_without_an_order_closes_at_once():
