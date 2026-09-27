@@ -166,6 +166,7 @@
     }
   },
   "settings": {
+    "appearance": "Appearance", "theme": "Theme", "theme_system": "System", "theme_light": "Light", "theme_dark": "Dark", "paths": "Programs and folders",
     "title": "Settings", "lang": "Language", "mode": "Default mode", "mode_simple": "Simple", "mode_expert": "Expert",
     "adb": "Path to adb.exe", "adb_hint": "Empty = adb from PATH", "check": "Check", "adb_ok": "Works: {version}", "adb_fail": "Does not work: {message}",
     "backups": "APK backup folder", "backups_hint": "Empty = default folder in %LOCALAPPDATA%\\DeMalware", "choose": "Choose…",

@@ -166,6 +166,7 @@
     }
   },
   "settings": {
+    "appearance": "Wygląd", "theme": "Motyw", "theme_system": "System", "theme_light": "Jasny", "theme_dark": "Ciemny", "paths": "Programy i katalogi",
     "title": "Ustawienia", "lang": "Język", "mode": "Tryb domyślny", "mode_simple": "Prosty", "mode_expert": "Ekspercki",
     "adb": "Ścieżka do adb.exe", "adb_hint": "Puste = adb z PATH", "check": "Sprawdź", "adb_ok": "Działa: {version}", "adb_fail": "Nie działa: {message}",
     "backups": "Katalog kopii APK", "backups_hint": "Puste = domyślny katalog w %LOCALAPPDATA%\\DeMalware", "choose": "Wybierz…",
