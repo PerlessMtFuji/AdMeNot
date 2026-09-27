@@ -154,3 +154,14 @@ export function initial(name: string): string {
 export function modelName(model: string | null): string {
   return model ? model.replaceAll('_', ' ') : '?';
 }
+
+export const LEVEL_TONE: Record<Level, 'accent' | 'warn' | 'bad'> = { silence: 'accent', disable: 'warn', remove: 'bad' };
+export const VERDICT_TONE: Record<Verdict, 'bad' | 'warn' | 'neutral' | 'ok'> = {
+  malicious: 'bad', suspicious: 'warn', review: 'neutral', safe: 'ok',
+};
+
+export function planEntries(apps: AppView[], selection: Record<string, Level>):
+  { package: string; name: string; level: Level }[] {
+  return apps.filter((a) => a.package in selection)
+    .map((a) => ({ package: a.package, name: a.name, level: selection[a.package] }));
+}

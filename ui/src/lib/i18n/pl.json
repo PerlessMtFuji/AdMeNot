@@ -1,11 +1,18 @@
 {
   "common": { "cancel": "Anuluj", "close": "Zamknij", "back": "Wróć", "save": "Zapisz", "saved": "Zapisano" },
   "category": { "ads": "Reklamy", "notif": "Spam powiadomień", "removal": "Utrudnia usunięcie", "data": "Dostęp do danych", "disguise": "Podszywa się", "background": "Działa w tle", "origin": "Pochodzenie", "combo": "Połączenie sygnałów" },
+  "choice": { "silence": "Wycisz", "disable": "Wyłącz", "remove": "Usuń" },
   "results": {
     "title": { "one": "{count} aplikacja wymaga uwagi", "few": "{count} aplikacje wymagają uwagi", "many": "{count} aplikacji wymaga uwagi", "other": "{count} aplikacji wymaga uwagi" },
-    "safe": { "one": "{count} aplikacja bez uwag", "few": "{count} aplikacje bez uwag", "many": "{count} aplikacji bez uwag", "other": "{count} aplikacji bez uwag" }
+    "safe": { "one": "{count} aplikacja bez uwag", "few": "{count} aplikacje bez uwag", "many": "{count} aplikacji bez uwag", "other": "{count} aplikacji bez uwag" },
+    "mode": "Tryb widoku", "action_for": "Akcja dla {name}",
+    "clean_title": "Nie znaleziono problemów", "clean_sub": "Sprawdzone aplikacje: {count}",
+    "safe_show": "Pokaż listę", "safe_hide": "Zwiń listę", "safe_list": "Aplikacje bez uwag"
   },
-  "panel": { "apps": { "one": "{count} aplikacja", "few": "{count} aplikacje", "many": "{count} aplikacji", "other": "{count} aplikacji" } },
+  "panel": {
+    "apps": { "one": "{count} aplikacja", "few": "{count} aplikacje", "many": "{count} aplikacji", "other": "{count} aplikacji" },
+    "plan": "Plan naprawy", "empty": "Zaznacz aplikacje, które chcesz naprawić.", "unchanged": "bez zmian"
+  },
   "app": { "new_order": "Nowe zlecenie", "order": "Zlecenie", "client": "Klient" },
   "rail": { "label": "Menu", "new_order": "Nowe zlecenie", "back_to_order": "Wróć do zlecenia" },
   "header": { "simple": "Prosty", "expert": "Ekspert", "history": "Historia", "settings": "Ustawienia", "lang": "Język" },

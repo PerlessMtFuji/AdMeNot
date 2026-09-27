@@ -12,6 +12,7 @@ import {
   linkState,
   mergeSelection,
   modelName,
+  planEntries,
   scanChecklist,
   signalChips,
   sourceKey,
@@ -141,4 +142,10 @@ describe('connect logic', () => {
     expect(scanChecklist('score')).toEqual(['done', 'done', 'done', 'on']);
     expect(scanChecklist('apk')).toEqual(['done', 'done', 'done', 'done']);
   });
+});
+
+test('planEntries lists the selected apps in scan order', () => {
+  const app = (pkg: string, name: string) => ({ package: pkg, name }) as never;
+  expect(planEntries([app('a', 'A'), app('b', 'B'), app('c', 'C')], { c: 'remove', a: 'silence' }))
+    .toEqual([{ package: 'a', name: 'A', level: 'silence' }, { package: 'c', name: 'C', level: 'remove' }]);
 });

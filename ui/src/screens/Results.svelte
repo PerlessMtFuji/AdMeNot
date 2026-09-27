@@ -1,58 +1,99 @@
 <script lang="ts">
   import { getContext } from 'svelte';
-  import AppRow from '../components/AppRow.svelte';
+  import { flip } from 'svelte/animate';
+  import AppCard from '../components/AppCard.svelte';
   import ExpertTable from '../components/ExpertTable.svelte';
   import InterruptedBanner from '../components/InterruptedBanner.svelte';
-  import PhoneCard from '../components/PhoneCard.svelte';
+  import PlanPanel from '../components/PlanPanel.svelte';
   import PlanPreview from '../components/PlanPreview.svelte';
-  import SummaryBanner from '../components/SummaryBanner.svelte';
   import type { Controller } from '../lib/controller';
-  import { t } from '../lib/i18n/index.svelte';
+  import { t, tp } from '../lib/i18n/index.svelte';
   import { flaggedApps } from '../lib/logic';
+  import { DUR, enter, ms, stagger } from '../lib/motion';
+  import type { Mode } from '../lib/types';
+  import Banner from '../ui/Banner.svelte';
+  import Button from '../ui/Button.svelte';
+  import CountUp from '../ui/CountUp.svelte';
+  import Icon from '../ui/Icon.svelte';
+  import Progress from '../ui/Progress.svelte';
+  import Segmented from '../ui/Segmented.svelte';
+  import SidePanel from '../ui/SidePanel.svelte';
 
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
   const expert = $derived(s.settings.mode === 'expert');
-  const flagged = $derived(s.scan ? flaggedApps(s.scan.apps) : []);
-  const count = $derived(Object.keys(s.selection).length);
-  const apkText = $derived(s.apk.running
-    ? t('summary.apk_running', { done: s.apk.done, total: s.apk.total })
-    : t('summary.apk_done'));
+  const apps = $derived(s.scan?.apps ?? []);
+  const flagged = $derived(flaggedApps(apps));
+  const safeApps = $derived(apps.filter((a) => a.verdict === 'safe'));
+  let showSafe = $state(false);
+  const titleParts = $derived(tp('results.title', flagged.length, { count: '\u0000' }).split('\u0000'));
+  const modes = $derived([{ value: 'simple' as Mode, label: t('header.simple') },
+    { value: 'expert' as Mode, label: t('header.expert') }]);
 </script>
 
-<div class="min-w-0 flex-1 overflow-auto p-4">
-<section class="flex min-h-0 gap-3.5">
-  <PhoneCard />
-  <div class="flex min-w-0 flex-1 flex-col gap-2.5">
-    {#if s.interrupted.length}<InterruptedBanner orders={s.interrupted} />{/if}
-    {#if !s.scan}
-      <div class="card hard"><span class="spin"></span> {t(`scan.stage.${s.scanStage ?? 'identify'}`)}</div>
-    {:else if expert}
-      <ExpertTable />
-    {:else}
-      <SummaryBanner />
-      {#each flagged as app (app.package)}<AppRow {app} />{/each}
-    {/if}
-  </div>
-</section>
+<div class="flex min-h-0 flex-1">
+  <main class="flex min-w-0 flex-1 flex-col gap-3 overflow-auto px-6 py-5">
+    <header class="flex items-end gap-3">
+      <div class="min-w-0 flex-1">
+        <div class="truncate text-[11.5px] font-semibold text-soft">
+          {[s.client.trim(), s.device?.name].filter(Boolean).join(' · ')}
+        </div>
+        {#if flagged.length > 0}
+          <h1 class="text-[19px] font-extrabold" aria-label={tp('results.title', flagged.length)}>
+            {titleParts[0]}<CountUp value={flagged.length} />{titleParts[1]}
+          </h1>
+        {:else}
+          <h1 class="text-[19px] font-extrabold">{t('results.clean_title')}</h1>
+        {/if}
+      </div>
+      <Segmented label={t('results.mode')} value={s.settings.mode} options={modes} onchange={(m) => ctl.setMode(m)} />
+      <Button onclick={() => ctl.newScan()}><Icon name="rotate-ccw" />{t('actions.rescan')}</Button>
+    </header>
 
-{#if s.scan}
-  <div class="actionbar sticky bottom-0 -mx-4 -mb-4 mt-auto">
-    {#if expert}
-      <span class="mono text-[11px] text-mut">› {apkText}</span>
-    {:else}
-      <span class="text-mut">{t('summary.ok_count', { count: s.scan.counts.safe })}</span>
-      {#if s.apk.running}<span class="text-[11px] text-mut"><span class="spin"></span> {apkText}</span>{/if}
+    {#if s.apk.running}
+      <div class="flex items-center gap-3 text-[11.5px] text-mut">
+        <span class="whitespace-nowrap">{t('summary.apk_running', { done: s.apk.done, total: s.apk.total })}</span>
+        <div class="w-40"><Progress value={s.apk.total ? s.apk.done / s.apk.total : 0} label={t('scan.stage.apk')} /></div>
+      </div>
     {/if}
-    <span class="ml-auto flex gap-2">
-      <button class="btn" onclick={() => ctl.newScan()}>{t('actions.rescan')}</button>
-      {#if !expert}
-        <button class="btn" onclick={() => ctl.setMode('expert')}>{t('actions.details')}</button>
-      {/if}
-      <button class="btn btn-pri" disabled={count === 0 || s.orderRunning} onclick={() => ctl.openPlan()}>{t('actions.fix', { count })}</button>
-    </span>
-  </div>
-{/if}
+    {#if s.interrupted.length}<InterruptedBanner orders={s.interrupted} />{/if}
+    {#if s.scan?.low_behavior_data}<Banner tone="warn" icon="info" title={t('summary.low_data')} />{/if}
+
+    {#if expert}
+      <ExpertTable />
+    {:else if flagged.length === 0}
+      <div class="grid place-items-center gap-2 py-10 text-center" in:enter>
+        <span class="grid h-16 w-16 place-items-center rounded-full bg-ok text-white shadow-[0_0_0_10px_var(--color-ok-soft)] [animation:pop-in_.6s]">
+          <Icon name="check" size={32} strokeWidth={3} />
+        </span>
+        <p class="mt-3 text-mut">{t('results.clean_sub', { count: s.scan?.counts.total ?? 0 })}</p>
+      </div>
+    {:else}
+      <div class="flex flex-col gap-2.5">
+        {#each flagged as app, i (app.package)}
+          <div animate:flip={{ duration: ms(DUR.flip) }} in:enter={{ delay: stagger(i) }}>
+            <AppCard {app} level={s.selection[app.package] ?? null} flash={s.apk.changed.includes(app.package)}
+              onlevel={(level) => ctl.setLevel(app.package, level)} ontoggle={() => ctl.toggle(app)} />
+          </div>
+        {/each}
+      </div>
+    {/if}
+    {#if showSafe && !expert}
+      <section class="rounded-2xl bg-surface p-4 shadow-card" in:enter>
+        <span class="lbl">{t('results.safe_list')}</span>
+        <ul aria-label={t('results.safe_list')} class="mt-2 grid grid-cols-2 gap-x-6 gap-y-1">
+          {#each safeApps as a (a.package)}
+            <li class="flex min-w-0 gap-2"><span class="truncate">{a.name}</span><span class="mono truncate text-[10.5px] text-soft">{a.package}</span></li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
+  </main>
+  {#if !expert}
+    <SidePanel label={t('panel.plan')}>
+      <PlanPanel {showSafe} ontoggleSafe={() => (showSafe = !showSafe)} />
+    </SidePanel>
+  {/if}
 </div>
 
 <PlanPreview />

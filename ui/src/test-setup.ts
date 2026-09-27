@@ -39,4 +39,11 @@ if (!Element.prototype.animate) {
   };
 }
 
+// animate:flip (§6 „Przestawienie listy”) sprawdza trwające animacje przez getAnimations().
+if (!Element.prototype.getAnimations) {
+  Element.prototype.getAnimations = function getAnimations() {
+    return [];
+  };
+}
+
 afterEach(() => cleanup());

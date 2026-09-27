@@ -1,11 +1,18 @@
 {
   "common": { "cancel": "Cancel", "close": "Close", "back": "Back", "save": "Save", "saved": "Saved" },
   "category": { "ads": "Ads", "notif": "Notification spam", "removal": "Hard to remove", "data": "Access to data", "disguise": "Impersonation", "background": "Runs in background", "origin": "Origin", "combo": "Signal combination" },
+  "choice": { "silence": "Silence", "disable": "Disable", "remove": "Remove" },
   "results": {
     "title": { "one": "{count} app needs attention", "few": "{count} apps need attention", "many": "{count} apps need attention", "other": "{count} apps need attention" },
-    "safe": { "one": "{count} app without issues", "few": "{count} apps without issues", "many": "{count} apps without issues", "other": "{count} apps without issues" }
+    "safe": { "one": "{count} app without issues", "few": "{count} apps without issues", "many": "{count} apps without issues", "other": "{count} apps without issues" },
+    "mode": "View mode", "action_for": "Action for {name}",
+    "clean_title": "No problems found", "clean_sub": "Apps checked: {count}",
+    "safe_show": "Show the list", "safe_hide": "Hide the list", "safe_list": "Apps without issues"
   },
-  "panel": { "apps": { "one": "{count} app", "few": "{count} apps", "many": "{count} apps", "other": "{count} apps" } },
+  "panel": {
+    "apps": { "one": "{count} app", "few": "{count} apps", "many": "{count} apps", "other": "{count} apps" },
+    "plan": "Repair plan", "empty": "Select the apps you want to fix.", "unchanged": "no change"
+  },
   "app": { "new_order": "New order", "order": "Order", "client": "Client" },
   "rail": { "label": "Menu", "new_order": "New order", "back_to_order": "Back to the order" },
   "header": { "simple": "Simple", "expert": "Expert", "history": "History", "settings": "Settings", "lang": "Language" },
