@@ -23,6 +23,8 @@ Specyfikacja: `docs/superpowers/specs/2026-09-26-demalware-design.md`. Plany: `d
 
 albo `.venv\Scripts\demalware-gui`. Okno wymaga zbudowanego UI (`src\demalware\app\web\`, poza gitem) — bez niego program podaje polecenie budowania.
 
+Motyw (System / Jasny / Ciemny), język i tryb domyślny zmienia się w Ustawieniach; „System” podąża za motywem Windows.
+
 Praca nad samym UI bez telefonu i bez Pythona (atrapa mostu odtwarza nagrane scenariusze):
 
     cd ui
