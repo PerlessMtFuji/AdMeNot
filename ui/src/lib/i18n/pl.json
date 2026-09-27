@@ -118,14 +118,23 @@
   "actions": { "details": "Pokaż szczegóły", "console": "Konsola ADB", "fix": "Napraw zaznaczone ({count})", "rescan": "Skanuj ponownie" },
   "plan": { "title": "Plan naprawy", "confirm_title": "Co zrobię na telefonie", "blocked": "Pominięta", "unlock": "Odblokuj", "undo_hint": "Każdą zmianę można cofnąć w Historii.", "run": "Wykonaj ({count})", "nothing": "Nic do wykonania — wszystkie aplikacje są zablokowane." },
   "exec": {
-    "title": "Naprawa · {order}", "waiting": "Czeka w kolejce", "stop": "Wstrzymaj", "stopping": "Wstrzymuję po bieżącym kroku…",
+    "title": "Naprawiam telefon…", "step": "krok {done} z {total}", "panel": "Zlecenie",
+    "done_title": "Telefon naprawiony", "done_warn": "Naprawa zakończona z uwagami",
+    "done_sub": "{apps} · {steps} · każdą zmianę można cofnąć w Historii",
+    "stopped_title": "Zlecenie wstrzymane",
+    "stop_hint": "Wstrzymanie kończy bieżący krok. Zlecenie można potem dokończyć lub cofnąć.",
+    "report_soon": "Protokół · wkrótce",
+    "state": { "queued": "czeka", "running": "w toku", "ok": "gotowe", "still_active": "nadal aktywna", "failed": "błąd", "stopped": "wstrzymana" },
+    "waiting": "Czeka w kolejce", "stop": "Wstrzymaj", "stopping": "Wstrzymuję po bieżącym kroku…",
     "verifying": "Sprawdzam, czy zmiany się utrzymały…", "stopped": "Zlecenie wstrzymane. Możesz je dokończyć albo cofnąć.",
-    "done": "Zlecenie {order}: {status}", "resume": "Dokończ", "undo_all": "Cofnij całe zlecenie", "new_scan": "Nowe skanowanie",
+    "resume": "Dokończ", "undo_all": "Cofnij całe zlecenie", "new_scan": "Nowe skanowanie",
     "apps": { "one": "{count} aplikacja", "few": "{count} aplikacje", "many": "{count} aplikacji", "other": "{count} aplikacji" },
     "steps": { "one": "{count} krok", "few": "{count} kroki", "many": "{count} kroków", "other": "{count} kroku" }
   },
-  "result": { "ok": "Gotowe", "still_active": "Nadal aktywna — zmiana się nie utrzymała ({kinds})", "failed": "Błąd", "stopped": "Wstrzymana" },
+  "result": { "ok": "Gotowe", "still_active": "Nadal aktywna — zmiana się nie utrzymała ({kinds})", "failed": "Błąd", "stopped": "Wstrzymana",
+    "ok_level": { "silence": "wyciszona · sprawdzone", "disable": "wyłączona · sprawdzone", "remove": "usunięta · sprawdzone" } },
   "admin": {
+    "phone_title": "Administratorzy urządzenia", "deactivate": "Dezaktywuj",
     "title": "Potrzebny jeden ruch na telefonie",
     "text": "Na ekranie telefonu otworzyło się okno administratorów urządzenia. Stuknij „Dezaktywuj” przy {name} — resztę zrobię sam.",
     "left": "Czekam jeszcze {time}"

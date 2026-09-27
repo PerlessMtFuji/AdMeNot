@@ -118,14 +118,23 @@
   "actions": { "details": "Show details", "console": "ADB console", "fix": "Fix selected ({count})", "rescan": "Scan again" },
   "plan": { "title": "Repair plan", "confirm_title": "What I will do on the phone", "blocked": "Skipped", "unlock": "Unlock", "undo_hint": "Every change can be undone in History.", "run": "Run ({count})", "nothing": "Nothing to run — all apps are blocked." },
   "exec": {
-    "title": "Repair · {order}", "waiting": "Queued", "stop": "Pause", "stopping": "Pausing after the current step…",
+    "title": "Fixing the phone…", "step": "step {done} of {total}", "panel": "Order",
+    "done_title": "Phone fixed", "done_warn": "Repair finished with remarks",
+    "done_sub": "{apps} · {steps} · every change can be undone in History",
+    "stopped_title": "Order paused",
+    "stop_hint": "Pausing finishes the current step. You can finish or undo the order later.",
+    "report_soon": "Report · soon",
+    "state": { "queued": "waiting", "running": "in progress", "ok": "done", "still_active": "still active", "failed": "failed", "stopped": "paused" },
+    "waiting": "Queued", "stop": "Pause", "stopping": "Pausing after the current step…",
     "verifying": "Checking that the changes hold…", "stopped": "Order paused. You can finish or undo it.",
-    "done": "Order {order}: {status}", "resume": "Finish", "undo_all": "Undo the whole order", "new_scan": "New scan",
+    "resume": "Finish", "undo_all": "Undo the whole order", "new_scan": "New scan",
     "apps": { "one": "{count} app", "few": "{count} apps", "many": "{count} apps", "other": "{count} apps" },
     "steps": { "one": "{count} step", "few": "{count} steps", "many": "{count} steps", "other": "{count} steps" }
   },
-  "result": { "ok": "Done", "still_active": "Still active — the change did not hold ({kinds})", "failed": "Error", "stopped": "Paused" },
+  "result": { "ok": "Done", "still_active": "Still active — the change did not hold ({kinds})", "failed": "Error", "stopped": "Paused",
+    "ok_level": { "silence": "silenced · verified", "disable": "disabled · verified", "remove": "removed · verified" } },
   "admin": {
+    "phone_title": "Device admin apps", "deactivate": "Deactivate",
     "title": "One tap needed on the phone",
     "text": "The device admin screen is open on the phone. Tap “Deactivate” next to {name} — I will do the rest.",
     "left": "Waiting {time} more"

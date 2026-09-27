@@ -28,8 +28,8 @@ describe('plan and execution', () => {
     await fireEvent.click(screen.getByRole('button', { name: /^Wykonaj/ }));
     await vi.waitFor(() => expect(s.phase).toBe('done'));
     await tick();
-    expect(screen.getAllByText('✓ Gotowe')).toHaveLength(s.result!.apps.length);
-    expect(screen.getByText(new RegExp(`${s.result!.order}: wykonane`))).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Telefon naprawiony' })).toBeTruthy();
+    expect(screen.getAllByText(/· sprawdzone$/)).toHaveLength(s.result!.apps.length);
     await fireEvent.click(screen.getByRole('button', { name: 'Nowe skanowanie' }));
     expect(s.phase).toBe('connect');
   });
@@ -84,6 +84,7 @@ describe('plan and execution', () => {
     expect(screen.getByText('Potrzebny jeden ruch na telefonie')).toBeTruthy();
     expect(screen.getByText(/Stuknij „Dezaktywuj” przy Cleaner/)).toBeTruthy();
     expect(screen.getByText(/Czekam jeszcze 3:00|Czekam jeszcze 2:5\d/)).toBeTruthy();
+    expect(screen.getByText('Dezaktywuj')).toBeTruthy();
     bridge.emit('exec:question', { job_id: 'job-4', kind: 'admin_timeout', package: 'p', name: 'Cleaner' });
     await tick();
     await fireEvent.click(screen.getByRole('button', { name: 'Pomiń' }));
@@ -111,10 +112,10 @@ describe('plan and execution', () => {
     await tick();
     expect(s.phase).toBe('done');
     expect(screen.queryByText(/Czeka w kolejce/)).toBeNull();
-    const card = screen.getByText('Druga').closest('.card') as HTMLElement;
-    expect(card.textContent).toContain('⏸ Wstrzymana');
-    expect(card.textContent).toContain('WYŁĄCZ');
-    expect(screen.getAllByText('⏸ Wstrzymana')).toHaveLength(2);
+    const card = screen.getByRole('article', { name: 'Druga' });
+    expect(card.textContent).toContain('Wstrzymana');
+    expect(card.textContent).toContain('Wyłącz');
+    expect(screen.getAllByText('Wstrzymana')).toHaveLength(2);
   });
 
   test('stopped order offers to finish it', async () => {
@@ -123,9 +124,22 @@ describe('plan and execution', () => {
     bridge.emit('exec:done', { order: 'ZS/2026/0926/02', status: 'running', status_label: 'w toku',
       stopped: true, apps: [{ package: 'p', name: 'P', outcome: 'stopped', errors: [], kinds: [] }] });
     await tick();
-    expect(screen.getByText(/Zlecenie wstrzymane/)).toBeTruthy();
-    expect(screen.getByText('⏸ Wstrzymana')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Zlecenie wstrzymane' })).toBeTruthy();
+    expect(screen.getByText('Wstrzymana')).toBeTruthy();
     await fireEvent.click(screen.getByRole('button', { name: 'Dokończ' }));
     expect(bridge.calls.at(-1)).toEqual({ method: 'resume', args: ['ZS/2026/0926/02'] });
+  });
+
+  test('progress counts finished steps of the plan', async () => {
+    const { bridge } = await app('empty');
+    const plan = { package: 'a', name: 'Pierwsza', level: 'disable' as const, level_label: 'WYŁĄCZ', blocked: false,
+      reason: null, reason_text: null, steps: ['x', 'y', 'z', 'w'], warnings: [] };
+    bridge.emit('exec:order', { order: 'ZS/2026/0926/06', plan: { runnable: 1, apps: [plan] } });
+    bridge.emit('exec:step', { action_id: 1, package: 'a', name: 'Pierwsza', kind: 'x', label: 'x', status: 'done', error: null });
+    bridge.emit('exec:step', { action_id: 2, package: 'a', name: 'Pierwsza', kind: 'y', label: 'y', status: 'running', error: null });
+    await tick();
+    expect(screen.getByRole('heading', { name: 'Naprawiam telefon…' })).toBeTruthy();
+    expect(screen.getByText('krok 2 z 4')).toBeTruthy();
+    expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('25');
   });
 });
