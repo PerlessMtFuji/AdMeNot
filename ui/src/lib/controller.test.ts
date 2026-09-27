@@ -121,6 +121,75 @@ describe('controller edge cases', () => {
     expect(s.closeRequested).toBe(true);
   });
 
+  test('job:error during a scan always returns to connect so the user can rescan', async () => {
+    for (const key of ['timeout', 'adb_error', 'adb_missing', 'internal']) {
+      const { ctl, s, bridge } = setup('empty');
+      await ctl.init();
+      s.phase = 'scanning';
+      s.device = { serial: 'S' } as never;
+      bridge.emit('job:error', { job_id: 'job-1', kind: 'scan', key, message: 'x' });
+      expect(s.phase).toBe('connect');
+      expect(s.device).toBeNull();
+      expect(s.error?.key).toBe(key);
+    }
+  });
+
+  test('job:error during the APK analysis stops its progress', async () => {
+    const { ctl, s, bridge } = setup('empty');
+    await ctl.init();
+    s.phase = 'results';
+    s.apk = { done: 3, total: 9, running: true, changed: [] };
+    bridge.emit('job:error', { job_id: 'job-2', kind: 'apk', key: 'timeout', message: '' });
+    expect(s.apk.running).toBe(false);
+    expect(s.phase).toBe('results');
+    expect(s.error?.key).toBe('timeout');
+  });
+
+  test('job:error after exec:order leaves the order to finish or undo', async () => {
+    for (const kind of ['exec', 'resume']) {
+      const { ctl, s, bridge } = setup('empty');
+      await ctl.init();
+      bridge.emit('exec:order', { order: 'ZS/2026/0926/03', plan: null });
+      s.job = { id: 'job-5', kind };
+      s.verifying = true;
+      bridge.emit('job:error', { job_id: 'job-5', kind, key: 'internal', message: 'boom' });
+      bridge.emit('job:end', { job_id: 'job-5', kind });
+      expect(s.phase).toBe('connect');
+      expect(s.interrupted).toEqual(['ZS/2026/0926/03']);
+      expect(s.verifying).toBe(false);
+      expect(s.job).toBeNull();
+      expect(s.error?.key).toBe('internal');
+    }
+  });
+
+  test('a failed resume keeps the order offered for resuming', async () => {
+    const bridge = createFakeBridge('empty', { delay: 0 });
+    const api = new Proxy(bridge.api, {
+      get: (target, method: string) => (method === 'resume'
+        ? async () => ({ job_id: 'job-6' })
+        : target[method as keyof typeof target]),
+    });
+    const ctl = new Controller(new AppState(), { ...bridge, api });
+    const s = ctl.state;
+    await ctl.init();
+    s.interrupted = ['ZS/2026/0926/04'];
+    await ctl.resume('ZS/2026/0926/04');
+    expect(s.job).toEqual({ id: 'job-6', kind: 'resume' });
+    bridge.emit('job:error', { job_id: 'job-6', kind: 'resume', key: 'wrong_device', message: '' });
+    expect(s.interrupted).toEqual(['ZS/2026/0926/04']);
+  });
+
+  test('job:error during an undo refreshes the history', async () => {
+    const { ctl, s, bridge } = setup('empty');
+    await ctl.init();
+    s.phase = 'done';
+    const before = bridge.calls.filter((c) => c.method === 'history').length;
+    bridge.emit('job:error', { job_id: 'job-8', kind: 'undo', key: 'internal', message: '' });
+    expect(s.phase).toBe('done');
+    await vi.waitFor(() =>
+      expect(bridge.calls.filter((c) => c.method === 'history').length).toBe(before + 1));
+  });
+
   test('a job that ended before its id arrived does not stay busy', async () => {
     const { ctl, s, bridge } = setup('empty');
     await ctl.init();

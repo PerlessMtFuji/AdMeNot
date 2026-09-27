@@ -5,7 +5,6 @@ import type { AppState } from './state.svelte';
 import type { ApiError, AppView, DevicesPayload, Lang, Level, Mode, Settings } from './types';
 
 const CONSOLE_LIMIT = 500;
-const CONNECTION_ERRORS = new Set(['disconnected', 'unauthorized', 'offline']);
 
 export class Controller {
   private ended = new Set<string>();
@@ -93,6 +92,7 @@ export class Controller {
       s.stopping = false;
       s.verifying = false;
       s.disconnectedOrder = null;
+      s.interrupted = s.interrupted.filter((o) => o !== d.order);
       s.plan = null;
       s.screen = 'main';
       s.phase = 'executing';
@@ -130,9 +130,22 @@ export class Controller {
     on('adb:command', (d) => { s.console = [...s.console.slice(-(CONSOLE_LIMIT - 1)), d]; });
     on('job:error', (d) => {
       s.error = d;
-      if (CONNECTION_ERRORS.has(d.key) && s.phase === 'scanning') {
+      // Każdy błąd zadania musi zostawić ekran, z którego da się wyjść (ponowny skan,
+      // dokończenie albo cofnięcie zlecenia), niezależnie od klucza błędu.
+      if (d.kind === 'scan' && s.phase === 'scanning') {
         s.phase = 'connect';
         s.device = null;
+      } else if (d.kind === 'apk') {
+        s.apk = { ...s.apk, running: false };
+      } else if ((d.kind === 'exec' || d.kind === 'resume') && s.phase === 'executing') {
+        if (s.order && !s.interrupted.includes(s.order)) s.interrupted = [...s.interrupted, s.order];
+        s.admin = null;
+        s.question = null;
+        s.verifying = false;
+        s.stopping = false;
+        s.phase = 'connect';
+      } else if (d.kind === 'undo') {
+        void this.refreshHistory();
       }
     });
     on('job:end', (d) => {
@@ -229,11 +242,9 @@ export class Controller {
   async resume(order: string): Promise<void> {
     const s = this.state;
     s.error = null;
+    // zlecenie znika z „przerwanych” dopiero z `exec:order`: nieudane wznowienie zostawia je
     const r = await this.call(this.api.resume(order));
-    if (r) {
-      this.setJob(r.job_id, 'resume');
-      s.interrupted = s.interrupted.filter((o) => o !== order);
-    }
+    if (r) this.setJob(r.job_id, 'resume');
   }
 
   async undo(order: string, actionId: number | null = null): Promise<void> {
