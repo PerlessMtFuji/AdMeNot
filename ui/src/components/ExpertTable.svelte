@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getContext } from 'svelte';
+  import { getContext, tick } from 'svelte';
   import { CATEGORY_ICON, categoryKey } from '../lib/categories';
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
@@ -25,11 +25,16 @@
   const CHIP = { bad: 'bg-bad-soft text-bad', warn: 'bg-warn-soft text-warn', neutral: 'bg-neutral-soft text-neutral' };
   const LEVEL_TEXT = { accent: 'text-accent', warn: 'text-warn', bad: 'text-bad' };
 
-  function keydown(e: KeyboardEvent) {
+  let table: HTMLElement;
+
+  async function keydown(e: KeyboardEvent) {
+    if (e.target !== e.currentTarget) return; // klawisze w polach wiersza należą do tych pól
     const ids = rows.map((r) => r.package);
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       ctl.focus(moveFocus(ids, focused, e.key === 'ArrowDown' ? 1 : -1));
+      await tick();
+      table.querySelector('tr[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
     } else if (e.key === ' ' && focused) {
       e.preventDefault();
       const app = rows.find((r) => r.package === focused);
@@ -65,7 +70,7 @@
 </div>
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
-<div role="group" aria-label={t('expert.table')} tabindex="0" onkeydown={keydown}
+<div role="group" aria-label={t('expert.table')} tabindex="0" onkeydown={keydown} bind:this={table}
   class="flex-none overflow-hidden rounded-2xl bg-surface shadow-card">
   <table class="w-full border-collapse">
     <thead>

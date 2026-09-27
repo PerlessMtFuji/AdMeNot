@@ -34,6 +34,17 @@ describe('Connect', () => {
     expect(screen.getByText('Jak włączyć debugowanie USB')).toBeTruthy();
   });
 
+  test('the guide collapses once the phone turns out to be known (history arrives after the first render)', async () => {
+    const env = await setupCtl('unauthorized');
+    env.s.knownSerials = [];
+    render(Connect, { context: new Map([['ctl', env.ctl]]) });
+    expect(screen.getByText('Jak włączyć debugowanie USB')).toBeTruthy();
+    env.s.knownSerials = ['R58T00TEST'];
+    await tick();
+    expect(screen.queryByText('Jak włączyć debugowanie USB')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Pokaż, jak włączyć debugowanie USB' })).toBeTruthy();
+  });
+
   test('several phones: pick one, then scan', async () => {
     const { s, bridge } = await renderWith(Connect, 'many');
     const radios = screen.getAllByRole('radio');

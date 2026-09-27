@@ -222,7 +222,9 @@ export function groupHistory(actions: HistoryAction[]): HistoryAppRow[] {
   }
   for (const r of rows) {
     const statuses = r.actions.map((a) => a.status);
-    r.state = statuses.every((x) => x === 'undone') ? 'restored'
+    // Po cofnięciu zostają „failed” tylko kroki, które niczego nie zmieniły (np. pominięte).
+    const restored = statuses.includes('undone') && !statuses.includes('done') && !statuses.includes('pending');
+    r.state = restored ? 'restored'
       : statuses.includes('pending') ? 'pending' : statuses.includes('failed') ? 'failed' : 'done';
     r.backup = r.actions.some((a) => a.kind === 'backup' && a.status === 'done');
     r.canRestore = statuses.includes('done');

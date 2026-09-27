@@ -188,6 +188,14 @@ test('groupHistory: one row per app with its state', () => {
   expect(orderCounts(rows)).toEqual([['remove', 1], ['disable', 2], ['silence', 1]]);
 });
 
+test('groupHistory: an app is restored when undo leaves only never-applied failed steps', () => {
+  const a = (id: number, kind: string, status: string, error: string | null = null) =>
+    ({ id, package: 'x', level: 'remove', level_label: '', kind, step_label: kind, status, status_label: status, error }) as never;
+  const [row] = groupHistory([a(1, 'backup', 'undone'), a(2, 'admin', 'failed', 'declined'),
+    a(3, 'enabled', 'failed', 'skipped'), a(4, 'installed', 'failed', 'skipped')]);
+  expect([row.state, row.canRestore]).toEqual(['restored', false]);
+});
+
 test('dayKey', () => {
   const now = new Date(2026, 8, 27, 12, 0);
   expect(dayKey('2026-09-27T08:15', now)).toBe('today');

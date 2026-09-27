@@ -104,4 +104,23 @@ describe('Results', () => {
     await fireEvent.click(screen.getByRole('button', { name: `Wszystkie · ${s.scan!.apps.length}` }));
     expect(screen.getAllByRole('row')).toHaveLength(s.scan!.apps.length + 1);
   });
+  test('expert table: keys typed in a row control stay there, arrows keep the focused row in view', async () => {
+    const { s, ctl } = await scanned();
+    await ctl.setMode('expert');
+    await tick();
+    const flagged = s.scan!.apps.filter((a) => a.verdict !== 'safe');
+    const focused = s.focused ?? flagged[0].package;
+    const other = flagged.find((a) => a.package !== focused)!;
+    const selected = focused in s.selection;
+    await fireEvent.keyDown(screen.getByRole('checkbox', { name: other.package }), { key: ' ' });
+    expect(focused in s.selection).toBe(selected);
+    await fireEvent.keyDown(screen.getByRole('combobox', { name: `Akcja ${focused}` }), { key: 'ArrowDown' });
+    expect(s.focused ?? flagged[0].package).toBe(focused);
+    const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
+    await fireEvent.keyDown(screen.getByRole('group', { name: 'Tabela aplikacji' }), { key: 'ArrowDown' });
+    await tick();
+    expect(scroll).toHaveBeenCalledWith({ block: 'nearest' });
+    expect((scroll.mock.contexts.at(-1) as HTMLElement).getAttribute('aria-selected')).toBe('true');
+    scroll.mockRestore();
+  });
 });

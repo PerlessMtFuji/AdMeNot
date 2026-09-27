@@ -61,3 +61,6 @@ if (!('inert' in HTMLElement.prototype)) {
 }
 
 afterEach(() => cleanup());
+
+// jsdom nie przewija: tabela eksperta woła scrollIntoView na podświetlonym wierszu.
+if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {};

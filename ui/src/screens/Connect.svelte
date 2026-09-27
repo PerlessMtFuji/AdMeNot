@@ -61,7 +61,10 @@
         </form>
       </div>
     {:else}
-      <UsbGuide model={pending?.model ?? null} collapsed={known} />
+      <!-- nowy telefon albo historia wczytana po pierwszym renderze: przewodnik liczy stan od nowa -->
+      {#key `${pending?.serial ?? ''}|${known}`}
+        <UsbGuide model={pending?.model ?? null} collapsed={known} />
+      {/key}
     {/if}
   </div>
 </main>
