@@ -8,7 +8,9 @@
   import { t } from './lib/i18n/index.svelte';
   import Connect from './screens/Connect.svelte';
   import Execute from './screens/Execute.svelte';
+  import History from './screens/History.svelte';
   import Results from './screens/Results.svelte';
+  import Settings from './screens/Settings.svelte';
 
   let props: { ctl: Controller } = $props();
   const ctl = untrack(() => props.ctl); // kontroler nie zmienia się przez całe życie okna
@@ -23,13 +25,19 @@
       <ErrorCard fatal />
     {:else}
       <ErrorCard />
-      <StageBar />
-      {#if s.phase === 'connect' || (s.phase === 'scanning' && !s.device)}
-        <Connect />
-      {:else if s.phase === 'executing' || s.phase === 'done'}
-        <Execute />
+      {#if s.screen === 'history'}
+        <History />
+      {:else if s.screen === 'settings'}
+        <Settings />
       {:else}
-        <Results />
+        <StageBar />
+        {#if s.phase === 'connect' || (s.phase === 'scanning' && !s.device)}
+          <Connect />
+        {:else if s.phase === 'executing' || s.phase === 'done'}
+          <Execute />
+        {:else}
+          <Results />
+        {/if}
       {/if}
     {/if}
   </main>
