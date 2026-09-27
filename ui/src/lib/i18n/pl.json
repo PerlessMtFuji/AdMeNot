@@ -2,7 +2,7 @@
   "common": { "cancel": "Anuluj", "close": "Zamknij", "back": "Wróć", "save": "Zapisz", "saved": "Zapisano" },
   "app": { "new_order": "Nowe zlecenie", "order": "Zlecenie", "client": "Klient" },
   "header": { "simple": "Prosty", "expert": "Ekspert", "history": "Historia", "settings": "Ustawienia", "lang": "Język" },
-  "stage": { "connect": "Połączenie", "read": "Odczyt", "analyze": "Analiza", "fix": "Naprawa", "report": "Protokół", "soon": "Protokół — wkrótce" },
+  "stage": { "label": "Etapy", "connect": "Połączenie", "read": "Odczyt", "analyze": "Analiza", "fix": "Naprawa", "report": "Protokół", "soon": "Protokół — wkrótce" },
   "connect": {
     "waiting": "Czekam na telefon…",
     "plug": "Podłącz telefon kablem USB. Jeśli to pierwszy raz, włącz debugowanie USB:",

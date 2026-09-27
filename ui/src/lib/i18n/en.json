@@ -2,7 +2,7 @@
   "common": { "cancel": "Cancel", "close": "Close", "back": "Back", "save": "Save", "saved": "Saved" },
   "app": { "new_order": "New order", "order": "Order", "client": "Client" },
   "header": { "simple": "Simple", "expert": "Expert", "history": "History", "settings": "Settings", "lang": "Language" },
-  "stage": { "connect": "Connection", "read": "Reading", "analyze": "Analysis", "fix": "Repair", "report": "Report", "soon": "Report — coming soon" },
+  "stage": { "label": "Stages", "connect": "Connection", "read": "Reading", "analyze": "Analysis", "fix": "Repair", "report": "Report", "soon": "Report — coming soon" },
   "connect": {
     "waiting": "Waiting for a phone…",
     "plug": "Connect the phone with a USB cable. If this is the first time, enable USB debugging:",
