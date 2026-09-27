@@ -7,6 +7,7 @@
   import type { Controller } from './lib/controller';
   import { t } from './lib/i18n/index.svelte';
   import Connect from './screens/Connect.svelte';
+  import Results from './screens/Results.svelte';
 
   let props: { ctl: Controller } = $props();
   const ctl = untrack(() => props.ctl); // kontroler nie zmienia się przez całe życie okna
@@ -22,7 +23,11 @@
     {:else}
       <ErrorCard />
       <StageBar />
-      <Connect />
+      {#if s.phase === 'connect' || (s.phase === 'scanning' && !s.device)}
+        <Connect />
+      {:else}
+        <Results />
+      {/if}
     {/if}
   </main>
 </div>
