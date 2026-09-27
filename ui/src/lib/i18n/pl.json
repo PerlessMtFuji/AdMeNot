@@ -13,9 +13,8 @@
     "apps": { "one": "{count} aplikacja", "few": "{count} aplikacje", "many": "{count} aplikacji", "other": "{count} aplikacji" },
     "plan": "Plan naprawy", "empty": "Zaznacz aplikacje, które chcesz naprawić.", "unchanged": "bez zmian"
   },
-  "app": { "new_order": "Nowe zlecenie", "order": "Zlecenie", "client": "Klient" },
   "rail": { "label": "Menu", "new_order": "Nowe zlecenie", "back_to_order": "Wróć do zlecenia" },
-  "header": { "simple": "Prosty", "expert": "Ekspert", "history": "Historia", "settings": "Ustawienia", "lang": "Język" },
+  "header": { "simple": "Prosty", "expert": "Ekspert", "history": "Historia", "settings": "Ustawienia" },
   "stage": { "label": "Etapy", "connect": "Połączenie", "read": "Odczyt", "analyze": "Analiza", "fix": "Naprawa", "report": "Protokół", "soon": "Protokół — wkrótce" },
   "connect": {
     "title": { "none": "Podłącz telefon", "unauthorized": "Potwierdź na telefonie", "offline": "Odłącz i podłącz kabel", "ready": "Połączono", "many": "Wybierz telefon", "adb_missing": "Brak programu adb" },
@@ -30,7 +29,6 @@
     "client_label": "Klient (opcjonalnie)",
     "client_placeholder": "np. Anna K.",
     "scan": "Skanuj",
-    "scanning": "Łączę z telefonem…",
     "adb_missing": "Nie znaleziono programu adb.",
     "open_settings": "Otwórz ustawienia"
   },
@@ -83,28 +81,18 @@
   },
   "scan": { "title": "Skanuję telefon", "sub": "To potrwa kilkanaście sekund. Nie odłączaj kabla.", "steps": "Etapy skanowania", "stage": { "identify": "Rozpoznaję telefon…", "packages": "Czytam listę aplikacji…", "collectors": "Zbieram dane o zachowaniu aplikacji…", "score": "Oceniam aplikacje…", "apk": "Analizuję pliki APK…" } },
   "phone": {
-    "subject": "Przedmiot zlecenia", "android": "Android", "connection": "Połączenie", "connected": "● USB, autoryzowane",
-    "apps": "Aplikacje", "apps_value": "{total} ({user} użytk.)", "model": "Model", "match": "Dopasowanie", "serial": "S/N",
-    "sdk": "SDK", "uptime": "Uptime", "patch": "Poprawka", "oem": "Producent"
+    "subject": "Przedmiot zlecenia", "serial": "S/N", "patch": "Poprawka"
   },
-  "match": { "manual": "wybrane ręcznie", "exact": "✓ dokładne", "approximate": "~ przybliżone", "none": "sylwetka" },
   "summary": {
-    "found": "Aplikacje, które zaśmiecają telefon: {count}",
-    "advice": "Zalecamy je usunąć albo wyłączyć. Każdą zmianę można cofnąć.",
-    "review": "Kilka aplikacji warto sprawdzić — nic nie jest zaznaczone do naprawy.",
-    "clean": "Nie znaleziono podejrzanych aplikacji.",
     "low_data": "Mało danych o zachowaniu (telefon niedawno uruchomiony) — oceny mogą być zaniżone.",
-    "ok_count": "✓ Bez uwag: {count}",
-    "apk_running": "Analiza APK w tle: {done}/{total}",
-    "apk_done": "Analiza APK: gotowe"
+    "apk_running": "Analiza APK w tle: {done}/{total}"
   },
   "level": { "silence": "WYCISZ", "disable": "WYŁĄCZ", "remove": "USUŃ", "review": "SPRAWDŹ", "none": "—" },
-  "verdict": { "all": "Wszystkie werdykty", "malicious": "Szkodliwa", "suspicious": "Podejrzana", "review": "Do sprawdzenia", "safe": "Bezpieczna" },
+  "verdict": { "malicious": "Szkodliwa", "suspicious": "Podejrzana", "review": "Do sprawdzenia", "safe": "Bezpieczna" },
   "expert": {
-    "malicious": "Szkodliwe", "suspicious": "Podejrzane", "non_play": "Spoza Play", "admins": "Admin urządz.", "collectors": "Kolektory OK",
-    "col_app": "Aplikacja", "col_problems": "Problemy", "col_score": "Wynik", "col_signals": "Sygnały", "col_source": "Źródło", "col_action": "Akcja",
-    "search": "Szukaj aplikacji lub pakietu", "show_all": "Pokaż wszystkie aplikacje",
-    "source_play": "Play", "source_system": "systemowa", "source_sideload": "spoza sklepu",
+    "malicious": "Szkodliwe", "suspicious": "Podejrzane", "non_play": "Spoza Play", "admins": "Admin urządz.",
+    "col_app": "Aplikacja", "col_problems": "Problemy", "col_score": "Wynik", "col_source": "Źródło", "col_action": "Akcja",
+    "search": "Szukaj aplikacji lub pakietu",
     "apk_error": "APK: błąd", "collector_failed": "Kolektor {name}: {error}", "ad_sdks": "SDK reklamowe: {list}",
     "table": "Tabela aplikacji", "filter": "Filtr", "filter_attention": "Wymagające uwagi · {count}", "filter_all": "Wszystkie · {count}",
     "collectors_apk": "kolektory {ok}/{total} · APK {analyzed}/{requested}", "collectors_only": "kolektory {ok}/{total}", "today": "dziś", "protected": "Aplikacja chroniona",
@@ -115,7 +103,7 @@
     "none": "Wybierz aplikację w tabeli.", "plan": "Plan", "fix": "Napraw ({count})",
     "zone": { "safe": "bez uwag", "review": "do sprawdzenia", "suspicious": "podejrzana", "malicious": "szkodliwa" }
   },
-  "actions": { "details": "Pokaż szczegóły", "console": "Konsola ADB", "fix": "Napraw zaznaczone ({count})", "rescan": "Skanuj ponownie" },
+  "actions": { "console": "Konsola ADB", "fix": "Napraw zaznaczone ({count})", "rescan": "Skanuj ponownie" },
   "plan": { "title": "Plan naprawy", "confirm_title": "Co zrobię na telefonie", "blocked": "Pominięta", "unlock": "Odblokuj", "undo_hint": "Każdą zmianę można cofnąć w Historii.", "run": "Wykonaj ({count})", "nothing": "Nic do wykonania — wszystkie aplikacje są zablokowane." },
   "exec": {
     "title": "Naprawiam telefon…", "step": "krok {done} z {total}", "panel": "Zlecenie",
@@ -146,8 +134,8 @@
   },
   "history": {
     "title": "Historia zleceń", "phone": "Telefon", "empty": "Brak zleceń dla tego telefonu.", "none": "Brak zapisanych zleceń.",
-    "restore": "Przywróć", "undo_all": "Cofnij całe zlecenie", "resume": "Dokończ", "interrupted": "Przerwane",
-    "working": "Pracuję…", "admin_note": "Cofnięcie nie przywraca uprawnień administratora urządzenia.", "undo_errors": "Nie wszystko udało się cofnąć:",
+    "restore": "Przywróć", "undo_all": "Cofnij całe zlecenie", "resume": "Dokończ",
+    "admin_note": "Cofnięcie nie przywraca uprawnień administratora urządzenia.", "undo_errors": "Nie wszystko udało się cofnąć:",
     "banner": "Zlecenie z {when} nie zostało dokończone",
     "banner_detail": "{name} — wykonano {done} z {total} kroków.",
     "undo_changes": "Cofnij zmiany",

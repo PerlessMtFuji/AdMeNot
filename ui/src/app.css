@@ -19,9 +19,6 @@
   --color-neutral-soft: #f3f4f6;
   --color-ok: #16a34a;
   --color-ok-soft: #dcfce7;
-  /* legacy (Task 15 usuwa) */
-  --color-paper: #f5f6fa;
-  --color-card: #ffffff;
   --shadow-card: 0 1px 2px rgb(16 24 40 / .05), 0 8px 24px -14px rgb(16 24 40 / .16);
   --shadow-pop: 0 0 0 2px var(--color-accent), 0 14px 30px -16px rgb(79 70 229 / .6);
   --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
@@ -47,17 +44,8 @@
   --color-neutral-soft: #222b36;
   --color-ok: #4ade80;
   --color-ok-soft: #12301d;
-  --color-paper: #0f141b;
-  --color-card: #171e27;
   --shadow-card: 0 0 0 1px var(--color-line);
   color-scheme: dark;
-}
-
-/* legacy — kolory dla jeszcze nieprzepisanych ekranów (Tailwind arbitrary values); usuwane w Task 15 */
-:root {
-  --bad-bg: #fee2e2; --bad-line: #fca5a5;
-  --warn-bg: #fef3c7; --warn-line: #fcd34d;
-  --ok-bg: #dcfce7; --ok-line: #86efac;
 }
 
 @layer base {
@@ -84,28 +72,6 @@
   .progress-fill { position: relative; overflow: hidden; background: linear-gradient(90deg, #6366f1, var(--color-accent)); transition: width .6s cubic-bezier(.2, .8, .2, 1); }
   .progress-fill::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgb(255 255 255 / .45), transparent); animation: shimmer 1.4s linear infinite; }
   .flash { animation: flash 2s ease-out; }
-
-  /* legacy — usuwane w Task 15 razem z ostatnimi starymi komponentami */
-  .topbar { background: #1d2733; color: #e6edf5; }
-  .card { background: var(--color-surface); border: 1px solid var(--color-line); border-radius: 12px; padding: 11px 12px; }
-  .hard { box-shadow: var(--shadow-card); }
-  .btn { padding: 7px 13px; border-radius: 9px; font-weight: 600; border: 1px solid var(--color-line); background: var(--color-surface); color: var(--color-ink); }
-  .btn-pri { background: var(--color-accent); border-color: var(--color-accent); color: #fff; }
-  .btn-link { color: var(--color-accent); font-weight: 600; background: none; border: 0; padding: 0; }
-  .tag { font-size: 10px; padding: 3px 8px; border-radius: 99px; font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
-  .tag-bad { background: var(--color-bad-soft); color: var(--color-bad); }
-  .tag-warn { background: var(--color-warn-soft); color: var(--color-warn); }
-  .tag-gray { background: var(--color-neutral-soft); color: var(--color-neutral); }
-  .tag-ok { background: var(--color-ok-soft); color: var(--color-ok); }
-  .chip { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 4px; background: var(--color-surface-2); border: 1px solid var(--color-line); margin: 1px 2px 1px 0; }
-  .chip-bad { background: var(--color-bad-soft); color: var(--color-bad); }
-  .ok { color: var(--color-ok); }
-  .warn { color: var(--color-warn); }
-  .bad { color: var(--color-bad); }
-  .evidence { background: #0f172a; color: #cbd5e1; border-radius: 6px; padding: 7px 9px; font-size: 11px; font-family: var(--font-mono); white-space: pre-wrap; word-break: break-word; }
-  .actionbar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: var(--color-surface); border-top: 1px solid var(--color-line); }
-  .modal-backdrop { position: fixed; inset: 0; background: rgb(15 23 42 / .45); display: grid; place-items: center; z-index: 50; }
-  .modal { background: var(--color-surface); border-radius: 16px; padding: 16px; width: min(560px, 92vw); max-height: 86vh; overflow: auto; box-shadow: var(--shadow-card); }
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -116,9 +82,6 @@
 @keyframes ring { 0% { transform: scale(.7); opacity: .5; } 100% { transform: scale(1.3); opacity: 0; } }
 @keyframes tap { 0%, 100% { box-shadow: 0 0 0 0 rgb(79 70 229 / .6); } 60% { box-shadow: 0 0 0 9px rgb(79 70 229 / 0); } }
 @keyframes tap-red { 0%, 100% { box-shadow: 0 0 0 0 rgb(220 38 38 / .55); } 60% { box-shadow: 0 0 0 6px rgb(220 38 38 / 0); } }
-/* legacy — Connect.svelte SVG; usuwane w Task 15 */
-@keyframes dash { to { stroke-dashoffset: -20; } }
-@keyframes pulse-ring { 0%, 100% { transform: scale(1); opacity: .55; } 50% { transform: scale(1.25); opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

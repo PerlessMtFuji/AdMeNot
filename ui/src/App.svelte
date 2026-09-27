@@ -3,6 +3,7 @@
   import ErrorCard from './components/ErrorCard.svelte';
   import type { Controller } from './lib/controller';
   import { t } from './lib/i18n/index.svelte';
+  import { screenIn } from './lib/motion';
   import Connect from './screens/Connect.svelte';
   import Execute from './screens/Execute.svelte';
   import History from './screens/History.svelte';
@@ -17,24 +18,39 @@
   const ctl = untrack(() => props.ctl); // kontroler nie zmienia się przez całe życie okna
   setContext('ctl', ctl);
   const s = ctl.state;
+
+  const ORDER = ['connect', 'scanning', 'results', 'executing', 'history', 'settings', 'fatal'];
+  const view = $derived(s.fatal ? 'fatal' : s.screen !== 'main' ? s.screen
+    : s.phase === 'done' ? 'executing' : s.phase);
+  let last = 'connect';
+  let dir = $state<1 | -1>(1);
+  $effect.pre(() => {
+    const next = view;
+    dir = ORDER.indexOf(next) >= ORDER.indexOf(last) ? 1 : -1;
+    last = next;
+  });
 </script>
 
 <AppShell>
-  {#if s.fatal}
-    <div class="flex-1 p-6"><ErrorCard fatal /></div>
-  {:else if s.screen === 'history'}
-    <History />
-  {:else if s.screen === 'settings'}
-    <Settings />
-  {:else if s.phase === 'connect'}
-    <Connect />
-  {:else if s.phase === 'scanning'}
-    <Scan />
-  {:else if s.phase === 'executing' || s.phase === 'done'}
-    <Execute />
-  {:else}
-    <Results />
-  {/if}
+  {#key view}
+    <div class="flex min-h-0 min-w-0 flex-1" in:screenIn={{ dir }}>
+      {#if s.fatal}
+        <div class="flex-1 p-6"><ErrorCard fatal /></div>
+      {:else if s.screen === 'history'}
+        <History />
+      {:else if s.screen === 'settings'}
+        <Settings />
+      {:else if s.phase === 'connect'}
+        <Connect />
+      {:else if s.phase === 'scanning'}
+        <Scan />
+      {:else if s.phase === 'executing' || s.phase === 'done'}
+        <Execute />
+      {:else}
+        <Results />
+      {/if}
+    </div>
+  {/key}
 </AppShell>
 
 {#if s.closeRequested}

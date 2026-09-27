@@ -11,7 +11,6 @@ export const ERROR_KEYS = ['adb_missing', 'unauthorized', 'offline', 'disconnect
   'nothing_to_resume', 'nothing_to_do', 'no_target', 'bad_request', 'internal'] as const;
 export const SCAN_STAGES = ['identify', 'packages', 'collectors', 'score', 'apk'] as const;
 export const LEVEL_KEYS = ['silence', 'disable', 'remove', 'review', 'none'] as const;
-export const MATCH_KEYS = ['manual', 'exact', 'approximate', 'none'] as const;
 // Rodziny kluczy z formami liczby mnogiej (one/few/many/other w obu słownikach).
 export const PLURAL_KEYS = ['results.title', 'results.safe', 'expert.days', 'panel.apps',
   'exec.apps', 'exec.steps', 'history.did.remove', 'history.did.disable', 'history.did.silence'] as const;

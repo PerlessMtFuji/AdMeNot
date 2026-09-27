@@ -13,9 +13,8 @@
     "apps": { "one": "{count} app", "few": "{count} apps", "many": "{count} apps", "other": "{count} apps" },
     "plan": "Repair plan", "empty": "Select the apps you want to fix.", "unchanged": "no change"
   },
-  "app": { "new_order": "New order", "order": "Order", "client": "Client" },
   "rail": { "label": "Menu", "new_order": "New order", "back_to_order": "Back to the order" },
-  "header": { "simple": "Simple", "expert": "Expert", "history": "History", "settings": "Settings", "lang": "Language" },
+  "header": { "simple": "Simple", "expert": "Expert", "history": "History", "settings": "Settings" },
   "stage": { "label": "Stages", "connect": "Connection", "read": "Reading", "analyze": "Analysis", "fix": "Repair", "report": "Report", "soon": "Report — coming soon" },
   "connect": {
     "title": { "none": "Connect the phone", "unauthorized": "Confirm on the phone", "offline": "Unplug and reconnect the cable", "ready": "Connected", "many": "Choose a phone", "adb_missing": "adb not found" },
@@ -30,7 +29,6 @@
     "client_label": "Client (optional)",
     "client_placeholder": "e.g. Anna K.",
     "scan": "Scan",
-    "scanning": "Connecting to the phone…",
     "adb_missing": "adb was not found.",
     "open_settings": "Open settings"
   },
@@ -83,28 +81,18 @@
   },
   "scan": { "title": "Scanning the phone", "sub": "This takes a few seconds. Keep the cable connected.", "steps": "Scan stages", "stage": { "identify": "Identifying the phone…", "packages": "Reading the app list…", "collectors": "Collecting app behavior data…", "score": "Rating the apps…", "apk": "Analyzing APK files…" } },
   "phone": {
-    "subject": "Device", "android": "Android", "connection": "Connection", "connected": "● USB, authorized",
-    "apps": "Apps", "apps_value": "{total} ({user} user)", "model": "Model", "match": "Match", "serial": "S/N",
-    "sdk": "SDK", "uptime": "Uptime", "patch": "Patch", "oem": "Maker"
+    "subject": "Device", "serial": "S/N", "patch": "Patch"
   },
-  "match": { "manual": "chosen manually", "exact": "✓ exact", "approximate": "~ approximate", "none": "silhouette" },
   "summary": {
-    "found": "Apps cluttering the phone: {count}",
-    "advice": "We recommend removing or disabling them. Every change can be undone.",
-    "review": "A few apps are worth a look — nothing is selected for repair.",
-    "clean": "No suspicious apps found.",
     "low_data": "Little behavior data (the phone was restarted recently) — ratings may be too low.",
-    "ok_count": "✓ Without issues: {count}",
-    "apk_running": "APK analysis in the background: {done}/{total}",
-    "apk_done": "APK analysis: done"
+    "apk_running": "APK analysis in the background: {done}/{total}"
   },
   "level": { "silence": "SILENCE", "disable": "DISABLE", "remove": "REMOVE", "review": "CHECK", "none": "—" },
-  "verdict": { "all": "All verdicts", "malicious": "Malicious", "suspicious": "Suspicious", "review": "Review", "safe": "Safe" },
+  "verdict": { "malicious": "Malicious", "suspicious": "Suspicious", "review": "Review", "safe": "Safe" },
   "expert": {
-    "malicious": "Malicious", "suspicious": "Suspicious", "non_play": "Outside Play", "admins": "Device admins", "collectors": "Collectors OK",
-    "col_app": "App", "col_problems": "Problems", "col_score": "Score", "col_signals": "Signals", "col_source": "Source", "col_action": "Action",
-    "search": "Search app or package", "show_all": "Show all apps",
-    "source_play": "Play", "source_system": "system", "source_sideload": "sideloaded",
+    "malicious": "Malicious", "suspicious": "Suspicious", "non_play": "Outside Play", "admins": "Device admins",
+    "col_app": "App", "col_problems": "Problems", "col_score": "Score", "col_source": "Source", "col_action": "Action",
+    "search": "Search app or package",
     "apk_error": "APK: error", "collector_failed": "Collector {name}: {error}", "ad_sdks": "Ad SDKs: {list}",
     "table": "Apps table", "filter": "Filter", "filter_attention": "Needs attention · {count}", "filter_all": "All · {count}",
     "collectors_apk": "collectors {ok}/{total} · APK {analyzed}/{requested}", "collectors_only": "collectors {ok}/{total}", "today": "today", "protected": "Protected app",
@@ -115,7 +103,7 @@
     "none": "Select an app in the table.", "plan": "Plan", "fix": "Fix ({count})",
     "zone": { "safe": "no issues", "review": "to review", "suspicious": "suspicious", "malicious": "malicious" }
   },
-  "actions": { "details": "Show details", "console": "ADB console", "fix": "Fix selected ({count})", "rescan": "Scan again" },
+  "actions": { "console": "ADB console", "fix": "Fix selected ({count})", "rescan": "Scan again" },
   "plan": { "title": "Repair plan", "confirm_title": "What I will do on the phone", "blocked": "Skipped", "unlock": "Unlock", "undo_hint": "Every change can be undone in History.", "run": "Run ({count})", "nothing": "Nothing to run — all apps are blocked." },
   "exec": {
     "title": "Fixing the phone…", "step": "step {done} of {total}", "panel": "Order",
@@ -146,8 +134,8 @@
   },
   "history": {
     "title": "Order history", "phone": "Phone", "empty": "No orders for this phone.", "none": "No saved orders.",
-    "restore": "Restore", "undo_all": "Undo the whole order", "resume": "Finish", "interrupted": "Interrupted",
-    "working": "Working…", "admin_note": "Undo does not restore device admin rights.", "undo_errors": "Not everything could be undone:",
+    "restore": "Restore", "undo_all": "Undo the whole order", "resume": "Finish",
+    "admin_note": "Undo does not restore device admin rights.", "undo_errors": "Not everything could be undone:",
     "banner": "The order from {when} was not finished",
     "banner_detail": "{name} — {done} of {total} steps done.",
     "undo_changes": "Undo changes",

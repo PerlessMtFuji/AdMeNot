@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { USB_GROUPS, USB_STEPS } from '../usb';
 import en from './en.json';
-import { ERROR_KEYS, i18n, LEVEL_KEYS, MATCH_KEYS, PLURAL_KEYS, SCAN_STAGES, t, tp } from './index.svelte';
+import { ERROR_KEYS, i18n, LEVEL_KEYS, PLURAL_KEYS, SCAN_STAGES, t, tp } from './index.svelte';
 import pl from './pl.json';
 
 function flat(obj: Record<string, unknown>, prefix = ''): string[] {
@@ -37,7 +37,6 @@ describe('dictionaries', () => {
       ...ERROR_KEYS.map((k) => `error.${k}`),
       ...SCAN_STAGES.map((k) => `scan.stage.${k}`),
       ...LEVEL_KEYS.map((k) => `level.${k}`),
-      ...MATCH_KEYS.map((k) => `match.${k}`),
       ...USB_GROUPS.map((g) => `usb.group.${g}`),
       ...USB_GROUPS.flatMap((g) => Array.from({ length: USB_STEPS[g] }, (_, i) => `usb.${g}.s${i + 1}`)),
       ...['ads', 'notif', 'removal', 'data', 'disguise', 'background', 'origin', 'combo']
