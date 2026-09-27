@@ -63,3 +63,30 @@ test('theme: explicit dark, then system follows Windows', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark' });
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 });
+
+test('expert table keeps every row reachable when the list is longer than the window', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 300 });
+  await scan(page, 'adware');
+  await page.getByRole('button', { name: 'Ekspert' }).click();
+  await page.getByRole('button', { name: /^Wszystkie/ }).click();
+  const table = page.getByRole('group', { name: 'Tabela aplikacji' });
+  const rows = table.locator('tbody tr');
+  expect(await rows.count()).toBeGreaterThan(3);
+  const clipped = await table.evaluate((el) => el.scrollHeight - el.clientHeight);
+  expect(clipped).toBe(0);
+  await rows.last().scrollIntoViewIfNeeded();
+  await expect(rows.last()).toBeInViewport();
+});
+
+test('repair cards keep their full height when the order is longer than the window', async ({ page }) => {
+  await scan(page, 'adware');
+  await page.getByRole('button', { name: /Napraw zaznaczone/ }).click();
+  await page.getByRole('button', { name: /^Wykonaj/ }).click();
+  await expect(page.getByRole('heading', { name: 'Telefon naprawiony' })).toBeVisible({ timeout: 15_000 });
+  await page.setViewportSize({ width: 1280, height: 300 });
+  const cards = page.getByRole('main').getByRole('article');
+  expect(await cards.count()).toBeGreaterThan(0);
+  for (const card of await cards.all()) {
+    expect(await card.evaluate((el) => el.scrollHeight - el.clientHeight)).toBe(0);
+  }
+});

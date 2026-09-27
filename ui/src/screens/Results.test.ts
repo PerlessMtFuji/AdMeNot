@@ -15,6 +15,16 @@ async function scanned(scenario = 'adware') {
 }
 
 describe('Results', () => {
+  test('header shows the phone thumbnail next to the device name, in both modes', async () => {
+    const { ctl, s } = await scanned();
+    const header = screen.getByRole('main').querySelector('header')!;
+    const img = within(header).getByRole('img', { name: s.device!.name });
+    expect(img.getAttribute('src')).toBe(s.device!.image);
+    ctl.setMode('expert');
+    await tick();
+    expect(within(screen.getByRole('main').querySelector('header')!).getByRole('img', { name: s.device!.name })).toBeTruthy();
+  });
+
   test('simple mode: title, symptom rows, action switch, plan panel and safe list', async () => {
     const { s } = await scanned();
     const flagged = s.scan!.apps.filter((a) => a.verdict !== 'safe');

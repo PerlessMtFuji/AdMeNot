@@ -66,7 +66,7 @@
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
 <div role="group" aria-label={t('expert.table')} tabindex="0" onkeydown={keydown}
-  class="overflow-hidden rounded-2xl bg-surface shadow-card">
+  class="flex-none overflow-hidden rounded-2xl bg-surface shadow-card">
   <table class="w-full border-collapse">
     <thead>
       <tr class="text-left text-[10px] tracking-[.08em] text-mut uppercase">

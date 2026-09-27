@@ -6,6 +6,7 @@
   import EvidencePanel from '../components/EvidencePanel.svelte';
   import ExpertTable from '../components/ExpertTable.svelte';
   import InterruptedBanner from '../components/InterruptedBanner.svelte';
+  import PhoneThumb from '../components/PhoneThumb.svelte';
   import PlanConfirm from '../components/PlanConfirm.svelte';
   import PlanPanel from '../components/PlanPanel.svelte';
   import type { Controller } from '../lib/controller';
@@ -40,6 +41,7 @@
   <main inert={s.plan !== null}
     class="flex min-w-0 flex-1 flex-col gap-3 overflow-auto px-6 py-5 transition-opacity duration-300 {s.plan ? 'opacity-50' : ''}">
     <header class="flex items-end gap-3">
+      {#if s.device}<PhoneThumb compact image={s.device.image} name={s.device.name} />{/if}
       <div class="min-w-0 flex-1">
         <div class="truncate text-[11.5px] font-semibold text-soft">
           {[s.client.trim(), s.device?.name].filter(Boolean).join(' · ')}

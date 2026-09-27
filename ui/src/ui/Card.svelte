@@ -8,7 +8,7 @@
 </script>
 
 <div {role} aria-label={label}
-  class="relative overflow-hidden rounded-2xl bg-surface shadow-card transition-opacity duration-300 {dim ? 'opacity-50' : ''} {cls}">
+  class="relative flex-none overflow-hidden rounded-2xl bg-surface shadow-card transition-opacity duration-300 {dim ? 'opacity-50' : ''} {cls}">
   {#if stripe}<span class="absolute inset-y-0 left-0 w-1 {STRIPE[stripe]}" aria-hidden="true"></span>{/if}
   {@render children()}
 </div>
