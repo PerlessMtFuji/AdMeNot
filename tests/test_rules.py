@@ -21,7 +21,8 @@ def test_check_operators():
 
 def _rule(**over):
     rule = {
-        "id": "T-1", "class": "behavior", "weight": 10,
+        "id": "T-1", "class": "behavior", "weight": 10, "category": "notif",
+        "label": {"pl": "Dużo powiadomień", "en": "Many notifications"},
         "when": {"notif_per_hour_24h": {"gte": 8}},
         "evidence": ["notif_per_hour_24h"],
         "text": {"simple": {"pl": "{notif_per_hour_24h:.0f}/h", "en": "{notif_per_hour_24h:.0f}/h"},
@@ -37,6 +38,45 @@ def test_parse_rules_and_evaluate():
     assert finding.rule_id == "T-1" and finding.weight == 10
     assert finding.text("pl") == "10/h"
     assert rule.evaluate(AppFacts("com.a", notif_interruptions_24h=24)) is None
+
+
+def test_parse_rules_requires_category_and_label():
+    with pytest.raises(ValueError, match="category"):
+        parse_rules([_rule(category="nope")])
+    with pytest.raises(ValueError, match="category"):
+        parse_rules([_rule(category="combo")])
+    with pytest.raises(ValueError, match="label"):
+        parse_rules([_rule(label={"pl": "Tylko PL"})])
+    [rule] = parse_rules([_rule()])
+    finding = rule.evaluate(AppFacts("com.a", notif_interruptions_24h=240))
+    assert finding.category == "notif"
+    assert finding.label_text("en") == "Many notifications"
+    assert finding.label_text("de") == "Dużo powiadomień"
+
+
+EXPECTED_CATEGORIES = {
+    "DM-NOTIF-01": "notif", "DM-NOTIF-02": "notif",
+    "DM-OVERLAY-01": "ads", "DM-FSI-01": "ads", "DM-BGACT-01": "ads", "DM-FSIPERM-01": "ads",
+    "DM-ADSDK-01": "ads", "DM-ADSDK-02": "ads",
+    "DM-ALARM-01": "background", "DM-PERM-01": "background", "DM-DYNDEX-01": "background",
+    "DM-ADMIN-01": "removal", "DM-HOME-01": "removal", "DM-HOME-02": "removal",
+    "DM-HIDDEN-01": "removal",
+    "DM-A11Y-01": "data", "DM-NLS-01": "data", "DM-SMS-01": "data", "DM-BROWSER-01": "data",
+    "DM-SRC-01": "origin", "DM-FRESH-01": "origin",
+    "DM-LABEL-01": "disguise",
+}
+
+
+def test_default_rules_have_categories_and_labels():
+    ruleset = load_default_ruleset()
+    assert {r.id: r.category for r in ruleset.yaml_rules} == EXPECTED_CATEGORIES
+    for r in ruleset.yaml_rules:
+        assert r.label["pl"] and r.label["en"], r.id
+    facts = AppFacts("com.systemupdate.xkqzvbnm", installer="com.android.chrome")
+    found = [rule_name_mimic(facts), rule_random_name(facts)]
+    assert [f.rule_id for f in found] == ["DM-NAME-01", "DM-NAME-02"]
+    for f in found:
+        assert f.category == "disguise" and f.label["pl"] and f.label["en"]
 
 
 @pytest.mark.parametrize("bad", [

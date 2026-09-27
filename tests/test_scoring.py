@@ -77,6 +77,19 @@ def test_trusted_app_never_malicious():
     assert result.score == 60 and result.verdict == "suspicious"
 
 
+def test_combo_findings_carry_category_and_label():
+    from demalware.engine.scoring import COMBOS, _combo_findings
+
+    def make(rule_id, cls, weight):
+        return Finding(rule_id, cls, weight, {}, {"pl": rule_id, "en": rule_id}, {"pl": "", "en": ""})
+
+    (combo,) = _combo_findings([make("DM-ADMIN-01", "position", 25),
+                                make("DM-OVERLAY-01", "behavior", 25)])
+    assert combo.rule_id == "DM-COMBO-02" and combo.category == "combo"
+    assert combo.label_text("pl") == "Blokuje usunięcie i nachalnie wyświetla treści"
+    assert all(c.label["pl"] and c.label["en"] for c in COMBOS)
+
+
 def test_combo_03_many_ad_networks_plus_behavior():
     facts = AppFacts("com.x", installer="com.android.vending")
     alone = score_app(facts, [F("DM-ADSDK-02", "apk", 20)], trusted=False,
