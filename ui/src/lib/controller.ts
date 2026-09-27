@@ -1,0 +1,310 @@
+import { type Bridge, isApiError } from './bridge';
+import { i18n } from './i18n/index.svelte';
+import { changedVerdicts, defaultSelection, mergeSelection, upsertStep } from './logic';
+import type { AppState } from './state.svelte';
+import type { ApiError, AppView, DevicesPayload, Lang, Level, Mode, Settings } from './types';
+
+const CONSOLE_LIMIT = 500;
+const CONNECTION_ERRORS = new Set(['disconnected', 'unauthorized', 'offline']);
+
+export class Controller {
+  private ended = new Set<string>();
+
+  constructor(readonly state: AppState, readonly bridge: Bridge) {}
+
+  private get api() {
+    return this.bridge.api;
+  }
+
+  private async call<T>(promise: Promise<T | ApiError>): Promise<T | null> {
+    try {
+      const result = await promise;
+      if (isApiError(result)) {
+        this.state.error = result.error;
+        return null;
+      }
+      return result;
+    } catch (e) {
+      this.state.error = { key: 'internal', message: String(e) };
+      return null;
+    }
+  }
+
+  setJob(id: string, kind: string): void {
+    if (!this.ended.has(id)) this.state.job = { id, kind };
+  }
+
+  async init(): Promise<void> {
+    this.subscribe();
+    const settings = await this.call(this.api.get_settings());
+    if (settings) this.applySettings(settings);
+    const devices = await this.call(this.api.list_devices());
+    if (devices) this.onDevices(devices);
+    await this.call(this.api.watch_devices(true));
+  }
+
+  private applySettings(settings: Settings): void {
+    this.state.settings = settings;
+    i18n.lang = settings.lang;
+    if (typeof document !== 'undefined') document.documentElement.lang = settings.lang;
+  }
+
+  private onDevices(d: DevicesPayload): void {
+    const s = this.state;
+    s.devices = d.devices;
+    s.devicesError = d.error;
+    if (s.serial && !d.devices.some((e) => e.serial === s.serial && e.state === 'device')) {
+      s.serial = null;
+    }
+    const ready = d.devices.filter((e) => e.state === 'device');
+    if (!s.serial && ready.length === 1) s.serial = ready[0].serial;
+  }
+
+  private subscribe(): void {
+    const on = this.bridge.on;
+    const s = this.state;
+    on('devices', (d) => this.onDevices(d));
+    on('scan:stage', (d) => { s.scanStage = d.stage; });
+    on('scan:device', (d) => { s.device = d.device; });
+    on('scan:done', (d) => {
+      s.scan = d.scan;
+      s.interrupted = d.interrupted;
+      s.selection = defaultSelection(d.scan.apps);
+      s.touched = [];
+      s.unlocked = [];
+      s.expanded = [];
+      s.apk = { done: 0, total: 0, running: true, changed: [] };
+      s.phase = 'results';
+    });
+    on('apk:progress', (d) => { s.apk = { ...s.apk, done: d.done, total: d.total, running: true }; });
+    on('apk:done', (d) => {
+      const changed = changedVerdicts(s.scan?.apps ?? [], d.scan.apps);
+      s.selection = mergeSelection(s.selection, d.scan.apps, s.touched);
+      s.scan = d.scan;
+      s.apk = { ...s.apk, running: false, changed };
+    });
+    on('apk:stopped', () => { s.apk = { ...s.apk, running: false }; });
+    on('exec:order', (d) => {
+      s.order = d.order;
+      s.execPlan = d.plan;
+      s.steps = [];
+      s.result = null;
+      s.stopped = false;
+      s.stopping = false;
+      s.verifying = false;
+      s.disconnectedOrder = null;
+      s.plan = null;
+      s.screen = 'main';
+      s.phase = 'executing';
+    });
+    on('exec:step', (d) => { s.steps = upsertStep(s.steps, d); });
+    on('exec:admin_wait', (d) => { s.admin = { ...d, since: Date.now() }; });
+    on('exec:admin_done', () => { s.admin = null; });
+    on('exec:question', (d) => { s.question = d; });
+    on('exec:verify', () => { s.verifying = true; });
+    on('exec:stopped', () => { s.stopped = true; });
+    on('exec:done', (d) => {
+      s.result = d;
+      s.verifying = false;
+      s.admin = null;
+      s.question = null;
+      s.stopping = false;
+      s.interrupted = d.stopped ? [d.order] : s.interrupted.filter((o) => o !== d.order);
+      s.phase = 'done';
+    });
+    on('exec:disconnected', (d) => {
+      s.disconnectedOrder = d.order;
+      s.interrupted = [d.order];
+      s.admin = null;
+      s.question = null;
+      s.verifying = false;
+      s.device = null;
+      s.scan = null;
+      s.phase = 'connect';
+    });
+    on('undo:step', (d) => { s.undoSteps = upsertStep(s.undoSteps, d); });
+    on('undo:done', (d) => {
+      s.undoResult = d;
+      void this.refreshHistory();
+    });
+    on('adb:command', (d) => { s.console = [...s.console.slice(-(CONSOLE_LIMIT - 1)), d]; });
+    on('job:error', (d) => {
+      s.error = d;
+      if (CONNECTION_ERRORS.has(d.key) && s.phase === 'scanning') {
+        s.phase = 'connect';
+        s.device = null;
+      }
+    });
+    on('job:end', (d) => {
+      this.ended.add(d.job_id);
+      if (s.job?.id === d.job_id) s.job = null;
+    });
+    on('app:close_requested', () => { s.closeRequested = true; });
+  }
+
+  // --- podłączanie i skan ---------------------------------------------------------------------
+
+  selectDevice(serial: string): void {
+    this.state.serial = serial;
+  }
+
+  async startScan(): Promise<void> {
+    const s = this.state;
+    if (!s.serial) return;
+    Object.assign(s, {
+      error: null, phase: 'scanning', scanStage: 'identify', device: null, scan: null, plan: null,
+      result: null, order: null, disconnectedOrder: null, steps: [], screen: 'main',
+    });
+    s.apk = { done: 0, total: 0, running: false, changed: [] };
+    const r = await this.call(this.api.start_scan(s.serial, s.client.trim() || null));
+    if (r) this.setJob(r.job_id, 'scan');
+    else s.phase = 'connect';
+  }
+
+  newScan(): void {
+    Object.assign(this.state, {
+      phase: 'connect', screen: 'main', device: null, scan: null, result: null, order: null,
+      plan: null, selection: {}, steps: [], disconnectedOrder: null,
+    });
+  }
+
+  // --- wybór akcji i plan ------------------------------------------------------------------------
+
+  setLevel(pkg: string, level: Level | null): void {
+    const s = this.state;
+    const next = { ...s.selection };
+    if (level) next[pkg] = level;
+    else delete next[pkg];
+    s.selection = next;
+    if (!s.touched.includes(pkg)) s.touched = [...s.touched, pkg];
+  }
+
+  toggle(app: AppView): void {
+    this.setLevel(app.package, this.state.selection[app.package] ? null : app.default_level ?? 'silence');
+  }
+
+  toggleExpanded(pkg: string): void {
+    const s = this.state;
+    s.expanded = s.expanded.includes(pkg) ? s.expanded.filter((p) => p !== pkg) : [...s.expanded, pkg];
+  }
+
+  async openPlan(): Promise<void> {
+    const s = this.state;
+    const r = await this.call(this.api.preview_plan({ ...s.selection }, [...s.unlocked]));
+    if (r) s.plan = r;
+  }
+
+  closePlan(): void {
+    this.state.plan = null;
+  }
+
+  async unlock(pkg: string): Promise<void> {
+    this.state.unlocked = [...this.state.unlocked, pkg];
+    await this.openPlan();
+  }
+
+  // --- wykonanie ------------------------------------------------------------------------------------
+
+  async execute(): Promise<void> {
+    const s = this.state;
+    s.error = null;
+    const r = await this.call(this.api.execute({ ...s.selection }, [...s.unlocked]));
+    if (r) this.setJob(r.job_id, 'exec');
+  }
+
+  async stop(): Promise<void> {
+    const job = this.state.job;
+    if (!job) return;
+    this.state.stopping = true;
+    await this.call(this.api.stop(job.id));
+  }
+
+  async answer(value: 'retry' | 'skip'): Promise<void> {
+    const q = this.state.question;
+    if (!q) return;
+    this.state.question = null;
+    await this.call(this.api.answer(q.job_id, value));
+  }
+
+  async resume(order: string): Promise<void> {
+    const s = this.state;
+    s.error = null;
+    const r = await this.call(this.api.resume(order));
+    if (r) {
+      this.setJob(r.job_id, 'resume');
+      s.interrupted = s.interrupted.filter((o) => o !== order);
+    }
+  }
+
+  async undo(order: string, actionId: number | null = null): Promise<void> {
+    const s = this.state;
+    s.error = null;
+    s.undoSteps = [];
+    s.undoResult = null;
+    const r = await this.call(this.api.undo(order, actionId, null));
+    if (r) this.setJob(r.job_id, 'undo');
+  }
+
+  // --- historia, ustawienia, konsola -------------------------------------------------------------
+
+  async openHistory(serial: string | null = null): Promise<void> {
+    const s = this.state;
+    s.screen = 'history';
+    s.undoResult = null;
+    await this.refreshHistory(serial ?? s.history?.serial ?? s.device?.serial ?? null);
+  }
+
+  async refreshHistory(serial: string | null = this.state.history?.serial ?? null): Promise<void> {
+    const r = await this.call(this.api.history(serial));
+    if (r) this.state.history = r;
+  }
+
+  openSettings(): void {
+    this.state.screen = 'settings';
+  }
+
+  back(): void {
+    this.state.screen = 'main';
+  }
+
+  async saveSettings(changes: Partial<Settings>): Promise<Settings | null> {
+    const r = await this.call(this.api.save_settings(changes));
+    if (!r) return null;
+    this.applySettings(r);
+    if ('lang' in changes) {
+      const view = await this.call(this.api.rerender());
+      if (view?.scan) this.state.scan = view.scan;
+      if (this.state.screen === 'history') await this.refreshHistory();
+    }
+    return r;
+  }
+
+  setMode(mode: Mode): Promise<Settings | null> {
+    return this.saveSettings({ mode });
+  }
+
+  setLang(lang: Lang): Promise<Settings | null> {
+    return this.saveSettings({ lang });
+  }
+
+  runConsole(command: string) {
+    return this.call(this.api.adb_shell(command));
+  }
+
+  checkAdb(path: string | null) {
+    return this.call(this.api.check_adb(path));
+  }
+
+  pickFolder() {
+    return this.call(this.api.pick_folder());
+  }
+
+  async quit(): Promise<void> {
+    this.state.closeRequested = false;
+    await this.call(this.api.quit());
+  }
+
+  dismissError(): void {
+    this.state.error = null;
+  }
+}

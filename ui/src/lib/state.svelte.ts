@@ -1,0 +1,55 @@
+import type { Phase } from './logic';
+import type {
+  ApiErrorBody, ConsoleEntry, DeviceEntry, HistoryView, Level, OrderResult, PhoneCard, PlanView,
+  Question, ScanView, Settings, StepEvent, UndoDone, Verdict,
+} from './types';
+
+export type Screen = 'main' | 'history' | 'settings';
+const ORDER_KINDS = ['exec', 'resume', 'undo'];
+
+export class AppState {
+  phase = $state<Phase>('connect');
+  screen = $state<Screen>('main');
+  settings = $state<Settings>({ lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null });
+  devices = $state<DeviceEntry[]>([]);
+  devicesError = $state<string | null>(null);
+  serial = $state<string | null>(null);
+  client = $state('');
+  scanStage = $state<string | null>(null);
+  device = $state<PhoneCard | null>(null);
+  scan = $state<ScanView | null>(null);
+  apk = $state({ done: 0, total: 0, running: false, changed: [] as string[] });
+  interrupted = $state<string[]>([]);
+  selection = $state<Record<string, Level>>({});
+  touched = $state<string[]>([]);
+  unlocked = $state<string[]>([]);
+  showAll = $state(false);
+  verdictFilter = $state<Verdict | 'all'>('all');
+  query = $state('');
+  expanded = $state<string[]>([]);
+  plan = $state<PlanView | null>(null);
+  job = $state<{ id: string; kind: string } | null>(null);
+  order = $state<string | null>(null);
+  execPlan = $state<PlanView | null>(null);
+  steps = $state<StepEvent[]>([]);
+  admin = $state<{ package: string; name: string; timeout: number; since: number } | null>(null);
+  question = $state<Question | null>(null);
+  verifying = $state(false);
+  stopping = $state(false);
+  stopped = $state(false);
+  result = $state<OrderResult | null>(null);
+  disconnectedOrder = $state<string | null>(null);
+  history = $state<HistoryView | null>(null);
+  undoSteps = $state<StepEvent[]>([]);
+  undoResult = $state<UndoDone | null>(null);
+  consoleOpen = $state(false);
+  console = $state<ConsoleEntry[]>([]);
+  consoleWarned = $state(false);
+  error = $state<ApiErrorBody | null>(null);
+  closeRequested = $state(false);
+  fatal = $state<string | null>(null);
+
+  get orderRunning(): boolean {
+    return this.job !== null && ORDER_KINDS.includes(this.job.kind);
+  }
+}
