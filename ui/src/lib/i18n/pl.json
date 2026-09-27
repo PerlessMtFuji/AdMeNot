@@ -1,0 +1,149 @@
+{
+  "common": { "cancel": "Anuluj", "close": "Zamknij", "back": "Wróć", "save": "Zapisz", "saved": "Zapisano" },
+  "app": { "new_order": "Nowe zlecenie", "order": "Zlecenie", "client": "Klient" },
+  "header": { "simple": "Prosty", "expert": "Ekspert", "history": "Historia", "settings": "Ustawienia", "lang": "Język" },
+  "stage": { "connect": "Połączenie", "read": "Odczyt", "analyze": "Analiza", "fix": "Naprawa", "report": "Protokół", "soon": "Protokół — wkrótce" },
+  "connect": {
+    "waiting": "Czekam na telefon…",
+    "plug": "Podłącz telefon kablem USB. Jeśli to pierwszy raz, włącz debugowanie USB:",
+    "guide_for": "Instrukcja dla",
+    "unauthorized": "Telefon wykryty, ale nieautoryzowany — potwierdź na ekranie telefonu okno „Zezwolić na debugowanie USB?”.",
+    "offline": "Telefon jest offline — odłącz i podłącz kabel ponownie.",
+    "many": "Podłączono kilka telefonów — wybierz jeden:",
+    "ready": "Telefon gotowy",
+    "client_label": "Klient (opcjonalnie)",
+    "client_placeholder": "np. Anna K.",
+    "scan": "Skanuj",
+    "scanning": "Łączę z telefonem…",
+    "adb_missing": "Nie znaleziono programu adb.",
+    "open_settings": "Otwórz ustawienia"
+  },
+  "usb": {
+    "group": { "samsung": "Samsung", "xiaomi": "Xiaomi / Redmi / POCO", "motorola": "Motorola", "oppo": "Oppo / Realme / OnePlus", "huawei": "Huawei / Honor", "pixel": "Pixel", "other": "Inny" },
+    "samsung": {
+      "s1": "Ustawienia → Telefon — informacje → Informacje o oprogramowaniu",
+      "s2": "Stuknij 7× „Numer wersji”",
+      "s3": "Ustawienia → Opcje programisty → włącz „Debugowanie USB”",
+      "s4": "Podłącz kabel i na telefonie wybierz „Zezwól” (zaznacz „Zawsze zezwalaj”)"
+    },
+    "xiaomi": {
+      "s1": "Ustawienia → O telefonie",
+      "s2": "Stuknij 7× „Wersja MIUI” albo „Wersja HyperOS”",
+      "s3": "Ustawienia → Ustawienia dodatkowe → Opcje programisty → „Debugowanie USB”",
+      "s4": "Włącz też „Debugowanie USB (ustawienia zabezpieczeń)” — potrzebna karta SIM i konto Mi",
+      "s5": "Podłącz kabel i na telefonie zezwól na debugowanie"
+    },
+    "motorola": {
+      "s1": "Ustawienia → Informacje o telefonie",
+      "s2": "Stuknij 7× „Numer kompilacji”",
+      "s3": "Ustawienia → System → Opcje programisty → „Debugowanie USB”",
+      "s4": "Podłącz kabel i na telefonie zezwól na debugowanie"
+    },
+    "oppo": {
+      "s1": "Ustawienia → Informacje o urządzeniu → Wersja",
+      "s2": "Stuknij 7× „Numer wersji”",
+      "s3": "Ustawienia → Ustawienia dodatkowe → Opcje programisty → „Debugowanie USB”",
+      "s4": "Jeśli jest opcja „Wyłącz monitorowanie uprawnień”, włącz ją",
+      "s5": "Podłącz kabel i na telefonie zezwól na debugowanie"
+    },
+    "huawei": {
+      "s1": "Ustawienia → Informacje o telefonie",
+      "s2": "Stuknij 7× „Numer kompilacji”",
+      "s3": "Ustawienia → System i aktualizacje → Opcje programisty → „Debugowanie USB”",
+      "s4": "Podłącz kabel, wybierz „Przesyłanie plików” i zezwól na debugowanie"
+    },
+    "pixel": {
+      "s1": "Ustawienia → Informacje o telefonie",
+      "s2": "Stuknij 7× „Numer kompilacji”",
+      "s3": "Ustawienia → System → Opcje programisty → „Debugowanie USB”",
+      "s4": "Podłącz kabel i na telefonie zezwól na debugowanie"
+    },
+    "other": {
+      "s1": "Ustawienia → Informacje o telefonie (czasem: Oprogramowanie)",
+      "s2": "Stuknij 7× „Numer kompilacji” albo „Numer wersji”",
+      "s3": "Wróć i otwórz „Opcje programisty” → „Debugowanie USB”",
+      "s4": "Podłącz kabel i na telefonie zezwól na debugowanie"
+    }
+  },
+  "scan": { "stage": { "identify": "Rozpoznaję telefon…", "packages": "Czytam listę aplikacji…", "collectors": "Zbieram dane o zachowaniu aplikacji…", "score": "Oceniam aplikacje…", "apk": "Analizuję pliki APK…" } },
+  "phone": {
+    "subject": "Przedmiot zlecenia", "android": "Android", "connection": "Połączenie", "connected": "● USB, autoryzowane",
+    "apps": "Aplikacje", "apps_value": "{total} ({user} użytk.)", "model": "Model", "match": "Dopasowanie", "serial": "S/N",
+    "sdk": "SDK", "uptime": "Uptime", "patch": "Poprawka", "oem": "Producent"
+  },
+  "match": { "manual": "wybrane ręcznie", "exact": "✓ dokładne", "approximate": "~ przybliżone", "none": "sylwetka" },
+  "summary": {
+    "found": "Aplikacje, które zaśmiecają telefon: {count}",
+    "advice": "Zalecamy je usunąć albo wyłączyć. Każdą zmianę można cofnąć.",
+    "review": "Kilka aplikacji warto sprawdzić — nic nie jest zaznaczone do naprawy.",
+    "clean": "Nie znaleziono podejrzanych aplikacji.",
+    "low_data": "Mało danych o zachowaniu (telefon niedawno uruchomiony) — oceny mogą być zaniżone.",
+    "ok_count": "✓ Bez uwag: {count}",
+    "apk_running": "Analiza APK w tle: {done}/{total}",
+    "apk_done": "Analiza APK: gotowe"
+  },
+  "level": { "silence": "WYCISZ", "disable": "WYŁĄCZ", "remove": "USUŃ", "review": "SPRAWDŹ", "none": "—" },
+  "verdict": { "all": "Wszystkie werdykty", "malicious": "Szkodliwa", "suspicious": "Podejrzana", "review": "Do sprawdzenia", "safe": "Bezpieczna" },
+  "expert": {
+    "malicious": "Szkodliwe", "suspicious": "Podejrzane", "non_play": "Spoza Play", "admins": "Admin urządz.", "collectors": "Kolektory OK",
+    "col_app": "Aplikacja / pakiet", "col_score": "Wynik", "col_signals": "Sygnały", "col_source": "Źródło", "col_action": "Akcja",
+    "search": "Szukaj aplikacji lub pakietu", "show_all": "Pokaż wszystkie aplikacje", "evidence": "Dowody",
+    "source_play": "Play", "source_system": "systemowa", "source_sideload": "spoza sklepu",
+    "apk_error": "APK: błąd", "collector_failed": "Kolektor {name}: {error}", "ad_sdks": "SDK reklamowe: {list}"
+  },
+  "actions": { "details": "Pokaż szczegóły", "preview": "Podgląd planu", "console": "Konsola ADB", "fix": "Napraw zaznaczone ({count})", "rescan": "Skanuj ponownie" },
+  "plan": { "title": "Plan naprawy", "unlock": "Odblokuj", "undo_hint": "Każdą zmianę można cofnąć w Historii.", "run": "Wykonaj ({count})", "nothing": "Nic do wykonania — wszystkie aplikacje są zablokowane." },
+  "exec": {
+    "title": "Naprawa · {order}", "waiting": "Czeka w kolejce", "stop": "Wstrzymaj", "stopping": "Wstrzymuję po bieżącym kroku…",
+    "verifying": "Sprawdzam, czy zmiany się utrzymały…", "stopped": "Zlecenie wstrzymane. Możesz je dokończyć albo cofnąć.",
+    "done": "Zlecenie {order}: {status}", "resume": "Dokończ", "undo_all": "Cofnij całe zlecenie", "new_scan": "Nowe skanowanie"
+  },
+  "result": { "ok": "Gotowe", "still_active": "Nadal aktywna — zmiana się nie utrzymała ({kinds})", "failed": "Błąd", "stopped": "Wstrzymana" },
+  "admin": {
+    "title": "Potrzebny jeden ruch na telefonie",
+    "text": "Na ekranie telefonu otworzyło się okno administratorów urządzenia. Stuknij „Dezaktywuj” przy {name} — resztę zrobię sam.",
+    "left": "Czekam jeszcze {time}"
+  },
+  "question": { "admin": { "title": "Nie odebrano uprawnień administratora", "text": "{name} nadal jest administratorem urządzenia. Spróbować jeszcze raz?", "retry": "Ponów", "skip": "Pomiń" } },
+  "interrupted": {
+    "text": "Przerwane zlecenie {order}", "resume": "Dokończ", "undo": "Cofnij",
+    "disconnected": "Telefon odłączony w trakcie zlecenia {order}. Podłącz go ponownie i zeskanuj, a potem dokończ albo cofnij zlecenie."
+  },
+  "history": {
+    "title": "Historia zleceń", "phone": "Telefon", "empty": "Brak zleceń dla tego telefonu.", "none": "Brak zapisanych zleceń.",
+    "restore": "Przywróć", "undo_all": "Cofnij całe zlecenie", "resume": "Dokończ", "interrupted": "Przerwane",
+    "working": "Pracuję…", "admin_note": "Cofnięcie nie przywraca uprawnień administratora urządzenia.", "undo_errors": "Nie wszystko udało się cofnąć:"
+  },
+  "settings": {
+    "title": "Ustawienia", "lang": "Język", "mode": "Tryb domyślny", "mode_simple": "Prosty", "mode_expert": "Ekspercki",
+    "adb": "Ścieżka do adb.exe", "adb_hint": "Puste = adb z PATH", "check": "Sprawdź", "adb_ok": "Działa: {version}", "adb_fail": "Nie działa: {message}",
+    "backups": "Katalog kopii APK", "backups_hint": "Puste = domyślny katalog w %LOCALAPPDATA%\\DeMalware", "choose": "Wybierz…",
+    "service_soon": "Dane serwisu do protokołu — wkrótce."
+  },
+  "console": {
+    "title": "Konsola ADB", "placeholder": "polecenie adb shell, np. dumpsys package com.example", "run": "Wykonaj",
+    "warn_title": "Polecenia omijają dziennik", "warn_text": "Polecenia z konsoli omijają dziennik zmian i nie da się ich cofnąć. Kontynuować?",
+    "warn_ok": "Rozumiem", "empty": "Brak poleceń w tej sesji.", "disabled": "Konsola działa przy zeskanowanym telefonie, gdy nie trwa zlecenie."
+  },
+  "close": { "title": "Trwa zlecenie", "message": "Przerwać po bieżącym kroku i zamknąć program? Zlecenie da się później dokończyć albo cofnąć.", "confirm": "Przerwij i zamknij" },
+  "error": {
+    "title": "Coś poszło nie tak", "fatal": "Wystąpił nieoczekiwany błąd interfejsu.", "restart": "Wróć do początku", "log": "Szczegóły w logu: {path}",
+    "adb_missing": "Nie znaleziono programu adb. Wskaż adb.exe w ustawieniach.",
+    "unauthorized": "Telefon nie jest autoryzowany — potwierdź okno na telefonie.",
+    "offline": "Telefon jest offline — podłącz kabel ponownie.",
+    "disconnected": "Telefon został odłączony.",
+    "timeout": "Telefon nie odpowiedział na czas.",
+    "adb_error": "Błąd ADB.",
+    "action_error": "Telefon odrzucił polecenie.",
+    "busy": "Trwa inne zadanie — poczekaj na jego koniec.",
+    "wrong_device": "Podłącz telefon {serial}, którego dotyczy zlecenie.",
+    "no_scan": "Najpierw zeskanuj telefon.",
+    "no_device": "Najpierw podłącz i zeskanuj telefon.",
+    "unknown_order": "Nie znaleziono zlecenia.",
+    "nothing_to_resume": "To zlecenie nie ma kroków do dokończenia.",
+    "nothing_to_do": "Nic do wykonania — zaznaczone aplikacje są zablokowane.",
+    "no_target": "Nie ma takiej aplikacji ani kroku w zleceniu.",
+    "bad_request": "Nieprawidłowe dane.",
+    "internal": "Nieoczekiwany błąd programu."
+  }
+}

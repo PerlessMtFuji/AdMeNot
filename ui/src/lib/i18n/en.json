@@ -1,0 +1,149 @@
+{
+  "common": { "cancel": "Cancel", "close": "Close", "back": "Back", "save": "Save", "saved": "Saved" },
+  "app": { "new_order": "New order", "order": "Order", "client": "Client" },
+  "header": { "simple": "Simple", "expert": "Expert", "history": "History", "settings": "Settings", "lang": "Language" },
+  "stage": { "connect": "Connection", "read": "Reading", "analyze": "Analysis", "fix": "Repair", "report": "Report", "soon": "Report — coming soon" },
+  "connect": {
+    "waiting": "Waiting for a phone…",
+    "plug": "Connect the phone with a USB cable. If this is the first time, enable USB debugging:",
+    "guide_for": "Instructions for",
+    "unauthorized": "Phone detected but not authorized — confirm “Allow USB debugging?” on the phone screen.",
+    "offline": "The phone is offline — unplug and reconnect the cable.",
+    "many": "Several phones are connected — pick one:",
+    "ready": "Phone ready",
+    "client_label": "Client (optional)",
+    "client_placeholder": "e.g. Anna K.",
+    "scan": "Scan",
+    "scanning": "Connecting to the phone…",
+    "adb_missing": "The adb program was not found.",
+    "open_settings": "Open settings"
+  },
+  "usb": {
+    "group": { "samsung": "Samsung", "xiaomi": "Xiaomi / Redmi / POCO", "motorola": "Motorola", "oppo": "Oppo / Realme / OnePlus", "huawei": "Huawei / Honor", "pixel": "Pixel", "other": "Other" },
+    "samsung": {
+      "s1": "Settings → About phone → Software information",
+      "s2": "Tap “Build number” 7 times",
+      "s3": "Settings → Developer options → turn on “USB debugging”",
+      "s4": "Connect the cable and tap “Allow” on the phone (tick “Always allow”)"
+    },
+    "xiaomi": {
+      "s1": "Settings → About phone",
+      "s2": "Tap “MIUI version” or “HyperOS version” 7 times",
+      "s3": "Settings → Additional settings → Developer options → “USB debugging”",
+      "s4": "Also turn on “USB debugging (Security settings)” — needs a SIM card and a Mi account",
+      "s5": "Connect the cable and allow debugging on the phone"
+    },
+    "motorola": {
+      "s1": "Settings → About phone",
+      "s2": "Tap “Build number” 7 times",
+      "s3": "Settings → System → Developer options → “USB debugging”",
+      "s4": "Connect the cable and allow debugging on the phone"
+    },
+    "oppo": {
+      "s1": "Settings → About device → Version",
+      "s2": "Tap “Build number” 7 times",
+      "s3": "Settings → Additional settings → Developer options → “USB debugging”",
+      "s4": "If there is “Disable permission monitoring”, turn it on",
+      "s5": "Connect the cable and allow debugging on the phone"
+    },
+    "huawei": {
+      "s1": "Settings → About phone",
+      "s2": "Tap “Build number” 7 times",
+      "s3": "Settings → System & updates → Developer options → “USB debugging”",
+      "s4": "Connect the cable, choose “File transfer” and allow debugging"
+    },
+    "pixel": {
+      "s1": "Settings → About phone",
+      "s2": "Tap “Build number” 7 times",
+      "s3": "Settings → System → Developer options → “USB debugging”",
+      "s4": "Connect the cable and allow debugging on the phone"
+    },
+    "other": {
+      "s1": "Settings → About phone (sometimes: Software)",
+      "s2": "Tap “Build number” 7 times",
+      "s3": "Go back and open “Developer options” → “USB debugging”",
+      "s4": "Connect the cable and allow debugging on the phone"
+    }
+  },
+  "scan": { "stage": { "identify": "Identifying the phone…", "packages": "Reading the app list…", "collectors": "Collecting app behavior data…", "score": "Rating the apps…", "apk": "Analyzing APK files…" } },
+  "phone": {
+    "subject": "Device", "android": "Android", "connection": "Connection", "connected": "● USB, authorized",
+    "apps": "Apps", "apps_value": "{total} ({user} user)", "model": "Model", "match": "Match", "serial": "S/N",
+    "sdk": "SDK", "uptime": "Uptime", "patch": "Patch", "oem": "Maker"
+  },
+  "match": { "manual": "chosen manually", "exact": "✓ exact", "approximate": "~ approximate", "none": "silhouette" },
+  "summary": {
+    "found": "Apps cluttering the phone: {count}",
+    "advice": "We recommend removing or disabling them. Every change can be undone.",
+    "review": "A few apps are worth a look — nothing is selected for repair.",
+    "clean": "No suspicious apps found.",
+    "low_data": "Little behavior data (the phone was restarted recently) — ratings may be too low.",
+    "ok_count": "✓ Without issues: {count}",
+    "apk_running": "APK analysis in the background: {done}/{total}",
+    "apk_done": "APK analysis: done"
+  },
+  "level": { "silence": "SILENCE", "disable": "DISABLE", "remove": "REMOVE", "review": "CHECK", "none": "—" },
+  "verdict": { "all": "All verdicts", "malicious": "Malicious", "suspicious": "Suspicious", "review": "Review", "safe": "Safe" },
+  "expert": {
+    "malicious": "Malicious", "suspicious": "Suspicious", "non_play": "Outside Play", "admins": "Device admins", "collectors": "Collectors OK",
+    "col_app": "App / package", "col_score": "Score", "col_signals": "Signals", "col_source": "Source", "col_action": "Action",
+    "search": "Search app or package", "show_all": "Show all apps", "evidence": "Evidence",
+    "source_play": "Play", "source_system": "system", "source_sideload": "sideloaded",
+    "apk_error": "APK: error", "collector_failed": "Collector {name}: {error}", "ad_sdks": "Ad SDKs: {list}"
+  },
+  "actions": { "details": "Show details", "preview": "Preview plan", "console": "ADB console", "fix": "Fix selected ({count})", "rescan": "Scan again" },
+  "plan": { "title": "Repair plan", "unlock": "Unlock", "undo_hint": "Every change can be undone in History.", "run": "Run ({count})", "nothing": "Nothing to run — all apps are blocked." },
+  "exec": {
+    "title": "Repair · {order}", "waiting": "Queued", "stop": "Pause", "stopping": "Pausing after the current step…",
+    "verifying": "Checking that the changes hold…", "stopped": "Order paused. You can finish or undo it.",
+    "done": "Order {order}: {status}", "resume": "Finish", "undo_all": "Undo the whole order", "new_scan": "New scan"
+  },
+  "result": { "ok": "Done", "still_active": "Still active — the change did not hold ({kinds})", "failed": "Error", "stopped": "Paused" },
+  "admin": {
+    "title": "One tap needed on the phone",
+    "text": "The device admin screen is open on the phone. Tap “Deactivate” next to {name} — I will do the rest.",
+    "left": "Waiting {time} more"
+  },
+  "question": { "admin": { "title": "Admin rights were not removed", "text": "{name} is still a device admin. Try again?", "retry": "Retry", "skip": "Skip" } },
+  "interrupted": {
+    "text": "Interrupted order {order}", "resume": "Finish", "undo": "Undo",
+    "disconnected": "The phone was disconnected during order {order}. Reconnect and scan it, then finish or undo the order."
+  },
+  "history": {
+    "title": "Order history", "phone": "Phone", "empty": "No orders for this phone.", "none": "No saved orders.",
+    "restore": "Restore", "undo_all": "Undo the whole order", "resume": "Finish", "interrupted": "Interrupted",
+    "working": "Working…", "admin_note": "Undo does not restore device admin rights.", "undo_errors": "Not everything could be undone:"
+  },
+  "settings": {
+    "title": "Settings", "lang": "Language", "mode": "Default mode", "mode_simple": "Simple", "mode_expert": "Expert",
+    "adb": "Path to adb.exe", "adb_hint": "Empty = adb from PATH", "check": "Check", "adb_ok": "Works: {version}", "adb_fail": "Does not work: {message}",
+    "backups": "APK backup folder", "backups_hint": "Empty = default folder in %LOCALAPPDATA%\\DeMalware", "choose": "Choose…",
+    "service_soon": "Service details for the report — coming soon."
+  },
+  "console": {
+    "title": "ADB console", "placeholder": "adb shell command, e.g. dumpsys package com.example", "run": "Run",
+    "warn_title": "Commands bypass the journal", "warn_text": "Console commands bypass the change journal and cannot be undone. Continue?",
+    "warn_ok": "I understand", "empty": "No commands in this session.", "disabled": "The console works with a scanned phone while no order is running."
+  },
+  "close": { "title": "An order is running", "message": "Pause after the current step and close the program? The order can be finished or undone later.", "confirm": "Pause and close" },
+  "error": {
+    "title": "Something went wrong", "fatal": "An unexpected interface error occurred.", "restart": "Back to start", "log": "Details in the log: {path}",
+    "adb_missing": "The adb program was not found. Point to adb.exe in the settings.",
+    "unauthorized": "The phone is not authorized — confirm the prompt on the phone.",
+    "offline": "The phone is offline — reconnect the cable.",
+    "disconnected": "The phone was disconnected.",
+    "timeout": "The phone did not answer in time.",
+    "adb_error": "ADB error.",
+    "action_error": "The phone rejected the command.",
+    "busy": "Another task is running — wait for it to finish.",
+    "wrong_device": "Connect phone {serial}, which this order is for.",
+    "no_scan": "Scan the phone first.",
+    "no_device": "Connect and scan a phone first.",
+    "unknown_order": "Order not found.",
+    "nothing_to_resume": "This order has no steps left to finish.",
+    "nothing_to_do": "Nothing to run — the selected apps are blocked.",
+    "no_target": "No such app or step in the order.",
+    "bad_request": "Invalid data.",
+    "internal": "Unexpected program error."
+  }
+}
