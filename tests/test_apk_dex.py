@@ -4,6 +4,7 @@ import zipfile
 import pytest
 from dexutil import make_apk, make_dex
 
+from demalware.engine.apk import dex as dexmod
 from demalware.engine.apk.dex import DexFormatError, read_apk_types, read_dex_types
 
 
@@ -75,3 +76,23 @@ def test_read_apk_types_skips_corrupt_entry_and_keeps_later_dex(tmp_path, compre
     types, errors = read_apk_types([path])
     assert {"com.a.A", "com.c.C"} <= types.defined
     assert len(errors) == 1 and "classes2.dex" in errors[0]
+
+
+def test_oversized_dex_entry_is_an_error_not_a_crash(tmp_path, monkeypatch):
+    monkeypatch.setattr(dexmod, "MAX_DEX_BYTES", 1024)
+    apk = tmp_path / "base.apk"
+    with zipfile.ZipFile(apk, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("classes.dex", b"\0" * 4096)  # dobrze się kompresuje: „bomba” w miniaturze
+    types, errors = read_apk_types([apk])
+    assert types.defined == set()
+    assert errors and "too large" in errors[0]
+
+
+def test_too_many_dex_entries_are_reported(tmp_path, monkeypatch):
+    monkeypatch.setattr(dexmod, "MAX_DEX_ENTRIES", 2)
+    apk = tmp_path / "base.apk"
+    with zipfile.ZipFile(apk, "w") as z:
+        for i in ("", "2", "3"):
+            z.writestr(f"classes{i}.dex", b"not dex")
+    _, errors = read_apk_types([apk])
+    assert any("too many DEX entries" in e for e in errors)

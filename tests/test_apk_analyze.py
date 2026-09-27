@@ -1,4 +1,5 @@
 import json
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -200,3 +201,43 @@ def test_apply_apk_report_drops_foreign_icons(icon):
     f = AppFacts("com.clean.x")
     apply_apk_report(f, ApkReport("com.clean.x", label="X", class_count=1, icon=icon))
     assert f.icon is None
+
+
+def test_report_lists_hash_of_every_file(tmp_path):
+    base, split = tmp_path / "base.apk", tmp_path / "split_config.apk"
+    for p in (base, split):
+        with zipfile.ZipFile(p, "w") as z:
+            z.writestr("x.txt", p.name)
+    report = analyze_apk("com.x", [base, split],
+                         read_manifest=lambda p: ManifestInfo("com.x", 5, "X", ("ab" * 32,)))
+    assert set(report.files) == {"base.apk", "split_config.apk"}
+    assert report.files["base.apk"] == report.sha256
+
+
+def test_stale_report_is_not_applied_and_marks_gap():
+    facts = AppFacts("com.x", version_code=8)
+    apply_apk_report(facts, ApkReport("com.x", version_code=7, class_count=10, ad_sdks=["admob"],
+                                      cert_sha256=["ab" * 32]))
+    assert facts.ad_sdks is None and facts.cert_sha256 is None
+    assert "stale" in facts.apk_error and "apk" in facts.gaps
+
+
+def test_partial_report_applies_what_it_has_but_marks_gap():
+    facts = AppFacts("com.x", version_code=7)
+    apply_apk_report(facts, ApkReport("com.x", version_code=7, class_count=10, ad_sdks=["admob"],
+                                      error="base.apk!classes2.dex: truncated uleb128",
+                                      files={"base.apk": "cd" * 32}))
+    assert facts.ad_sdks == {"admob"} and "apk" in facts.gaps
+    assert facts.apk_sha256 == ("cd" * 32,)
+
+
+def test_complete_report_leaves_no_gap():
+    facts = AppFacts("com.x", version_code=7)
+    apply_apk_report(facts, ApkReport("com.x", version_code=7, class_count=10))
+    assert facts.gaps == set() and facts.apk_error is None
+
+
+def test_old_json_without_files_still_loads():
+    data = report_to_json(ApkReport("com.x"))
+    del data["files"]
+    assert report_from_json(data).files == {}
