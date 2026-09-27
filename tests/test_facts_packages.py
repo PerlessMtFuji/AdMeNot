@@ -76,3 +76,22 @@ def test_collect_packages_ignores_install_time_after_device_clock():
     facts = collect_packages(_adb(DUMP), datetime(2010, 1, 4, 0, 41, 0))
     assert facts["com.a"].first_install == datetime(2026, 9, 20, 14, 0, 0)
     assert facts["com.a"].installed_days is None
+
+
+def test_empty_or_unrecognized_package_list_stops_the_scan():
+    adb = _adb(DUMP)
+    adb.responses[PM_LIST] = "Something unexpected\n"
+    with pytest.raises(AdbError):
+        collect_packages(adb, NOW)
+
+
+def test_package_list_without_any_system_package_is_implausible():
+    adb = _adb(DUMP)
+    adb.responses[PM_SYSTEM] = ""
+    with pytest.raises(AdbError):
+        collect_packages(adb, NOW)
+
+
+def test_missing_dumpsys_entry_is_a_packages_gap():
+    facts = collect_packages(_adb(AdbError("timeout", "slow")), NOW)
+    assert all(f.gaps == {"packages"} for f in facts.values())

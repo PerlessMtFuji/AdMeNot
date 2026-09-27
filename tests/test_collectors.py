@@ -3,6 +3,8 @@ import time
 from datetime import datetime
 from unittest import mock
 
+import pytest
+
 from demalware.engine.adb.fake import FakeAdb
 from demalware.engine.adb.transport import AdbError
 from demalware.engine.collectors.base import run_collectors
@@ -36,6 +38,7 @@ from demalware.engine.collectors.system import (
     SecureSettingsCollector,
 )
 from demalware.engine.facts import AppFacts
+from demalware.engine.parsers.common import UnrecognizedOutput, query_packages
 
 NOW = datetime(2026, 9, 26, 14, 0, 0)
 
@@ -97,7 +100,8 @@ def test_usagestats_without_events_is_not_ok():
 
 def test_system_collectors_with_home_fallback():
     adb = FakeAdb({
-        DEVICE_POLICY: ("  Enabled Device Admins (User 0, provisioningState: 0):\n"
+        DEVICE_POLICY: ("Current Device Policy Manager state:\n"
+                        "  Enabled Device Admins (User 0, provisioningState: 0):\n"
                         "    com.b/.Admin:\n      uid=1\n"),
         ROLE_HOME: AdbError("command_failed", "Unknown command"),
         RESOLVE_HOME: "priority=0\n  com.b/.FakeHome\n",
@@ -248,3 +252,60 @@ def test_roles_collector_tolerates_missing_browser_and_sms():
     status = run_collectors(adb, facts, [RolesCollector()])
     assert status["roles"].ok and facts["com.sys"].is_home_holder
     assert not any(f.is_browser_holder or f.is_sms_holder for f in facts.values())
+
+
+def test_query_packages_accepts_headers_and_components():
+    assert query_packages("2 activities found:\n  Activity #0:\n    com.a/.Main\n") == {"com.a"}
+    assert query_packages("No receivers found\n") == set()
+    assert query_packages("priority=0\n  com.a/.Main\n") == {"com.a"}
+
+
+def test_query_packages_rejects_unknown_formats():
+    for text in ("", "Error: unknown command\n", "3 activities found:\n  Activity #0: <hidden>\n"):
+        with pytest.raises(UnrecognizedOutput):
+            query_packages(text)
+    with pytest.raises(UnrecognizedOutput):
+        query_packages("No activities found\n", expect_some=True)
+
+
+def test_unrecognized_launcher_list_is_a_gap_not_hidden_icons():
+    adb = FakeAdb({LAUNCHER_QUERY: "Error: something new\n", HOME_QUERY: "priority=0\n  com.sys/.Home\n",
+                   BOOT_QUERY: "No receivers found\n"})
+    facts = _facts()
+    status = run_collectors(adb, facts, [ComponentsCollector()])
+    assert not status["components"].ok
+    assert all(f.has_launcher_icon is None and "components" in f.gaps for f in facts.values())
+
+
+def test_unrecognized_notifications_are_a_gap():
+    facts = _facts()
+    status = run_collectors(FakeAdb({NOTIFICATIONS: "Totally different dump\n"}), facts,
+                            [NotificationsCollector()])
+    assert not status["notifications"].ok
+    assert all("notifications" in f.gaps for f in facts.values())
+
+
+def test_appops_unparseable_output_for_one_app_is_a_gap():
+    adb = FakeAdb({
+        APPOPS_GET.format(package="com.a"): "SYSTEM_ALERT_WINDOW: allow; time=+10s ago\n",
+        APPOPS_GET.format(package="com.b"): "?? vendor text ??\n",
+    })
+    facts = _facts()
+    run_collectors(adb, facts, [AppOpsCollector()])
+    assert facts["com.b"].gaps == {"appops"}
+
+
+def test_appops_no_operations_is_a_confirmed_absence():
+    adb = FakeAdb({APPOPS_GET.format(package="com.a"): "No operations.\n",
+                   APPOPS_GET.format(package="com.b"): "SYSTEM_ALERT_WINDOW: allow\n"})
+    facts = _facts()
+    run_collectors(adb, facts, [AppOpsCollector()])
+    assert facts["com.a"].gaps == set() and facts["com.a"].appops == {}
+
+
+def test_unrecognized_device_policy_is_a_gap():
+    facts = _facts()
+    status = run_collectors(FakeAdb({DEVICE_POLICY: "Permission Denial\n"}), facts,
+                            [DevicePolicyCollector()])
+    assert not status["device_policy"].ok
+    assert all("device_policy" in f.gaps for f in facts.values())

@@ -1,5 +1,8 @@
 from datetime import datetime
 
+import pytest
+
+from demalware.engine.parsers.common import UnrecognizedOutput
 from demalware.engine.parsers.notifications import NotifStats, parse_notifications
 from demalware.engine.parsers.usagestats import UsageCounts, parse_usage_events
 
@@ -26,8 +29,18 @@ def test_parse_notifications_counts_only_notification_list():
     }
 
 
-def test_parse_notifications_without_section():
-    assert parse_notifications("Current Notification Manager state:\n") == {}
+def test_parse_notifications_without_section_is_unrecognized():
+    with pytest.raises(UnrecognizedOutput):
+        parse_notifications("Current Notification Manager state:\n")
+
+
+def test_parse_notifications_empty_list_is_a_confirmed_absence():
+    assert parse_notifications("  Notification List:\n  Snoozed notifications:\n") == {}
+
+
+def test_parse_notifications_records_without_package_are_unrecognized():
+    with pytest.raises(UnrecognizedOutput):
+        parse_notifications("  Notification List:\n    NotificationRecord(0x1: something)\n")
 
 
 NOW = datetime(2026, 9, 26, 14, 0, 0)
