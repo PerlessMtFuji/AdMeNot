@@ -12,6 +12,7 @@ import {
   linkState,
   mergeSelection,
   modelName,
+  scanChecklist,
   signalChips,
   sourceKey,
   stageStates,
@@ -132,5 +133,12 @@ describe('connect logic', () => {
     expect(initial('')).toBe('?');
     expect(modelName('SM_A145R')).toBe('SM A145R');
     expect(modelName(null)).toBe('?');
+  });
+
+  test('scanChecklist marks earlier stages done and the current one running', () => {
+    expect(scanChecklist(null)).toEqual(['on', 'todo', 'todo', 'todo']);
+    expect(scanChecklist('collectors')).toEqual(['done', 'done', 'on', 'todo']);
+    expect(scanChecklist('score')).toEqual(['done', 'done', 'done', 'on']);
+    expect(scanChecklist('apk')).toEqual(['done', 'done', 'done', 'done']);
   });
 });

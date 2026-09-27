@@ -11,7 +11,6 @@
   import { enter } from '../lib/motion';
   import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
-  import Spinner from '../ui/Spinner.svelte';
 
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
@@ -21,7 +20,6 @@
   const stage = $derived(link === 'ready' || link === 'many' ? 'ok'
     : link === 'unauthorized' ? 'auth' : link === 'offline' ? 'offline' : 'wait');
   const checks = $derived(connectChecklist(link));
-  const scanning = $derived(s.phase === 'scanning');
   const known = $derived(pending !== null && s.knownSerials.includes(pending.serial));
 </script>
 
@@ -59,9 +57,7 @@
         <form class="flex gap-2" onsubmit={(e) => { e.preventDefault(); void ctl.startScan(); }}>
           <input class="flex-1 rounded-[10px] border border-line bg-surface px-3 py-2" bind:value={s.client}
             placeholder={t('connect.client_placeholder')} aria-label={t('connect.client_label')} maxlength="80" />
-          <Button type="submit" variant="primary" disabled={!s.serial || scanning}>
-            {#if scanning}<Spinner /> {t('connect.scanning')}{:else}{t('connect.scan')}{/if}
-          </Button>
+          <Button type="submit" variant="primary" disabled={!s.serial}>{t('connect.scan')}</Button>
         </form>
       </div>
     {:else}

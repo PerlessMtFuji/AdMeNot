@@ -74,7 +74,7 @@
       "s4": "Connect the cable and allow debugging on the phone"
     }
   },
-  "scan": { "stage": { "identify": "Identifying the phone…", "packages": "Reading the app list…", "collectors": "Collecting app behavior data…", "score": "Rating the apps…", "apk": "Analyzing APK files…" } },
+  "scan": { "title": "Scanning the phone", "sub": "This takes a few seconds. Keep the cable connected.", "steps": "Scan stages", "stage": { "identify": "Identifying the phone…", "packages": "Reading the app list…", "collectors": "Collecting app behavior data…", "score": "Rating the apps…", "apk": "Analyzing APK files…" } },
   "phone": {
     "subject": "Device", "android": "Android", "connection": "Connection", "connected": "● USB, authorized",
     "apps": "Apps", "apps_value": "{total} ({user} user)", "model": "Model", "match": "Match", "serial": "S/N",

@@ -8,6 +8,7 @@
   import Execute from './screens/Execute.svelte';
   import History from './screens/History.svelte';
   import Results from './screens/Results.svelte';
+  import Scan from './screens/Scan.svelte';
   import Settings from './screens/Settings.svelte';
   import AppShell from './ui/AppShell.svelte';
 
@@ -24,8 +25,10 @@
     <History />
   {:else if s.screen === 'settings'}
     <Settings />
-  {:else if s.phase === 'connect' || s.phase === 'scanning'}
+  {:else if s.phase === 'connect'}
     <Connect />
+  {:else if s.phase === 'scanning'}
+    <Scan />
   {:else if s.phase === 'executing' || s.phase === 'done'}
     <Execute />
   {:else}

@@ -140,6 +140,13 @@ export function guideHighlight(text: string): string {
   return parts[parts.length - 1].trim();
 }
 
+export const SCAN_STEPS = ['identify', 'packages', 'collectors', 'score'] as const;
+
+export function scanChecklist(stage: string | null): CheckStatus[] {
+  const at = stage === 'apk' ? SCAN_STEPS.length : Math.max(0, SCAN_STEPS.indexOf((stage ?? 'identify') as never));
+  return SCAN_STEPS.map((_, i) => (i < at ? 'done' : i === at ? 'on' : 'todo'));
+}
+
 export function initial(name: string): string {
   return (name.trim()[0] ?? '?').toUpperCase();
 }

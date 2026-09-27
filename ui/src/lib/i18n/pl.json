@@ -74,7 +74,7 @@
       "s4": "Podłącz kabel i na telefonie zezwól na debugowanie"
     }
   },
-  "scan": { "stage": { "identify": "Rozpoznaję telefon…", "packages": "Czytam listę aplikacji…", "collectors": "Zbieram dane o zachowaniu aplikacji…", "score": "Oceniam aplikacje…", "apk": "Analizuję pliki APK…" } },
+  "scan": { "title": "Skanuję telefon", "sub": "To potrwa kilkanaście sekund. Nie odłączaj kabla.", "steps": "Etapy skanowania", "stage": { "identify": "Rozpoznaję telefon…", "packages": "Czytam listę aplikacji…", "collectors": "Zbieram dane o zachowaniu aplikacji…", "score": "Oceniam aplikacje…", "apk": "Analizuję pliki APK…" } },
   "phone": {
     "subject": "Przedmiot zlecenia", "android": "Android", "connection": "Połączenie", "connected": "● USB, autoryzowane",
     "apps": "Aplikacje", "apps_value": "{total} ({user} użytk.)", "model": "Model", "match": "Dopasowanie", "serial": "S/N",
