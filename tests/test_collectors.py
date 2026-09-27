@@ -181,6 +181,34 @@ def test_run_collectors_respects_deadline():
     event.set()  # Let the blocking thread exit
 
 
+def test_failed_collector_marks_gaps_only_for_covered_apps():
+    facts = _facts()
+    status = run_collectors(FakeAdb({APPOPS_GET.format(package="com.a"): AdbError("timeout", "x"),
+                                     APPOPS_GET.format(package="com.b"): AdbError("timeout", "x")}),
+                            facts, [AppOpsCollector()])
+    assert not status["appops"].ok
+    assert "appops" in facts["com.a"].gaps and "appops" in facts["com.b"].gaps
+    assert "appops" not in facts["com.sys"].gaps  # AppOps nie obejmuje aplikacji systemowych
+
+
+def test_appops_failure_for_one_app_is_a_gap_of_that_app():
+    adb = FakeAdb({
+        APPOPS_GET.format(package="com.a"): "SYSTEM_ALERT_WINDOW: allow; time=+10s ago\n",
+        APPOPS_GET.format(package="com.b"): AdbError("command_failed", "unknown package"),
+    })
+    facts = _facts()
+    status = run_collectors(adb, facts, [AppOpsCollector()])
+    assert status["appops"].ok and status["appops"].partial == ["com.b"]
+    assert facts["com.a"].gaps == set() and facts["com.b"].gaps == {"appops"}
+
+
+def test_whole_collector_failure_marks_every_app():
+    facts = _facts()
+    run_collectors(FakeAdb({NOTIFICATIONS: AdbError("timeout", "slow")}), facts,
+                   [NotificationsCollector()])
+    assert all("notifications" in f.gaps for f in facts.values())
+
+
 def test_default_collectors_names():
     names = [c.name for c in default_collectors(NOW, uptime_s=3600)]
     assert names == ["components", "appops", "notifications", "usagestats", "alarm",

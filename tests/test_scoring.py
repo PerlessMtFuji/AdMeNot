@@ -39,7 +39,13 @@ def test_combos_add_bonus_findings():
 def test_trusted_lowers_score():
     result = score_app(AppFacts("com.x"), [F("DM-NLS-01", "position", 10)],
                        trusted=True, low_behavior_data=True)
-    assert (result.score, result.verdict, result.incomplete) == (0, "safe", False)
+    assert (result.score, result.verdict, result.incomplete) == (0, "safe", True)
+
+
+def test_gaps_make_result_incomplete_even_when_trusted():
+    facts = AppFacts("com.x", gaps={"appops"})
+    assert score_app(facts, [], trusted=True, low_behavior_data=False).incomplete is True
+    assert score_app(AppFacts("com.y"), [], trusted=True, low_behavior_data=False).incomplete is False
 
 
 def test_system_app_without_behavior_is_capped_safe():

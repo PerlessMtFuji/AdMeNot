@@ -4,6 +4,7 @@ from demalware.engine.adb.transport import AdbError
 from demalware.engine.apk.analyze import ApkReport, report_to_json
 from demalware.engine.apk.providers import StoredApkProvider
 from demalware.engine.collectors.behavior import USAGESTATS
+from demalware.engine.collectors.system import DEVICE_POLICY
 from demalware.engine.device.info import UPTIME, read_device_info
 from demalware.engine.session import SCAN_STAGES, analyze_apks, report_to_dict, run_scan
 
@@ -46,6 +47,14 @@ def test_failed_usagestats_sets_low_data_and_keeps_scanning(synthetic_adb):
     assert report.collectors["usagestats"].ok is False
     assert report.low_behavior_data is True
     assert _by_pkg(report)["com.clean.pro.boost"].verdict == "malicious"
+
+
+def test_failed_collector_makes_every_app_incomplete_including_trusted(synthetic_adb):
+    synthetic_adb.responses[DEVICE_POLICY] = AdbError("timeout", "slow")
+    report = run_scan(synthetic_adb)
+    assert report.low_behavior_data is False  # device_policy to nie zachowanie
+    assert all(r.incomplete and "device_policy" in r.facts.gaps for r in report.results)
+    assert report_to_dict(report)["results"][0]["gaps"] == ["device_policy"]
 
 
 def test_report_to_dict_is_json_serializable(synthetic_adb):
