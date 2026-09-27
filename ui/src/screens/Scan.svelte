@@ -11,6 +11,9 @@
   const entry = $derived(s.devices.find((d) => d.serial === s.serial) ?? null);
   const name = $derived(s.device?.name ?? modelName(entry?.model ?? null));
   const checks = $derived(scanChecklist(s.scanStage));
+  const details = $derived(s.device
+    ? `${s.device.model} · Android ${s.device.android}${s.device.patch ? ` · ${t('phone.patch')} ${s.device.patch}` : ''}`
+    : modelName(entry?.model ?? null));
 </script>
 
 <div class="flex min-h-0 flex-1">
@@ -37,6 +40,6 @@
   </main>
   <SidePanel label={t('phone.subject')}>
     <DeviceCard compact name={name} serial={s.serial ?? ''} image={s.device?.image ?? null}
-      details={s.device ? `${s.device.model} · Android ${s.device.android}` : modelName(entry?.model ?? null)} connected />
+      {details} connected />
   </SidePanel>
 </div>

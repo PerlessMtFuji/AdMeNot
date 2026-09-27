@@ -14,9 +14,10 @@ test('scan screen: stage checklist, then the phone photo with the scan line', as
   expect([...items].map((li) => li.dataset.status)).toEqual(['done', 'on', 'todo', 'todo']);
   expect(screen.getAllByText('SM A145R').length).toBeGreaterThan(0);
   s.device = { serial: 'R58T00TEST', name: 'Galaxy A14', brand: 'samsung', manufacturer: 'samsung',
-    model: 'SM-A145R', market_name: 'Galaxy A14', android: '14', sdk: 34, patch: null, uptime_s: 60,
+    model: 'SM-A145R', market_name: 'Galaxy A14', android: '14', sdk: 34, patch: '2026-07-01', uptime_s: 60,
     match: null, image: 'data:image/svg+xml;base64,PHN2Zy8+' };
   await tick();
   expect(screen.getAllByAltText('Galaxy A14').length).toBeGreaterThan(0);
   expect(container.querySelector('.scanline')).toBeTruthy();
+  expect(screen.getAllByText(/Poprawka 2026-07-01/).length).toBeGreaterThan(0);
 });
