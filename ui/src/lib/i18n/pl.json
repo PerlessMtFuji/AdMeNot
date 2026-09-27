@@ -109,7 +109,7 @@
     "days": { "one": "{count} dzień temu", "few": "{count} dni temu", "many": "{count} dni temu", "other": "{count} dnia temu" }
   },
   "actions": { "details": "Pokaż szczegóły", "console": "Konsola ADB", "fix": "Napraw zaznaczone ({count})", "rescan": "Skanuj ponownie" },
-  "plan": { "title": "Plan naprawy", "unlock": "Odblokuj", "undo_hint": "Każdą zmianę można cofnąć w Historii.", "run": "Wykonaj ({count})", "nothing": "Nic do wykonania — wszystkie aplikacje są zablokowane." },
+  "plan": { "title": "Plan naprawy", "confirm_title": "Co zrobię na telefonie", "blocked": "Pominięta", "unlock": "Odblokuj", "undo_hint": "Każdą zmianę można cofnąć w Historii.", "run": "Wykonaj ({count})", "nothing": "Nic do wykonania — wszystkie aplikacje są zablokowane." },
   "exec": {
     "title": "Naprawa · {order}", "waiting": "Czeka w kolejce", "stop": "Wstrzymaj", "stopping": "Wstrzymuję po bieżącym kroku…",
     "verifying": "Sprawdzam, czy zmiany się utrzymały…", "stopped": "Zlecenie wstrzymane. Możesz je dokończyć albo cofnąć.",

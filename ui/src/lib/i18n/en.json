@@ -109,7 +109,7 @@
     "days": { "one": "{count} day ago", "few": "{count} days ago", "many": "{count} days ago", "other": "{count} days ago" }
   },
   "actions": { "details": "Show details", "console": "ADB console", "fix": "Fix selected ({count})", "rescan": "Scan again" },
-  "plan": { "title": "Repair plan", "unlock": "Unlock", "undo_hint": "Every change can be undone in History.", "run": "Run ({count})", "nothing": "Nothing to run — all apps are blocked." },
+  "plan": { "title": "Repair plan", "confirm_title": "What I will do on the phone", "blocked": "Skipped", "unlock": "Unlock", "undo_hint": "Every change can be undone in History.", "run": "Run ({count})", "nothing": "Nothing to run — all apps are blocked." },
   "exec": {
     "title": "Repair · {order}", "waiting": "Queued", "stop": "Pause", "stopping": "Pausing after the current step…",
     "verifying": "Checking that the changes hold…", "stopped": "Order paused. You can finish or undo it.",

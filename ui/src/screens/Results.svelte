@@ -4,8 +4,8 @@
   import AppCard from '../components/AppCard.svelte';
   import ExpertTable from '../components/ExpertTable.svelte';
   import InterruptedBanner from '../components/InterruptedBanner.svelte';
+  import PlanConfirm from '../components/PlanConfirm.svelte';
   import PlanPanel from '../components/PlanPanel.svelte';
-  import PlanPreview from '../components/PlanPreview.svelte';
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
   import { flaggedApps } from '../lib/logic';
@@ -32,7 +32,8 @@
 </script>
 
 <div class="flex min-h-0 flex-1">
-  <main class="flex min-w-0 flex-1 flex-col gap-3 overflow-auto px-6 py-5">
+  <main inert={s.plan !== null}
+    class="flex min-w-0 flex-1 flex-col gap-3 overflow-auto px-6 py-5 transition-opacity duration-300 {s.plan ? 'opacity-50' : ''}">
     <header class="flex items-end gap-3">
       <div class="min-w-0 flex-1">
         <div class="truncate text-[11.5px] font-semibold text-soft">
@@ -89,11 +90,13 @@
       </section>
     {/if}
   </main>
-  {#if !expert}
+  {#if !expert || s.plan}
     <SidePanel label={t('panel.plan')}>
-      <PlanPanel {showSafe} ontoggleSafe={() => (showSafe = !showSafe)} />
+      {#if s.plan}
+        <PlanConfirm />
+      {:else}
+        <PlanPanel {showSafe} ontoggleSafe={() => (showSafe = !showSafe)} />
+      {/if}
     </SidePanel>
   {/if}
 </div>
-
-<PlanPreview />

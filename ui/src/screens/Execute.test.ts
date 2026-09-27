@@ -22,12 +22,12 @@ describe('plan and execution', () => {
   test('preview, run, results, new scan', async () => {
     const { s } = await scanned();
     await fireEvent.click(screen.getByRole('button', { name: /Napraw zaznaczone/ }));
-    const dialog = await screen.findByRole('dialog', { name: 'Plan naprawy' });
-    expect(dialog.textContent).toContain('wyłączenie aplikacji');
+    const confirm = await screen.findByRole('region', { name: 'Plan naprawy' });
+    expect(confirm.textContent).toContain('wyłączenie aplikacji');
+    expect(screen.getByRole('main').hasAttribute('inert')).toBe(true);
     await fireEvent.click(screen.getByRole('button', { name: /^Wykonaj/ }));
     await vi.waitFor(() => expect(s.phase).toBe('done'));
     await tick();
-    expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.getAllByText('✓ Gotowe')).toHaveLength(s.result!.apps.length);
     expect(screen.getByText(new RegExp(`${s.result!.order}: wykonane`))).toBeTruthy();
     await fireEvent.click(screen.getByRole('button', { name: 'Nowe skanowanie' }));
@@ -60,6 +60,16 @@ describe('plan and execution', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Odblokuj' }));
     expect(bridge.calls.at(-1)).toMatchObject({ method: 'preview_plan', args: [expect.anything(),
       ['com.sec.android.app.launcher']] });
+  });
+
+  test('back from the confirmation returns to the plan panel', async () => {
+    const { s } = await scanned();
+    await fireEvent.click(screen.getByRole('button', { name: /Napraw zaznaczone/ }));
+    await screen.findByRole('region', { name: 'Plan naprawy' });
+    await fireEvent.click(screen.getByRole('button', { name: 'Wróć' }));
+    expect(s.plan).toBeNull();
+    expect(screen.getByRole('button', { name: /Napraw zaznaczone/ })).toBeTruthy();
+    expect(screen.getByRole('main').hasAttribute('inert')).toBe(false);
   });
 
   test('admin prompt, question dialog and pause', async () => {

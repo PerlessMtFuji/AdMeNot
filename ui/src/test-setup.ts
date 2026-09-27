@@ -46,4 +46,18 @@ if (!Element.prototype.getAnimations) {
   };
 }
 
+// jsdom nie ma IDL-property `inert` (Svelte ustawia ją jako property, nie atrybut przez setAttribute).
+if (!('inert' in HTMLElement.prototype)) {
+  Object.defineProperty(HTMLElement.prototype, 'inert', {
+    get(this: HTMLElement) {
+      return this.hasAttribute('inert');
+    },
+    set(this: HTMLElement, value: boolean) {
+      if (value) this.setAttribute('inert', '');
+      else this.removeAttribute('inert');
+    },
+    configurable: true,
+  });
+}
+
 afterEach(() => cleanup());
