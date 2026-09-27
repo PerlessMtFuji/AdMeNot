@@ -29,4 +29,7 @@ test('console shows session commands and runs shell commands after a warning', a
   await tick();
   expect((input as HTMLInputElement).disabled).toBe(true);
   expect(screen.getByText(/Konsola działa przy zeskanowanym telefonie/)).toBeTruthy();
+  const handle = screen.getByRole('button', { name: 'Zmień wysokość konsoli' });
+  expect(handle).toBeTruthy();
+  expect(drawer.className).not.toContain('border-t-2');
 });

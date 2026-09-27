@@ -154,7 +154,8 @@
   "console": {
     "title": "Konsola ADB", "placeholder": "polecenie adb shell, np. dumpsys package com.example", "run": "Wykonaj",
     "warn_title": "Polecenia omijają dziennik", "warn_text": "Polecenia z konsoli omijają dziennik zmian i nie da się ich cofnąć. Kontynuować?",
-    "warn_ok": "Rozumiem", "empty": "Brak poleceń w tej sesji.", "disabled": "Konsola działa przy zeskanowanym telefonie, gdy nie trwa zlecenie."
+    "warn_ok": "Rozumiem", "empty": "Brak poleceń w tej sesji.", "disabled": "Konsola działa przy zeskanowanym telefonie, gdy nie trwa zlecenie.",
+    "resize": "Zmień wysokość konsoli"
   },
   "close": { "title": "Trwa zlecenie", "message": "Przerwać po bieżącym kroku i zamknąć program? Zlecenie da się później dokończyć albo cofnąć.", "confirm": "Przerwij i zamknij" },
   "error": {

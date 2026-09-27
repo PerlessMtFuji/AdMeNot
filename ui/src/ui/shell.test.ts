@@ -26,3 +26,18 @@ test('back-to-order label while an order is in progress', async () => {
   await tick();
   expect(screen.getByRole('button', { name: 'Wróć do zlecenia' })).toBeTruthy();
 });
+
+test('closing the window during an order asks first', async () => {
+  const { ctl, s, bridge } = await setupCtl('empty');
+  render(App, { props: { ctl } });
+  s.closeRequested = true;
+  await tick();
+  const dialog = screen.getByRole('dialog', { name: 'Trwa zlecenie' });
+  expect(dialog.textContent).toContain('Przerwać po bieżącym kroku');
+  await fireEvent.keyDown(dialog, { key: 'Escape' });
+  expect(s.closeRequested).toBe(false);
+  s.closeRequested = true;
+  await tick();
+  await fireEvent.click(screen.getByRole('button', { name: 'Przerwij i zamknij' }));
+  expect(bridge.calls.at(-1)).toEqual({ method: 'quit', args: [] });
+});

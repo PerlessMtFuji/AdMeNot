@@ -16,3 +16,11 @@ test('error card: translated key, serial, log path, dismiss', async () => {
   await fireEvent.click(screen.getByRole('button', { name: 'Zamknij' }));
   expect(s.error).toBeNull();
 });
+
+test('fatal error offers a restart', async () => {
+  const { s } = await renderWith(ErrorCard, 'empty', { fatal: true });
+  s.fatal = 'TypeError: boom';
+  await tick();
+  expect(screen.getByRole('alert').textContent).toContain('TypeError: boom');
+  expect(screen.getByRole('button', { name: 'Wróć do początku' })).toBeTruthy();
+});

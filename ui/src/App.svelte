@@ -1,6 +1,5 @@
 <script lang="ts">
   import { setContext, untrack } from 'svelte';
-  import ConfirmDialog from './components/ConfirmDialog.svelte';
   import ErrorCard from './components/ErrorCard.svelte';
   import type { Controller } from './lib/controller';
   import { t } from './lib/i18n/index.svelte';
@@ -11,6 +10,8 @@
   import Scan from './screens/Scan.svelte';
   import Settings from './screens/Settings.svelte';
   import AppShell from './ui/AppShell.svelte';
+  import Button from './ui/Button.svelte';
+  import Dialog from './ui/Dialog.svelte';
 
   let props: { ctl: Controller } = $props();
   const ctl = untrack(() => props.ctl); // kontroler nie zmienia się przez całe życie okna
@@ -37,6 +38,11 @@
 </AppShell>
 
 {#if s.closeRequested}
-  <ConfirmDialog title={t('close.title')} message={t('close.message')} confirm={t('close.confirm')}
-    cancel={t('common.cancel')} onconfirm={() => ctl.quit()} oncancel={() => (s.closeRequested = false)} />
+  <Dialog title={t('close.title')} oncancel={() => (s.closeRequested = false)}>
+    {t('close.message')}
+    {#snippet actions()}
+      <Button onclick={() => (s.closeRequested = false)}>{t('common.cancel')}</Button>
+      <Button variant="danger" onclick={() => ctl.quit()}>{t('close.confirm')}</Button>
+    {/snippet}
+  </Dialog>
 {/if}

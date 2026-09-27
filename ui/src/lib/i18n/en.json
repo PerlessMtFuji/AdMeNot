@@ -154,7 +154,8 @@
   "console": {
     "title": "ADB console", "placeholder": "adb shell command, e.g. dumpsys package com.example", "run": "Run",
     "warn_title": "Commands bypass the journal", "warn_text": "Console commands bypass the change journal and cannot be undone. Continue?",
-    "warn_ok": "I understand", "empty": "No commands in this session.", "disabled": "The console works with a scanned phone while no order is running."
+    "warn_ok": "I understand", "empty": "No commands in this session.", "disabled": "The console works with a scanned phone while no order is running.",
+    "resize": "Resize the console"
   },
   "close": { "title": "An order is running", "message": "Pause after the current step and close the program? The order can be finished or undone later.", "confirm": "Pause and close" },
   "error": {
