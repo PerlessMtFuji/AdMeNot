@@ -87,11 +87,11 @@
   "expert": {
     "malicious": "Szkodliwe", "suspicious": "Podejrzane", "non_play": "Spoza Play", "admins": "Admin urządz.", "collectors": "Kolektory OK",
     "col_app": "Aplikacja / pakiet", "col_score": "Wynik", "col_signals": "Sygnały", "col_source": "Źródło", "col_action": "Akcja",
-    "search": "Szukaj aplikacji lub pakietu", "show_all": "Pokaż wszystkie aplikacje", "evidence": "Dowody",
+    "search": "Szukaj aplikacji lub pakietu", "show_all": "Pokaż wszystkie aplikacje",
     "source_play": "Play", "source_system": "systemowa", "source_sideload": "spoza sklepu",
     "apk_error": "APK: błąd", "collector_failed": "Kolektor {name}: {error}", "ad_sdks": "SDK reklamowe: {list}"
   },
-  "actions": { "details": "Pokaż szczegóły", "preview": "Podgląd planu", "console": "Konsola ADB", "fix": "Napraw zaznaczone ({count})", "rescan": "Skanuj ponownie" },
+  "actions": { "details": "Pokaż szczegóły", "console": "Konsola ADB", "fix": "Napraw zaznaczone ({count})", "rescan": "Skanuj ponownie" },
   "plan": { "title": "Plan naprawy", "unlock": "Odblokuj", "undo_hint": "Każdą zmianę można cofnąć w Historii.", "run": "Wykonaj ({count})", "nothing": "Nic do wykonania — wszystkie aplikacje są zablokowane." },
   "exec": {
     "title": "Naprawa · {order}", "waiting": "Czeka w kolejce", "stop": "Wstrzymaj", "stopping": "Wstrzymuję po bieżącym kroku…",
@@ -127,7 +127,7 @@
   },
   "close": { "title": "Trwa zlecenie", "message": "Przerwać po bieżącym kroku i zamknąć program? Zlecenie da się później dokończyć albo cofnąć.", "confirm": "Przerwij i zamknij" },
   "error": {
-    "title": "Coś poszło nie tak", "fatal": "Wystąpił nieoczekiwany błąd interfejsu.", "restart": "Wróć do początku", "log": "Szczegóły w logu: {path}",
+    "fatal": "Wystąpił nieoczekiwany błąd interfejsu.", "restart": "Wróć do początku", "log": "Szczegóły w logu: {path}",
     "adb_missing": "Nie znaleziono programu adb. Wskaż adb.exe w ustawieniach.",
     "unauthorized": "Telefon nie jest autoryzowany — potwierdź okno na telefonie.",
     "offline": "Telefon jest offline — podłącz kabel ponownie.",

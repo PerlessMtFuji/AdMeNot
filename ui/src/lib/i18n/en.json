@@ -87,11 +87,11 @@
   "expert": {
     "malicious": "Malicious", "suspicious": "Suspicious", "non_play": "Outside Play", "admins": "Device admins", "collectors": "Collectors OK",
     "col_app": "App / package", "col_score": "Score", "col_signals": "Signals", "col_source": "Source", "col_action": "Action",
-    "search": "Search app or package", "show_all": "Show all apps", "evidence": "Evidence",
+    "search": "Search app or package", "show_all": "Show all apps",
     "source_play": "Play", "source_system": "system", "source_sideload": "sideloaded",
     "apk_error": "APK: error", "collector_failed": "Collector {name}: {error}", "ad_sdks": "Ad SDKs: {list}"
   },
-  "actions": { "details": "Show details", "preview": "Preview plan", "console": "ADB console", "fix": "Fix selected ({count})", "rescan": "Scan again" },
+  "actions": { "details": "Show details", "console": "ADB console", "fix": "Fix selected ({count})", "rescan": "Scan again" },
   "plan": { "title": "Repair plan", "unlock": "Unlock", "undo_hint": "Every change can be undone in History.", "run": "Run ({count})", "nothing": "Nothing to run — all apps are blocked." },
   "exec": {
     "title": "Repair · {order}", "waiting": "Queued", "stop": "Pause", "stopping": "Pausing after the current step…",
@@ -127,7 +127,7 @@
   },
   "close": { "title": "An order is running", "message": "Pause after the current step and close the program? The order can be finished or undone later.", "confirm": "Pause and close" },
   "error": {
-    "title": "Something went wrong", "fatal": "An unexpected interface error occurred.", "restart": "Back to start", "log": "Details in the log: {path}",
+    "fatal": "An unexpected interface error occurred.", "restart": "Back to start", "log": "Details in the log: {path}",
     "adb_missing": "The adb program was not found. Point to adb.exe in the settings.",
     "unauthorized": "The phone is not authorized — confirm the prompt on the phone.",
     "offline": "The phone is offline — reconnect the cable.",
