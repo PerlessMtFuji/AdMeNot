@@ -1,6 +1,7 @@
 <script lang="ts">
   import { setContext, untrack } from 'svelte';
   import ConfirmDialog from './components/ConfirmDialog.svelte';
+  import Console from './components/Console.svelte';
   import ErrorCard from './components/ErrorCard.svelte';
   import Header from './components/Header.svelte';
   import StageBar from './components/StageBar.svelte';
@@ -41,6 +42,9 @@
       {/if}
     {/if}
   </main>
+  {#if s.settings.mode === 'expert' && s.consoleOpen}
+    <Console />
+  {/if}
 </div>
 
 {#if s.closeRequested}

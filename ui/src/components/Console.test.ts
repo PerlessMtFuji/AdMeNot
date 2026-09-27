@@ -1,0 +1,32 @@
+import { fireEvent, render, screen } from '@testing-library/svelte';
+import { tick } from 'svelte';
+import { expect, test, vi } from 'vitest';
+import App from '../App.svelte';
+import { setupCtl } from '../test-utils';
+
+test('console shows session commands and runs shell commands after a warning', async () => {
+  const { ctl, s, bridge } = await setupCtl('adware');
+  render(App, { props: { ctl } });
+  await ctl.startScan();
+  await vi.waitFor(() => expect(s.job).toBeNull());
+  await ctl.setMode('expert');
+  await tick();
+  await fireEvent.click(screen.getByRole('button', { name: 'Konsola ADB' }));
+  const drawer = screen.getByRole('region', { name: 'Konsola ADB' });
+  expect(drawer.textContent).toContain('getprop');
+  const input = screen.getByRole('textbox', { name: /polecenie adb shell/ });
+  await fireEvent.input(input, { target: { value: 'id' } });
+  await fireEvent.click(screen.getByRole('button', { name: 'Wykonaj' }));
+  expect(screen.getByRole('dialog', { name: 'Polecenia omijają dziennik' })).toBeTruthy();
+  await fireEvent.click(screen.getByRole('button', { name: 'Rozumiem' }));
+  await vi.waitFor(() => expect(bridge.calls.at(-1)).toEqual({ method: 'adb_shell', args: ['id'] }));
+  await vi.waitFor(() => expect((input as HTMLInputElement).value).toBe(''));
+  await fireEvent.input(input, { target: { value: 'getprop ro.product.model' } });
+  await fireEvent.click(screen.getByRole('button', { name: 'Wykonaj' }));
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(bridge.calls.at(-1)).toEqual({ method: 'adb_shell', args: ['getprop ro.product.model'] });
+  s.job = { id: 'job-9', kind: 'exec' };
+  await tick();
+  expect((input as HTMLInputElement).disabled).toBe(true);
+  expect(screen.getByText(/Konsola działa przy zeskanowanym telefonie/)).toBeTruthy();
+});
