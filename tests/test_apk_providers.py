@@ -1,10 +1,10 @@
 import json
-import threading
 
 from demalware.engine.adb.fake import FakeAdb
 from demalware.engine.adb.transport import AdbError
 from demalware.engine.apk.analyze import ApkReport, report_to_json
 from demalware.engine.apk.fetch import FetchedApks
+from demalware.engine.apk.isolated import IsolatedAnalyzer
 from demalware.engine.apk.providers import (
     DeviceApkProvider,
     StoredApkProvider,
@@ -80,19 +80,20 @@ def test_device_provider_pull_error_and_crash_become_report_errors(tmp_path):
     assert reports["com.crash"].error == "RuntimeError: boom"
 
 
-def test_device_provider_timeout_is_incomplete_not_fatal(tmp_path):
-    release = threading.Event()
+def _one_class(package, paths):
+    return ApkReport(package, class_count=1)
 
-    def analyze(package, paths):
-        if package == "com.slow":
-            release.wait(5)
-        return ApkReport(package, class_count=1)
 
-    provider = DeviceApkProvider(FakeAdb(), cache_dir=tmp_path, timeout_s=0.2,
-                                 fetch=lambda *a: FetchedApks([], verified=True), analyze=analyze)
-    try:
-        reports = provider.reports_for([AppFacts("com.slow"), AppFacts("com.fast")])
-    finally:
-        release.set()
-    assert reports["com.slow"].error == "timeout"
-    assert reports["com.fast"].error is None
+def test_device_provider_isolates_analysis_by_default(tmp_path):
+    made = []
+
+    def isolated(timeout_s):
+        made.append(IsolatedAnalyzer(timeout_s, analyze=_one_class))
+        return made[-1]
+
+    provider = DeviceApkProvider(
+        FakeAdb(), cache_dir=tmp_path, workers=1, timeout_s=20,
+        fetch=lambda adb, package, cache_dir: FetchedApks([], verified=True), isolated=isolated)
+    reports = provider.reports_for([AppFacts("com.a"), AppFacts("com.b")])
+    assert {p: r.class_count for p, r in reports.items()} == {"com.a": 1, "com.b": 1}
+    assert len(made) == 1 and made[0]._proc is None  # jeden proces na wątek, zamknięty na końcu
