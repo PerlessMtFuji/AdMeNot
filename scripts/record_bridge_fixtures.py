@@ -11,6 +11,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import re
 import sys
 import tempfile
 from collections.abc import Callable, Iterator
@@ -73,14 +74,24 @@ class Recorder:
         return [d for c in self.calls for n, d in c["events"] if n == name]
 
 
+_PART_DIR = re.compile(r"\.part-[A-Za-z0-9_]+")
+
+
 def _normalize(value: Any, tmp: str) -> Any:
-    """Czas trwania -> 0.0, katalog tymczasowy (np. w `adb pull … <kopia>`) -> `<tmp>`."""
+    """Czas trwania -> 0.0, katalog tymczasowy (np. w `adb pull … <kopia>`) -> `<tmp>`.
+
+    `fetch_apks` (Plan 4b Task 3) pobiera do unikalnego katalogu roboczego
+    (`tempfile.mkdtemp(prefix=".part-", ...)`), żeby dwa równoczesne skany się nie zobaczyły —
+    nazwa jest losowa przy każdym uruchomieniu, więc trzeba ją też ujednolicić, inaczej nagranie
+    nigdy nie byłoby stabilne.
+    """
     if isinstance(value, dict):
         return {k: (0.0 if k == "duration" else _normalize(v, tmp)) for k, v in value.items()}
     if isinstance(value, list):
         return [_normalize(v, tmp) for v in value]
     if isinstance(value, str):
-        return value.replace(tmp, "<tmp>").replace(tmp.replace("\\", "/"), "<tmp>")
+        text = value.replace(tmp, "<tmp>").replace(tmp.replace("\\", "/"), "<tmp>")
+        return _PART_DIR.sub(".part-X", text)
     return value
 
 

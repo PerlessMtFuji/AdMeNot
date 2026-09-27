@@ -4,6 +4,7 @@ import threading
 from demalware.engine.adb.fake import FakeAdb
 from demalware.engine.adb.transport import AdbError
 from demalware.engine.apk.analyze import ApkReport, report_to_json
+from demalware.engine.apk.fetch import FetchedApks
 from demalware.engine.apk.providers import (
     DeviceApkProvider,
     StoredApkProvider,
@@ -38,9 +39,9 @@ def test_stored_provider_reads_existing_reports(tmp_path):
 def test_device_provider_fetches_and_analyzes(tmp_path):
     seen = []
 
-    def fetch(adb, package, version_code, cache_dir):
-        seen.append((package, version_code, cache_dir))
-        return [tmp_path / f"{package}.apk"]
+    def fetch(adb, package, cache_dir):
+        seen.append((package, cache_dir))
+        return FetchedApks([tmp_path / f"{package}.apk"], verified=True)
 
     def analyze(package, paths):
         return ApkReport(package, class_count=1, ad_sdks=["admob"])
@@ -50,15 +51,25 @@ def test_device_provider_fetches_and_analyzes(tmp_path):
     reports = provider.reports_for([AppFacts("com.a", version_code=3), AppFacts("com.b")],
                                    progress=lambda done, total, pkg: progress.append((done, total, pkg)))
     assert set(reports) == {"com.a", "com.b"}
-    assert ("com.a", 3, tmp_path) in seen
+    assert ("com.a", tmp_path) in seen
     assert [p[:2] for p in progress] == [(1, 2), (2, 2)]
+    assert reports["com.a"].error is None
+
+
+def test_unverified_identity_is_reported_as_error(tmp_path):
+    provider = DeviceApkProvider(
+        FakeAdb(), cache_dir=tmp_path,
+        fetch=lambda adb, package, cache_dir: FetchedApks([tmp_path / "x.apk"], verified=False),
+        analyze=lambda package, paths: ApkReport(package, class_count=1))
+    report = provider.reports_for([AppFacts("com.a")])["com.a"]
+    assert report.error == "identity: unverified (no sha256sum on the phone)"
 
 
 def test_device_provider_pull_error_and_crash_become_report_errors(tmp_path):
-    def fetch(adb, package, version_code, cache_dir):
+    def fetch(adb, package, cache_dir):
         if package == "com.gone":
             raise AdbError("command_failed", "pm path com.gone: no APK (uninstalled?)")
-        return []
+        return FetchedApks([], verified=True)
 
     def analyze(package, paths):
         raise RuntimeError("boom")
@@ -78,7 +89,7 @@ def test_device_provider_timeout_is_incomplete_not_fatal(tmp_path):
         return ApkReport(package, class_count=1)
 
     provider = DeviceApkProvider(FakeAdb(), cache_dir=tmp_path, timeout_s=0.2,
-                                 fetch=lambda *a: [], analyze=analyze)
+                                 fetch=lambda *a: FetchedApks([], verified=True), analyze=analyze)
     try:
         reports = provider.reports_for([AppFacts("com.slow"), AppFacts("com.fast")])
     finally:

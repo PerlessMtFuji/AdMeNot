@@ -1547,7 +1547,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "host:pull /data/app/~~fake==/com.clean.pro.boost-1/base.apk <tmp>\\data\\DeMalware\\backups\\R58T00TEST\\com.clean.pro.boost\\7.part\\base.apk",
+      "command": "host:pull /data/app/~~fake==/com.clean.pro.boost-1/base.apk <tmp>\\data\\DeMalware\\apk-cache\\com.clean.pro.boost\\.part-X\\base.apk",
       "status": "ok",
       "duration": 0.0,
       "output": "/data/app/~~fake==/com.clean.pro.boost-1/base.apk: 1 file pulled\n",
@@ -1559,7 +1559,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "host:pull /data/app/~~fake==/com.clean.pro.boost-1/split_config.arm64_v8a.apk <tmp>\\data\\DeMalware\\backups\\R58T00TEST\\com.clean.pro.boost\\7.part\\split_config.arm64_v8a.apk",
+      "command": "host:pull /data/app/~~fake==/com.clean.pro.boost-1/split_config.arm64_v8a.apk <tmp>\\data\\DeMalware\\apk-cache\\com.clean.pro.boost\\.part-X\\split_config.arm64_v8a.apk",
       "status": "ok",
       "duration": 0.0,
       "output": "/data/app/~~fake==/com.clean.pro.boost-1/split_config.arm64_v8a.apk: 1 file pulled\n",
@@ -1575,6 +1575,18 @@
       "status": "ok",
       "duration": 0.0,
       "output": "package:/data/app/~~fake==/com.clean.pro.boost-1/base.apk\npackage:/data/app/~~fake==/com.clean.pro.boost-1/split_config.arm64_v8a.apk\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "sha256sum '/data/app/~~fake==/com.clean.pro.boost-1/base.apk' '/data/app/~~fake==/com.clean.pro.boost-1/split_config.arm64_v8a.apk'",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for \"sha256sum '/data/app/~~fake==/com.clean.pro.boost-1/base.apk' '/data/app/~~fake==/com.clean.pro.boost-1/split_config.arm64_v8a.apk'\"",
       "tag": null
      }
     ],
