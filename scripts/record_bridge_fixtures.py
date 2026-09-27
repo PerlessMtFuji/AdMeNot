@@ -116,6 +116,7 @@ def _scenario(name: str, steps: Callable[[Recorder, Any], None]) -> dict[str, An
 def _adware(r: Recorder, phone: Any) -> None:
     phone.on_admin_screen = lambda p: setattr(p.apps["com.clean.pro.boost"], "admin", False)
     r.call("list_devices")
+    r.call("history", None)  # UI przy starcie pyta o znane telefony (Controller.loadKnownSerials)
     r.call("start_scan", SERIAL, CLIENT)
     r.call("preview_plan", ADWARE, [])
     r.call("execute", ADWARE, [])
@@ -127,6 +128,7 @@ def _adware(r: Recorder, phone: Any) -> None:
 
 def _disconnect(r: Recorder, phone: Any) -> None:
     r.call("list_devices")
+    r.call("history", None)  # UI przy starcie pyta o znane telefony (Controller.loadKnownSerials)
     r.call("start_scan", SERIAL, CLIENT)
     r.call("preview_plan", {"com.wlive.forecast": "disable"}, [])
     phone.lose_response.add(DISABLE)

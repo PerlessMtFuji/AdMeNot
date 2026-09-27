@@ -9,6 +9,7 @@ const CONSOLE_LIMIT = 500;
 
 export class Controller {
   private ended = new Set<string>();
+  private knownLoaded = false;
 
   constructor(readonly state: AppState, readonly bridge: Bridge) {}
 
@@ -41,6 +42,14 @@ export class Controller {
     const devices = await this.call(this.api.list_devices());
     if (devices) this.onDevices(devices);
     await this.call(this.api.watch_devices(true));
+    await this.loadKnownSerials();
+  }
+
+  async loadKnownSerials(): Promise<void> {
+    if (this.knownLoaded) return;
+    this.knownLoaded = true;
+    const r = await this.call(this.api.history(null));
+    if (r) this.state.knownSerials = r.serials;
   }
 
   private applySettings(settings: Settings): void {

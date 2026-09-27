@@ -32,11 +32,15 @@ describe('fake bridge', () => {
 
   test('repeats the last recording and has defaults', async () => {
     const bridge = createFakeBridge('adware', { delay: 0 });
+    // adware.json nagrywa `history` trzy razy (start, po execute, po undo, ruling F4 w
+    // global-constraints.md) — czwarte wywołanie powtarza ostatnie nagranie.
     const first = await bridge.api.history(null);
     const second = await bridge.api.history(null);
     const third = await bridge.api.history(null);
+    const fourth = await bridge.api.history(null);
     expect(first).not.toEqual(second);
-    expect(third).toEqual(second);
+    expect(second).not.toEqual(third);
+    expect(fourth).toEqual(third);
     expect(await bridge.api.save_settings({ lang: 'en' })).toMatchObject({ lang: 'en' });
     expect(await bridge.api.get_settings()).toMatchObject({ lang: 'en', mode: 'simple' });
     const shell = await bridge.api.adb_shell('id');

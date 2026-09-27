@@ -1,12 +1,17 @@
 import { describe, expect, test } from 'vitest';
 import {
   changedVerdicts,
+  connectChecklist,
   defaultSelection,
   flaggedApps,
   formatUptime,
   groupSteps,
+  guideHighlight,
+  initial,
   levelTag,
+  linkState,
   mergeSelection,
+  modelName,
   signalChips,
   sourceKey,
   stageStates,
@@ -95,5 +100,37 @@ describe('formatting', () => {
     expect(signalChips(a)).toEqual([{ label: 'admin', bad: true }, { label: 'boot', bad: false }]);
     expect(sourceKey(app('p', 'safe', { is_system: true }))).toBe('system');
     expect(sourceKey(app('p', 'safe', { from_play: false }))).toBe('sideload');
+  });
+});
+
+describe('connect logic', () => {
+  const dev = (serial: string, state: string) => ({ serial, state, model: null });
+
+  test('linkState', () => {
+    expect(linkState([], 'adb_missing')).toBe('adb_missing');
+    expect(linkState([], null)).toBe('none');
+    expect(linkState([dev('A', 'unauthorized')], null)).toBe('unauthorized');
+    expect(linkState([dev('A', 'offline')], null)).toBe('offline');
+    expect(linkState([dev('A', 'device'), dev('B', 'unauthorized')], null)).toBe('ready');
+    expect(linkState([dev('A', 'device'), dev('B', 'device')], null)).toBe('many');
+  });
+
+  test('connectChecklist', () => {
+    expect(connectChecklist('none')).toEqual(['on', 'todo', 'todo']);
+    expect(connectChecklist('unauthorized')).toEqual(['done', 'on', 'todo']);
+    expect(connectChecklist('ready')).toEqual(['done', 'done', 'done']);
+  });
+
+  test('guideHighlight takes the quoted term or the last menu level', () => {
+    expect(guideHighlight('Stuknij 7× „Numer wersji”')).toBe('Numer wersji');
+    expect(guideHighlight('Tap “Build number” 7 times')).toBe('Build number');
+    expect(guideHighlight('Ustawienia → O telefonie')).toBe('O telefonie');
+  });
+
+  test('initial and modelName', () => {
+    expect(initial('  cleaner')).toBe('C');
+    expect(initial('')).toBe('?');
+    expect(modelName('SM_A145R')).toBe('SM A145R');
+    expect(modelName(null)).toBe('?');
   });
 });

@@ -10,7 +10,7 @@ async function scan(page: Page, scenario = 'adware') {
 test.describe('screens (PL, 1280×800)', () => {
   test('connect: waiting', async ({ page }) => {
     await page.goto('/?scenario=empty');
-    await expect(page.getByText('Czekam na telefon…')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Podłącz telefon' })).toBeVisible();
     await expect(page).toHaveScreenshot('connect-empty.png');
   });
 

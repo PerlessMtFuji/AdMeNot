@@ -17,6 +17,19 @@
    "events": []
   },
   {
+   "method": "history",
+   "args": [
+    null
+   ],
+   "result": {
+    "serial": null,
+    "serials": [],
+    "devices": [],
+    "orders": []
+   },
+   "events": []
+  },
+  {
    "method": "start_scan",
    "args": [
     "R58T00TEST",

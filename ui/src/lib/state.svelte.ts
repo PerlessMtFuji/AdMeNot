@@ -13,6 +13,7 @@ export class AppState {
   settings = $state<Settings>({ lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system' });
   devices = $state<DeviceEntry[]>([]);
   devicesError = $state<string | null>(null);
+  knownSerials = $state<string[]>([]);
   serial = $state<string | null>(null);
   client = $state('');
   scanStage = $state<string | null>(null);

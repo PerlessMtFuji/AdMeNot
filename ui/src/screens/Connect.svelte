@@ -1,83 +1,71 @@
 <script lang="ts">
   import { getContext } from 'svelte';
+  import ConnectChecklist from '../components/ConnectChecklist.svelte';
+  import DeviceCard from '../components/DeviceCard.svelte';
   import InterruptedBanner from '../components/InterruptedBanner.svelte';
+  import PhoneStage from '../components/PhoneStage.svelte';
   import UsbGuide from '../components/UsbGuide.svelte';
   import type { Controller } from '../lib/controller';
   import { t } from '../lib/i18n/index.svelte';
+  import { connectChecklist, linkState, modelName } from '../lib/logic';
+  import { enter } from '../lib/motion';
+  import Banner from '../ui/Banner.svelte';
+  import Button from '../ui/Button.svelte';
+  import Spinner from '../ui/Spinner.svelte';
 
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
+  const link = $derived(linkState(s.devices, s.devicesError));
   const ready = $derived(s.devices.filter((d) => d.state === 'device'));
-  const unauthorized = $derived(s.devices.some((d) => d.state === 'unauthorized'));
-  const offline = $derived(s.devices.some((d) => d.state === 'offline'));
+  const pending = $derived(s.devices.find((d) => d.state !== 'device') ?? null);
+  const stage = $derived(link === 'ready' || link === 'many' ? 'ok'
+    : link === 'unauthorized' ? 'auth' : link === 'offline' ? 'offline' : 'wait');
+  const checks = $derived(connectChecklist(link));
   const scanning = $derived(s.phase === 'scanning');
+  const known = $derived(pending !== null && s.knownSerials.includes(pending.serial));
 </script>
 
-<div class="min-w-0 flex-1 overflow-auto p-4">
-<section class="flex gap-4">
-  <div class="relative grid h-[210px] w-[150px] flex-none place-items-center" aria-hidden="true">
-    <svg width="150" height="210" viewBox="0 0 150 210">
-      <rect x="45" y="20" width="60" height="110" rx="10" fill="var(--color-card)" stroke="var(--color-ink)" stroke-width="2.5" />
-      <rect x="52" y="30" width="46" height="86" rx="4" fill="var(--color-paper)" />
-      <path d="M75 130 C75 160, 75 160, 75 195" stroke="#2563eb" stroke-width="3" fill="none"
-        stroke-dasharray="6 4" style="animation: dash 1s linear infinite" />
-      <rect x="55" y="188" width="40" height="16" rx="3" fill="var(--color-ink)" />
-    </svg>
-    <span class="absolute top-[60px] left-[45px] h-[60px] w-[60px] rounded-full border-2 border-accent"
-      style="animation: pulse-ring 1.8s infinite"></span>
+<main class="flex min-w-0 flex-1 gap-5 overflow-auto px-6 py-5">
+  <div class="flex w-[260px] flex-none flex-col gap-3">
+    <div>
+      <h1 class="text-[17px] font-extrabold">{t(`connect.title.${link}`)}</h1>
+      <p class="mt-0.5 min-h-[34px] text-mut">{t(`connect.sub.${link}`)}</p>
+    </div>
+    <PhoneStage state={stage} />
+    <ConnectChecklist label={t('connect.check.label')} items={[
+      { label: t('connect.check.cable'), status: checks[0] },
+      { label: t('connect.check.auth'), status: checks[1] },
+      { label: t('connect.check.model'), status: checks[2] },
+    ]} />
   </div>
 
-  <div class="flex flex-1 flex-col gap-2">
-    {#if s.interrupted.length}
-      <InterruptedBanner orders={s.interrupted} />
-    {/if}
-    {#if s.devicesError === 'adb_missing'}
-      <div class="card hard" role="alert">
-        <b>{t('connect.adb_missing')}</b>
-        <button class="btn ml-2" onclick={() => ctl.openSettings()}>{t('connect.open_settings')}</button>
-      </div>
-    {:else if ready.length > 1}
-      <div class="card hard">
-        <b>{t('connect.many')}</b>
+  <div class="flex min-w-0 flex-1 flex-col gap-3">
+    {#if s.interrupted.length}<InterruptedBanner orders={s.interrupted} />{/if}
+    {#if link === 'adb_missing'}
+      <Banner tone="bad" icon="triangle-alert" title={t('connect.adb_missing')}>
+        {#snippet actions()}<Button onclick={() => ctl.openSettings()}>{t('connect.open_settings')}</Button>{/snippet}
+      </Banner>
+    {:else if link === 'ready' || link === 'many'}
+      <div class="flex flex-col gap-2.5" in:enter>
         {#each ready as d (d.serial)}
-          <label class="mt-1.5 flex items-center gap-2">
-            <input type="radio" name="device" checked={s.serial === d.serial}
-              onchange={() => ctl.selectDevice(d.serial)} />
-            <span>{d.model ?? '?'}</span>
-            <span class="mono text-mut">{d.serial}</span>
+          <label class="block cursor-pointer rounded-2xl {s.serial === d.serial && ready.length > 1 ? 'ring-2 ring-accent' : ''}">
+            {#if ready.length > 1}
+              <input class="sr-only" type="radio" name="device" checked={s.serial === d.serial}
+                aria-label="{modelName(d.model)} {d.serial}" onchange={() => ctl.selectDevice(d.serial)} />
+            {/if}
+            <DeviceCard name={modelName(d.model)} details={t('connect.title.ready')} serial={d.serial} connected />
           </label>
         {/each}
-      </div>
-    {:else if ready.length === 1}
-      <div class="card hard">
-        <b class="ok">✓ {t('connect.ready')}</b>
-        <span>{ready[0].model ?? ''}</span>
-        <span class="mono text-mut">{ready[0].serial}</span>
+        <form class="flex gap-2" onsubmit={(e) => { e.preventDefault(); void ctl.startScan(); }}>
+          <input class="flex-1 rounded-[10px] border border-line bg-surface px-3 py-2" bind:value={s.client}
+            placeholder={t('connect.client_placeholder')} aria-label={t('connect.client_label')} maxlength="80" />
+          <Button type="submit" variant="primary" disabled={!s.serial || scanning}>
+            {#if scanning}<Spinner /> {t('connect.scanning')}{:else}{t('connect.scan')}{/if}
+          </Button>
+        </form>
       </div>
     {:else}
-      <div class="card hard">
-        <b class="text-[14px]">{t('connect.waiting')}</b> <span class="spin"></span>
-        <p class="mt-1">{t('connect.plug')}</p>
-      </div>
-      {#if unauthorized}
-        <div class="card border-[var(--warn-line)] bg-[var(--warn-bg)]"><span class="warn">⚠</span> {t('connect.unauthorized')}</div>
-      {/if}
-      {#if offline}
-        <div class="card border-[var(--warn-line)] bg-[var(--warn-bg)]"><span class="warn">⚠</span> {t('connect.offline')}</div>
-      {/if}
-      <UsbGuide />
+      <UsbGuide model={pending?.model ?? null} collapsed={known} />
     {/if}
-
-    <div class="card flex flex-wrap items-end gap-3">
-      <label class="flex flex-1 flex-col gap-1">
-        <span class="lbl">{t('connect.client_label')}</span>
-        <input class="rounded border border-line bg-card px-2 py-1.5" bind:value={s.client}
-          placeholder={t('connect.client_placeholder')} maxlength="80" />
-      </label>
-      <button class="btn btn-pri" disabled={!s.serial || scanning} onclick={() => ctl.startScan()}>
-        {#if scanning}<span class="spin"></span> {t('connect.scanning')}{:else}{t('connect.scan')}{/if}
-      </button>
-    </div>
   </div>
-</section>
-</div>
+</main>

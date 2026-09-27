@@ -27,8 +27,8 @@ def test_bridge_fixtures_are_up_to_date():
 def test_adware_scenario_covers_the_whole_flow():
     data = _module().record_all()["adware"]
     methods = [c["method"] for c in data["calls"]]
-    assert methods == ["list_devices", "start_scan", "preview_plan", "execute", "history", "undo",
-                       "history"]
+    assert methods == ["list_devices", "history", "start_scan", "preview_plan", "execute", "history",
+                       "undo", "history"]
     events = [name for c in data["calls"] for name, _ in c["events"]]
     for name in ("scan:device", "scan:done", "apk:done", "exec:order", "exec:admin_wait",
                  "exec:done", "undo:done", "adb:command"):

@@ -1,4 +1,4 @@
-import type { AppView, Level, StepEvent, Verdict } from './types';
+import type { AppView, DeviceEntry, Level, StepEvent, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done';
 export type StageState = 'done' | 'now' | 'todo' | 'off';
@@ -111,4 +111,39 @@ export function signalChips(app: AppView): { label: string; bad: boolean }[] {
 export function sourceKey(app: AppView): 'play' | 'system' | 'sideload' {
   if (app.is_system) return 'system';
   return app.from_play ? 'play' : 'sideload';
+}
+
+export type LinkState = 'adb_missing' | 'none' | 'unauthorized' | 'offline' | 'ready' | 'many';
+export type CheckStatus = 'todo' | 'on' | 'done';
+
+export function linkState(devices: DeviceEntry[], error: string | null): LinkState {
+  if (error === 'adb_missing') return 'adb_missing';
+  const ready = devices.filter((d) => d.state === 'device').length;
+  if (ready > 1) return 'many';
+  if (ready === 1) return 'ready';
+  if (devices.some((d) => d.state === 'unauthorized')) return 'unauthorized';
+  if (devices.some((d) => d.state === 'offline')) return 'offline';
+  return 'none';
+}
+
+export function connectChecklist(link: LinkState): CheckStatus[] {
+  if (link === 'ready' || link === 'many') return ['done', 'done', 'done'];
+  if (link === 'unauthorized' || link === 'offline') return ['done', 'on', 'todo'];
+  return ['on', 'todo', 'todo'];
+}
+
+/** Termin do podświetlenia na miniaturze ekranu: tekst w cudzysłowie albo ostatni poziom menu. */
+export function guideHighlight(text: string): string {
+  const quoted = text.match(/[„“"]([^”"]+)[”"]/);
+  if (quoted) return quoted[1];
+  const parts = text.split('→');
+  return parts[parts.length - 1].trim();
+}
+
+export function initial(name: string): string {
+  return (name.trim()[0] ?? '?').toUpperCase();
+}
+
+export function modelName(model: string | null): string {
+  return model ? model.replaceAll('_', ' ') : '?';
 }
