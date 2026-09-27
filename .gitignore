@@ -9,3 +9,8 @@ build/
 src/demalware/assets/phones/
 src/demalware/assets/phones.db
 src/demalware/assets/phones.db.tmp
+ui/node_modules/
+ui/dist-e2e/
+ui/test-results/
+ui/playwright-report/
+src/demalware/app/web/
