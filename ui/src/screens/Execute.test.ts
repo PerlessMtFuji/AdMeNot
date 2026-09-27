@@ -84,6 +84,29 @@ describe('plan and execution', () => {
     expect(screen.getByRole('button', { name: /Wstrzymuję/ })).toBeTruthy();
   });
 
+  test('after a pause the apps never started stay listed in the result', async () => {
+    const { s, bridge } = await app('empty');
+    const plan = (pkg: string, name: string) => ({ package: pkg, name, level: 'disable' as const,
+      level_label: 'WYŁĄCZ', blocked: false, reason: null, reason_text: null, steps: [], warnings: [] });
+    bridge.emit('exec:order', { order: 'ZS/2026/0926/05', plan: { runnable: 2,
+      apps: [plan('a', 'Pierwsza'), plan('b', 'Druga')] } });
+    bridge.emit('exec:step', { action_id: 1, package: 'a', name: 'Pierwsza', kind: 'enabled',
+      label: 'wyłączenie aplikacji', status: 'done', error: null });
+    await tick();
+    expect(screen.getByText(/Czeka w kolejce/)).toBeTruthy();
+    bridge.emit('exec:done', { order: 'ZS/2026/0926/05', status: 'running', status_label: 'w toku',
+      stopped: true, apps: [
+        { package: 'a', name: 'Pierwsza', outcome: 'stopped', errors: [], kinds: [] },
+        { package: 'b', name: 'Druga', outcome: 'stopped', errors: [], kinds: [] }] });
+    await tick();
+    expect(s.phase).toBe('done');
+    expect(screen.queryByText(/Czeka w kolejce/)).toBeNull();
+    const card = screen.getByText('Druga').closest('.card') as HTMLElement;
+    expect(card.textContent).toContain('⏸ Wstrzymana');
+    expect(card.textContent).toContain('WYŁĄCZ');
+    expect(screen.getAllByText('⏸ Wstrzymana')).toHaveLength(2);
+  });
+
   test('stopped order offers to finish it', async () => {
     const { s, bridge } = await app('empty');
     s.phase = 'executing';

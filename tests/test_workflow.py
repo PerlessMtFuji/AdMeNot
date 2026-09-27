@@ -93,6 +93,16 @@ def test_stopped_order_marks_the_app_stopped_and_resumes(tmp_path):
     assert again.apps == [AppStatus("com.wlive.forecast", "ok")] and again.stopped is False
 
 
+def test_stopped_order_lists_apps_the_runner_never_reached(tmp_path):
+    phone = make_cli_phone()
+    journal, order, result = _run(tmp_path, phone, {"com.wlive.forecast": "disable",
+                                                     "com.whatsapp": "silence"},
+                                  ExecOptions(should_stop=lambda: True))
+    queued = list(dict.fromkeys(a.package for a in journal.actions(order.id)))
+    assert result.stopped is True and len(queued) == 2
+    assert result.apps == [AppStatus(p, "stopped") for p in queued]
+
+
 def test_disconnect_raises_order_interrupted(tmp_path):
     phone = make_cli_phone()
     phone.lose_response.add(DISABLE)

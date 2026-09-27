@@ -52,9 +52,17 @@
       {/if}
     </div>
   {/each}
+  <!-- aplikacje bez kroków: np. po „Wstrzymaj” te, do których wykonanie nie doszło -->
   {#each s.result?.apps.filter((a) => !groups.some((g) => g.package === a.package)) ?? [] as res (res.package)}
     {@const o = outcome(res)}
-    <div class="card"><b>{res.name}</b><p class="mt-1.5 font-semibold {o.cls}">{o.text}</p></div>
+    {@const plan = planned.find((a) => a.package === res.package)}
+    <div class="card">
+      <div class="flex items-center gap-2">
+        <b>{res.name}</b>
+        {#if plan}<span class="tag ml-auto {levelTag(plan.level)}">{plan.level_label}</span>{/if}
+      </div>
+      <p class="mt-1.5 font-semibold {o.cls}">{o.text}</p>
+    </div>
   {/each}
   {#if running}
     {#each waiting as a (a.package)}
