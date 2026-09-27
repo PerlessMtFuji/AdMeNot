@@ -13,6 +13,7 @@
   const scanning = $derived(s.phase === 'scanning');
 </script>
 
+<div class="min-w-0 flex-1 overflow-auto p-4">
 <section class="flex gap-4">
   <div class="relative grid h-[210px] w-[150px] flex-none place-items-center" aria-hidden="true">
     <svg width="150" height="210" viewBox="0 0 150 210">
@@ -79,3 +80,4 @@
     </div>
   </div>
 </section>
+</div>

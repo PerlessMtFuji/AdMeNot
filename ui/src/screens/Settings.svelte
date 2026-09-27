@@ -36,6 +36,7 @@
   }
 </script>
 
+<div class="min-w-0 flex-1 overflow-auto p-4">
 <section class="card hard flex max-w-[680px] flex-col gap-4">
   <b class="text-[14px]">{t('settings.title')}</b>
 
@@ -88,3 +89,4 @@
 
   <p class="text-[11px] text-mut">{t('settings.service_soon')}</p>
 </section>
+</div>

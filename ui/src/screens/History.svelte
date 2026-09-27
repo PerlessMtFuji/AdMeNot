@@ -15,6 +15,7 @@
   }
 </script>
 
+<div class="min-w-0 flex-1 overflow-auto p-4">
 <section class="flex flex-col gap-2">
   <div class="flex items-center gap-3">
     <b class="text-[14px]">{t('history.title')}</b>
@@ -86,3 +87,4 @@
     {/each}
   {/if}
 </section>
+</div>

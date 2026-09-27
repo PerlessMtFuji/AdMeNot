@@ -1,12 +1,22 @@
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import { expect, test } from 'vitest';
 import App from './App.svelte';
 import { setupCtl } from './test-utils';
 
-test('shell shows the header, stages and the connect screen', async () => {
-  const { ctl } = await setupCtl('empty');
+test('shell: brand, five stages in the rail, history and settings toggle', async () => {
+  const { ctl, s } = await setupCtl('empty');
   render(App, { props: { ctl } });
-  expect(screen.getByText('DEMALWARE')).toBeTruthy();
-  expect(screen.getByText(/Czekam na telefon/)).toBeTruthy();
-  expect(screen.getByRole('list', { name: 'Etapy' }).children).toHaveLength(5);
+  expect(screen.getByText('DeMalware')).toBeTruthy();
+  const stages = screen.getByRole('list', { name: 'Etapy' });
+  expect(stages.children).toHaveLength(5);
+  expect(stages.children[0].getAttribute('aria-current')).toBe('step');
+  expect(stages.children[4].getAttribute('title')).toBe('Protokół — wkrótce');
+  await fireEvent.click(screen.getByRole('button', { name: 'Historia' }));
+  await tick();
+  expect(s.screen).toBe('history');
+  expect(screen.queryByRole('list', { name: 'Etapy' })).toBeNull();
+  expect(screen.getByRole('button', { name: 'Nowe zlecenie' })).toBeTruthy();
+  await fireEvent.click(screen.getByRole('button', { name: 'Nowe zlecenie' }));
+  expect(s.screen).toBe('main');
 });

@@ -7,6 +7,7 @@
   },
   "panel": { "apps": { "one": "{count} app", "few": "{count} apps", "many": "{count} apps", "other": "{count} apps" } },
   "app": { "new_order": "New order", "order": "Order", "client": "Client" },
+  "rail": { "label": "Menu", "new_order": "New order", "back_to_order": "Back to the order" },
   "header": { "simple": "Simple", "expert": "Expert", "history": "History", "settings": "Settings", "lang": "Language" },
   "stage": { "label": "Stages", "connect": "Connection", "read": "Reading", "analyze": "Analysis", "fix": "Repair", "report": "Report", "soon": "Report — coming soon" },
   "connect": {

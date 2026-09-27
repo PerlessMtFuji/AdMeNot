@@ -34,6 +34,7 @@
   }
 </script>
 
+<div class="min-w-0 flex-1 overflow-auto p-4">
 <section class="flex flex-col gap-2">
   <b class="text-[14px]">{t('exec.title', { order: s.order ?? '' })}</b>
   <AdminPrompt />
@@ -97,6 +98,7 @@
       <button class="btn btn-pri" onclick={() => ctl.newScan()}>{t('exec.new_scan')}</button>
     {/if}
   </span>
+</div>
 </div>
 
 <QuestionDialog />

@@ -20,6 +20,7 @@
     : t('summary.apk_done'));
 </script>
 
+<div class="min-w-0 flex-1 overflow-auto p-4">
 <section class="flex min-h-0 gap-3.5">
   <PhoneCard />
   <div class="flex min-w-0 flex-1 flex-col gap-2.5">
@@ -45,14 +46,13 @@
     {/if}
     <span class="ml-auto flex gap-2">
       <button class="btn" onclick={() => ctl.newScan()}>{t('actions.rescan')}</button>
-      {#if expert}
-        <button class="btn" aria-pressed={s.consoleOpen} onclick={() => (s.consoleOpen = !s.consoleOpen)}>{t('actions.console')}</button>
-      {:else}
+      {#if !expert}
         <button class="btn" onclick={() => ctl.setMode('expert')}>{t('actions.details')}</button>
       {/if}
       <button class="btn btn-pri" disabled={count === 0 || s.orderRunning} onclick={() => ctl.openPlan()}>{t('actions.fix', { count })}</button>
     </span>
   </div>
 {/if}
+</div>
 
 <PlanPreview />

@@ -7,6 +7,7 @@
   },
   "panel": { "apps": { "one": "{count} aplikacja", "few": "{count} aplikacje", "many": "{count} aplikacji", "other": "{count} aplikacji" } },
   "app": { "new_order": "Nowe zlecenie", "order": "Zlecenie", "client": "Klient" },
+  "rail": { "label": "Menu", "new_order": "Nowe zlecenie", "back_to_order": "Wróć do zlecenia" },
   "header": { "simple": "Prosty", "expert": "Ekspert", "history": "Historia", "settings": "Ustawienia", "lang": "Język" },
   "stage": { "label": "Etapy", "connect": "Połączenie", "read": "Odczyt", "analyze": "Analiza", "fix": "Naprawa", "report": "Protokół", "soon": "Protokół — wkrótce" },
   "connect": {
