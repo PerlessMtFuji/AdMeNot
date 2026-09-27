@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { USB_GROUPS, USB_STEPS } from '../usb';
 import en from './en.json';
-import { ERROR_KEYS, i18n, LEVEL_KEYS, MATCH_KEYS, SCAN_STAGES, t } from './index.svelte';
+import { ERROR_KEYS, i18n, LEVEL_KEYS, MATCH_KEYS, PLURAL_KEYS, SCAN_STAGES, t, tp } from './index.svelte';
 import pl from './pl.json';
 
 function flat(obj: Record<string, unknown>, prefix = ''): string[] {
@@ -40,6 +40,8 @@ describe('dictionaries', () => {
       ...MATCH_KEYS.map((k) => `match.${k}`),
       ...USB_GROUPS.map((g) => `usb.group.${g}`),
       ...USB_GROUPS.flatMap((g) => Array.from({ length: USB_STEPS[g] }, (_, i) => `usb.${g}.s${i + 1}`)),
+      ...['ads', 'notif', 'removal', 'data', 'disguise', 'background', 'origin', 'combo']
+        .map((c) => `category.${c}`),
     ];
     expect(wanted.filter((k) => !keys.has(k))).toEqual([]);
   });
@@ -50,6 +52,24 @@ describe('dictionaries', () => {
     i18n.lang = 'en';
     expect(t('actions.fix', { count: 2 })).toBe('Fix selected (2)');
     expect(t('no.such.key')).toBe('no.such.key');
+    i18n.lang = 'pl';
+  });
+
+  test('plural families have every form', () => {
+    const keys = new Set(flat(pl));
+    const wanted = PLURAL_KEYS.flatMap((k) => ['one', 'few', 'many', 'other'].map((f) => `${k}.${f}`));
+    expect(wanted.filter((k) => !keys.has(k))).toEqual([]);
+  });
+
+  test('tp() picks the Polish and English plural form', () => {
+    i18n.lang = 'pl';
+    expect(tp('results.title', 1)).toBe('1 aplikacja wymaga uwagi');
+    expect(tp('results.title', 3)).toBe('3 aplikacje wymagają uwagi');
+    expect(tp('results.title', 5)).toBe('5 aplikacji wymaga uwagi');
+    expect(tp('results.title', 22)).toBe('22 aplikacje wymagają uwagi');
+    i18n.lang = 'en';
+    expect(tp('results.title', 1)).toBe('1 app needs attention');
+    expect(tp('results.title', 3)).toBe('3 apps need attention');
     i18n.lang = 'pl';
   });
 });

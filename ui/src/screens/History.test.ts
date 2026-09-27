@@ -28,7 +28,7 @@ test('history lists the order, restores one action and undoes the whole order', 
 test('interrupted orders can be finished from history', async () => {
   const { ctl, s, bridge } = await setupCtl('empty');
   render(App, { props: { ctl } });
-  s.history = { serial: 'S1', serials: ['S1', 'S2'], orders: [{
+  s.history = { serial: 'S1', serials: ['S1', 'S2'], devices: [], orders: [{
     id: 1, number: 'ZS/2026/0926/05', created_at: '2026-09-26T14:30', status: 'running',
     status_label: 'w toku', client: null, model: 'SM-A145R', interrupted: true,
     actions: [{ id: 3, package: 'p', level: 'disable', level_label: 'WYŁĄCZ', kind: 'enabled',

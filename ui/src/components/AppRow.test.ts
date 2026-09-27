@@ -9,7 +9,7 @@ const evil: AppView = {
   verdict: 'malicious', verdict_label: 'Szkodliwa', trusted: false, incomplete: false,
   is_system: false, from_play: false, installer: 'com.android.chrome', is_admin: true,
   default_level: 'remove', problems: ['Pokazuje <b>reklamy</b>.'], findings: [], apk_error: null,
-  ad_sdks: null,
+  ad_sdks: null, symptoms: [], source: { label: '', days: null },
 };
 
 test('labels from the phone are shown literally, never as HTML', async () => {

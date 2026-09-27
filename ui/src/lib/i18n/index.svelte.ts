@@ -12,6 +12,9 @@ export const ERROR_KEYS = ['adb_missing', 'unauthorized', 'offline', 'disconnect
 export const SCAN_STAGES = ['identify', 'packages', 'collectors', 'score', 'apk'] as const;
 export const LEVEL_KEYS = ['silence', 'disable', 'remove', 'review', 'none'] as const;
 export const MATCH_KEYS = ['manual', 'exact', 'approximate', 'none'] as const;
+// Rodziny kluczy z formami liczby mnogiej (one/few/many/other w obu słownikach).
+export const PLURAL_KEYS = ['results.title', 'results.safe', 'expert.days', 'panel.apps',
+  'exec.apps', 'exec.steps', 'history.did.remove', 'history.did.disable', 'history.did.silence'] as const;
 
 class I18n {
   lang = $state<Lang>('pl');
@@ -32,4 +35,9 @@ export function t(key: string, params: Record<string, string | number> = {}): st
   const text = lookup(dictionaries[i18n.lang], key) ?? lookup(dictionaries.pl, key) ?? key;
   return text.replace(/\{(\w+)\}/g, (all, name: string) =>
     name in params ? String(params[name]) : all);
+}
+
+export function tp(key: string, count: number, params: Record<string, string | number> = {}): string {
+  const form = new Intl.PluralRules(i18n.lang).select(count);
+  return t(`${key}.${form}`, { count, ...params });
 }

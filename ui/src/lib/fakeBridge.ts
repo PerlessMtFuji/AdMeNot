@@ -44,7 +44,7 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
   }
   const target = new EventTarget();
   const calls: FakeBridge['calls'] = [];
-  let settings: Settings = { lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null };
+  let settings: Settings = { lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system' };
   let lastScan: ScanView | null = null;
 
   const dispatch = (event: string, detail: unknown) => {
@@ -76,7 +76,7 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
       case 'list_devices':
         return { devices: [], error: null };
       case 'history':
-        return { serial: null, serials: [], orders: [] };
+        return { serial: null, serials: [], orders: [], devices: [] };
       case 'check_adb':
         return { ok: true, version: 'Android Debug Bridge version 1.0.41', message: '' };
       case 'pick_folder':

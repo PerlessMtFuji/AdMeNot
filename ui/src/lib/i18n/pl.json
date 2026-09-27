@@ -1,5 +1,11 @@
 {
   "common": { "cancel": "Anuluj", "close": "Zamknij", "back": "Wróć", "save": "Zapisz", "saved": "Zapisano" },
+  "category": { "ads": "Reklamy", "notif": "Spam powiadomień", "removal": "Utrudnia usunięcie", "data": "Dostęp do danych", "disguise": "Podszywa się", "background": "Działa w tle", "origin": "Pochodzenie", "combo": "Połączenie sygnałów" },
+  "results": {
+    "title": { "one": "{count} aplikacja wymaga uwagi", "few": "{count} aplikacje wymagają uwagi", "many": "{count} aplikacji wymaga uwagi", "other": "{count} aplikacji wymaga uwagi" },
+    "safe": { "one": "{count} aplikacja bez uwag", "few": "{count} aplikacje bez uwag", "many": "{count} aplikacji bez uwag", "other": "{count} aplikacji bez uwag" }
+  },
+  "panel": { "apps": { "one": "{count} aplikacja", "few": "{count} aplikacje", "many": "{count} aplikacji", "other": "{count} aplikacji" } },
   "app": { "new_order": "Nowe zlecenie", "order": "Zlecenie", "client": "Klient" },
   "header": { "simple": "Prosty", "expert": "Ekspert", "history": "Historia", "settings": "Ustawienia", "lang": "Język" },
   "stage": { "label": "Etapy", "connect": "Połączenie", "read": "Odczyt", "analyze": "Analiza", "fix": "Naprawa", "report": "Protokół", "soon": "Protokół — wkrótce" },
@@ -89,14 +95,17 @@
     "col_app": "Aplikacja / pakiet", "col_score": "Wynik", "col_signals": "Sygnały", "col_source": "Źródło", "col_action": "Akcja",
     "search": "Szukaj aplikacji lub pakietu", "show_all": "Pokaż wszystkie aplikacje",
     "source_play": "Play", "source_system": "systemowa", "source_sideload": "spoza sklepu",
-    "apk_error": "APK: błąd", "collector_failed": "Kolektor {name}: {error}", "ad_sdks": "SDK reklamowe: {list}"
+    "apk_error": "APK: błąd", "collector_failed": "Kolektor {name}: {error}", "ad_sdks": "SDK reklamowe: {list}",
+    "days": { "one": "{count} dzień temu", "few": "{count} dni temu", "many": "{count} dni temu", "other": "{count} dnia temu" }
   },
   "actions": { "details": "Pokaż szczegóły", "console": "Konsola ADB", "fix": "Napraw zaznaczone ({count})", "rescan": "Skanuj ponownie" },
   "plan": { "title": "Plan naprawy", "unlock": "Odblokuj", "undo_hint": "Każdą zmianę można cofnąć w Historii.", "run": "Wykonaj ({count})", "nothing": "Nic do wykonania — wszystkie aplikacje są zablokowane." },
   "exec": {
     "title": "Naprawa · {order}", "waiting": "Czeka w kolejce", "stop": "Wstrzymaj", "stopping": "Wstrzymuję po bieżącym kroku…",
     "verifying": "Sprawdzam, czy zmiany się utrzymały…", "stopped": "Zlecenie wstrzymane. Możesz je dokończyć albo cofnąć.",
-    "done": "Zlecenie {order}: {status}", "resume": "Dokończ", "undo_all": "Cofnij całe zlecenie", "new_scan": "Nowe skanowanie"
+    "done": "Zlecenie {order}: {status}", "resume": "Dokończ", "undo_all": "Cofnij całe zlecenie", "new_scan": "Nowe skanowanie",
+    "apps": { "one": "{count} aplikacja", "few": "{count} aplikacje", "many": "{count} aplikacji", "other": "{count} aplikacji" },
+    "steps": { "one": "{count} krok", "few": "{count} kroki", "many": "{count} kroków", "other": "{count} kroku" }
   },
   "result": { "ok": "Gotowe", "still_active": "Nadal aktywna — zmiana się nie utrzymała ({kinds})", "failed": "Błąd", "stopped": "Wstrzymana" },
   "admin": {
@@ -112,7 +121,12 @@
   "history": {
     "title": "Historia zleceń", "phone": "Telefon", "empty": "Brak zleceń dla tego telefonu.", "none": "Brak zapisanych zleceń.",
     "restore": "Przywróć", "undo_all": "Cofnij całe zlecenie", "resume": "Dokończ", "interrupted": "Przerwane",
-    "working": "Pracuję…", "admin_note": "Cofnięcie nie przywraca uprawnień administratora urządzenia.", "undo_errors": "Nie wszystko udało się cofnąć:"
+    "working": "Pracuję…", "admin_note": "Cofnięcie nie przywraca uprawnień administratora urządzenia.", "undo_errors": "Nie wszystko udało się cofnąć:",
+    "did": {
+      "remove": { "one": "usunięto {count} aplikację", "few": "usunięto {count} aplikacje", "many": "usunięto {count} aplikacji", "other": "usunięto {count} aplikacji" },
+      "disable": { "one": "wyłączono {count} aplikację", "few": "wyłączono {count} aplikacje", "many": "wyłączono {count} aplikacji", "other": "wyłączono {count} aplikacji" },
+      "silence": { "one": "wyciszono {count} aplikację", "few": "wyciszono {count} aplikacje", "many": "wyciszono {count} aplikacji", "other": "wyciszono {count} aplikacji" }
+    }
   },
   "settings": {
     "title": "Ustawienia", "lang": "Język", "mode": "Tryb domyślny", "mode_simple": "Prosty", "mode_expert": "Ekspercki",

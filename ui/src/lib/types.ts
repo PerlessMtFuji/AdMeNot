@@ -4,12 +4,22 @@ export type Lang = 'pl' | 'en';
 export type Mode = 'simple' | 'expert';
 export type Verdict = 'safe' | 'review' | 'suspicious' | 'malicious';
 export type Level = 'silence' | 'disable' | 'remove';
+export type Theme = 'system' | 'light' | 'dark';
+export type Category = 'ads' | 'notif' | 'removal' | 'data' | 'disguise' | 'background' | 'origin';
+export type Severity = 'bad' | 'warn' | 'neutral';
 
 export interface Settings {
   lang: Lang;
   mode: Mode;
   adb_path: string | null;
   backups_dir: string | null;
+  theme: Theme;
+}
+
+export interface Symptom {
+  category: Category;
+  severity: Severity;
+  text: string;
 }
 
 export interface DeviceEntry {
@@ -45,6 +55,8 @@ export interface Finding {
   text: string;
   text_expert: string;
   evidence: Record<string, unknown>;
+  category: Category | 'combo';
+  label: string;
 }
 
 export interface AppView {
@@ -64,6 +76,8 @@ export interface AppView {
   findings: Finding[];
   apk_error: string | null;
   ad_sdks: string[] | null;
+  symptoms: Symptom[];
+  source: { label: string; days: number | null };
 }
 
 export interface ScanCounts {
@@ -160,6 +174,7 @@ export interface HistoryView {
   serial: string | null;
   serials: string[];
   orders: HistoryOrder[];
+  devices: { serial: string; model: string | null }[];
 }
 
 export interface ConsoleEntry {

@@ -2,7 +2,8 @@ import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
 import { changedVerdicts, defaultSelection, mergeSelection, upsertStep } from './logic';
 import type { AppState } from './state.svelte';
-import type { ApiError, AppView, DevicesPayload, Lang, Level, Mode, Settings } from './types';
+import { applyTheme } from './theme';
+import type { ApiError, AppView, DevicesPayload, Lang, Level, Mode, Settings, Theme } from './types';
 
 const CONSOLE_LIMIT = 500;
 
@@ -46,6 +47,7 @@ export class Controller {
     this.state.settings = settings;
     i18n.lang = settings.lang;
     if (typeof document !== 'undefined') document.documentElement.lang = settings.lang;
+    if (typeof document !== 'undefined') applyTheme(settings.theme ?? 'system');
   }
 
   private onDevices(d: DevicesPayload): void {
@@ -296,6 +298,10 @@ export class Controller {
 
   setLang(lang: Lang): Promise<Settings | null> {
     return this.saveSettings({ lang });
+  }
+
+  setTheme(theme: Theme): Promise<Settings | null> {
+    return this.saveSettings({ theme });
   }
 
   runConsole(command: string) {

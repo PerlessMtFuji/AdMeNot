@@ -1,5 +1,11 @@
 {
   "common": { "cancel": "Cancel", "close": "Close", "back": "Back", "save": "Save", "saved": "Saved" },
+  "category": { "ads": "Ads", "notif": "Notification spam", "removal": "Hard to remove", "data": "Access to data", "disguise": "Impersonation", "background": "Runs in background", "origin": "Origin", "combo": "Signal combination" },
+  "results": {
+    "title": { "one": "{count} app needs attention", "few": "{count} apps need attention", "many": "{count} apps need attention", "other": "{count} apps need attention" },
+    "safe": { "one": "{count} app without issues", "few": "{count} apps without issues", "many": "{count} apps without issues", "other": "{count} apps without issues" }
+  },
+  "panel": { "apps": { "one": "{count} app", "few": "{count} apps", "many": "{count} apps", "other": "{count} apps" } },
   "app": { "new_order": "New order", "order": "Order", "client": "Client" },
   "header": { "simple": "Simple", "expert": "Expert", "history": "History", "settings": "Settings", "lang": "Language" },
   "stage": { "label": "Stages", "connect": "Connection", "read": "Reading", "analyze": "Analysis", "fix": "Repair", "report": "Report", "soon": "Report — coming soon" },
@@ -89,14 +95,17 @@
     "col_app": "App / package", "col_score": "Score", "col_signals": "Signals", "col_source": "Source", "col_action": "Action",
     "search": "Search app or package", "show_all": "Show all apps",
     "source_play": "Play", "source_system": "system", "source_sideload": "sideloaded",
-    "apk_error": "APK: error", "collector_failed": "Collector {name}: {error}", "ad_sdks": "Ad SDKs: {list}"
+    "apk_error": "APK: error", "collector_failed": "Collector {name}: {error}", "ad_sdks": "Ad SDKs: {list}",
+    "days": { "one": "{count} day ago", "few": "{count} days ago", "many": "{count} days ago", "other": "{count} days ago" }
   },
   "actions": { "details": "Show details", "console": "ADB console", "fix": "Fix selected ({count})", "rescan": "Scan again" },
   "plan": { "title": "Repair plan", "unlock": "Unlock", "undo_hint": "Every change can be undone in History.", "run": "Run ({count})", "nothing": "Nothing to run — all apps are blocked." },
   "exec": {
     "title": "Repair · {order}", "waiting": "Queued", "stop": "Pause", "stopping": "Pausing after the current step…",
     "verifying": "Checking that the changes hold…", "stopped": "Order paused. You can finish or undo it.",
-    "done": "Order {order}: {status}", "resume": "Finish", "undo_all": "Undo the whole order", "new_scan": "New scan"
+    "done": "Order {order}: {status}", "resume": "Finish", "undo_all": "Undo the whole order", "new_scan": "New scan",
+    "apps": { "one": "{count} app", "few": "{count} apps", "many": "{count} apps", "other": "{count} apps" },
+    "steps": { "one": "{count} step", "few": "{count} steps", "many": "{count} steps", "other": "{count} steps" }
   },
   "result": { "ok": "Done", "still_active": "Still active — the change did not hold ({kinds})", "failed": "Error", "stopped": "Paused" },
   "admin": {
@@ -112,7 +121,12 @@
   "history": {
     "title": "Order history", "phone": "Phone", "empty": "No orders for this phone.", "none": "No saved orders.",
     "restore": "Restore", "undo_all": "Undo the whole order", "resume": "Finish", "interrupted": "Interrupted",
-    "working": "Working…", "admin_note": "Undo does not restore device admin rights.", "undo_errors": "Not everything could be undone:"
+    "working": "Working…", "admin_note": "Undo does not restore device admin rights.", "undo_errors": "Not everything could be undone:",
+    "did": {
+      "remove": { "one": "removed {count} app", "few": "removed {count} apps", "many": "removed {count} apps", "other": "removed {count} apps" },
+      "disable": { "one": "disabled {count} app", "few": "disabled {count} apps", "many": "disabled {count} apps", "other": "disabled {count} apps" },
+      "silence": { "one": "silenced {count} app", "few": "silenced {count} apps", "many": "silenced {count} apps", "other": "silenced {count} apps" }
+    }
   },
   "settings": {
     "title": "Settings", "lang": "Language", "mode": "Default mode", "mode_simple": "Simple", "mode_expert": "Expert",
