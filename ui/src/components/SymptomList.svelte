@@ -8,10 +8,10 @@
   const COLOR = { bad: 'text-bad', warn: 'text-warn', neutral: 'text-neutral' };
 </script>
 
-<ul class="flex flex-col gap-1.5 pr-4 pb-3.5 pl-[76px]">
+<ul class="mr-5 mb-4 ml-[92px] flex flex-col gap-2 rounded-xl bg-surface-2/70 px-4 py-3 shadow-[var(--shadow-well)]">
   {#each symptoms as sy (sy.category)}
-    <li class="grid grid-cols-[16px_150px_1fr] items-start gap-2">
-      <span class="mt-px {COLOR[sy.severity]}"><Icon name={CATEGORY_ICON[sy.category]} size={15} /></span>
+    <li class="grid grid-cols-[18px_170px_1fr] items-start gap-2.5">
+      <span class="mt-px {COLOR[sy.severity]}"><Icon name={CATEGORY_ICON[sy.category]} size={17} /></span>
       <b class={COLOR[sy.severity]}>{t(categoryKey(sy.category))}</b>
       <span class="text-mut">{sy.text}</span>
     </li>

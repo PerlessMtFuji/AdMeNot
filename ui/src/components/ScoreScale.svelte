@@ -12,11 +12,11 @@
 <div role="meter" aria-label={t('evidence.score')} aria-valuemin="0" aria-valuemax="100" aria-valuenow={score}>
   <div class="relative mt-5 flex h-2 overflow-visible rounded">
     {#each SCORE_ZONES as z (z.verdict)}<span class="flex-1 first:rounded-l last:rounded-r {ZONE[z.verdict]}"></span>{/each}
-    <span class="absolute -top-[19px] -translate-x-1/2 text-[11px] font-extrabold {MARK[verdict]}" style="left: {left}%">
+    <span class="absolute -top-[21px] -translate-x-1/2 text-xs font-extrabold {MARK[verdict]}" style="left: {left}%">
       {score}<i class="absolute top-[15px] left-1/2 block h-3.5 w-0.5 -translate-x-1/2 rounded bg-current"></i>
     </span>
   </div>
-  <div class="mt-1 flex text-[9.5px] text-soft">
+  <div class="mt-1.5 flex text-2xs text-soft">
     {#each SCORE_ZONES as z (z.verdict)}<span class="flex-1 text-center">{t(`evidence.zone.${z.verdict}`)}</span>{/each}
   </div>
 </div>

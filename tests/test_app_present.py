@@ -7,6 +7,7 @@ from fakephone import make_cli_phone
 
 from demalware.app.present import (
     app_name,
+    app_view,
     device_card,
     history_view,
     image_uri,
@@ -156,3 +157,11 @@ def test_plan_step_result_and_history_views(tmp_path):
         assert hv["devices"] == [{"serial": phone.serial, "model": o["model"]}]
         empty = history_view(journal, None, [], "pl")
         assert empty["orders"] == [] and empty["devices"] == []
+
+
+def test_app_view_passes_icon():
+    from demalware.engine.scoring import AppResult
+
+    facts = AppFacts("com.x", icon="data:image/png;base64,iVBORw0KGgo=")
+    view = app_view(AppResult(facts, [], 0, "safe", False, False), "pl")
+    assert view["icon"] == "data:image/png;base64,iVBORw0KGgo="

@@ -19,7 +19,7 @@
 </script>
 
 {#if s.admin || s.question}
-  <div role="status" in:enter class="flex items-center gap-4 rounded-2xl bg-surface px-4 py-3.5 shadow-pop">
+  <div role="status" in:enter class="flex items-center gap-5 rounded-[20px] bg-surface px-5 py-4 shadow-pop">
     <div class="relative h-[132px] w-[70px] flex-none rounded-[14px] bg-[linear-gradient(145deg,#374151,#111827)] p-1" aria-hidden="true">
       <div class="flex h-full flex-col gap-1 rounded-[11px] bg-white px-1.5 py-1.5 text-[6.5px] text-[#374151]">
         <b class="text-[7px]">{t('admin.phone_title')}</b>
@@ -31,16 +31,16 @@
     </div>
     <div class="min-w-0 flex-1">
       {#if s.question}
-        <b class="text-[14px]">{t('question.admin.title')}</b>
+        <b class="text-lg">{t('question.admin.title')}</b>
         <p class="mt-1 text-mut">{t('question.admin.text', { name: s.question.name })}</p>
         <div class="mt-2.5 flex gap-2">
           <Button size="sm" onclick={() => ctl.answer('skip')}>{t('question.admin.skip')}</Button>
           <Button size="sm" variant="primary" onclick={() => ctl.answer('retry')}>{t('question.admin.retry')}</Button>
         </div>
       {:else if s.admin}
-        <b class="text-[14px]">{t('admin.title')}</b>
+        <b class="text-lg">{t('admin.title')}</b>
         <p class="mt-1 text-mut">{t('admin.text', { name: s.admin.name })}</p>
-        <p class="mono mt-1 text-[11px] text-soft">{t('admin.left', { time })}</p>
+        <p class="mono mt-1 text-xs text-soft">{t('admin.left', { time })}</p>
       {/if}
     </div>
     {#if s.admin && !s.question}
@@ -51,7 +51,7 @@
             stroke-dasharray={RING} stroke-dashoffset={RING * (1 - left / Math.max(1, s.admin.timeout))}
             style="transition: stroke-dashoffset 1s linear" />
         </svg>
-        <span class="absolute inset-0 grid place-items-center text-[12px] font-extrabold tabular-nums">{left}</span>
+        <span class="absolute inset-0 grid place-items-center text-sm font-extrabold tabular-nums">{left}</span>
       </div>
     {/if}
   </div>

@@ -37,29 +37,29 @@
     { value: 'expert' as Mode, label: t('header.expert') }]);
 </script>
 
-<div class="flex min-h-0 flex-1">
+<div class="flex min-h-0 min-w-0 flex-1">
   <main inert={s.plan !== null}
-    class="flex min-w-0 flex-1 flex-col gap-3 overflow-auto px-6 py-5 transition-opacity duration-300 {s.plan ? 'opacity-50' : ''}">
-    <header class="flex items-end gap-3">
-      {#if s.device}<PhoneThumb compact image={s.device.image} name={s.device.name} />{/if}
-      <div class="min-w-0 flex-1">
-        <div class="truncate text-[11.5px] font-semibold text-soft">
-          {[s.client.trim(), s.device?.name].filter(Boolean).join(' · ')}
-        </div>
-        {#if flagged.length > 0}
-          <h1 class="text-[19px] font-extrabold" aria-label={tp('results.title', flagged.length)}>
-            {titleParts[0]}<CountUp value={flagged.length} />{titleParts[1]}
-          </h1>
-        {:else}
-          <h1 class="text-[19px] font-extrabold">{t('results.clean_title')}</h1>
-        {/if}
+    class="flex min-w-0 flex-1 flex-col gap-4 scroll-fade overflow-auto px-7 py-7 transition-opacity duration-300 {s.plan ? 'opacity-50' : ''}">
+    <header class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 pb-1">
+      {#if s.device}<div class="row-span-2"><PhoneThumb compact image={s.device.image} name={s.device.name} /></div>{/if}
+      <div class="truncate text-sm font-semibold text-soft {s.device ? '' : 'col-span-2'}">
+        {[s.client.trim(), s.device?.name].filter(Boolean).join(' · ')}
       </div>
-      <Segmented label={t('results.mode')} value={s.settings.mode} options={modes} onchange={(m) => ctl.setMode(m)} />
-      <Button onclick={() => ctl.newScan()}><Icon name="rotate-ccw" />{t('actions.rescan')}</Button>
+      <div class="flex items-center gap-2">
+        <Segmented label={t('results.mode')} value={s.settings.mode} options={modes} onchange={(m) => ctl.setMode(m)} />
+        <Button onclick={() => ctl.newScan()}><Icon name="rotate-ccw" />{t('actions.rescan')}</Button>
+      </div>
+      {#if flagged.length > 0}
+        <h1 class="col-span-2 text-2xl font-extrabold" aria-label={tp('results.title', flagged.length)}>
+          {titleParts[0]}<CountUp value={flagged.length} />{titleParts[1]}
+        </h1>
+      {:else}
+        <h1 class="col-span-2 text-2xl font-extrabold">{t('results.clean_title')}</h1>
+      {/if}
     </header>
 
     {#if s.apk.running}
-      <div class="flex items-center gap-3 text-[11.5px] text-mut">
+      <div class="flex items-center gap-3 text-sm text-mut">
         <span class="whitespace-nowrap">{t('summary.apk_running', { done: s.apk.done, total: s.apk.total })}</span>
         <div class="w-40"><Progress value={s.apk.total ? s.apk.done / s.apk.total : 0} label={t('scan.stage.apk')} /></div>
       </div>
@@ -71,13 +71,13 @@
       <ExpertTable {rows} {focused} />
     {:else if flagged.length === 0}
       <div class="grid place-items-center gap-2 py-10 text-center" in:enter>
-        <span class="grid h-16 w-16 place-items-center rounded-full bg-ok text-white shadow-[0_0_0_10px_var(--color-ok-soft)] [animation:pop-in_.6s]">
-          <Icon name="check" size={32} strokeWidth={3} />
+        <span class="grid h-20 w-20 place-items-center rounded-full bg-ok text-white shadow-[0_0_0_12px_var(--color-ok-soft),0_0_40px_-4px_var(--color-ok)] [animation:pop-in_.6s]">
+          <Icon name="check" size={38} strokeWidth={3} />
         </span>
         <p class="mt-3 text-mut">{t('results.clean_sub', { count: s.scan?.counts.total ?? 0 })}</p>
       </div>
     {:else}
-      <div class="flex flex-col gap-2.5">
+      <div class="flex flex-col gap-3.5">
         {#each flagged as app, i (app.package)}
           <div animate:flip={{ duration: ms(DUR.flip) }} in:enter={{ delay: stagger(i) }}>
             <AppCard {app} level={s.selection[app.package] ?? null} flash={s.apk.changed.includes(app.package)}
@@ -87,17 +87,17 @@
       </div>
     {/if}
     {#if showSafe && !expert}
-      <section class="rounded-2xl bg-surface p-4 shadow-card" in:enter>
+      <section class="rounded-2xl card p-4" in:enter>
         <span class="lbl">{t('results.safe_list')}</span>
-        <ul aria-label={t('results.safe_list')} class="mt-2 grid grid-cols-2 gap-x-6 gap-y-1">
+        <ul aria-label={t('results.safe_list')} class="mt-3 grid grid-cols-2 gap-x-6 gap-y-1.5">
           {#each safeApps as a (a.package)}
-            <li class="flex min-w-0 gap-2"><span class="truncate">{a.name}</span><span class="mono truncate text-[10.5px] text-soft">{a.package}</span></li>
+            <li class="flex min-w-0 gap-2"><span class="truncate">{a.name}</span><span class="mono truncate text-2xs text-soft">{a.package}</span></li>
           {/each}
         </ul>
       </section>
     {/if}
   </main>
-  <SidePanel width={expert ? 340 : undefined} label={expert && !s.plan ? t('evidence.title') : t('panel.plan')}>
+  <SidePanel width={expert ? 344 : undefined} label={expert && !s.plan ? t('evidence.title') : t('panel.plan')}>
     <div class="grid flex-1 grid-cols-1 grid-rows-1">
       {#if s.plan}
         <div class="col-start-1 row-start-1 flex min-h-0 flex-col gap-3"

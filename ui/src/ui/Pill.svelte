@@ -8,6 +8,6 @@
   };
 </script>
 
-<span class="inline-flex items-center rounded-full px-2 py-0.5 text-[9.5px] font-extrabold tracking-[.05em] whitespace-nowrap uppercase {TONE[tone]}">
+<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold whitespace-nowrap ring-1 ring-current/15 ring-inset {TONE[tone]}">
   {@render children()}
 </span>

@@ -7,7 +7,7 @@
     actions?: Snippet };
   let { tone, icon, title, children, actions }: Props = $props();
   const BOX = {
-    warn: 'border-warn-strong/40 bg-warn-soft', info: 'border-line bg-surface',
+    warn: 'border-warn-strong/40 bg-warn-soft', info: 'border-line card',
     bad: 'border-bad/30 bg-bad-soft', ok: 'border-ok/30 bg-ok-soft',
   };
   const DOT = {
@@ -18,8 +18,8 @@
 </script>
 
 <div role={tone === 'bad' ? 'alert' : 'status'} in:enter
-  class="flex items-center gap-3 rounded-2xl border px-4 py-3 {BOX[tone]}">
-  <span class="grid h-8 w-8 flex-none place-items-center rounded-full {DOT[tone]}"><Icon name={icon} size={16} /></span>
+  class="flex items-center gap-3.5 rounded-2xl border px-4 py-3.5 {BOX[tone]}">
+  <span class="grid h-9 w-9 flex-none place-items-center rounded-full {DOT[tone]}"><Icon name={icon} size={18} /></span>
   <div class="min-w-0 flex-1">
     {#if title}<b class="block text-ink">{title}</b>{/if}
     {#if children}<div class={TEXT[tone]}>{@render children()}</div>{/if}

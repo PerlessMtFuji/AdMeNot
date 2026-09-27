@@ -24,7 +24,7 @@
     { value: 'simple' as Mode, label: t('settings.mode_simple') },
     { value: 'expert' as Mode, label: t('settings.mode_expert') },
   ]);
-  const INPUT = 'mono min-w-0 flex-1 rounded-[10px] border border-line bg-surface px-3 py-2';
+  const INPUT = 'field mono min-w-0 flex-1 rounded-xl px-3.5 py-2.5';
 
   async function checkAdb() {
     const r = await ctl.checkAdb(adbPath.trim() || null);
@@ -45,11 +45,11 @@
   }
 </script>
 
-<main class="min-w-0 flex-1 overflow-auto px-6 py-5">
-  <div class="mx-auto flex max-w-[720px] flex-col gap-3">
-    <h1 class="text-[19px] font-extrabold">{t('settings.title')}</h1>
+<main class="min-w-0 flex-1 scroll-fade overflow-auto px-7 py-7">
+  <div class="mx-auto flex max-w-[760px] flex-col gap-4">
+    <h1 class="text-2xl font-extrabold">{t('settings.title')}</h1>
 
-    <Card><div class="flex flex-col gap-4 p-5">
+    <Card><div class="flex flex-col gap-5 p-6">
       <span class="lbl">{t('settings.appearance')}</span>
       <div class="flex items-center justify-between gap-4"><span>{t('settings.theme')}</span>
         <Segmented label={t('settings.theme')} value={s.settings.theme} options={themes} onchange={(v) => ctl.setTheme(v)} /></div>
@@ -59,7 +59,7 @@
         <Segmented label={t('settings.mode')} value={s.settings.mode} options={modes} onchange={(v) => ctl.setMode(v)} /></div>
     </div></Card>
 
-    <Card><div class="flex flex-col gap-4 p-5">
+    <Card><div class="flex flex-col gap-5 p-6">
       <span class="lbl">{t('settings.paths')}</span>
       <div class="flex flex-col gap-1">
         <label class="font-semibold" for="adb-path">{t('settings.adb')}</label>
@@ -67,7 +67,7 @@
           <input id="adb-path" class={INPUT} bind:value={adbPath} placeholder="C:\platform-tools\adb.exe" />
           <Button onclick={checkAdb}>{t('settings.check')}</Button>
         </div>
-        <span class="text-[11px] text-mut">{t('settings.adb_hint')}</span>
+        <span class="text-xs text-mut">{t('settings.adb_hint')}</span>
         {#if check}<span class="flex items-center gap-1.5 {check.ok ? 'text-ok' : 'text-bad'}"><Icon name={check.ok ? 'check' : 'x'} />{check.text}</span>{/if}
       </div>
       <div class="flex flex-col gap-1">
@@ -76,7 +76,7 @@
           <input id="backups-dir" class={INPUT} bind:value={backups} />
           <Button onclick={choose}>{t('settings.choose')}</Button>
         </div>
-        <span class="text-[11px] text-mut">{t('settings.backups_hint')}</span>
+        <span class="text-xs text-mut">{t('settings.backups_hint')}</span>
       </div>
       <div class="flex items-center gap-3">
         <Button variant="primary" onclick={savePaths}>{t('common.save')}</Button>
@@ -84,6 +84,6 @@
       </div>
     </div></Card>
 
-    <p class="text-[11px] text-mut">{t('settings.service_soon')}</p>
+    <p class="text-xs text-mut">{t('settings.service_soon')}</p>
   </div>
 </main>

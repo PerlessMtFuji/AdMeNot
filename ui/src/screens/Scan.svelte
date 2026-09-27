@@ -16,23 +16,23 @@
     : modelName(entry?.model ?? null));
 </script>
 
-<div class="flex min-h-0 flex-1">
-  <main class="flex min-w-0 flex-1 flex-col gap-4 overflow-auto px-6 py-5">
+<div class="flex min-h-0 min-w-0 flex-1">
+  <main class="flex min-w-0 flex-1 flex-col gap-4 scroll-fade overflow-auto px-7 py-7">
     <div>
-      <div class="text-[11.5px] font-semibold text-soft">{s.client.trim()}</div>
-      <h1 class="text-[19px] font-extrabold">{t('scan.title')}</h1>
+      <div class="text-sm font-semibold text-soft">{s.client.trim()}</div>
+      <h1 class="text-2xl font-extrabold">{t('scan.title')}</h1>
       <p class="text-mut">{t('scan.sub')}</p>
     </div>
-    <div class="flex items-start gap-5">
-      <div class="relative grid h-[260px] w-[200px] flex-none place-items-center overflow-hidden rounded-2xl bg-[linear-gradient(160deg,var(--color-accent-soft),var(--color-surface))] shadow-card">
+    <div class="flex items-start gap-7">
+      <div class="relative grid h-[300px] w-[230px] flex-none place-items-center overflow-hidden rounded-[20px] bg-[linear-gradient(160deg,var(--color-accent-soft),var(--color-surface))] shadow-[var(--shadow-card),0_0_40px_-12px_var(--glow-accent)]">
         {#if s.device}
-          <img class="max-h-[220px] drop-shadow-[0_8px_10px_rgba(17,24,39,.25)]" src={s.device.image} alt={s.device.name} />
+          <img class="max-h-[250px] drop-shadow-[0_8px_10px_rgba(17,24,39,.25)]" src={s.device.image} alt={s.device.name} />
         {:else}
           <span class="h-[160px] w-[80px] rounded-[14px] bg-[#1f2937]" aria-hidden="true"></span>
         {/if}
         <div class="scanline"></div>
       </div>
-      <div class="w-[320px]">
+      <div class="w-[360px]">
         <ConnectChecklist label={t('scan.steps')}
           items={SCAN_STEPS.map((k, i) => ({ label: t(`scan.stage.${k}`), status: checks[i] }))} />
       </div>

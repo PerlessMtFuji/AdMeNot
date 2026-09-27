@@ -6,8 +6,9 @@
   import { initial, LEVEL_TONE, moveFocus } from '../lib/logic';
   import type { AppView, Level } from '../lib/types';
   import CountUp from '../ui/CountUp.svelte';
-  import Icon from '../ui/Icon.svelte';
+  import Icon, { type IconName } from '../ui/Icon.svelte';
   import Segmented from '../ui/Segmented.svelte';
+  import AppIcon from './AppIcon.svelte';
 
   let { rows, focused }: { rows: AppView[]; focused: string | null } = $props();
   const ctl = getContext<Controller>('ctl');
@@ -24,6 +25,20 @@
   const BAR = { malicious: 'bg-bad', suspicious: 'bg-warn-strong', review: 'bg-soft', safe: 'bg-ok' };
   const CHIP = { bad: 'bg-bad-soft text-bad', warn: 'bg-warn-soft text-warn', neutral: 'bg-neutral-soft text-neutral' };
   const LEVEL_TEXT = { accent: 'text-accent', warn: 'text-warn', bad: 'text-bad' };
+  type TileTone = 'bad' | 'warn' | 'accent' | 'ok';
+  // Ikona kafelka dostaje kolor tylko wtedy, gdy jest co zgłosić; zero zostaje szare.
+  const tiles = $derived([
+    { icon: 'shield-x', value: counts.malicious, label: t('expert.malicious'), tone: 'bad' },
+    { icon: 'shield-alert', value: counts.suspicious, label: t('expert.suspicious'), tone: 'warn' },
+    { icon: 'download', value: counts.non_play, label: t('expert.non_play'), tone: 'accent' },
+    { icon: 'shield-user', value: counts.admins, label: t('expert.admins'), tone: 'accent' },
+  ] as { icon: IconName; value: number; label: string; tone: TileTone }[]);
+  const NUMBER = { bad: 'text-bad', warn: 'text-warn', accent: '', ok: 'text-ok' };
+  const TILE_ICON = {
+    bad: 'bg-bad-soft text-bad', warn: 'bg-warn-soft text-warn', accent: 'bg-accent-soft text-accent',
+    ok: 'bg-ok-soft text-ok',
+  };
+  const TILE_ICON_OFF = 'bg-neutral-soft text-soft ring-1 ring-current/15 ring-inset';
 
   let table: HTMLElement;
 
@@ -48,21 +63,27 @@
   }
 </script>
 
-<div class="grid grid-cols-5 gap-2">
-  <div class="rounded-xl bg-surface px-3 py-2 shadow-card"><b class="block text-[18px] text-bad"><CountUp value={counts.malicious} /></b><span class="text-[10.5px] text-mut">{t('expert.malicious')}</span></div>
-  <div class="rounded-xl bg-surface px-3 py-2 shadow-card"><b class="block text-[18px] text-warn"><CountUp value={counts.suspicious} /></b><span class="text-[10.5px] text-mut">{t('expert.suspicious')}</span></div>
-  <div class="rounded-xl bg-surface px-3 py-2 shadow-card"><b class="block text-[18px]"><CountUp value={counts.non_play} /></b><span class="text-[10.5px] text-mut">{t('expert.non_play')}</span></div>
-  <div class="rounded-xl bg-surface px-3 py-2 shadow-card"><b class="block text-[18px]"><CountUp value={counts.admins} /></b><span class="text-[10.5px] text-mut">{t('expert.admins')}</span></div>
-  <div class="rounded-xl bg-surface px-3 py-2 shadow-card" title={collectors.failed.map((c) => t('expert.collector_failed', { name: c.name, error: c.error ?? '' })).join('\n')}>
-    <b class="mono block text-[16px] {complete ? 'text-ok' : 'text-warn'}">{collectors.ok}/{collectors.total}</b>
-    <span class="text-[10.5px] text-mut">{apk ? t('expert.collectors_apk', { ok: collectors.ok, total: collectors.total, analyzed: apk.analyzed, requested: apk.requested }) : t('expert.collectors_only', { ok: collectors.ok, total: collectors.total })}</span>
+<div class="grid grid-cols-5 gap-3">
+  {#each tiles as tile (tile.icon)}
+    <div class="relative rounded-2xl card px-4 py-3">
+      <span class="absolute top-3 right-3 grid h-8 w-8 place-items-center rounded-[10px]
+        {tile.value > 0 ? `${TILE_ICON[tile.tone]} glow-soft` : TILE_ICON_OFF}" aria-hidden="true"><Icon name={tile.icon} size={17} /></span>
+      <b class="block text-2xl {tile.value > 0 ? NUMBER[tile.tone] : ''}"><CountUp value={tile.value} /></b>
+      <span class="text-2xs text-mut">{tile.label}</span>
+    </div>
+  {/each}
+  <div class="relative rounded-2xl card px-4 py-3" title={collectors.failed.map((c) => t('expert.collector_failed', { name: c.name, error: c.error ?? '' })).join('\n')}>
+    <span class="absolute top-3 right-3 grid h-8 w-8 place-items-center rounded-[10px]
+      {complete ? TILE_ICON.ok : TILE_ICON.warn} glow-soft" aria-hidden="true"><Icon name="scan-search" size={17} /></span>
+    <b class="mono block text-xl {complete ? 'text-ok' : 'text-warn'}">{collectors.ok}/{collectors.total}</b>
+    <span class="text-2xs text-mut">{apk ? t('expert.collectors_apk', { ok: collectors.ok, total: collectors.total, analyzed: apk.analyzed, requested: apk.requested }) : t('expert.collectors_only', { ok: collectors.ok, total: collectors.total })}</span>
   </div>
 </div>
 
-<div class="flex items-center gap-2">
+<div class="flex items-center gap-3">
   <Segmented label={t('expert.filter')} value={s.showAll ? 'all' : 'attention'} options={filters}
     onchange={(v) => (s.showAll = v === 'all')} />
-  <label class="flex flex-1 items-center gap-2 rounded-[10px] border border-line bg-surface px-3 py-1.5 text-soft">
+  <label class="field flex flex-1 items-center gap-2.5 rounded-xl px-3.5 py-2 text-soft">
     <Icon name="search" />
     <input type="search" class="flex-1 bg-transparent text-ink outline-none" bind:value={s.query}
       placeholder={t('expert.search')} aria-label={t('expert.search')} />
@@ -71,47 +92,49 @@
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
 <div role="group" aria-label={t('expert.table')} tabindex="0" onkeydown={keydown} bind:this={table}
-  class="flex-none overflow-hidden rounded-2xl bg-surface shadow-card">
+  class="flex-none overflow-hidden rounded-2xl card">
   <table class="w-full border-collapse">
     <thead>
-      <tr class="text-left text-[10px] tracking-[.08em] text-mut uppercase">
-        <th class="w-8 border-b border-line px-3 py-2"></th>
-        <th class="border-b border-line px-3 py-2">{t('expert.col_app')}</th>
-        <th class="border-b border-line px-3 py-2">{t('expert.col_score')}</th>
-        <th class="border-b border-line px-3 py-2">{t('expert.col_problems')}</th>
-        <th class="border-b border-line px-3 py-2">{t('expert.col_source')}</th>
-        <th class="border-b border-line px-3 py-2">{t('expert.col_action')}</th>
+      <tr class="bg-surface-2/60 text-left text-xs font-bold text-mut">
+        <th class="w-10 border-b border-line px-4 py-3"></th>
+        <th class="border-b border-line px-3 py-3">{t('expert.col_app')}</th>
+        <th class="border-b border-line px-3 py-3">{t('expert.col_score')}</th>
+        <th class="border-b border-line px-3 py-3">{t('expert.col_problems')}</th>
+        <th class="border-b border-line px-3 py-3">{t('expert.col_source')}</th>
+        <th class="border-b border-line px-3 py-3">{t('expert.col_action')}</th>
       </tr>
     </thead>
     <tbody>
       {#each rows as a (a.package)}
         {@const level = s.selection[a.package] ?? null}
         <tr aria-selected={a.package === focused} onclick={() => ctl.focus(a.package)}
-          class="cursor-pointer border-b border-[var(--color-surface-2)] {a.package === focused ? 'bg-accent-soft/60 shadow-[inset_3px_0_0_var(--color-accent)]' : 'hover:bg-surface-2'} {s.apk.changed.includes(a.package) ? 'flash' : ''}">
-          <td class="px-3 py-2"><input type="checkbox" checked={level !== null} aria-label={a.package}
+          class="cursor-pointer border-b border-[var(--color-surface-2)] {a.package === focused ? 'bg-accent-soft/70 shadow-[inset_3px_0_0_var(--color-accent),inset_0_0_24px_-12px_var(--glow-accent)]' : 'hover:bg-surface-2'} {s.apk.changed.includes(a.package) ? 'flash' : ''}">
+          <td class="px-4 py-3"><input type="checkbox" class="h-4 w-4 accent-[var(--color-accent)]" checked={level !== null} aria-label={a.package}
             onclick={(e) => e.stopPropagation()} onchange={() => ctl.toggle(a)} /></td>
-          <td class="px-3 py-2">
-            <div class="flex items-center gap-2">
-              <span class="grid h-[26px] w-[26px] flex-none place-items-center rounded-lg text-[12px] font-extrabold text-white {BAR[a.verdict]}" aria-hidden="true">{initial(a.name)}</span>
-              <div class="min-w-0"><b class="block truncate">{a.name}</b><span class="mono block truncate text-[10px] text-soft">{a.package}</span></div>
+          <td class="w-full max-w-0 px-3 py-3">
+            <div class="flex items-center gap-3">
+              <AppIcon icon={a.icon} class="h-8 w-8">
+                <span class="grid h-8 w-8 flex-none place-items-center rounded-[10px] text-sm font-extrabold text-white shadow-[inset_0_1px_0_rgb(255_255_255/.3)] {BAR[a.verdict]}" aria-hidden="true">{initial(a.name)}</span>
+              </AppIcon>
+              <div class="min-w-0"><b class="block truncate">{a.name}</b><span class="mono block truncate text-2xs text-soft">{a.package}</span></div>
             </div>
           </td>
-          <td class="px-3 py-2"><div class="flex items-center gap-2">
+          <td class="px-3 py-3 whitespace-nowrap"><div class="flex items-center gap-2">
             <b class="mono {SCORE[a.verdict]}">{a.score}</b>
-            <span class="h-[5px] w-14 overflow-hidden rounded bg-neutral-soft"><i class="block h-full {BAR[a.verdict]}" style="width: {a.score}%"></i></span>
+            <span class="h-1.5 w-12 overflow-hidden rounded-full bg-neutral-soft shadow-[var(--shadow-well)]"><i class="block h-full rounded-full {BAR[a.verdict]}" style="width: {a.score}%"></i></span>
           </div></td>
-          <td class="px-3 py-2"><span class="inline-flex gap-[3px]">
+          <td class="px-3 py-3"><span class="inline-flex gap-1">
             {#each a.symptoms as sy (sy.category)}
-              <span class="grid h-[22px] w-[22px] place-items-center rounded-[7px] {CHIP[sy.severity]}" title={t(categoryKey(sy.category))}>
-                <Icon name={CATEGORY_ICON[sy.category]} size={13} />
+              <span class="grid h-6 w-6 place-items-center rounded-[7px] ring-1 ring-current/15 ring-inset {CHIP[sy.severity]}" title={t(categoryKey(sy.category))}>
+                <Icon name={CATEGORY_ICON[sy.category]} size={14} />
               </span>
             {/each}
           </span></td>
-          <td class="px-3 py-2">{a.source.label}<span class="block text-[10px] text-soft">{when(a.source.days)}</span></td>
-          <td class="px-3 py-2">
+          <td class="px-3 py-3 whitespace-nowrap">{a.source.label}<span class="block text-2xs text-soft">{when(a.source.days)}</span></td>
+          <td class="px-3 py-3">
             <select aria-label="{t('expert.col_action')} {a.package}" value={level ?? ''} onclick={(e) => e.stopPropagation()}
               onchange={(e) => ctl.setLevel(a.package, (e.currentTarget.value || null) as Level | null)}
-              class="rounded-lg border border-line bg-surface px-2 py-1 text-[11px] font-bold {level ? LEVEL_TEXT[LEVEL_TONE[level]] : 'text-mut'}">
+              class="field rounded-[10px] px-2.5 py-1.5 text-sm font-bold {level ? LEVEL_TEXT[LEVEL_TONE[level]] : 'text-mut'}">
               <option value="">{t('level.none')}</option>
               <option value="silence">{t('choice.silence')}</option>
               <option value="disable">{t('choice.disable')}</option>

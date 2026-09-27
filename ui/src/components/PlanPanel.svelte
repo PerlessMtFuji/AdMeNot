@@ -19,7 +19,7 @@
   const details = $derived(s.device
     ? `${s.device.model} · Android ${s.device.android}${s.device.patch ? ` · ${t('phone.patch')} ${s.device.patch}` : ''}`
     : '');
-  const DOT = { accent: 'bg-accent', warn: 'bg-warn-strong', bad: 'bg-bad' };
+  const DOT = { accent: 'bg-accent text-accent', warn: 'bg-warn-strong text-warn-strong', bad: 'bg-bad text-bad' };
 </script>
 
 {#if s.device}
@@ -28,26 +28,26 @@
 {/if}
 <span class="lbl">{t('panel.plan')}</span>
 {#if entries.length === 0}<p class="text-mut">{t('panel.empty')}</p>{/if}
-<ul class="flex flex-col gap-1.5">
+<ul class="well well-list flex flex-col overflow-hidden empty:hidden">
   {#each entries as e (e.package)}
     <li animate:flip={{ duration: ms(DUR.flip) }} transition:enter
-      class="flex items-center gap-2 rounded-[10px] bg-surface-2 px-2.5 py-2">
-      <span class="h-2 w-2 flex-none rounded-full {DOT[LEVEL_TONE[e.level]]}"></span>
+      class="flex items-center gap-2.5 px-3.5 py-2.5">
+      <span class="glow-dot h-2 w-2 flex-none rounded-full {DOT[LEVEL_TONE[e.level]]}"></span>
       <b class="min-w-0 flex-1 truncate">{e.name}</b>
       <Pill tone={LEVEL_TONE[e.level]}>{t(`choice.${e.level}`)}</Pill>
     </li>
   {/each}
 </ul>
-{#each unchanged as a (a.package)}<p class="text-[11px] text-soft">{a.name} — {t('panel.unchanged')}</p>{/each}
+{#each unchanged as a (a.package)}<p class="text-xs text-soft">{a.name} — {t('panel.unchanged')}</p>{/each}
 {#if s.scan && s.scan.counts.safe > 0}
   <button type="button" aria-expanded={showSafe} onclick={ontoggleSafe}
-    class="flex items-center gap-2.5 rounded-xl bg-ok-soft px-3 py-2.5 text-left">
-    <span class="grid h-[22px] w-[22px] flex-none place-items-center rounded-full bg-ok text-white"><Icon name="check" size={12} strokeWidth={3} /></span>
+    class="flex items-center gap-3 rounded-2xl bg-ok-soft px-4 py-3 text-left ring-1 ring-ok/20 ring-inset transition duration-150 hover:ring-ok/40">
+    <span class="grid h-7 w-7 flex-none place-items-center rounded-full bg-ok text-white shadow-[0_0_14px_-2px_var(--color-ok)]"><Icon name="check" size={15} strokeWidth={3} /></span>
     <span><b class="block">{tp('results.safe', s.scan.counts.safe)}</b>
-      <span class="text-[11px] font-semibold text-accent">{showSafe ? t('results.safe_hide') : t('results.safe_show')}</span></span>
+      <span class="text-xs font-semibold text-accent">{showSafe ? t('results.safe_hide') : t('results.safe_show')}</span></span>
   </button>
 {/if}
-<div class="mt-auto text-[11px] text-mut">{t('plan.undo_hint')}</div>
+<div class="mt-auto text-xs text-mut">{t('plan.undo_hint')}</div>
 <Button variant="primary" size="lg" disabled={entries.length === 0 || s.orderRunning} onclick={() => ctl.openPlan()}>
   {t('actions.fix', { count: entries.length })}
 </Button>

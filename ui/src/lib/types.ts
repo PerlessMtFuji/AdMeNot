@@ -75,6 +75,7 @@ export interface AppView {
   problems: string[];
   findings: Finding[];
   apk_error: string | null;
+  icon: string | null;
   ad_sdks: string[] | null;
   symptoms: Symptom[];
   source: { label: string; days: number | null };

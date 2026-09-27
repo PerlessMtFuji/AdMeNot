@@ -36,13 +36,13 @@
   }
 </script>
 
-<div class="fixed inset-0 z-50 grid place-items-center bg-[rgb(15_23_42/.45)] backdrop-blur-[4px]"
+<div class="fixed inset-0 z-50 grid place-items-center bg-[rgb(15_23_42/.45)] backdrop-blur-[6px]"
   transition:fade={{ duration: ms(DUR.micro) }}>
   <div bind:this={box} role="dialog" aria-modal="true" aria-labelledby={id} tabindex="-1" onkeydown={keydown}
-    class="w-[min(460px,92vw)] rounded-2xl bg-surface p-5 shadow-card"
+    class="w-[min(500px,92vw)] rounded-[20px] card p-6"
     transition:scale={{ start: 0.96, duration: ms(DUR.dialog) }}>
-    <h2 {id} class="text-[15px] font-bold">{title}</h2>
+    <h2 {id} class="text-lg font-bold">{title}</h2>
     <div class="mt-2 text-mut">{@render children()}</div>
-    <div class="mt-5 flex justify-end gap-2">{@render actions()}</div>
+    <div class="mt-6 flex justify-end gap-2">{@render actions()}</div>
   </div>
 </div>

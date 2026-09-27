@@ -4,7 +4,7 @@
 </script>
 
 <div class="relative grid flex-none place-items-center overflow-hidden rounded-xl bg-[linear-gradient(160deg,var(--color-accent-soft),var(--color-surface-2))]
-  {compact ? 'h-[60px] w-[36px]' : 'h-[96px] w-[58px]'}">
+  {compact ? 'h-[68px] w-[42px]' : 'h-[108px] w-[66px]'}">
   {#if image}
     <img src={image} alt={name} class="max-h-full max-w-full object-contain" />
   {:else}

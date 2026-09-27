@@ -7,12 +7,12 @@
 </script>
 
 <div role="group" aria-label={label}
-  class="{stretch ? 'flex' : 'inline-flex'} gap-0.5 rounded-[10px] bg-neutral-soft p-[3px]">
+  class="{stretch ? 'flex' : 'inline-flex'} gap-0.5 rounded-xl bg-neutral-soft p-[3px] shadow-[var(--shadow-well)]">
   {#each options as o (o.value)}
     {@const on = o.value === value}
     <button type="button" aria-pressed={on} {disabled} onclick={() => onchange(o.value)}
-      class="flex-1 rounded-[7px] font-semibold whitespace-nowrap transition duration-150 disabled:opacity-50
-        {size === 'sm' ? 'px-2 py-0.5 text-[11px]' : 'px-2.5 py-1 text-[11.5px]'}
-        {on ? `bg-surface shadow-sm ${TONE[o.tone ?? 'ink']}` : 'text-mut hover:text-ink'}">{o.label}</button>
+      class="flex-1 rounded-[9px] font-semibold whitespace-nowrap transition duration-150 disabled:opacity-50
+        {size === 'sm' ? 'px-2.5 py-1 text-sm' : 'px-3.5 py-1.5 text-sm'}
+        {on ? `card ${TONE[o.tone ?? 'ink']}` : 'text-mut hover:text-ink'}">{o.label}</button>
   {/each}
 </div>

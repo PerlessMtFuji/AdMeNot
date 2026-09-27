@@ -23,11 +23,11 @@
   const known = $derived(pending !== null && s.knownSerials.includes(pending.serial));
 </script>
 
-<main class="flex min-w-0 flex-1 gap-5 overflow-auto px-6 py-5">
+<main class="flex min-w-0 flex-1 gap-7 scroll-fade overflow-auto px-7 py-7">
   <div class="flex w-[260px] flex-none flex-col gap-3">
     <div>
-      <h1 class="text-[17px] font-extrabold">{t(`connect.title.${link}`)}</h1>
-      <p class="mt-0.5 min-h-[34px] text-mut">{t(`connect.sub.${link}`)}</p>
+      <h1 class="text-2xl font-extrabold">{t(`connect.title.${link}`)}</h1>
+      <p class="mt-1 min-h-[44px] text-mut">{t(`connect.sub.${link}`)}</p>
     </div>
     <PhoneStage state={stage} />
     <ConnectChecklist label={t('connect.check.label')} items={[
@@ -37,7 +37,7 @@
     ]} />
   </div>
 
-  <div class="flex min-w-0 flex-1 flex-col gap-3">
+  <div class="flex min-w-0 flex-1 flex-col gap-4">
     {#if s.interrupted.length}<InterruptedBanner orders={s.interrupted} />{/if}
     {#if link === 'adb_missing'}
       <Banner tone="bad" icon="triangle-alert" title={t('connect.adb_missing')}>
@@ -55,9 +55,9 @@
           </label>
         {/each}
         <form class="flex gap-2" onsubmit={(e) => { e.preventDefault(); void ctl.startScan(); }}>
-          <input class="flex-1 rounded-[10px] border border-line bg-surface px-3 py-2" bind:value={s.client}
+          <input class="field flex-1 rounded-xl px-3.5 py-2.5" bind:value={s.client}
             placeholder={t('connect.client_placeholder')} aria-label={t('connect.client_label')} maxlength="80" />
-          <Button type="submit" variant="primary" disabled={!s.serial}>{t('connect.scan')}</Button>
+          <Button type="submit" variant="primary" size="lg" disabled={!s.serial}>{t('connect.scan')}</Button>
         </form>
       </div>
     {:else}

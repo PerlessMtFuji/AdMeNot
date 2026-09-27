@@ -14,8 +14,12 @@
   import Pause from '@lucide/svelte/icons/pause';
   import Plus from '@lucide/svelte/icons/plus';
   import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
+  import ScanSearch from '@lucide/svelte/icons/scan-search';
   import Search from '@lucide/svelte/icons/search';
   import SettingsIcon from '@lucide/svelte/icons/settings';
+  import ShieldAlert from '@lucide/svelte/icons/shield-alert';
+  import ShieldUser from '@lucide/svelte/icons/shield-user';
+  import ShieldX from '@lucide/svelte/icons/shield-x';
   import Smartphone from '@lucide/svelte/icons/smartphone';
   import Terminal from '@lucide/svelte/icons/terminal';
   import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
@@ -30,12 +34,13 @@
     'triangle-alert': TriangleAlert, info: Info, 'undo-2': Undo2, 'rotate-ccw': RotateCcw,
     'chevron-down': ChevronDown, 'chevron-right': ChevronRight, search: Search, terminal: Terminal,
     history: HistoryIcon, settings: SettingsIcon, plus: Plus, pause: Pause, smartphone: Smartphone,
+    'shield-x': ShieldX, 'shield-alert': ShieldAlert, 'shield-user': ShieldUser, 'scan-search': ScanSearch,
   } as const;
   export type IconName = keyof typeof ICONS;
 </script>
 
 <script lang="ts">
-  let { name, size = 14, strokeWidth = 2, class: cls = '' }:
+  let { name, size = 16, strokeWidth = 2, class: cls = '' }:
     { name: IconName; size?: number; strokeWidth?: number; class?: string } = $props();
   const Glyph = $derived(ICONS[name]);
 </script>

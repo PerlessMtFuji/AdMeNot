@@ -11,19 +11,19 @@
   const states = $derived(stageStates(s.phase, s.scanStage));
   const expert = $derived(s.settings.mode === 'expert');
   const ITEM: Record<StageState, string> = {
-    now: 'bg-accent-soft font-bold text-accent', done: 'text-ink', todo: 'text-soft', off: 'text-soft',
+    now: 'rail-now font-bold text-accent', done: 'text-ink', todo: 'text-soft', off: 'text-soft',
   };
   const DOT: Record<StageState, string> = {
-    now: 'bg-accent text-white', done: 'bg-ok-soft text-ok', todo: 'bg-neutral-soft text-soft',
+    now: 'bg-accent text-white shadow-[0_0_0_4px_color-mix(in_srgb,var(--color-accent)_18%,transparent),0_0_14px_var(--glow-accent)]', done: 'bg-ok-soft text-ok', todo: 'bg-neutral-soft text-soft',
     off: 'bg-neutral-soft text-soft',
   };
-  const NAV = 'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11.5px] text-ink transition duration-150 hover:bg-surface-2';
-  const CURRENT = 'bg-accent-soft font-bold text-accent hover:bg-accent-soft';
+  const NAV = 'flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-semibold text-mut transition duration-150 hover:bg-neutral-soft hover:text-ink';
+  const CURRENT = 'rail-now !text-accent';
 </script>
 
-<nav aria-label={t('rail.label')} class="flex w-[168px] flex-none flex-col gap-1 border-r border-line bg-surface px-3 py-4">
-  <div class="mb-3 flex items-center gap-2 px-1 text-[13px] font-extrabold">
-    <span class="h-[22px] w-[22px] rounded-[7px] bg-[linear-gradient(135deg,#6366f1,#3b82f6)]" aria-hidden="true"></span>
+<nav aria-label={t('rail.label')} class="flex w-[200px] flex-none flex-col gap-1 border-r border-line bg-surface/90 px-3.5 py-5 backdrop-blur-xl">
+  <div class="mb-5 flex items-center gap-2.5 px-1.5 text-lg font-extrabold tracking-[-.01em]">
+    <span class="h-7 w-7 rounded-[9px] bg-[linear-gradient(135deg,#818cf8,#4f46e5_55%,#3b82f6)] shadow-[inset_0_1px_0_rgb(255_255_255/.35),0_4px_14px_-2px_var(--glow-accent)]" aria-hidden="true"></span>
     DeMalware
   </div>
   {#if s.screen === 'main'}
@@ -31,9 +31,9 @@
       {#each STAGES as stage, i (stage)}
         <li aria-current={states[i] === 'now' ? 'step' : undefined}
           title={stage === 'report' ? t('stage.soon') : undefined}
-          class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[11.5px] transition-colors duration-300 {ITEM[states[i]]}">
-          <span class="grid h-[18px] w-[18px] place-items-center rounded-full text-[10px] transition-colors duration-300 {DOT[states[i]]}">
-            {#if states[i] === 'done'}<Icon name="check" size={11} strokeWidth={3} />{:else}{i + 1}{/if}
+          class="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition-colors duration-300 {ITEM[states[i]]}">
+          <span class="grid h-[22px] w-[22px] place-items-center rounded-full text-2xs font-bold transition duration-300 {DOT[states[i]]}">
+            {#if states[i] === 'done'}<Icon name="check" size={13} strokeWidth={3} />{:else}{i + 1}{/if}
           </span>
           {t(`stage.${stage}`)}
         </li>

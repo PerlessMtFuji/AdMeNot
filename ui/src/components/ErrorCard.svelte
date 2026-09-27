@@ -14,10 +14,10 @@
 </script>
 
 {#if fatal}
-  <div role="alert" class="mx-auto mt-10 flex max-w-[520px] flex-col items-center gap-3 rounded-2xl bg-surface p-6 text-center shadow-card">
+  <div role="alert" class="mx-auto mt-10 flex max-w-[520px] flex-col items-center gap-3 rounded-2xl card p-6 text-center">
     <span class="grid h-12 w-12 place-items-center rounded-full bg-bad-soft text-bad"><Icon name="triangle-alert" size={22} /></span>
-    <b class="text-[15px]">{t('error.fatal')}</b>
-    <pre class="mono w-full rounded-lg bg-surface-2 p-2.5 text-left text-[11px] whitespace-pre-wrap text-mut">{s.fatal}</pre>
+    <b class="text-lg">{t('error.fatal')}</b>
+    <pre class="mono w-full rounded-lg bg-surface-2 p-2.5 text-left text-xs whitespace-pre-wrap text-mut">{s.fatal}</pre>
     <Button variant="primary" onclick={() => location.reload()}>{t('error.restart')}</Button>
   </div>
 {:else if s.error}
@@ -26,9 +26,9 @@
     <div class="min-w-0 flex-1">
       <b class="text-ink">{t(`error.${key}`, { serial: s.error.serial ?? '' })}</b>
       {#if s.error.message && key !== 'wrong_device'}
-        <div class="mono mt-1 text-[11px] break-words text-mut">{s.error.message}</div>
+        <div class="mono mt-1 text-xs break-words text-mut">{s.error.message}</div>
       {/if}
-      {#if s.error.log}<div class="mt-1 text-[11px] text-mut">{t('error.log', { path: s.error.log })}</div>{/if}
+      {#if s.error.log}<div class="mt-1 text-xs text-mut">{t('error.log', { path: s.error.log })}</div>{/if}
     </div>
     {#if key === 'adb_missing'}
       <Button size="sm" onclick={() => { ctl.dismissError(); ctl.openSettings(); }}>{t('connect.open_settings')}</Button>

@@ -8,42 +8,63 @@
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
   import Pill from '../ui/Pill.svelte';
+  import AppIcon from './AppIcon.svelte';
   import ScoreScale from './ScoreScale.svelte';
 
   let { app }: { app: AppView | null } = $props();
   const ctl = getContext<Controller | undefined>('ctl');
   const groups = $derived(app ? evidenceGroups(app.findings) : { groups: [], combos: [] });
   const count = $derived(ctl ? planEntries(ctl.state.scan?.apps ?? [], ctl.state.selection).length : 0);
-  const AVATAR = { malicious: 'bg-bad', suspicious: 'bg-warn-strong', review: 'bg-soft', safe: 'bg-ok' };
+  // Surowe dane: jeden wpis na regułę. Lista SDK tylko wtedy, gdy nie wypisała jej już reguła DM-ADSDK.
+  const raw = $derived.by(() => {
+    if (!app) return [];
+    const rows = app.findings.filter((f) => f.category !== 'combo')
+      .map((f) => ({ key: f.rule_id, label: f.label, text: f.text_expert }));
+    if (app.ad_sdks?.length && !app.findings.some((f) => f.rule_id.startsWith('DM-ADSDK')))
+      rows.push({ key: 'ad_sdks', label: t('evidence.ad_sdks'), text: app.ad_sdks.join(', ') });
+    return rows;
+  });
+  const AVATAR = { malicious: 'bg-bad text-bad', suspicious: 'bg-warn-strong text-warn-strong', review: 'bg-soft text-soft', safe: 'bg-ok text-ok' };
 </script>
 
 {#if app}
   <div class="flex items-center gap-2.5">
-    <span class="grid h-9 w-9 flex-none place-items-center rounded-[10px] text-[15px] font-extrabold text-white {AVATAR[app.verdict]}" aria-hidden="true">{initial(app.name)}</span>
-    <div class="min-w-0 flex-1"><b class="block truncate text-[14px]">{app.name}</b>{#if app.name !== app.package}<span class="mono block truncate text-[10px] text-soft">{app.package}</span>{/if}</div>
+    <AppIcon icon={app.icon} class="h-11 w-11">
+      <span class="grid h-11 w-11 flex-none place-items-center rounded-[13px] shadow-[inset_0_1px_0_rgb(255_255_255/.3),0_6px_14px_-6px_currentColor] {AVATAR[app.verdict]}" aria-hidden="true"><span class="text-lg font-extrabold text-white">{initial(app.name)}</span></span>
+    </AppIcon>
+    <div class="min-w-0 flex-1"><b class="block truncate text-lg">{app.name}</b>{#if app.name !== app.package}<span class="mono block truncate text-2xs text-soft">{app.package}</span>{/if}</div>
     <Pill tone={VERDICT_TONE[app.verdict]}>{app.verdict_label}</Pill>
   </div>
   <div><span class="lbl">{t('evidence.score')}</span><ScoreScale score={app.score} verdict={app.verdict} /></div>
   <span class="lbl">{t('evidence.why')}</span>
-  <div class="flex flex-col gap-2">
+  <div class="well well-list flex flex-col p-3.5 [&>*+*]:mt-2.5 [&>*+*]:pt-2.5">
     {#each groups.groups as g (g.category)}
       <div>
         <div class="flex items-center gap-2 font-bold"><span class="text-mut"><Icon name={CATEGORY_ICON[g.category]} /></span>{t(categoryKey(g.category))}</div>
         {#each g.items as f (f.rule_id)}
-          <div class="flex gap-2 py-0.5 pl-[22px] text-ink"><span class="min-w-0 flex-1">{f.label}</span><span class="text-[11px] text-soft tabular-nums">+{f.weight}</span></div>
+          <div class="flex gap-2 py-0.5 pl-[26px] text-ink"><span class="min-w-0 flex-1">{f.label}</span><span class="text-xs text-soft tabular-nums">+{f.weight}</span></div>
         {/each}
       </div>
     {/each}
     {#each groups.combos as c (c.rule_id)}
-      <div class="flex gap-2 border-t border-dashed border-line pt-1.5 text-[11px] text-mut"><span class="flex-1">{c.label}</span><span class="text-soft tabular-nums">+{c.weight}</span></div>
+      <div class="flex gap-2 border-t border-dashed border-line pt-1.5 text-xs text-mut"><span class="flex-1">{c.label}</span><span class="text-soft tabular-nums">+{c.weight}</span></div>
     {/each}
     {#if app.apk_error}
-      <div class="flex items-center gap-2 text-[11px] text-mut"><Icon name="triangle-alert" />{t('expert.apk_error')}: {app.apk_error}</div>
+      <div class="flex items-center gap-2 text-xs text-mut"><Icon name="triangle-alert" />{t('expert.apk_error')}: {app.apk_error}</div>
     {/if}
   </div>
-  <details class="text-[11px]">
-    <summary class="cursor-pointer font-semibold text-accent">{t('evidence.raw')}</summary>
-    <pre class="mono mt-1.5 rounded-lg bg-surface-2 p-2 text-[10.5px] whitespace-pre-wrap text-mut">{app.findings.filter((f) => f.category !== 'combo').map((f) => f.text_expert).join('\n')}{app.ad_sdks?.length ? `\n${t('expert.ad_sdks', { list: app.ad_sdks.join(', ') })}` : ''}</pre>
+  <details class="group text-xs">
+    <summary class="flex cursor-pointer list-none items-center gap-1.5 font-semibold text-accent">
+      <Icon name="chevron-right" size={14} class="transition-transform duration-150 group-open:rotate-90" />{t('evidence.raw')}
+    </summary>
+    <ul aria-label={t('evidence.raw')} class="well well-list mt-2 flex flex-col">
+      {#each raw as r (r.key)}
+        <li class="px-3 py-2">
+          <span class="block text-xs font-bold text-ink">{r.label}</span>
+          <span class="mono mt-0.5 block text-2xs break-words whitespace-pre-wrap text-mut">{r.text}</span>
+        </li>
+      {/each}
+    </ul>
   </details>
 {:else}
   <p class="text-mut">{t('evidence.none')}</p>

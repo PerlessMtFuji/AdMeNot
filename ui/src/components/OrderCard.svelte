@@ -6,10 +6,11 @@
   import type { HistoryOrder } from '../lib/types';
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
+  import AppIcon from './AppIcon.svelte';
 
-  type Props = { order: HistoryOrder; names: Map<string, string>; disabled: boolean;
+  type Props = { order: HistoryOrder; names: Map<string, string>; icons?: Map<string, string | null>; disabled: boolean;
     onrestore: (pkg: string) => void; onrestoreStep: (actionId: number) => void; onundoAll: () => void };
-  let { order, names, disabled, onrestore, onrestoreStep, onundoAll }: Props = $props();
+  let { order, names, icons, disabled, onrestore, onrestoreStep, onundoAll }: Props = $props();
   let open = $state<string[]>([]);
   const rows = $derived(groupHistory(order.actions));
   const undone = $derived(order.status === 'undone');
@@ -34,35 +35,37 @@
 </script>
 
 <article aria-label={order.number}
-  class="rounded-2xl {undone ? 'border border-dashed border-line' : 'bg-surface shadow-card'}">
-  <div class="flex items-start gap-3 px-4 pt-3 pb-2.5">
+  class="rounded-2xl {undone ? 'border border-dashed border-line' : 'card'}">
+  <div class="flex items-start gap-3 px-5 pt-4 pb-3">
     <div class="min-w-0 flex-1">
-      <div class="text-[14.5px] {undone ? 'font-semibold text-mut' : 'font-bold'}">{title}</div>
-      <div class="text-[11.5px] text-soft">{order.client ? `${order.client} · ` : ''}<span class="mono">{order.number}</span>{order.interrupted ? ` · ${order.status_label}` : ''}</div>
+      <div class="text-lg {undone ? 'font-semibold text-mut' : 'font-bold'}">{title}</div>
+      <div class="text-sm text-soft">{order.client ? `${order.client} · ` : ''}<span class="mono">{order.number}</span>{order.interrupted ? ` · ${order.status_label}` : ''}</div>
     </div>
     {#if canUndo && !order.interrupted}
       <Button variant="ghost" size="sm" {disabled} onclick={onundoAll}><Icon name="undo-2" />{t('history.undo_all')}</Button>
     {/if}
   </div>
   {#each rows as r (r.package)}
-    <div class="group border-t border-[var(--color-surface-2)]">
-      <div class="flex items-center gap-2.5 px-4 py-2 transition-colors duration-150 hover:bg-surface-2">
-        <span class="grid h-[22px] w-[22px] flex-none place-items-center rounded-md bg-neutral-soft text-[10.5px] font-extrabold text-mut" aria-hidden="true">{initial(nameOf(r.package))}</span>
+    <div class="group border-t border-line/70">
+      <div class="flex items-center gap-3 px-5 py-2.5 transition-colors duration-150 hover:bg-surface-2">
+        <AppIcon icon={icons?.get(r.package)} class="h-7 w-7">
+          <span class="grid h-7 w-7 flex-none place-items-center rounded-lg bg-neutral-soft text-xs font-extrabold text-mut shadow-[var(--shadow-well)]" aria-hidden="true">{initial(nameOf(r.package))}</span>
+        </AppIcon>
         <b class="min-w-0 truncate">{nameOf(r.package)}</b>
         <span class="truncate text-mut">{stateText(r)}</span>
         <span class="ml-auto flex flex-none items-center gap-3">
-          <button type="button" class="text-[11.5px] font-semibold text-soft hover:text-ink" aria-expanded={open.includes(r.package)}
+          <button type="button" class="text-sm font-semibold text-soft hover:text-ink" aria-expanded={open.includes(r.package)}
             onclick={() => toggle(r.package)}>{t('history.steps')}</button>
           {#if r.canRestore}
             <button type="button" {disabled} aria-label="{t('history.restore')} {nameOf(r.package)}" onclick={() => onrestore(r.package)}
-              class="text-[11.5px] font-semibold text-accent opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus:opacity-100 disabled:opacity-40">↶ {t('history.restore')}</button>
+              class="text-sm font-semibold text-accent opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus:opacity-100 disabled:opacity-40">↶ {t('history.restore')}</button>
           {/if}
         </span>
       </div>
       {#if open.includes(r.package)}
-        <ul class="pr-4 pb-2 pl-[52px]" transition:slide={{ duration: ms(DUR.enter) }}>
+        <ul class="pr-5 pb-2.5 pl-[60px]" transition:slide={{ duration: ms(DUR.enter) }}>
           {#each r.actions as a (a.id)}
-            <li class="flex gap-2 py-0.5 text-[11.5px] text-mut">
+            <li class="flex gap-2 py-0.5 text-sm text-mut">
               <span class="min-w-0 flex-1">{a.step_label} — {a.status_label}{a.error ? `: ${a.error}` : ''}</span>
               {#if a.status === 'done'}
                 <button type="button" class="font-semibold text-accent" {disabled} onclick={() => onrestoreStep(a.id)}>↶ {t('history.restore')}</button>

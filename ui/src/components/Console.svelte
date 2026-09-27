@@ -51,14 +51,14 @@
 </script>
 
 <section aria-label={t('console.title')} style="height: {height}px"
-  class="flex flex-none flex-col bg-[#0f172a] text-[#cbd5e1]" transition:fly={{ y: 40, duration: ms(DUR.enter) }}>
+  class="flex flex-none flex-col bg-[#0b1020] text-[#cbd5e1] shadow-[0_-12px_30px_-18px_rgb(79_70_229/.6)]" transition:fly={{ y: 40, duration: ms(DUR.enter) }}>
   <button type="button" aria-label={t('console.resize')} onpointerdown={resize}
-    class="h-2 w-full flex-none cursor-ns-resize bg-[#1e293b] hover:bg-[#334155]"></button>
+    class="grid h-3 w-full flex-none cursor-ns-resize place-items-center border-t border-[#312e81]/60 bg-[#111733] after:h-1 after:w-10 after:rounded-full after:bg-[#4f46e5]/50 hover:after:bg-[#818cf8]"></button>
   <div class="flex items-center gap-2 px-4 py-2">
-    <Icon name="terminal" /><b class="text-[12px] text-white">{t('console.title')}</b>
-    <button class="ml-auto text-[12px] opacity-80 hover:opacity-100" onclick={() => (s.consoleOpen = false)}>{t('common.close')}</button>
+    <Icon name="terminal" /><b class="text-sm text-white">{t('console.title')}</b>
+    <button class="ml-auto text-sm opacity-80 hover:opacity-100" onclick={() => (s.consoleOpen = false)}>{t('common.close')}</button>
   </div>
-  <ol class="mono min-h-0 flex-1 overflow-auto px-4 text-[11px] leading-[1.6]">
+  <ol class="scroll-fade mono min-h-0 flex-1 overflow-auto px-4 text-xs leading-[1.7]">
     {#each s.console as e, i (i)}
       <li>
         <details>
@@ -77,12 +77,12 @@
     {/each}
   </ol>
   <form class="flex gap-2 px-4 py-2.5" onsubmit={(e) => { e.preventDefault(); void run(); }}>
-    <span class="mono self-center text-[11px] opacity-70">adb shell</span>
-    <input class="mono flex-1 rounded-lg bg-[#1e293b] px-2.5 py-1.5 text-[12px] text-white" bind:value={command}
+    <span class="mono self-center text-xs opacity-70">adb shell</span>
+    <input class="mono flex-1 rounded-[10px] bg-[#151c35] px-3 py-2 text-sm text-white ring-1 ring-[#312e81] outline-none focus:ring-[#818cf8] focus:shadow-[0_0_0_4px_rgb(129_140_248/.2)]" bind:value={command}
       placeholder={t('console.placeholder')} aria-label={t('console.placeholder')} disabled={!enabled} />
     <Button type="submit" size="sm" variant="primary" disabled={!enabled || running || !command.trim()}>{t('console.run')}</Button>
   </form>
-  {#if !enabled}<p class="px-4 pb-2 text-[11px] opacity-70">{t('console.disabled')}</p>{/if}
+  {#if !enabled}<p class="px-4 pb-2 text-xs opacity-70">{t('console.disabled')}</p>{/if}
 </section>
 
 {#if confirming}

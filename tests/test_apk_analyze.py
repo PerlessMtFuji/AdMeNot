@@ -12,7 +12,7 @@ from demalware.engine.apk.analyze import (
     report_from_json,
     report_to_json,
 )
-from demalware.engine.apk.manifest import ManifestInfo
+from demalware.engine.apk.manifest import ICON_MAX_BYTES, ManifestInfo, _read_icon, icon_uri
 from demalware.engine.apk.sdks import load_default_ad_sdks, parse_ad_sdks
 from demalware.engine.facts import AppFacts
 
@@ -136,3 +136,67 @@ def test_apply_apk_report_cleans_stored_label():
     f = AppFacts("com.clean.x")
     apply_apk_report(f, ApkReport("com.clean.x", label="\x1b[31mRed", class_count=1))
     assert f.label == "[31mRed"
+
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
+WEBP = b"RIFF\x10\x00\x00\x00WEBPVP8 " + b"\x00" * 8
+
+
+def test_icon_uri_accepts_only_bitmaps_by_magic_bytes():
+    assert icon_uri(PNG).startswith("data:image/png;base64,")
+    assert icon_uri(WEBP).startswith("data:image/webp;base64,")
+    assert icon_uri(b"\xff\xd8\xff\xe0jfif").startswith("data:image/jpeg;base64,")
+    assert icon_uri(b"<svg onload='x'/>") is None
+    assert icon_uri(b"\x03\x00\x08\x00axml") is None  # skompilowany XML (ikona adaptacyjna)
+    assert icon_uri(PNG + b"\x00" * ICON_MAX_BYTES) is None
+
+
+class _FakeApk:
+    def __init__(self, icons, files):
+        self.icons, self.files = icons, files
+
+    def get_app_icon(self, max_dpi=65536):
+        return self.icons.get(max_dpi)
+
+    def get_file(self, path):
+        if path not in self.files:
+            raise FileNotFoundError(path)
+        return self.files[path]
+
+
+def test_read_icon_prefers_bitmap_and_skips_adaptive_xml():
+    apk = _FakeApk({480: "res/mipmap-xxhdpi/ic.png", 65536: "res/mipmap-anydpi-v26/ic.xml"},
+                   {"res/mipmap-xxhdpi/ic.png": PNG, "res/mipmap-anydpi-v26/ic.xml": b"\x03\x00"})
+    assert _read_icon(apk) == icon_uri(PNG)
+    only_xml = _FakeApk({65536: "res/mipmap-anydpi-v26/ic.xml"},
+                        {"res/mipmap-anydpi-v26/ic.xml": b"\x03\x00"})
+    assert _read_icon(only_xml) is None
+    missing = _FakeApk({480: "res/gone.png", 640: "res/x.webp"}, {"res/x.webp": WEBP})
+    assert _read_icon(missing) == icon_uri(WEBP)
+
+
+def test_analyze_apk_carries_icon_to_facts(tmp_path):
+    base = make_apk(tmp_path / "base.apk", {"classes.dex": make_dex(["com.clean.x.Main"])})
+
+    def read(path: Path) -> ManifestInfo:
+        return ManifestInfo("com.clean.x", 42, "X", (), icon_uri(PNG))
+
+    report = analyze_apk("com.clean.x", [base], read_manifest=read, sdks=load_default_ad_sdks())
+    assert report.icon == icon_uri(PNG)
+    restored = report_from_json(json.loads(json.dumps(report_to_json(report))))
+    f = AppFacts("com.clean.x")
+    apply_apk_report(f, restored)
+    assert f.icon == icon_uri(PNG)
+
+
+@pytest.mark.parametrize("icon", [
+    "data:image/svg+xml;base64,PHN2Zy8+",
+    "javascript:alert(1)",
+    "data:image/png;base64,PHN2Zy8+",  # nagłówek mówi PNG, treść to SVG
+    "data:image/png;base64,!!!",
+    42,
+])
+def test_apply_apk_report_drops_foreign_icons(icon):
+    f = AppFacts("com.clean.x")
+    apply_apk_report(f, ApkReport("com.clean.x", label="X", class_count=1, icon=icon))
+    assert f.icon is None

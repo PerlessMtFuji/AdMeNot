@@ -93,13 +93,13 @@
     "malicious": "Malicious", "suspicious": "Suspicious", "non_play": "Outside Play", "admins": "Device admins",
     "col_app": "App", "col_problems": "Problems", "col_score": "Score", "col_source": "Source", "col_action": "Action",
     "search": "Search app or package",
-    "apk_error": "APK: error", "collector_failed": "Collector {name}: {error}", "ad_sdks": "Ad SDKs: {list}",
+    "apk_error": "APK: error", "collector_failed": "Collector {name}: {error}",
     "table": "Apps table", "filter": "Filter", "filter_attention": "Needs attention · {count}", "filter_all": "All · {count}",
     "collectors_apk": "collectors {ok}/{total} · APK {analyzed}/{requested}", "collectors_only": "collectors {ok}/{total}", "today": "today", "protected": "Protected app",
     "days": { "one": "{count} day ago", "few": "{count} days ago", "many": "{count} days ago", "other": "{count} days ago" }
   },
   "evidence": {
-    "title": "App details", "score": "Score", "why": "Why", "raw": "Raw data from the phone",
+    "title": "App details", "score": "Score", "why": "Why", "raw": "Raw data from the phone", "ad_sdks": "Ad libraries",
     "none": "Select an app in the table.", "plan": "Plan", "fix": "Fix ({count})",
     "zone": { "safe": "no issues", "review": "to review", "suspicious": "suspicious", "malicious": "malicious" }
   },

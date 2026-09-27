@@ -13,7 +13,7 @@
   <StepRail />
   <div class="flex min-w-0 flex-1 flex-col">
     {#if s.error}<div class="px-6 pt-4"><ErrorCard /></div>{/if}
-    <div class="flex min-h-0 flex-1">{@render children()}</div>
+    <div class="flex min-h-0 min-w-0 flex-1">{@render children()}</div>
     {#if s.settings.mode === 'expert' && s.consoleOpen && s.screen === 'main'}<Console />{/if}
   </div>
 </div>
