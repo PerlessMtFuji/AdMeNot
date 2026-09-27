@@ -1,0 +1,20 @@
+{
+ "name": "unauthorized",
+ "calls": [
+  {
+   "method": "list_devices",
+   "args": [],
+   "result": {
+    "devices": [
+     {
+      "serial": "R58T00TEST",
+      "state": "unauthorized",
+      "model": null
+     }
+    ],
+    "error": null
+   },
+   "events": []
+  }
+ ]
+}

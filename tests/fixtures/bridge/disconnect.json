@@ -1,0 +1,1516 @@
+{
+ "name": "disconnect",
+ "calls": [
+  {
+   "method": "list_devices",
+   "args": [],
+   "result": {
+    "devices": [
+     {
+      "serial": "R58T00TEST",
+      "state": "device",
+      "model": "SM_A145R"
+     }
+    ],
+    "error": null
+   },
+   "events": []
+  },
+  {
+   "method": "start_scan",
+   "args": [
+    "R58T00TEST",
+    "Anna K."
+   ],
+   "result": {
+    "job_id": "job-1"
+   },
+   "events": [
+    [
+     "scan:stage",
+     {
+      "stage": "identify"
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cat /proc/uptime",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "280000.12 500000.00\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "date \"+%Y-%m-%d %H:%M:%S\"",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "2026-09-26 14:00:00\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "getprop",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "[ro.product.brand]: [samsung]\n[ro.product.manufacturer]: [samsung]\n[ro.product.model]: [SM-A145R]\n[ro.product.device]: [a14]\n[ro.build.version.release]: [14]\n[ro.build.version.sdk]: [34]\n[ro.build.version.security_patch]: [2026-07-01]\n[ro.serialno]: [R58T00TEST]\n[persist.sys.device_name]: [Telefon Anny]\n",
+      "tag": null
+     }
+    ],
+    [
+     "scan:device",
+     {
+      "device": {
+       "serial": "R58T00TEST",
+       "name": "samsung SM-A145R",
+       "brand": "samsung",
+       "manufacturer": "samsung",
+       "model": "SM-A145R",
+       "market_name": null,
+       "android": "14",
+       "sdk": 34,
+       "patch": "2026-07-01",
+       "uptime_s": 280000.12,
+       "match": {
+        "confidence": "none",
+        "step": "no_db",
+        "matched": null
+       },
+       "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNjAgMjEyIiB3aWR0aD0iMTYwIiBoZWlnaHQ9IjIxMiIKICAgICBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+CiAgPHRpdGxlPlRlbGVmb24gKG1vZGVsIG5pZXJvenBvem5hbnkpPC90aXRsZT4KICA8cmVjdCB4PSI0NSIgeT0iMTgiIHdpZHRoPSI3MCIgaGVpZ2h0PSIxNDYiIHJ4PSIxMCIvPgogIDxyZWN0IHg9IjUwIiB5PSIzMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEyMiIgcng9IjMiIHN0cm9rZS13aWR0aD0iMSIvPgogIDxjaXJjbGUgY3g9IjgwIiBjeT0iMjQiIHI9IjEuOCIvPgogIDxwYXRoIGQ9Ik0xMTcgNDh2MTRNMTE3IDY4djIyIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8cGF0aCBkPSJNODAgMTB2MTY0TTM2IDkxaDg4IiBzdHJva2Utd2lkdGg9IjAuNzUiIHN0cm9rZS1kYXNoYXJyYXk9IjMgMiIvPgogIDxnIHN0cm9rZS13aWR0aD0iMC43NSI+CiAgICA8cGF0aCBkPSJNNDUgMTcydjE0TTExNSAxNzJ2MTRNNDUgMTgyaDcwIi8+CiAgICA8cGF0aCBkPSJNNDUgMTgybDQtMnY0ek0xMTUgMTgybC00LTJ2NHoiIGZpbGw9ImN1cnJlbnRDb2xvciIvPgogICAgPHBhdGggZD0iTTI2IDE4aDE0TTI2IDE2NGgxNE0zMiAxOHYxNDYiLz4KICAgIDxwYXRoIGQ9Ik0zMiAxOGwtMiA0aDR6TTMyIDE2NGwtMi00aDR6IiBmaWxsPSJjdXJyZW50Q29sb3IiLz4KICA8L2c+CiAgPHRleHQgeD0iODAiIHk9IjIwMiIgZmlsbD0iY3VycmVudENvbG9yIiBzdHJva2U9Im5vbmUiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIGZvbnQtc2l6ZT0iOSIKICAgICAgICB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4/IMOXID8gbW08L3RleHQ+Cjwvc3ZnPgo="
+      }
+     }
+    ],
+    [
+     "scan:stage",
+     {
+      "stage": "packages"
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys package packages",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Packages:\n  Package [com.clean.pro.boost] (b1a2c3):\n    userId=10301\n    versionCode=7 minSdk=24 targetSdk=33\n    firstInstallTime=2026-09-20 10:00:00\n    lastUpdateTime=2026-09-20 10:00:00\n    installerPackageName=com.android.chrome\n    requested permissions:\n      android.permission.INTERNET\n      android.permission.SYSTEM_ALERT_WINDOW\n      android.permission.RECEIVE_BOOT_COMPLETED\n      android.permission.QUERY_ALL_PACKAGES\n      android.permission.USE_FULL_SCREEN_INTENT\n      android.permission.POST_NOTIFICATIONS\n    install permissions:\n      android.permission.INTERNET: granted=true\n      android.permission.RECEIVE_BOOT_COMPLETED: granted=true\n      android.permission.QUERY_ALL_PACKAGES: granted=true\n    User 0: ceDataInode=1 installed=true enabled=0\n      runtime permissions:\n        android.permission.POST_NOTIFICATIONS: granted=true, flags=[ USER_SET ]\n  Package [com.whatsapp] (c1):\n    versionCode=242000 minSdk=21 targetSdk=34\n    firstInstallTime=2025-01-10 09:00:00\n    installerPackageName=com.android.vending\n    requested permissions:\n      android.permission.POST_NOTIFICATIONS\n  Package [com.wlive.forecast] (d1):\n    versionCode=31 minSdk=23 targetSdk=34\n    firstInstallTime=2026-06-01 12:00:00\n    installerPackageName=com.android.vending\n    requested permissions:\n      android.permission.POST_NOTIFICATIONS\n  Package [com.sec.android.app.launcher] (e1):\n    versionCode=150000 minSdk=34 targetSdk=34\n    firstInstallTime=2008-12-31 16:00:00\n    installerPackageName=null\n    requested permissions:\n      android.permission.QUERY_ALL_PACKAGES\n\nHidden system packages:\n  Package [com.sec.android.app.launcher] (f1):\n    versionCode=1\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm list packages -d --user 0",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm list packages -f -i -U --user 0",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "package:/data/app/~~Rg8wIz5ZcWJ2cUNYmbzZ2w==/com.clean.pro.boost-a1B2==/base.apk=com.clean.pro.boost  installer=com.android.chrome uid:10301\npackage:/data/app/~~x9==/com.whatsapp-q==/base.apk=com.whatsapp  installer=com.android.vending uid:10250\npackage:/data/app/~~y7==/com.wlive.forecast-z==/base.apk=com.wlive.forecast  installer=com.android.vending uid:10260\npackage:/system/priv-app/TouchWizHome/TouchWizHome.apk=com.sec.android.app.launcher  installer=null uid:10090\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm list packages -s --user 0",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "package:com.sec.android.app.launcher\n",
+      "tag": null
+     }
+    ],
+    [
+     "scan:stage",
+     {
+      "stage": "collectors"
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "appops get com.clean.pro.boost",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Uid mode: SYSTEM_ALERT_WINDOW: allow\nPOST_NOTIFICATION: allow\n  null=[\n    Access: [bg-s] 2026-09-26 13:50:00.000 (-10m0s0ms)\n  ]\nSYSTEM_ALERT_WINDOW: allow\n  null=[\n    Access: [bg-s] 2026-09-26 13:55:48.123 (-4m11s877ms)\n  ]\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "appops get com.whatsapp",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "POST_NOTIFICATION: allow\n  null=[\n    Access: [top-s] 2026-09-26 13:00:00.000 (-1h0m0s0ms)\n  ]\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "appops get com.wlive.forecast",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "POST_NOTIFICATION: allow; time=+2m ago\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n  com.sec.android.app.launcher/com.android.launcher3.uioverrides.QuickstepLauncher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n  com.whatsapp/.Main\npriority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n  com.wlive.forecast/com.wlive.forecast.MainActivity\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cmd package query-receivers --brief -a android.intent.action.BOOT_COMPLETED",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "priority=0\n  com.clean.pro.boost/.BootReceiver\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cmd role get-role-holders android.app.role.BROWSER",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "com.android.chrome\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cmd role get-role-holders android.app.role.HOME",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "com.sec.android.app.launcher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cmd role get-role-holders android.app.role.SMS",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "com.google.android.apps.messaging\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys alarm",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Current Alarm Manager state:\n  Alarm Stats:\n  u0a301:com.clean.pro.boost +1m2s running, 600 wakeups:\n    +1m2s 600 wakes 600 alarms, last -2m1s12ms:\n      *walarm*:com.clean.pro.boost/.AdReceiver\n  u0a250:com.whatsapp +3s running, 20 wakeups:\n    +3s 20 wakes 25 alarms, last -1h2m:\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys device_policy",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Current Device Policy Manager state:\n  User 0:\n    Enabled Device Admins (User 0, provisioningState: 0):\n      com.clean.pro.boost/.AdminReceiver:\n        uid=10001\n    mPasswordOwner=-1\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys notification",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Current Notification Manager state:\n  Notification List:\n    NotificationRecord(0x0a1: pkg=com.clean.pro.boost user=UserHandle{0} id=7 tag=null importance=4 key=0|com.clean.pro.boost|7|null|10301: Notification(channel=ads))\n      uid=10301 userId=0\n      fullscreenIntent=PendingIntent{5f3: android.os.BinderProxy@1}\n      tickerText=null\n    NotificationRecord(0x0b2: pkg=com.whatsapp user=UserHandle{0} id=1 tag=null importance=4 key=0|com.whatsapp|1|null|10250: Notification(channel=msg))\n      uid=10250 userId=0\n      fullscreenIntent=null\n      tickerText=Anna: hej, jutro o 10? pisz na anna.k@example.com\n  Snoozed notifications:\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys usagestats",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "user=0\n  In-memory daily stats\n    events\n      time=\"2026-09-26 13:59:00\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:56:10\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:53:20\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:50:30\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:47:40\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:44:50\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:42:00\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:39:10\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:36:20\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:33:30\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:30:40\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:27:50\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:25:00\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:22:10\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:19:20\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:16:30\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:13:40\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:10:50\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:08:00\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:05:10\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:02:20\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:59:30\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:56:40\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:53:50\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:51:00\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:48:10\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:45:20\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:42:30\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:39:40\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:36:50\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:34:00\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:31:10\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:28:20\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:25:30\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:22:40\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:19:50\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:17:00\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:14:10\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:11:20\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:08:30\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:05:40\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:02:50\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:00:00\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 11:57:10\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 11:54:20\" type=NOTIFICATION",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "settings get secure enabled_accessibility_services",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "null\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "settings get secure enabled_notification_listeners",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "com.whatsapp/com.whatsapp.NotificationListener\n",
+      "tag": null
+     }
+    ],
+    [
+     "scan:stage",
+     {
+      "stage": "score"
+     }
+    ],
+    [
+     "scan:done",
+     {
+      "scan": {
+       "collectors": {
+        "ok": 8,
+        "total": 8,
+        "failed": []
+       },
+       "low_behavior_data": false,
+       "apk": null,
+       "apps": [
+        {
+         "package": "com.clean.pro.boost",
+         "name": "com.clean.pro.boost",
+         "score": 100,
+         "verdict": "malicious",
+         "verdict_label": "Szkodliwa",
+         "trusted": false,
+         "incomplete": false,
+         "is_system": false,
+         "from_play": false,
+         "installer": "com.android.chrome",
+         "is_admin": true,
+         "default_level": "remove",
+         "problems": [
+          "W ciągu ostatniej doby wyświetlała okna na wierzchu innych aplikacji (np. reklamy).",
+          "Nadała sobie uprawnienia administratora, żeby utrudnić usunięcie.",
+          "Ukryta aplikacja spoza Sklepu Play wyświetla okna nad innymi — typowe adware."
+         ],
+         "findings": [
+          {
+           "rule_id": "DM-OVERLAY-01",
+           "class": "behavior",
+           "weight": 25,
+           "text": "W ciągu ostatniej doby wyświetlała okna na wierzchu innych aplikacji (np. reklamy).",
+           "text_expert": "appops SYSTEM_ALERT_WINDOW: ostatnie użycie 252 s temu",
+           "evidence": {
+            "overlay_last_access_s": 251.877
+           }
+          },
+          {
+           "rule_id": "DM-ADMIN-01",
+           "class": "position",
+           "weight": 25,
+           "text": "Nadała sobie uprawnienia administratora, żeby utrudnić usunięcie.",
+           "text_expert": "dumpsys device_policy: aktywny administrator urządzenia",
+           "evidence": {}
+          },
+          {
+           "rule_id": "DM-COMBO-01",
+           "class": "combo",
+           "weight": 20,
+           "text": "Ukryta aplikacja spoza Sklepu Play wyświetla okna nad innymi — typowe adware.",
+           "text_expert": "kombinacja: DM-HIDDEN-01 + DM-OVERLAY-01 + DM-SRC-01",
+           "evidence": {}
+          },
+          {
+           "rule_id": "DM-FSI-01",
+           "class": "behavior",
+           "weight": 15,
+           "text": "Ma powiadomienie, które otwiera się na cały ekran.",
+           "text_expert": "dumpsys notification: aktywne powiadomienie z fullscreenIntent (1 aktywnych)",
+           "evidence": {
+            "notif_active": 1
+           }
+          },
+          {
+           "rule_id": "DM-HIDDEN-01",
+           "class": "position",
+           "weight": 15,
+           "text": "Ukrywa swoją ikonę — nie widać jej na liście aplikacji.",
+           "text_expert": "brak aktywności MAIN/LAUNCHER",
+           "evidence": {}
+          },
+          {
+           "rule_id": "DM-COMBO-02",
+           "class": "combo",
+           "weight": 15,
+           "text": "Blokuje usunięcie i jednocześnie nachalnie wyświetla treści.",
+           "text_expert": "kombinacja: DM-ADMIN-01 + zachowanie reklamowe",
+           "evidence": {}
+          },
+          {
+           "rule_id": "DM-ALARM-01",
+           "class": "behavior",
+           "weight": 10,
+           "text": "Często budzi telefon — średnio 8 razy na godzinę.",
+           "text_expert": "dumpsys alarm: 600 wybudzeń (7.7/h)",
+           "evidence": {
+            "alarm_wakeups": 600,
+            "alarm_wakeups_per_hour": 7.714282408164682
+           }
+          },
+          {
+           "rule_id": "DM-SRC-01",
+           "class": "context",
+           "weight": 8,
+           "text": "Zainstalowana spoza Sklepu Play.",
+           "text_expert": "instalator: com.android.chrome",
+           "evidence": {
+            "installer": "com.android.chrome"
+           }
+          },
+          {
+           "rule_id": "DM-NAME-01",
+           "class": "context",
+           "weight": 6,
+           "text": "Nazwa sugeruje aplikację systemową lub „czyszczącą” (clean, boost).",
+           "text_expert": "Nazwa pakietu zawiera tokeny podszywania się: clean, boost",
+           "evidence": {
+            "tokens": "clean, boost"
+           }
+          },
+          {
+           "rule_id": "DM-PERM-01",
+           "class": "context",
+           "weight": 4,
+           "text": "Uruchamia się sama po włączeniu telefonu i sprawdza inne zainstalowane aplikacje.",
+           "text_expert": "BOOT_COMPLETED receiver + QUERY_ALL_PACKAGES",
+           "evidence": {}
+          },
+          {
+           "rule_id": "DM-FSIPERM-01",
+           "class": "context",
+           "weight": 4,
+           "text": "Może wyświetlać okna na cały ekran.",
+           "text_expert": "żąda USE_FULL_SCREEN_INTENT (instalacja spoza Play)",
+           "evidence": {}
+          },
+          {
+           "rule_id": "DM-FRESH-01",
+           "class": "context",
+           "weight": 3,
+           "text": "Zainstalowana niedawno (6 dni temu).",
+           "text_expert": "firstInstallTime: 6.2 dni temu",
+           "evidence": {
+            "installed_days": 6.166666666666667
+           }
+          }
+         ],
+         "apk_error": null,
+         "ad_sdks": null
+        },
+        {
+         "package": "com.wlive.forecast",
+         "name": "com.wlive.forecast",
+         "score": 25,
+         "verdict": "review",
+         "verdict_label": "Do sprawdzenia",
+         "trusted": false,
+         "incomplete": false,
+         "is_system": false,
+         "from_play": true,
+         "installer": "com.android.vending",
+         "is_admin": false,
+         "default_level": null,
+         "problems": [
+          "Zasypuje telefon powiadomieniami — średnio 21 na godzinę."
+         ],
+         "findings": [
+          {
+           "rule_id": "DM-NOTIF-02",
+           "class": "behavior",
+           "weight": 25,
+           "text": "Zasypuje telefon powiadomieniami — średnio 21 na godzinę.",
+           "text_expert": "usagestats: 500 × NOTIFICATION_INTERRUPTION / 24 h (20.8/h)",
+           "evidence": {
+            "notif_interruptions_24h": 500,
+            "notif_per_hour_24h": 20.833333333333332
+           }
+          }
+         ],
+         "apk_error": null,
+         "ad_sdks": null
+        },
+        {
+         "package": "com.sec.android.app.launcher",
+         "name": "com.sec.android.app.launcher",
+         "score": 20,
+         "verdict": "safe",
+         "verdict_label": "Bezpieczna",
+         "trusted": false,
+         "incomplete": false,
+         "is_system": true,
+         "from_play": false,
+         "installer": null,
+         "is_admin": false,
+         "default_level": null,
+         "problems": [
+          "Jest ustawiona jako ekran główny telefonu."
+         ],
+         "findings": [
+          {
+           "rule_id": "DM-HOME-01",
+           "class": "position",
+           "weight": 20,
+           "text": "Jest ustawiona jako ekran główny telefonu.",
+           "text_expert": "rola android.app.role.HOME",
+           "evidence": {}
+          }
+         ],
+         "apk_error": null,
+         "ad_sdks": null
+        },
+        {
+         "package": "com.whatsapp",
+         "name": "com.whatsapp",
+         "score": 0,
+         "verdict": "safe",
+         "verdict_label": "Bezpieczna",
+         "trusted": true,
+         "incomplete": false,
+         "is_system": false,
+         "from_play": true,
+         "installer": "com.android.vending",
+         "is_admin": false,
+         "default_level": null,
+         "problems": [
+          "Czyta powiadomienia z innych aplikacji."
+         ],
+         "findings": [
+          {
+           "rule_id": "DM-NLS-01",
+           "class": "position",
+           "weight": 10,
+           "text": "Czyta powiadomienia z innych aplikacji.",
+           "text_expert": "secure/enabled_notification_listeners zawiera usługę aplikacji",
+           "evidence": {}
+          }
+         ],
+         "apk_error": null,
+         "ad_sdks": null
+        }
+       ],
+       "counts": {
+        "malicious": 1,
+        "suspicious": 0,
+        "review": 1,
+        "safe": 2,
+        "non_play": 1,
+        "admins": 1,
+        "total": 4,
+        "user": 3
+       }
+      },
+      "interrupted": [],
+      "client": "Anna K."
+     }
+    ],
+    [
+     "apk:progress",
+     {
+      "done": 1,
+      "total": 2,
+      "package": "com.clean.pro.boost"
+     }
+    ],
+    [
+     "apk:progress",
+     {
+      "done": 2,
+      "total": 2,
+      "package": "com.wlive.forecast"
+     }
+    ],
+    [
+     "apk:done",
+     {
+      "scan": {
+       "collectors": {
+        "ok": 8,
+        "total": 8,
+        "failed": []
+       },
+       "low_behavior_data": false,
+       "apk": {
+        "requested": 2,
+        "analyzed": 0,
+        "failed": {}
+       },
+       "apps": [
+        {
+         "package": "com.clean.pro.boost",
+         "name": "com.clean.pro.boost",
+         "score": 100,
+         "verdict": "malicious",
+         "verdict_label": "Szkodliwa",
+         "trusted": false,
+         "incomplete": false,
+         "is_system": false,
+         "from_play": false,
+         "installer": "com.android.chrome",
+         "is_admin": true,
+         "default_level": "remove",
+         "problems": [
+          "W ciągu ostatniej doby wyświetlała okna na wierzchu innych aplikacji (np. reklamy).",
+          "Nadała sobie uprawnienia administratora, żeby utrudnić usunięcie.",
+          "Ukryta aplikacja spoza Sklepu Play wyświetla okna nad innymi — typowe adware."
+         ],
+         "findings": [
+          {
+           "rule_id": "DM-OVERLAY-01",
+           "class": "behavior",
+           "weight": 25,
+           "text": "W ciągu ostatniej doby wyświetlała okna na wierzchu innych aplikacji (np. reklamy).",
+           "text_expert": "appops SYSTEM_ALERT_WINDOW: ostatnie użycie 252 s temu",
+           "evidence": {
+            "overlay_last_access_s": 251.877
+           }
+          },
+          {
+           "rule_id": "DM-ADMIN-01",
+           "class": "position",
+           "weight": 25,
+           "text": "Nadała sobie uprawnienia administratora, żeby utrudnić usunięcie.",
+           "text_expert": "dumpsys device_policy: aktywny administrator urządzenia",
+           "evidence": {}
+          },
+          {
+           "rule_id": "DM-COMBO-01",
+           "class": "combo",
+           "weight": 20,
+           "text": "Ukryta aplikacja spoza Sklepu Play wyświetla okna nad innymi — typowe adware.",
+           "text_expert": "kombinacja: DM-HIDDEN-01 + DM-OVERLAY-01 + DM-SRC-01",
+           "evidence": {}
+          },
+          {
+           "rule_id": "DM-FSI-01",
+           "class": "behavior",
+           "weight": 15,
+           "text": "Ma powiadomienie, które otwiera się na cały ekran.",
+           "text_expert": "dumpsys notification: aktywne powiadomienie z fullscreenIntent (1 aktywnych)",
+           "evidence": {
+            "notif_active": 1
+           }
+          },
+          {
+           "rule_id": "DM-HIDDEN-01",
+           "class": "position",
+           "weight": 15,
+           "text": "Ukrywa swoją ikonę — nie widać jej na liście aplikacji.",
+           "text_expert": "brak aktywności MAIN/LAUNCHER",
+           "evidence": {}
+          },
+          {
+           "rule_id": "DM-COMBO-02",
+           "class": "combo",
+           "weight": 15,
+           "text": "Blokuje usunięcie i jednocześnie nachalnie wyświetla treści.",
+           "text_expert": "kombinacja: DM-ADMIN-01 + zachowanie reklamowe",
+           "evidence": {}
+          },
+          {
+           "rule_id": "DM-ALARM-01",
+           "class": "behavior",
+           "weight": 10,
+           "text": "Często budzi telefon — średnio 8 razy na godzinę.",
+           "text_expert": "dumpsys alarm: 600 wybudzeń (7.7/h)",
+           "evidence": {
+            "alarm_wakeups": 600,
+            "alarm_wakeups_per_hour": 7.714282408164682
+           }
+          },
+          {
+           "rule_id": "DM-SRC-01",
+           "class": "context",
+           "weight": 8,
+           "text": "Zainstalowana spoza Sklepu Play.",
+           "text_expert": "instalator: com.android.chrome",
+           "evidence": {
+            "installer": "com.android.chrome"
+           }
+          },
+          {
+           "rule_id": "DM-NAME-01",
+           "class": "context",
+           "weight": 6,
+           "text": "Nazwa sugeruje aplikację systemową lub „czyszczącą” (clean, boost).",
+           "text_expert": "Nazwa pakietu zawiera tokeny podszywania się: clean, boost",
+           "evidence": {
+            "tokens": "clean, boost"
+           }
+          },
+          {
+           "rule_id": "DM-PERM-01",
+           "class": "context",
+           "weight": 4,
+           "text": "Uruchamia się sama po włączeniu telefonu i sprawdza inne zainstalowane aplikacje.",
+           "text_expert": "BOOT_COMPLETED receiver + QUERY_ALL_PACKAGES",
+           "evidence": {}
+          },
+          {
+           "rule_id": "DM-FSIPERM-01",
+           "class": "context",
+           "weight": 4,
+           "text": "Może wyświetlać okna na cały ekran.",
+           "text_expert": "żąda USE_FULL_SCREEN_INTENT (instalacja spoza Play)",
+           "evidence": {}
+          },
+          {
+           "rule_id": "DM-FRESH-01",
+           "class": "context",
+           "weight": 3,
+           "text": "Zainstalowana niedawno (6 dni temu).",
+           "text_expert": "firstInstallTime: 6.2 dni temu",
+           "evidence": {
+            "installed_days": 6.166666666666667
+           }
+          }
+         ],
+         "apk_error": null,
+         "ad_sdks": null
+        },
+        {
+         "package": "com.wlive.forecast",
+         "name": "com.wlive.forecast",
+         "score": 25,
+         "verdict": "review",
+         "verdict_label": "Do sprawdzenia",
+         "trusted": false,
+         "incomplete": false,
+         "is_system": false,
+         "from_play": true,
+         "installer": "com.android.vending",
+         "is_admin": false,
+         "default_level": null,
+         "problems": [
+          "Zasypuje telefon powiadomieniami — średnio 21 na godzinę."
+         ],
+         "findings": [
+          {
+           "rule_id": "DM-NOTIF-02",
+           "class": "behavior",
+           "weight": 25,
+           "text": "Zasypuje telefon powiadomieniami — średnio 21 na godzinę.",
+           "text_expert": "usagestats: 500 × NOTIFICATION_INTERRUPTION / 24 h (20.8/h)",
+           "evidence": {
+            "notif_interruptions_24h": 500,
+            "notif_per_hour_24h": 20.833333333333332
+           }
+          }
+         ],
+         "apk_error": null,
+         "ad_sdks": null
+        },
+        {
+         "package": "com.sec.android.app.launcher",
+         "name": "com.sec.android.app.launcher",
+         "score": 20,
+         "verdict": "safe",
+         "verdict_label": "Bezpieczna",
+         "trusted": false,
+         "incomplete": false,
+         "is_system": true,
+         "from_play": false,
+         "installer": null,
+         "is_admin": false,
+         "default_level": null,
+         "problems": [
+          "Jest ustawiona jako ekran główny telefonu."
+         ],
+         "findings": [
+          {
+           "rule_id": "DM-HOME-01",
+           "class": "position",
+           "weight": 20,
+           "text": "Jest ustawiona jako ekran główny telefonu.",
+           "text_expert": "rola android.app.role.HOME",
+           "evidence": {}
+          }
+         ],
+         "apk_error": null,
+         "ad_sdks": null
+        },
+        {
+         "package": "com.whatsapp",
+         "name": "com.whatsapp",
+         "score": 0,
+         "verdict": "safe",
+         "verdict_label": "Bezpieczna",
+         "trusted": true,
+         "incomplete": false,
+         "is_system": false,
+         "from_play": true,
+         "installer": "com.android.vending",
+         "is_admin": false,
+         "default_level": null,
+         "problems": [
+          "Czyta powiadomienia z innych aplikacji."
+         ],
+         "findings": [
+          {
+           "rule_id": "DM-NLS-01",
+           "class": "position",
+           "weight": 10,
+           "text": "Czyta powiadomienia z innych aplikacji.",
+           "text_expert": "secure/enabled_notification_listeners zawiera usługę aplikacji",
+           "evidence": {}
+          }
+         ],
+         "apk_error": null,
+         "ad_sdks": null
+        }
+       ],
+       "counts": {
+        "malicious": 1,
+        "suspicious": 0,
+        "review": 1,
+        "safe": 2,
+        "non_play": 1,
+        "admins": 1,
+        "total": 4,
+        "user": 3
+       }
+      }
+     }
+    ],
+    [
+     "job:end",
+     {
+      "job_id": "job-1",
+      "kind": "apk"
+     }
+    ]
+   ]
+  },
+  {
+   "method": "preview_plan",
+   "args": [
+    {
+     "com.wlive.forecast": "disable"
+    },
+    []
+   ],
+   "result": {
+    "apps": [
+     {
+      "package": "com.wlive.forecast",
+      "name": "com.wlive.forecast",
+      "level": "disable",
+      "level_label": "WYŁĄCZ",
+      "blocked": false,
+      "reason": null,
+      "reason_text": null,
+      "steps": [
+       "odebranie zgody na powiadomienia",
+       "blokada powiadomień pełnoekranowych",
+       "zatrzymanie aplikacji",
+       "wyłączenie aplikacji"
+      ],
+      "warnings": []
+     }
+    ],
+    "runnable": 1
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n  com.sec.android.app.launcher/com.android.launcher3.uioverrides.QuickstepLauncher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\ncom.sec.android.app.launcher/com.android.launcher3.uioverrides.QuickstepLauncher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "getprop ro.build.version.sdk",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "34\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm list packages -s --user 0",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "package:com.sec.android.app.launcher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "settings get secure default_input_method",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "null\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "settings get secure enabled_accessibility_services",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "null\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "settings get secure enabled_notification_listeners",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "com.whatsapp/com.whatsapp.NotificationListener\n",
+      "tag": null
+     }
+    ]
+   ]
+  },
+  {
+   "method": "execute",
+   "args": [
+    {
+     "com.wlive.forecast": "disable"
+    },
+    []
+   ],
+   "result": {
+    "job_id": "job-2"
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n  com.sec.android.app.launcher/com.android.launcher3.uioverrides.QuickstepLauncher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\ncom.sec.android.app.launcher/com.android.launcher3.uioverrides.QuickstepLauncher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "getprop ro.build.version.sdk",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "34\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm list packages -s --user 0",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "package:com.sec.android.app.launcher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "settings get secure default_input_method",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "null\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "settings get secure enabled_accessibility_services",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "null\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "settings get secure enabled_notification_listeners",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "com.whatsapp/com.whatsapp.NotificationListener\n",
+      "tag": null
+     }
+    ],
+    [
+     "exec:order",
+     {
+      "order": "ZS/2026/0926/01",
+      "plan": {
+       "apps": [
+        {
+         "package": "com.wlive.forecast",
+         "name": "com.wlive.forecast",
+         "level": "disable",
+         "level_label": "WYŁĄCZ",
+         "blocked": false,
+         "reason": null,
+         "reason_text": null,
+         "steps": [
+          "odebranie zgody na powiadomienia",
+          "blokada powiadomień pełnoekranowych",
+          "zatrzymanie aplikacji",
+          "wyłączenie aplikacji"
+         ],
+         "warnings": []
+        }
+       ],
+       "runnable": 1
+      }
+     }
+    ],
+    [
+     "exec:step",
+     {
+      "action_id": 1,
+      "package": "com.wlive.forecast",
+      "name": "com.wlive.forecast",
+      "kind": "permission",
+      "label": "odebranie zgody na powiadomienia",
+      "status": "running",
+      "error": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys package com.wlive.forecast",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Domain verification status:\nFailure printing domain verification information\nPackages:\n  Package [com.wlive.forecast] (f00d):\n    versionCode=31 minSdk=26 targetSdk=34\n    User 0: ceDataInode=1 installed=true enabled=0\n      runtime permissions:\n        android.permission.POST_NOTIFICATIONS: granted=true\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm revoke com.wlive.forecast android.permission.POST_NOTIFICATIONS",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "exec:step",
+     {
+      "action_id": 1,
+      "package": "com.wlive.forecast",
+      "name": "com.wlive.forecast",
+      "kind": "permission",
+      "label": "odebranie zgody na powiadomienia",
+      "status": "done",
+      "error": null
+     }
+    ],
+    [
+     "exec:step",
+     {
+      "action_id": 2,
+      "package": "com.wlive.forecast",
+      "name": "com.wlive.forecast",
+      "kind": "appop",
+      "label": "blokada powiadomień pełnoekranowych",
+      "status": "running",
+      "error": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "appops get com.wlive.forecast USE_FULL_SCREEN_INTENT",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "No operations.\nDefault mode: allow\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "appops set com.wlive.forecast USE_FULL_SCREEN_INTENT deny",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "exec:step",
+     {
+      "action_id": 2,
+      "package": "com.wlive.forecast",
+      "name": "com.wlive.forecast",
+      "kind": "appop",
+      "label": "blokada powiadomień pełnoekranowych",
+      "status": "done",
+      "error": null
+     }
+    ],
+    [
+     "exec:step",
+     {
+      "action_id": 3,
+      "package": "com.wlive.forecast",
+      "name": "com.wlive.forecast",
+      "kind": "force_stop",
+      "label": "zatrzymanie aplikacji",
+      "status": "running",
+      "error": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "am force-stop com.wlive.forecast",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "exec:step",
+     {
+      "action_id": 3,
+      "package": "com.wlive.forecast",
+      "name": "com.wlive.forecast",
+      "kind": "force_stop",
+      "label": "zatrzymanie aplikacji",
+      "status": "done",
+      "error": null
+     }
+    ],
+    [
+     "exec:step",
+     {
+      "action_id": 4,
+      "package": "com.wlive.forecast",
+      "name": "com.wlive.forecast",
+      "kind": "enabled",
+      "label": "wyłączenie aplikacji",
+      "status": "running",
+      "error": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm disable-user --user 0 com.wlive.forecast",
+      "status": "error:no_device",
+      "duration": 0.0,
+      "output": "device 'R58T00TEST' not found",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm list packages -d --user 0",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "exec:disconnected",
+     {
+      "order": "ZS/2026/0926/01"
+     }
+    ],
+    [
+     "job:end",
+     {
+      "job_id": "job-2",
+      "kind": "exec"
+     }
+    ]
+   ]
+  },
+  {
+   "method": "history",
+   "args": [
+    null
+   ],
+   "result": {
+    "serial": "R58T00TEST",
+    "serials": [
+     "R58T00TEST"
+    ],
+    "orders": [
+     {
+      "id": 1,
+      "number": "ZS/2026/0926/01",
+      "created_at": "2026-09-26T14:30",
+      "status": "running",
+      "status_label": "w toku",
+      "client": "Anna K.",
+      "model": "SM-A145R",
+      "interrupted": true,
+      "actions": [
+       {
+        "id": 1,
+        "package": "com.wlive.forecast",
+        "level": "disable",
+        "level_label": "WYŁĄCZ",
+        "kind": "permission",
+        "step_label": "odebranie zgody na powiadomienia",
+        "status": "done",
+        "status_label": "wykonane",
+        "error": null
+       },
+       {
+        "id": 2,
+        "package": "com.wlive.forecast",
+        "level": "disable",
+        "level_label": "WYŁĄCZ",
+        "kind": "appop",
+        "step_label": "blokada powiadomień pełnoekranowych",
+        "status": "done",
+        "status_label": "wykonane",
+        "error": null
+       },
+       {
+        "id": 3,
+        "package": "com.wlive.forecast",
+        "level": "disable",
+        "level_label": "WYŁĄCZ",
+        "kind": "force_stop",
+        "step_label": "zatrzymanie aplikacji",
+        "status": "done",
+        "status_label": "wykonane",
+        "error": null
+       },
+       {
+        "id": 4,
+        "package": "com.wlive.forecast",
+        "level": "disable",
+        "level_label": "WYŁĄCZ",
+        "kind": "enabled",
+        "step_label": "wyłączenie aplikacji",
+        "status": "pending",
+        "status_label": "oczekuje",
+        "error": null
+       }
+      ]
+     }
+    ]
+   },
+   "events": []
+  },
+  {
+   "method": "resume",
+   "args": [
+    "ZS/2026/0926/01"
+   ],
+   "result": {
+    "job_id": "job-3"
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cat /proc/uptime",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "280000.12 500000.00\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "date \"+%Y-%m-%d %H:%M:%S\"",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "2026-09-26 14:00:00\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "getprop",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "[ro.product.brand]: [samsung]\n[ro.product.manufacturer]: [samsung]\n[ro.product.model]: [SM-A145R]\n[ro.product.device]: [a14]\n[ro.build.version.release]: [14]\n[ro.build.version.sdk]: [34]\n[ro.build.version.security_patch]: [2026-07-01]\n[ro.serialno]: [R58T00TEST]\n[persist.sys.device_name]: [Telefon Anny]\n",
+      "tag": null
+     }
+    ],
+    [
+     "exec:order",
+     {
+      "order": "ZS/2026/0926/01",
+      "plan": null
+     }
+    ],
+    [
+     "exec:step",
+     {
+      "action_id": 4,
+      "package": "com.wlive.forecast",
+      "name": "com.wlive.forecast",
+      "kind": "enabled",
+      "label": "wyłączenie aplikacji",
+      "status": "running",
+      "error": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm list packages -d --user 0",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "package:com.wlive.forecast\n",
+      "tag": null
+     }
+    ],
+    [
+     "exec:step",
+     {
+      "action_id": 4,
+      "package": "com.wlive.forecast",
+      "name": "com.wlive.forecast",
+      "kind": "enabled",
+      "label": "wyłączenie aplikacji",
+      "status": "done",
+      "error": null
+     }
+    ],
+    [
+     "exec:verify",
+     {}
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "appops get com.wlive.forecast USE_FULL_SCREEN_INTENT",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "USE_FULL_SCREEN_INTENT: deny\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys package com.wlive.forecast",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Domain verification status:\nFailure printing domain verification information\nPackages:\n  Package [com.wlive.forecast] (f00d):\n    versionCode=31 minSdk=26 targetSdk=34\n    User 0: ceDataInode=1 installed=true enabled=3\n      runtime permissions:\n        android.permission.POST_NOTIFICATIONS: granted=false\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm list packages -d --user 0",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "package:com.wlive.forecast\n",
+      "tag": null
+     }
+    ],
+    [
+     "exec:done",
+     {
+      "order": "ZS/2026/0926/01",
+      "status": "done",
+      "status_label": "wykonane",
+      "stopped": false,
+      "apps": [
+       {
+        "package": "com.wlive.forecast",
+        "name": "com.wlive.forecast",
+        "outcome": "ok",
+        "errors": [],
+        "kinds": []
+       }
+      ]
+     }
+    ],
+    [
+     "job:end",
+     {
+      "job_id": "job-3",
+      "kind": "resume"
+     }
+    ]
+   ]
+  }
+ ]
+}

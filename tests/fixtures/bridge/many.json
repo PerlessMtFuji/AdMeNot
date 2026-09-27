@@ -1,0 +1,25 @@
+{
+ "name": "many",
+ "calls": [
+  {
+   "method": "list_devices",
+   "args": [],
+   "result": {
+    "devices": [
+     {
+      "serial": "R58T00TEST",
+      "state": "device",
+      "model": "SM_A145R"
+     },
+     {
+      "serial": "HT7A1B2C3",
+      "state": "device",
+      "model": "Pixel_7"
+     }
+    ],
+    "error": null
+   },
+   "events": []
+  }
+ ]
+}

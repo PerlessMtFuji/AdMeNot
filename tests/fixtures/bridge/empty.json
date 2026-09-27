@@ -1,0 +1,14 @@
+{
+ "name": "empty",
+ "calls": [
+  {
+   "method": "list_devices",
+   "args": [],
+   "result": {
+    "devices": [],
+    "error": null
+   },
+   "events": []
+  }
+ ]
+}
