@@ -14,11 +14,16 @@ from demalware.app.present import (
     plan_view,
     result_view,
     scan_view,
+    severity,
+    source_view,
     step_view,
+    symptoms,
 )
 from demalware.engine.actions.executor import ExecOptions
+from demalware.engine.facts import AppFacts
 from demalware.engine.journal.db import Journal
 from demalware.engine.phones.provider import SILHOUETTE, PhoneMatch
+from demalware.engine.rules.model import Finding
 from demalware.engine.session import run_scan
 from demalware.engine.workflow import execute_order, plan_order, start
 
@@ -66,6 +71,53 @@ def test_device_card_with_and_without_photo(synthetic_adb, tmp_path):
     assert image_uri(SILHOUETTE).startswith("data:image/svg+xml")
 
 
+def _f(rule_id, category, weight, text):
+    return Finding(rule_id, "behavior", weight, {}, {"pl": text, "en": text}, {}, category,
+                   {"pl": rule_id, "en": rule_id})
+
+
+def test_symptoms_group_by_category_sort_and_join():
+    out = symptoms([
+        _f("A", "removal", 15, "Ukrywa ikonę."),
+        _f("B", "ads", 25, "Okna."),
+        _f("C", "removal", 25, "Admin."),
+        _f("D", "removal", 15, "Ukrywa ikonę."),
+        _f("E", "origin", 8, "Spoza Play."),
+        Finding("X", "combo", 20, {}, {"pl": "k"}, {}, "combo", {"pl": "k"}),
+    ], "pl")
+    assert out == [
+        {"category": "ads", "severity": "bad", "text": "Okna."},
+        {"category": "removal", "severity": "bad", "text": "Admin. Ukrywa ikonę."},
+        {"category": "origin", "severity": "neutral", "text": "Spoza Play."},
+    ]
+    assert [severity(w) for w in (25, 20, 19, 10, 9)] == ["bad", "bad", "warn", "warn", "neutral"]
+    assert symptoms([], "pl") == []
+
+
+def test_source_view_names_installers():
+    assert source_view(AppFacts("p", installer="com.apkpure.aegon", installed_days=3.4), "pl") == \
+        {"label": "APKPure", "days": 3}
+    assert source_view(AppFacts("p", installer="com.android.vending"), "en") == \
+        {"label": "Play Store", "days": None}
+    assert source_view(AppFacts("p", installer="com.android.vending"), "pl")["label"] == "Sklep Play"
+    assert source_view(AppFacts("p", installer="com.foo.store"), "pl")["label"] == "com.foo.store"
+    assert source_view(AppFacts("p"), "pl")["label"] == "nieznane"
+    assert source_view(AppFacts("p", is_system=True), "en")["label"] == "system"
+
+
+def test_scan_view_has_symptoms_labels_and_source(synthetic_adb):
+    view = scan_view(run_scan(synthetic_adb), "pl")
+    apps = {a["package"]: a for a in view["apps"]}
+    boost = apps["com.clean.pro.boost"]
+    cats = [s["category"] for s in boost["symptoms"]]
+    assert cats and "combo" not in cats and len(cats) == len(set(cats))
+    assert boost["symptoms"][0]["severity"] == "bad"
+    assert all(f["label"] and f["category"] for f in boost["findings"])
+    assert not any(f["label"].startswith("DM-") for f in boost["findings"])
+    assert boost["source"]["label"] == "Chrome"
+    json.dumps(view)
+
+
 def test_plan_step_result_and_history_views(tmp_path):
     phone = make_cli_phone()
     report = run_scan(phone)
@@ -101,4 +153,6 @@ def test_plan_step_result_and_history_views(tmp_path):
         assert o["number"] == order.number and o["client"] == "Anna <b>"
         assert o["status_label"] == "wykonane" and o["interrupted"] is False
         assert {a["status_label"] for a in o["actions"]} == {"wykonane"}
-        assert history_view(journal, None, [], "pl")["orders"] == []
+        assert hv["devices"] == [{"serial": phone.serial, "model": o["model"]}]
+        empty = history_view(journal, None, [], "pl")
+        assert empty["orders"] == [] and empty["devices"] == []

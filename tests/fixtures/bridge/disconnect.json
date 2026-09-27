@@ -87,7 +87,7 @@
         "step": "no_db",
         "matched": null
        },
-       "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNjAgMjEyIiB3aWR0aD0iMTYwIiBoZWlnaHQ9IjIxMiIKICAgICBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+CiAgPHRpdGxlPlRlbGVmb24gKG1vZGVsIG5pZXJvenBvem5hbnkpPC90aXRsZT4KICA8cmVjdCB4PSI0NSIgeT0iMTgiIHdpZHRoPSI3MCIgaGVpZ2h0PSIxNDYiIHJ4PSIxMCIvPgogIDxyZWN0IHg9IjUwIiB5PSIzMCIgd2lkdGg9IjYwIiBoZWlnaHQ9IjEyMiIgcng9IjMiIHN0cm9rZS13aWR0aD0iMSIvPgogIDxjaXJjbGUgY3g9IjgwIiBjeT0iMjQiIHI9IjEuOCIvPgogIDxwYXRoIGQ9Ik0xMTcgNDh2MTRNMTE3IDY4djIyIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8cGF0aCBkPSJNODAgMTB2MTY0TTM2IDkxaDg4IiBzdHJva2Utd2lkdGg9IjAuNzUiIHN0cm9rZS1kYXNoYXJyYXk9IjMgMiIvPgogIDxnIHN0cm9rZS13aWR0aD0iMC43NSI+CiAgICA8cGF0aCBkPSJNNDUgMTcydjE0TTExNSAxNzJ2MTRNNDUgMTgyaDcwIi8+CiAgICA8cGF0aCBkPSJNNDUgMTgybDQtMnY0ek0xMTUgMTgybC00LTJ2NHoiIGZpbGw9ImN1cnJlbnRDb2xvciIvPgogICAgPHBhdGggZD0iTTI2IDE4aDE0TTI2IDE2NGgxNE0zMiAxOHYxNDYiLz4KICAgIDxwYXRoIGQ9Ik0zMiAxOGwtMiA0aDR6TTMyIDE2NGwtMi00aDR6IiBmaWxsPSJjdXJyZW50Q29sb3IiLz4KICA8L2c+CiAgPHRleHQgeD0iODAiIHk9IjIwMiIgZmlsbD0iY3VycmVudENvbG9yIiBzdHJva2U9Im5vbmUiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIGZvbnQtc2l6ZT0iOSIKICAgICAgICB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4/IMOXID8gbW08L3RleHQ+Cjwvc3ZnPgo="
+       "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxNjAgMjEyIiB3aWR0aD0iMTYwIiBoZWlnaHQ9IjIxMiINCiAgICAgZmlsbD0ibm9uZSIgc3Ryb2tlPSJjdXJyZW50Q29sb3IiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPg0KICA8dGl0bGU+VGVsZWZvbiAobW9kZWwgbmllcm96cG96bmFueSk8L3RpdGxlPg0KICA8cmVjdCB4PSI0NSIgeT0iMTgiIHdpZHRoPSI3MCIgaGVpZ2h0PSIxNDYiIHJ4PSIxMCIvPg0KICA8cmVjdCB4PSI1MCIgeT0iMzAiIHdpZHRoPSI2MCIgaGVpZ2h0PSIxMjIiIHJ4PSIzIiBzdHJva2Utd2lkdGg9IjEiLz4NCiAgPGNpcmNsZSBjeD0iODAiIGN5PSIyNCIgcj0iMS44Ii8+DQogIDxwYXRoIGQ9Ik0xMTcgNDh2MTRNMTE3IDY4djIyIiBzdHJva2Utd2lkdGg9IjIiLz4NCiAgPHBhdGggZD0iTTgwIDEwdjE2NE0zNiA5MWg4OCIgc3Ryb2tlLXdpZHRoPSIwLjc1IiBzdHJva2UtZGFzaGFycmF5PSIzIDIiLz4NCiAgPGcgc3Ryb2tlLXdpZHRoPSIwLjc1Ij4NCiAgICA8cGF0aCBkPSJNNDUgMTcydjE0TTExNSAxNzJ2MTRNNDUgMTgyaDcwIi8+DQogICAgPHBhdGggZD0iTTQ1IDE4Mmw0LTJ2NHpNMTE1IDE4MmwtNC0ydjR6IiBmaWxsPSJjdXJyZW50Q29sb3IiLz4NCiAgICA8cGF0aCBkPSJNMjYgMThoMTRNMjYgMTY0aDE0TTMyIDE4djE0NiIvPg0KICAgIDxwYXRoIGQ9Ik0zMiAxOGwtMiA0aDR6TTMyIDE2NGwtMi00aDR6IiBmaWxsPSJjdXJyZW50Q29sb3IiLz4NCiAgPC9nPg0KICA8dGV4dCB4PSI4MCIgeT0iMjAyIiBmaWxsPSJjdXJyZW50Q29sb3IiIHN0cm9rZT0ibm9uZSIgZm9udC1mYW1pbHk9Im1vbm9zcGFjZSIgZm9udC1zaXplPSI5Ig0KICAgICAgICB0ZXh0LWFuY2hvcj0ibWlkZGxlIj4/IMOXID8gbW08L3RleHQ+DQo8L3N2Zz4NCg=="
       }
      }
     ],
@@ -376,7 +376,9 @@
            "text_expert": "appops SYSTEM_ALERT_WINDOW: ostatnie użycie 252 s temu",
            "evidence": {
             "overlay_last_access_s": 251.877
-           }
+           },
+           "category": "ads",
+           "label": "Okna nad innymi aplikacjami"
           },
           {
            "rule_id": "DM-ADMIN-01",
@@ -384,7 +386,9 @@
            "weight": 25,
            "text": "Nadała sobie uprawnienia administratora, żeby utrudnić usunięcie.",
            "text_expert": "dumpsys device_policy: aktywny administrator urządzenia",
-           "evidence": {}
+           "evidence": {},
+           "category": "removal",
+           "label": "Administrator urządzenia"
           },
           {
            "rule_id": "DM-COMBO-01",
@@ -392,7 +396,9 @@
            "weight": 20,
            "text": "Ukryta aplikacja spoza Sklepu Play wyświetla okna nad innymi — typowe adware.",
            "text_expert": "kombinacja: DM-HIDDEN-01 + DM-OVERLAY-01 + DM-SRC-01",
-           "evidence": {}
+           "evidence": {},
+           "category": "combo",
+           "label": "Ukryta, spoza Play, okna nad innymi"
           },
           {
            "rule_id": "DM-FSI-01",
@@ -402,7 +408,9 @@
            "text_expert": "dumpsys notification: aktywne powiadomienie z fullscreenIntent (1 aktywnych)",
            "evidence": {
             "notif_active": 1
-           }
+           },
+           "category": "ads",
+           "label": "Powiadomienie pełnoekranowe"
           },
           {
            "rule_id": "DM-HIDDEN-01",
@@ -410,7 +418,9 @@
            "weight": 15,
            "text": "Ukrywa swoją ikonę — nie widać jej na liście aplikacji.",
            "text_expert": "brak aktywności MAIN/LAUNCHER",
-           "evidence": {}
+           "evidence": {},
+           "category": "removal",
+           "label": "Ukryta ikona"
           },
           {
            "rule_id": "DM-COMBO-02",
@@ -418,7 +428,9 @@
            "weight": 15,
            "text": "Blokuje usunięcie i jednocześnie nachalnie wyświetla treści.",
            "text_expert": "kombinacja: DM-ADMIN-01 + zachowanie reklamowe",
-           "evidence": {}
+           "evidence": {},
+           "category": "combo",
+           "label": "Blokuje usunięcie i nachalnie wyświetla treści"
           },
           {
            "rule_id": "DM-ALARM-01",
@@ -429,7 +441,9 @@
            "evidence": {
             "alarm_wakeups": 600,
             "alarm_wakeups_per_hour": 7.714282408164682
-           }
+           },
+           "category": "background",
+           "label": "Częste wybudzanie telefonu"
           },
           {
            "rule_id": "DM-SRC-01",
@@ -439,7 +453,9 @@
            "text_expert": "instalator: com.android.chrome",
            "evidence": {
             "installer": "com.android.chrome"
-           }
+           },
+           "category": "origin",
+           "label": "Spoza Sklepu Play"
           },
           {
            "rule_id": "DM-NAME-01",
@@ -449,7 +465,9 @@
            "text_expert": "Nazwa pakietu zawiera tokeny podszywania się: clean, boost",
            "evidence": {
             "tokens": "clean, boost"
-           }
+           },
+           "category": "disguise",
+           "label": "Nazwa udaje systemową"
           },
           {
            "rule_id": "DM-PERM-01",
@@ -457,7 +475,9 @@
            "weight": 4,
            "text": "Uruchamia się sama po włączeniu telefonu i sprawdza inne zainstalowane aplikacje.",
            "text_expert": "BOOT_COMPLETED receiver + QUERY_ALL_PACKAGES",
-           "evidence": {}
+           "evidence": {},
+           "category": "background",
+           "label": "Start z telefonem, lista aplikacji"
           },
           {
            "rule_id": "DM-FSIPERM-01",
@@ -465,7 +485,9 @@
            "weight": 4,
            "text": "Może wyświetlać okna na cały ekran.",
            "text_expert": "żąda USE_FULL_SCREEN_INTENT (instalacja spoza Play)",
-           "evidence": {}
+           "evidence": {},
+           "category": "ads",
+           "label": "Uprawnienie do pełnego ekranu"
           },
           {
            "rule_id": "DM-FRESH-01",
@@ -475,11 +497,44 @@
            "text_expert": "firstInstallTime: 6.2 dni temu",
            "evidence": {
             "installed_days": 6.166666666666667
-           }
+           },
+           "category": "origin",
+           "label": "Świeża instalacja"
           }
          ],
          "apk_error": null,
-         "ad_sdks": null
+         "ad_sdks": null,
+         "symptoms": [
+          {
+           "category": "ads",
+           "severity": "bad",
+           "text": "W ciągu ostatniej doby wyświetlała okna na wierzchu innych aplikacji (np. reklamy). Ma powiadomienie, które otwiera się na cały ekran. Może wyświetlać okna na cały ekran."
+          },
+          {
+           "category": "removal",
+           "severity": "bad",
+           "text": "Nadała sobie uprawnienia administratora, żeby utrudnić usunięcie. Ukrywa swoją ikonę — nie widać jej na liście aplikacji."
+          },
+          {
+           "category": "background",
+           "severity": "warn",
+           "text": "Często budzi telefon — średnio 8 razy na godzinę. Uruchamia się sama po włączeniu telefonu i sprawdza inne zainstalowane aplikacje."
+          },
+          {
+           "category": "origin",
+           "severity": "neutral",
+           "text": "Zainstalowana spoza Sklepu Play. Zainstalowana niedawno (6 dni temu)."
+          },
+          {
+           "category": "disguise",
+           "severity": "neutral",
+           "text": "Nazwa sugeruje aplikację systemową lub „czyszczącą” (clean, boost)."
+          }
+         ],
+         "source": {
+          "label": "Chrome",
+          "days": 6
+         }
         },
         {
          "package": "com.wlive.forecast",
@@ -507,11 +562,24 @@
            "evidence": {
             "notif_interruptions_24h": 500,
             "notif_per_hour_24h": 20.833333333333332
-           }
+           },
+           "category": "notif",
+           "label": "Zalew powiadomień"
           }
          ],
          "apk_error": null,
-         "ad_sdks": null
+         "ad_sdks": null,
+         "symptoms": [
+          {
+           "category": "notif",
+           "severity": "bad",
+           "text": "Zasypuje telefon powiadomieniami — średnio 21 na godzinę."
+          }
+         ],
+         "source": {
+          "label": "Sklep Play",
+          "days": 117
+         }
         },
         {
          "package": "com.sec.android.app.launcher",
@@ -536,11 +604,24 @@
            "weight": 20,
            "text": "Jest ustawiona jako ekran główny telefonu.",
            "text_expert": "rola android.app.role.HOME",
-           "evidence": {}
+           "evidence": {},
+           "category": "removal",
+           "label": "Ustawiona jako ekran główny"
           }
          ],
          "apk_error": null,
-         "ad_sdks": null
+         "ad_sdks": null,
+         "symptoms": [
+          {
+           "category": "removal",
+           "severity": "bad",
+           "text": "Jest ustawiona jako ekran główny telefonu."
+          }
+         ],
+         "source": {
+          "label": "systemowa",
+          "days": 6478
+         }
         },
         {
          "package": "com.whatsapp",
@@ -565,11 +646,24 @@
            "weight": 10,
            "text": "Czyta powiadomienia z innych aplikacji.",
            "text_expert": "secure/enabled_notification_listeners zawiera usługę aplikacji",
-           "evidence": {}
+           "evidence": {},
+           "category": "data",
+           "label": "Czyta powiadomienia"
           }
          ],
          "apk_error": null,
-         "ad_sdks": null
+         "ad_sdks": null,
+         "symptoms": [
+          {
+           "category": "data",
+           "severity": "warn",
+           "text": "Czyta powiadomienia z innych aplikacji."
+          }
+         ],
+         "source": {
+          "label": "Sklep Play",
+          "days": 624
+         }
         }
        ],
        "counts": {
@@ -646,7 +740,9 @@
            "text_expert": "appops SYSTEM_ALERT_WINDOW: ostatnie użycie 252 s temu",
            "evidence": {
             "overlay_last_access_s": 251.877
-           }
+           },
+           "category": "ads",
+           "label": "Okna nad innymi aplikacjami"
           },
           {
            "rule_id": "DM-ADMIN-01",
@@ -654,7 +750,9 @@
            "weight": 25,
            "text": "Nadała sobie uprawnienia administratora, żeby utrudnić usunięcie.",
            "text_expert": "dumpsys device_policy: aktywny administrator urządzenia",
-           "evidence": {}
+           "evidence": {},
+           "category": "removal",
+           "label": "Administrator urządzenia"
           },
           {
            "rule_id": "DM-COMBO-01",
@@ -662,7 +760,9 @@
            "weight": 20,
            "text": "Ukryta aplikacja spoza Sklepu Play wyświetla okna nad innymi — typowe adware.",
            "text_expert": "kombinacja: DM-HIDDEN-01 + DM-OVERLAY-01 + DM-SRC-01",
-           "evidence": {}
+           "evidence": {},
+           "category": "combo",
+           "label": "Ukryta, spoza Play, okna nad innymi"
           },
           {
            "rule_id": "DM-FSI-01",
@@ -672,7 +772,9 @@
            "text_expert": "dumpsys notification: aktywne powiadomienie z fullscreenIntent (1 aktywnych)",
            "evidence": {
             "notif_active": 1
-           }
+           },
+           "category": "ads",
+           "label": "Powiadomienie pełnoekranowe"
           },
           {
            "rule_id": "DM-HIDDEN-01",
@@ -680,7 +782,9 @@
            "weight": 15,
            "text": "Ukrywa swoją ikonę — nie widać jej na liście aplikacji.",
            "text_expert": "brak aktywności MAIN/LAUNCHER",
-           "evidence": {}
+           "evidence": {},
+           "category": "removal",
+           "label": "Ukryta ikona"
           },
           {
            "rule_id": "DM-COMBO-02",
@@ -688,7 +792,9 @@
            "weight": 15,
            "text": "Blokuje usunięcie i jednocześnie nachalnie wyświetla treści.",
            "text_expert": "kombinacja: DM-ADMIN-01 + zachowanie reklamowe",
-           "evidence": {}
+           "evidence": {},
+           "category": "combo",
+           "label": "Blokuje usunięcie i nachalnie wyświetla treści"
           },
           {
            "rule_id": "DM-ALARM-01",
@@ -699,7 +805,9 @@
            "evidence": {
             "alarm_wakeups": 600,
             "alarm_wakeups_per_hour": 7.714282408164682
-           }
+           },
+           "category": "background",
+           "label": "Częste wybudzanie telefonu"
           },
           {
            "rule_id": "DM-SRC-01",
@@ -709,7 +817,9 @@
            "text_expert": "instalator: com.android.chrome",
            "evidence": {
             "installer": "com.android.chrome"
-           }
+           },
+           "category": "origin",
+           "label": "Spoza Sklepu Play"
           },
           {
            "rule_id": "DM-NAME-01",
@@ -719,7 +829,9 @@
            "text_expert": "Nazwa pakietu zawiera tokeny podszywania się: clean, boost",
            "evidence": {
             "tokens": "clean, boost"
-           }
+           },
+           "category": "disguise",
+           "label": "Nazwa udaje systemową"
           },
           {
            "rule_id": "DM-PERM-01",
@@ -727,7 +839,9 @@
            "weight": 4,
            "text": "Uruchamia się sama po włączeniu telefonu i sprawdza inne zainstalowane aplikacje.",
            "text_expert": "BOOT_COMPLETED receiver + QUERY_ALL_PACKAGES",
-           "evidence": {}
+           "evidence": {},
+           "category": "background",
+           "label": "Start z telefonem, lista aplikacji"
           },
           {
            "rule_id": "DM-FSIPERM-01",
@@ -735,7 +849,9 @@
            "weight": 4,
            "text": "Może wyświetlać okna na cały ekran.",
            "text_expert": "żąda USE_FULL_SCREEN_INTENT (instalacja spoza Play)",
-           "evidence": {}
+           "evidence": {},
+           "category": "ads",
+           "label": "Uprawnienie do pełnego ekranu"
           },
           {
            "rule_id": "DM-FRESH-01",
@@ -745,11 +861,44 @@
            "text_expert": "firstInstallTime: 6.2 dni temu",
            "evidence": {
             "installed_days": 6.166666666666667
-           }
+           },
+           "category": "origin",
+           "label": "Świeża instalacja"
           }
          ],
          "apk_error": null,
-         "ad_sdks": null
+         "ad_sdks": null,
+         "symptoms": [
+          {
+           "category": "ads",
+           "severity": "bad",
+           "text": "W ciągu ostatniej doby wyświetlała okna na wierzchu innych aplikacji (np. reklamy). Ma powiadomienie, które otwiera się na cały ekran. Może wyświetlać okna na cały ekran."
+          },
+          {
+           "category": "removal",
+           "severity": "bad",
+           "text": "Nadała sobie uprawnienia administratora, żeby utrudnić usunięcie. Ukrywa swoją ikonę — nie widać jej na liście aplikacji."
+          },
+          {
+           "category": "background",
+           "severity": "warn",
+           "text": "Często budzi telefon — średnio 8 razy na godzinę. Uruchamia się sama po włączeniu telefonu i sprawdza inne zainstalowane aplikacje."
+          },
+          {
+           "category": "origin",
+           "severity": "neutral",
+           "text": "Zainstalowana spoza Sklepu Play. Zainstalowana niedawno (6 dni temu)."
+          },
+          {
+           "category": "disguise",
+           "severity": "neutral",
+           "text": "Nazwa sugeruje aplikację systemową lub „czyszczącą” (clean, boost)."
+          }
+         ],
+         "source": {
+          "label": "Chrome",
+          "days": 6
+         }
         },
         {
          "package": "com.wlive.forecast",
@@ -777,11 +926,24 @@
            "evidence": {
             "notif_interruptions_24h": 500,
             "notif_per_hour_24h": 20.833333333333332
-           }
+           },
+           "category": "notif",
+           "label": "Zalew powiadomień"
           }
          ],
          "apk_error": null,
-         "ad_sdks": null
+         "ad_sdks": null,
+         "symptoms": [
+          {
+           "category": "notif",
+           "severity": "bad",
+           "text": "Zasypuje telefon powiadomieniami — średnio 21 na godzinę."
+          }
+         ],
+         "source": {
+          "label": "Sklep Play",
+          "days": 117
+         }
         },
         {
          "package": "com.sec.android.app.launcher",
@@ -806,11 +968,24 @@
            "weight": 20,
            "text": "Jest ustawiona jako ekran główny telefonu.",
            "text_expert": "rola android.app.role.HOME",
-           "evidence": {}
+           "evidence": {},
+           "category": "removal",
+           "label": "Ustawiona jako ekran główny"
           }
          ],
          "apk_error": null,
-         "ad_sdks": null
+         "ad_sdks": null,
+         "symptoms": [
+          {
+           "category": "removal",
+           "severity": "bad",
+           "text": "Jest ustawiona jako ekran główny telefonu."
+          }
+         ],
+         "source": {
+          "label": "systemowa",
+          "days": 6478
+         }
         },
         {
          "package": "com.whatsapp",
@@ -835,11 +1010,24 @@
            "weight": 10,
            "text": "Czyta powiadomienia z innych aplikacji.",
            "text_expert": "secure/enabled_notification_listeners zawiera usługę aplikacji",
-           "evidence": {}
+           "evidence": {},
+           "category": "data",
+           "label": "Czyta powiadomienia"
           }
          ],
          "apk_error": null,
-         "ad_sdks": null
+         "ad_sdks": null,
+         "symptoms": [
+          {
+           "category": "data",
+           "severity": "warn",
+           "text": "Czyta powiadomienia z innych aplikacji."
+          }
+         ],
+         "source": {
+          "label": "Sklep Play",
+          "days": 624
+         }
         }
        ],
        "counts": {
@@ -1295,6 +1483,12 @@
     "serial": "R58T00TEST",
     "serials": [
      "R58T00TEST"
+    ],
+    "devices": [
+     {
+      "serial": "R58T00TEST",
+      "model": "SM-A145R"
+     }
     ],
     "orders": [
      {

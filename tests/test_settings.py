@@ -56,6 +56,15 @@ def test_backups_dir_follows_the_setting(data_dir):
     assert backups_dir() == data_dir / "kopie"
 
 
+def test_theme_default_valid_values_and_rejection():
+    assert S.load_settings().theme == "system"
+    assert S.save_settings({"theme": "dark"}).theme == "dark"
+    with pytest.raises(ValueError):
+        S.save_settings({"theme": "blue"})
+    settings_path().write_text('{"theme": "neon", "mode": "expert"}', "utf-8")
+    assert S.load_settings() == S.Settings(mode="expert")
+
+
 @pytest.mark.parametrize(("locale_name", "lang"), [
     (("Polish_Poland", "1250"), "pl"), (("pl_PL", "UTF-8"), "pl"),
     (("en_US", "UTF-8"), "en"), ((None, None), "en"),
