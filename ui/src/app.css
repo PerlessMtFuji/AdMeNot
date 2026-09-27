@@ -53,6 +53,13 @@
   color-scheme: dark;
 }
 
+/* legacy — kolory dla jeszcze nieprzepisanych ekranów (Tailwind arbitrary values); usuwane w Task 15 */
+:root {
+  --bad-bg: #fee2e2; --bad-line: #fca5a5;
+  --warn-bg: #fef3c7; --warn-line: #fcd34d;
+  --ok-bg: #dcfce7; --ok-line: #86efac;
+}
+
 @layer base {
   html, body { height: 100%; }
   body {
@@ -79,6 +86,7 @@
   .flash { animation: flash 2s ease-out; }
 
   /* legacy — usuwane w Task 15 razem z ostatnimi starymi komponentami */
+  .topbar { background: #1d2733; color: #e6edf5; }
   .card { background: var(--color-surface); border: 1px solid var(--color-line); border-radius: 12px; padding: 11px 12px; }
   .hard { box-shadow: var(--shadow-card); }
   .btn { padding: 7px 13px; border-radius: 9px; font-weight: 600; border: 1px solid var(--color-line); background: var(--color-surface); color: var(--color-ink); }
@@ -108,6 +116,9 @@
 @keyframes ring { 0% { transform: scale(.7); opacity: .5; } 100% { transform: scale(1.3); opacity: 0; } }
 @keyframes tap { 0%, 100% { box-shadow: 0 0 0 0 rgb(79 70 229 / .6); } 60% { box-shadow: 0 0 0 9px rgb(79 70 229 / 0); } }
 @keyframes tap-red { 0%, 100% { box-shadow: 0 0 0 0 rgb(220 38 38 / .55); } 60% { box-shadow: 0 0 0 6px rgb(220 38 38 / 0); } }
+/* legacy — Connect.svelte SVG; usuwane w Task 15 */
+@keyframes dash { to { stroke-dashoffset: -20; } }
+@keyframes pulse-ring { 0%, 100% { transform: scale(1); opacity: .55; } 50% { transform: scale(1.25); opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
