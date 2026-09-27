@@ -1,5 +1,5 @@
 import { CATEGORY_ORDER } from './categories';
-import type { AppView, Category, DeviceEntry, Finding, Level, StepEvent, Verdict } from './types';
+import type { AppView, Category, DeviceEntry, Finding, HistoryAction, Level, StepEvent, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done';
 export type StageState = 'done' | 'now' | 'todo' | 'off';
@@ -199,3 +199,50 @@ export const SCORE_ZONES: { from: number; to: number; verdict: Verdict }[] = [
   { from: 0, to: 25, verdict: 'safe' }, { from: 25, to: 50, verdict: 'review' },
   { from: 50, to: 75, verdict: 'suspicious' }, { from: 75, to: 100, verdict: 'malicious' },
 ];
+
+export type AppHistoryState = 'done' | 'restored' | 'pending' | 'failed';
+export interface HistoryAppRow {
+  package: string;
+  level: Level;
+  state: AppHistoryState;
+  actions: HistoryAction[];
+  backup: boolean;
+  canRestore: boolean;
+}
+
+export function groupHistory(actions: HistoryAction[]): HistoryAppRow[] {
+  const rows: HistoryAppRow[] = [];
+  for (const a of actions) {
+    let row = rows.find((r) => r.package === a.package);
+    if (!row) {
+      row = { package: a.package, level: a.level as Level, state: 'done', actions: [], backup: false, canRestore: false };
+      rows.push(row);
+    }
+    row.actions.push(a);
+  }
+  for (const r of rows) {
+    const statuses = r.actions.map((a) => a.status);
+    r.state = statuses.every((x) => x === 'undone') ? 'restored'
+      : statuses.includes('pending') ? 'pending' : statuses.includes('failed') ? 'failed' : 'done';
+    r.backup = r.actions.some((a) => a.kind === 'backup' && a.status === 'done');
+    r.canRestore = statuses.includes('done');
+  }
+  return rows;
+}
+
+export function orderCounts(rows: HistoryAppRow[]): [Level, number][] {
+  const out: [Level, number][] = [];
+  for (const level of ['remove', 'disable', 'silence'] as Level[]) {
+    const n = rows.filter((r) => r.level === level).length;
+    if (n) out.push([level, n]);
+  }
+  return out;
+}
+
+export function dayKey(iso: string, now: Date): 'today' | 'yesterday' | 'date' {
+  const d = new Date(iso);
+  const day = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const diff = Math.round((today - day) / 86_400_000);
+  return diff === 0 ? 'today' : diff === 1 ? 'yesterday' : 'date';
+}

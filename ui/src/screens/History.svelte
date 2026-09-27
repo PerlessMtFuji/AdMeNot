@@ -1,90 +1,119 @@
 <script lang="ts">
   import { getContext } from 'svelte';
+  import OrderCard from '../components/OrderCard.svelte';
+  import StepTimeline from '../components/StepTimeline.svelte';
   import type { Controller } from '../lib/controller';
-  import { t } from '../lib/i18n/index.svelte';
+  import { i18n, t } from '../lib/i18n/index.svelte';
+  import { dayKey, groupHistory, modelName } from '../lib/logic';
+  import { enter, stagger } from '../lib/motion';
   import type { HistoryOrder } from '../lib/types';
+  import Banner from '../ui/Banner.svelte';
+  import Button from '../ui/Button.svelte';
+  import Card from '../ui/Card.svelte';
+  import SidePanel from '../ui/SidePanel.svelte';
+  import Spinner from '../ui/Spinner.svelte';
 
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
   const h = $derived(s.history);
-  const ICON: Record<string, string> = { done: '✓', failed: '✗', undone: '↺', pending: '○' };
   const names = $derived(new Map((s.scan?.apps ?? []).map((a) => [a.package, a.name])));
+  const interrupted = $derived(h?.orders.filter((o) => o.interrupted) ?? []);
+  let other = $state('');
 
-  function canUndo(o: HistoryOrder): boolean {
-    return o.actions.some((a) => a.status === 'done' || a.status === 'pending');
+  function day(iso: string): string {
+    const key = dayKey(iso, new Date());
+    return key === 'date'
+      ? new Date(iso).toLocaleDateString(i18n.lang, { day: 'numeric', month: 'short' })
+      : t(`history.${key}`);
+  }
+
+  function detail(o: HistoryOrder): string {
+    const rows = groupHistory(o.actions);
+    const row = rows.find((r) => r.state === 'pending') ?? rows[0];
+    return t('history.banner_detail', { name: names.get(row?.package ?? '') ?? row?.package ?? '',
+      done: o.actions.filter((a) => a.status === 'done').length, total: o.actions.length });
+  }
+
+  function dot(o: HistoryOrder): string {
+    if (o.interrupted) return 'border-warn-strong bg-warn-soft';
+    if (o.status === 'undone') return 'border-line bg-surface';
+    return 'border-accent bg-surface';
   }
 </script>
 
-<div class="min-w-0 flex-1 overflow-auto p-4">
-<section class="flex flex-col gap-2">
-  <div class="flex items-center gap-3">
-    <b class="text-[14px]">{t('history.title')}</b>
-    {#if h && h.serials.length}
-      <label class="ml-auto flex items-center gap-2">
-        <span class="lbl">{t('history.phone')}</span>
-        <select class="mono rounded border border-line bg-card px-1.5 py-1" aria-label={t('history.phone')}
-          value={h.serial ?? ''} onchange={(e) => ctl.refreshHistory(e.currentTarget.value)}>
-          {#each h.serials as serial (serial)}<option value={serial}>{serial}</option>{/each}
-        </select>
-      </label>
+<div class="flex min-h-0 flex-1">
+  <main class="flex min-w-0 flex-1 flex-col gap-3 overflow-auto px-7 py-5">
+    <h1 class="text-[19px] font-extrabold">{t('history.title')}</h1>
+
+    {#if s.orderRunning}
+      <Card>
+        <div class="flex items-center gap-2 px-4 py-3 font-semibold"><Spinner />{t('history.undoing')}</div>
+        {#if s.undoSteps.length}<StepTimeline steps={s.undoSteps} />{/if}
+      </Card>
     {/if}
-  </div>
-
-  {#if s.orderRunning}
-    <div class="card"><span class="spin"></span> {t('history.working')}</div>
-  {/if}
-  {#if s.undoResult}
-    <div class="card {s.undoResult.errors.length
-      ? 'border-[var(--warn-line)] bg-[var(--warn-bg)]'
-      : 'border-[var(--ok-line)] bg-[var(--ok-bg)]'}" role="status">
-      <b>{s.undoResult.order}: {s.undoResult.status_label}</b>
-      {#if s.undoResult.admin_not_restored}<p class="mt-1">{t('history.admin_note')}</p>{/if}
-      {#if s.undoResult.errors.length}
-        <p class="mt-1">{t('history.undo_errors')}</p>
-        <ul class="list-disc pl-5">{#each s.undoResult.errors as e, i (i)}<li>{e}</li>{/each}</ul>
-      {/if}
-    </div>
-  {/if}
-
-  {#if !h || !h.serial}
-    <div class="card">{t('history.none')}</div>
-  {:else if h.orders.length === 0}
-    <div class="card">{t('history.empty')}</div>
-  {:else}
-    {#each h.orders as o (o.id)}
-      <div class="card {o.status === 'undone' ? 'opacity-70' : ''}">
-        <div class="flex flex-wrap items-center gap-2">
-          <b class="mono">{o.number}</b>
-          <span class="text-mut">{o.created_at.replace('T', ' ')}{o.client ? ` · ${o.client}` : ''} · {o.status_label}</span>
-          {#if o.interrupted}<span class="tag tag-warn">{t('history.interrupted')}</span>{/if}
-          <span class="ml-auto flex gap-2">
-            {#if o.interrupted}
-              <button class="btn px-2.5 py-1 text-[11px]" disabled={s.orderRunning}
-                onclick={() => ctl.resume(o.number)}>{t('history.resume')}</button>
-            {/if}
-            {#if canUndo(o)}
-              <button class="btn px-2.5 py-1 text-[11px]" disabled={s.orderRunning}
-                onclick={() => ctl.undo(o.number)}>↶ {t('history.undo_all')}</button>
-            {/if}
-          </span>
-        </div>
-        <ul class="mt-2 flex flex-col gap-1">
-          {#each o.actions as a (a.id)}
-            <li class="flex items-center gap-2 text-[12px]">
-              <span class={a.status === 'done' ? 'ok' : a.status === 'failed' ? 'bad' : 'text-mut'}>{ICON[a.status] ?? '·'}</span>
-              <span>
-                <b>{names.get(a.package) ?? a.package}</b> — {a.step_label}
-                <span class="text-mut">({a.level_label}, {a.status_label}{a.error ? `: ${a.error}` : ''})</span>
-              </span>
-              {#if a.status === 'done'}
-                <button class="btn-link ml-auto" disabled={s.orderRunning}
-                  onclick={() => ctl.undo(o.number, a.id)}>↶ {t('history.restore')}</button>
-              {/if}
-            </li>
-          {/each}
-        </ul>
-      </div>
+    {#if s.undoResult}
+      {@const r = s.undoResult}
+      <Banner tone={r.errors.length ? 'warn' : 'ok'} icon={r.errors.length ? 'triangle-alert' : 'check'}
+        title="{r.order}: {r.status_label}">
+        {#if r.admin_not_restored}<p>{t('history.admin_note')}</p>{/if}
+        {#if r.errors.length}
+          <p>{t('history.undo_errors')}</p>
+          <ul class="list-disc pl-5">{#each r.errors as e, i (i)}<li>{e}</li>{/each}</ul>
+        {/if}
+      </Banner>
+    {/if}
+    {#each interrupted as o (o.id)}
+      <Banner tone="warn" icon="triangle-alert"
+        title={t('history.banner', { when: `${day(o.created_at).toLowerCase()}, ${o.created_at.slice(11, 16)}` })}>
+        {detail(o)}
+        {#snippet actions()}
+          <Button variant="ghost" size="sm" disabled={s.orderRunning} onclick={() => ctl.undo(o.number)}>{t('history.undo_changes')}</Button>
+          <Button variant="primary" size="sm" disabled={s.orderRunning} onclick={() => ctl.resume(o.number)}>{t('history.resume')}</Button>
+        {/snippet}
+      </Banner>
     {/each}
-  {/if}
-</section>
+
+    {#if !h || !h.serial}
+      <p class="text-mut">{t('history.none')}</p>
+    {:else if h.orders.length === 0}
+      <p class="text-mut">{t('history.empty')}</p>
+    {:else}
+      <ol class="relative mt-2 pl-[92px] before:absolute before:top-2 before:bottom-0 before:left-[78px] before:w-0.5 before:bg-line">
+        {#each h.orders as o, i (o.id)}
+          <li class="relative mb-4" in:enter={{ delay: stagger(i) }}>
+            <div class="absolute top-2.5 -left-[92px] w-[66px] text-right">
+              <b class="block text-[13px]">{day(o.created_at)}</b>
+              <span class="text-[11px] text-soft">{o.created_at.slice(11, 16)}</span>
+            </div>
+            <span class="absolute top-3.5 -left-[19px] h-3 w-3 rounded-full border-2 {dot(o)}" aria-hidden="true"></span>
+            <OrderCard order={o} {names} disabled={s.orderRunning}
+              onrestore={(pkg) => ctl.undo(o.number, null, pkg)}
+              onrestoreStep={(id) => ctl.undo(o.number, id)}
+              onundoAll={() => ctl.undo(o.number)} />
+          </li>
+        {/each}
+      </ol>
+    {/if}
+  </main>
+
+  <SidePanel width={260} label={t('history.phone')}>
+    <span class="lbl">{t('history.phone')}</span>
+    {#each h?.devices ?? [] as d (d.serial)}
+      {@const current = d.serial === h?.serial}
+      <button type="button" aria-pressed={current} onclick={() => ctl.refreshHistory(d.serial)}
+        class="flex items-center gap-2.5 rounded-xl p-2.5 text-left transition-colors duration-150 {current ? 'bg-accent-soft' : 'hover:bg-surface-2'}">
+        <span class="h-9 w-5 flex-none rounded-[5px] {current ? 'bg-[#1f2937]' : 'bg-soft'}" aria-hidden="true"></span>
+        <span class="min-w-0 flex-1">
+          <b class="block truncate">{d.model ? modelName(d.model) : d.serial}</b>
+          <span class="mono block truncate text-[10.5px] text-soft">{d.serial}</span>
+        </span>
+        {#if s.device?.serial === d.serial}<span class="text-[11px] text-ok">● USB</span>{/if}
+      </button>
+    {/each}
+    <form class="flex gap-2" onsubmit={(e) => { e.preventDefault(); if (other.trim()) void ctl.refreshHistory(other.trim()); }}>
+      <input class="mono min-w-0 flex-1 rounded-lg border border-line bg-surface px-2 py-1.5 text-[11.5px]" bind:value={other}
+        placeholder={t('history.serial_placeholder')} aria-label={t('history.other_serial')} />
+      <Button type="submit" size="sm" disabled={!other.trim()}>{t('history.show')}</Button>
+    </form>
+  </SidePanel>
 </div>

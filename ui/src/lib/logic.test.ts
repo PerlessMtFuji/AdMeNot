@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import {
   changedVerdicts,
+  dayKey,
+  groupHistory,
+  orderCounts,
   evidenceGroups,
   focusedApp,
   moveFocus,
@@ -172,4 +175,22 @@ test('evidenceGroups: category order by heaviest rule, combos apart', () => {
   expect(out.groups.map((g) => [g.category, g.items.map((i) => i.rule_id)])).toEqual([
     ['ads', ['O']], ['removal', ['A', 'H']], ['origin', ['S']]]);
   expect(out.combos.map((c) => c.rule_id)).toEqual(['C']);
+});
+
+test('groupHistory: one row per app with its state', () => {
+  const a = (id: number, pkg: string, level: string, kind: string, status: string) =>
+    ({ id, package: pkg, level, level_label: '', kind, step_label: kind, status, status_label: status, error: null }) as never;
+  const rows = groupHistory([a(1, 'x', 'remove', 'backup', 'done'), a(2, 'x', 'remove', 'installed', 'done'),
+    a(3, 'y', 'disable', 'enabled', 'undone'), a(4, 'z', 'disable', 'enabled', 'pending'),
+    a(5, 'w', 'silence', 'notif', 'failed')]);
+  expect(rows.map((r) => [r.package, r.state, r.backup, r.canRestore])).toEqual([
+    ['x', 'done', true, true], ['y', 'restored', false, false], ['z', 'pending', false, false], ['w', 'failed', false, false]]);
+  expect(orderCounts(rows)).toEqual([['remove', 1], ['disable', 2], ['silence', 1]]);
+});
+
+test('dayKey', () => {
+  const now = new Date(2026, 8, 27, 12, 0);
+  expect(dayKey('2026-09-27T08:15', now)).toBe('today');
+  expect(dayKey('2026-09-26T23:59', now)).toBe('yesterday');
+  expect(dayKey('2026-08-12T09:12', now)).toBe('date');
 });

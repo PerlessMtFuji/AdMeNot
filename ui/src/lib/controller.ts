@@ -262,12 +262,12 @@ export class Controller {
     if (r) this.setJob(r.job_id, 'resume');
   }
 
-  async undo(order: string, actionId: number | null = null): Promise<void> {
+  async undo(order: string, actionId: number | null = null, pkg: string | null = null): Promise<void> {
     const s = this.state;
     s.error = null;
     s.undoSteps = [];
     s.undoResult = null;
-    const r = await this.call(this.api.undo(order, actionId, null));
+    const r = await this.call(this.api.undo(order, actionId, pkg));
     if (r) this.setJob(r.job_id, 'undo');
   }
 
