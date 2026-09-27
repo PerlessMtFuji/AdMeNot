@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import { flip } from 'svelte/animate';
+  import { fade } from 'svelte/transition';
   import AppCard from '../components/AppCard.svelte';
   import ExpertTable from '../components/ExpertTable.svelte';
   import InterruptedBanner from '../components/InterruptedBanner.svelte';
@@ -92,11 +93,19 @@
   </main>
   {#if !expert || s.plan}
     <SidePanel label={t('panel.plan')}>
-      {#if s.plan}
-        <PlanConfirm />
-      {:else}
-        <PlanPanel {showSafe} ontoggleSafe={() => (showSafe = !showSafe)} />
-      {/if}
+      <div class="grid flex-1 grid-cols-1 grid-rows-1">
+        {#if s.plan}
+          <div class="col-start-1 row-start-1 flex min-h-0 flex-col gap-3"
+            in:fade={{ duration: ms(DUR.panel) }} out:fade={{ duration: ms(DUR.panel) }}>
+            <PlanConfirm />
+          </div>
+        {:else}
+          <div class="col-start-1 row-start-1 flex flex-col gap-3"
+            in:fade={{ duration: ms(DUR.panel) }} out:fade={{ duration: ms(DUR.panel) }}>
+            <PlanPanel {showSafe} ontoggleSafe={() => (showSafe = !showSafe)} />
+          </div>
+        {/if}
+      </div>
     </SidePanel>
   {/if}
 </div>

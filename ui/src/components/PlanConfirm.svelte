@@ -1,10 +1,8 @@
 <script lang="ts">
   import { getContext } from 'svelte';
-  import { fade } from 'svelte/transition';
   import type { Controller } from '../lib/controller';
   import { t } from '../lib/i18n/index.svelte';
   import { LEVEL_TONE } from '../lib/logic';
-  import { DUR, ms } from '../lib/motion';
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
   import Pill from '../ui/Pill.svelte';
@@ -16,7 +14,7 @@
 
 {#if s.plan}
   {@const plan = s.plan}
-  <section aria-label={t('plan.title')} class="flex min-h-0 flex-1 flex-col gap-3" in:fade={{ duration: ms(DUR.enter) }}>
+  <section aria-label={t('plan.title')} class="flex min-h-0 flex-1 flex-col gap-3">
     <h2 class="text-[14px] font-bold">{t('plan.confirm_title')}</h2>
     <div class="flex min-h-0 flex-col gap-2 overflow-auto">
       {#each plan.apps as a (a.package)}

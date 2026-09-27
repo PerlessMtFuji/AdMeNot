@@ -3,7 +3,8 @@ import { fly, scale } from 'svelte/transition';
 
 // Stałe ruchu (spec §6). Wszystkie przejścia w UI biorą czasy stąd.
 // dialog: wejście Dialog.svelte (skala .96 → 1 + fade), spec §5.8.
-export const DUR = { micro: 140, enter: 300, screen: 300, success: 500, count: 400, flip: 300, dialog: 200 } as const;
+// panel: przenikanie (crossfade) PlanPanel ⇄ PlanConfirm w prawym panelu, spec §5.5.
+export const DUR = { micro: 140, enter: 300, screen: 300, success: 500, count: 400, flip: 300, dialog: 200, panel: 250 } as const;
 const STAGGER = 40;
 const STAGGER_MAX = 10;
 
