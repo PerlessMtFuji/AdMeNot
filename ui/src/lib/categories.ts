@@ -1,9 +1,10 @@
+import type { IconName } from '../ui/Icon.svelte';
 import type { Category } from './types';
 
 export const CATEGORY_ORDER: Category[] = ['ads', 'notif', 'removal', 'data', 'disguise', 'background', 'origin'];
 
 // Nazwy ikon z ui/Icon.svelte (Task 4).
-export const CATEGORY_ICON: Record<Category | 'combo', string> = {
+export const CATEGORY_ICON: Record<Category | 'combo', IconName> = {
   ads: 'megaphone',
   notif: 'bell-ring',
   removal: 'lock',
