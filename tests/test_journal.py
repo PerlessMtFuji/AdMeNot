@@ -82,3 +82,12 @@ def test_data_paths_follow_localappdata(monkeypatch, tmp_path):
     assert journal_path() == tmp_path / "DeMalware" / "journal.db"
     assert backups_dir() == tmp_path / "DeMalware" / "backups"
     assert logs_dir() == tmp_path / "DeMalware" / "logs"
+
+
+def test_recent_serials_newest_first(tmp_path):
+    with Journal(tmp_path / "j.db") as j:
+        j.create_order("A", None)
+        j.create_order("B", None)
+        j.create_order("A", None)
+        assert j.recent_serials() == ["A", "B"]
+        assert j.recent_serials(limit=1) == ["A"]
