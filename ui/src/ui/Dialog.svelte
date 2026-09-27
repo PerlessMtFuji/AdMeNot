@@ -40,7 +40,7 @@
   transition:fade={{ duration: ms(DUR.micro) }}>
   <div bind:this={box} role="dialog" aria-modal="true" aria-labelledby={id} tabindex="-1" onkeydown={keydown}
     class="w-[min(460px,92vw)] rounded-2xl bg-surface p-5 shadow-card"
-    transition:scale={{ start: 0.96, duration: ms(200) }}>
+    transition:scale={{ start: 0.96, duration: ms(DUR.dialog) }}>
     <h2 {id} class="text-[15px] font-bold">{title}</h2>
     <div class="mt-2 text-mut">{@render children()}</div>
     <div class="mt-5 flex justify-end gap-2">{@render actions()}</div>
