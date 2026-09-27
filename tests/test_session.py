@@ -47,7 +47,9 @@ def test_failed_usagestats_sets_low_data_and_keeps_scanning(synthetic_adb):
     report = run_scan(synthetic_adb)
     assert report.collectors["usagestats"].ok is False
     assert report.low_behavior_data is True
-    assert _by_pkg(report)["com.clean.pro.boost"].verdict == "malicious"
+    boost = _by_pkg(report)["com.clean.pro.boost"]
+    # score wciąż wysoki, ale niepełne dane obniżają pewność — "Szkodliwa" wymaga wysokiej pewności
+    assert boost.score == 100 and boost.verdict == "suspicious" and boost.confidence != "high"
 
 
 def test_failed_collector_makes_every_app_incomplete_including_trusted(synthetic_adb):
@@ -100,7 +102,9 @@ def test_apk_failures_are_reported_not_fatal(synthetic_adb):
                                                                     error="timeout")})
     report = run_scan(synthetic_adb, apk=provider)
     assert report.apk.failed == {"com.clean.pro.boost": "timeout"}
-    assert _by_pkg(report)["com.clean.pro.boost"].verdict == "malicious"
+    boost = _by_pkg(report)["com.clean.pro.boost"]
+    # brakująca analiza APK to luka w danych ("apk" w gaps) — ocena niepełna, więc niższa pewność
+    assert boost.score == 100 and boost.verdict == "suspicious" and boost.incomplete is True
 
 
 def test_scan_without_apk_has_no_apk_status(synthetic_adb):

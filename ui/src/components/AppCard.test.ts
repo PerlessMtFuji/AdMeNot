@@ -5,7 +5,7 @@ import AppCard from './AppCard.svelte';
 
 const evil: AppView = {
   package: 'com.evil', name: '<img src=x onerror="alert(1)"> & „Cleaner”', score: 90,
-  verdict: 'malicious', verdict_label: 'Szkodliwa', trusted: false, incomplete: false,
+  verdict: 'malicious', verdict_label: 'Szkodliwa', confidence: 'high', trusted: false, incomplete: false,
   is_system: false, from_play: false, installer: 'com.android.chrome', is_admin: true,
   default_level: 'remove', problems: [], findings: [], apk_error: null, icon: null, ad_sdks: null,
   symptoms: [{ category: 'ads', severity: 'bad', text: 'Pokazuje <b>reklamy</b>.' },

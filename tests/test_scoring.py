@@ -2,11 +2,16 @@ import pytest
 
 from demalware.engine.facts import AppFacts
 from demalware.engine.rules.model import Finding
-from demalware.engine.scoring import score_app, verdict_for
+from demalware.engine.scoring import confidence_for, score_app, verdict_for
 
 
 def F(rule_id, cls, weight):
     return Finding(rule_id, cls, weight, {}, {"pl": rule_id, "en": rule_id}, {"pl": "", "en": ""})
+
+
+def FB(rule_id, cls, weight, basis, category="ads"):
+    return Finding(rule_id, cls, weight, {}, {"pl": rule_id, "en": rule_id}, {"pl": "", "en": ""},
+                   category=category, basis=basis)
 
 
 @pytest.mark.parametrize(("score", "verdict"), [
@@ -17,6 +22,33 @@ def test_verdict_thresholds(score, verdict):
     assert verdict_for(score) == verdict
 
 
+def test_confidence_levels():
+    declared = [FB("A", "context", 8, "declared")]
+    one_obs = declared + [FB("B", "behavior", 25, "observed", "ads")]
+    two_obs = one_obs + [FB("C", "behavior", 10, "observed", "background")]
+    assert confidence_for(declared, incomplete=False) == "low"
+    assert confidence_for(one_obs, incomplete=False) == "medium"
+    assert confidence_for(two_obs, incomplete=False) == "high"
+    assert confidence_for(two_obs, incomplete=True) == "medium"
+    assert confidence_for([FB("I", "ioc", 80, "confirmed", "origin")], incomplete=True) == "high"
+
+
+def test_high_score_without_strong_evidence_is_only_suspicious():
+    findings = [FB("DM-ADMIN-01", "position", 25, "granted", "removal"),
+                FB("DM-A11Y-01", "position", 20, "granted", "data"),
+                FB("DM-SRC-01", "context", 20, "declared", "origin"),
+                FB("DM-ADSDK-02", "apk", 30, "declared", "ads")]
+    result = score_app(AppFacts("com.x"), findings, trusted=False, low_behavior_data=False)
+    assert result.score >= 75
+    assert (result.verdict, result.confidence) == ("suspicious", "low")
+
+
+def test_verdict_thresholds_with_confidence():
+    assert verdict_for(80, "high") == "malicious"
+    assert verdict_for(80, "medium") == "suspicious"
+    assert verdict_for(30, "low") == "review"
+
+
 def test_class_caps_limit_weak_signals():
     findings = [F(f"C{i}", "context", 8) for i in range(10)]
     result = score_app(AppFacts("com.x"), findings, trusted=False, low_behavior_data=False)
@@ -25,14 +57,15 @@ def test_class_caps_limit_weak_signals():
 
 
 def test_combos_add_bonus_findings():
-    findings = [F("DM-HIDDEN-01", "position", 15), F("DM-OVERLAY-01", "behavior", 25),
+    findings = [F("DM-HIDDEN-01", "position", 15), FB("DM-OVERLAY-01", "behavior", 25, "observed", "ads"),
                 F("DM-SRC-01", "context", 8), F("DM-ADMIN-01", "position", 25)]
     result = score_app(AppFacts("com.x"), findings, trusted=False, low_behavior_data=False)
     ids = [f.rule_id for f in result.findings]
     assert "DM-COMBO-01" in ids and "DM-COMBO-02" in ids
     # behavior 25 + position min(40, 40) + context 8 + combo 20 + 15 = 108 → 100
     assert result.score == 100
-    assert result.verdict == "malicious"
+    # jedno zaobserwowane zachowanie = pewność średnia, nie wysoka
+    assert result.verdict == "suspicious"
 
 
 def test_trusted_lowers_score():

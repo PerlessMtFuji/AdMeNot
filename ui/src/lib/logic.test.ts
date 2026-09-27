@@ -32,7 +32,7 @@ function app(pkg: string, verdict: AppView['verdict'], extra: Partial<AppView> =
   const level = verdict === 'malicious' ? 'remove' : verdict === 'suspicious' ? 'disable' : null;
   return {
     package: pkg, name: pkg.split('.').at(-1)!, score: 0, verdict, verdict_label: verdict,
-    trusted: false, incomplete: false, is_system: false, from_play: true, installer: null,
+    confidence: 'high', trusted: false, incomplete: false, is_system: false, from_play: true, installer: null,
     is_admin: false, default_level: level, problems: [], findings: [], apk_error: null, icon: null,
     ad_sdks: null, symptoms: [], source: { label: '', days: null }, ...extra,
   };
@@ -100,9 +100,9 @@ describe('formatting', () => {
     expect(levelTag(null)).toBe('tag-gray');
     const a = app('x.y', 'malicious', {
       findings: [
-        { rule_id: 'DM-ADMIN-01', class: 'position', weight: 20, text: '', text_expert: '', evidence: {}, category: 'removal', label: '' },
-        { rule_id: 'DM-ADMIN-02', class: 'position', weight: 5, text: '', text_expert: '', evidence: {}, category: 'removal', label: '' },
-        { rule_id: 'DM-BOOT-01', class: 'context', weight: 3, text: '', text_expert: '', evidence: {}, category: 'background', label: '' },
+        { rule_id: 'DM-ADMIN-01', class: 'position', weight: 20, text: '', text_expert: '', evidence: {}, category: 'removal', label: '', basis: 'granted' },
+        { rule_id: 'DM-ADMIN-02', class: 'position', weight: 5, text: '', text_expert: '', evidence: {}, category: 'removal', label: '', basis: 'granted' },
+        { rule_id: 'DM-BOOT-01', class: 'context', weight: 3, text: '', text_expert: '', evidence: {}, category: 'background', label: '', basis: 'declared' },
       ],
     });
     expect(signalChips(a)).toEqual([{ label: 'admin', bad: true }, { label: 'boot', bad: false }]);

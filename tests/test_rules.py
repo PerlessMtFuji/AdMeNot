@@ -3,8 +3,8 @@ import pytest
 from demalware.engine.facts import AppFacts
 from demalware.engine.parsers.appops import AppOpState
 from demalware.engine.rules.conditions import check
-from demalware.engine.rules.engine import load_default_ruleset, parse_rules
-from demalware.engine.rules.model import Finding
+from demalware.engine.rules.engine import load_default_ruleset, load_yaml_rules, parse_rules
+from demalware.engine.rules.model import BASES, Finding
 from demalware.engine.rules.python_rules import rule_name_mimic, rule_random_name
 
 
@@ -21,7 +21,7 @@ def test_check_operators():
 
 def _rule(**over):
     rule = {
-        "id": "T-1", "class": "behavior", "weight": 10, "category": "notif",
+        "id": "T-1", "class": "behavior", "weight": 10, "category": "notif", "basis": "declared",
         "label": {"pl": "Dużo powiadomień", "en": "Many notifications"},
         "when": {"notif_per_hour_24h": {"gte": 8}},
         "evidence": ["notif_per_hour_24h"],
@@ -81,14 +81,34 @@ def test_default_rules_have_categories_and_labels():
 
 @pytest.mark.parametrize("bad", [
     {"class": "magic"},
-    {"weight": 0},
+    {"weight": -1},
     {"when": {"no_such_field": True}},
     {"evidence": ["no_such_field"]},
     {"text": {"simple": {"pl": "x"}, "expert": {"pl": "x", "en": "x"}}},
+    {"basis": "guessed"},
 ])
 def test_parse_rules_rejects_invalid(bad):
     with pytest.raises(ValueError):
         parse_rules([_rule(**bad)])
+
+
+def test_every_default_rule_has_a_basis():
+    for rule in load_default_ruleset().yaml_rules:
+        assert rule.basis in BASES, rule.id
+
+
+def test_rule_without_basis_is_rejected():
+    with pytest.raises(ValueError, match="basis"):
+        load_yaml_rules("- id: X\n  class: context\n  weight: 1\n  category: origin\n"
+                        "  label: {pl: a, en: a}\n  when: {is_system: true}\n"
+                        "  text: {simple: {pl: a, en: a}, expert: {pl: a, en: a}}\n")
+
+
+def test_zero_weight_rule_is_allowed():
+    rules = load_yaml_rules("- id: X\n  class: context\n  weight: 0\n  basis: declared\n"
+                            "  category: origin\n  label: {pl: a, en: a}\n  when: {is_system: true}\n"
+                            "  text: {simple: {pl: a, en: a}, expert: {pl: a, en: a}}\n")
+    assert rules[0].weight == 0
 
 
 def test_parse_rules_rejects_duplicate_ids():

@@ -368,6 +368,7 @@
          "score": 100,
          "verdict": "malicious",
          "verdict_label": "Szkodliwa",
+         "confidence": "high",
          "trusted": false,
          "incomplete": false,
          "is_system": false,
@@ -391,7 +392,8 @@
             "overlay_last_access_s": 251.877
            },
            "category": "ads",
-           "label": "Okna nad innymi aplikacjami"
+           "label": "Okna nad innymi aplikacjami",
+           "basis": "observed"
           },
           {
            "rule_id": "DM-ADMIN-01",
@@ -401,7 +403,8 @@
            "text_expert": "dumpsys device_policy: aktywny administrator urządzenia",
            "evidence": {},
            "category": "removal",
-           "label": "Administrator urządzenia"
+           "label": "Administrator urządzenia",
+           "basis": "granted"
           },
           {
            "rule_id": "DM-COMBO-01",
@@ -411,7 +414,8 @@
            "text_expert": "kombinacja: DM-HIDDEN-01 + DM-OVERLAY-01 + DM-SRC-01",
            "evidence": {},
            "category": "combo",
-           "label": "Ukryta, spoza Play, okna nad innymi"
+           "label": "Ukryta, spoza Play, okna nad innymi",
+           "basis": "declared"
           },
           {
            "rule_id": "DM-FSI-01",
@@ -423,7 +427,8 @@
             "notif_active": 1
            },
            "category": "ads",
-           "label": "Powiadomienie pełnoekranowe"
+           "label": "Powiadomienie pełnoekranowe",
+           "basis": "observed"
           },
           {
            "rule_id": "DM-HIDDEN-01",
@@ -433,7 +438,8 @@
            "text_expert": "brak aktywności MAIN/LAUNCHER",
            "evidence": {},
            "category": "removal",
-           "label": "Ukryta ikona"
+           "label": "Ukryta ikona",
+           "basis": "declared"
           },
           {
            "rule_id": "DM-COMBO-02",
@@ -443,7 +449,8 @@
            "text_expert": "kombinacja: DM-ADMIN-01 + zachowanie reklamowe",
            "evidence": {},
            "category": "combo",
-           "label": "Blokuje usunięcie i nachalnie wyświetla treści"
+           "label": "Blokuje usunięcie i nachalnie wyświetla treści",
+           "basis": "declared"
           },
           {
            "rule_id": "DM-ALARM-01",
@@ -456,7 +463,8 @@
             "alarm_wakeups_per_hour": 7.714282408164682
            },
            "category": "background",
-           "label": "Częste wybudzanie telefonu"
+           "label": "Częste wybudzanie telefonu",
+           "basis": "observed"
           },
           {
            "rule_id": "DM-SRC-01",
@@ -468,7 +476,8 @@
             "installer": "com.android.chrome"
            },
            "category": "origin",
-           "label": "Spoza Sklepu Play"
+           "label": "Spoza Sklepu Play",
+           "basis": "declared"
           },
           {
            "rule_id": "DM-NAME-01",
@@ -480,7 +489,8 @@
             "tokens": "clean, boost"
            },
            "category": "disguise",
-           "label": "Nazwa udaje systemową"
+           "label": "Nazwa udaje systemową",
+           "basis": "declared"
           },
           {
            "rule_id": "DM-PERM-01",
@@ -490,7 +500,8 @@
            "text_expert": "BOOT_COMPLETED receiver + QUERY_ALL_PACKAGES",
            "evidence": {},
            "category": "background",
-           "label": "Start z telefonem, lista aplikacji"
+           "label": "Start z telefonem, lista aplikacji",
+           "basis": "declared"
           },
           {
            "rule_id": "DM-FSIPERM-01",
@@ -500,7 +511,8 @@
            "text_expert": "żąda USE_FULL_SCREEN_INTENT (instalacja spoza Play)",
            "evidence": {},
            "category": "ads",
-           "label": "Uprawnienie do pełnego ekranu"
+           "label": "Uprawnienie do pełnego ekranu",
+           "basis": "declared"
           },
           {
            "rule_id": "DM-FRESH-01",
@@ -512,7 +524,8 @@
             "installed_days": 6.166666666666667
            },
            "category": "origin",
-           "label": "Świeża instalacja"
+           "label": "Świeża instalacja",
+           "basis": "declared"
           }
          ],
          "apk_error": null,
@@ -556,6 +569,7 @@
          "score": 25,
          "verdict": "review",
          "verdict_label": "Do sprawdzenia",
+         "confidence": "medium",
          "trusted": false,
          "incomplete": false,
          "is_system": false,
@@ -578,7 +592,8 @@
             "notif_per_hour_24h": 20.833333333333332
            },
            "category": "notif",
-           "label": "Zalew powiadomień"
+           "label": "Zalew powiadomień",
+           "basis": "observed"
           }
          ],
          "apk_error": null,
@@ -602,6 +617,7 @@
          "score": 20,
          "verdict": "safe",
          "verdict_label": "Bezpieczna",
+         "confidence": "low",
          "trusted": false,
          "incomplete": false,
          "is_system": true,
@@ -621,7 +637,8 @@
            "text_expert": "rola android.app.role.HOME",
            "evidence": {},
            "category": "removal",
-           "label": "Ustawiona jako ekran główny"
+           "label": "Ustawiona jako ekran główny",
+           "basis": "granted"
           }
          ],
          "apk_error": null,
@@ -645,6 +662,7 @@
          "score": 10,
          "verdict": "safe",
          "verdict_label": "Bezpieczna",
+         "confidence": "low",
          "trusted": false,
          "incomplete": false,
          "is_system": false,
@@ -664,7 +682,8 @@
            "text_expert": "secure/enabled_notification_listeners zawiera usługę aplikacji",
            "evidence": {},
            "category": "data",
-           "label": "Czyta powiadomienia"
+           "label": "Czyta powiadomienia",
+           "basis": "granted"
           }
          ],
          "apk_error": null,
@@ -744,6 +763,7 @@
          "score": 100,
          "verdict": "malicious",
          "verdict_label": "Szkodliwa",
+         "confidence": "high",
          "trusted": false,
          "incomplete": false,
          "is_system": false,
@@ -767,7 +787,8 @@
             "overlay_last_access_s": 251.877
            },
            "category": "ads",
-           "label": "Okna nad innymi aplikacjami"
+           "label": "Okna nad innymi aplikacjami",
+           "basis": "observed"
           },
           {
            "rule_id": "DM-ADMIN-01",
@@ -777,7 +798,8 @@
            "text_expert": "dumpsys device_policy: aktywny administrator urządzenia",
            "evidence": {},
            "category": "removal",
-           "label": "Administrator urządzenia"
+           "label": "Administrator urządzenia",
+           "basis": "granted"
           },
           {
            "rule_id": "DM-COMBO-01",
@@ -787,7 +809,8 @@
            "text_expert": "kombinacja: DM-HIDDEN-01 + DM-OVERLAY-01 + DM-SRC-01",
            "evidence": {},
            "category": "combo",
-           "label": "Ukryta, spoza Play, okna nad innymi"
+           "label": "Ukryta, spoza Play, okna nad innymi",
+           "basis": "declared"
           },
           {
            "rule_id": "DM-FSI-01",
@@ -799,7 +822,8 @@
             "notif_active": 1
            },
            "category": "ads",
-           "label": "Powiadomienie pełnoekranowe"
+           "label": "Powiadomienie pełnoekranowe",
+           "basis": "observed"
           },
           {
            "rule_id": "DM-HIDDEN-01",
@@ -809,7 +833,8 @@
            "text_expert": "brak aktywności MAIN/LAUNCHER",
            "evidence": {},
            "category": "removal",
-           "label": "Ukryta ikona"
+           "label": "Ukryta ikona",
+           "basis": "declared"
           },
           {
            "rule_id": "DM-COMBO-02",
@@ -819,7 +844,8 @@
            "text_expert": "kombinacja: DM-ADMIN-01 + zachowanie reklamowe",
            "evidence": {},
            "category": "combo",
-           "label": "Blokuje usunięcie i nachalnie wyświetla treści"
+           "label": "Blokuje usunięcie i nachalnie wyświetla treści",
+           "basis": "declared"
           },
           {
            "rule_id": "DM-ALARM-01",
@@ -832,7 +858,8 @@
             "alarm_wakeups_per_hour": 7.714282408164682
            },
            "category": "background",
-           "label": "Częste wybudzanie telefonu"
+           "label": "Częste wybudzanie telefonu",
+           "basis": "observed"
           },
           {
            "rule_id": "DM-SRC-01",
@@ -844,7 +871,8 @@
             "installer": "com.android.chrome"
            },
            "category": "origin",
-           "label": "Spoza Sklepu Play"
+           "label": "Spoza Sklepu Play",
+           "basis": "declared"
           },
           {
            "rule_id": "DM-NAME-01",
@@ -856,7 +884,8 @@
             "tokens": "clean, boost"
            },
            "category": "disguise",
-           "label": "Nazwa udaje systemową"
+           "label": "Nazwa udaje systemową",
+           "basis": "declared"
           },
           {
            "rule_id": "DM-PERM-01",
@@ -866,7 +895,8 @@
            "text_expert": "BOOT_COMPLETED receiver + QUERY_ALL_PACKAGES",
            "evidence": {},
            "category": "background",
-           "label": "Start z telefonem, lista aplikacji"
+           "label": "Start z telefonem, lista aplikacji",
+           "basis": "declared"
           },
           {
            "rule_id": "DM-FSIPERM-01",
@@ -876,7 +906,8 @@
            "text_expert": "żąda USE_FULL_SCREEN_INTENT (instalacja spoza Play)",
            "evidence": {},
            "category": "ads",
-           "label": "Uprawnienie do pełnego ekranu"
+           "label": "Uprawnienie do pełnego ekranu",
+           "basis": "declared"
           },
           {
            "rule_id": "DM-FRESH-01",
@@ -888,7 +919,8 @@
             "installed_days": 6.166666666666667
            },
            "category": "origin",
-           "label": "Świeża instalacja"
+           "label": "Świeża instalacja",
+           "basis": "declared"
           }
          ],
          "apk_error": null,
@@ -932,6 +964,7 @@
          "score": 25,
          "verdict": "review",
          "verdict_label": "Do sprawdzenia",
+         "confidence": "medium",
          "trusted": false,
          "incomplete": false,
          "is_system": false,
@@ -954,7 +987,8 @@
             "notif_per_hour_24h": 20.833333333333332
            },
            "category": "notif",
-           "label": "Zalew powiadomień"
+           "label": "Zalew powiadomień",
+           "basis": "observed"
           }
          ],
          "apk_error": null,
@@ -978,6 +1012,7 @@
          "score": 20,
          "verdict": "safe",
          "verdict_label": "Bezpieczna",
+         "confidence": "low",
          "trusted": false,
          "incomplete": false,
          "is_system": true,
@@ -997,7 +1032,8 @@
            "text_expert": "rola android.app.role.HOME",
            "evidence": {},
            "category": "removal",
-           "label": "Ustawiona jako ekran główny"
+           "label": "Ustawiona jako ekran główny",
+           "basis": "granted"
           }
          ],
          "apk_error": null,
@@ -1021,6 +1057,7 @@
          "score": 10,
          "verdict": "safe",
          "verdict_label": "Bezpieczna",
+         "confidence": "low",
          "trusted": false,
          "incomplete": false,
          "is_system": false,
@@ -1040,7 +1077,8 @@
            "text_expert": "secure/enabled_notification_listeners zawiera usługę aplikacji",
            "evidence": {},
            "category": "data",
-           "label": "Czyta powiadomienia"
+           "label": "Czyta powiadomienia",
+           "basis": "granted"
           }
          ],
          "apk_error": null,

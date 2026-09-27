@@ -355,6 +355,7 @@
          "score": 20,
          "verdict": "safe",
          "verdict_label": "Bezpieczna",
+         "confidence": "low",
          "trusted": false,
          "incomplete": false,
          "is_system": true,
@@ -374,7 +375,8 @@
            "text_expert": "rola android.app.role.HOME",
            "evidence": {},
            "category": "removal",
-           "label": "Ustawiona jako ekran główny"
+           "label": "Ustawiona jako ekran główny",
+           "basis": "granted"
           }
          ],
          "apk_error": null,
@@ -398,6 +400,7 @@
          "score": 10,
          "verdict": "safe",
          "verdict_label": "Bezpieczna",
+         "confidence": "low",
          "trusted": false,
          "incomplete": false,
          "is_system": false,
@@ -417,7 +420,8 @@
            "text_expert": "secure/enabled_notification_listeners zawiera usługę aplikacji",
            "evidence": {},
            "category": "data",
-           "label": "Czyta powiadomienia"
+           "label": "Czyta powiadomienia",
+           "basis": "granted"
           }
          ],
          "apk_error": null,
@@ -497,6 +501,7 @@
          "score": 20,
          "verdict": "safe",
          "verdict_label": "Bezpieczna",
+         "confidence": "low",
          "trusted": false,
          "incomplete": false,
          "is_system": true,
@@ -516,7 +521,8 @@
            "text_expert": "rola android.app.role.HOME",
            "evidence": {},
            "category": "removal",
-           "label": "Ustawiona jako ekran główny"
+           "label": "Ustawiona jako ekran główny",
+           "basis": "granted"
           }
          ],
          "apk_error": null,
@@ -540,6 +546,7 @@
          "score": 10,
          "verdict": "safe",
          "verdict_label": "Bezpieczna",
+         "confidence": "low",
          "trusted": false,
          "incomplete": false,
          "is_system": false,
@@ -559,7 +566,8 @@
            "text_expert": "secure/enabled_notification_listeners zawiera usługę aplikacji",
            "evidence": {},
            "category": "data",
-           "label": "Czyta powiadomienia"
+           "label": "Czyta powiadomienia",
+           "basis": "granted"
           }
          ],
          "apk_error": null,

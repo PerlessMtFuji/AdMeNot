@@ -57,6 +57,7 @@ export interface Finding {
   evidence: Record<string, unknown>;
   category: Category | 'combo';
   label: string;
+  basis: 'declared' | 'granted' | 'observed' | 'confirmed';
 }
 
 export interface AppView {
@@ -65,6 +66,7 @@ export interface AppView {
   score: number;
   verdict: Verdict;
   verdict_label: string;
+  confidence: 'low' | 'medium' | 'high';
   trusted: boolean;
   incomplete: boolean;
   is_system: boolean;

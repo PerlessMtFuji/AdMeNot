@@ -7,6 +7,7 @@ from demalware.engine.actions.context import PhoneContext, read_phone_context
 from demalware.engine.actions.planner import AppPlan, Blocked, default_level, plan_app
 from demalware.engine.allowlist.trust import load_protected_list, parse_package_patterns
 from demalware.engine.facts import AppFacts
+from demalware.engine.scoring import AppResult
 
 AD = "com.intelli.clean"
 AD_HOME = f"{AD}/com.star.james.ui.activity.launcher.LauncherActivity"
@@ -101,9 +102,16 @@ def test_missing_app_and_unknown_level():
     assert _plan("com.other", "nuke") == Blocked("com.other", "nuke", "unknown_level")
 
 
-def test_default_level_by_verdict():
-    verdicts = ("malicious", "suspicious", "review", "safe")
-    assert [default_level(v) for v in verdicts] == ["remove", "disable", None, None]
+def _r(verdict, confidence="medium", is_system=False):
+    return AppResult(AppFacts("com.x", is_system=is_system), [], 0, verdict, False, False, confidence)
+
+
+def test_default_level_depends_on_verdict_and_confidence():
+    assert default_level(_r("malicious", "high")) == "remove"
+    assert default_level(_r("suspicious", "medium")) == "disable"
+    assert default_level(_r("suspicious", "low")) == "silence"
+    assert default_level(_r("review")) is None and default_level(_r("safe")) is None
+    assert default_level(_r("malicious", "high", is_system=True)) == "disable"
 
 
 def test_bundled_protected_list_covers_core_system_apps():
