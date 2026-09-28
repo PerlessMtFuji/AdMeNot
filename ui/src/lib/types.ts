@@ -212,6 +212,9 @@ export type JobError = ApiErrorBody & { job_id: string; kind: string };
 
 type R<T> = Promise<T | ApiError>;
 
+export interface WhoEntry { package: string; name: string }
+export interface WhoView { resumed: WhoEntry | null; overlays: WhoEntry[]; errors: string[] }
+
 export interface Api {
   get_settings(): R<Settings>;
   save_settings(changes: Partial<Settings>): R<Settings>;
@@ -227,6 +230,7 @@ export interface Api {
   answer(jobId: string, value: string): R<{ ok: boolean }>;
   history(serial: string | null): R<HistoryView>;
   adb_shell(command: string): R<{ ok: boolean; output: string }>;
+  who_is_showing(): R<WhoView>;
   check_adb(path: string | null): R<{ ok: boolean; version: string | null; message: string }>;
   pick_folder(): R<{ path: string | null }>;
   quit(): R<{ ok: boolean }>;

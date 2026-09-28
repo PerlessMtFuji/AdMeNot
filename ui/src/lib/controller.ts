@@ -321,6 +321,10 @@ export class Controller {
     return this.call(this.api.adb_shell(command));
   }
 
+  whoIsShowing() {
+    return this.call(this.api.who_is_showing());
+  }
+
   checkAdb(path: string | null) {
     return this.call(this.api.check_adb(path));
   }

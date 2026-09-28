@@ -6,6 +6,7 @@ from demalware.cli.main import main
 from demalware.engine.adb.fake import FakeAdb
 from demalware.engine.adb.transport import AdbError
 from demalware.engine.apk.analyze import ApkReport
+from demalware.engine.foreground import ACTIVITIES, WINDOWS
 
 
 def test_devices_lists_entries(capsys):
@@ -95,3 +96,21 @@ def test_scan_apk_lists_failures(capsys, monkeypatch):
     monkeypatch.setattr("demalware.cli.main.DeviceApkProvider", Failing)
     assert main(["scan", "--apk"], host=make_synthetic_adb()) == 0
     assert "[apk] com.clean.pro.boost: timeout" in capsys.readouterr().out
+
+
+def test_who_prints_foreground_and_overlays(capsys):
+    adb = make_synthetic_adb()
+    adb.responses[ACTIVITIES] = "  topResumedActivity=ActivityRecord{1 u0 com.clean.pro.boost/.Ad t1}\n"
+    adb.responses[WINDOWS] = ("  Window #1 Window{a u0 com.clean.pro.boost}:\n"
+                              "    mAttrs={ty=APPLICATION_OVERLAY}\n    isOnScreen=true\n")
+    assert main(["who", "--delay", "0"], host=adb) == 0
+    out = capsys.readouterr().out
+    assert "com.clean.pro.boost" in out and "Na pierwszym planie" in out
+
+
+def test_who_reports_unknown_when_the_phone_does_not_answer(capsys):
+    assert main(["who", "--delay", "0", "--lang", "en"], host=make_synthetic_adb()) == 0
+    captured = capsys.readouterr()
+    assert "Could not tell which app is in the foreground." in captured.out
+    assert "No windows over other apps." in captured.out
+    assert "[who] activities:" in captured.err and "[who] windows:" in captured.err

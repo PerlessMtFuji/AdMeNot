@@ -5,6 +5,7 @@
   import AppCard from '../components/AppCard.svelte';
   import EvidencePanel from '../components/EvidencePanel.svelte';
   import ExpertTable from '../components/ExpertTable.svelte';
+  import WhoIsShowing from '../components/WhoIsShowing.svelte';
   import InterruptedBanner from '../components/InterruptedBanner.svelte';
   import PhoneThumb from '../components/PhoneThumb.svelte';
   import PlanConfirm from '../components/PlanConfirm.svelte';
@@ -66,6 +67,7 @@
     {/if}
     {#if s.interrupted.length}<InterruptedBanner orders={s.interrupted} />{/if}
     {#if s.scan?.low_behavior_data}<Banner tone="warn" icon="info" title={t('summary.low_data')} />{/if}
+    <WhoIsShowing ask={() => ctl.whoIsShowing()} />
 
     {#if expert}
       <ExpertTable {rows} {focused} />

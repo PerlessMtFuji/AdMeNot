@@ -81,6 +81,8 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
         return { ok: true, version: 'Android Debug Bridge version 1.0.41', message: '' };
       case 'pick_folder':
         return { path: 'D:\\DeMalware\\kopie' };
+      case 'who_is_showing':
+        return { resumed: null, overlays: [], errors: [] };
       case 'adb_shell':
         return { ok: true, output: `(atrapa) ${String(args[0])}\n` };
       case 'watch_devices':

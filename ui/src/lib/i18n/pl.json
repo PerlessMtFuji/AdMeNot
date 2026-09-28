@@ -83,6 +83,14 @@
   "phone": {
     "subject": "Przedmiot zlecenia", "serial": "S/N", "patch": "Poprawka"
   },
+  "who": {
+    "button": "Kto to wyświetla?",
+    "hint": "Odtwórz problem na telefonie (np. odblokuj i poczekaj na reklamę), a potem kliknij.",
+    "resumed": "Na pierwszym planie: {name}",
+    "overlays": "Okna nad innymi aplikacjami: {names}",
+    "none": "Brak okien nad innymi aplikacjami.",
+    "unknown": "Nie udało się ustalić aplikacji na pierwszym planie."
+  },
   "summary": {
     "low_data": "Mało danych o zachowaniu (telefon niedawno uruchomiony) — oceny mogą być zaniżone.",
     "apk_running": "Analiza APK w tle: {done}/{total}"

@@ -6,6 +6,7 @@ from conftest import SERIAL
 from fakephone import make_cli_phone
 
 from demalware.engine.adb.transport import AdbError
+from demalware.engine.foreground import ACTIVITIES, WINDOWS
 
 
 @pytest.fixture(autouse=True)
@@ -45,6 +46,39 @@ def test_console_is_busy_during_an_order():
     job = api.execute({"com.clean.pro.boost": "disable"}, [])["job_id"]
     rec.wait_for("exec:question")
     assert api.adb_shell("getprop")["error"]["key"] == "busy"
+    api.answer(job, "skip")
+    rec.wait_for("exec:done")
+
+
+def test_who_is_showing_names_packages_from_the_scan():
+    phone, api, rec = _scanned()
+    phone.static[ACTIVITIES] = "  topResumedActivity=ActivityRecord{1 u0 com.clean.pro.boost/.Ad t1}\n"
+    phone.static[WINDOWS] = ("  Window #1 Window{a u0 com.clean.pro.boost}:\n"
+                             "    mAttrs={ty=APPLICATION_OVERLAY}\n    isOnScreen=true\n")
+    result = api.who_is_showing()
+    assert result["resumed"] == {"package": "com.clean.pro.boost", "name": "com.clean.pro.boost"}
+    assert [o["package"] for o in result["overlays"]] == ["com.clean.pro.boost"]
+    assert result["errors"] == []
+    assert {e["tag"] for e in rec.of("adb:command")} == {"who"}
+
+
+def test_who_is_showing_reports_failed_commands_without_failing():
+    _phone, api, _rec = _scanned()
+    result = api.who_is_showing()
+    assert result["resumed"] is None and result["overlays"] == []
+    assert [e.split(":")[0] for e in result["errors"]] == ["activities", "windows"]
+
+
+def test_who_is_showing_without_device_is_an_error():
+    api, _ = make_api(make_cli_phone())
+    assert api.who_is_showing()["error"]["key"] == "no_device"
+
+
+def test_who_is_showing_is_busy_during_an_order():
+    _phone, api, rec = _scanned(sync=False, admin_timeout=0)
+    job = api.execute({"com.clean.pro.boost": "disable"}, [])["job_id"]
+    rec.wait_for("exec:question")
+    assert api.who_is_showing()["error"]["key"] == "busy"
     api.answer(job, "skip")
     rec.wait_for("exec:done")
 
