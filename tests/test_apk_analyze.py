@@ -241,3 +241,51 @@ def test_old_json_without_files_still_loads():
     data = report_to_json(ApkReport("com.x"))
     del data["files"]
     assert report_from_json(data).files == {}
+
+
+LONG_CODE = (1 << 32) | 7  # versionCodeMajor=1, versionCode=7 — dumpsys pokazuje długi kod
+
+
+def test_long_version_code_from_dumpsys_matches_lower_manifest_code():
+    """Przegląd końcowy M1: raport sprzed odczytu versionCodeMajor nie jest »stale«."""
+    facts = AppFacts("com.x", version_code=LONG_CODE)
+    apply_apk_report(facts, ApkReport("com.x", version_code=7, class_count=10, ad_sdks=["admob"]))
+    assert facts.apk_error is None and facts.gaps == set()
+    assert facts.ad_sdks == {"admob"}
+
+
+def test_long_version_code_still_detects_a_different_install():
+    facts = AppFacts("com.x", version_code=LONG_CODE)
+    apply_apk_report(facts, ApkReport("com.x", version_code=(2 << 32) | 7, class_count=10))
+    assert "stale" in facts.apk_error and "apk" in facts.gaps
+
+
+def test_read_manifest_combines_version_code_major(monkeypatch, tmp_path):
+    import androguard.core.apk as androguard_apk
+
+    from demalware.engine.apk.manifest import read_manifest
+
+    class FakeApk:
+        def __init__(self, path):
+            pass
+
+        def get_app_name(self):
+            return "X"
+
+        def get_app_icon(self, max_dpi=None):
+            return None
+
+        def get_androidversion_code(self):
+            return "7"
+
+        def get_attribute_value(self, tag, attribute, format_value=False):
+            return {"versionCodeMajor": "1"}.get(attribute) if tag == "manifest" else None
+
+        def get_certificates(self):
+            return []
+
+        def get_package(self):
+            return "com.x"
+
+    monkeypatch.setattr(androguard_apk, "APK", FakeApk)
+    assert read_manifest(tmp_path / "base.apk").version_code == LONG_CODE
