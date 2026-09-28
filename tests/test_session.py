@@ -138,6 +138,23 @@ class _OneReport:
         return {p: r for p, r in self.reports.items() if p in {a.package for a in apps}}
 
 
+def test_short_usage_history_is_low_data_and_reported(synthetic_adb):
+    now = "2026-09-26 14:00:00"
+    synthetic_adb.responses[USAGESTATS] = (
+        'user=0\n  In-memory daily stats\n    events\n'
+        f'      time="2026-09-26 12:30:00" type=SCREEN_INTERACTIVE package=android\n'
+        f'      time="{now}" type=ACTIVITY_RESUMED package=com.whatsapp\n')
+    report = run_scan(synthetic_adb)
+    assert report.usage_window_h == 1.5
+    assert report.low_behavior_data is True
+    assert all(r.incomplete for r in report.results)
+
+
+def test_apk_step_keeps_usage_window(synthetic_adb, tmp_path):
+    report = run_scan(synthetic_adb)
+    assert analyze_apks(report, StoredApkProvider(tmp_path)).usage_window_h == report.usage_window_h
+
+
 def test_run_scan_reports_stages_and_reuses_device(synthetic_adb):
     stages = []
     run_scan(synthetic_adb, on_stage=stages.append)

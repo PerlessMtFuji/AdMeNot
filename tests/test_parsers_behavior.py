@@ -4,7 +4,7 @@ import pytest
 
 from demalware.engine.parsers.common import UnrecognizedOutput
 from demalware.engine.parsers.notifications import NotifStats, parse_notifications
-from demalware.engine.parsers.usagestats import UsageCounts, parse_usage_events
+from demalware.engine.parsers.usagestats import UsageCounts, observed_since, parse_usage_events
 
 NOTIF = """Current Notification Manager state:
   Notification List:
@@ -62,8 +62,10 @@ USAGE = """user=0
 
 def test_parse_usage_events_dedupes_and_windows():
     counts = parse_usage_events(USAGE, NOW)
+    # com.wlive: 12:00 i 13:00 są dokładnie godzinę od siebie, więc żadne okno 60-minutowe
+    # nie obejmuje obu naraz — szczyt to 1.
     assert counts == {
-        "com.wlive": UsageCounts(notif_interruptions=2, foreground=0),
+        "com.wlive": UsageCounts(notif_interruptions=2, foreground=0, notif_peak_1h=1),
         "com.whatsapp": UsageCounts(notif_interruptions=0, foreground=2),
     }
 
@@ -160,6 +162,21 @@ def test_interaction_from_before_screen_off_does_not_excuse_later_launch():
         _ev("11:00:02", "ACTIVITY_RESUMED", "com.clean.x"),
     )
     assert parse_usage_events(text, UNLOCK_NOW)["com.clean.x"].unlock_launches == 1
+
+
+def test_peak_hour_catches_a_short_burst():
+    burst = [_ev(f"12:{m:02d}:00", "NOTIFICATION_INTERRUPTION", "com.burst") for m in range(40)]
+    spread = [f'    time="2026-09-26 {h:02d}:00:00" type=NOTIFICATION_INTERRUPTION package=com.calm'
+              for h in range(13)]
+    counts = parse_usage_events(_usage(*burst, *spread), UNLOCK_NOW)
+    assert counts["com.burst"].notif_peak_1h == 40
+    assert counts["com.calm"].notif_peak_1h == 1
+
+
+def test_observed_since_is_earliest_event_in_window():
+    text = _usage(_ev("11:30:00", "SCREEN_INTERACTIVE"), _ev("13:00:00", "ACTIVITY_RESUMED", "com.a"))
+    assert observed_since(text, UNLOCK_NOW) == datetime(2026, 9, 26, 11, 30, 0)
+    assert observed_since("no events\n", UNLOCK_NOW) is None
 
 
 def test_known_limit_ad_after_launcher_is_not_counted():

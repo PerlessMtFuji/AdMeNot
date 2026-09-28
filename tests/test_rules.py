@@ -56,7 +56,7 @@ def test_parse_rules_requires_category_and_label():
 
 
 EXPECTED_CATEGORIES = {
-    "DM-NOTIF-01": "notif", "DM-NOTIF-02": "notif",
+    "DM-NOTIF-01": "notif", "DM-NOTIF-02": "notif", "DM-NOTIF-03": "notif",
     "DM-OVERLAY-01": "ads", "DM-FSI-01": "ads", "DM-BGACT-01": "ads", "DM-FSIPERM-01": "ads",
     "DM-ADSDK-01": "ads", "DM-ADSDK-02": "ads",
     "DM-ALARM-01": "background", "DM-PERM-01": "background", "DM-DYNDEX-01": "background",
@@ -283,6 +283,13 @@ def test_simple_texts_describe_facts_not_intent():
             texts += [(finding.rule_id, finding.text(lang)) for lang in ("pl", "en")]
     for rule_id, text in texts:
         assert not any(word in text.lower() for word in NEUTRAL_FORBIDDEN), (rule_id, text)
+
+
+def test_notification_burst_rule():
+    burst = AppFacts("com.x", notif_interruptions_24h=40, notif_peak_1h=40)
+    flood = AppFacts("com.x", notif_interruptions_24h=600, notif_peak_1h=60)
+    assert "DM-NOTIF-03" in _ids(burst)
+    assert "DM-NOTIF-03" not in _ids(flood) and "DM-NOTIF-02" in _ids(flood)
 
 
 def test_roles_are_context_signals():

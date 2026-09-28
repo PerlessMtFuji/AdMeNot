@@ -567,15 +567,15 @@
          "is_admin": false,
          "default_level": null,
          "problems": [
-          "Zasypuje telefon powiadomieniami — średnio 21 na godzinę."
+          "Bardzo często wyświetla powiadomienia z dźwiękiem lub wyskakujące — średnio 21 na godzinę w ciągu doby."
          ],
          "findings": [
           {
            "rule_id": "DM-NOTIF-02",
            "class": "behavior",
            "weight": 25,
-           "text": "Zasypuje telefon powiadomieniami — średnio 21 na godzinę.",
-           "text_expert": "usagestats: 500 × NOTIFICATION_INTERRUPTION / 24 h (20.8/h)",
+           "text": "Bardzo często wyświetla powiadomienia z dźwiękiem lub wyskakujące — średnio 21 na godzinę w ciągu doby.",
+           "text_expert": "usagestats: 500 × NOTIFICATION_INTERRUPTION (przerywające) / 24 h (20.8/h)",
            "evidence": {
             "notif_interruptions_24h": 500,
             "notif_per_hour_24h": 20.833333333333332
@@ -592,7 +592,7 @@
           {
            "category": "notif",
            "severity": "bad",
-           "text": "Zasypuje telefon powiadomieniami — średnio 21 na godzinę."
+           "text": "Bardzo często wyświetla powiadomienia z dźwiękiem lub wyskakujące — średnio 21 na godzinę w ciągu doby."
           }
          ],
          "source": {
@@ -951,15 +951,15 @@
          "is_admin": false,
          "default_level": null,
          "problems": [
-          "Zasypuje telefon powiadomieniami — średnio 21 na godzinę."
+          "Bardzo często wyświetla powiadomienia z dźwiękiem lub wyskakujące — średnio 21 na godzinę w ciągu doby."
          ],
          "findings": [
           {
            "rule_id": "DM-NOTIF-02",
            "class": "behavior",
            "weight": 25,
-           "text": "Zasypuje telefon powiadomieniami — średnio 21 na godzinę.",
-           "text_expert": "usagestats: 500 × NOTIFICATION_INTERRUPTION / 24 h (20.8/h)",
+           "text": "Bardzo często wyświetla powiadomienia z dźwiękiem lub wyskakujące — średnio 21 na godzinę w ciągu doby.",
+           "text_expert": "usagestats: 500 × NOTIFICATION_INTERRUPTION (przerywające) / 24 h (20.8/h)",
            "evidence": {
             "notif_interruptions_24h": 500,
             "notif_per_hour_24h": 20.833333333333332
@@ -976,7 +976,7 @@
           {
            "category": "notif",
            "severity": "bad",
-           "text": "Zasypuje telefon powiadomieniami — średnio 21 na godzinę."
+           "text": "Bardzo często wyświetla powiadomienia z dźwiękiem lub wyskakujące — średnio 21 na godzinę w ciągu doby."
           }
          ],
          "source": {
