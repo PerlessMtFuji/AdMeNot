@@ -91,3 +91,40 @@ def test_recent_serials_newest_first(tmp_path):
         j.create_order("A", None)
         assert j.recent_serials() == ["A", "B"]
         assert j.recent_serials(limit=1) == ["A"]
+
+
+def test_scan_snapshot_and_verification_are_stored_per_order(tmp_path):
+    path = tmp_path / "j.db"
+    snapshot = {"device": {"serial": "S1"}, "apps": [{"package": "com.x", "label": "Źle & <b>"}]}
+    with Journal(path) as j:
+        order = j.create_order("S1", "M")
+        other = j.create_order("S1", "M")
+        assert j.scan(order.id) is None and j.verification(order.id) is None
+        j.save_scan(order.id, snapshot)
+        j.save_verification(order.id, {"com.x": ["appop"]})
+    with Journal(path) as j:
+        assert j.scan(order.id) == snapshot
+        assert j.verification(order.id) == {"com.x": ["appop"]}
+        assert j.scan(other.id) is None and j.verification(other.id) is None
+
+
+def test_verification_without_scan_and_both_overwrite(tmp_path):
+    with Journal(tmp_path / "j.db") as j:
+        order = j.create_order("S1", "M")
+        j.save_verification(order.id, {"com.x": ["enabled"]})
+        j.save_verification(order.id, {})
+        assert j.verification(order.id) == {} and j.scan(order.id) is None
+        j.save_scan(order.id, {"apps": []})
+        j.save_scan(order.id, {"apps": [1]})
+        assert j.scan(order.id) == {"apps": [1]} and j.verification(order.id) == {}
+
+
+def test_journal_from_plan_2_gets_the_scan_table(tmp_path):
+    path = tmp_path / "j.db"
+    with Journal(path) as j:
+        order = j.create_order("S1", "M")
+        j._db.execute("DROP TABLE order_scans")  # stan bazy sprzed Planu 6
+    with Journal(path) as j:
+        assert j.order(order.id).number == order.number
+        j.save_scan(order.id, {"apps": []})
+        assert j.scan(order.id) == {"apps": []}
