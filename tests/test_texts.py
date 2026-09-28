@@ -1,7 +1,9 @@
 from demalware.engine.texts import (
     TEXTS,
     VERDICT_LABELS,
+    confidence_label,
     error_text,
+    gap_label,
     level_label,
     order_status_label,
     reason_text,
@@ -56,3 +58,15 @@ def test_order_status_label_looks_up_section_and_falls_back_to_status():
     assert order_status_label("running", "pl") == "w toku"
     assert order_status_label("done", "en") == "done"
     assert order_status_label("weird", "pl") == "weird"
+
+
+def test_every_gap_source_has_labels():
+    for key in ("components", "appops", "notifications", "usagestats", "alarm", "device_policy",
+                "roles", "secure_settings", "packages", "apk"):
+        for lang in ("pl", "en"):
+            assert gap_label(key, lang) != key
+
+
+def test_confidence_label_falls_back_to_level():
+    assert confidence_label("low", "pl").startswith("niska")
+    assert confidence_label("weird", "en") == "weird"

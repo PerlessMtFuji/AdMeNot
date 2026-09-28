@@ -21,6 +21,9 @@ from demalware.app.present import (
     symptoms,
 )
 from demalware.engine.actions.executor import ExecOptions
+from demalware.engine.adb.transport import AdbError
+from demalware.engine.collectors.profiles import PM_USERS
+from demalware.engine.collectors.system import DEVICE_POLICY
 from demalware.engine.facts import AppFacts
 from demalware.engine.journal.db import Journal
 from demalware.engine.phones.provider import SILHOUETTE, PhoneMatch
@@ -167,3 +170,21 @@ def test_app_view_passes_icon():
     facts = AppFacts("com.x", icon="data:image/png;base64,iVBORw0KGgo=")
     view = app_view(AppResult(facts, [], 0, "safe", False, False), "pl")
     assert view["icon"] == "data:image/png;base64,iVBORw0KGgo="
+
+
+def test_app_view_shows_confidence_gaps_and_scoped_safe_label(synthetic_adb):
+    synthetic_adb.responses[DEVICE_POLICY] = AdbError("timeout", "slow")
+    report = run_scan(synthetic_adb)
+    apps = {a["package"]: a for a in scan_view(report, "pl")["apps"]}
+    whatsapp = apps["com.whatsapp"]
+    assert whatsapp["verdict_label"] == "Brak oznak (ocena niepełna)"
+    assert whatsapp["gaps"] == [{"key": "device_policy", "label": "administratorzy urządzenia"}]
+    # brak danych obniża pewność: zachowanie dwóch rodzajów daje „wysoką” tylko przy pełnych danych
+    assert apps["com.clean.pro.boost"]["confidence_label"].startswith("średnia")
+
+
+def test_scan_view_reports_other_profiles_and_usage_window(synthetic_adb):
+    synthetic_adb.responses[PM_USERS] = "Users:\n\tUserInfo{0:A:c13}\n\tUserInfo{10:W:1030}\n"
+    view = scan_view(run_scan(synthetic_adb), "en")
+    assert view["profiles"] == {"others": [10], "known": True}
+    assert view["usage_window_h"] is not None

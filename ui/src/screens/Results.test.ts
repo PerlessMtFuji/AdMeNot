@@ -60,8 +60,8 @@ describe('Results', () => {
 
   test('clean phone', async () => {
     const { s } = await scanned('clean');
-    expect(screen.getByRole('heading', { name: 'Nie znaleziono problemów' })).toBeTruthy();
-    expect(screen.getByText(`Sprawdzone aplikacje: ${s.scan!.counts.total}`)).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Nie wykryto oznak zagrożenia' })).toBeTruthy();
+    expect(screen.getByText(`W zakresie wykonanego skanu · sprawdzone aplikacje: ${s.scan!.counts.total}`)).toBeTruthy();
     expect((screen.getByRole('button', { name: 'Napraw zaznaczone (0)' }) as HTMLButtonElement)
       .disabled).toBe(true);
   });

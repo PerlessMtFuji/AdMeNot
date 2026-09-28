@@ -5,7 +5,8 @@ import AppCard from './AppCard.svelte';
 
 const evil: AppView = {
   package: 'com.evil', name: '<img src=x onerror="alert(1)"> & „Cleaner”', score: 90,
-  verdict: 'malicious', verdict_label: 'Szkodliwa', confidence: 'high', trusted: false, incomplete: false,
+  verdict: 'malicious', verdict_label: 'Szkodliwa', confidence: 'high', confidence_label: 'wysoka',
+  gaps: [], trusted: false, incomplete: false,
   is_system: false, from_play: false, installer: 'com.android.chrome', is_admin: true,
   default_level: 'remove', problems: [], findings: [], apk_error: null, icon: null, ad_sdks: null,
   symptoms: [{ category: 'ads', severity: 'bad', text: 'Pokazuje <b>reklamy</b>.' },
@@ -46,4 +47,9 @@ test('app card: real icon from the APK, initial when it fails to load', async ()
   await rerender({ ...props, app: { ...evil, icon: null } });
   expect(container.querySelector('img[data-app-icon]')).toBeNull();
   expect(initial()).not.toBeNull();
+});
+
+test('app card: incomplete assessment is visible', () => {
+  render(AppCard, { props: { app: { ...evil, incomplete: true }, level: null, onlevel: vi.fn(), ontoggle: vi.fn() } });
+  expect(screen.getByText('Ocena niepełna')).toBeTruthy();
 });

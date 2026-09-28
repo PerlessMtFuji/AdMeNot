@@ -6,8 +6,9 @@
     "title": { "one": "{count} aplikacja wymaga uwagi", "few": "{count} aplikacje wymagają uwagi", "many": "{count} aplikacji wymaga uwagi", "other": "{count} aplikacji wymaga uwagi" },
     "safe": { "one": "{count} aplikacja bez uwag", "few": "{count} aplikacje bez uwag", "many": "{count} aplikacji bez uwag", "other": "{count} aplikacji bez uwag" },
     "mode": "Tryb widoku", "action_for": "Akcja dla {name}",
-    "clean_title": "Nie znaleziono problemów", "clean_sub": "Sprawdzone aplikacje: {count}",
-    "safe_show": "Pokaż listę", "safe_hide": "Zwiń listę", "safe_list": "Aplikacje bez uwag"
+    "clean_title": "Nie wykryto oznak zagrożenia", "clean_sub": "W zakresie wykonanego skanu · sprawdzone aplikacje: {count}",
+    "safe_show": "Pokaż listę", "safe_hide": "Zwiń listę", "safe_list": "Aplikacje bez uwag",
+    "incomplete": "Ocena niepełna"
   },
   "panel": {
     "apps": { "one": "{count} aplikacja", "few": "{count} aplikacje", "many": "{count} aplikacji", "other": "{count} aplikacji" },
@@ -93,7 +94,8 @@
     "unknown": "Nie udało się ustalić aplikacji na pierwszym planie."
   },
   "summary": {
-    "low_data": "Mało danych o zachowaniu (telefon niedawno uruchomiony) — oceny mogą być zaniżone.",
+    "low_data": "Mało danych o zachowaniu (statystyki z {hours} h lub niedawny restart) — użyj telefonu kilkanaście minut, odtwórz problem i zeskanuj ponownie albo użyj „Kto to wyświetla?”.",
+    "profiles": "Na telefonie są inne profile użytkownika ({ids}) — ich aplikacje nie zostały sprawdzone.",
     "apk_running": "Analiza APK w tle: {done}/{total}"
   },
   "level": { "silence": "WYCISZ", "disable": "WYŁĄCZ", "remove": "USUŃ", "review": "SPRAWDŹ", "none": "—" },
@@ -110,7 +112,8 @@
   "evidence": {
     "title": "Szczegóły aplikacji", "score": "Wynik", "why": "Dlaczego", "raw": "Surowe dane z telefonu", "ad_sdks": "Biblioteki reklamowe",
     "none": "Wybierz aplikację w tabeli.", "plan": "Plan", "fix": "Napraw ({count})",
-    "zone": { "safe": "bez uwag", "review": "do sprawdzenia", "suspicious": "podejrzana", "malicious": "szkodliwa" }
+    "zone": { "safe": "bez uwag", "review": "do sprawdzenia", "suspicious": "podejrzana", "malicious": "szkodliwa" },
+    "limits": "Ograniczenia oceny", "confidence": "Pewność wniosku"
   },
   "actions": { "console": "Konsola ADB", "fix": "Napraw zaznaczone ({count})", "rescan": "Skanuj ponownie" },
   "plan": { "title": "Plan naprawy", "confirm_title": "Co zrobię na telefonie", "blocked": "Pominięta", "unlock": "Odblokuj", "undo_hint": "Każdą zmianę można cofnąć w Historii.", "run": "Wykonaj ({count})", "nothing": "Nic do wykonania — wszystkie aplikacje są zablokowane." },

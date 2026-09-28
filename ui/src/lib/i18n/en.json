@@ -6,8 +6,9 @@
     "title": { "one": "{count} app needs attention", "few": "{count} apps need attention", "many": "{count} apps need attention", "other": "{count} apps need attention" },
     "safe": { "one": "{count} app without issues", "few": "{count} apps without issues", "many": "{count} apps without issues", "other": "{count} apps without issues" },
     "mode": "View mode", "action_for": "Action for {name}",
-    "clean_title": "No problems found", "clean_sub": "Apps checked: {count}",
-    "safe_show": "Show the list", "safe_hide": "Hide the list", "safe_list": "Apps without issues"
+    "clean_title": "No signs of a threat", "clean_sub": "Within the scope of this scan · apps checked: {count}",
+    "safe_show": "Show the list", "safe_hide": "Hide the list", "safe_list": "Apps without issues",
+    "incomplete": "Incomplete assessment"
   },
   "panel": {
     "apps": { "one": "{count} app", "few": "{count} apps", "many": "{count} apps", "other": "{count} apps" },
@@ -93,7 +94,8 @@
     "unknown": "Could not tell which app is in the foreground."
   },
   "summary": {
-    "low_data": "Little behavior data (the phone was restarted recently) — ratings may be too low.",
+    "low_data": "Little behavior data ({hours} h of statistics or a recent reboot) — use the phone for a few minutes, reproduce the problem and scan again, or use “Who is showing this?”.",
+    "profiles": "The phone has other user profiles ({ids}) — their apps were not checked.",
     "apk_running": "APK analysis in the background: {done}/{total}"
   },
   "level": { "silence": "SILENCE", "disable": "DISABLE", "remove": "REMOVE", "review": "CHECK", "none": "—" },
@@ -110,7 +112,8 @@
   "evidence": {
     "title": "App details", "score": "Score", "why": "Why", "raw": "Raw data from the phone", "ad_sdks": "Ad libraries",
     "none": "Select an app in the table.", "plan": "Plan", "fix": "Fix ({count})",
-    "zone": { "safe": "no issues", "review": "to review", "suspicious": "suspicious", "malicious": "malicious" }
+    "zone": { "safe": "no issues", "review": "to review", "suspicious": "suspicious", "malicious": "malicious" },
+    "limits": "Assessment limits", "confidence": "Confidence"
   },
   "actions": { "console": "ADB console", "fix": "Fix selected ({count})", "rescan": "Scan again" },
   "plan": { "title": "Repair plan", "confirm_title": "What I will do on the phone", "blocked": "Skipped", "unlock": "Unlock", "undo_hint": "Every change can be undone in History.", "run": "Run ({count})", "nothing": "Nothing to run — all apps are blocked." },

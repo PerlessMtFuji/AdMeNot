@@ -31,6 +31,7 @@
       <div class="flex min-w-0 items-center gap-2">
         <b class="truncate text-md">{app.name}</b>
         <Pill tone={VERDICT_TONE[app.verdict]}>{app.verdict_label}</Pill>
+        {#if app.incomplete && app.verdict !== 'safe'}<Pill tone="neutral">{t('results.incomplete')}</Pill>{/if}
       </div>
       <div class="mono truncate text-2xs text-soft">{app.package}</div>
     </div>

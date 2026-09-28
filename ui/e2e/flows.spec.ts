@@ -23,7 +23,7 @@ test('adware: scan, confirm the plan, fix with the admin step, undo from history
 
 test('clean phone has nothing to fix', async ({ page }) => {
   await scan(page, 'clean');
-  await expect(page.getByRole('heading', { name: 'Nie znaleziono problemów' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Nie wykryto oznak zagrożenia' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Napraw zaznaczone (0)' })).toBeDisabled();
 });
 

@@ -32,7 +32,8 @@ function app(pkg: string, verdict: AppView['verdict'], extra: Partial<AppView> =
   const level = verdict === 'malicious' ? 'remove' : verdict === 'suspicious' ? 'disable' : null;
   return {
     package: pkg, name: pkg.split('.').at(-1)!, score: 0, verdict, verdict_label: verdict,
-    confidence: 'high', trusted: false, incomplete: false, is_system: false, from_play: true, installer: null,
+    confidence: 'high', confidence_label: 'high', gaps: [],
+    trusted: false, incomplete: false, is_system: false, from_play: true, installer: null,
     is_admin: false, default_level: level, problems: [], findings: [], apk_error: null, icon: null,
     ad_sdks: null, symptoms: [], source: { label: '', days: null }, ...extra,
   };

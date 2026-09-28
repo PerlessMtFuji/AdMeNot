@@ -6,6 +6,8 @@ from demalware.cli.main import main
 from demalware.engine.adb.fake import FakeAdb
 from demalware.engine.adb.transport import AdbError
 from demalware.engine.apk.analyze import ApkReport
+from demalware.engine.collectors.profiles import PM_USERS
+from demalware.engine.collectors.system import DEVICE_POLICY
 from demalware.engine.foreground import ACTIVITIES, WINDOWS
 
 
@@ -115,3 +117,13 @@ def test_who_reports_unknown_when_the_phone_does_not_answer(capsys):
     assert "Could not read windows over other apps." in captured.out
     assert "No windows over other apps." not in captured.out
     assert "[who] activities:" in captured.err and "[who] windows:" in captured.err
+
+
+def test_scan_output_explains_incomplete_results_and_profiles(capsys):
+    adb = make_synthetic_adb()
+    adb.responses[DEVICE_POLICY] = AdbError("timeout", "slow")
+    adb.responses[PM_USERS] = "Users:\n\tUserInfo{0:A:c13}\n\tUserInfo{10:W:1030}\n"
+    assert main(["scan", "--all"], host=adb) == 0
+    out = capsys.readouterr().out
+    assert "brak danych: administratorzy urządzenia" in out
+    assert "profil" in out and "10" in out

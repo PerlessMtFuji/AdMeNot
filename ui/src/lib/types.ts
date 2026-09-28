@@ -67,6 +67,8 @@ export interface AppView {
   verdict: Verdict;
   verdict_label: string;
   confidence: 'low' | 'medium' | 'high';
+  confidence_label: string;
+  gaps: { key: string; label: string }[];
   trusted: boolean;
   incomplete: boolean;
   is_system: boolean;
@@ -99,6 +101,8 @@ export interface ScanView {
   low_behavior_data: boolean;
   apk: { requested: number; analyzed: number; failed: Record<string, string> } | null;
   apps: AppView[];
+  profiles: { others: number[]; known: boolean };
+  usage_window_h: number | null;
   counts: ScanCounts;
 }
 

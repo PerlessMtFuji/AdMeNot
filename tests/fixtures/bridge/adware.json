@@ -381,6 +381,8 @@
          "verdict": "malicious",
          "verdict_label": "Szkodliwa",
          "confidence": "high",
+         "confidence_label": "wysoka — potwierdzony wskaźnik lub zachowanie kilku rodzajów",
+         "gaps": [],
          "trusted": false,
          "incomplete": false,
          "is_system": false,
@@ -571,6 +573,8 @@
          "verdict": "review",
          "verdict_label": "Do sprawdzenia",
          "confidence": "medium",
+         "confidence_label": "średnia — zaobserwowane zachowanie",
+         "gaps": [],
          "trusted": false,
          "incomplete": false,
          "is_system": false,
@@ -619,6 +623,8 @@
          "verdict": "safe",
          "verdict_label": "Bezpieczna",
          "confidence": "low",
+         "confidence_label": "niska — tylko cechy pakietu i przyznane uprawnienia",
+         "gaps": [],
          "trusted": false,
          "incomplete": false,
          "is_system": false,
@@ -664,6 +670,8 @@
          "verdict": "safe",
          "verdict_label": "Bezpieczna",
          "confidence": "low",
+         "confidence_label": "niska — tylko cechy pakietu i przyznane uprawnienia",
+         "gaps": [],
          "trusted": false,
          "incomplete": false,
          "is_system": true,
@@ -703,6 +711,11 @@
          }
         }
        ],
+       "profiles": {
+        "others": [],
+        "known": false
+       },
+       "usage_window_h": 23.58,
        "counts": {
         "malicious": 1,
         "suspicious": 0,
@@ -765,6 +778,8 @@
          "verdict": "malicious",
          "verdict_label": "Szkodliwa",
          "confidence": "high",
+         "confidence_label": "wysoka — potwierdzony wskaźnik lub zachowanie kilku rodzajów",
+         "gaps": [],
          "trusted": false,
          "incomplete": false,
          "is_system": false,
@@ -955,6 +970,8 @@
          "verdict": "review",
          "verdict_label": "Do sprawdzenia",
          "confidence": "medium",
+         "confidence_label": "średnia — zaobserwowane zachowanie",
+         "gaps": [],
          "trusted": false,
          "incomplete": false,
          "is_system": false,
@@ -1003,6 +1020,8 @@
          "verdict": "safe",
          "verdict_label": "Bezpieczna",
          "confidence": "low",
+         "confidence_label": "niska — tylko cechy pakietu i przyznane uprawnienia",
+         "gaps": [],
          "trusted": false,
          "incomplete": false,
          "is_system": false,
@@ -1048,6 +1067,8 @@
          "verdict": "safe",
          "verdict_label": "Bezpieczna",
          "confidence": "low",
+         "confidence_label": "niska — tylko cechy pakietu i przyznane uprawnienia",
+         "gaps": [],
          "trusted": false,
          "incomplete": false,
          "is_system": true,
@@ -1087,6 +1108,11 @@
          }
         }
        ],
+       "profiles": {
+        "others": [],
+        "known": false
+       },
+       "usage_window_h": 23.58,
        "counts": {
         "malicious": 1,
         "suspicious": 0,

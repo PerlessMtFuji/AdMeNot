@@ -12,7 +12,8 @@ test('evidence: score meter, grouped reasons with muted points, raw data, no rul
 test('evidence for a flagged app', async () => {
   const app = {
     package: 'com.clean.pro.boost', name: 'Cleaner Pro', score: 100, verdict: 'malicious',
-    verdict_label: 'Szkodliwa', trusted: false, incomplete: false, is_system: false, from_play: false,
+    verdict_label: 'Szkodliwa', confidence: 'high', confidence_label: 'wysoka', gaps: [],
+    trusted: false, incomplete: false, is_system: false, from_play: false,
     installer: 'com.android.chrome', is_admin: true, default_level: 'remove', problems: [],
     apk_error: null, ad_sdks: null, symptoms: [], source: { label: 'Chrome', days: 3 },
     findings: [
@@ -33,7 +34,8 @@ test('evidence for a flagged app', async () => {
 
 test('raw data: one entry per rule, ad SDK list only once', () => {
   const base = {
-    package: 'com.x', name: 'X', score: 40, verdict: 'suspicious', verdict_label: 'Podejrzana', trusted: false,
+    package: 'com.x', name: 'X', score: 40, verdict: 'suspicious', verdict_label: 'Podejrzana',
+    confidence: 'medium', confidence_label: 'średnia', gaps: [], trusted: false,
     incomplete: false, is_system: false, from_play: false, installer: null, is_admin: false, default_level: null,
     problems: [], apk_error: null, symptoms: [], source: { label: 'Chrome', days: 1 },
   };
@@ -53,4 +55,19 @@ test('raw data: one entry per rule, ad SDK list only once', () => {
   expect(rows).toHaveLength(2);
   expect(rows[1].textContent).toContain('Biblioteki reklamowe');
   expect(rows[1].textContent).toContain('a, b');
+});
+
+test('evidence: data gaps show an "Assessment limits" section and the confidence line', () => {
+  const app = {
+    package: 'com.x', name: 'X', score: 40, verdict: 'suspicious', verdict_label: 'Podejrzana',
+    confidence: 'low', confidence_label: 'niska — …', gaps: [{ key: 'apk', label: 'analiza pliku APK' }],
+    trusted: false, incomplete: true, is_system: false, from_play: false, installer: null, is_admin: false,
+    default_level: null, problems: [], apk_error: null, ad_sdks: null, symptoms: [],
+    source: { label: 'Chrome', days: 1 }, findings: [],
+  };
+  render(EvidencePanel, { props: { app: app as never } });
+  expect(screen.getByText('Ograniczenia oceny')).toBeTruthy();
+  expect(screen.getByText('analiza pliku APK')).toBeTruthy();
+  expect(screen.getByText('Pewność wniosku')).toBeTruthy();
+  expect(screen.getByText('niska — …')).toBeTruthy();
 });

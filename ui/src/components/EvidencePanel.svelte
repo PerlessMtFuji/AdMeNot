@@ -36,6 +36,13 @@
     <Pill tone={VERDICT_TONE[app.verdict]}>{app.verdict_label}</Pill>
   </div>
   <div><span class="lbl">{t('evidence.score')}</span><ScoreScale score={app.score} verdict={app.verdict} /></div>
+  <div class="text-xs text-mut"><span class="lbl">{t('evidence.confidence')}</span> {app.confidence_label}</div>
+  {#if app.gaps.length}
+    <div class="well p-3 text-xs">
+      <span class="lbl block">{t('evidence.limits')}</span>
+      <ul class="mt-1 list-disc pl-4">{#each app.gaps as g (g.key)}<li>{g.label}</li>{/each}</ul>
+    </div>
+  {/if}
   <span class="lbl">{t('evidence.why')}</span>
   <div class="well well-list flex flex-col p-3.5 [&>*+*]:mt-2.5 [&>*+*]:pt-2.5">
     {#each groups.groups as g (g.category)}

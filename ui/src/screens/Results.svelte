@@ -66,7 +66,8 @@
       </div>
     {/if}
     {#if s.interrupted.length}<InterruptedBanner orders={s.interrupted} />{/if}
-    {#if s.scan?.low_behavior_data}<Banner tone="warn" icon="info" title={t('summary.low_data')} />{/if}
+    {#if s.scan?.low_behavior_data}<Banner tone="warn" icon="info" title={t('summary.low_data', { hours: s.scan.usage_window_h?.toFixed(1) ?? '?' })} />{/if}
+    {#if s.scan?.profiles.others.length}<Banner tone="warn" icon="info" title={t('summary.profiles', { ids: s.scan.profiles.others.join(', ') })} />{/if}
     <WhoIsShowing ask={() => ctl.whoIsShowing()} />
 
     {#if expert}
