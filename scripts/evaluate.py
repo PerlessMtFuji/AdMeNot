@@ -7,7 +7,15 @@ from pathlib import Path
 
 from demalware.engine.adb.fake import FakeAdb
 from demalware.engine.apk.providers import StoredApkProvider
-from demalware.engine.evaluation import LABELS_FILE, evaluate, format_evaluation, load_labels
+from demalware.engine.evaluation import (
+    LABELS_FILE,
+    evaluate,
+    format_evaluation,
+    format_threshold_table,
+    load_label_sets,
+    load_labels,
+    with_install_age,
+)
 from demalware.engine.session import run_scan
 
 FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures"
@@ -28,6 +36,10 @@ def main(argv: list[str]) -> int:
         report = run_scan(FakeAdb.from_capture(d), apk=provider)
         print(f"== {d.name}")
         print(format_evaluation(evaluate(report.results, labels)))
+        sets = load_label_sets(d) or {}
+        print(format_threshold_table(report.results, labels, sets))
+        aged = evaluate(with_install_age(report, 30.0), labels)
+        print(f"  Stabilność (instalacja +30 dni): TP {len(evaluate(report.results, labels).tp)} → {len(aged.tp)}")
     return 0
 
 

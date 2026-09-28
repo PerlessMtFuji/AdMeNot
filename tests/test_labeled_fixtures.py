@@ -24,6 +24,9 @@ def test_labeled_fixture_meets_targets(fixture_dir):
     assert len(ev.fp) <= targets["max_false_positives"], summary
     assert (ev.recall or 0.0) >= targets["min_recall"], summary
 
+    strict = evaluate(report.results, load_labels(fixture_dir), threshold="suspicious")
+    assert len(strict.fp) <= targets.get("max_false_positives_suspicious", 0), format_evaluation(strict)
+
 
 @pytest.mark.parametrize("fixture_dir", FIXTURES, ids=[p.name for p in FIXTURES])
 def test_verdicts_do_not_depend_on_install_age(fixture_dir):

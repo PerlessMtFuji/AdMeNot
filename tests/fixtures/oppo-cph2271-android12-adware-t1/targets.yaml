@@ -4,3 +4,6 @@
 # FP = 0 obniżyłoby czułość do 27%. Decyzja człowieka: dopuszczamy 2 FP do czasu sygnału, który je rozdzieli.
 min_recall: 0.60
 max_false_positives: 2
+
+# Plan 4b (2026-09-27): czyste aplikacje nie mogą być „Podejrzana” ani wyżej.
+max_false_positives_suspicious: 0
