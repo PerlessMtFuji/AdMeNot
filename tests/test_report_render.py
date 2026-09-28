@@ -117,12 +117,25 @@ def test_limited_scope_and_incomplete_rows(photo):
     assert "Nie udało się odczytać listy profili" in only_safe
 
 
+def test_full_scope_with_incomplete_table_row_still_shows_scope_and_warns(photo):
+    rows = [AppRow("com.game", None, "review", ["Reklamy"], None, "none", True, ["apk"])]
+    html = render_html(make_protocol(photo, rows=rows,
+                                     recommendations=[Recommendation("incomplete_scan")]),
+                       ServiceInfo(), GENERATED)
+    assert "Zakres skanu" in html
+    assert "Aplikacje w tabeli z oceną niepełną" in html
+    assert ": 1." in html
+    assert 'class="warn"' in html
+
+
 def test_scope_lines():
     t = TEXTS["en"]
     assert scope_lines(None, t) == [] and scope_lines(FULL_SCOPE, t) == []
     lines = scope_lines(ScanScope([10, 11], True, True, None, 0), t)
     assert lines == [t["scope"]["other_profiles"].format(ids="10, 11"),
                      t["scope"]["low_data_unknown"]]
+    assert scope_lines(FULL_SCOPE, t, 2) == [t["scope"]["incomplete_rows"].format(count=2)]
+    assert scope_lines(None, t, 2) == []
 
 
 def test_silhouette_approximate_note_and_missing_scan(photo):
