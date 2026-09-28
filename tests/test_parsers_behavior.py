@@ -111,6 +111,7 @@ def test_returning_to_previous_app_after_unlock_is_not_counted():
 
 
 def test_late_resume_after_unlock_is_not_counted():
+    """Ograniczenie: reklama z opóźnieniem > 10 s nie jest liczona."""
     text = _usage(
         _ev("11:00:00", "SCREEN_INTERACTIVE"),
         _ev("11:00:30", "ACTIVITY_RESUMED", "com.clean.x"),
@@ -125,3 +126,50 @@ def test_unlock_launches_outside_24h_window_ignored():
     )
     counts = parse_usage_events(text, UNLOCK_NOW)
     assert "com.clean.x" not in counts or counts["com.clean.x"].unlock_launches == 0
+
+
+def test_notification_tap_from_lock_screen_is_not_counted():
+    """Użytkownik stuknął powiadomienie na ekranie blokady: aplikacja otwiera się po odblokowaniu."""
+    text = _usage(
+        _ev("10:00:00", "ACTIVITY_RESUMED", "com.user.chat"),
+        _ev("10:01:00", "SCREEN_NON_INTERACTIVE"),
+        _ev("11:00:00", "SCREEN_INTERACTIVE"),
+        _ev("11:00:01", "USER_INTERACTION", "com.bank"),
+        _ev("11:00:03", "KEYGUARD_HIDDEN"),
+        _ev("11:00:04", "ACTIVITY_RESUMED", "com.bank"),
+    )
+    counts = parse_usage_events(text, UNLOCK_NOW)
+    assert counts.get("com.bank") is None or counts["com.bank"].unlock_launches == 0
+
+
+def test_shortcut_from_lock_screen_is_not_counted():
+    text = _usage(
+        _ev("11:00:00", "SCREEN_INTERACTIVE"),
+        _ev("11:00:01", "SHORTCUT_INVOCATION", "com.camera.x"),
+        _ev("11:00:02", "ACTIVITY_RESUMED", "com.camera.x"),
+    )
+    counts = parse_usage_events(text, UNLOCK_NOW)
+    assert counts.get("com.camera.x") is None or counts["com.camera.x"].unlock_launches == 0
+
+
+def test_interaction_from_before_screen_off_does_not_excuse_later_launch():
+    text = _usage(
+        _ev("10:00:00", "USER_INTERACTION", "com.clean.x"),
+        _ev("10:01:00", "SCREEN_NON_INTERACTIVE"),
+        _ev("11:00:00", "SCREEN_INTERACTIVE"),
+        _ev("11:00:02", "ACTIVITY_RESUMED", "com.clean.x"),
+    )
+    assert parse_usage_events(text, UNLOCK_NOW)["com.clean.x"].unlock_launches == 1
+
+
+def test_known_limit_ad_after_launcher_is_not_counted():
+    """Ograniczenie: launcher → reklama wygląda jak ręczne otwarcie z launchera; nie liczymy."""
+    text = _usage(
+        _ev("10:00:00", "ACTIVITY_RESUMED", "com.user.chat"),
+        _ev("10:01:00", "SCREEN_NON_INTERACTIVE"),
+        _ev("11:00:00", "SCREEN_INTERACTIVE"),
+        _ev("11:00:01", "ACTIVITY_RESUMED", "com.oem.launcher"),
+        _ev("11:00:03", "ACTIVITY_RESUMED", "com.clean.x"),
+    )
+    counts = parse_usage_events(text, UNLOCK_NOW)
+    assert counts.get("com.clean.x") is None or counts["com.clean.x"].unlock_launches == 0

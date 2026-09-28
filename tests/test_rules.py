@@ -233,13 +233,15 @@ def test_alarm_rule_uses_rate_per_hour():
     assert AppFacts("com.x").alarm_wakeups_per_hour is None
 
 
-def test_unlock_rule_needs_two_events_and_skips_home():
-    once = AppFacts("com.x", unlock_launches_24h=1)   # np. otwarcie z powiadomienia na ekranie blokady
+def test_unlock_rule_needs_three_events_and_skips_home():
     twice = AppFacts("com.x", unlock_launches_24h=2)
+    three = AppFacts("com.x", unlock_launches_24h=3)
     home = AppFacts("com.x", unlock_launches_24h=5, is_home_holder=True)
-    assert "DM-BGACT-01" not in _ids(once)
-    assert "DM-BGACT-01" in _ids(twice)
+    assert "DM-BGACT-01" not in _ids(twice)
+    assert "DM-BGACT-01" in _ids(three)
     assert "DM-BGACT-01" not in _ids(home)
+    finding = next(f for f in load_default_ruleset().evaluate(three) if f.rule_id == "DM-BGACT-01")
+    assert finding.weight == 12 and "sama" not in finding.text("pl").lower()
 
 
 def test_role_rules():

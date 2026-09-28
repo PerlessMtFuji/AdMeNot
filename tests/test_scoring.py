@@ -132,6 +132,16 @@ def test_combo_findings_carry_category_and_label():
     assert all(c.label["pl"] and c.label["en"] for c in COMBOS)
 
 
+def test_ad_sdks_and_unlock_appearances_are_review_not_suspicious():
+    """Audyt: 5 SDK + 2 otwarcia po odblokowaniu dawały 60 pkt i domyślne „Wyłącz”."""
+    facts = AppFacts("com.x", installer="com.android.vending", has_launcher_icon=True,
+                     installed_days=100.0, unlock_launches_24h=3,
+                     ad_sdks={"admob", "meta", "applovin", "mintegral", "pangle"})
+    result = score_app(facts, load_default_ruleset().evaluate(facts), trusted=False,
+                       low_behavior_data=False)
+    assert result.verdict == "review" and result.score == 37
+
+
 def test_combo_03_many_ad_networks_plus_behavior():
     facts = AppFacts("com.x", installer="com.android.vending")
     alone = score_app(facts, [F("DM-ADSDK-02", "apk", 20)], trusted=False,
