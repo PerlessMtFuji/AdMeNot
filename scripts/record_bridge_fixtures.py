@@ -74,7 +74,7 @@ class Recorder:
         return [d for c in self.calls for n, d in c["events"] if n == name]
 
 
-_PART_DIR = re.compile(r"\.part-[A-Za-z0-9_]+")
+_PART_DIR = re.compile(r"\.(part|unverified)-[A-Za-z0-9_]+")
 
 
 def _normalize(value: Any, tmp: str) -> Any:
@@ -83,7 +83,7 @@ def _normalize(value: Any, tmp: str) -> Any:
     `fetch_apks` (Plan 4b Task 3) pobiera do unikalnego katalogu roboczego
     (`tempfile.mkdtemp(prefix=".part-", ...)`), żeby dwa równoczesne skany się nie zobaczyły —
     nazwa jest losowa przy każdym uruchomieniu, więc trzeba ją też ujednolicić, inaczej nagranie
-    nigdy nie byłoby stabilne.
+    nigdy nie byłoby stabilne. Tak samo `.unverified-…` (pobranie bez `sha256sum`).
     """
     if isinstance(value, dict):
         return {k: (0.0 if k == "duration" else _normalize(v, tmp)) for k, v in value.items()}
@@ -91,7 +91,7 @@ def _normalize(value: Any, tmp: str) -> Any:
         return [_normalize(v, tmp) for v in value]
     if isinstance(value, str):
         text = value.replace(tmp, "<tmp>").replace(tmp.replace("\\", "/"), "<tmp>")
-        return _PART_DIR.sub(".part-X", text)
+        return _PART_DIR.sub(r".\1-X", text)
     return value
 
 
