@@ -44,3 +44,13 @@ def test_anonymize_alarm_keeps_only_stats_lines():
     assert "SECRET-123" not in out and "anna.k" not in out and "walarm" not in out
     assert "Pending alarm" not in out
     assert parse_alarm_stats(out) == parse_alarm_stats(ALARM_OUT)
+
+
+def test_alarm_stats_of_other_users_are_ignored():
+    text = ("Current Alarm Manager state:\n  Alarm Stats:\n"
+            "  u0a301:com.a +1s running, 5 wakeups:\n    +1s 5 wakes 5 alarms, last -1m:\n"
+            "  u10a301:com.a +1s running, 500 wakeups:\n    +1s 500 wakes 500 alarms, last -1m:\n"
+            "  1010301:com.b +1s running, 50 wakeups:\n    +1s 50 wakes 50 alarms, last -1m:\n"
+            "  1000:android +1s running, 7 wakeups:\n    +1s 7 wakes 7 alarms, last -1m:\n")
+    stats = parse_alarm_stats(text)
+    assert stats["com.a"].wakeups == 5 and "com.b" not in stats and stats["android"].wakeups == 7

@@ -5,6 +5,7 @@ from demalware.engine.allowlist.trust import parse_trust_list
 from demalware.engine.apk.analyze import ApkReport, report_to_json
 from demalware.engine.apk.providers import StoredApkProvider
 from demalware.engine.collectors.behavior import USAGESTATS
+from demalware.engine.collectors.profiles import PM_USERS, ProfileScope
 from demalware.engine.collectors.system import DEVICE_POLICY
 from demalware.engine.device.info import UPTIME, read_device_info
 from demalware.engine.session import SCAN_STAGES, analyze_apks, report_to_dict, run_scan
@@ -187,6 +188,18 @@ def test_trust_comes_from_the_signer_seen_in_the_apk(synthetic_adb, tmp_path):
         ApkReport("com.whatsapp", version_code=242000, class_count=5, cert_sha256=["a1" * 32]))))
     report = run_scan(synthetic_adb, trust=trust, apk=StoredApkProvider(tmp_path))
     assert _by_pkg(report)["com.whatsapp"].trusted
+
+
+def test_other_profiles_are_reported_as_not_scanned(synthetic_adb):
+    synthetic_adb.responses[PM_USERS] = "Users:\n\tUserInfo{0:A:c13} running\n\tUserInfo{10:W:1030}\n"
+    report = run_scan(synthetic_adb)
+    assert report.profiles == ProfileScope(scanned=(0,), present=(0, 10))
+    assert report.profiles.others == (10,)
+
+
+def test_missing_user_list_is_unknown_not_fatal(synthetic_adb):
+    report = run_scan(synthetic_adb)  # nagrania sprzed Planu 4b nie mają `pm list users`
+    assert report.profiles == ProfileScope(scanned=(0,), present=None)
 
 
 def test_exception_from_progress_stops_the_analysis(synthetic_adb):

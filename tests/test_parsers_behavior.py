@@ -179,6 +179,24 @@ def test_observed_since_is_earliest_event_in_window():
     assert observed_since("no events\n", UNLOCK_NOW) is None
 
 
+def test_notifications_of_other_users_are_ignored():
+    text = ("  Notification List:\n"
+            "    NotificationRecord(0x1: pkg=com.a user=UserHandle{0} id=1)\n"
+            "    NotificationRecord(0x2: pkg=com.a user=UserHandle{10} id=2)\n"
+            "      fullscreenIntent=PendingIntent{1: x}\n"
+            "    NotificationRecord(0x3: pkg=com.b)\n")
+    stats = parse_notifications(text)
+    assert stats["com.a"] == NotifStats(active=1, fsi=False) and stats["com.b"].active == 1
+
+
+def test_usage_events_of_other_users_are_ignored():
+    text = ("user=0\n  In-memory daily stats\n    events\n"
+            + _ev("13:00:00", "NOTIFICATION_INTERRUPTION", "com.a") + "\n"
+            + "user=10\n  In-memory daily stats\n    events\n"
+            + _ev("13:10:00", "NOTIFICATION_INTERRUPTION", "com.a") + "\n")
+    assert parse_usage_events(text, UNLOCK_NOW)["com.a"].notif_interruptions == 1
+
+
 def test_known_limit_ad_after_launcher_is_not_counted():
     """Ograniczenie: launcher → reklama wygląda jak ręczne otwarcie z launchera; nie liczymy."""
     text = _usage(

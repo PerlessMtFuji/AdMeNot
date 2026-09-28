@@ -146,6 +146,18 @@
      }
     ],
     [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm list users",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'pm list users'",
+      "tag": null
+     }
+    ],
+    [
      "scan:stage",
      {
       "stage": "collectors"
