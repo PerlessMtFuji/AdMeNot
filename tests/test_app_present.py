@@ -92,7 +92,8 @@ def test_symptoms_group_by_category_sort_and_join():
         {"category": "removal", "severity": "bad", "text": "Admin. Ukrywa ikonę."},
         {"category": "origin", "severity": "neutral", "text": "Spoza Play."},
     ]
-    assert [severity(w) for w in (25, 20, 19, 10, 9)] == ["bad", "bad", "warn", "warn", "neutral"]
+    assert [severity(w) for w in (25, 20, 19, 10, 9, 0)] == \
+        ["bad", "bad", "warn", "warn", "neutral", "neutral"]
     assert symptoms([], "pl") == []
 
 

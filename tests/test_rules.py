@@ -105,6 +105,12 @@ def test_rule_without_basis_is_rejected():
                         "  text: {simple: {pl: a, en: a}, expert: {pl: a, en: a}}\n")
 
 
+def test_fresh_install_is_information_not_points():
+    facts = AppFacts("com.x", installer="com.android.vending", installed_days=2.0)
+    finding = next(f for f in load_default_ruleset().evaluate(facts) if f.rule_id == "DM-FRESH-01")
+    assert finding.weight == 0
+
+
 def test_zero_weight_rule_is_allowed():
     rules = load_yaml_rules("- id: X\n  class: context\n  weight: 0\n  basis: declared\n"
                             "  category: origin\n  label: {pl: a, en: a}\n  when: {is_system: true}\n"

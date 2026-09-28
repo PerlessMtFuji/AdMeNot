@@ -506,7 +506,7 @@
           {
            "rule_id": "DM-FRESH-01",
            "class": "context",
-           "weight": 3,
+           "weight": 0,
            "text": "Zainstalowana niedawno (6 dni temu).",
            "text_expert": "firstInstallTime: 6.2 dni temu",
            "evidence": {
@@ -890,7 +890,7 @@
           {
            "rule_id": "DM-FRESH-01",
            "class": "context",
-           "weight": 3,
+           "weight": 0,
            "text": "Zainstalowana niedawno (6 dni temu).",
            "text_expert": "firstInstallTime: 6.2 dni temu",
            "evidence": {
