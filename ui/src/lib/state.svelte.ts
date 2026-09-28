@@ -1,7 +1,7 @@
 import type { Phase } from './logic';
 import type {
   ApiErrorBody, ConsoleEntry, DeviceEntry, HistoryView, Level, OrderResult, PhoneCard, PlanView,
-  Question, ScanView, Settings, StepEvent, UndoDone, Verdict,
+  Question, ReportResult, ScanView, Settings, StepEvent, UndoDone, Verdict,
 } from './types';
 
 export type Screen = 'main' | 'history' | 'settings';
@@ -44,6 +44,8 @@ export class AppState {
   history = $state<HistoryView | null>(null);
   undoSteps = $state<StepEvent[]>([]);
   undoResult = $state<UndoDone | null>(null);
+  reportBusy = $state<string | null>(null);
+  reports = $state<Record<string, ReportResult>>({});
   consoleOpen = $state(false);
   console = $state<ConsoleEntry[]>([]);
   consoleWarned = $state(false);

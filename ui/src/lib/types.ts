@@ -207,6 +207,21 @@ export interface Question {
   name: string;
 }
 
+export interface ServiceInfo {
+  name: string | null;
+  address: string | null;
+  phone: string | null;
+  logo: string | null;
+}
+
+export interface ReportResult {
+  order: string;
+  html: string;
+  pdf: string | null;
+  error: 'no_browser' | 'timeout' | 'failed' | 'locked' | null;
+  opened: string;
+}
+
 export interface ApiErrorBody {
   key: string;
   message: string;
@@ -243,6 +258,10 @@ export interface Api {
   who_is_showing(): R<WhoView>;
   check_adb(path: string | null): R<{ ok: boolean; version: string | null; message: string }>;
   pick_folder(): R<{ path: string | null }>;
+  report(order: string): R<ReportResult>;
+  service(): R<ServiceInfo>;
+  save_service(changes: Partial<ServiceInfo>): R<ServiceInfo>;
+  pick_logo(): R<{ path: string | null }>;
   quit(): R<{ ok: boolean }>;
 }
 

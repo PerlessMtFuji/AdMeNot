@@ -18,6 +18,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "tests" / "fixtures" / "bridge"
@@ -27,6 +28,7 @@ from apphelpers import make_api
 from conftest import SERIAL
 from fakephone import make_cli_phone
 
+from demalware.engine.report.pdf import PdfError
 from demalware.engine.settings import save_settings
 
 CLIENT = "Anna K."
@@ -151,6 +153,27 @@ def _disconnect(r: Recorder, phone: Any) -> None:
     r.call("resume", number)
 
 
+def _fake_pdf(html: Path, pdf: Path) -> None:
+    pdf.write_bytes(b"%PDF-1.4 fake")
+
+
+def _report(r: Recorder, phone: Any) -> None:
+    r.call("list_devices")
+    r.call("history", None)  # UI przy starcie pyta o znane telefony (Controller.loadKnownSerials)
+    r.call("start_scan", SERIAL, CLIENT)
+    r.call("preview_plan", {"com.wlive.forecast": "disable"}, [])  # „Napraw zaznaczone”
+    r.call("execute", {"com.wlive.forecast": "disable"}, [])
+    number = r.events("exec:order")[0]["order"]
+    with mock.patch("demalware.engine.report.files.html_to_pdf", _fake_pdf):
+        r.call("report", number)
+    with mock.patch("demalware.engine.report.files.html_to_pdf",
+                    mock.Mock(side_effect=PdfError("locked"))):
+        r.call("report", number)
+    r.call("service")
+    r.call("save_service", {"name": "Serwis Ząb", "address": "ul. Długa 1", "phone": "600 000 000"})
+    r.call("history", None)
+
+
 def _devices_only(output: str) -> Callable[[Recorder, Any], None]:
     def steps(r: Recorder, phone: Any) -> None:
         phone.host["devices -l"] = output
@@ -189,6 +212,7 @@ def record_all() -> dict[str, dict[str, Any]]:
         "adware": adware,
         "clean": _clean(adware),
         "disconnect": _scenario("disconnect", _disconnect),
+        "report": _scenario("report", _report),
         "unauthorized": _scenario("unauthorized", _devices_only(unauthorized)),
         "many": _scenario("many", _devices_only(many)),
         "empty": _scenario("empty", _devices_only("List of devices attached\n\n")),

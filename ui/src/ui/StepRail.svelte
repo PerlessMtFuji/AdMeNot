@@ -8,14 +8,13 @@
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
   const STAGES = ['connect', 'read', 'analyze', 'fix', 'report'] as const;
-  const states = $derived(stageStates(s.phase, s.scanStage));
+  const states = $derived(stageStates(s.phase, s.scanStage, !!(s.result && s.reports[s.result.order])));
   const expert = $derived(s.settings.mode === 'expert');
   const ITEM: Record<StageState, string> = {
-    now: 'rail-now font-bold text-accent', done: 'text-ink', todo: 'text-soft', off: 'text-soft',
+    now: 'rail-now font-bold text-accent', done: 'text-ink', todo: 'text-soft',
   };
   const DOT: Record<StageState, string> = {
     now: 'bg-accent text-white shadow-[0_0_0_4px_color-mix(in_srgb,var(--color-accent)_18%,transparent),0_0_14px_var(--glow-accent)]', done: 'bg-ok-soft text-ok', todo: 'bg-neutral-soft text-soft',
-    off: 'bg-neutral-soft text-soft',
   };
   const NAV = 'flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm font-semibold text-mut transition duration-150 hover:bg-neutral-soft hover:text-ink';
   const CURRENT = 'rail-now !text-accent';
@@ -30,7 +29,6 @@
     <ol aria-label={t('stage.label')} class="flex flex-col gap-0.5">
       {#each STAGES as stage, i (stage)}
         <li aria-current={states[i] === 'now' ? 'step' : undefined}
-          title={stage === 'report' ? t('stage.soon') : undefined}
           class="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition-colors duration-300 {ITEM[states[i]]}">
           <span class="grid h-[22px] w-[22px] place-items-center rounded-full text-2xs font-bold transition duration-300 {DOT[states[i]]}">
             {#if states[i] === 'done'}<Icon name="check" size={13} strokeWidth={3} />{:else}{i + 1}{/if}

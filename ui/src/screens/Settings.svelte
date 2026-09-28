@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getContext } from 'svelte';
+  import { getContext, onMount } from 'svelte';
   import type { Controller } from '../lib/controller';
   import { t } from '../lib/i18n/index.svelte';
   import type { Lang, Mode, Theme } from '../lib/types';
@@ -25,6 +25,27 @@
     { value: 'expert' as Mode, label: t('settings.mode_expert') },
   ]);
   const INPUT = 'field mono min-w-0 flex-1 rounded-xl px-3.5 py-2.5';
+  const FIELD = 'field min-w-0 flex-1 rounded-xl px-3.5 py-2.5';
+  let svc = $state({ name: '', address: '', phone: '', logo: '' });
+  let svcSaved = $state(false);
+
+  onMount(async () => {
+    const r = await ctl.loadService();
+    if (r) svc = { name: r.name ?? '', address: r.address ?? '', phone: r.phone ?? '', logo: r.logo ?? '' };
+  });
+
+  async function chooseLogo() {
+    const r = await ctl.pickLogo();
+    if (r?.path) svc.logo = r.path;
+  }
+
+  async function saveService() {
+    svcSaved = false;
+    const clean = (v: string) => v.trim() || null;
+    const r = await ctl.saveService({ name: clean(svc.name), address: clean(svc.address),
+                                      phone: clean(svc.phone), logo: clean(svc.logo) });
+    svcSaved = r !== null;
+  }
 
   async function checkAdb() {
     const r = await ctl.checkAdb(adbPath.trim() || null);
@@ -84,6 +105,35 @@
       </div>
     </div></Card>
 
-    <p class="text-xs text-mut">{t('settings.service_soon')}</p>
+    <Card><div class="flex flex-col gap-5 p-6">
+      <div class="flex flex-col gap-1">
+        <span class="lbl">{t('settings.service_title')}</span>
+        <span class="text-xs text-mut">{t('settings.service_hint')}</span>
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="font-semibold" for="svc-name">{t('settings.service_name')}</label>
+        <input id="svc-name" class={FIELD} bind:value={svc.name} />
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="font-semibold" for="svc-address">{t('settings.service_address')}</label>
+        <input id="svc-address" class={FIELD} bind:value={svc.address} />
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="font-semibold" for="svc-phone">{t('settings.service_phone')}</label>
+        <input id="svc-phone" class={FIELD} bind:value={svc.phone} />
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="font-semibold" for="svc-logo">{t('settings.service_logo')}</label>
+        <div class="flex gap-2">
+          <input id="svc-logo" class={INPUT} bind:value={svc.logo} />
+          <Button onclick={chooseLogo}>{t('settings.choose_logo')}</Button>
+        </div>
+        <span class="text-xs text-mut">{t('settings.logo_hint')}</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <Button variant="primary" onclick={saveService}>{t('settings.save_service')}</Button>
+        {#if svcSaved}<span class="flex items-center gap-1 text-ok"><Icon name="check" />{t('common.saved')}</span>{/if}
+      </div>
+    </div></Card>
   </div>
 </main>

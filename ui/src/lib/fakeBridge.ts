@@ -1,6 +1,6 @@
 // Atrapa mostu: odtwarza scenariusze nagrane z prawdziwego Api (scripts/record_bridge_fixtures.py).
 import type { Bridge } from './bridge';
-import type { Api, EventMap, EventName, ScanView, Settings } from './types';
+import type { Api, EventMap, EventName, ScanView, ServiceInfo, Settings } from './types';
 
 interface RecordedCall {
   method: string;
@@ -45,6 +45,7 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
   const target = new EventTarget();
   const calls: FakeBridge['calls'] = [];
   let settings: Settings = { lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system' };
+  let service: ServiceInfo = { name: null, address: null, phone: null, logo: null };
   let lastScan: ScanView | null = null;
 
   const dispatch = (event: string, detail: unknown) => {
@@ -81,6 +82,19 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
         return { ok: true, version: 'Android Debug Bridge version 1.0.41', message: '' };
       case 'pick_folder':
         return { path: 'D:\\DeMalware\\kopie' };
+      case 'service':
+        return { ...service };
+      case 'save_service':
+        service = { ...service, ...(args[0] as Partial<ServiceInfo>) };
+        return { ...service };
+      case 'pick_logo':
+        return { path: 'D:\\DeMalware\\logo.png' };
+      case 'report': {
+        const stem = String(args[0]).replaceAll('/', '-');
+        const dir = 'C:\\Users\\serwis\\AppData\\Local\\DeMalware\\reports';
+        return { order: args[0], html: `${dir}\\${stem}.html`, pdf: `${dir}\\${stem}.pdf`,
+                 error: null, opened: `${dir}\\${stem}.pdf` };
+      }
       case 'who_is_showing':
         return { resumed: null, overlays: [], errors: [] };
       case 'adb_shell':

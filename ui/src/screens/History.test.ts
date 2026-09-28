@@ -95,3 +95,17 @@ test('partially undone order: restored app has no restore, others keep it; clien
   expect(card.querySelector('img')).toBeNull();
   expect(within(card).getByText(/<img src=x onerror=alert\(1\)>/)).toBeTruthy();
 });
+
+test('history: report button next to each order', async () => {
+  const { s, ctl, bridge } = await setupCtl('report');
+  render(App, { props: { ctl } });
+  await ctl.startScan();
+  await vi.waitFor(() => expect(s.job).toBeNull());
+  await fireEvent.click(screen.getByRole('button', { name: /Napraw zaznaczone/ }));
+  await fireEvent.click(await screen.findByRole('button', { name: /^Wykonaj/ }));
+  await vi.waitFor(() => expect(s.phase).toBe('done'));
+  await fireEvent.click(screen.getByRole('button', { name: 'Historia' }));
+  const order = await screen.findByRole('article', { name: s.result!.order });
+  await fireEvent.click(within(order).getByRole('button', { name: 'Protokół PDF' }));
+  await vi.waitFor(() => expect(bridge.calls.some((c) => c.method === 'report')).toBe(true));
+});

@@ -3,7 +3,9 @@ import { i18n } from './i18n/index.svelte';
 import { changedVerdicts, defaultSelection, mergeSelection, upsertStep } from './logic';
 import type { AppState } from './state.svelte';
 import { applyTheme } from './theme';
-import type { ApiError, AppView, DevicesPayload, Lang, Level, Mode, Settings, Theme } from './types';
+import type {
+  ApiError, AppView, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, Theme,
+} from './types';
 
 const CONSOLE_LIMIT = 500;
 
@@ -188,7 +190,7 @@ export class Controller {
   newScan(): void {
     Object.assign(this.state, {
       phase: 'connect', screen: 'main', device: null, scan: null, result: null, order: null,
-      plan: null, selection: {}, steps: [], disconnectedOrder: null,
+      plan: null, selection: {}, steps: [], disconnectedOrder: null, reports: {},
     });
   }
 
@@ -331,6 +333,29 @@ export class Controller {
 
   pickFolder() {
     return this.call(this.api.pick_folder());
+  }
+
+  async report(order: string): Promise<void> {
+    const s = this.state;
+    s.reportBusy = order;
+    try {
+      const r = await this.call(this.api.report(order));
+      if (r) s.reports = { ...s.reports, [order]: r };
+    } finally {
+      s.reportBusy = null;
+    }
+  }
+
+  loadService() {
+    return this.call(this.api.service());
+  }
+
+  saveService(changes: Partial<ServiceInfo>) {
+    return this.call(this.api.save_service(changes));
+  }
+
+  pickLogo() {
+    return this.call(this.api.pick_logo());
   }
 
   async quit(): Promise<void> {

@@ -19,6 +19,24 @@ async function scanned(scenario = 'adware') {
 }
 
 describe('plan and execution', () => {
+  test('report button opens the PDF, then shows the PDF error', async () => {
+    const { s, bridge } = await scanned('report');
+    await fireEvent.click(screen.getByRole('button', { name: /Napraw zaznaczone/ }));
+    await fireEvent.click(await screen.findByRole('button', { name: /^Wykonaj/ }));
+    await vi.waitFor(() => expect(s.phase).toBe('done'));
+    await tick();
+    const rail = screen.getByRole('list', { name: 'Etapy' });
+    expect(rail.children[4].getAttribute('aria-current')).toBe('step');
+    const button = screen.getByRole('button', { name: 'Protokół PDF' });
+    await fireEvent.click(button);
+    expect(await screen.findByText(/Otwarto protokół/)).toBeTruthy();
+    expect(bridge.calls.filter((c) => c.method === 'report')).toEqual([
+      { method: 'report', args: [s.result!.order] }]);
+    expect(rail.children[4].getAttribute('aria-current')).toBeNull(); // etap 5 zrobiony
+    await fireEvent.click(button);
+    expect(await screen.findByText(/otwarty w innym programie/)).toBeTruthy();
+  });
+
   test('preview, run, results, new scan', async () => {
     const { s } = await scanned();
     await fireEvent.click(screen.getByRole('button', { name: /Napraw zaznaczone/ }));

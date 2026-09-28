@@ -80,11 +80,12 @@ describe('steps and stages', () => {
   });
 
   test('stage states per phase', () => {
-    expect(stageStates('connect', null)).toEqual(['now', 'todo', 'todo', 'todo', 'off']);
-    expect(stageStates('scanning', 'collectors')).toEqual(['done', 'now', 'todo', 'todo', 'off']);
-    expect(stageStates('scanning', 'score')).toEqual(['done', 'done', 'now', 'todo', 'off']);
-    expect(stageStates('results', null)).toEqual(['done', 'done', 'done', 'now', 'off']);
-    expect(stageStates('done', null)).toEqual(['done', 'done', 'done', 'done', 'off']);
+    expect(stageStates('connect', null)).toEqual(['now', 'todo', 'todo', 'todo', 'todo']);
+    expect(stageStates('scanning', 'collectors')).toEqual(['done', 'now', 'todo', 'todo', 'todo']);
+    expect(stageStates('scanning', 'score')).toEqual(['done', 'done', 'now', 'todo', 'todo']);
+    expect(stageStates('results', null)).toEqual(['done', 'done', 'done', 'now', 'todo']);
+    expect(stageStates('done', null)).toEqual(['done', 'done', 'done', 'done', 'now']);
+    expect(stageStates('done', null, true)).toEqual(['done', 'done', 'done', 'done', 'done']);
   });
 });
 

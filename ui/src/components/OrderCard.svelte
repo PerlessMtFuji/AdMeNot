@@ -7,6 +7,7 @@
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
   import AppIcon from './AppIcon.svelte';
+  import ReportButton from './ReportButton.svelte';
 
   type Props = { order: HistoryOrder; names: Map<string, string>; icons?: Map<string, string | null>; disabled: boolean;
     onrestore: (pkg: string) => void; onrestoreStep: (actionId: number) => void; onundoAll: () => void };
@@ -41,9 +42,12 @@
       <div class="text-lg {undone ? 'font-semibold text-mut' : 'font-bold'}">{title}</div>
       <div class="text-sm text-soft">{order.client ? `${order.client} · ` : ''}<span class="mono">{order.number}</span>{order.interrupted ? ` · ${order.status_label}` : ''}</div>
     </div>
-    {#if canUndo && !order.interrupted}
-      <Button variant="ghost" size="sm" {disabled} onclick={onundoAll}><Icon name="undo-2" />{t('history.undo_all')}</Button>
-    {/if}
+    <div class="flex flex-none flex-col items-end gap-1">
+      <ReportButton order={order.number} variant="ghost" size="sm" />
+      {#if canUndo && !order.interrupted}
+        <Button variant="ghost" size="sm" {disabled} onclick={onundoAll}><Icon name="undo-2" />{t('history.undo_all')}</Button>
+      {/if}
+    </div>
   </div>
   {#each rows as r (r.package)}
     <div class="group border-t border-line/70">

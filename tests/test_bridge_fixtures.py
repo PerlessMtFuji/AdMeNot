@@ -16,7 +16,8 @@ def _module():
 
 def test_bridge_fixtures_are_up_to_date():
     fresh = _module().record_all()
-    assert set(fresh) == {"adware", "clean", "disconnect", "unauthorized", "many", "empty"}
+    assert set(fresh) == {"adware", "clean", "disconnect", "report", "unauthorized", "many",
+                          "empty"}
     for name, data in fresh.items():
         path = OUT / f"{name}.json"
         assert path.exists(), f"brak {path} — uruchom: python scripts/record_bridge_fixtures.py"

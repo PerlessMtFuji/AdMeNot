@@ -2,7 +2,7 @@ import { CATEGORY_ORDER } from './categories';
 import type { AppView, Category, DeviceEntry, Finding, HistoryAction, Level, StepEvent, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done';
-export type StageState = 'done' | 'now' | 'todo' | 'off';
+export type StageState = 'done' | 'now' | 'todo';
 
 export function defaultSelection(apps: AppView[]): Record<string, Level> {
   const out: Record<string, Level> = {};
@@ -63,19 +63,19 @@ export function groupSteps(steps: StepEvent[]): { package: string; name: string;
 
 const READ_STAGES = new Set(['identify', 'packages', 'collectors']);
 
-export function stageStates(phase: Phase, scanStage: string | null): StageState[] {
+export function stageStates(phase: Phase, scanStage: string | null, reported = false): StageState[] {
   switch (phase) {
     case 'connect':
-      return ['now', 'todo', 'todo', 'todo', 'off'];
+      return ['now', 'todo', 'todo', 'todo', 'todo'];
     case 'scanning':
       return READ_STAGES.has(scanStage ?? 'identify')
-        ? ['done', 'now', 'todo', 'todo', 'off']
-        : ['done', 'done', 'now', 'todo', 'off'];
+        ? ['done', 'now', 'todo', 'todo', 'todo']
+        : ['done', 'done', 'now', 'todo', 'todo'];
     case 'results':
     case 'executing':
-      return ['done', 'done', 'done', 'now', 'off'];
+      return ['done', 'done', 'done', 'now', 'todo'];
     case 'done':
-      return ['done', 'done', 'done', 'done', 'off'];
+      return ['done', 'done', 'done', 'done', reported ? 'done' : 'now'];
   }
 }
 

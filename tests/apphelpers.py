@@ -46,6 +46,7 @@ def make_api(phone, *, sync=True, apk=None, **kw):
     # sztywno przed skonstruowaniem `Api`, które przy starcie wczytuje ustawienia.
     save_settings({"lang": "pl"})
     rec = RecordingEmitter()
+    kw.setdefault("open_file", lambda path: None)
     provider = apk or NoApk()
     api = Api(rec, host_factory=lambda path: phone, apk_factory=lambda adb: provider,
               sync_jobs=sync, now=lambda: NOW, **kw)

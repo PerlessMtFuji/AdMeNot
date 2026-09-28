@@ -17,6 +17,8 @@ test('adware: scan, confirm the plan, fix with the admin step, undo from history
   await page.getByRole('button', { name: /^Wykonaj/ }).click();
   await expect(page.getByRole('heading', { name: 'Telefon naprawiony' })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/· sprawdzone$/)).toHaveCount(2);
+  await page.getByRole('button', { name: 'Protokół PDF' }).click();
+  await expect(page.getByText(/Otwarto protokół/)).toBeVisible();
   await page.getByRole('button', { name: 'Cofnij całe zlecenie' }).click();
   await expect(page.getByText(/ZS\/2026\/0926\/01: cofnięte/).first()).toBeVisible({ timeout: 15_000 });
 });
@@ -34,6 +36,22 @@ test('disconnect during the order, then finish it', async ({ page }) => {
   await expect(page.getByText(/Telefon odłączony w trakcie zlecenia/)).toBeVisible({ timeout: 15_000 });
   await page.getByRole('button', { name: 'Dokończ' }).first().click();
   await expect(page.getByRole('heading', { name: 'Telefon naprawiony' })).toBeVisible({ timeout: 15_000 });
+});
+
+test('report scenario: PDF error falls back to HTML, service details saved', async ({ page }) => {
+  await scan(page, 'report');
+  await page.getByRole('button', { name: /Napraw zaznaczone/ }).click();
+  await page.getByRole('button', { name: /^Wykonaj/ }).click();
+  await expect(page.getByRole('heading', { name: 'Telefon naprawiony' })).toBeVisible({ timeout: 15_000 });
+  const report = page.getByRole('button', { name: 'Protokół PDF' });
+  await report.click();
+  await expect(page.getByText(/Otwarto protokół/)).toBeVisible();
+  await report.click();
+  await expect(page.getByText(/otwarty w innym programie/)).toBeVisible();
+  await page.getByRole('button', { name: 'Ustawienia' }).click();
+  await page.getByLabel('Nazwa serwisu').fill('Serwis Ząb');
+  await page.getByRole('button', { name: 'Zapisz dane serwisu' }).click();
+  await expect(page.getByText(/Zapisano/)).toBeVisible();
 });
 
 test('unauthorized phone asks for the permission', async ({ page }) => {

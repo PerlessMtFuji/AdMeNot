@@ -17,7 +17,7 @@
   },
   "rail": { "label": "Menu", "new_order": "Nowe zlecenie", "back_to_order": "Wróć do zlecenia" },
   "header": { "simple": "Prosty", "expert": "Ekspert", "history": "Historia", "settings": "Ustawienia" },
-  "stage": { "label": "Etapy", "connect": "Połączenie", "read": "Odczyt", "analyze": "Analiza", "fix": "Naprawa", "report": "Protokół", "soon": "Protokół — wkrótce" },
+  "stage": { "label": "Etapy", "connect": "Połączenie", "read": "Odczyt", "analyze": "Analiza", "fix": "Naprawa", "report": "Protokół" },
   "connect": {
     "title": { "none": "Podłącz telefon", "unauthorized": "Potwierdź na telefonie", "offline": "Odłącz i podłącz kabel", "ready": "Połączono", "many": "Wybierz telefon", "adb_missing": "Brak programu adb" },
     "sub": { "none": "Użyj kabla USB, który przesyła dane (nie tylko ładuje).", "unauthorized": "Na ekranie telefonu pojawiło się okno — stuknij „Zezwól”.", "offline": "Telefon nie odpowiada. Odłącz kabel i podłącz go ponownie.", "ready": "Telefon jest gotowy do skanowania.", "many": "Podłączono kilka telefonów — wybierz jeden.", "adb_missing": "Wskaż adb.exe w ustawieniach." },
@@ -126,7 +126,6 @@
     "done_sub": "{apps} · {steps} · każdą zmianę można cofnąć w Historii",
     "stopped_title": "Zlecenie wstrzymane",
     "stop_hint": "Wstrzymanie kończy bieżący krok. Zlecenie można potem dokończyć lub cofnąć.",
-    "report_soon": "Protokół · wkrótce",
     "state": { "queued": "czeka", "running": "w toku", "ok": "gotowe", "still_active": "nadal aktywna", "failed": "błąd", "stopped": "wstrzymana" },
     "waiting": "Czeka w kolejce", "stop": "Wstrzymaj", "stopping": "Wstrzymuję po bieżącym kroku…",
     "verifying": "Sprawdzam, czy zmiany się utrzymały…", "stopped": "Zlecenie wstrzymane. Możesz je dokończyć albo cofnąć.",
@@ -173,7 +172,15 @@
     "title": "Ustawienia", "lang": "Język", "mode": "Tryb domyślny", "mode_simple": "Prosty", "mode_expert": "Ekspercki",
     "adb": "Ścieżka do adb.exe", "adb_hint": "Puste = adb z PATH", "check": "Sprawdź", "adb_ok": "Działa: {version}", "adb_fail": "Nie działa: {message}",
     "backups": "Katalog kopii APK", "backups_hint": "Puste = domyślny katalog w %LOCALAPPDATA%\\DeMalware", "choose": "Wybierz…",
-    "service_soon": "Dane serwisu do protokołu — wkrótce."
+    "service_title": "Dane serwisu",
+    "service_hint": "Pojawiają się w nagłówku protokołu.",
+    "service_name": "Nazwa serwisu",
+    "service_address": "Adres serwisu",
+    "service_phone": "Telefon serwisu",
+    "service_logo": "Logo",
+    "choose_logo": "Wybierz logo…",
+    "logo_hint": "PNG, JPG, WebP albo SVG, najwyżej 1 MB.",
+    "save_service": "Zapisz dane serwisu"
   },
   "console": {
     "title": "Konsola ADB", "placeholder": "polecenie adb shell, np. dumpsys package com.example", "run": "Wykonaj",
@@ -182,6 +189,15 @@
     "resize": "Zmień wysokość konsoli"
   },
   "close": { "title": "Trwa zlecenie", "message": "Przerwać po bieżącym kroku i zamknąć program? Zlecenie da się później dokończyć albo cofnąć.", "confirm": "Przerwij i zamknij" },
+  "report": {
+    "button": "Protokół PDF",
+    "busy": "Tworzę protokół…",
+    "opened": "Otwarto protokół: {path}",
+    "pdf_no_browser": "Nie znaleziono przeglądarki Microsoft Edge, która tworzy PDF. Otwarto protokół HTML — wydrukuj go do PDF: {html}",
+    "pdf_timeout": "Tworzenie PDF trwało zbyt długo. Otwarto protokół HTML: {html}",
+    "pdf_failed": "Nie udało się utworzyć PDF. Otwarto protokół HTML: {html}",
+    "pdf_locked": "Plik {pdf} jest otwarty w innym programie — zamknij go i spróbuj ponownie. Otwarto protokół HTML: {html}"
+  },
   "error": {
     "fatal": "Wystąpił nieoczekiwany błąd interfejsu.", "restart": "Wróć do początku", "log": "Szczegóły w logu: {path}",
     "adb_missing": "Nie znaleziono programu adb. Wskaż adb.exe w ustawieniach.",
@@ -200,6 +216,9 @@
     "nothing_to_do": "Nic do wykonania — zaznaczone aplikacje są zablokowane.",
     "no_target": "Nie ma takiej aplikacji ani kroku w zleceniu.",
     "bad_request": "Nieprawidłowe dane.",
-    "internal": "Nieoczekiwany błąd programu."
+    "internal": "Nieoczekiwany błąd programu.",
+    "logo_missing": "Nie ma takiego pliku logo.",
+    "logo_type": "Logo musi być plikiem PNG, JPG, WebP albo SVG.",
+    "logo_size": "Logo jest za duże (limit 1 MB)."
   }
 }

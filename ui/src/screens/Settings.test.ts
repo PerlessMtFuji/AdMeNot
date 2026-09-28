@@ -37,3 +37,19 @@ test('settings: theme, language, mode, adb check, folder and save', async () => 
   await fireEvent.click(screen.getByRole('button', { name: 'Polski' }));
   await vi.waitFor(() => expect(i18n.lang).toBe('pl'));
 });
+
+test('settings: service details and logo', async () => {
+  const { ctl, bridge } = await setupCtl('empty');
+  render(App, { props: { ctl } });
+  await fireEvent.click(screen.getByRole('button', { name: 'Ustawienia' }));
+  const name = await screen.findByLabelText('Nazwa serwisu');
+  await fireEvent.input(name, { target: { value: 'Serwis Ząb' } });
+  await fireEvent.input(screen.getByLabelText('Telefon serwisu'), { target: { value: '600 000 000' } });
+  await fireEvent.click(screen.getByRole('button', { name: 'Wybierz logo…' }));
+  await vi.waitFor(() => expect((screen.getByLabelText('Logo') as HTMLInputElement).value)
+    .toBe('D:\\DeMalware\\logo.png'));
+  await fireEvent.click(screen.getByRole('button', { name: 'Zapisz dane serwisu' }));
+  expect(bridge.calls.at(-1)).toEqual({ method: 'save_service', args: [{
+    name: 'Serwis Ząb', address: null, phone: '600 000 000', logo: 'D:\\DeMalware\\logo.png' }] });
+  expect(await screen.findByText(/Zapisano/)).toBeTruthy();
+});

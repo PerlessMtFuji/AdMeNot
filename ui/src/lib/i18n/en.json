@@ -17,7 +17,7 @@
   },
   "rail": { "label": "Menu", "new_order": "New order", "back_to_order": "Back to the order" },
   "header": { "simple": "Simple", "expert": "Expert", "history": "History", "settings": "Settings" },
-  "stage": { "label": "Stages", "connect": "Connection", "read": "Reading", "analyze": "Analysis", "fix": "Repair", "report": "Report", "soon": "Report — coming soon" },
+  "stage": { "label": "Stages", "connect": "Connection", "read": "Reading", "analyze": "Analysis", "fix": "Repair", "report": "Report" },
   "connect": {
     "title": { "none": "Connect the phone", "unauthorized": "Confirm on the phone", "offline": "Unplug and reconnect the cable", "ready": "Connected", "many": "Choose a phone", "adb_missing": "adb not found" },
     "sub": { "none": "Use a USB cable that carries data (not a charge-only one).", "unauthorized": "A prompt appeared on the phone — tap “Allow”.", "offline": "The phone does not respond. Unplug the cable and plug it in again.", "ready": "The phone is ready to scan.", "many": "Several phones are connected — choose one.", "adb_missing": "Point to adb.exe in the settings." },
@@ -126,7 +126,6 @@
     "done_sub": "{apps} · {steps} · every change can be undone in History",
     "stopped_title": "Order paused",
     "stop_hint": "Pausing finishes the current step. You can finish or undo the order later.",
-    "report_soon": "Report · soon",
     "state": { "queued": "waiting", "running": "in progress", "ok": "done", "still_active": "still active", "failed": "failed", "stopped": "paused" },
     "waiting": "Queued", "stop": "Pause", "stopping": "Pausing after the current step…",
     "verifying": "Checking that the changes hold…", "stopped": "Order paused. You can finish or undo it.",
@@ -173,7 +172,15 @@
     "title": "Settings", "lang": "Language", "mode": "Default mode", "mode_simple": "Simple", "mode_expert": "Expert",
     "adb": "Path to adb.exe", "adb_hint": "Empty = adb from PATH", "check": "Check", "adb_ok": "Works: {version}", "adb_fail": "Does not work: {message}",
     "backups": "APK backup folder", "backups_hint": "Empty = default folder in %LOCALAPPDATA%\\DeMalware", "choose": "Choose…",
-    "service_soon": "Service details for the report — coming soon."
+    "service_title": "Service details",
+    "service_hint": "Shown in the report header.",
+    "service_name": "Service name",
+    "service_address": "Service address",
+    "service_phone": "Service phone",
+    "service_logo": "Logo",
+    "choose_logo": "Choose logo…",
+    "logo_hint": "PNG, JPG, WebP or SVG, up to 1 MB.",
+    "save_service": "Save service details"
   },
   "console": {
     "title": "ADB console", "placeholder": "adb shell command, e.g. dumpsys package com.example", "run": "Run",
@@ -182,6 +189,15 @@
     "resize": "Resize the console"
   },
   "close": { "title": "An order is running", "message": "Pause after the current step and close the program? The order can be finished or undone later.", "confirm": "Pause and close" },
+  "report": {
+    "button": "Report PDF",
+    "busy": "Creating the report…",
+    "opened": "Opened the report: {path}",
+    "pdf_no_browser": "Microsoft Edge, which creates the PDF, was not found. Opened the HTML report — print it to PDF: {html}",
+    "pdf_timeout": "Creating the PDF took too long. Opened the HTML report: {html}",
+    "pdf_failed": "Could not create the PDF. Opened the HTML report: {html}",
+    "pdf_locked": "File {pdf} is open in another program — close it and try again. Opened the HTML report: {html}"
+  },
   "error": {
     "fatal": "An unexpected interface error occurred.", "restart": "Back to start", "log": "Details in the log: {path}",
     "adb_missing": "The adb program was not found. Point to adb.exe in the settings.",
@@ -200,6 +216,9 @@
     "nothing_to_do": "Nothing to run — the selected apps are blocked.",
     "no_target": "No such app or step in the order.",
     "bad_request": "Invalid data.",
-    "internal": "Unexpected program error."
+    "internal": "Unexpected program error.",
+    "logo_missing": "The logo file does not exist.",
+    "logo_type": "The logo must be a PNG, JPG, WebP or SVG file.",
+    "logo_size": "The logo is too large (1 MB limit)."
   }
 }

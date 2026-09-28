@@ -6,7 +6,7 @@ import type { EventName } from './types';
 describe('fake bridge', () => {
   test('knows the recorded scenarios', () => {
     expect(scenarioNames().sort()).toEqual(
-      ['adware', 'clean', 'disconnect', 'empty', 'many', 'unauthorized'].sort());
+      ['adware', 'clean', 'disconnect', 'empty', 'many', 'report', 'unauthorized'].sort());
   });
 
   test('replays results and events of the adware scenario', async () => {

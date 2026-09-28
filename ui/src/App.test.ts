@@ -11,7 +11,8 @@ test('shell: brand, five stages in the rail, history and settings toggle', async
   const stages = screen.getByRole('list', { name: 'Etapy' });
   expect(stages.children).toHaveLength(5);
   expect(stages.children[0].getAttribute('aria-current')).toBe('step');
-  expect(stages.children[4].getAttribute('title')).toBe('Protokół — wkrótce');
+  expect(stages.children[4].hasAttribute('title')).toBe(false);
+  expect(stages.children[4].textContent).toContain('Protokół');
   await fireEvent.click(screen.getByRole('button', { name: 'Historia' }));
   await tick();
   expect(s.screen).toBe('history');
