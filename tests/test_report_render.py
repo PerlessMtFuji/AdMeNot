@@ -55,7 +55,7 @@ def test_polish_protocol_has_every_section(photo):
                  "Samsung Galaxy A14", "SM-A145R", "R58T00TEST", "Klient", "26.09.2026",
                  "Aplikacja", "Problem", "Działanie", "Szkodliwa", "Usunięto", "Bez zmian",
                  "Wyłączenie: nie powiodło się", "Ukryta aplikacja spoza Sklepu Play",
-                 "✓ 37 aplikacji bez uwag", "Zalecenia", "com.game",
+                 "✓ Aplikacje bez uwag: 37", "Zalecenia", "com.game",
                  "Instaluj aplikacje tylko ze Sklepu Play", "Podpis serwisanta",
                  "Podpis klienta", "Klient potwierdza ustąpienie objawów", "nie sprawdzono",
                  "26.09.2026 14:30"):
@@ -92,8 +92,19 @@ def test_no_flagged_apps_says_no_signs_within_the_scope(photo):
                                      recommendations=[Recommendation("general")]),
                        ServiceInfo(), GENERATED)
     assert "Nie wykryto oznak zagrożenia w zakresie wykonanego skanu." in html
-    assert "aplikacji bez uwag" not in html and "Wyciszono" in html
+    assert "Aplikacje bez uwag" not in html and "Wyciszono" in html
     assert "Bezpieczna" not in html  # bez etykiety werdyktu przy aplikacji bez uwag
+
+
+def test_zero_clean_apps_with_flagged_rows_shows_no_headline(photo):
+    rows = [AppRow("com.game", None, "review", ["Reklamy"], None, "none")]
+    html = render_html(make_protocol(photo, rows=rows, clean_count=0,
+                                     recommendations=[Recommendation("review_left",
+                                                                     {"apps": "com.game"}),
+                                                      Recommendation("general")]),
+                       ServiceInfo(), GENERATED)
+    assert "bez uwag" not in html
+    assert "Nie wykryto oznak zagrożenia" not in html  # są aplikacje z uwagami: nie „bez uwag”
 
 
 def test_limited_scope_and_incomplete_rows(photo):
@@ -108,7 +119,7 @@ def test_limited_scope_and_incomplete_rows(photo):
                  "ocena niepełna — brak danych: statystyki użycia, analiza pliku APK",
                  "Brak oznak (ocena niepełna)", "Skan nie objął wszystkiego"):
         assert text in html, text
-    assert "✓ 37 aplikacji bez uwag" in html  # są aplikacje z uwagami: licznik zostaje
+    assert "✓ Aplikacje bez uwag: 37" in html  # są aplikacje z uwagami: licznik zostaje
 
     only_safe = render_html(make_protocol(photo, rows=rows[1:],
                                           scope=ScanScope([], False, False, None, 0)),
@@ -181,8 +192,8 @@ def test_data_uri(tmp_path):
     ("done", "remove", "Usunięto", "Removed"),
     ("still_active", "disable", "Wyłączenie: wykonano, ale aplikacja nadal działa",
      "Disable: done, but the app is still active"),
-    ("interrupted", "remove", "Usunięcie: przerwano (telefon odłączony)",
-     "Remove: interrupted (phone disconnected)"),
+    ("interrupted", "remove", "Usunięcie: przerwano, nie dokończono",
+     "Remove: interrupted, not finished"),
     ("undone", "silence", "Wyciszenie: cofnięto", "Silence: undone"),
     ("partially_undone", "disable", "Wyłączenie: częściowo cofnięto", "Disable: partially undone"),
     ("none", None, "Bez zmian", "No change"),

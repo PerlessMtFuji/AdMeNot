@@ -32,7 +32,10 @@ Praca nad samym UI bez telefonu i bez Pythona (atrapa mostu odtwarza nagrane sce
 
 ## CLI
 
-    demalware devices | device | scan [--apk] | capture | fix | undo | resume | history | cache | gui
+    demalware devices | device | scan [--apk] | capture | fix | undo | resume | history | cache | service | report | gui
+
+- `service` — zapisuje dane serwisu (nazwa, adres, telefon, logo) do protokołu, np. `demalware service --name "…"`.
+- `report` — tworzy protokół serwisowy (PDF i HTML) dla zlecenia z dziennika, np. `demalware report --order ZS/…`.
 
 ## Testy
 

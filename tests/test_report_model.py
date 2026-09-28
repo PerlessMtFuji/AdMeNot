@@ -192,6 +192,33 @@ def test_incomplete_scan_recommendation(journal, photo, profiles, gaps, limited)
     assert (Recommendation("incomplete_scan") in recs) is limited
 
 
+@pytest.mark.parametrize(("statuses", "outcome"), [
+    (("undone",), "undone"),
+    (("done", "undone"), "partially_undone"),
+])
+def test_undone_flagged_app_still_gets_review_left(journal, photo, statuses, outcome):
+    snap = snapshot(photo)
+    snap["apps"] = [snap["apps"][0]]  # tylko BOOST (malicious) — zostaje na telefonie po cofnięciu
+    order = make_order(journal, snap, ((BOOST, "remove", statuses),))
+    p = build_protocol(journal, order.id, "pl")
+    boost = next(r for r in p.rows if r.package == BOOST)
+    assert boost.outcome == outcome
+    assert Recommendation("review_left", {"apps": "Cleaner"}) in p.recommendations
+
+
+def test_photo_relocated_after_app_moved(journal, tmp_path, monkeypatch):
+    assets = tmp_path / "assets"
+    (assets / "phones").mkdir(parents=True)
+    relocated = assets / "phones" / "samsung-galaxy-a14.webp"
+    relocated.write_bytes(b"RIFF\0\0\0\0WEBP")
+    monkeypatch.setenv("DEMALWARE_ASSETS", str(assets))
+    old_path = tmp_path / "old-install" / "samsung-galaxy-a14.webp"  # katalog już nie istnieje
+    order = make_order(journal, snapshot(old_path))
+    p = build_protocol(journal, order.id, "pl")
+    assert p.device.image == relocated
+    assert p.device.photo == "exact"
+
+
 def test_safe_app_chosen_by_the_technician_is_a_row(journal, photo):
     snap = snapshot(photo)
     snap["apps"].append({"package": "com.chosen", "label": "Latarka", "verdict": "safe",
