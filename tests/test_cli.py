@@ -127,3 +127,66 @@ def test_scan_output_explains_incomplete_results_and_profiles(capsys):
     out = capsys.readouterr().out
     assert "brak danych: administratorzy urządzenia" in out
     assert "profil" in out and "10" in out
+
+
+def _safe_only_report(adb):
+    import dataclasses
+
+    from demalware.engine.session import run_scan
+
+    report = run_scan(adb)
+    return dataclasses.replace(report, results=[r for r in report.results if r.verdict == "safe"])
+
+
+def test_default_scan_counts_incomplete_safe_apps_separately(capsys):
+    """Przegląd końcowy I2: „bez uwag” nigdy nie obejmuje aplikacji z oceną niepełną."""
+    from demalware.cli.main import _print_report
+
+    adb = make_synthetic_adb()
+    adb.responses[DEVICE_POLICY] = AdbError("timeout", "slow")
+    report = _safe_only_report(adb)
+    assert report.results and all(r.incomplete for r in report.results)
+    _print_report(report, "pl", show_all=False)
+    out = capsys.readouterr().out
+    assert "✓ Nie wykryto oznak zagrożenia" not in out
+    assert "bez uwag" not in out.replace("0 aplikacji bez uwag", "")
+    assert f"{len(report.results)} z oceną niepełną" in out
+    assert "com.whatsapp" in out and "administratorzy urządzenia" in out
+    assert "* ocena niepełna" in out
+    _print_report(report, "en", show_all=False)
+    out = capsys.readouterr().out
+    assert "✓ No signs" not in out and "incomplete assessment" in out
+
+
+def test_default_scan_all_clean_only_when_nothing_is_missing(capsys):
+    from demalware.cli.main import _print_report
+
+    report = _safe_only_report(make_synthetic_adb())
+    assert report.results and not any(r.incomplete for r in report.results)
+    _print_report(report, "pl", show_all=False)
+    out = capsys.readouterr().out
+    assert "✓ Nie wykryto oznak zagrożenia" in out and "niepełn" not in out
+
+
+def test_scan_output_lists_collector_partial(capsys):
+    from demalware.engine.collectors.behavior import APPOPS_GET
+
+    adb = make_synthetic_adb()
+    adb.responses[APPOPS_GET.format(package="com.whatsapp")] = AdbError("command_failed", "x")
+    assert main(["scan"], host=adb) == 0
+    out = capsys.readouterr().out
+    assert "[appops]" in out and "com.whatsapp" in out
+
+
+def test_scan_output_says_when_the_profile_list_is_unknown(capsys):
+    """Przegląd końcowy M2: nieodczytana lista profili to nie „jeden profil”."""
+    adb = make_synthetic_adb()
+    adb.responses[PM_USERS] = AdbError("command_failed", "pm list users: denied")
+    assert main(["scan"], host=adb) == 0
+    assert "Nie udało się odczytać listy profili" in capsys.readouterr().out
+    adb.responses[PM_USERS] = "Users:\n\tUserInfo{0:A:c13} running\n"
+    assert main(["scan"], host=adb) == 0
+    assert "listy profili" not in capsys.readouterr().out
+    adb.responses[PM_USERS] = AdbError("command_failed", "pm list users: denied")
+    assert main(["scan", "--lang", "en"], host=adb) == 0
+    assert "Could not read the list of user profiles" in capsys.readouterr().out
