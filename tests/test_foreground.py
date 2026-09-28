@@ -7,6 +7,7 @@ from demalware.engine.adb.transport import AdbError
 from demalware.engine.foreground import (
     ACTIVITIES,
     WINDOWS,
+    Foreground,
     parse_overlay_windows,
     parse_resumed,
     read_foreground,
@@ -102,3 +103,8 @@ def test_recorded_oppo_output_parses():
     windows = (REC / "oppo-windows.txt").read_text("utf-8")
     assert parse_resumed(activities) == "com.intelli.clean"
     assert parse_overlay_windows(windows) == []
+
+
+def test_foreground_default_overlays_are_unknown_not_empty():
+    """Przegląd końcowy M6: domyślnie „nie wiadomo”, nigdy „brak okien nad innymi”."""
+    assert Foreground("com.x").overlays is None
