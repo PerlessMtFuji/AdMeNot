@@ -320,3 +320,13 @@ def test_unrecognized_device_policy_is_a_gap():
                             [DevicePolicyCollector()])
     assert not status["device_policy"].ok
     assert all("device_policy" in f.gaps for f in facts.values())
+
+
+def test_alarm_failure_is_not_a_gap_of_system_apps():
+    """Przegląd końcowy M3: DM-ALARM-01 dotyczy tylko aplikacji niesystemowych."""
+    facts = _facts()
+    status = run_collectors(FakeAdb({ALARM: AdbError("timeout", "slow")}), facts,
+                            [AlarmCollector(3600)])
+    assert not status["alarm"].ok
+    assert "alarm" in facts["com.a"].gaps and "alarm" in facts["com.b"].gaps
+    assert "alarm" not in facts["com.sys"].gaps
