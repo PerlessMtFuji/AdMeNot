@@ -5,6 +5,7 @@ from demalware.engine.actions import commands as C
 from demalware.engine.actions.executor import ExecOptions, resume, run_order
 from demalware.engine.actions.planner import Blocked
 from demalware.engine.journal.db import Journal
+from demalware.engine.phones.provider import PhoneImageProvider
 from demalware.engine.session import run_scan
 from demalware.engine.workflow import (
     AppStatus,
@@ -158,3 +159,38 @@ def test_certain_error_from_the_admin_fallback_still_interrupts_the_order(tmp_pa
     assert info.value.order.number == order.number
     assert info.value.order.status == "running"
     assert [o.number for o in journal.interrupted_orders(phone.serial)] == [order.number]
+
+
+def test_start_stores_the_snapshot_and_execute_the_verification(tmp_path):
+    phone = make_cli_phone()
+    report = run_scan(phone)
+    plan = plan_order(phone, report, {"com.wlive.forecast": "disable"})
+    match = PhoneImageProvider(tmp_path / "missing", tmp_path / "o.json").match(report.device)
+    journal = Journal(tmp_path / "j.db")
+    order = start(journal, plan, "Anna", report, match)
+    snap = journal.scan(order.id)
+    assert snap["device"]["model"] == "SM-A145R" and snap["phone"]["confidence"] == "none"
+    apps = {a["package"]: a for a in snap["apps"]}
+    assert apps["com.wlive.forecast"]["chosen_level"] == "disable"
+    assert apps["com.clean.pro.boost"]["chosen_level"] is None
+    assert snap["scope"]["profiles"]["present"] == [0]
+    assert journal.verification(order.id) is None
+    execute_order(phone, journal, order, ExecOptions())
+    assert journal.verification(order.id) == {}
+
+
+def test_start_without_report_keeps_the_order_without_snapshot(tmp_path):
+    journal, order, _ = _run(tmp_path, make_cli_phone(), {"com.wlive.forecast": "disable"})
+    assert journal.scan(order.id) is None and journal.verification(order.id) == {}
+
+
+def test_resume_overwrites_the_verification(tmp_path):
+    phone = make_cli_phone()
+    done = []
+    options = ExecOptions(on_event=lambda e: e.get("status") == "done" and done.append(1),
+                          should_stop=lambda: len(done) >= 1)
+    journal, order, _ = _run(tmp_path, phone, {"com.wlive.forecast": "disable"}, options)
+    assert journal.verification(order.id) == {}  # verify sprawdza tylko kroki „done”
+    journal.save_verification(order.id, {"com.wlive.forecast": ["enabled"]})  # nieaktualna
+    execute_order(phone, journal, order, ExecOptions(), resume)
+    assert journal.verification(order.id) == {}

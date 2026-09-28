@@ -120,3 +120,16 @@ def test_fix_disconnect_before_planning_is_reported_without_traceback(capsys, mo
     monkeypatch.setattr("demalware.cli.actions_cli.read_phone_context", gone)
     assert main(["fix", "--app", "com.wlive.forecast=disable", "--yes"], host=make_cli_phone()) == 3
     assert "Podłącz" in capsys.readouterr().err
+
+
+def test_fix_stores_scan_snapshot_and_verification(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("DEMALWARE_ASSETS", str(tmp_path / "no-assets"))
+    phone = make_cli_phone()
+    assert main(["fix", "--app", "com.wlive.forecast=disable", "--yes"], host=phone) == 0
+    (order,) = _orders()
+    assert f"report --order {order.number}" in capsys.readouterr().out
+    with Journal(journal_path()) as j:
+        snap = j.scan(order.id)
+        assert snap["device"]["model"] == "SM-A145R" and snap["phone"]["confidence"] == "none"
+        assert "com.clean.pro.boost" in {a["package"] for a in snap["apps"]}
+        assert j.verification(order.id) == {}

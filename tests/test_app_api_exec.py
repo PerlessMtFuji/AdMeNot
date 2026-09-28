@@ -4,6 +4,8 @@ from conftest import SERIAL
 from fakephone import make_cli_phone
 
 from demalware.app.events import RecordingEmitter
+from demalware.engine.journal.db import Journal
+from demalware.engine.paths import journal_path
 
 DISABLE = "pm disable-user --user 0 com.wlive.forecast"
 WLIVE = {"com.wlive.forecast": "disable"}
@@ -164,3 +166,15 @@ def test_history_and_undo_with_another_phone_connected():
     assert error["key"] == "wrong_device" and error["serial"] == SERIAL
     assert phone.apps["com.wlive.forecast"].enabled is False
     assert fresh.history("NOPE")["orders"] == []
+
+
+def test_execute_stores_the_snapshot_from_the_scan():
+    _, api, rec = _scanned()
+    api.execute(WLIVE, [])
+    number = rec.of("exec:order")[0]["order"]
+    with Journal(journal_path()) as j:
+        order = j.order_by_number(number)
+        snap = j.scan(order.id)
+        assert snap["device"]["serial"] == SERIAL and snap["phone"]["confidence"] == "none"
+        assert snap["app_count"] == len(api._report.results)
+        assert j.verification(order.id) == {}
