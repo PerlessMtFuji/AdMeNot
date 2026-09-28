@@ -86,7 +86,12 @@ def test_parse_overlay_windows_uses_owner_package_and_skips_destroyed_and_other_
 
 def test_read_foreground_tolerates_failures():
     fg = read_foreground(FakeAdb({ACTIVITIES: ACT_12, WINDOWS: AdbError("timeout", "slow")}))
-    assert fg.resumed == "com.clean.x" and fg.overlays == [] and fg.errors == ["windows: slow"]
+    assert fg.resumed == "com.clean.x" and fg.overlays is None and fg.errors == ["windows: slow"]
+
+
+def test_read_foreground_empty_overlays_only_when_windows_were_read():
+    fg = read_foreground(FakeAdb({ACTIVITIES: AdbError("timeout", "slow"), WINDOWS: WIN.splitlines()[0]}))
+    assert fg.resumed is None and fg.overlays == [] and fg.errors == ["activities: slow"]
 
 
 @pytest.mark.skipif(not (REC / "oppo-windows.txt").exists(), reason="brak nagrania z telefonu")

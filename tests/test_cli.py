@@ -112,5 +112,6 @@ def test_who_reports_unknown_when_the_phone_does_not_answer(capsys):
     assert main(["who", "--delay", "0", "--lang", "en"], host=make_synthetic_adb()) == 0
     captured = capsys.readouterr()
     assert "Could not tell which app is in the foreground." in captured.out
-    assert "No windows over other apps." in captured.out
+    assert "Could not read windows over other apps." in captured.out
+    assert "No windows over other apps." not in captured.out
     assert "[who] activities:" in captured.err and "[who] windows:" in captured.err

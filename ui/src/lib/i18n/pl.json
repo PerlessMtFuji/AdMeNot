@@ -89,6 +89,7 @@
     "resumed": "Na pierwszym planie: {name}",
     "overlays": "Okna nad innymi aplikacjami: {names}",
     "none": "Brak okien nad innymi aplikacjami.",
+    "overlays_unknown": "Nie udało się odczytać okien nad innymi aplikacjami.",
     "unknown": "Nie udało się ustalić aplikacji na pierwszym planie."
   },
   "summary": {

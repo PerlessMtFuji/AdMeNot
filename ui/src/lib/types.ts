@@ -213,7 +213,7 @@ export type JobError = ApiErrorBody & { job_id: string; kind: string };
 type R<T> = Promise<T | ApiError>;
 
 export interface WhoEntry { package: string; name: string }
-export interface WhoView { resumed: WhoEntry | null; overlays: WhoEntry[]; errors: string[] }
+export interface WhoView { resumed: WhoEntry | null; overlays: WhoEntry[] | null; errors: string[] }
 
 export interface Api {
   get_settings(): R<Settings>;

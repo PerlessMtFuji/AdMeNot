@@ -89,6 +89,7 @@
     "resumed": "In the foreground: {name}",
     "overlays": "Windows over other apps: {names}",
     "none": "No windows over other apps.",
+    "overlays_unknown": "Could not read windows over other apps.",
     "unknown": "Could not tell which app is in the foreground."
   },
   "summary": {

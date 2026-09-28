@@ -26,7 +26,11 @@
   {#if view}
     <div class="well p-3 text-sm" role="status">
       <p>{view.resumed ? t('who.resumed', { name: view.resumed.name }) : t('who.unknown')}</p>
-      <p>{view.overlays.length ? t('who.overlays', { names: view.overlays.map((o) => o.name).join(', ') }) : t('who.none')}</p>
+      <p>
+        {#if view.overlays === null}{t('who.overlays_unknown')}
+        {:else if view.overlays.length}{t('who.overlays', { names: view.overlays.map((o) => o.name).join(', ') })}
+        {:else}{t('who.none')}{/if}
+      </p>
     </div>
   {/if}
 </div>

@@ -65,7 +65,7 @@ def test_who_is_showing_names_packages_from_the_scan():
 def test_who_is_showing_reports_failed_commands_without_failing():
     _phone, api, _rec = _scanned()
     result = api.who_is_showing()
-    assert result["resumed"] is None and result["overlays"] == []
+    assert result["resumed"] is None and result["overlays"] is None
     assert [e.split(":")[0] for e in result["errors"]] == ["activities", "windows"]
 
 
