@@ -116,3 +116,40 @@ def test_concurrent_fetches_of_one_package_do_not_collide(tmp_path):
         t.join()
     assert errors == []
     assert {tuple(p.read_bytes() for p in r.paths) for r in results} == {(b"base-bytes", b"split")}
+
+
+_NO_SHA = AdbError("command_failed", "sha256sum: not found")
+
+
+def test_unverified_fetch_of_other_phone_does_not_overwrite_earlier_paths(tmp_path):
+    """Przegląd końcowy I1: telefon A i B bez `sha256sum`, ten sam pakiet."""
+    a = fetch_apks(_adb(sha=_NO_SHA, serial="PHONE-A"), "com.clean.x", tmp_path)
+    b = fetch_apks(_adb(files={BASE: b"phone-b-base", SPLIT: b"phone-b-split"}, sha=_NO_SHA,
+                        serial="PHONE-B"), "com.clean.x", tmp_path)
+    assert [p.read_bytes() for p in a.paths] == [b"base-bytes", b"split"]
+    assert [p.read_bytes() for p in b.paths] == [b"phone-b-base", b"phone-b-split"]
+    assert a.paths[0].parent != b.paths[0].parent
+
+
+def test_old_unverified_dirs_are_swept_but_fresh_ones_kept(tmp_path):
+    import os
+    import time
+
+    old = fetch_apks(_adb(sha=_NO_SHA), "com.clean.x", tmp_path).paths[0].parent
+    fresh = fetch_apks(_adb(sha=_NO_SHA), "com.clean.x", tmp_path).paths[0].parent
+    stale = time.time() - 2 * 3600
+    os.utime(old, (stale, stale))
+    fetch_apks(_adb(sha=_NO_SHA), "com.clean.x", tmp_path)
+    assert not old.exists()
+    assert fresh.exists()
+
+
+def test_backup_without_sha256sum_copies_this_phones_files(tmp_path):
+    from demalware.engine.actions.backup import backup_apks
+
+    cache = tmp_path / "cache"
+    fetch_apks(_adb(files={BASE: b"phone-b-base", SPLIT: b"phone-b-split"}, sha=_NO_SHA,
+                    serial="PHONE-B"), "com.clean.x", cache)
+    target = tmp_path / "backups" / "com.clean.x" / "unknown"
+    saved = backup_apks(_adb(sha=_NO_SHA, serial="PHONE-A"), "com.clean.x", None, target, cache)
+    assert [p.read_bytes() for p in saved] == [b"base-bytes", b"split"]
