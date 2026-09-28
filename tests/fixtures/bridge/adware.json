@@ -769,7 +769,7 @@
        "low_behavior_data": false,
        "apk": {
         "requested": 3,
-        "analyzed": 0,
+        "analyzed": 3,
         "failed": {}
        },
        "apps": [
@@ -932,7 +932,7 @@
          ],
          "apk_error": null,
          "icon": null,
-         "ad_sdks": null,
+         "ad_sdks": [],
          "symptoms": [
           {
            "category": "removal",
@@ -1002,7 +1002,7 @@
          ],
          "apk_error": null,
          "icon": null,
-         "ad_sdks": null,
+         "ad_sdks": [],
          "symptoms": [
           {
            "category": "notif",
@@ -1049,7 +1049,7 @@
          ],
          "apk_error": null,
          "icon": null,
-         "ad_sdks": null,
+         "ad_sdks": [],
          "symptoms": [
           {
            "category": "data",

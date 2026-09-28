@@ -5,19 +5,27 @@ from datetime import datetime
 
 from demalware.app.api import Api
 from demalware.app.events import RecordingEmitter
+from demalware.engine.apk.analyze import ApkReport
 from demalware.engine.settings import save_settings
 
 NOW = datetime(2026, 9, 26, 14, 30, 0)
 
 
 class NoApk:
-    """Analiza APK bez wyników: tylko postęp dla każdej aplikacji."""
+    """Analiza APK bez znalezisk: postęp i pusty, poprawny raport dla każdej aplikacji.
+
+    Jak `DeviceApkProvider`: raport (albo błąd) dla każdego celu — brak raportu to luka „apk”
+    (przegląd końcowy Planu 4b, T6). `class_count=1`: plik z kodem, w którym nic nie znaleziono;
+    raport bez klas `apply_apk_report` traktuje jako niepełną analizę.
+    """
 
     def reports_for(self, apps, progress=None):
+        reports = {}
         for i, facts in enumerate(apps, start=1):
+            reports[facts.package] = ApkReport(facts.package, facts.version_code, class_count=1)
             if progress:
                 progress(i, len(apps), facts.package)
-        return {}
+        return reports
 
 
 class SlowApk:

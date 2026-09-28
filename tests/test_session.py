@@ -217,3 +217,13 @@ def test_exception_from_progress_stops_the_analysis(synthetic_adb):
         pass
     else:
         raise AssertionError("Stop not raised")
+
+
+def test_apk_target_without_any_report_is_a_gap(synthetic_adb):
+    """Przegląd końcowy (T6): cel analizy APK, dla którego dostawca nic nie zwrócił, to luka."""
+    provider = _RecordingProvider({"com.wlive.forecast": ApkReport(
+        "com.wlive.forecast", 31, class_count=500)})
+    report = run_scan(synthetic_adb, apk=provider)
+    whatsapp = _by_pkg(report)["com.whatsapp"]
+    assert "apk" in whatsapp.facts.gaps and whatsapp.incomplete
+    assert "apk" not in _by_pkg(report)["com.wlive.forecast"].facts.gaps
