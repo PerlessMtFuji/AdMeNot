@@ -164,9 +164,9 @@
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
       "command": "pm list users",
-      "status": "error:command_failed",
+      "status": "ok",
       "duration": 0.0,
-      "output": "FakePhone: no response for 'pm list users'",
+      "output": "Users:\n\tUserInfo{0:Owner:c13} running\n",
       "tag": null
      }
     ],
@@ -369,7 +369,8 @@
        "collectors": {
         "ok": 8,
         "total": 8,
-        "failed": []
+        "failed": [],
+        "partial": []
        },
        "low_behavior_data": false,
        "apk": null,
@@ -713,7 +714,7 @@
        ],
        "profiles": {
         "others": [],
-        "known": false
+        "known": true
        },
        "usage_window_h": 23.58,
        "counts": {
@@ -762,7 +763,8 @@
        "collectors": {
         "ok": 8,
         "total": 8,
-        "failed": []
+        "failed": [],
+        "partial": []
        },
        "low_behavior_data": false,
        "apk": {
@@ -1110,7 +1112,7 @@
        ],
        "profiles": {
         "others": [],
-        "known": false
+        "known": true
        },
        "usage_window_h": 23.58,
        "counts": {

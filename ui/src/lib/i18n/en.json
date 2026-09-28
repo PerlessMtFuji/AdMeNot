@@ -6,9 +6,10 @@
     "title": { "one": "{count} app needs attention", "few": "{count} apps need attention", "many": "{count} apps need attention", "other": "{count} apps need attention" },
     "safe": { "one": "{count} app without issues", "few": "{count} apps without issues", "many": "{count} apps without issues", "other": "{count} apps without issues" },
     "mode": "View mode", "action_for": "Action for {name}",
-    "clean_title": "No signs of a threat", "clean_sub": "Within the scope of this scan · apps checked: {count}",
+    "clean_title": "No signs of a threat", "clean_title_incomplete": "No signs of a threat — incomplete assessment", "clean_sub": "Within the scope of this scan · apps checked: {count}",
     "safe_show": "Show the list", "safe_hide": "Hide the list", "safe_list": "Apps without issues",
-    "incomplete": "Incomplete assessment"
+    "incomplete": "Incomplete assessment",
+    "safe_incomplete": { "one": "incl. {count} with an incomplete assessment", "few": "incl. {count} with an incomplete assessment", "many": "incl. {count} with an incomplete assessment", "other": "incl. {count} with an incomplete assessment" }
   },
   "panel": {
     "apps": { "one": "{count} app", "few": "{count} apps", "many": "{count} apps", "other": "{count} apps" },
@@ -96,6 +97,8 @@
   "summary": {
     "low_data": "Little behavior data ({hours} h of statistics or a recent reboot) — use the phone for a few minutes, reproduce the problem and scan again, or use “Who is showing this?”.",
     "profiles": "The phone has other user profiles ({ids}) — their apps were not checked.",
+    "profiles_unknown": "Could not read the list of user profiles — only the main profile was checked; apps in other profiles (e.g. a work profile) may have been missed.",
+    "incomplete": "Incomplete assessment — could not read: {names}. Apps affected: {count}. “Without issues” here only means “no signs in the data that was read”.",
     "apk_running": "APK analysis in the background: {done}/{total}"
   },
   "level": { "silence": "SILENCE", "disable": "DISABLE", "remove": "REMOVE", "review": "CHECK", "none": "—" },

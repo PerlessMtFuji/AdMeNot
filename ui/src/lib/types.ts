@@ -97,7 +97,13 @@ export interface ScanCounts {
 }
 
 export interface ScanView {
-  collectors: { ok: number; total: number; failed: { name: string; error: string | null }[] };
+  collectors: {
+    ok: number;
+    total: number;
+    failed: { name: string; error: string | null }[];
+    /** Kolektory, które zadziałały, ale bez danych dla części aplikacji (starsze nagrania: brak). */
+    partial?: { name: string; count: number }[];
+  };
   low_behavior_data: boolean;
   apk: { requested: number; analyzed: number; failed: Record<string, string> } | null;
   apps: AppView[];

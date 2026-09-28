@@ -15,6 +15,7 @@
   const s = ctl.state;
   const apps = $derived(s.scan?.apps ?? []);
   const entries = $derived(planEntries(apps, s.selection));
+  const safeIncomplete = $derived(apps.filter((a) => a.verdict === 'safe' && a.incomplete).length);
   const unchanged = $derived(flaggedApps(apps).filter((a) => !(a.package in s.selection)));
   const details = $derived(s.device
     ? `${s.device.model} · Android ${s.device.android}${s.device.patch ? ` · ${t('phone.patch')} ${s.device.patch}` : ''}`
@@ -42,8 +43,13 @@
 {#if s.scan && s.scan.counts.safe > 0}
   <button type="button" aria-expanded={showSafe} onclick={ontoggleSafe}
     class="flex items-center gap-3 rounded-2xl bg-ok-soft px-4 py-3 text-left ring-1 ring-ok/20 ring-inset transition duration-150 hover:ring-ok/40">
-    <span class="grid h-7 w-7 flex-none place-items-center rounded-full bg-ok text-white shadow-[0_0_14px_-2px_var(--color-ok)]"><Icon name="check" size={15} strokeWidth={3} /></span>
+    {#if safeIncomplete}
+      <span class="grid h-7 w-7 flex-none place-items-center rounded-full bg-warn-strong text-white shadow-[0_0_14px_-2px_var(--color-warn-strong)]"><Icon name="info" size={15} strokeWidth={3} /></span>
+    {:else}
+      <span class="grid h-7 w-7 flex-none place-items-center rounded-full bg-ok text-white shadow-[0_0_14px_-2px_var(--color-ok)]"><Icon name="check" size={15} strokeWidth={3} /></span>
+    {/if}
     <span><b class="block">{tp('results.safe', s.scan.counts.safe)}</b>
+      {#if safeIncomplete}<span class="block text-xs font-semibold text-warn">{tp('results.safe_incomplete', safeIncomplete)}</span>{/if}
       <span class="text-xs font-semibold text-accent">{showSafe ? t('results.safe_hide') : t('results.safe_show')}</span></span>
   </button>
 {/if}

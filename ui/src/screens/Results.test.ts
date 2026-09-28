@@ -124,3 +124,61 @@ describe('Results', () => {
     scroll.mockRestore();
   });
 });
+
+describe('Results: missing data is never a plain "all clear" (final review I2/M2)', () => {
+  const GAP = { key: 'device_policy', label: 'administratorzy urządzenia' };
+
+  function devicePolicyFailed(s: Awaited<ReturnType<typeof scanned>>['s']) {
+    const scan = s.scan!;
+    s.scan = {
+      ...scan,
+      collectors: { ...scan.collectors, ok: scan.collectors.total - 1,
+        failed: [{ name: 'device_policy', error: 'timeout' }] },
+      apps: scan.apps.map((a) => ({ ...a, incomplete: true, gaps: [GAP],
+        verdict_label: a.verdict === 'safe' ? 'Brak oznak (ocena niepełna)' : a.verdict_label })),
+    };
+  }
+
+  test('clean phone with a failed collector: warn banner, scoped title, incomplete pills', async () => {
+    const { s } = await scanned('clean');
+    devicePolicyFailed(s);
+    await tick();
+    const n = s.scan!.apps.length;
+    expect(screen.queryByRole('heading', { name: t('results.clean_title') })).toBeNull();
+    expect(screen.getByRole('heading', { name: t('results.clean_title_incomplete') })).toBeTruthy();
+    expect(screen.getByText(t('summary.incomplete', { count: n, names: GAP.label }))).toBeTruthy();
+    const panel = screen.getByRole('complementary', { name: 'Plan naprawy' });
+    const toggle = within(panel).getByRole('button', { name: new RegExp(tp('results.safe_incomplete', n)) });
+    await fireEvent.click(toggle);
+    const list = screen.getByRole('list', { name: t('results.safe_list') });
+    expect(within(list).getAllByText(t('results.incomplete'))).toHaveLength(n);
+  });
+
+  test('a failed or partial collector alone still shows the warn banner', async () => {
+    const { s } = await scanned('clean');
+    s.scan = { ...s.scan!, collectors: { ...s.scan!.collectors,
+      partial: [{ name: 'appops', count: 1 }] } };
+    await tick();
+    expect(screen.getByText(t('summary.incomplete', { count: 0, names: 'appops' }))).toBeTruthy();
+  });
+
+  test('unknown profile list gets its own banner; a known single profile does not', async () => {
+    const { s } = await scanned('clean');
+    s.scan = { ...s.scan!, profiles: { others: [], known: false } };
+    await tick();
+    expect(screen.getByText(t('summary.profiles_unknown'))).toBeTruthy();
+    s.scan = { ...s.scan!, profiles: { others: [], known: true } };
+    await tick();
+    expect(screen.queryByText(t('summary.profiles_unknown'))).toBeNull();
+  });
+
+  test('low-data banner shows the hours; other profiles banner lists their ids', async () => {
+    const { s } = await scanned();
+    s.scan = { ...s.scan!, low_behavior_data: true, usage_window_h: 1.5,
+      profiles: { others: [10, 11], known: true } };
+    await tick();
+    expect(screen.getByText(t('summary.low_data', { hours: '1.5' }))).toBeTruthy();
+    expect(t('summary.low_data', { hours: '1.5' })).toContain('1.5 h');
+    expect(screen.getByText(t('summary.profiles', { ids: '10, 11' }))).toBeTruthy();
+  });
+});

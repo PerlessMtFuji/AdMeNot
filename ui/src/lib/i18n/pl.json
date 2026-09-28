@@ -6,9 +6,10 @@
     "title": { "one": "{count} aplikacja wymaga uwagi", "few": "{count} aplikacje wymagają uwagi", "many": "{count} aplikacji wymaga uwagi", "other": "{count} aplikacji wymaga uwagi" },
     "safe": { "one": "{count} aplikacja bez uwag", "few": "{count} aplikacje bez uwag", "many": "{count} aplikacji bez uwag", "other": "{count} aplikacji bez uwag" },
     "mode": "Tryb widoku", "action_for": "Akcja dla {name}",
-    "clean_title": "Nie wykryto oznak zagrożenia", "clean_sub": "W zakresie wykonanego skanu · sprawdzone aplikacje: {count}",
+    "clean_title": "Nie wykryto oznak zagrożenia", "clean_title_incomplete": "Nie wykryto oznak zagrożenia — ocena niepełna", "clean_sub": "W zakresie wykonanego skanu · sprawdzone aplikacje: {count}",
     "safe_show": "Pokaż listę", "safe_hide": "Zwiń listę", "safe_list": "Aplikacje bez uwag",
-    "incomplete": "Ocena niepełna"
+    "incomplete": "Ocena niepełna",
+    "safe_incomplete": { "one": "w tym {count} z oceną niepełną", "few": "w tym {count} z oceną niepełną", "many": "w tym {count} z oceną niepełną", "other": "w tym {count} z oceną niepełną" }
   },
   "panel": {
     "apps": { "one": "{count} aplikacja", "few": "{count} aplikacje", "many": "{count} aplikacji", "other": "{count} aplikacji" },
@@ -96,6 +97,8 @@
   "summary": {
     "low_data": "Mało danych o zachowaniu (statystyki z {hours} h lub niedawny restart) — użyj telefonu kilkanaście minut, odtwórz problem i zeskanuj ponownie albo użyj „Kto to wyświetla?”.",
     "profiles": "Na telefonie są inne profile użytkownika ({ids}) — ich aplikacje nie zostały sprawdzone.",
+    "profiles_unknown": "Nie udało się odczytać listy profili użytkownika — sprawdzono tylko profil główny; aplikacje z innych profili (np. służbowego) mogły zostać pominięte.",
+    "incomplete": "Ocena niepełna — nie udało się odczytać: {names}. Aplikacje, których to dotyczy: {count}. „Bez uwag” znaczy tu tylko „brak oznak w odczytanych danych”.",
     "apk_running": "Analiza APK w tle: {done}/{total}"
   },
   "level": { "silence": "WYCISZ", "disable": "WYŁĄCZ", "remove": "USUŃ", "review": "SPRAWDŹ", "none": "—" },

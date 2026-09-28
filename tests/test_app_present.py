@@ -188,3 +188,13 @@ def test_scan_view_reports_other_profiles_and_usage_window(synthetic_adb):
     view = scan_view(run_scan(synthetic_adb), "en")
     assert view["profiles"] == {"others": [10], "known": True}
     assert view["usage_window_h"] is not None
+
+
+def test_scan_view_reports_partial_collectors(synthetic_adb):
+    """Przegląd końcowy I2: częściowa awaria kolektora musi być widoczna w GUI."""
+    from demalware.engine.collectors.behavior import APPOPS_GET
+
+    synthetic_adb.responses[APPOPS_GET.format(package="com.whatsapp")] = AdbError("command_failed", "x")
+    view = scan_view(run_scan(synthetic_adb), "pl")
+    assert view["collectors"]["partial"] == [{"name": "appops", "count": 1}]
+    assert view["collectors"]["failed"] == []

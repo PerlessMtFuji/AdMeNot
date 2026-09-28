@@ -19,6 +19,7 @@
   import Button from '../ui/Button.svelte';
   import CountUp from '../ui/CountUp.svelte';
   import Icon from '../ui/Icon.svelte';
+  import Pill from '../ui/Pill.svelte';
   import Progress from '../ui/Progress.svelte';
   import Segmented from '../ui/Segmented.svelte';
   import SidePanel from '../ui/SidePanel.svelte';
@@ -29,6 +30,16 @@
   const apps = $derived(s.scan?.apps ?? []);
   const flagged = $derived(flaggedApps(apps));
   const safeApps = $derived(apps.filter((a) => a.verdict === 'safe'));
+  const anyIncomplete = $derived(apps.some((a) => a.incomplete));
+  // Brakujące dane (Plan 6: nigdy samo „bez uwag”): etykiety luk z aplikacji, a gdy żadna
+  // aplikacja ich nie ma — nazwy kolektorów, które zawiodły albo zadziałały częściowo.
+  const missing = $derived.by(() => {
+    const labels = [...new Set(apps.flatMap((a) => a.gaps.map((g) => g.label)))];
+    if (labels.length) return labels;
+    const c = s.scan?.collectors;
+    return [...new Set([...(c?.failed ?? []), ...(c?.partial ?? [])].map((x) => x.name))];
+  });
+  const withGaps = $derived(apps.filter((a) => a.gaps.length > 0).length);
   let showSafe = $state(false);
   const rows = $derived(visibleApps(apps, { showAll: s.showAll, verdict: 'all', query: s.query }));
   const focused = $derived(focusedApp(rows.map((r) => r.package), s.focused));
@@ -55,7 +66,7 @@
           {titleParts[0]}<CountUp value={flagged.length} />{titleParts[1]}
         </h1>
       {:else}
-        <h1 class="col-span-2 text-2xl font-extrabold">{t('results.clean_title')}</h1>
+        <h1 class="col-span-2 text-2xl font-extrabold">{t(anyIncomplete ? 'results.clean_title_incomplete' : 'results.clean_title')}</h1>
       {/if}
     </header>
 
@@ -67,16 +78,24 @@
     {/if}
     {#if s.interrupted.length}<InterruptedBanner orders={s.interrupted} />{/if}
     {#if s.scan?.low_behavior_data}<Banner tone="warn" icon="info" title={t('summary.low_data', { hours: s.scan.usage_window_h?.toFixed(1) ?? '?' })} />{/if}
-    {#if s.scan?.profiles.others.length}<Banner tone="warn" icon="info" title={t('summary.profiles', { ids: s.scan.profiles.others.join(', ') })} />{/if}
+    {#if missing.length}<Banner tone="warn" icon="info" title={t('summary.incomplete', { count: withGaps, names: missing.join(', ') })} />{/if}
+    {#if s.scan?.profiles.others.length}<Banner tone="warn" icon="info" title={t('summary.profiles', { ids: s.scan.profiles.others.join(', ') })} />
+    {:else if s.scan && !s.scan.profiles.known}<Banner tone="warn" icon="info" title={t('summary.profiles_unknown')} />{/if}
     <WhoIsShowing ask={() => ctl.whoIsShowing()} />
 
     {#if expert}
       <ExpertTable {rows} {focused} />
     {:else if flagged.length === 0}
       <div class="grid place-items-center gap-2 py-10 text-center" in:enter>
-        <span class="grid h-20 w-20 place-items-center rounded-full bg-ok text-white shadow-[0_0_0_12px_var(--color-ok-soft),0_0_40px_-4px_var(--color-ok)] [animation:pop-in_.6s]">
-          <Icon name="check" size={38} strokeWidth={3} />
-        </span>
+        {#if anyIncomplete}
+          <span class="grid h-20 w-20 place-items-center rounded-full bg-warn-strong text-white shadow-[0_0_0_12px_var(--color-warn-soft),0_0_40px_-4px_var(--color-warn-strong)] [animation:pop-in_.6s]">
+            <Icon name="info" size={38} strokeWidth={3} />
+          </span>
+        {:else}
+          <span class="grid h-20 w-20 place-items-center rounded-full bg-ok text-white shadow-[0_0_0_12px_var(--color-ok-soft),0_0_40px_-4px_var(--color-ok)] [animation:pop-in_.6s]">
+            <Icon name="check" size={38} strokeWidth={3} />
+          </span>
+        {/if}
         <p class="mt-3 text-mut">{t('results.clean_sub', { count: s.scan?.counts.total ?? 0 })}</p>
       </div>
     {:else}
@@ -94,7 +113,8 @@
         <span class="lbl">{t('results.safe_list')}</span>
         <ul aria-label={t('results.safe_list')} class="mt-3 grid grid-cols-2 gap-x-6 gap-y-1.5">
           {#each safeApps as a (a.package)}
-            <li class="flex min-w-0 gap-2"><span class="truncate">{a.name}</span><span class="mono truncate text-2xs text-soft">{a.package}</span></li>
+            <li class="flex min-w-0 items-center gap-2"><span class="truncate">{a.name}</span><span class="mono truncate text-2xs text-soft">{a.package}</span>
+              {#if a.incomplete}<span class="ml-auto flex-none" title={a.verdict_label}><Pill tone="warn">{t('results.incomplete')}</Pill></span>{/if}</li>
           {/each}
         </ul>
       </section>

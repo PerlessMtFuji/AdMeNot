@@ -16,6 +16,7 @@ from demalware.engine.actions import commands as C
 from demalware.engine.adb.transport import AdbError
 from demalware.engine.collectors.components import HOME_QUERY
 from demalware.engine.collectors.packages import PM_DISABLED, PM_SYSTEM
+from demalware.engine.collectors.profiles import PM_USERS
 from demalware.engine.collectors.system import DEVICE_POLICY, RESOLVE_HOME
 
 POST = "android.permission.POST_NOTIFICATIONS"
@@ -327,7 +328,10 @@ def make_cli_phone() -> FakePhone:
         serial=SERIAL,
         home=f"com.sec.android.app.launcher/{launcher}",
         secure={LISTENERS: "com.whatsapp/com.whatsapp.NotificationListener"},
-        static=make_synthetic_adb().responses,
+        # Współczesny telefon odpowiada na `pm list users` (jeden profil) — nagrania mostu
+        # nie pokazują więc ostrzeżenia o nieznanym zakresie profili (Plan 4b, przegląd M2).
+        static={**make_synthetic_adb().responses,
+                PM_USERS: "Users:\n\tUserInfo{0:Owner:c13} running\n"},
         host={"devices -l": SYNTHETIC_DEVICES},
     )
     # com.clean.pro.boost jest aktywnym administratorem: wyłączenie też jest blokowane, nie tylko usunięcie.
