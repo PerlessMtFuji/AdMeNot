@@ -11,6 +11,7 @@ from demalware.engine.apk.providers import (
     select_apk_targets,
 )
 from demalware.engine.facts import AppFacts
+from demalware.engine.rules.model import Finding
 from demalware.engine.scoring import AppResult
 
 
@@ -27,6 +28,14 @@ def test_select_targets_every_user_app_and_flagged_system_apps():
     ]
     assert [f.package for f in select_apk_targets(results)] == [
         "com.user.app", "com.whatsapp", "com.sys.flagged"]
+
+
+def test_select_targets_includes_system_apps_with_strong_signals():
+    admin = Finding("DM-ADMIN-01", "position", 25, {}, {}, {}, category="removal", basis="granted")
+    quiet_admin = AppResult(AppFacts("com.sys.admin", is_system=True), [admin], 24, "safe", False, False)
+    trusted_admin = AppResult(AppFacts("com.sys.oem", is_system=True), [admin], 0, "safe", True, False)
+    targets = [f.package for f in select_apk_targets([quiet_admin, trusted_admin])]
+    assert targets == ["com.sys.admin"]
 
 
 def test_stored_provider_reads_existing_reports(tmp_path):

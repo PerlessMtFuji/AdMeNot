@@ -295,6 +295,17 @@ def test_appops_unparseable_output_for_one_app_is_a_gap():
     assert facts["com.b"].gaps == {"appops"}
 
 
+def test_appops_covers_system_apps_that_can_draw_over_others():
+    facts = _facts()
+    facts["com.sys.saw"] = AppFacts("com.sys.saw", is_system=True,
+                                    requested_permissions={"android.permission.SYSTEM_ALERT_WINDOW"})
+    adb = FakeAdb({APPOPS_GET.format(package=p): "SYSTEM_ALERT_WINDOW: allow; time=+10s ago\n"
+                   for p in ("com.a", "com.b", "com.sys.saw")})
+    run_collectors(adb, facts, [AppOpsCollector()])
+    assert facts["com.sys.saw"].overlay_last_access_s == 10
+    assert APPOPS_GET.format(package="com.sys") not in adb.calls
+
+
 def test_appops_no_operations_is_a_confirmed_absence():
     adb = FakeAdb({APPOPS_GET.format(package="com.a"): "No operations.\n",
                    APPOPS_GET.format(package="com.b"): "SYSTEM_ALERT_WINDOW: allow\n"})

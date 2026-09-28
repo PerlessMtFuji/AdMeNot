@@ -98,6 +98,13 @@ def test_system_app_without_behavior_is_capped_safe():
     assert result.score == 24 and result.verdict == "safe"
 
 
+def test_confirmed_indicator_is_not_capped_for_system_apps():
+    ioc = FB("DM-IOC-01", "ioc", 80, "confirmed", "origin")
+    result = score_app(AppFacts("com.sys", is_system=True), [ioc], trusted=False,
+                       low_behavior_data=False)
+    assert result.score == 80 and result.verdict == "malicious"
+
+
 def test_low_behavior_data_marks_untrusted_incomplete():
     result = score_app(AppFacts("com.x"), [], trusted=False, low_behavior_data=True)
     assert result.incomplete is True
