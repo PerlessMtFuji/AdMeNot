@@ -1,6 +1,8 @@
 import pytest
 
 from demalware.engine.facts import AppFacts
+from demalware.engine.parsers.appops import AppOpState
+from demalware.engine.rules.engine import load_default_ruleset
 from demalware.engine.rules.model import Finding
 from demalware.engine.scoring import confidence_for, score_app, verdict_for
 
@@ -56,16 +58,25 @@ def test_class_caps_limit_weak_signals():
     assert result.verdict == "safe"
 
 
-def test_combos_add_bonus_findings():
-    findings = [F("DM-HIDDEN-01", "position", 15), FB("DM-OVERLAY-01", "behavior", 25, "observed", "ads"),
-                F("DM-SRC-01", "context", 8), F("DM-ADMIN-01", "position", 25)]
+def test_only_the_strongest_combo_counts():
+    findings = [FB("DM-HIDDEN-01", "position", 10, "declared", "removal"),
+                FB("DM-OVERLAY-01", "behavior", 20, "observed", "ads"),
+                FB("DM-SRC-01", "context", 8, "declared", "origin"),
+                FB("DM-ADMIN-01", "position", 25, "granted", "removal")]
     result = score_app(AppFacts("com.x"), findings, trusted=False, low_behavior_data=False)
-    ids = [f.rule_id for f in result.findings]
-    assert "DM-COMBO-01" in ids and "DM-COMBO-02" in ids
-    # behavior 25 + position min(40, 40) + context 8 + combo 20 + 15 = 108 → 100
-    assert result.score == 100
-    # jedno zaobserwowane zachowanie = pewność średnia, nie wysoka
-    assert result.verdict == "suspicious"
+    combos = [f.rule_id for f in result.findings if f.rule_class == "combo"]
+    assert combos == ["DM-COMBO-01"]
+    assert result.score == 20 + 35 + 8 + 20
+
+
+def test_play_admin_with_overlay_is_review_not_suspicious():
+    """Audyt: administrator + overlay dawały 65 pkt nawet przy Play i widocznej ikonie."""
+    facts = AppFacts("com.x.remote", installer="com.android.vending", has_launcher_icon=True,
+                     is_device_admin=True, appops={"SYSTEM_ALERT_WINDOW": AppOpState("allow", 60.0)},
+                     installed_days=200.0)
+    result = score_app(facts, load_default_ruleset().evaluate(facts), trusted=False,
+                       low_behavior_data=False)
+    assert (result.score, result.verdict) == (45, "review")
 
 
 def test_trusted_lowers_score():
@@ -114,9 +125,10 @@ def test_combo_findings_carry_category_and_label():
         return Finding(rule_id, cls, weight, {}, {"pl": rule_id, "en": rule_id}, {"pl": "", "en": ""})
 
     (combo,) = _combo_findings([make("DM-ADMIN-01", "position", 25),
+                                make("DM-SRC-01", "context", 8),
                                 make("DM-OVERLAY-01", "behavior", 25)])
     assert combo.rule_id == "DM-COMBO-02" and combo.category == "combo"
-    assert combo.label_text("pl") == "Blokuje usunięcie i nachalnie wyświetla treści"
+    assert combo.label_text("pl") == "Administrator spoza Play + wyświetlanie treści"
     assert all(c.label["pl"] and c.label["en"] for c in COMBOS)
 
 

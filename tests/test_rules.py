@@ -6,6 +6,7 @@ from demalware.engine.rules.conditions import check
 from demalware.engine.rules.engine import load_default_ruleset, load_yaml_rules, parse_rules
 from demalware.engine.rules.model import BASES, Finding
 from demalware.engine.rules.python_rules import rule_name_mimic, rule_random_name
+from demalware.engine.scoring import COMBOS
 
 
 def test_check_operators():
@@ -258,3 +259,25 @@ def test_plan4_rule_texts_format_with_real_evidence():
                     assert "{" not in finding.text(lang, expert), finding.rule_id
     assert {"DM-ADSDK-01", "DM-ADSDK-02", "DM-DYNDEX-01", "DM-LABEL-01", "DM-ALARM-01",
             "DM-BGACT-01", "DM-SMS-01", "DM-BROWSER-01"} <= fired
+
+
+NEUTRAL_FORBIDDEN = ("żeby", "ukrywa", "blokuje", "nachaln", "typowe", "aplikacji-śmieci",
+                     "to hide", "to make", "blocks", "aggressive", "typical")
+
+
+def test_simple_texts_describe_facts_not_intent():
+    texts = [(r.id, t) for r in load_default_ruleset().yaml_rules
+             for t in (*r.text_simple.values(), *r.label.values())]
+    for combo in COMBOS:
+        texts += [(combo.rule_id, t) for t in (*combo.text_simple.values(), *combo.label.values())]
+    for facts in (AppFacts("com.clean.booster.xq7zkr"),):
+        for finding in load_default_ruleset().evaluate(facts):
+            texts += [(finding.rule_id, finding.text(lang)) for lang in ("pl", "en")]
+    for rule_id, text in texts:
+        assert not any(word in text.lower() for word in NEUTRAL_FORBIDDEN), (rule_id, text)
+
+
+def test_roles_are_context_signals():
+    rules = {r.id: r for r in load_default_ruleset().yaml_rules}
+    assert {rules[i].rule_class for i in ("DM-HOME-01", "DM-HOME-02", "DM-SMS-01",
+                                         "DM-BROWSER-01")} == {"context"}

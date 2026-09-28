@@ -350,51 +350,6 @@
        "apk": null,
        "apps": [
         {
-         "package": "com.sec.android.app.launcher",
-         "name": "com.sec.android.app.launcher",
-         "score": 20,
-         "verdict": "safe",
-         "verdict_label": "Bezpieczna",
-         "confidence": "low",
-         "trusted": false,
-         "incomplete": false,
-         "is_system": true,
-         "from_play": false,
-         "installer": null,
-         "is_admin": false,
-         "default_level": null,
-         "problems": [
-          "Jest ustawiona jako ekran główny telefonu."
-         ],
-         "findings": [
-          {
-           "rule_id": "DM-HOME-01",
-           "class": "position",
-           "weight": 20,
-           "text": "Jest ustawiona jako ekran główny telefonu.",
-           "text_expert": "rola android.app.role.HOME",
-           "evidence": {},
-           "category": "removal",
-           "label": "Ustawiona jako ekran główny",
-           "basis": "granted"
-          }
-         ],
-         "apk_error": null,
-         "icon": null,
-         "ad_sdks": null,
-         "symptoms": [
-          {
-           "category": "removal",
-           "severity": "bad",
-           "text": "Jest ustawiona jako ekran główny telefonu."
-          }
-         ],
-         "source": {
-          "label": "systemowa",
-          "days": 6478
-         }
-        },
-        {
          "package": "com.whatsapp",
          "name": "com.whatsapp",
          "score": 10,
@@ -437,6 +392,51 @@
          "source": {
           "label": "Sklep Play",
           "days": 624
+         }
+        },
+        {
+         "package": "com.sec.android.app.launcher",
+         "name": "com.sec.android.app.launcher",
+         "score": 8,
+         "verdict": "safe",
+         "verdict_label": "Bezpieczna",
+         "confidence": "low",
+         "trusted": false,
+         "incomplete": false,
+         "is_system": true,
+         "from_play": false,
+         "installer": null,
+         "is_admin": false,
+         "default_level": null,
+         "problems": [
+          "Jest ustawiona jako ekran główny telefonu."
+         ],
+         "findings": [
+          {
+           "rule_id": "DM-HOME-01",
+           "class": "context",
+           "weight": 8,
+           "text": "Jest ustawiona jako ekran główny telefonu.",
+           "text_expert": "rola android.app.role.HOME",
+           "evidence": {},
+           "category": "removal",
+           "label": "Ustawiona jako ekran główny",
+           "basis": "granted"
+          }
+         ],
+         "apk_error": null,
+         "icon": null,
+         "ad_sdks": null,
+         "symptoms": [
+          {
+           "category": "removal",
+           "severity": "neutral",
+           "text": "Jest ustawiona jako ekran główny telefonu."
+          }
+         ],
+         "source": {
+          "label": "systemowa",
+          "days": 6478
          }
         }
        ],
@@ -496,51 +496,6 @@
        },
        "apps": [
         {
-         "package": "com.sec.android.app.launcher",
-         "name": "com.sec.android.app.launcher",
-         "score": 20,
-         "verdict": "safe",
-         "verdict_label": "Bezpieczna",
-         "confidence": "low",
-         "trusted": false,
-         "incomplete": false,
-         "is_system": true,
-         "from_play": false,
-         "installer": null,
-         "is_admin": false,
-         "default_level": null,
-         "problems": [
-          "Jest ustawiona jako ekran główny telefonu."
-         ],
-         "findings": [
-          {
-           "rule_id": "DM-HOME-01",
-           "class": "position",
-           "weight": 20,
-           "text": "Jest ustawiona jako ekran główny telefonu.",
-           "text_expert": "rola android.app.role.HOME",
-           "evidence": {},
-           "category": "removal",
-           "label": "Ustawiona jako ekran główny",
-           "basis": "granted"
-          }
-         ],
-         "apk_error": null,
-         "icon": null,
-         "ad_sdks": null,
-         "symptoms": [
-          {
-           "category": "removal",
-           "severity": "bad",
-           "text": "Jest ustawiona jako ekran główny telefonu."
-          }
-         ],
-         "source": {
-          "label": "systemowa",
-          "days": 6478
-         }
-        },
-        {
          "package": "com.whatsapp",
          "name": "com.whatsapp",
          "score": 10,
@@ -583,6 +538,51 @@
          "source": {
           "label": "Sklep Play",
           "days": 624
+         }
+        },
+        {
+         "package": "com.sec.android.app.launcher",
+         "name": "com.sec.android.app.launcher",
+         "score": 8,
+         "verdict": "safe",
+         "verdict_label": "Bezpieczna",
+         "confidence": "low",
+         "trusted": false,
+         "incomplete": false,
+         "is_system": true,
+         "from_play": false,
+         "installer": null,
+         "is_admin": false,
+         "default_level": null,
+         "problems": [
+          "Jest ustawiona jako ekran główny telefonu."
+         ],
+         "findings": [
+          {
+           "rule_id": "DM-HOME-01",
+           "class": "context",
+           "weight": 8,
+           "text": "Jest ustawiona jako ekran główny telefonu.",
+           "text_expert": "rola android.app.role.HOME",
+           "evidence": {},
+           "category": "removal",
+           "label": "Ustawiona jako ekran główny",
+           "basis": "granted"
+          }
+         ],
+         "apk_error": null,
+         "icon": null,
+         "ad_sdks": null,
+         "symptoms": [
+          {
+           "category": "removal",
+           "severity": "neutral",
+           "text": "Jest ustawiona jako ekran główny telefonu."
+          }
+         ],
+         "source": {
+          "label": "systemowa",
+          "days": 6478
          }
         }
        ],

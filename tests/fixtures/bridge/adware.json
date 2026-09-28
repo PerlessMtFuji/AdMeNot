@@ -377,16 +377,27 @@
          "is_admin": true,
          "default_level": "remove",
          "problems": [
-          "W ciągu ostatniej doby wyświetlała okna na wierzchu innych aplikacji (np. reklamy).",
-          "Nadała sobie uprawnienia administratora, żeby utrudnić usunięcie.",
-          "Ukryta aplikacja spoza Sklepu Play wyświetla okna nad innymi — typowe adware."
+          "Jest aktywnym administratorem urządzenia — przed wyłączeniem lub usunięciem trzeba odebrać te uprawnienia.",
+          "W ciągu ostatniej doby korzystała z wyświetlania okien nad innymi aplikacjami.",
+          "Bez ikony, spoza Sklepu Play i korzysta z okien nad innymi aplikacjami — ten układ często ma adware."
          ],
          "findings": [
           {
+           "rule_id": "DM-ADMIN-01",
+           "class": "position",
+           "weight": 25,
+           "text": "Jest aktywnym administratorem urządzenia — przed wyłączeniem lub usunięciem trzeba odebrać te uprawnienia.",
+           "text_expert": "dumpsys device_policy: aktywny administrator urządzenia",
+           "evidence": {},
+           "category": "removal",
+           "label": "Administrator urządzenia",
+           "basis": "granted"
+          },
+          {
            "rule_id": "DM-OVERLAY-01",
            "class": "behavior",
-           "weight": 25,
-           "text": "W ciągu ostatniej doby wyświetlała okna na wierzchu innych aplikacji (np. reklamy).",
+           "weight": 20,
+           "text": "W ciągu ostatniej doby korzystała z wyświetlania okien nad innymi aplikacjami.",
            "text_expert": "appops SYSTEM_ALERT_WINDOW: ostatnie użycie 252 s temu",
            "evidence": {
             "overlay_last_access_s": 251.877
@@ -396,32 +407,21 @@
            "basis": "observed"
           },
           {
-           "rule_id": "DM-ADMIN-01",
-           "class": "position",
-           "weight": 25,
-           "text": "Nadała sobie uprawnienia administratora, żeby utrudnić usunięcie.",
-           "text_expert": "dumpsys device_policy: aktywny administrator urządzenia",
-           "evidence": {},
-           "category": "removal",
-           "label": "Administrator urządzenia",
-           "basis": "granted"
-          },
-          {
            "rule_id": "DM-COMBO-01",
            "class": "combo",
            "weight": 20,
-           "text": "Ukryta aplikacja spoza Sklepu Play wyświetla okna nad innymi — typowe adware.",
+           "text": "Bez ikony, spoza Sklepu Play i korzysta z okien nad innymi aplikacjami — ten układ często ma adware.",
            "text_expert": "kombinacja: DM-HIDDEN-01 + DM-OVERLAY-01 + DM-SRC-01",
            "evidence": {},
            "category": "combo",
-           "label": "Ukryta, spoza Play, okna nad innymi",
+           "label": "Bez ikony, spoza Play, okna nad innymi",
            "basis": "declared"
           },
           {
            "rule_id": "DM-FSI-01",
            "class": "behavior",
            "weight": 15,
-           "text": "Ma powiadomienie, które otwiera się na cały ekran.",
+           "text": "Ma aktywne powiadomienie pełnoekranowe.",
            "text_expert": "dumpsys notification: aktywne powiadomienie z fullscreenIntent (1 aktywnych)",
            "evidence": {
             "notif_active": 1
@@ -429,28 +429,6 @@
            "category": "ads",
            "label": "Powiadomienie pełnoekranowe",
            "basis": "observed"
-          },
-          {
-           "rule_id": "DM-HIDDEN-01",
-           "class": "position",
-           "weight": 15,
-           "text": "Ukrywa swoją ikonę — nie widać jej na liście aplikacji.",
-           "text_expert": "brak aktywności MAIN/LAUNCHER",
-           "evidence": {},
-           "category": "removal",
-           "label": "Ukryta ikona",
-           "basis": "declared"
-          },
-          {
-           "rule_id": "DM-COMBO-02",
-           "class": "combo",
-           "weight": 15,
-           "text": "Blokuje usunięcie i jednocześnie nachalnie wyświetla treści.",
-           "text_expert": "kombinacja: DM-ADMIN-01 + zachowanie reklamowe",
-           "evidence": {},
-           "category": "combo",
-           "label": "Blokuje usunięcie i nachalnie wyświetla treści",
-           "basis": "declared"
           },
           {
            "rule_id": "DM-ALARM-01",
@@ -465,6 +443,17 @@
            "category": "background",
            "label": "Częste wybudzanie telefonu",
            "basis": "observed"
+          },
+          {
+           "rule_id": "DM-HIDDEN-01",
+           "class": "position",
+           "weight": 10,
+           "text": "Nie ma ikony na liście aplikacji (brak aktywności startowej).",
+           "text_expert": "brak aktywności MAIN/LAUNCHER",
+           "evidence": {},
+           "category": "removal",
+           "label": "Ukryta ikona",
+           "basis": "declared"
           },
           {
            "rule_id": "DM-SRC-01",
@@ -483,7 +472,7 @@
            "rule_id": "DM-NAME-01",
            "class": "context",
            "weight": 6,
-           "text": "Nazwa sugeruje aplikację systemową lub „czyszczącą” (clean, boost).",
+           "text": "Nazwa pakietu zawiera słowa kojarzone z aplikacjami systemowymi lub „czyszczącymi” (clean, boost).",
            "text_expert": "Nazwa pakietu zawiera tokeny podszywania się: clean, boost",
            "evidence": {
             "tokens": "clean, boost"
@@ -496,7 +485,7 @@
            "rule_id": "DM-PERM-01",
            "class": "context",
            "weight": 4,
-           "text": "Uruchamia się sama po włączeniu telefonu i sprawdza inne zainstalowane aplikacje.",
+           "text": "Deklaruje uruchamianie po włączeniu telefonu i dostęp do listy zainstalowanych aplikacji.",
            "text_expert": "BOOT_COMPLETED receiver + QUERY_ALL_PACKAGES",
            "evidence": {},
            "category": "background",
@@ -507,7 +496,7 @@
            "rule_id": "DM-FSIPERM-01",
            "class": "context",
            "weight": 4,
-           "text": "Może wyświetlać okna na cały ekran.",
+           "text": "Deklaruje uprawnienie do powiadomień pełnoekranowych.",
            "text_expert": "żąda USE_FULL_SCREEN_INTENT (instalacja spoza Play)",
            "evidence": {},
            "category": "ads",
@@ -533,19 +522,19 @@
          "ad_sdks": null,
          "symptoms": [
           {
-           "category": "ads",
-           "severity": "bad",
-           "text": "W ciągu ostatniej doby wyświetlała okna na wierzchu innych aplikacji (np. reklamy). Ma powiadomienie, które otwiera się na cały ekran. Może wyświetlać okna na cały ekran."
-          },
-          {
            "category": "removal",
            "severity": "bad",
-           "text": "Nadała sobie uprawnienia administratora, żeby utrudnić usunięcie. Ukrywa swoją ikonę — nie widać jej na liście aplikacji."
+           "text": "Jest aktywnym administratorem urządzenia — przed wyłączeniem lub usunięciem trzeba odebrać te uprawnienia. Nie ma ikony na liście aplikacji (brak aktywności startowej)."
+          },
+          {
+           "category": "ads",
+           "severity": "bad",
+           "text": "W ciągu ostatniej doby korzystała z wyświetlania okien nad innymi aplikacjami. Ma aktywne powiadomienie pełnoekranowe. Deklaruje uprawnienie do powiadomień pełnoekranowych."
           },
           {
            "category": "background",
            "severity": "warn",
-           "text": "Często budzi telefon — średnio 8 razy na godzinę. Uruchamia się sama po włączeniu telefonu i sprawdza inne zainstalowane aplikacje."
+           "text": "Często budzi telefon — średnio 8 razy na godzinę. Deklaruje uruchamianie po włączeniu telefonu i dostęp do listy zainstalowanych aplikacji."
           },
           {
            "category": "origin",
@@ -555,7 +544,7 @@
           {
            "category": "disguise",
            "severity": "neutral",
-           "text": "Nazwa sugeruje aplikację systemową lub „czyszczącą” (clean, boost)."
+           "text": "Nazwa pakietu zawiera słowa kojarzone z aplikacjami systemowymi lub „czyszczącymi” (clean, boost)."
           }
          ],
          "source": {
@@ -612,51 +601,6 @@
          }
         },
         {
-         "package": "com.sec.android.app.launcher",
-         "name": "com.sec.android.app.launcher",
-         "score": 20,
-         "verdict": "safe",
-         "verdict_label": "Bezpieczna",
-         "confidence": "low",
-         "trusted": false,
-         "incomplete": false,
-         "is_system": true,
-         "from_play": false,
-         "installer": null,
-         "is_admin": false,
-         "default_level": null,
-         "problems": [
-          "Jest ustawiona jako ekran główny telefonu."
-         ],
-         "findings": [
-          {
-           "rule_id": "DM-HOME-01",
-           "class": "position",
-           "weight": 20,
-           "text": "Jest ustawiona jako ekran główny telefonu.",
-           "text_expert": "rola android.app.role.HOME",
-           "evidence": {},
-           "category": "removal",
-           "label": "Ustawiona jako ekran główny",
-           "basis": "granted"
-          }
-         ],
-         "apk_error": null,
-         "icon": null,
-         "ad_sdks": null,
-         "symptoms": [
-          {
-           "category": "removal",
-           "severity": "bad",
-           "text": "Jest ustawiona jako ekran główny telefonu."
-          }
-         ],
-         "source": {
-          "label": "systemowa",
-          "days": 6478
-         }
-        },
-        {
          "package": "com.whatsapp",
          "name": "com.whatsapp",
          "score": 10,
@@ -699,6 +643,51 @@
          "source": {
           "label": "Sklep Play",
           "days": 624
+         }
+        },
+        {
+         "package": "com.sec.android.app.launcher",
+         "name": "com.sec.android.app.launcher",
+         "score": 8,
+         "verdict": "safe",
+         "verdict_label": "Bezpieczna",
+         "confidence": "low",
+         "trusted": false,
+         "incomplete": false,
+         "is_system": true,
+         "from_play": false,
+         "installer": null,
+         "is_admin": false,
+         "default_level": null,
+         "problems": [
+          "Jest ustawiona jako ekran główny telefonu."
+         ],
+         "findings": [
+          {
+           "rule_id": "DM-HOME-01",
+           "class": "context",
+           "weight": 8,
+           "text": "Jest ustawiona jako ekran główny telefonu.",
+           "text_expert": "rola android.app.role.HOME",
+           "evidence": {},
+           "category": "removal",
+           "label": "Ustawiona jako ekran główny",
+           "basis": "granted"
+          }
+         ],
+         "apk_error": null,
+         "icon": null,
+         "ad_sdks": null,
+         "symptoms": [
+          {
+           "category": "removal",
+           "severity": "neutral",
+           "text": "Jest ustawiona jako ekran główny telefonu."
+          }
+         ],
+         "source": {
+          "label": "systemowa",
+          "days": 6478
          }
         }
        ],
@@ -772,16 +761,27 @@
          "is_admin": true,
          "default_level": "remove",
          "problems": [
-          "W ciągu ostatniej doby wyświetlała okna na wierzchu innych aplikacji (np. reklamy).",
-          "Nadała sobie uprawnienia administratora, żeby utrudnić usunięcie.",
-          "Ukryta aplikacja spoza Sklepu Play wyświetla okna nad innymi — typowe adware."
+          "Jest aktywnym administratorem urządzenia — przed wyłączeniem lub usunięciem trzeba odebrać te uprawnienia.",
+          "W ciągu ostatniej doby korzystała z wyświetlania okien nad innymi aplikacjami.",
+          "Bez ikony, spoza Sklepu Play i korzysta z okien nad innymi aplikacjami — ten układ często ma adware."
          ],
          "findings": [
           {
+           "rule_id": "DM-ADMIN-01",
+           "class": "position",
+           "weight": 25,
+           "text": "Jest aktywnym administratorem urządzenia — przed wyłączeniem lub usunięciem trzeba odebrać te uprawnienia.",
+           "text_expert": "dumpsys device_policy: aktywny administrator urządzenia",
+           "evidence": {},
+           "category": "removal",
+           "label": "Administrator urządzenia",
+           "basis": "granted"
+          },
+          {
            "rule_id": "DM-OVERLAY-01",
            "class": "behavior",
-           "weight": 25,
-           "text": "W ciągu ostatniej doby wyświetlała okna na wierzchu innych aplikacji (np. reklamy).",
+           "weight": 20,
+           "text": "W ciągu ostatniej doby korzystała z wyświetlania okien nad innymi aplikacjami.",
            "text_expert": "appops SYSTEM_ALERT_WINDOW: ostatnie użycie 252 s temu",
            "evidence": {
             "overlay_last_access_s": 251.877
@@ -791,32 +791,21 @@
            "basis": "observed"
           },
           {
-           "rule_id": "DM-ADMIN-01",
-           "class": "position",
-           "weight": 25,
-           "text": "Nadała sobie uprawnienia administratora, żeby utrudnić usunięcie.",
-           "text_expert": "dumpsys device_policy: aktywny administrator urządzenia",
-           "evidence": {},
-           "category": "removal",
-           "label": "Administrator urządzenia",
-           "basis": "granted"
-          },
-          {
            "rule_id": "DM-COMBO-01",
            "class": "combo",
            "weight": 20,
-           "text": "Ukryta aplikacja spoza Sklepu Play wyświetla okna nad innymi — typowe adware.",
+           "text": "Bez ikony, spoza Sklepu Play i korzysta z okien nad innymi aplikacjami — ten układ często ma adware.",
            "text_expert": "kombinacja: DM-HIDDEN-01 + DM-OVERLAY-01 + DM-SRC-01",
            "evidence": {},
            "category": "combo",
-           "label": "Ukryta, spoza Play, okna nad innymi",
+           "label": "Bez ikony, spoza Play, okna nad innymi",
            "basis": "declared"
           },
           {
            "rule_id": "DM-FSI-01",
            "class": "behavior",
            "weight": 15,
-           "text": "Ma powiadomienie, które otwiera się na cały ekran.",
+           "text": "Ma aktywne powiadomienie pełnoekranowe.",
            "text_expert": "dumpsys notification: aktywne powiadomienie z fullscreenIntent (1 aktywnych)",
            "evidence": {
             "notif_active": 1
@@ -824,28 +813,6 @@
            "category": "ads",
            "label": "Powiadomienie pełnoekranowe",
            "basis": "observed"
-          },
-          {
-           "rule_id": "DM-HIDDEN-01",
-           "class": "position",
-           "weight": 15,
-           "text": "Ukrywa swoją ikonę — nie widać jej na liście aplikacji.",
-           "text_expert": "brak aktywności MAIN/LAUNCHER",
-           "evidence": {},
-           "category": "removal",
-           "label": "Ukryta ikona",
-           "basis": "declared"
-          },
-          {
-           "rule_id": "DM-COMBO-02",
-           "class": "combo",
-           "weight": 15,
-           "text": "Blokuje usunięcie i jednocześnie nachalnie wyświetla treści.",
-           "text_expert": "kombinacja: DM-ADMIN-01 + zachowanie reklamowe",
-           "evidence": {},
-           "category": "combo",
-           "label": "Blokuje usunięcie i nachalnie wyświetla treści",
-           "basis": "declared"
           },
           {
            "rule_id": "DM-ALARM-01",
@@ -860,6 +827,17 @@
            "category": "background",
            "label": "Częste wybudzanie telefonu",
            "basis": "observed"
+          },
+          {
+           "rule_id": "DM-HIDDEN-01",
+           "class": "position",
+           "weight": 10,
+           "text": "Nie ma ikony na liście aplikacji (brak aktywności startowej).",
+           "text_expert": "brak aktywności MAIN/LAUNCHER",
+           "evidence": {},
+           "category": "removal",
+           "label": "Ukryta ikona",
+           "basis": "declared"
           },
           {
            "rule_id": "DM-SRC-01",
@@ -878,7 +856,7 @@
            "rule_id": "DM-NAME-01",
            "class": "context",
            "weight": 6,
-           "text": "Nazwa sugeruje aplikację systemową lub „czyszczącą” (clean, boost).",
+           "text": "Nazwa pakietu zawiera słowa kojarzone z aplikacjami systemowymi lub „czyszczącymi” (clean, boost).",
            "text_expert": "Nazwa pakietu zawiera tokeny podszywania się: clean, boost",
            "evidence": {
             "tokens": "clean, boost"
@@ -891,7 +869,7 @@
            "rule_id": "DM-PERM-01",
            "class": "context",
            "weight": 4,
-           "text": "Uruchamia się sama po włączeniu telefonu i sprawdza inne zainstalowane aplikacje.",
+           "text": "Deklaruje uruchamianie po włączeniu telefonu i dostęp do listy zainstalowanych aplikacji.",
            "text_expert": "BOOT_COMPLETED receiver + QUERY_ALL_PACKAGES",
            "evidence": {},
            "category": "background",
@@ -902,7 +880,7 @@
            "rule_id": "DM-FSIPERM-01",
            "class": "context",
            "weight": 4,
-           "text": "Może wyświetlać okna na cały ekran.",
+           "text": "Deklaruje uprawnienie do powiadomień pełnoekranowych.",
            "text_expert": "żąda USE_FULL_SCREEN_INTENT (instalacja spoza Play)",
            "evidence": {},
            "category": "ads",
@@ -928,19 +906,19 @@
          "ad_sdks": null,
          "symptoms": [
           {
-           "category": "ads",
-           "severity": "bad",
-           "text": "W ciągu ostatniej doby wyświetlała okna na wierzchu innych aplikacji (np. reklamy). Ma powiadomienie, które otwiera się na cały ekran. Może wyświetlać okna na cały ekran."
-          },
-          {
            "category": "removal",
            "severity": "bad",
-           "text": "Nadała sobie uprawnienia administratora, żeby utrudnić usunięcie. Ukrywa swoją ikonę — nie widać jej na liście aplikacji."
+           "text": "Jest aktywnym administratorem urządzenia — przed wyłączeniem lub usunięciem trzeba odebrać te uprawnienia. Nie ma ikony na liście aplikacji (brak aktywności startowej)."
+          },
+          {
+           "category": "ads",
+           "severity": "bad",
+           "text": "W ciągu ostatniej doby korzystała z wyświetlania okien nad innymi aplikacjami. Ma aktywne powiadomienie pełnoekranowe. Deklaruje uprawnienie do powiadomień pełnoekranowych."
           },
           {
            "category": "background",
            "severity": "warn",
-           "text": "Często budzi telefon — średnio 8 razy na godzinę. Uruchamia się sama po włączeniu telefonu i sprawdza inne zainstalowane aplikacje."
+           "text": "Często budzi telefon — średnio 8 razy na godzinę. Deklaruje uruchamianie po włączeniu telefonu i dostęp do listy zainstalowanych aplikacji."
           },
           {
            "category": "origin",
@@ -950,7 +928,7 @@
           {
            "category": "disguise",
            "severity": "neutral",
-           "text": "Nazwa sugeruje aplikację systemową lub „czyszczącą” (clean, boost)."
+           "text": "Nazwa pakietu zawiera słowa kojarzone z aplikacjami systemowymi lub „czyszczącymi” (clean, boost)."
           }
          ],
          "source": {
@@ -1007,51 +985,6 @@
          }
         },
         {
-         "package": "com.sec.android.app.launcher",
-         "name": "com.sec.android.app.launcher",
-         "score": 20,
-         "verdict": "safe",
-         "verdict_label": "Bezpieczna",
-         "confidence": "low",
-         "trusted": false,
-         "incomplete": false,
-         "is_system": true,
-         "from_play": false,
-         "installer": null,
-         "is_admin": false,
-         "default_level": null,
-         "problems": [
-          "Jest ustawiona jako ekran główny telefonu."
-         ],
-         "findings": [
-          {
-           "rule_id": "DM-HOME-01",
-           "class": "position",
-           "weight": 20,
-           "text": "Jest ustawiona jako ekran główny telefonu.",
-           "text_expert": "rola android.app.role.HOME",
-           "evidence": {},
-           "category": "removal",
-           "label": "Ustawiona jako ekran główny",
-           "basis": "granted"
-          }
-         ],
-         "apk_error": null,
-         "icon": null,
-         "ad_sdks": null,
-         "symptoms": [
-          {
-           "category": "removal",
-           "severity": "bad",
-           "text": "Jest ustawiona jako ekran główny telefonu."
-          }
-         ],
-         "source": {
-          "label": "systemowa",
-          "days": 6478
-         }
-        },
-        {
          "package": "com.whatsapp",
          "name": "com.whatsapp",
          "score": 10,
@@ -1094,6 +1027,51 @@
          "source": {
           "label": "Sklep Play",
           "days": 624
+         }
+        },
+        {
+         "package": "com.sec.android.app.launcher",
+         "name": "com.sec.android.app.launcher",
+         "score": 8,
+         "verdict": "safe",
+         "verdict_label": "Bezpieczna",
+         "confidence": "low",
+         "trusted": false,
+         "incomplete": false,
+         "is_system": true,
+         "from_play": false,
+         "installer": null,
+         "is_admin": false,
+         "default_level": null,
+         "problems": [
+          "Jest ustawiona jako ekran główny telefonu."
+         ],
+         "findings": [
+          {
+           "rule_id": "DM-HOME-01",
+           "class": "context",
+           "weight": 8,
+           "text": "Jest ustawiona jako ekran główny telefonu.",
+           "text_expert": "rola android.app.role.HOME",
+           "evidence": {},
+           "category": "removal",
+           "label": "Ustawiona jako ekran główny",
+           "basis": "granted"
+          }
+         ],
+         "apk_error": null,
+         "icon": null,
+         "ad_sdks": null,
+         "symptoms": [
+          {
+           "category": "removal",
+           "severity": "neutral",
+           "text": "Jest ustawiona jako ekran główny telefonu."
+          }
+         ],
+         "source": {
+          "label": "systemowa",
+          "days": 6478
          }
         }
        ],
