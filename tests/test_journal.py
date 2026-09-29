@@ -2,7 +2,7 @@ from datetime import datetime
 
 import pytest
 
-from demalware.engine.journal.db import Journal
+from demalware.engine.journal.db import MAX_REPORT_SCREENSHOTS, Journal, ScreenshotLimit
 from demalware.engine.paths import backups_dir, journal_path, logs_dir
 
 
@@ -128,3 +128,80 @@ def test_journal_from_plan_2_gets_the_scan_table(tmp_path):
         assert j.order(order.id).number == order.number
         j.save_scan(order.id, {"apps": []})
         assert j.scan(order.id) == {"apps": []}
+
+
+SHOT_NOW = datetime(2026, 9, 29, 10, 0, 0)
+CONTEXT = {"foreground": {"package": "com.ad", "name": "Ad"}, "overlays": [], "black": False}
+
+
+@pytest.fixture
+def shots_journal():
+    journal = Journal(":memory:", now=lambda: SHOT_NOW)
+    yield journal
+    journal.close()
+
+
+def test_screenshot_waits_then_attaches_to_its_order(shots_journal):
+    j = shots_journal
+    shot = j.add_screenshot("S1", CONTEXT)
+    assert shot.order_id is None and shot.in_report and shot.context == CONTEXT
+    assert shot.taken_at == SHOT_NOW and shot.device_serial == "S1"
+    order = j.create_order("S1", "SM-A145R")
+    j.attach_screenshots([shot.id], order.id)
+    assert [s.id for s in j.screenshots(order.id)] == [shot.id]
+    assert j.screenshot_count(order.id) == 1
+    assert j.orphan_screenshots() == []
+
+
+def test_attach_keeps_the_eight_newest_in_the_report(shots_journal):
+    j = shots_journal
+    ids = [j.add_screenshot("S1", CONTEXT).id for _ in range(10)]
+    order = j.create_order("S1", None)
+    j.attach_screenshots(ids, order.id)
+    chosen = [s.id for s in j.screenshots(order.id) if s.in_report]
+    assert chosen == ids[-MAX_REPORT_SCREENSHOTS:]
+
+
+def test_attach_never_moves_a_shot_from_another_order(shots_journal):
+    j = shots_journal
+    first = j.create_order("S1", None)
+    taken = j.add_screenshot("S1", CONTEXT, first.id)
+    second = j.create_order("S1", None)
+    j.attach_screenshots([taken.id], second.id)
+    assert j.screenshot(taken.id).order_id == first.id
+
+
+def test_ninth_shot_in_an_order_is_left_out_and_cannot_be_forced_in(shots_journal):
+    j = shots_journal
+    order = j.create_order("S1", None)
+    for _ in range(MAX_REPORT_SCREENSHOTS):
+        assert j.add_screenshot("S1", CONTEXT, order.id).in_report
+    ninth = j.add_screenshot("S1", CONTEXT, order.id)
+    assert ninth.in_report is False
+    with pytest.raises(ScreenshotLimit):
+        j.set_screenshot_in_report(ninth.id, True)
+    first = j.screenshots(order.id)[0]
+    assert j.set_screenshot_in_report(first.id, False).in_report is False
+    assert j.set_screenshot_in_report(ninth.id, True).in_report is True
+
+
+def test_orphans_and_delete(shots_journal):
+    j = shots_journal
+    orphan = j.add_screenshot("S1", CONTEXT)
+    order = j.create_order("S1", None)
+    kept = j.add_screenshot("S1", CONTEXT, order.id)
+    assert j.orphan_screenshots() == [orphan.id]
+    j.delete_screenshots([orphan.id])
+    j.delete_screenshots([])
+    with pytest.raises(KeyError):
+        j.screenshot(orphan.id)
+    assert j.screenshot(kept.id).order_id == order.id
+
+
+def test_screenshot_paths(monkeypatch, tmp_path):
+    from demalware.engine import paths
+
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    assert paths.screenshots_dir() == tmp_path / "DeMalware" / "screenshots"
+    assert paths.screenshot_files(7) == (tmp_path / "DeMalware" / "screenshots" / "7.png",
+                                         tmp_path / "DeMalware" / "screenshots" / "7.jpg")
