@@ -7,7 +7,7 @@ Specyfikacja: `docs/superpowers/specs/2026-09-26-demalware-design.md`. Plany: `d
 ## Wymagania
 
 - Windows 10/11 x64, Python 3.13, Node.js 24 (tylko do budowania UI)
-- `adb.exe` (Android platform-tools) w `PATH` albo wskazany w ustawieniach
+- `adb.exe` jest dołączany razem ze scrcpy (`scripts\fetch_tools.py`); inny adb można wskazać w ustawieniach
 - Microsoft Edge WebView2 Runtime (wbudowany w Windows 11)
 
 ## Instalacja (środowisko deweloperskie)
@@ -15,6 +15,7 @@ Specyfikacja: `docs/superpowers/specs/2026-09-26-demalware-design.md`. Plany: `d
     py -3.13 -m venv .venv
     .venv\Scripts\pip install -e ".[dev,gui]"
     python scripts\build_phone_db.py            # baza telefonów i zdjęcia (Plan 3)
+    python scripts\fetch_tools.py               # scrcpy 4.1 z adb (podgląd ekranu, Plan 6b)
     powershell -ExecutionPolicy Bypass -File scripts\build_ui.ps1
 
 ## Uruchomienie GUI

@@ -9,6 +9,7 @@ build/
 src/demalware/assets/phones/
 src/demalware/assets/phones.db
 src/demalware/assets/phones.db.tmp
+src/demalware/assets/tools/
 ui/node_modules/
 ui/dist-e2e/
 ui/test-results/
