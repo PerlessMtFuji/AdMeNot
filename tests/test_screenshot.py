@@ -107,3 +107,32 @@ def test_black_screen_caption_does_not_blame_the_app():
     text = screenshot_caption({"foreground": None, "overlays": [], "black": True}, "pl")
     assert text == "czarny ekran — telefon uśpiony albo aplikacja chroni obraz"
     assert "uśpiony" in text and "chroniony przez aplikację" not in text
+
+
+def test_png_write_failure_cleans_up_partial_file():
+    """Orphan PNG file cleanup when write_bytes fails partway through."""
+    import pathlib
+    from unittest.mock import patch
+
+    phone = make_cli_phone()
+    phone.static[ACTIVITIES] = "  topResumedActivity=ActivityRecord{1 u0 com.clean.pro.boost/.Ad t1}\n"
+    phone.static[WINDOWS] = ""
+    with Journal(paths.journal_path()) as journal:
+        # Monkeypatch Path.write_bytes to simulate a write failure
+        original_write_bytes = pathlib.Path.write_bytes
+
+        def fail_write_bytes(self, data):
+            # Fail if trying to write a PNG file
+            if isinstance(self, pathlib.Path) and self.suffix == ".png":
+                self.parent.mkdir(parents=True, exist_ok=True)
+                raise OSError("disk full")
+            return original_write_bytes(self, data)
+
+        with patch.object(pathlib.Path, 'write_bytes', fail_write_bytes), \
+             pytest.raises(OSError, match="disk full"):
+            take_screenshot(phone, journal, "R58", {}, None)
+
+        # Verify cleanup: no journal row, no files
+        assert journal.orphan_screenshots() == []
+        png, jpg = paths.screenshot_files(1)  # shot.id would be 1
+        assert not png.exists() and not jpg.exists()
