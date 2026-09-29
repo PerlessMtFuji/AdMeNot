@@ -1,4 +1,5 @@
 from demalware.engine.texts import (
+    SHOT_TEXTS,
     TEXTS,
     VERDICT_LABELS,
     confidence_label,
@@ -25,6 +26,7 @@ def test_pl_and_en_have_the_same_keys():
     assert set(TEXTS["pl"]) == {"levels", "steps", "reasons", "warnings", "errors",
                                 "order_status", "action_status"}
     assert VERDICT_LABELS["pl"].keys() == VERDICT_LABELS["en"].keys()
+    assert SHOT_TEXTS["pl"].keys() == SHOT_TEXTS["en"].keys()
 
 
 def test_step_labels_pick_specific_then_generic_template():
