@@ -4,6 +4,8 @@ import { describe, expect, test } from 'vitest';
 import { renderWith, setupCtl } from '../test-utils';
 import Connect from './Connect.svelte';
 
+const flush = () => new Promise((r) => setTimeout(r, 0));
+
 describe('Connect', () => {
   test('no phone: title, waiting stage, open guide with maker tabs, no scan button', async () => {
     const { container } = await renderWith(Connect, 'empty');
@@ -55,6 +57,22 @@ describe('Connect', () => {
     expect(s.client).toBe('Jan');
     await fireEvent.click(screen.getByRole('button', { name: 'Skanuj' }));
     expect(bridge.calls.at(-1)).toEqual({ method: 'start_scan', args: ['HT7A1B2C3', 'Jan'] });
+  });
+
+  test('several phones: the screenshot button for the second phone does not steal the selection', async () => {
+    const { s, bridge } = await renderWith(Connect, 'many');
+    const before = s.serial;
+    const shotButtons = screen.getAllByRole('button', { name: 'Zrzut ekranu' });
+    expect(shotButtons).toHaveLength(2);
+    // Przyciski podglądu/zrzutu nie mogą być potomkami <label> (klik trafiałby do radia).
+    for (const button of shotButtons) expect(button.closest('label')).toBeNull();
+    await fireEvent.click(shotButtons[1]);
+    await flush();
+    await tick();
+    expect(bridge.calls.at(-1)).toEqual({ method: 'screenshot', args: ['HT7A1B2C3'] });
+    expect(s.serial).toBe(before);
+    const radios = screen.getAllByRole('radio') as HTMLInputElement[];
+    expect(radios.map((r) => r.checked)).toEqual([before === 'R58T00TEST', before === 'HT7A1B2C3']);
   });
 
   test('one ready phone: connected card with scan; adb missing points to settings', async () => {

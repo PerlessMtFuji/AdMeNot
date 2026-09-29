@@ -47,15 +47,25 @@
     {:else if link === 'ready' || link === 'many'}
       <div class="flex flex-col gap-2.5" in:enter>
         {#each ready as d (d.serial)}
-          <label class="block cursor-pointer rounded-2xl {s.serial === d.serial && ready.length > 1 ? 'ring-2 ring-accent' : ''}">
-            {#if ready.length > 1}
-              <input class="sr-only" type="radio" name="device" checked={s.serial === d.serial}
-                aria-label="{modelName(d.model)} {d.serial}" onchange={() => ctl.selectDevice(d.serial)} />
-            {/if}
-            <DeviceCard name={modelName(d.model)} details={t('connect.title.ready')} serial={d.serial} connected>
-              <MirrorControls serial={d.serial} name={modelName(d.model)} />
-            </DeviceCard>
-          </label>
+          {#if ready.length > 1}
+            <!-- Wiele telefonów: przyciski podglądu/zrzutu NIE mogą być potomkami <label>, bo klik
+                 byłby przekazany do radia (zmieniałby wybrane urządzenie) — renderujemy je jako
+                 rodzeństwo pod etykietą, wciąż wizualnie pod kartą tego telefonu. -->
+            <div class="flex flex-col gap-2">
+              <label class="block cursor-pointer rounded-2xl {s.serial === d.serial ? 'ring-2 ring-accent' : ''}">
+                <input class="sr-only" type="radio" name="device" checked={s.serial === d.serial}
+                  aria-label="{modelName(d.model)} {d.serial}" onchange={() => ctl.selectDevice(d.serial)} />
+                <DeviceCard name={modelName(d.model)} details={t('connect.title.ready')} serial={d.serial} connected />
+              </label>
+              <div class="pl-[80px]"><MirrorControls serial={d.serial} name={modelName(d.model)} /></div>
+            </div>
+          {:else}
+            <label class="block cursor-pointer rounded-2xl">
+              <DeviceCard name={modelName(d.model)} details={t('connect.title.ready')} serial={d.serial} connected>
+                <MirrorControls serial={d.serial} name={modelName(d.model)} />
+              </DeviceCard>
+            </label>
+          {/if}
         {/each}
         <form class="flex gap-2" onsubmit={(e) => { e.preventDefault(); void ctl.startScan(); }}>
           <input class="field flex-1 rounded-xl px-3.5 py-2.5" bind:value={s.client}
