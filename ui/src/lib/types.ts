@@ -187,7 +187,7 @@ export interface HistoryView {
   serial: string | null;
   serials: string[];
   orders: HistoryOrder[];
-  devices: { serial: string; model: string | null }[];
+  devices: { serial: string; name: string; model: string | null; image: string }[];
 }
 
 export interface ConsoleEntry {

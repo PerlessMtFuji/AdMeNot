@@ -159,7 +159,8 @@ def test_plan_step_result_and_history_views(tmp_path):
         assert o["number"] == order.number and o["client"] == "Anna <b>"
         assert o["status_label"] == "wykonane" and o["interrupted"] is False
         assert {a["status_label"] for a in o["actions"]} == {"wykonane"}
-        assert hv["devices"] == [{"serial": phone.serial, "model": o["model"]}]
+        assert hv["devices"] == [{"serial": phone.serial, "name": o["model"], "model": o["model"],
+                                  "image": image_uri(SILHOUETTE)}]
         empty = history_view(journal, None, [], "pl")
         assert empty["orders"] == [] and empty["devices"] == []
 
@@ -198,3 +199,23 @@ def test_scan_view_reports_partial_collectors(synthetic_adb):
     view = scan_view(run_scan(synthetic_adb), "pl")
     assert view["collectors"]["partial"] == [{"name": "appops", "count": 1}]
     assert view["collectors"]["failed"] == []
+
+
+def test_history_devices_show_phone_name_model_and_photo(tmp_path):
+    photo = tmp_path / "samsung-galaxy-a14.webp"
+    photo.write_bytes(b"RIFF\0\0\0\0WEBP")
+    with Journal(tmp_path / "j.db") as journal:
+        order = journal.create_order("R58", "SM-A145R", "Anna")
+        journal.save_scan(order.id, {
+            "device": {"serial": "R58", "brand": "samsung", "model": "SM-A145R", "market_name": None},
+            "phone": {"name": "Samsung Galaxy A14", "slug": "samsung-galaxy-a14",
+                      "confidence": "exact", "image": str(photo)},
+            "apps": []})
+        journal.create_order("OLD1", "Redmi_Note_8", None)  # zlecenie sprzed migawek (Plan 6)
+        hv = history_view(journal, "R58", ["R58", "OLD1"], "pl")
+    json.dumps(hv)
+    a14, old = hv["devices"]
+    assert (a14["serial"], a14["name"], a14["model"]) == ("R58", "Samsung Galaxy A14", "SM-A145R")
+    assert a14["image"] == image_uri(photo)
+    assert (old["serial"], old["name"], old["model"]) == ("OLD1", "Redmi_Note_8", "Redmi_Note_8")
+    assert old["image"] == image_uri(SILHOUETTE)

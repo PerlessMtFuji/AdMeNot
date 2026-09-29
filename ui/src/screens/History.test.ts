@@ -47,7 +47,8 @@ test('history: steps of an app can be restored one by one', async () => {
 });
 
 function view(over: Partial<HistoryView['orders'][number]>): HistoryView {
-  return { serial: 'S1', serials: ['S1', 'S2'], devices: [{ serial: 'S1', model: 'SM-A145R' }, { serial: 'S2', model: null }],
+  return { serial: 'S1', serials: ['S1', 'S2'], devices: [{ serial: 'S1', name: 'Samsung Galaxy A14', model: 'SM-A145R', image: '' },
+    { serial: 'S2', name: 'S2', model: null, image: '' }],
     orders: [{ id: 1, number: 'ZS/2026/0926/05', created_at: '2026-09-26T14:30', status: 'running',
       status_label: 'w toku', client: null, model: 'SM-A145R', interrupted: true,
       actions: [
@@ -108,4 +109,14 @@ test('history: report button next to each order', async () => {
   const order = await screen.findByRole('article', { name: s.result!.order });
   await fireEvent.click(within(order).getByRole('button', { name: 'Protokół PDF' }));
   await vi.waitFor(() => expect(bridge.calls.some((c) => c.method === 'report')).toBe(true));
+});
+
+test('history: phone list shows the phone name first, the model below and the phone photo', async () => {
+  const { s } = await openHistory();
+  const d = s.history!.devices[0];
+  const panel = screen.getByRole('complementary', { name: 'Telefon' });
+  const row = within(panel).getByRole('button', { name: new RegExp(`^${d.name}`) });
+  const lines = [...row.querySelectorAll('b, span.text-xs')].map((el) => el.textContent);
+  expect(lines.slice(0, 2)).toEqual([d.name, d.model]);
+  expect(within(row).getByRole('img', { name: d.name }).getAttribute('src')).toBe(d.image);
 });

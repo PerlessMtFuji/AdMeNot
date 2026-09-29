@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import OrderCard from '../components/OrderCard.svelte';
+  import PhoneThumb from '../components/PhoneThumb.svelte';
   import StepTimeline from '../components/StepTimeline.svelte';
   import type { Controller } from '../lib/controller';
   import { i18n, t } from '../lib/i18n/index.svelte';
@@ -103,9 +104,10 @@
       {@const current = d.serial === h?.serial}
       <button type="button" aria-pressed={current} onclick={() => ctl.refreshHistory(d.serial)}
         class="flex items-center gap-3 rounded-xl p-3 text-left transition duration-150 {current ? 'rail-now' : 'hover:bg-neutral-soft'}">
-        <span class="h-10 w-[22px] flex-none rounded-[6px] {current ? 'bg-[linear-gradient(145deg,#374151,#111827)]' : 'bg-soft'}" aria-hidden="true"></span>
+        <PhoneThumb compact image={d.image} name={modelName(d.name)} />
         <span class="min-w-0 flex-1">
-          <b class="block truncate">{d.model ? modelName(d.model) : d.serial}</b>
+          <b class="line-clamp-2 break-words leading-snug">{modelName(d.name)}</b>
+          {#if d.model && d.model !== d.name}<span class="block truncate text-xs text-mut">{modelName(d.model)}</span>{/if}
           <span class="mono block truncate text-2xs text-soft">{d.serial}</span>
         </span>
         {#if s.device?.serial === d.serial}<span class="text-xs text-ok">● USB</span>{/if}
