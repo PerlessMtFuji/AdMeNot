@@ -2,6 +2,7 @@
 
 import threading
 from datetime import datetime
+from typing import ClassVar
 
 from demalware.app.api import Api
 from demalware.app.events import RecordingEmitter
@@ -55,3 +56,59 @@ def make_api(phone, *, sync=True, apk=None, **kw):
 
 def names(rec):
     return [n for n in rec.names() if n != "adb:command"]
+
+
+class FakeScrcpyProc:
+    def __init__(self, lines):
+        self.pid = 4242
+        self.lines = [line.encode("utf-8") + b"\n" for line in lines]
+        self.ended = threading.Event()
+        self.code = 0
+
+    @property
+    def stdout(self):
+        yield from self.lines
+        self.ended.wait(5)
+
+    def wait(self, timeout=None):
+        self.ended.wait(5)
+        return self.code
+
+
+class FakeScrcpy:
+    """scrcpy do testów mostu: każdy start oddaje nagrane linie i „działa” do zamknięcia."""
+
+    LINES: ClassVar[list[str]] = ["scrcpy 4.1 <https://github.com/Genymobile/scrcpy>",
+                                  "[server] INFO: Device: [samsung] samsung SM-A145R (Android 14)",
+                                  "INFO: Texture: 576x1280"]
+
+    def __init__(self, available=True):
+        self.available = available
+        self.procs: list[FakeScrcpyProc] = []
+        self.envs: list[dict] = []
+        self.cmds: list[list[str]] = []
+
+    def spawn(self, cmd, env):
+        self.cmds.append(cmd)
+        self.envs.append(env)
+        proc = FakeScrcpyProc(self.LINES)
+        self.procs.append(proc)
+        return proc
+
+    @staticmethod
+    def kill(proc):
+        proc.code = 1
+        proc.ended.set()
+
+
+def mirror_factory(fake: FakeScrcpy):
+    from pathlib import Path
+
+    from demalware.engine.mirror import Mirror
+
+    def build(on_state, on_warning, on_line, *, adb):
+        return Mirror(on_state, on_warning, on_line, adb=adb,
+                      scrcpy=lambda: Path("C:/tools/scrcpy.exe") if fake.available else None,
+                      spawn=fake.spawn, kill=fake.kill)
+
+    return build

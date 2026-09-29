@@ -73,6 +73,14 @@ def test_theme_default_valid_values_and_rejection():
     assert S.load_settings() == S.Settings(mode="expert")
 
 
+def test_mirror_auto_is_a_boolean(tmp_path):
+    path = tmp_path / "settings.json"
+    assert S.load_settings(path).mirror_auto is False
+    assert S.save_settings({"mirror_auto": True}, path).mirror_auto is True
+    with pytest.raises(ValueError):
+        S.save_settings({"mirror_auto": "yes"}, path)
+
+
 @pytest.mark.parametrize(("locale_name", "lang"), [
     (("Polish_Poland", "1250"), "pl"), (("pl_PL", "UTF-8"), "pl"),
     (("en_US", "UTF-8"), "en"), ((None, None), "en"),
