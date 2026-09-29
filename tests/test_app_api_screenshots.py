@@ -3,9 +3,11 @@ from apphelpers import make_api
 from conftest import SERIAL
 from fakephone import make_cli_phone
 
+import demalware.app.api as api_module
 from demalware.engine import paths
 from demalware.engine.foreground import ACTIVITIES, WINDOWS
 from demalware.engine.journal.db import Journal
+from demalware.engine.screenshot import take_screenshot as real_take_screenshot
 
 AD = "  topResumedActivity=ActivityRecord{1 u0 com.clean.pro.boost/.Ad t1}\n"
 
@@ -128,3 +130,39 @@ def test_disconnected_phone_is_an_error_without_a_file():
     api, _rec = make_api(phone)
     assert api.screenshot(SERIAL)["error"]["key"] == "disconnected"
     assert not paths.screenshots_dir().exists() or not any(paths.screenshots_dir().iterdir())
+
+
+def test_screenshot_started_before_the_order_still_joins_it(monkeypatch):
+    """Fix round 1 (review): screenshot() reads `_open_order` before the slow screencap, so a job
+    thread can create the order and call `_bind_order` while the screenshot is still in flight —
+    without the fix the shot stays orphaned (order_id NULL) instead of joining that order."""
+    api, _rec = make_api(_phone())
+    opened = {}
+
+    def fake_take_screenshot(adb, journal, serial, names, order_id):
+        shot = real_take_screenshot(adb, journal, serial, names, order_id)
+        # Simuluje wątek zadania, który w tym momencie otwiera zlecenie i wywołuje _bind_order —
+        # zanim ten wątek mostu wróci do sprawdzenia _open_order po zrzucie.
+        order = journal.create_order(serial, "SM-A145R")
+        api._bind_order(journal, serial, order.id)
+        opened["number"] = order.number
+        return shot
+
+    monkeypatch.setattr(api_module, "take_screenshot", fake_take_screenshot)
+    result = api.screenshot(SERIAL)
+
+    assert [i["id"] for i in api.screenshots(opened["number"])["items"]] == [result["shot"]["id"]]
+    with Journal(paths.journal_path()) as journal:
+        assert journal.orphan_screenshots() == []
+
+
+def test_pending_shot_count_excludes_shots_off_and_caps_at_the_limit():
+    api, _rec = make_api(_phone())
+    results = [api.screenshot(SERIAL) for _ in range(3)]
+    assert [r["count"] for r in results] == [1, 2, 3]
+    api.set_screenshot_in_report(results[0]["shot"]["id"], False)
+    fourth = api.screenshot(SERIAL)
+    assert fourth["count"] == 3  # 4 czekające, jeden odznaczony: tylko 3 trafią do protokołu
+    for _ in range(5):
+        last = api.screenshot(SERIAL)
+    assert last["count"] == 8  # 9 czekających, jeden odznaczony (8 zaznaczonych) — limit i tak 8
