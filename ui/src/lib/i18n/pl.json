@@ -168,11 +168,37 @@
       "silence": { "one": "wyciszono {count} aplikację", "few": "wyciszono {count} aplikacje", "many": "wyciszono {count} aplikacji", "other": "wyciszono {count} aplikacji" }
     }
   },
+  "mirror": {
+    "start": "Podgląd ekranu",
+    "starting": "Uruchamianie…",
+    "stop": "Zamknij podgląd",
+    "missing": "Podgląd niedostępny: brak dołączonego scrcpy (uruchom scripts\\fetch_tools.py).",
+    "blocked_title": "Podgląd działa, ale telefon blokuje sterowanie.",
+    "blocked_text": "Na Xiaomi włącz w opcjach programisty „Debugowanie USB (ustawienia zabezpieczeń)”, potem zamknij i otwórz podgląd.",
+    "wait_for_ad": "Otwórz podgląd i poczekaj na reklamę",
+    "show_phone": "Pokaż ekran telefonu"
+  },
+  "shot": {
+    "take": "Zrzut ekranu",
+    "busy": "Zapisywanie…",
+    "count": { "one": "{count} zrzut do protokołu", "few": "{count} zrzuty do protokołu", "many": "{count} zrzutów do protokołu", "other": "{count} zrzutu do protokołu" },
+    "black": "czarny ekran",
+    "with_caption": "Zapisz zrzut z tym opisem",
+    "strip_title": "Zrzuty ekranu",
+    "chosen": "w protokole: {count}/{limit}",
+    "in_report": "w protokole",
+    "zoom": "Powiększ zrzut: {caption}",
+    "history": "Zrzuty ({count})"
+  },
   "settings": {
     "appearance": "Wygląd", "theme": "Motyw", "theme_system": "System", "theme_light": "Jasny", "theme_dark": "Ciemny", "paths": "Programy i katalogi",
     "title": "Ustawienia", "lang": "Język", "mode": "Tryb domyślny", "mode_simple": "Prosty", "mode_expert": "Ekspercki",
-    "adb": "Ścieżka do adb.exe", "adb_hint": "Puste = adb z PATH", "check": "Sprawdź", "adb_ok": "Działa: {version}", "adb_fail": "Nie działa: {message}",
+    "adb": "Ścieżka do adb.exe", "adb_hint": "Puste = adb dołączony do programu (a bez niego adb z PATH)", "check": "Sprawdź", "adb_ok": "Działa: {version}", "adb_fail": "Nie działa: {message}",
     "backups": "Katalog kopii APK", "backups_hint": "Puste = domyślny katalog w %LOCALAPPDATA%\\DeMalware", "choose": "Wybierz…",
+    "mirror_title": "Podgląd ekranu",
+    "mirror_auto": "Otwieraj podgląd ekranu po podłączeniu telefonu",
+    "mirror_auto_hint": "Okno podglądu pokazuje ekran telefonu klienta — włącz tylko, jeśli tak pracujesz.",
+    "adb_source": { "settings": "z ustawień", "bundled": "dołączony", "path": "z PATH", "missing": "brak" },
     "service_title": "Dane serwisu",
     "service_hint": "Pojawiają się w nagłówku protokołu.",
     "service_name": "Nazwa serwisu",
@@ -221,6 +247,10 @@
     "internal": "Nieoczekiwany błąd programu.",
     "logo_missing": "Nie ma takiego pliku logo.",
     "logo_type": "Logo musi być plikiem PNG, JPG, WebP albo SVG.",
-    "logo_size": "Logo jest za duże (limit 1 MB)."
+    "logo_size": "Logo jest za duże (limit 1 MB).",
+    "mirror_missing": "Brak dołączonego scrcpy — uruchom scripts\\fetch_tools.py.",
+    "mirror_failed": "Nie udało się uruchomić podglądu ekranu.",
+    "unknown_screenshot": "Nie ma takiego zrzutu ekranu.",
+    "shot_limit": "Do protokołu można wybrać najwyżej 8 zrzutów."
   }
 }

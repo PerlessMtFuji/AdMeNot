@@ -1,6 +1,6 @@
 // Atrapa mostu: odtwarza scenariusze nagrane z prawdziwego Api (scripts/record_bridge_fixtures.py).
 import type { Bridge } from './bridge';
-import type { Api, EventMap, EventName, ScanView, ServiceInfo, Settings } from './types';
+import type { Api, EventMap, EventName, ScanView, ServiceInfo, Settings, ShotView } from './types';
 
 interface RecordedCall {
   method: string;
@@ -44,9 +44,14 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
   }
   const target = new EventTarget();
   const calls: FakeBridge['calls'] = [];
-  let settings: Settings = { lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system' };
+  let settings: Settings = { lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system', mirror_auto: false };
   let service: ServiceInfo = { name: null, address: null, phone: null, logo: null };
   let lastScan: ScanView | null = null;
+  let mirror: { serial: string | null; state: string } = { serial: null, state: 'stopped' };
+  const shots: ShotView[] = [];
+  const SHOT_IMAGE = 'data:image/svg+xml,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="200"><rect width="90" height="200" rx="8" fill="#1f2937"/>'
+    + '<rect x="8" y="40" width="74" height="90" rx="6" fill="#f59e0b"/></svg>');
 
   const dispatch = (event: string, detail: unknown) => {
     if (event === 'scan:done' || event === 'apk:done') lastScan = (detail as { scan: ScanView }).scan;
@@ -56,6 +61,7 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
   // Zdarzenia zawsze po zwróceniu wyniku (jak w pywebview), jedno wywołanie po drugim.
   let chain: Promise<void> = Promise.resolve();
   const replay = (events: [string, unknown][]) => {
+    if (events.length === 0) return; // nic do wysłania: nie zajmuje miejsca w łańcuchu (bez sztucznego opóźnienia)
     chain = chain.then(async () => {
       await sleep(delay);
       for (const [event, detail] of events) {
@@ -79,7 +85,42 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
       case 'history':
         return { serial: null, serials: [], orders: [], devices: [] };
       case 'check_adb':
-        return { ok: true, version: 'Android Debug Bridge version 1.0.41', message: '' };
+        return { ok: true, version: 'Android Debug Bridge version 1.0.41', message: '', source: 'bundled',
+                 path: 'C:\\DeMalware\\tools\\scrcpy\\adb.exe' };
+      case 'mirror_status':
+        return { available: true, serial: mirror.serial, state: mirror.state, reason: null };
+      case 'mirror_start': {
+        const serial = String(args[0]);
+        if (mirror.serial === serial && mirror.state !== 'stopped') return { serial, state: mirror.state, reason: null };
+        mirror = { serial, state: 'running' };
+        replay([['mirror:state', { serial, state: 'starting', reason: null }],
+                ['mirror:state', { serial, state: 'running', reason: null }]]);
+        return { serial, state: 'starting', reason: null };
+      }
+      case 'mirror_stop': {
+        const serial = mirror.serial;
+        mirror = { serial: null, state: 'stopped' };
+        if (serial) replay([['mirror:state', { serial, state: 'stopped', reason: 'closed' }]]);
+        return { ok: true };
+      }
+      case 'screenshot': {
+        const chosen = shots.filter((x) => x.in_report).length;
+        const shot: ShotView = { id: shots.length + 1, taken_at: '2026-09-26T14:31:00',
+          caption: 'Na pierwszym planie: com.clean.pro.boost', black: false, in_report: chosen < 8, image: SHOT_IMAGE };
+        shots.push(shot);
+        return { shot: { ...shot }, count: shots.filter((x) => x.in_report).length };
+      }
+      case 'screenshots':
+        return { order: args[0], limit: 8, items: shots.map((x) => ({ ...x })) };
+      case 'set_screenshot_in_report': {
+        const shot = shots.find((x) => x.id === args[0]);
+        if (!shot) return { error: { key: 'unknown_screenshot', message: String(args[0]) } };
+        if (args[1] && !shot.in_report && shots.filter((x) => x.in_report).length >= 8) {
+          return { error: { key: 'shot_limit', message: '8' } };
+        }
+        shot.in_report = Boolean(args[1]);
+        return { ...shot };
+      }
       case 'pick_folder':
         return { path: 'D:\\DeMalware\\kopie' };
       case 'service':

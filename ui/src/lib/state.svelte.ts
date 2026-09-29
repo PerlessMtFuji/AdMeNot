@@ -1,7 +1,7 @@
 import type { Phase } from './logic';
 import type {
-  ApiErrorBody, Category, ConsoleEntry, DeviceEntry, HistoryView, Level, OrderResult, PhoneCard, PlanView,
-  Question, ReportResult, ScanView, Settings, StepEvent, UndoDone, Verdict,
+  ApiErrorBody, Category, ConsoleEntry, DeviceEntry, HistoryView, Level, MirrorState, OrderResult, PhoneCard,
+  PlanView, Question, ReportResult, ScanView, Settings, ShotsView, ShotView, StepEvent, UndoDone, Verdict,
 } from './types';
 
 export type Screen = 'main' | 'history' | 'settings';
@@ -10,7 +10,7 @@ const ORDER_KINDS = ['exec', 'resume', 'undo'];
 export class AppState {
   phase = $state<Phase>('connect');
   screen = $state<Screen>('main');
-  settings = $state<Settings>({ lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system' });
+  settings = $state<Settings>({ lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system', mirror_auto: false });
   devices = $state<DeviceEntry[]>([]);
   devicesError = $state<string | null>(null);
   knownSerials = $state<string[]>([]);
@@ -48,6 +48,13 @@ export class AppState {
   undoResult = $state<UndoDone | null>(null);
   reportBusy = $state<string | null>(null);
   reports = $state<Record<string, ReportResult>>({});
+  mirror = $state<{ available: boolean; serial: string | null; state: MirrorState; reason: string | null; blocked: boolean }>(
+    { available: false, serial: null, state: 'stopped', reason: null, blocked: false });
+  shots = $state<Record<string, ShotsView>>({});
+  lastShot = $state<ShotView | null>(null);
+  lastShotSerial = $state<string | null>(null);
+  shotCount = $state(0);
+  shotBusy = $state(false);
   consoleOpen = $state(false);
   console = $state<ConsoleEntry[]>([]);
   consoleWarned = $state(false);

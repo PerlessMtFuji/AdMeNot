@@ -168,11 +168,37 @@
       "silence": { "one": "silenced {count} app", "few": "silenced {count} apps", "many": "silenced {count} apps", "other": "silenced {count} apps" }
     }
   },
+  "mirror": {
+    "start": "Screen view",
+    "starting": "Starting…",
+    "stop": "Close screen view",
+    "missing": "Screen view unavailable: bundled scrcpy is missing (run scripts\\fetch_tools.py).",
+    "blocked_title": "Screen view works, but the phone blocks control.",
+    "blocked_text": "On Xiaomi, turn on “USB debugging (Security settings)” in developer options, then close and reopen the screen view.",
+    "wait_for_ad": "Open the screen view and wait for the ad",
+    "show_phone": "Show the phone screen"
+  },
+  "shot": {
+    "take": "Screenshot",
+    "busy": "Saving…",
+    "count": { "one": "{count} screenshot for the report", "few": "{count} screenshots for the report", "many": "{count} screenshots for the report", "other": "{count} screenshots for the report" },
+    "black": "black screen",
+    "with_caption": "Save a screenshot with this description",
+    "strip_title": "Screenshots",
+    "chosen": "in the report: {count}/{limit}",
+    "in_report": "in the report",
+    "zoom": "Enlarge screenshot: {caption}",
+    "history": "Screenshots ({count})"
+  },
   "settings": {
     "appearance": "Appearance", "theme": "Theme", "theme_system": "System", "theme_light": "Light", "theme_dark": "Dark", "paths": "Programs and folders",
     "title": "Settings", "lang": "Language", "mode": "Default mode", "mode_simple": "Simple", "mode_expert": "Expert",
-    "adb": "Path to adb.exe", "adb_hint": "Empty = adb from PATH", "check": "Check", "adb_ok": "Works: {version}", "adb_fail": "Does not work: {message}",
+    "adb": "Path to adb.exe", "adb_hint": "Empty = adb bundled with the program (or adb from PATH without it)", "check": "Check", "adb_ok": "Works: {version}", "adb_fail": "Does not work: {message}",
     "backups": "APK backup folder", "backups_hint": "Empty = default folder in %LOCALAPPDATA%\\DeMalware", "choose": "Choose…",
+    "mirror_title": "Screen view",
+    "mirror_auto": "Open the screen view when a phone is connected",
+    "mirror_auto_hint": "The screen view shows the customer's phone screen — turn this on only if you work this way.",
+    "adb_source": { "settings": "from settings", "bundled": "bundled", "path": "from PATH", "missing": "missing" },
     "service_title": "Service details",
     "service_hint": "Shown in the report header.",
     "service_name": "Service name",
@@ -221,6 +247,10 @@
     "internal": "Unexpected program error.",
     "logo_missing": "The logo file does not exist.",
     "logo_type": "The logo must be a PNG, JPG, WebP or SVG file.",
-    "logo_size": "The logo is too large (1 MB limit)."
+    "logo_size": "The logo is too large (1 MB limit).",
+    "mirror_missing": "Bundled scrcpy is missing — run scripts\\fetch_tools.py.",
+    "mirror_failed": "Could not start the screen view.",
+    "unknown_screenshot": "No such screenshot.",
+    "shot_limit": "You can choose at most 8 screenshots for the report."
   }
 }

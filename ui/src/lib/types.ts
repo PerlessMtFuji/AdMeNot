@@ -14,6 +14,7 @@ export interface Settings {
   adb_path: string | null;
   backups_dir: string | null;
   theme: Theme;
+  mirror_auto: boolean;
 }
 
 export interface Symptom {
@@ -181,6 +182,7 @@ export interface HistoryOrder {
   model: string | null;
   interrupted: boolean;
   actions: HistoryAction[];
+  screenshots: number;
 }
 
 export interface HistoryView {
@@ -222,6 +224,31 @@ export interface ReportResult {
   opened: string | null; // null: zapisany, ale Windows nie ma programu, który go otworzy
 }
 
+export type MirrorState = 'starting' | 'running' | 'stopped' | 'failed';
+
+export interface MirrorView {
+  serial: string | null;
+  state: MirrorState;
+  reason?: string | null;
+}
+
+export interface ShotView {
+  id: number;
+  taken_at: string;
+  caption: string;
+  black: boolean;
+  in_report: boolean;
+  image: string | null;
+}
+
+export interface ShotsView {
+  order: string;
+  limit: number;
+  items: ShotView[];
+}
+
+export type AdbSource = 'settings' | 'bundled' | 'path' | 'missing';
+
 export interface ApiErrorBody {
   key: string;
   message: string;
@@ -256,7 +283,13 @@ export interface Api {
   history(serial: string | null): R<HistoryView>;
   adb_shell(command: string): R<{ ok: boolean; output: string }>;
   who_is_showing(): R<WhoView>;
-  check_adb(path: string | null): R<{ ok: boolean; version: string | null; message: string }>;
+  check_adb(path: string | null): R<{ ok: boolean; version: string | null; message: string; source: AdbSource; path: string | null }>;
+  mirror_status(): R<MirrorView & { available: boolean }>;
+  mirror_start(serial: string, name: string | null): R<MirrorView>;
+  mirror_stop(): R<{ ok: boolean }>;
+  screenshot(serial: string): R<{ shot: ShotView; count: number }>;
+  screenshots(order: string): R<ShotsView>;
+  set_screenshot_in_report(id: number, on: boolean): R<ShotView>;
   pick_folder(): R<{ path: string | null }>;
   report(order: string): R<ReportResult>;
   service(): R<ServiceInfo>;
@@ -288,6 +321,8 @@ export interface EventMap {
   'job:error': JobError;
   'job:end': { job_id: string; kind: string };
   'app:close_requested': { kind: string };
+  'mirror:state': MirrorView;
+  'mirror:warning': { serial: string; code: 'control_blocked' };
 }
 
 export type EventName = keyof EventMap;

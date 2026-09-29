@@ -50,7 +50,7 @@ function view(over: Partial<HistoryView['orders'][number]>): HistoryView {
   return { serial: 'S1', serials: ['S1', 'S2'], devices: [{ serial: 'S1', name: 'Samsung Galaxy A14', model: 'SM-A145R', image: '' },
     { serial: 'S2', name: 'S2', model: null, image: '' }],
     orders: [{ id: 1, number: 'ZS/2026/0926/05', created_at: '2026-09-26T14:30', status: 'running',
-      status_label: 'w toku', client: null, model: 'SM-A145R', interrupted: true,
+      status_label: 'w toku', client: null, model: 'SM-A145R', interrupted: true, screenshots: 0,
       actions: [
         { id: 2, package: 'p', level: 'disable', level_label: 'WYŁĄCZ', kind: 'notif', step_label: 'odebranie zgody',
           status: 'done', status_label: 'wykonane', error: null },

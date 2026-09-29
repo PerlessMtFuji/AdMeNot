@@ -9,12 +9,13 @@ const dictionaries: Record<Lang, Dict> = { pl, en };
 export const ERROR_KEYS = ['adb_missing', 'unauthorized', 'offline', 'disconnected', 'timeout',
   'adb_error', 'action_error', 'busy', 'wrong_device', 'no_scan', 'no_device', 'unknown_order',
   'nothing_to_resume', 'nothing_to_do', 'no_target', 'bad_request', 'logo_missing', 'logo_type',
-  'logo_size', 'internal'] as const;
+  'logo_size', 'internal', 'mirror_missing', 'mirror_failed', 'unknown_screenshot', 'shot_limit'] as const;
 export const SCAN_STAGES = ['identify', 'packages', 'collectors', 'score', 'apk'] as const;
 export const LEVEL_KEYS = ['silence', 'disable', 'remove', 'review', 'none'] as const;
 // Rodziny kluczy z formami liczby mnogiej (one/few/many/other w obu słownikach).
 export const PLURAL_KEYS = ['results.title', 'results.safe', 'expert.days', 'panel.apps',
-  'exec.apps', 'exec.steps', 'history.did.remove', 'history.did.disable', 'history.did.silence'] as const;
+  'exec.apps', 'exec.steps', 'history.did.remove', 'history.did.disable', 'history.did.silence',
+  'shot.count'] as const;
 
 class I18n {
   lang = $state<Lang>('pl');

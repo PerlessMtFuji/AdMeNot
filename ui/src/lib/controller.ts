@@ -12,6 +12,7 @@ const CONSOLE_LIMIT = 500;
 export class Controller {
   private ended = new Set<string>();
   private knownLoaded = false;
+  private autoMirrored = new Set<string>();
 
   constructor(readonly state: AppState, readonly bridge: Bridge) {}
 
@@ -43,6 +44,8 @@ export class Controller {
     if (settings) this.applySettings(settings);
     const devices = await this.call(this.api.list_devices());
     if (devices) this.onDevices(devices);
+    const mirror = await this.call(this.api.mirror_status());
+    if (mirror) this.state.mirror = { ...this.state.mirror, available: mirror.available, serial: mirror.serial, state: mirror.state };
     await this.call(this.api.watch_devices(true));
     await this.loadKnownSerials();
   }
@@ -70,6 +73,12 @@ export class Controller {
     }
     const ready = d.devices.filter((e) => e.state === 'device');
     if (!s.serial && ready.length === 1) s.serial = ready[0].serial;
+    const picked = s.serial ? d.devices.find((e) => e.serial === s.serial && e.state === 'device') : undefined;
+    if (picked && s.settings.mirror_auto && s.mirror.available && !this.autoMirrored.has(picked.serial)
+        && !this.mirrorActive(picked.serial)) {
+      this.autoMirrored.add(picked.serial);  // raz na uruchomienie: zamknięte okno nie wraca samo
+      void this.mirrorStart(picked.serial, picked.model?.replaceAll('_', ' ') ?? picked.serial);
+    }
   }
 
   private subscribe(): void {
@@ -124,6 +133,7 @@ export class Controller {
       s.stopping = false;
       s.interrupted = d.stopped ? [d.order] : s.interrupted.filter((o) => o !== d.order);
       s.phase = 'done';
+      void this.loadShots(d.order);
     });
     on('exec:disconnected', (d) => {
       s.disconnectedOrder = d.order;
@@ -166,6 +176,15 @@ export class Controller {
       if (s.job?.id === d.job_id) s.job = null;
     });
     on('app:close_requested', () => { s.closeRequested = true; });
+    on('mirror:state', (d) => {
+      const same = s.mirror.serial === d.serial;
+      s.mirror = { ...s.mirror, serial: d.serial, state: d.state, reason: d.reason ?? null,
+                   blocked: same && d.state === 'running' ? s.mirror.blocked : false };
+      if (d.state === 'failed') s.error = { key: 'mirror_failed', message: d.reason ?? '' };
+    });
+    on('mirror:warning', (d) => {
+      if (d.code === 'control_blocked' && s.mirror.serial === d.serial) s.mirror = { ...s.mirror, blocked: true };
+    });
   }
 
   // --- podłączanie i skan ---------------------------------------------------------------------
@@ -357,6 +376,55 @@ export class Controller {
 
   pickLogo() {
     return this.call(this.api.pick_logo());
+  }
+
+  // --- podgląd ekranu i zrzuty (Plan 6b) ----------------------------------------------------------
+
+  mirrorActive(serial: string): boolean {
+    const m = this.state.mirror;
+    return m.serial === serial && (m.state === 'starting' || m.state === 'running');
+  }
+
+  async mirrorStart(serial: string, name: string): Promise<void> {
+    const s = this.state;
+    s.mirror = { ...s.mirror, serial, state: 'starting', reason: null, blocked: false };
+    // Stan przychodzi zdarzeniami `mirror:state` — wynik wywołania może być starszy niż one.
+    const r = await this.call(this.api.mirror_start(serial, name));
+    if (!r) s.mirror = { ...s.mirror, state: 'stopped' };
+  }
+
+  async mirrorStop(): Promise<void> {
+    await this.call(this.api.mirror_stop());
+  }
+
+  async takeScreenshot(serial: string): Promise<void> {
+    const s = this.state;
+    s.shotBusy = true;
+    try {
+      const r = await this.call(this.api.screenshot(serial));
+      if (!r) return;
+      s.lastShot = r.shot;
+      s.lastShotSerial = serial;
+      s.shotCount = r.count;
+      if (s.order && s.shots[s.order]) await this.loadShots(s.order);
+    } finally {
+      s.shotBusy = false;
+    }
+  }
+
+  async loadShots(order: string): Promise<void> {
+    const r = await this.call(this.api.screenshots(order));
+    if (r) this.state.shots = { ...this.state.shots, [order]: r };
+  }
+
+  async setShotInReport(order: string, id: number, on: boolean): Promise<void> {
+    const r = await this.call(this.api.set_screenshot_in_report(id, on));
+    const view = this.state.shots[order];
+    if (r && view) {
+      this.state.shots = { ...this.state.shots, [order]: { ...view, items: view.items.map((i) => (i.id === id ? r : i)) } };
+    } else {
+      await this.loadShots(order);  // odrzucone (limit): przełącznik wraca do stanu z dziennika
+    }
   }
 
   async quit(): Promise<void> {

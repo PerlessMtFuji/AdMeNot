@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
+import { setupCtl } from '../test-utils';
 import { Controller } from './controller';
 import { createFakeBridge } from './fakeBridge';
 import { i18n } from './i18n/index.svelte';
@@ -9,6 +10,8 @@ function setup(scenario: string) {
   const ctl = new Controller(new AppState(), bridge);
   return { bridge, ctl, s: ctl.state };
 }
+
+const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe('controller with the adware scenario', () => {
   test('init picks the only ready phone, scan fills results and defaults', async () => {
@@ -196,5 +199,55 @@ describe('controller edge cases', () => {
     bridge.emit('job:end', { job_id: 'job-7', kind: 'exec' });
     ctl.setJob('job-7', 'exec');
     expect(s.job).toBeNull();
+  });
+});
+
+describe('screen mirror and screenshots (Plan 6b)', () => {
+  test('mirror: status on init, start follows events, stop', async () => {
+    const { ctl, s, bridge } = await setupCtl('empty');
+    expect(s.mirror.available).toBe(true);
+    await ctl.mirrorStart('R58T00TEST', 'Galaxy A14');
+    expect(bridge.calls.at(-1)).toEqual({ method: 'mirror_start', args: ['R58T00TEST', 'Galaxy A14'] });
+    await flush();
+    expect(s.mirror.state).toBe('running');
+    expect(ctl.mirrorActive('R58T00TEST')).toBe(true);
+    expect(ctl.mirrorActive('OTHER')).toBe(false);
+    bridge.emit('mirror:warning', { serial: 'R58T00TEST', code: 'control_blocked' });
+    expect(s.mirror.blocked).toBe(true);
+    await ctl.mirrorStop();
+    await flush();
+    expect(s.mirror.state).toBe('stopped');
+    expect(s.mirror.blocked).toBe(false);
+  });
+
+  test('mirror failure becomes an error card', async () => {
+    const { s, bridge } = await setupCtl('empty');
+    bridge.emit('mirror:state', { serial: 'S', state: 'failed', reason: 'ERROR: Server connection failed' });
+    expect(s.error).toEqual({ key: 'mirror_failed', message: 'ERROR: Server connection failed' });
+    expect(s.mirror.state).toBe('failed');
+  });
+
+  test('screenshot updates the counter and the order strip', async () => {
+    const { ctl, s } = await setupCtl('empty');
+    await ctl.takeScreenshot('R58T00TEST');
+    expect(s.shotCount).toBe(1);
+    expect(s.lastShotSerial).toBe('R58T00TEST');
+    expect(s.lastShot?.caption).toContain('Na pierwszym planie');
+    await ctl.loadShots('ZS/2026/0926/01');
+    const id = s.shots['ZS/2026/0926/01'].items[0].id;
+    await ctl.setShotInReport('ZS/2026/0926/01', id, false);
+    expect(s.shots['ZS/2026/0926/01'].items[0].in_report).toBe(false);
+  });
+
+  test('auto mirror starts once for the ready phone when enabled', async () => {
+    const { ctl, s, bridge } = await setupCtl('empty');
+    await ctl.saveSettings({ mirror_auto: true });
+    const ready = { devices: [{ serial: 'R58T00TEST', state: 'device', model: 'SM_A145R' }], error: null };
+    bridge.emit('devices', ready);
+    bridge.emit('devices', { devices: [], error: null });
+    bridge.emit('devices', ready);
+    await flush();
+    expect(bridge.calls.filter((c) => c.method === 'mirror_start')).toHaveLength(1);
+    expect(s.mirror.serial).toBe('R58T00TEST');
   });
 });
