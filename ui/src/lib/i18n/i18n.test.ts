@@ -45,6 +45,13 @@ describe('dictionaries', () => {
     expect(wanted.filter((k) => !keys.has(k))).toEqual([]);
   });
 
+  test('every translated error key reaches the error card', () => {
+    const ui = new Set(['fatal', 'restart', 'log']);
+    const known: readonly string[] = ERROR_KEYS;
+    const unused = Object.keys(pl.error).filter((k) => !ui.has(k) && !known.includes(k));
+    expect(unused).toEqual([]);
+  });
+
   test('t() switches language and fills parameters', () => {
     i18n.lang = 'pl';
     expect(t('actions.fix', { count: 2 })).toBe('Napraw zaznaczone (2)');
