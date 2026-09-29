@@ -240,3 +240,25 @@ def test_safe_app_chosen_by_the_technician_is_a_row(journal, photo):
     assert AppRow("com.chosen", "Latarka", "safe", [], "silence", "done",
                   icon="data:image/png;base64,AA==") in p.rows
     assert p.clean_count == 36 and p.scope.incomplete_apps == 0
+
+
+def test_protocol_takes_the_eight_newest_chosen_shots_with_a_jpeg(monkeypatch, tmp_path):
+    from demalware.engine import paths
+    from demalware.engine.journal.db import Journal
+    from demalware.engine.report.model import build_protocol
+
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    context = {"foreground": None, "overlays": [], "black": False}
+    with Journal(":memory:", now=lambda: datetime(2026, 9, 29, 10, 0)) as journal:
+        order = journal.create_order("S1", "SM-A145R")
+        ids = [journal.add_screenshot("S1", context).id for _ in range(10)]
+        journal.attach_screenshots(ids, order.id)  # zaznaczone: 8 najnowszych (ids[2:])
+        for shot_id in ids:
+            _png, jpg = paths.screenshot_files(shot_id)
+            jpg.parent.mkdir(parents=True, exist_ok=True)
+            if shot_id != ids[5]:  # jeden bez kopii JPG
+                jpg.write_bytes(b"\xff\xd8jpeg")
+        protocol = build_protocol(journal, order.id, "pl")
+    assert [s.image.name for s in protocol.screenshots] == [
+        f"{i}.jpg" for i in ids[2:] if i != ids[5]]
+    assert protocol.screenshots[0].context == context

@@ -264,3 +264,29 @@ def test_both_languages_have_the_same_keys():
     keys = {"unfinished", "review_left", "review_left_many", "incomplete_scan", "removed",
             "disabled", "old_patch", "general"}
     assert set(TEXTS["pl"]["recommendations"]) == keys
+
+
+def test_screenshots_are_an_attachment_page(photo, tmp_path):
+    from demalware.engine.report.model import ProtocolShot
+
+    jpg = tmp_path / "1.jpg"
+    jpg.write_bytes(b"\xff\xd8jpeg")
+    shot = ProtocolShot(jpg, datetime(2026, 9, 26, 14, 7),
+                        {"foreground": {"package": "a", "name": "Cleaner <b>Pro</b>"},
+                         "overlays": [], "black": False})
+    html = render_html(make_protocol(photo, screenshots=[shot]), ServiceInfo(), GENERATED)
+    assert "Załącznik: zrzuty ekranu" in html
+    assert 'class="shots"' in html and "data:image/jpeg;base64," in html
+    assert "26.09.2026 14:07" in html
+    assert "Na pierwszym planie: Cleaner &lt;b&gt;Pro&lt;/b&gt;" in html
+    assert html.index('class="shots"') > html.index('class="closing"')
+
+
+def test_no_screenshots_no_attachment(photo):
+    html = render_html(make_protocol(photo), ServiceInfo(), GENERATED)
+    assert 'class="shots"' not in html and "Załącznik" not in html
+
+
+def test_shot_texts_exist_in_both_languages():
+    assert TEXTS["pl"]["shots_title"] == "Załącznik: zrzuty ekranu"
+    assert TEXTS["en"]["shots_title"] == "Attachment: screenshots"
