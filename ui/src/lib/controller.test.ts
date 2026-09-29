@@ -250,4 +250,45 @@ describe('screen mirror and screenshots (Plan 6b)', () => {
     expect(bridge.calls.filter((c) => c.method === 'mirror_start')).toHaveLength(1);
     expect(s.mirror.serial).toBe('R58T00TEST');
   });
+
+  test('auto mirror starts once for a phone already connected at launch', async () => {
+    // mirror_status() musi się rozstrzygnąć przed pierwszym list_devices()/onDevices(), inaczej brama
+    // (s.mirror.available) jest jeszcze zamknięta, kiedy telefon jest już gotowy.
+    const bridge = createFakeBridge('adware', { delay: 0 });
+    await bridge.api.save_settings({ mirror_auto: true });
+    const ctl = new Controller(new AppState(), bridge);
+    await ctl.init();
+    await flush();
+    expect(bridge.calls.filter((c) => c.method === 'mirror_start')).toHaveLength(1);
+    expect(ctl.state.mirror.serial).toBe('R58T00TEST');
+  });
+
+  test('a stale mirror:state event for a different phone does not override the phone that is now starting', async () => {
+    const { ctl, s, bridge } = await setupCtl('empty');
+    const starting = ctl.mirrorStart('B', 'Phone B'); // optymistycznie: serial=B, state=starting — od razu, przed odpowiedzią
+    // Zdarzenie o poprzednim telefonie (A) dociera z opóźnieniem, już po starcie B — ma być zignorowane.
+    bridge.emit('mirror:state', { serial: 'A', state: 'stopped', reason: 'disconnected' });
+    expect(s.mirror.serial).toBe('B');
+    expect(s.mirror.state).toBe('starting');
+    expect(s.error).toBeNull();
+    await starting;
+    await flush();
+  });
+
+  test('mirror stopped by a disconnect does not raise an error card', async () => {
+    const { s, bridge } = await setupCtl('empty');
+    bridge.emit('mirror:state', { serial: 'S', state: 'stopped', reason: 'disconnected' });
+    expect(s.error).toBeNull();
+    expect(s.mirror.state).toBe('stopped');
+  });
+
+  test('mirrorStart seeds the state from the call result when no event follows (a repeated start)', async () => {
+    const { ctl, s } = await setupCtl('empty');
+    await ctl.mirrorStart('R58T00TEST', 'Galaxy A14');
+    await flush();
+    expect(s.mirror.state).toBe('running');
+    // Powtórzony start: most zwraca aktualny stan bez nowych zdarzeń — nie może zostać "starting" na zawsze.
+    await ctl.mirrorStart('R58T00TEST', 'Galaxy A14');
+    expect(s.mirror.state).toBe('running');
+  });
 });

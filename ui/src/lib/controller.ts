@@ -42,10 +42,11 @@ export class Controller {
     this.subscribe();
     const settings = await this.call(this.api.get_settings());
     if (settings) this.applySettings(settings);
-    const devices = await this.call(this.api.list_devices());
-    if (devices) this.onDevices(devices);
+    // Przed listą urządzeń: onDevices() decyduje o auto-podglądzie na podstawie s.mirror.available.
     const mirror = await this.call(this.api.mirror_status());
     if (mirror) this.state.mirror = { ...this.state.mirror, available: mirror.available, serial: mirror.serial, state: mirror.state };
+    const devices = await this.call(this.api.list_devices());
+    if (devices) this.onDevices(devices);
     await this.call(this.api.watch_devices(true));
     await this.loadKnownSerials();
   }
@@ -177,6 +178,9 @@ export class Controller {
     });
     on('app:close_requested', () => { s.closeRequested = true; });
     on('mirror:state', (d) => {
+      const active = s.mirror.state === 'starting' || s.mirror.state === 'running';
+      // Zdarzenie o innym telefonie, spóźnione względem optymistycznego startu kolejnego — ignoruj je całkiem.
+      if (d.serial !== s.mirror.serial && active) return;
       const same = s.mirror.serial === d.serial;
       s.mirror = { ...s.mirror, serial: d.serial, state: d.state, reason: d.reason ?? null,
                    blocked: same && d.state === 'running' ? s.mirror.blocked : false };
@@ -390,7 +394,15 @@ export class Controller {
     s.mirror = { ...s.mirror, serial, state: 'starting', reason: null, blocked: false };
     // Stan przychodzi zdarzeniami `mirror:state` — wynik wywołania może być starszy niż one.
     const r = await this.call(this.api.mirror_start(serial, name));
-    if (!r) s.mirror = { ...s.mirror, state: 'stopped' };
+    if (!r) {
+      s.mirror = { ...s.mirror, state: 'stopped' };
+      return;
+    }
+    // Powtórzony start (most zwraca dotychczasowy stan bez nowych zdarzeń) — nie zostaw "starting" na zawsze,
+    // ale tylko jeśli w międzyczasie nic (np. zdarzenie) już nie zmieniło stanu tego samego telefonu.
+    if (s.mirror.serial === serial && s.mirror.state === 'starting') {
+      s.mirror = { ...s.mirror, state: r.state, reason: r.reason ?? null };
+    }
   }
 
   async mirrorStop(): Promise<void> {
