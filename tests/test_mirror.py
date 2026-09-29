@@ -146,6 +146,10 @@ def test_start_for_another_phone_stops_the_first():
     h = Harness(first, second)
     h.mirror.start("S1", "t")
     h.mirror.start("S2", "t")
+    # S2 zostaje naprawdę uruchomiony (test nie zamyka jego okna), więc dołączenie do jego
+    # wątku wyczerpałoby cały timeout; krótki timeout + wait() i tak potwierdza opróżnienie
+    # kolejki po zdarzeniu S1 (`stopped`), zanim sprawdzimy `h.states`.
+    h.mirror.wait(0.3)
     assert first.killed and not second.killed
     assert {"serial": "S1", "state": "stopped", "reason": "closed"} in h.states
     assert h.mirror.status()["serial"] == "S2"
@@ -168,5 +172,38 @@ def test_spawn_error_is_a_failed_state():
 
     h.mirror._spawn = broken
     view = h.mirror.start("S1", "t")
+    h.mirror.wait()
     assert view["state"] == "failed" and "WinError 2" in view["reason"]
     assert h.mirror.status()["state"] == "stopped"
+
+
+def test_state_callbacks_never_run_on_the_caller_thread_and_do_not_deadlock():
+    """Regresja na Critical 1 z przeglądu Task 7: most woła `on_state`/`on_warning` przez
+    `window.run_js`, które czeka na wątek GUI. Gdyby te callbacki szły z wątku, który wywołał
+    `start()`/`stop()` (albo z wątku czytającego pod `_lock`), a wątek GUI próbowałby w tym
+    czasie zamknąć podgląd, powstałoby zakleszczenie. `on_state` tutaj samo wywołuje
+    `status()` (bierze `_lock`) — musi to przejść bez zawieszenia, nawet z wątku dyspozytora."""
+    caller = threading.current_thread()
+    seen: list[threading.Thread] = []
+    reached_stopped = threading.Event()
+
+    def on_state(view):
+        seen.append(threading.current_thread())
+        mirror.status()  # nie może się zakleszczyć, choć bierze `_lock`
+        if view["state"] == "stopped":
+            reached_stopped.set()
+
+    def kill(proc):
+        proc.code = 1
+        proc.ended.set()
+
+    proc = FakeProc(OPPO)
+    mirror = Mirror(on_state, lambda _v: None, lambda _s, _l: None,
+                    adb=lambda: "C:/tools/adb.exe", scrcpy=lambda: EXE,
+                    spawn=lambda cmd, env: proc, kill=kill)
+    mirror.start("S1", "t")
+    proc.close_window(0)
+    mirror.wait()
+    assert reached_stopped.wait(5)
+    assert seen and caller not in seen
+    assert all(t.name == "demalware-mirror-events" for t in seen)
