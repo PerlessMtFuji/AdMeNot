@@ -1,0 +1,4 @@
+scrcpy 4.1 <https://github.com/Genymobile/scrcpy>
+ERROR: Could not find ADB device NOPE:
+ERROR:           (usb)  OPPOTEST01                device  CPH2271
+ERROR: Server connection failed

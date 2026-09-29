@@ -1,0 +1,7 @@
+scrcpy 4.1 <https://github.com/Genymobile/scrcpy>
+INFO: ADB device found:
+INFO:     -->   (usb)  OPPOTEST01                      device  CPH2271
+C:\DeMalware\src\demalware\assets\tools\scrcpy\scrcpy-server: 1 file pushed, 0 skipped. 34.2 MB/s (733706 bytes in 0.020s)
+[server] INFO: Device: [OPPO] OPPO CPH2271 (Android 12)
+INFO: Renderer: direct3d11
+INFO: Texture: 576x1280
