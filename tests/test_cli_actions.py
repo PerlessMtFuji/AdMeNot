@@ -133,3 +133,26 @@ def test_fix_stores_scan_snapshot_and_verification(monkeypatch, tmp_path, capsys
         assert snap["device"]["model"] == "SM-A145R" and snap["phone"]["confidence"] == "none"
         assert "com.clean.pro.boost" in {a["package"] for a in snap["apps"]}
         assert j.verification(order.id) == {}
+
+
+def test_fix_with_apk_stores_app_names_and_icons_for_the_report(monkeypatch, tmp_path):
+    from demalware.engine.apk.analyze import ApkReport
+
+    icon = "data:image/png;base64,iVBORw0KGgo="
+
+    class Provider:
+        def __init__(self, adb):
+            pass
+
+        def reports_for(self, targets, progress=None):
+            return {"com.wlive.forecast": ApkReport("com.wlive.forecast", label="Pogoda Live",
+                                                    icon=icon, class_count=1)}
+
+    monkeypatch.setenv("DEMALWARE_ASSETS", str(tmp_path / "no-assets"))
+    monkeypatch.setattr("demalware.cli.main.DeviceApkProvider", Provider)
+    assert main(["fix", "--apk", "--app", "com.wlive.forecast=disable", "--yes"],
+                host=make_cli_phone()) == 0
+    (order,) = _orders()
+    with Journal(journal_path()) as j:
+        app = next(a for a in j.scan(order.id)["apps"] if a["package"] == "com.wlive.forecast")
+    assert (app["label"], app["icon"]) == ("Pogoda Live", icon)
