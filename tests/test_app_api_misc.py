@@ -83,14 +83,17 @@ def test_who_is_showing_is_busy_during_an_order():
     rec.wait_for("exec:done")
 
 
-def test_check_adb_and_pick_folder():
+def test_check_adb_and_pick_folder(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda name: None)
     phone = make_cli_phone()
     phone.host["version"] = "Android Debug Bridge version 1.0.41\nVersion 36.0.0\n"
     api, _ = make_api(phone)
-    assert api.check_adb("C:\\adb.exe") == {"ok": True, "version": "Android Debug Bridge version 1.0.41",
-                                           "message": ""}
+    assert api.check_adb("C:\\adb.exe") == {
+        "ok": True, "version": "Android Debug Bridge version 1.0.41", "message": "",
+        "source": "settings", "path": "C:\\adb.exe"}
     phone.host["version"] = AdbError("adb_missing", "not found")
-    assert api.check_adb(None) == {"ok": False, "version": None, "message": "not found"}
+    assert api.check_adb(None) == {"ok": False, "version": None, "message": "not found",
+                                   "source": "missing", "path": None}
     assert api.pick_folder() == {"path": None}
     api._attach(pick_folder=lambda: "D:\\kopie", close=lambda: None)
     assert api.pick_folder() == {"path": "D:\\kopie"}

@@ -41,11 +41,22 @@ def test_real_adb_timeout(monkeypatch):
     assert exc.value.kind == "timeout"
 
 
-def test_real_adb_missing_binary(monkeypatch):
+def test_real_adb_missing_binary(monkeypatch, tmp_path):
+    monkeypatch.setenv("DEMALWARE_ASSETS", str(tmp_path / "no-assets"))  # bez dołączonego adb
     monkeypatch.setattr("shutil.which", lambda name: None)
     with pytest.raises(AdbError) as exc:
         RealAdb().shell("x")
     assert exc.value.kind == "adb_missing"
+
+
+def test_real_adb_prefers_the_bundled_adb(monkeypatch, tmp_path):
+    directory = tmp_path / "assets" / "tools" / "scrcpy"
+    directory.mkdir(parents=True)
+    (directory / "adb.exe").write_bytes(b"x")
+    monkeypatch.setenv("DEMALWARE_ASSETS", str(tmp_path / "assets"))
+    monkeypatch.setattr("shutil.which", lambda name: "C:\\sdk\\adb.exe")
+    assert RealAdb().adb_path == str(directory / "adb.exe")
+    assert RealAdb(adb_path="D:\\adb.exe").adb_path == "D:\\adb.exe"
 
 
 @pytest.mark.parametrize(
