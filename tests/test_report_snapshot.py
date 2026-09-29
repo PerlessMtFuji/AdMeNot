@@ -64,6 +64,9 @@ def test_snapshot_adds_chosen_and_incomplete_apps_and_apk_identity(tmp_path):
     results = [dataclasses.replace(r, incomplete=True) if r.facts.package == gapped else r
                for r in report.results]
     apk = ApkReport(BOOST, files={"base.apk": "ab" * 32}, cert_sha256=["cd" * 32])
+    icon = "data:image/png;base64,iVBORw0KGgo="
+    results = [dataclasses.replace(r, facts=dataclasses.replace(r.facts, icon=icon))
+               if r.facts.package == BOOST else r for r in results]
     report = dataclasses.replace(report, results=results, apk_reports={BOOST: apk},
                                  apk=ApkStatus(requested=2, analyzed=1, failed={"x": "timeout"}))
     match = PhoneImageProvider(tmp_path / "missing", tmp_path / "o.json").match(report.device)
@@ -77,6 +80,7 @@ def test_snapshot_adds_chosen_and_incomplete_apps_and_apk_identity(tmp_path):
     assert apps[BOOST]["apk"] == {"files": {"base.apk": "ab" * 32}, "signers": ["cd" * 32],
                                   "error": None}
     assert snap["scope"]["apk"] == {"requested": 2, "analyzed": 1, "failed": {"x": "timeout"}}
+    assert apps[BOOST]["icon"] == icon and apps[FORECAST]["icon"] is None
 
 
 def test_snapshot_without_phone_database_uses_silhouette(tmp_path):

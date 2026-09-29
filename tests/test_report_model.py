@@ -90,6 +90,17 @@ def test_rows_device_and_recommendations(journal, photo):
     ]
 
 
+def test_many_apps_left_for_review_are_counted_not_listed(journal, photo):
+    snap = snapshot(photo)
+    for i in range(3):
+        snap["apps"].append({"package": f"com.more{i}", "label": None, "verdict": "review",
+                             "score": 20, "incomplete": False, "gaps": [],
+                             "problems": {"pl": ["Reklamy"], "en": ["Ads"]}})
+    p = build_protocol(journal, make_order(journal, snap).id, "pl")
+    assert Recommendation("review_left_many", {"count": "4"}) in p.recommendations
+    assert not any(r.key == "review_left" for r in p.recommendations)
+
+
 def test_problems_follow_the_language(journal, photo):
     order = make_order(journal, snapshot(photo))
     rows = build_protocol(journal, order.id, "en").rows
@@ -223,8 +234,9 @@ def test_safe_app_chosen_by_the_technician_is_a_row(journal, photo):
     snap = snapshot(photo)
     snap["apps"].append({"package": "com.chosen", "label": "Latarka", "verdict": "safe",
                          "score": 0, "incomplete": False, "gaps": [],
-                         "problems": {"pl": [], "en": []}})
+                         "problems": {"pl": [], "en": []}, "icon": "data:image/png;base64,AA=="})
     acts = DEFAULT_ACTS + (("com.chosen", "silence", ("done",)),)
     p = build_protocol(journal, make_order(journal, snap, acts).id, "pl")
-    assert AppRow("com.chosen", "Latarka", "safe", [], "silence", "done") in p.rows
+    assert AppRow("com.chosen", "Latarka", "safe", [], "silence", "done",
+                  icon="data:image/png;base64,AA==") in p.rows
     assert p.clean_count == 36 and p.scope.incomplete_apps == 0

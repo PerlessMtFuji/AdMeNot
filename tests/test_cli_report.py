@@ -85,9 +85,9 @@ def test_report_after_fix_without_a_phone(capsys, edge, data_dir):
     assert str(pdf) in capsys.readouterr().out
     assert pdf.read_bytes().startswith(b"%PDF") and edge.calls == [(pdf.with_suffix(".html"), pdf)]
     html = pdf.with_suffix(".html").read_text("utf-8")
-    for text in (number, "Anna Nowak", "Galaxy A14", "com.wlive.forecast", "Wyłączono",
-                 "com.clean.pro.boost", "Szkodliwa", "Bez zmian", "data:image/webp;base64,",
-                 "Klient potwierdza ustąpienie objawów"):
+    for text in (number, "Anna Nowak", "Galaxy A14", "com.<wbr>wlive.<wbr>forecast", "Wyłączono",
+                 "com.<wbr>clean.<wbr>pro.<wbr>boost", "Szkodliwa", "Bez zmian",
+                 "data:image/webp;base64,", "Podpis serwisanta"):
         assert text in html, text
     assert "Zakres skanu" not in html  # telefon z atrapy: pełny zakres (profil 0, dość danych)
     assert phone.calls == []

@@ -1,3 +1,4 @@
+import base64
 from datetime import datetime
 
 import pytest
@@ -53,18 +54,21 @@ def test_polish_protocol_has_every_section(photo):
     html = render_html(make_protocol(photo), ServiceInfo(), GENERATED)
     for text in ("Protokół serwisowy", "ZS/2026/0926/01", "Przedmiot zlecenia",
                  "Samsung Galaxy A14", "SM-A145R", "R58T00TEST", "Klient", "26.09.2026",
-                 "Aplikacja", "Problem", "Działanie", "Szkodliwa", "Usunięto", "Bez zmian",
+                 "Aplikacja", "Problem", "Działanie", "Szkodliwa", "Usunięto",
+                 "Do sprawdzenia, bez zmian (1)",
                  "Wyłączenie: nie powiodło się", "Ukryta aplikacja spoza Sklepu Play",
                  "✓ Aplikacje bez uwag: 37", "Zalecenia", "com.game",
                  "Instaluj aplikacje tylko ze Sklepu Play", "Podpis serwisanta",
-                 "Podpis klienta", "Klient potwierdza ustąpienie objawów", "nie sprawdzono",
                  "26.09.2026 14:30"):
         assert text in html, text
     assert '<html lang="pl">' in html and "size: A4" in html
     assert "data:image/webp;base64," in html
     assert "<td>—</td>" in html  # com.old bez migawki problemów
+    closing = html.split('<section class="closing">', 1)[1]  # podpis nie zostaje sam na stronie
+    assert "Zalecenia" in closing and "Podpis serwisanta" in closing
+    # Potwierdzenie odbioru i podpis klienta są w systemie serwisu (wydruk odbioru), nie tutaj.
     for absent in ("Brak zapisu skanu", "Zakres skanu", "ocena niepełna",
-                   "Nie wykryto oznak zagrożenia"):
+                   "Nie wykryto oznak zagrożenia", "Podpis klienta", "Klient potwierdza"):
         assert absent not in html, absent
 
 
@@ -79,11 +83,25 @@ def test_user_and_phone_text_is_escaped(photo):
 def test_english_protocol(photo):
     html = render_html(make_protocol(photo, lang="en"), ServiceInfo(), GENERATED)
     for text in ("Service report", "Subject of the order", "Client", "2026-09-26",
-                 "Application", "Action", "Malicious", "Removed", "No change",
-                 "Disable: failed", "Recommendations", "Technician signature",
-                 "Client signature", "Client confirms the symptoms are gone", "not checked"):
+                 "Application", "Action", "Malicious", "Removed", "For review, no change (1)",
+                 "Disable: failed", "Recommendations", "Technician signature"):
         assert text in html, text
     assert '<html lang="en">' in html
+    assert "Client signature" not in html and "Client confirms" not in html
+
+
+def test_app_cell_has_icon_label_and_package_broken_at_dots(photo):
+    icon = "data:image/png;base64," + base64.b64encode(b"\x89PNG\r\n\x1a\n" + bytes(8)).decode()
+    rows = [AppRow("com.superbllc.torch.flashlight", "Flashlight", "safe", [], "silence", "done",
+                   icon=icon),
+            AppRow("com.game", None, "review", ["Reklamy"], None, "none",
+                   icon="data:text/html;base64,PHNjcmlwdD4=")]
+    html = render_html(make_protocol(photo, rows=rows), ServiceInfo(), GENERATED)
+    assert f'<img class="icon" src="{icon}" alt="">' in html
+    assert "<b>Flashlight</b>" in html
+    assert "com.<wbr>superbllc.<wbr>torch.<wbr>flashlight" in html  # łamanie tylko na kropkach
+    assert "data:text/html" not in html  # ikona z dziennika to tylko rozpoznana bitmapa
+    assert '<span class="icon initial">G</span><div><b>com.<wbr>game</b>' in html
 
 
 def test_no_flagged_apps_says_no_signs_within_the_scope(photo):
@@ -137,6 +155,35 @@ def test_full_scope_with_incomplete_table_row_still_shows_scope_and_warns(photo)
     assert "Aplikacje w tabeli z oceną niepełną" in html
     assert ": 1." in html
     assert 'class="warn"' in html
+
+
+def test_untouched_review_apps_are_a_compact_list(photo):
+    rows = [AppRow("com.torch", "Latarka", "safe", [], "silence", "done"),
+            AppRow("com.sus", "Podejrzana app", "suspicious", ["Czyta powiadomienia"], None, "none"),
+            AppRow("com.gap", "Z lukami", "review", ["Opis luki"], None, "none", True, ["apk"])]
+    rows += [AppRow(f"com.ads{i}", f"Reklamy {i}", "review", [f"Opis reklam {i}"], None, "none")
+             for i in range(5)]
+    recs = [Recommendation("review_left_many", {"count": "7"}), Recommendation("general")]
+    html = render_html(make_protocol(photo, rows=rows, recommendations=recs),
+                       ServiceInfo(), GENERATED)
+    table, rest = html.split("</table>", 1)
+    # Działania, nieruszone „Podejrzana” i ocena niepełna (lista braków) zostają pełnymi wierszami.
+    for text in ("Latarka", "Czyta powiadomienia", "Opis luki", "ocena niepełna"):
+        assert text in table, text
+    assert "Reklamy 0" not in table
+    # Nieruszone „Do sprawdzenia” z pełną oceną: sama nazwa i pakiet, bez opisów problemu.
+    assert "Do sprawdzenia, bez zmian (5)" in rest
+    assert TEXTS["pl"]["watch_note"] in rest  # czym jest „Do sprawdzenia” i co z tym zrobić
+    assert all(f"Reklamy {i}" in rest for i in range(5))
+    assert "Opis reklam" not in html
+    assert "Aplikacje oznaczone wyżej (razem: 7): jeśli ich nie używasz" in rest
+
+
+def test_only_compact_apps_still_have_no_table(photo):
+    rows = [AppRow("com.ads", "Reklamy", "review", ["Opis"], None, "none")]
+    html = render_html(make_protocol(photo, rows=rows), ServiceInfo(), GENERATED)
+    assert "<table" not in html and "Do sprawdzenia, bez zmian (1)" in html
+    assert TEXTS["pl"]["no_rows"] not in html
 
 
 def test_scope_lines():
@@ -214,6 +261,6 @@ def _shape(value):
 
 def test_both_languages_have_the_same_keys():
     assert _shape(TEXTS["pl"]) == _shape(TEXTS["en"])
-    keys = {"unfinished", "review_left", "incomplete_scan", "removed", "disabled", "old_patch",
-            "general"}
+    keys = {"unfinished", "review_left", "review_left_many", "incomplete_scan", "removed",
+            "disabled", "old_patch", "general"}
     assert set(TEXTS["pl"]["recommendations"]) == keys
