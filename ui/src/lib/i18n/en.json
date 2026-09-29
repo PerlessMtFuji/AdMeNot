@@ -193,6 +193,7 @@
     "button": "Report PDF",
     "busy": "Creating the report…",
     "opened": "Opened the report: {path}",
+    "not_opened": "Saved the report: {path} — could not open it (no program for this file). Open it manually.",
     "pdf_no_browser": "Microsoft Edge, which creates the PDF, was not found. Opened the HTML report — print it to PDF: {html}",
     "pdf_timeout": "Creating the PDF took too long. Opened the HTML report: {html}",
     "pdf_failed": "Could not create the PDF. Opened the HTML report: {html}",

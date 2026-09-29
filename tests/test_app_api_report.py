@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from apphelpers import SlowApk, make_api
 from conftest import SERIAL
@@ -58,6 +60,18 @@ def test_pdf_failure_opens_the_html(monkeypatch):
     assert [str(p) for p in opened] == [r["html"]]
 
 
+def test_report_is_saved_even_when_windows_cannot_open_it(edge, tmp_path):
+    def no_viewer(path):
+        raise OSError("No application is associated with the specified file")
+
+    api, rec = make_api(make_cli_phone(), open_file=no_viewer)
+    api.start_scan(SERIAL, "Anna")
+    api.execute(WLIVE, [])
+    r = api.report(rec.of("exec:order")[0]["order"])
+    assert r["opened"] is None and r["error"] is None
+    assert r["pdf"] and Path(r["pdf"]).is_file()
+
+
 def test_report_errors(edge):
     api, _, number, _ = _executed()
     assert api.report("")["error"]["key"] == "bad_request"
@@ -98,6 +112,19 @@ def test_service_round_trip_and_logo(tmp_path):
     assert api.save_service({"logo": str(tmp_path / "x.gif")})["error"]["key"] == "logo_type"
     assert api.save_service({"colour": "red"})["error"]["key"] == "bad_request"
     assert load_service() == ServiceInfo("Serwis Ząb")
+
+
+def test_logo_that_disappeared_does_not_block_other_changes(tmp_path):
+    api, _ = make_api(make_cli_phone())
+    logo = tmp_path / "logo.png"
+    logo.write_bytes(b"\x89PNG....")
+    stored = api.save_service({"name": "Serwis", "logo": str(logo)})["logo"]
+    logo.unlink()
+    # okno odsyła zapisaną ścieżkę razem ze zmianą telefonu
+    r = api.save_service({"name": "Serwis", "phone": "600 000 000", "logo": stored})
+    assert r["phone"] == "600 000 000" and r["logo"] == stored
+    # nowo wybrany brakujący plik nadal jest błędem
+    assert api.save_service({"logo": str(tmp_path / "inne.png")})["error"]["key"] == "logo_missing"
 
 
 def test_pick_logo_without_a_window():

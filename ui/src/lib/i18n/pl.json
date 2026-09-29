@@ -193,6 +193,7 @@
     "button": "Protokół PDF",
     "busy": "Tworzę protokół…",
     "opened": "Otwarto protokół: {path}",
+    "not_opened": "Zapisano protokół: {path} — nie udało się go otworzyć (brak programu do tego pliku). Otwórz go ręcznie.",
     "pdf_no_browser": "Nie znaleziono przeglądarki Microsoft Edge, która tworzy PDF. Otwarto protokół HTML — wydrukuj go do PDF: {html}",
     "pdf_timeout": "Tworzenie PDF trwało zbyt długo. Otwarto protokół HTML: {html}",
     "pdf_failed": "Nie udało się utworzyć PDF. Otwarto protokół HTML: {html}",

@@ -219,7 +219,7 @@ export interface ReportResult {
   html: string;
   pdf: string | null;
   error: 'no_browser' | 'timeout' | 'failed' | 'locked' | null;
-  opened: string;
+  opened: string | null; // null: zapisany, ale Windows nie ma programu, który go otworzy
 }
 
 export interface ApiErrorBody {
