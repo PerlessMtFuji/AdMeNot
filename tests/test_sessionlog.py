@@ -57,3 +57,27 @@ def test_tagged_console_commands_are_marked_in_the_log(tmp_path):
     console.shell("id")
     assert (tmp_path / "l.log").read_text("utf-8").rstrip().endswith("\tconsole:id")
     assert seen[0]["tag"] == "console" and seen[0]["command"] == "id"
+
+
+def test_run_bytes_logs_size_not_content(tmp_path):
+    seen = []
+    inner = FakeAdb(serial="S1", binary={"exec-out screencap -p": b"\x89PNG" + b"x" * 96})
+    adb = SessionLogAdb(inner, tmp_path / "l.log", now=lambda: datetime(2026, 9, 26, 12, 0),
+                        on_command=seen.append).tagged("shot")
+    assert adb.run_bytes(["exec-out", "screencap", "-p"]).startswith(b"\x89PNG")
+    assert seen[0]["command"] == "host:exec-out screencap -p"
+    assert seen[0]["output"] == "<100 B>" and seen[0]["tag"] == "shot"
+    assert (tmp_path / "l.log").read_text("utf-8").rstrip().endswith(
+        "\tshot:host:exec-out screencap -p")
+
+
+def test_note_records_a_line_without_adb(tmp_path):
+    seen = []
+    adb = SessionLogAdb(FakeAdb(serial="S1"), tmp_path / "l.log",
+                        now=lambda: datetime(2026, 9, 26, 12, 0),
+                        on_command=seen.append).tagged("scrcpy")
+    adb.note("INFO: Texture: 576x1280")
+    assert seen == [{"time": "2026-09-26T12:00:00", "serial": "S1",
+                     "command": "INFO: Texture: 576x1280", "status": "info",
+                     "duration": seen[0]["duration"], "output": "", "tag": "scrcpy"}]
+    assert "\tinfo\t" in (tmp_path / "l.log").read_text("utf-8")

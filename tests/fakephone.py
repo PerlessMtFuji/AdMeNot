@@ -5,6 +5,7 @@ Polecenia skanu, których FakePhone nie modeluje, bierze z `static` (jak FakeAdb
 
 from __future__ import annotations
 
+import io
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -49,6 +50,19 @@ def apk_bytes(package: str, name: str) -> bytes:
     return f"APK:{package}:{name}".encode()
 
 
+def png_bytes(size: tuple[int, int] = (9, 16), color: tuple[int, int, int] = (30, 120, 200),
+              dot: bool = True) -> bytes:
+    """Mały PNG „ekranu”; `dot` dokłada biały piksel, żeby obraz nie był jednolity."""
+    from PIL import Image
+
+    image = Image.new("RGB", size, color)
+    if dot:
+        image.putpixel((0, 0), (255, 255, 255))
+    buf = io.BytesIO()
+    image.save(buf, "PNG")
+    return buf.getvalue()
+
+
 def _sh_word(raw: str) -> str:
     """Jak powłoka telefonu czyta jedno słowo: '…' dosłownie, bez cudzysłowu $zmienne znikają."""
     raw = raw.strip()
@@ -82,6 +96,7 @@ class FakePhone:
         self.on_admin_screen: Callable[[FakePhone], None] | None = None
         self.opened: list[str] = []
         self.calls: list[str] = []
+        self.screen: bytes = png_bytes()
 
     def with_serial(self, serial: str) -> FakePhone:
         self.serial = serial
@@ -115,6 +130,19 @@ class FakePhone:
         if args[0] in ("install", "install-multiple"):
             return self._install([Path(a) for a in args[1:] if not a.startswith("-")])
         return self._answer(self.host, " ".join(args))
+
+    def run_bytes(self, args: list[str], timeout: float = 20.0) -> bytes:
+        key = " ".join(args)
+        self.calls.append("host-bytes:" + key)
+        self._check_connected()
+        if key in self.fail:
+            value = self.fail[key]
+            if isinstance(value, AdbError):
+                raise value
+            return value.encode()
+        if key == "exec-out screencap -p":
+            return self.screen
+        raise AdbError("command_failed", f"FakePhone: no bytes for {key!r}")
 
     def _check_connected(self) -> None:
         if self.disconnected:

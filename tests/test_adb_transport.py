@@ -155,3 +155,36 @@ def test_real_adb_does_not_share_the_console_stdin(monkeypatch):
     monkeypatch.setattr(subprocess, "run", fake_run)
     RealAdb(serial="R58T", adb_path="adb.exe").shell("getprop")
     assert seen.get("stdin") is subprocess.DEVNULL
+
+
+def test_run_bytes_returns_raw_stdout(monkeypatch):
+    seen = {}
+
+    def fake_run(cmd, **kw):
+        seen["cmd"] = cmd
+        return _Proc(stdout=b"\x89PNG\r\n\x1a\n\x00\xff")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    adb = RealAdb(serial="R58T", adb_path="adb.exe")
+    assert adb.run_bytes(["exec-out", "screencap", "-p"]) == b"\x89PNG\r\n\x1a\n\x00\xff"
+    assert seen["cmd"] == ["adb.exe", "-s", "R58T", "exec-out", "screencap", "-p"]
+
+
+def test_run_bytes_classifies_errors(monkeypatch):
+    monkeypatch.setattr(
+        subprocess, "run", lambda cmd, **kw: _Proc(returncode=1, stderr=b"error: device offline"))
+    with pytest.raises(AdbError) as exc:
+        RealAdb(adb_path="adb.exe").run_bytes(["exec-out", "screencap", "-p"])
+    assert exc.value.kind == "offline"
+
+
+def test_fake_adb_run_bytes():
+    fake = FakeAdb(binary={"exec-out screencap -p": b"PNG",
+                           "exec-out bad": AdbError("command_failed", "x")})
+    assert fake.with_serial("S").run_bytes(["exec-out", "screencap", "-p"]) == b"PNG"
+    assert fake.run_bytes(["exec-out", "screencap", "-p"]) == b"PNG"
+    assert fake.calls == ["host-bytes:exec-out screencap -p"]
+    with pytest.raises(AdbError):
+        fake.run_bytes(["exec-out", "bad"])
+    with pytest.raises(AdbError):
+        fake.run_bytes(["exec-out", "other"])

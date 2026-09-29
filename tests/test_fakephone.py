@@ -64,3 +64,14 @@ def test_static_fallback_and_host_commands():
     assert phone.run(["devices", "-l"]) == "List\n"
     with pytest.raises(AdbError, match="no response"):
         phone.shell("dumpsys unknown")
+
+
+def test_fake_phone_takes_a_screenshot():
+    from fakephone import make_cli_phone, png_bytes
+
+    phone = make_cli_phone()
+    assert phone.run_bytes(["exec-out", "screencap", "-p"]) == phone.screen
+    assert phone.screen == png_bytes() and phone.screen.startswith(b"\x89PNG")
+    phone.disconnected = True
+    with pytest.raises(AdbError):
+        phone.run_bytes(["exec-out", "screencap", "-p"])
