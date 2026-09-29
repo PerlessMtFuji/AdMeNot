@@ -9,6 +9,7 @@
   import Icon from '../ui/Icon.svelte';
   import Pill from '../ui/Pill.svelte';
   import DeviceCard from './DeviceCard.svelte';
+  import MirrorControls from './MirrorControls.svelte';
 
   let { showSafe, ontoggleSafe }: { showSafe: boolean; ontoggleSafe: () => void } = $props();
   const ctl = getContext<Controller>('ctl');
@@ -24,7 +25,9 @@
 </script>
 
 {#if s.device}
-  <DeviceCard compact name={s.device.name} {details} serial={s.device.serial} image={s.device.image} connected />
+  <DeviceCard compact name={s.device.name} {details} serial={s.device.serial} image={s.device.image} connected>
+    <MirrorControls serial={s.device.serial} name={s.device.name} />
+  </DeviceCard>
   <div class="h-px bg-line"></div>
 {/if}
 <span class="lbl">{t('panel.plan')}</span>

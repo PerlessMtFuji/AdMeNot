@@ -4,6 +4,7 @@
   import { t } from '../lib/i18n/index.svelte';
   import { enter } from '../lib/motion';
   import Button from '../ui/Button.svelte';
+  import Icon from '../ui/Icon.svelte';
 
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
@@ -41,6 +42,11 @@
         <b class="text-lg">{t('admin.title')}</b>
         <p class="mt-1 text-mut">{t('admin.text', { name: s.admin.name })}</p>
         <p class="mono mt-1 text-xs text-soft">{t('admin.left', { time })}</p>
+        {#if s.device && s.mirror.available && !ctl.mirrorActive(s.device.serial)}
+          {@const device = s.device}
+          <div class="mt-2"><Button size="sm" onclick={() => ctl.mirrorStart(device.serial, device.name)}>
+            <Icon name="screen-share" />{t('mirror.show_phone')}</Button></div>
+        {/if}
       {/if}
     </div>
     {#if s.admin && !s.question}

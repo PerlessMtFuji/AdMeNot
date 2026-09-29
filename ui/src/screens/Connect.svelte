@@ -3,6 +3,7 @@
   import ConnectChecklist from '../components/ConnectChecklist.svelte';
   import DeviceCard from '../components/DeviceCard.svelte';
   import InterruptedBanner from '../components/InterruptedBanner.svelte';
+  import MirrorControls from '../components/MirrorControls.svelte';
   import PhoneStage from '../components/PhoneStage.svelte';
   import UsbGuide from '../components/UsbGuide.svelte';
   import type { Controller } from '../lib/controller';
@@ -51,7 +52,9 @@
               <input class="sr-only" type="radio" name="device" checked={s.serial === d.serial}
                 aria-label="{modelName(d.model)} {d.serial}" onchange={() => ctl.selectDevice(d.serial)} />
             {/if}
-            <DeviceCard name={modelName(d.model)} details={t('connect.title.ready')} serial={d.serial} connected />
+            <DeviceCard name={modelName(d.model)} details={t('connect.title.ready')} serial={d.serial} connected>
+              <MirrorControls serial={d.serial} name={modelName(d.model)} />
+            </DeviceCard>
           </label>
         {/each}
         <form class="flex gap-2" onsubmit={(e) => { e.preventDefault(); void ctl.startScan(); }}>

@@ -2,6 +2,7 @@
   import { getContext } from 'svelte';
   import ConnectChecklist from '../components/ConnectChecklist.svelte';
   import DeviceCard from '../components/DeviceCard.svelte';
+  import MirrorControls from '../components/MirrorControls.svelte';
   import type { Controller } from '../lib/controller';
   import { t } from '../lib/i18n/index.svelte';
   import { modelName, SCAN_STEPS, scanChecklist } from '../lib/logic';
@@ -40,6 +41,8 @@
   </main>
   <SidePanel label={t('phone.subject')}>
     <DeviceCard compact name={name} serial={s.serial ?? ''} image={s.device?.image ?? null}
-      {details} connected />
+      {details} connected>
+      {#if s.serial}<MirrorControls serial={s.serial} {name} />{/if}
+    </DeviceCard>
   </SidePanel>
 </div>

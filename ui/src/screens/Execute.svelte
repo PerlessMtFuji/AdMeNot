@@ -4,6 +4,7 @@
   import AdminPrompt from '../components/AdminPrompt.svelte';
   import AppIcon from '../components/AppIcon.svelte';
   import DeviceCard from '../components/DeviceCard.svelte';
+  import MirrorControls from '../components/MirrorControls.svelte';
   import ReportButton from '../components/ReportButton.svelte';
   import StepTimeline from '../components/StepTimeline.svelte';
   import type { Controller } from '../lib/controller';
@@ -142,7 +143,9 @@
   <SidePanel label={t('exec.panel')}>
     {#if s.device}
       <DeviceCard compact name={s.device.name} details={`Android ${s.device.android}`} serial={s.device.serial}
-        image={s.device.image} connected={running} />
+        image={s.device.image} connected={running}>
+        <MirrorControls serial={s.device.serial} name={s.device.name} />
+      </DeviceCard>
       <div class="h-px bg-line"></div>
     {/if}
     <span class="lbl">{t('exec.panel')}</span>

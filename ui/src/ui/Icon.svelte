@@ -1,5 +1,6 @@
 <script lang="ts" module>
   import BellRing from '@lucide/svelte/icons/bell-ring';
+  import Camera from '@lucide/svelte/icons/camera';
   import Check from '@lucide/svelte/icons/check';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
@@ -16,6 +17,8 @@
   import Plus from '@lucide/svelte/icons/plus';
   import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
   import ScanSearch from '@lucide/svelte/icons/scan-search';
+  import ScreenShare from '@lucide/svelte/icons/screen-share';
+  import ScreenShareOff from '@lucide/svelte/icons/screen-share-off';
   import Search from '@lucide/svelte/icons/search';
   import SettingsIcon from '@lucide/svelte/icons/settings';
   import ShieldAlert from '@lucide/svelte/icons/shield-alert';
@@ -36,7 +39,7 @@
     'chevron-down': ChevronDown, 'chevron-right': ChevronRight, search: Search, terminal: Terminal,
     history: HistoryIcon, settings: SettingsIcon, plus: Plus, pause: Pause, smartphone: Smartphone,
     'shield-x': ShieldX, 'shield-alert': ShieldAlert, 'shield-user': ShieldUser, 'scan-search': ScanSearch,
-    'file-text': FileText,
+    'file-text': FileText, camera: Camera, 'screen-share': ScreenShare, 'screen-share-off': ScreenShareOff,
   } as const;
   export type IconName = keyof typeof ICONS;
 </script>
