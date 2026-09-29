@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from conftest import SERIAL
 from fakephone import make_cli_phone
@@ -63,3 +65,27 @@ def test_english(capsys, env):
     target = env / "shot.png"
     assert main(["screenshot", "--out", str(target), "--lang", "en"], host=_phone()) == 0
     assert f"Saved {target}" in capsys.readouterr().out
+
+
+def test_out_to_nonexistent_directory(capsys):
+    phone = _phone()
+    target = Path(r"C:\this\dir\does\not\exist\shot.png")
+    code = main(["screenshot", "--out", str(target)], host=phone)
+    assert code == 6
+    err = capsys.readouterr().err
+    assert "Nie można zapisać" in err and str(target) in err
+    assert "Traceback" not in err
+
+
+def test_order_alone_saves_to_journal(capsys):
+    phone = _phone()
+    with Journal(paths.journal_path()) as journal:
+        order = journal.create_order(SERIAL, "SM-A145R")
+    code = main(["screenshot", "--order", order.number], host=phone)
+    assert code == 0
+    out = capsys.readouterr().out
+    assert f"w zleceniu {order.number}" in out
+    with Journal(paths.journal_path()) as journal:
+        (shot,) = journal.screenshots(order.id)
+    # Verify screenshot is in journal
+    assert paths.screenshot_files(shot.id)[0].exists()
