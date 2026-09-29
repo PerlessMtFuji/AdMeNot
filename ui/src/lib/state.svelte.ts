@@ -1,6 +1,6 @@
 import type { Phase } from './logic';
 import type {
-  ApiErrorBody, ConsoleEntry, DeviceEntry, HistoryView, Level, OrderResult, PhoneCard, PlanView,
+  ApiErrorBody, Category, ConsoleEntry, DeviceEntry, HistoryView, Level, OrderResult, PhoneCard, PlanView,
   Question, ReportResult, ScanView, Settings, StepEvent, UndoDone, Verdict,
 } from './types';
 
@@ -27,6 +27,8 @@ export class AppState {
   showAll = $state(false);
   verdictFilter = $state<Verdict | 'all'>('all');
   query = $state('');
+  categoryFilter = $state<Category[]>([]);
+  sourceFilter = $state<string | null>(null);
   expanded = $state<string[]>([]);
   focused = $state<string | null>(null);
   plan = $state<PlanView | null>(null);

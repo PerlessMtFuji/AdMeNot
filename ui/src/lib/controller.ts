@@ -191,6 +191,7 @@ export class Controller {
     Object.assign(this.state, {
       phase: 'connect', screen: 'main', device: null, scan: null, result: null, order: null,
       plan: null, selection: {}, steps: [], disconnectedOrder: null, reports: {},
+      categoryFilter: [], sourceFilter: null,
     });
   }
 

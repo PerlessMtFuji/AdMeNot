@@ -5,6 +5,7 @@ import {
   groupHistory,
   orderCounts,
   evidenceGroups,
+  facetCounts,
   focusedApp,
   moveFocus,
   connectChecklist,
@@ -26,7 +27,7 @@ import {
   upsertStep,
   visibleApps,
 } from './logic';
-import type { AppView, StepEvent } from './types';
+import type { AppView, Category, StepEvent } from './types';
 
 function app(pkg: string, verdict: AppView['verdict'], extra: Partial<AppView> = {}): AppView {
   const level = verdict === 'malicious' ? 'remove' : verdict === 'suspicious' ? 'disable' : null;
@@ -67,6 +68,40 @@ describe('selection', () => {
     expect(visibleApps(apps, { ...opts, verdict: 'suspicious' }).map((a) => a.package))
       .toEqual(['b.sus']);
     expect(visibleApps(apps, { ...opts, query: 'BAD' }).map((a) => a.package)).toEqual(['a.bad']);
+  });
+
+  const sy = (category: Category) => ({ category, severity: 'warn' as const, text: category });
+  const faceted = [
+    app('a.bad', 'malicious', { symptoms: [sy('ads'), sy('removal')], source: { label: 'Chrome', days: 1 } }),
+    app('b.sus', 'suspicious', { symptoms: [sy('notif')], source: { label: 'Sklep Play', days: 3 } }),
+    app('c.rev', 'review', { symptoms: [sy('ads')], source: { label: 'Sklep Play', days: 9 } }),
+    app('d.ok', 'safe', { symptoms: [], source: { label: 'systemowa', days: null } }),
+  ];
+
+  test('category filter keeps apps with any of the chosen categories', () => {
+    const opts = { showAll: true, verdict: 'all' as const, query: '' };
+    expect(visibleApps(faceted, { ...opts, categories: ['ads'] }).map((a) => a.package))
+      .toEqual(['a.bad', 'c.rev']);
+    expect(visibleApps(faceted, { ...opts, categories: ['notif', 'removal'] }).map((a) => a.package))
+      .toEqual(['a.bad', 'b.sus']);
+    expect(visibleApps(faceted, { ...opts, categories: [] })).toHaveLength(4);
+  });
+
+  test('source filter keeps apps with that source label and combines with the others', () => {
+    const opts = { showAll: true, verdict: 'all' as const, query: '' };
+    expect(visibleApps(faceted, { ...opts, source: 'Sklep Play' }).map((a) => a.package))
+      .toEqual(['b.sus', 'c.rev']);
+    expect(visibleApps(faceted, { ...opts, source: 'Sklep Play', categories: ['ads'] })
+      .map((a) => a.package)).toEqual(['c.rev']);
+    expect(visibleApps(faceted, { ...opts, source: 'systemowa', showAll: false })).toHaveLength(0);
+    expect(visibleApps(faceted, { ...opts, source: null })).toHaveLength(4);
+  });
+
+  test('facet counts: categories in fixed order, sources by count', () => {
+    expect(facetCounts(faceted)).toEqual({
+      categories: [{ value: 'ads', count: 2 }, { value: 'notif', count: 1 }, { value: 'removal', count: 1 }],
+      sources: [{ value: 'Sklep Play', count: 2 }, { value: 'Chrome', count: 1 }, { value: 'systemowa', count: 1 }],
+    });
   });
 });
 

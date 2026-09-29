@@ -4,13 +4,14 @@
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
   import { initial, LEVEL_TONE, moveFocus } from '../lib/logic';
-  import type { AppView, Level } from '../lib/types';
+  import type { AppView, Category, Level } from '../lib/types';
   import CountUp from '../ui/CountUp.svelte';
   import Icon, { type IconName } from '../ui/Icon.svelte';
   import Segmented from '../ui/Segmented.svelte';
   import AppIcon from './AppIcon.svelte';
 
-  let { rows, focused }: { rows: AppView[]; focused: string | null } = $props();
+  type Facets = { categories: { value: Category; count: number }[]; sources: { value: string; count: number }[] };
+  let { rows, focused, facets }: { rows: AppView[]; focused: string | null; facets: Facets } = $props();
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
   const counts = $derived(s.scan!.counts);
@@ -39,6 +40,22 @@
     ok: 'bg-ok-soft text-ok',
   };
   const TILE_ICON_OFF = 'bg-neutral-soft text-soft ring-1 ring-current/15 ring-inset';
+
+  // Wybrana opcja zostaje na liście z zerem, gdy przełącznik lub wyszukiwarka ją ukryje.
+  const typeChips = $derived([...facets.categories, ...s.categoryFilter
+    .filter((c) => !facets.categories.some((f) => f.value === c)).map((value) => ({ value, count: 0 }))]);
+  const sourceOptions = $derived(s.sourceFilter && !facets.sources.some((f) => f.value === s.sourceFilter)
+    ? [...facets.sources, { value: s.sourceFilter, count: 0 }] : facets.sources);
+  const filtered = $derived(s.categoryFilter.length > 0 || s.sourceFilter !== null);
+
+  function toggleType(c: Category) {
+    s.categoryFilter = s.categoryFilter.includes(c) ? s.categoryFilter.filter((x) => x !== c) : [...s.categoryFilter, c];
+  }
+
+  function clearFilters() {
+    s.categoryFilter = [];
+    s.sourceFilter = null;
+  }
 
   let table: HTMLElement;
 
@@ -88,6 +105,27 @@
     <input type="search" class="flex-1 bg-transparent text-ink outline-none" bind:value={s.query}
       placeholder={t('expert.search')} aria-label={t('expert.search')} />
   </label>
+</div>
+
+<div class="flex flex-wrap items-center gap-2">
+  <div role="group" aria-label={t('expert.filter_types')} class="flex flex-1 flex-wrap gap-1.5">
+    {#each typeChips as c (c.value)}
+      {@const on = s.categoryFilter.includes(c.value)}
+      <button type="button" aria-pressed={on} onclick={() => toggleType(c.value)}
+        class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold ring-1 ring-inset transition duration-150
+          {on ? 'bg-accent-soft text-accent ring-current/30' : 'text-mut ring-line hover:text-ink'}">
+        <Icon name={CATEGORY_ICON[c.value]} size={14} />{t(categoryKey(c.value))}<span class="mono text-2xs opacity-70">{c.count}</span>
+      </button>
+    {/each}
+  </div>
+  <select aria-label={t('expert.filter_source')} value={s.sourceFilter ?? ''}
+    onchange={(e) => (s.sourceFilter = e.currentTarget.value || null)}
+    class="field rounded-[10px] px-2.5 py-1.5 text-sm font-semibold {s.sourceFilter ? 'text-accent' : 'text-mut'}">
+    <option value="">{t('expert.all_sources')}</option>
+    {#each sourceOptions as o (o.value)}
+      <option value={o.value}>{o.value} · {o.count}</option>
+    {/each}
+  </select>
 </div>
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
@@ -145,4 +183,10 @@
       {/each}
     </tbody>
   </table>
+  {#if rows.length === 0 && filtered}
+    <div class="flex items-center justify-center gap-3 px-4 py-6 text-sm text-mut">
+      {t('expert.no_match')}
+      <button type="button" class="font-semibold text-accent hover:underline" onclick={clearFilters}>{t('expert.clear_filters')}</button>
+    </div>
+  {/if}
 </div>

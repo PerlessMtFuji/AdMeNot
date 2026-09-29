@@ -104,6 +104,32 @@ describe('Results', () => {
     await fireEvent.click(screen.getByRole('button', { name: `Wszystkie · ${s.scan!.apps.length}` }));
     expect(screen.getAllByRole('row')).toHaveLength(s.scan!.apps.length + 1);
   });
+  test('expert filters: problem type chips and source list narrow the table, clear brings it back', async () => {
+    const { s, ctl } = await scanned();
+    await ctl.setMode('expert');
+    await tick();
+    const flagged = s.scan!.apps.filter((a) => a.verdict !== 'safe');
+    const types = screen.getByRole('group', { name: 'Rodzaj problemu' });
+    const ads = within(types).getByRole('button', { name: /^Reklamy/ });
+    expect(ads.getAttribute('aria-pressed')).toBe('false');
+    await fireEvent.click(ads);
+    expect(ads.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getAllByRole('row')).toHaveLength(2);
+    expect(screen.getByRole('checkbox', { name: 'com.clean.pro.boost' })).toBeTruthy();
+    const source = screen.getByRole('combobox', { name: 'Filtr źródła' });
+    expect(within(source).getByRole('option', { name: 'Wszystkie źródła' })).toBeTruthy();
+    await fireEvent.change(source, { target: { value: 'Sklep Play' } });
+    expect(screen.getAllByRole('row')).toHaveLength(1);
+    expect(screen.getByText('Brak aplikacji pasujących do filtrów.')).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Wyczyść filtry' }));
+    expect(screen.getAllByRole('row')).toHaveLength(flagged.length + 1);
+    expect(s.categoryFilter).toEqual([]);
+    expect(s.sourceFilter).toBeNull();
+    await fireEvent.change(source, { target: { value: 'Chrome' } });
+    ctl.newScan();
+    expect(s.sourceFilter).toBeNull();
+  });
+
   test('expert table: keys typed in a row control stay there, arrows keep the focused row in view', async () => {
     const { s, ctl } = await scanned();
     await ctl.setMode('expert');

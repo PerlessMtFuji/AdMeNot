@@ -12,7 +12,7 @@
   import PlanPanel from '../components/PlanPanel.svelte';
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
-  import { flaggedApps, focusedApp, visibleApps } from '../lib/logic';
+  import { facetCounts, flaggedApps, focusedApp, visibleApps } from '../lib/logic';
   import { DUR, enter, ms, stagger } from '../lib/motion';
   import type { Mode } from '../lib/types';
   import Banner from '../ui/Banner.svelte';
@@ -41,7 +41,11 @@
   });
   const withGaps = $derived(apps.filter((a) => a.gaps.length > 0).length);
   let showSafe = $state(false);
-  const rows = $derived(visibleApps(apps, { showAll: s.showAll, verdict: 'all', query: s.query }));
+  // Liczniki filtrów rodzaju i źródła liczone po przełączniku i wyszukiwarce, przed samymi filtrami.
+  const base = $derived(visibleApps(apps, { showAll: s.showAll, verdict: 'all', query: s.query }));
+  const facets = $derived(facetCounts(base));
+  const rows = $derived(visibleApps(base, { showAll: true, verdict: 'all', query: '',
+    categories: s.categoryFilter, source: s.sourceFilter }));
   const focused = $derived(focusedApp(rows.map((r) => r.package), s.focused));
   const focusedRow = $derived(rows.find((r) => r.package === focused) ?? null);
   const titleParts = $derived(tp('results.title', flagged.length, { count: '\u0000' }).split('\u0000'));
@@ -84,7 +88,7 @@
     <WhoIsShowing ask={() => ctl.whoIsShowing()} />
 
     {#if expert}
-      <ExpertTable {rows} {focused} />
+      <ExpertTable {rows} {focused} {facets} />
     {:else if flagged.length === 0}
       <div class="grid place-items-center gap-2 py-10 text-center" in:enter>
         {#if anyIncomplete}

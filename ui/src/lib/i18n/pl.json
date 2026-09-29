@@ -109,6 +109,7 @@
     "search": "Szukaj aplikacji lub pakietu",
     "apk_error": "APK: błąd", "collector_failed": "Kolektor {name}: {error}",
     "table": "Tabela aplikacji", "filter": "Filtr", "filter_attention": "Wymagające uwagi · {count}", "filter_all": "Wszystkie · {count}",
+    "filter_types": "Rodzaj problemu", "filter_source": "Filtr źródła", "all_sources": "Wszystkie źródła", "no_match": "Brak aplikacji pasujących do filtrów.", "clear_filters": "Wyczyść filtry",
     "collectors_apk": "kolektory {ok}/{total} · APK {analyzed}/{requested}", "collectors_only": "kolektory {ok}/{total}", "today": "dziś", "protected": "Aplikacja chroniona",
     "days": { "one": "{count} dzień temu", "few": "{count} dni temu", "many": "{count} dni temu", "other": "{count} dnia temu" }
   },

@@ -32,12 +32,31 @@ export function flaggedApps(apps: AppView[]): AppView[] {
 }
 
 export function visibleApps(apps: AppView[],
-  opts: { showAll: boolean; verdict: Verdict | 'all'; query: string }): AppView[] {
+  opts: { showAll: boolean; verdict: Verdict | 'all'; query: string; categories?: Category[];
+    source?: string | null }): AppView[] {
   const q = opts.query.trim().toLowerCase();
+  const cats = opts.categories ?? [];
   return apps.filter((a) =>
     (opts.showAll || a.verdict !== 'safe')
     && (opts.verdict === 'all' || a.verdict === opts.verdict)
-    && (!q || a.name.toLowerCase().includes(q) || a.package.toLowerCase().includes(q)));
+    && (!q || a.name.toLowerCase().includes(q) || a.package.toLowerCase().includes(q))
+    && (!cats.length || a.symptoms.some((sy) => cats.includes(sy.category)))
+    && (!opts.source || a.source.label === opts.source));
+}
+
+// Opcje filtrów tabeli eksperta: kategorie w stałej kolejności, źródła od najczęstszego.
+export function facetCounts(apps: AppView[]): {
+  categories: { value: Category; count: number }[];
+  sources: { value: string; count: number }[];
+} {
+  const categories = CATEGORY_ORDER
+    .map((value) => ({ value, count: apps.filter((a) => a.symptoms.some((sy) => sy.category === value)).length }))
+    .filter((c) => c.count > 0);
+  const bySource = new Map<string, number>();
+  for (const a of apps) bySource.set(a.source.label, (bySource.get(a.source.label) ?? 0) + 1);
+  const sources = [...bySource].map(([value, count]) => ({ value, count }))
+    .sort((x, y) => y.count - x.count || x.value.localeCompare(y.value));
+  return { categories, sources };
 }
 
 export function upsertStep(steps: StepEvent[], step: StepEvent): StepEvent[] {
