@@ -108,3 +108,22 @@ test('repair cards keep their full height when the order is longer than the wind
     expect(await card.evaluate((el) => el.scrollHeight - el.clientHeight)).toBe(0);
   }
 });
+
+test('screen view and screenshots: start, stop, screenshot lands in the order strip', async ({ page }) => {
+  await scan(page, 'report');
+  const panel = page.getByRole('complementary', { name: 'Plan naprawy' });
+  await panel.getByRole('button', { name: 'Podgląd ekranu' }).click();
+  await expect(panel.getByRole('button', { name: 'Zamknij podgląd' })).toBeVisible();
+  await panel.getByRole('button', { name: 'Zrzut ekranu' }).click();
+  await expect(panel.getByText('1 zrzut do protokołu')).toBeVisible();
+  await panel.getByRole('button', { name: 'Zamknij podgląd' }).click();
+  await expect(panel.getByRole('button', { name: 'Podgląd ekranu' })).toBeVisible();
+  await page.getByRole('button', { name: /Napraw zaznaczone/ }).click();
+  await page.getByRole('button', { name: /^Wykonaj/ }).click();
+  await expect(page.getByRole('heading', { name: 'Telefon naprawiony' })).toBeVisible({ timeout: 15_000 });
+  const box = page.getByRole('checkbox', { name: 'w protokole' });
+  await expect(box).toBeChecked();
+  await expect(page.getByText('w protokole: 1/8')).toBeVisible();
+  await box.uncheck();
+  await expect(page.getByText('w protokole: 0/8')).toBeVisible();
+});
