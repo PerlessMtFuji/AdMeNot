@@ -1,10 +1,11 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import type { Controller } from '../lib/controller';
-  import { t, tp } from '../lib/i18n/index.svelte';
+  import { t } from '../lib/i18n/index.svelte';
   import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
+  import ShotStatus from './ShotStatus.svelte';
 
   let { serial, name }: { serial: string; name: string } = $props();
   const ctl = getContext<Controller>('ctl');
@@ -31,10 +32,5 @@
   {#if mine && active && s.mirror.blocked}
     <Banner tone="warn" icon="info" title={t('mirror.blocked_title')}>{t('mirror.blocked_text')}</Banner>
   {/if}
-  {#if s.lastShot && s.lastShotSerial === serial}
-    <div class="flex items-center gap-2 text-xs text-mut" role="status">
-      {#if s.lastShot.image}<img src={s.lastShot.image} alt="" class="h-10 w-auto rounded-md border border-line" />{/if}
-      <span>{tp('shot.count', s.shotCount)}{s.lastShot.black ? ` · ${t('shot.black')}` : ''}</span>
-    </div>
-  {/if}
+  <ShotStatus {serial} />
 </div>

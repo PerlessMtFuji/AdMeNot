@@ -39,3 +39,17 @@ test('offers the screen view and a screenshot with the description', async () =>
   await flush();
   expect(bridge.calls.some((c) => c.method === 'screenshot')).toBe(true);
 });
+
+test('a screenshot saved with the description is confirmed right under the button', async () => {
+  const { s } = await renderWith(WhoIsShowing, 'empty', { ask: async () => ({ resumed: null, overlays: [], errors: [] }) });
+  s.serial = 'R58T00TEST';
+  await tick();
+  await fireEvent.click(screen.getByRole('button', { name: 'Kto to wyświetla?' }));
+  await flush();
+  await tick();
+  expect(screen.queryByText(/zrzut do protokołu/)).toBeNull();
+  await fireEvent.click(screen.getByRole('button', { name: 'Zapisz zrzut z tym opisem' }));
+  await flush();
+  await tick();
+  expect(screen.getByText('1 zrzut do protokołu')).toBeTruthy();
+});
