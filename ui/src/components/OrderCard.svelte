@@ -8,11 +8,13 @@
   import Icon from '../ui/Icon.svelte';
   import AppIcon from './AppIcon.svelte';
   import ReportButton from './ReportButton.svelte';
+  import ScreenshotStrip from './ScreenshotStrip.svelte';
 
   type Props = { order: HistoryOrder; names: Map<string, string>; icons?: Map<string, string | null>; disabled: boolean;
     onrestore: (pkg: string) => void; onrestoreStep: (actionId: number) => void; onundoAll: () => void };
   let { order, names, icons, disabled, onrestore, onrestoreStep, onundoAll }: Props = $props();
   let open = $state<string[]>([]);
+  let shotsOpen = $state(false);
   const rows = $derived(groupHistory(order.actions));
   const undone = $derived(order.status === 'undone');
   const canUndo = $derived(order.actions.some((a) => a.status === 'done' || a.status === 'pending'));
@@ -41,6 +43,10 @@
     <div class="min-w-0 flex-1">
       <div class="text-lg {undone ? 'font-semibold text-mut' : 'font-bold'}">{title}</div>
       <div class="text-sm text-soft">{order.client ? `${order.client} · ` : ''}<span class="mono">{order.number}</span>{order.interrupted ? ` · ${order.status_label}` : ''}</div>
+      {#if order.screenshots}
+        <button type="button" class="mt-1 text-sm font-semibold text-soft hover:text-ink" aria-expanded={shotsOpen}
+          onclick={() => (shotsOpen = !shotsOpen)}>{t('shot.history', { count: order.screenshots })}</button>
+      {/if}
     </div>
     <div class="flex flex-none flex-col items-end gap-1">
       <ReportButton order={order.number} variant="ghost" size="sm" />
@@ -49,6 +55,11 @@
       {/if}
     </div>
   </div>
+  {#if shotsOpen}
+    <div class="border-t border-line/70 px-5 py-3" transition:slide={{ duration: ms(DUR.enter) }}>
+      <ScreenshotStrip order={order.number} />
+    </div>
+  {/if}
   {#each rows as r (r.package)}
     <div class="group border-t border-line/70">
       <div class="flex items-center gap-3 px-5 py-2.5 transition-colors duration-150 hover:bg-surface-2">

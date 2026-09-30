@@ -50,7 +50,7 @@
   async function checkAdb() {
     const r = await ctl.checkAdb(adbPath.trim() || null);
     if (r) check = r.ok
-      ? { ok: true, text: t('settings.adb_ok', { version: r.version ?? '' }) }
+      ? { ok: true, text: `${t('settings.adb_ok', { version: r.version ?? '' })} · ${t(`settings.adb_source.${r.source}`)}` }
       : { ok: false, text: t('settings.adb_fail', { message: r.message }) };
   }
 
@@ -103,6 +103,16 @@
         <Button variant="primary" onclick={savePaths}>{t('common.save')}</Button>
         {#if saved}<span class="flex items-center gap-1 text-ok"><Icon name="check" />{t('common.saved')}</span>{/if}
       </div>
+    </div></Card>
+
+    <Card><div class="flex flex-col gap-3 p-6">
+      <span class="lbl">{t('settings.mirror_title')}</span>
+      <label class="flex items-center gap-3">
+        <input type="checkbox" checked={s.settings.mirror_auto}
+          onchange={(e) => ctl.saveSettings({ mirror_auto: e.currentTarget.checked })} />
+        <span>{t('settings.mirror_auto')}</span>
+      </label>
+      <span class="text-xs text-mut">{t('settings.mirror_auto_hint')}</span>
     </div></Card>
 
     <Card><div class="flex flex-col gap-5 p-6">

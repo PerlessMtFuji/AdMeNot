@@ -6,6 +6,7 @@
   import DeviceCard from '../components/DeviceCard.svelte';
   import MirrorControls from '../components/MirrorControls.svelte';
   import ReportButton from '../components/ReportButton.svelte';
+  import ScreenshotStrip from '../components/ScreenshotStrip.svelte';
   import StepTimeline from '../components/StepTimeline.svelte';
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
@@ -171,6 +172,7 @@
           <Button variant="primary" size="lg" disabled={s.orderRunning} onclick={() => ctl.resume(order)}>{t('exec.resume')}</Button>
         {/if}
         <Button variant={s.result.stopped ? 'secondary' : 'primary'} size="lg" onclick={() => ctl.newScan()}>{t('exec.new_scan')}</Button>
+        <ScreenshotStrip {order} />
         <ReportButton order={order} size="lg" />
         <Button variant="ghost" disabled={s.orderRunning} onclick={() => undoAll(order)}><Icon name="undo-2" />{t('exec.undo_all')}</Button>
       </div>

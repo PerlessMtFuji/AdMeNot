@@ -3,7 +3,10 @@ import { tick } from 'svelte';
 import { expect, test, vi } from 'vitest';
 import App from '../App.svelte';
 import { i18n } from '../lib/i18n/index.svelte';
-import { setupCtl } from '../test-utils';
+import { renderWith, setupCtl } from '../test-utils';
+import Settings from './Settings.svelte';
+
+const flush = () => new Promise((r) => setTimeout(r, 0));
 
 test('settings: theme, language, mode, adb check, folder and save', async () => {
   const { ctl, s, bridge } = await setupCtl('empty');
@@ -52,4 +55,16 @@ test('settings: service details and logo', async () => {
   expect(bridge.calls.at(-1)).toEqual({ method: 'save_service', args: [{
     name: 'Serwis Ząb', address: null, phone: '600 000 000', logo: 'D:\\DeMalware\\logo.png' }] });
   expect(await screen.findByText(/Zapisano/)).toBeTruthy();
+});
+
+test('screen view setting and adb source', async () => {
+  const { s, bridge } = await renderWith(Settings, 'empty');
+  const toggle = screen.getByRole('checkbox', { name: 'Otwieraj podgląd ekranu po podłączeniu telefonu' });
+  await fireEvent.click(toggle);
+  await flush();
+  expect(s.settings.mirror_auto).toBe(true);
+  expect(bridge.calls.some((c) => c.method === 'save_settings' && (c.args[0] as { mirror_auto?: boolean }).mirror_auto === true)).toBe(true);
+  await fireEvent.click(screen.getByRole('button', { name: 'Sprawdź' }));
+  await flush();
+  expect(screen.getByText(/· dołączony$/)).toBeTruthy();
 });
