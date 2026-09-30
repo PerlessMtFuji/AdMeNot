@@ -21,7 +21,7 @@ test('start, running, stop', async () => {
 
 test('another phone mirrored: this card still offers to start', async () => {
   const { s } = await renderWith(MirrorControls, 'empty', PROPS);
-  s.mirror = { available: true, serial: 'OTHER', state: 'running', reason: null, blocked: false };
+  s.mirror = { available: true, serial: 'OTHER', state: 'running', reason: null, blocked: false, awakeBlocked: false };
   await tick();
   expect(screen.getByRole('button', { name: 'Podgląd ekranu' })).toBeTruthy();
 });
@@ -40,7 +40,15 @@ test('missing scrcpy disables the view but not the screenshot', async () => {
 
 test('blocked control shows the Xiaomi hint while mirroring', async () => {
   const { s } = await renderWith(MirrorControls, 'empty', PROPS);
-  s.mirror = { available: true, serial: PROPS.serial, state: 'running', reason: null, blocked: true };
+  s.mirror = { available: true, serial: PROPS.serial, state: 'running', reason: null, blocked: true, awakeBlocked: false };
   await tick();
   expect(screen.getByText(/Debugowanie USB \(ustawienia zabezpieczeń\)/)).toBeTruthy();
+});
+
+test('a phone that will not stay awake gets a short hint while mirroring', async () => {
+  const { s } = await renderWith(MirrorControls, 'empty', PROPS);
+  s.mirror = { available: true, serial: PROPS.serial, state: 'running', reason: null, blocked: false, awakeBlocked: true };
+  await tick();
+  expect(screen.getByText(/Ekran telefonu może gasnąć/)).toBeTruthy();
+  expect(screen.getByText(/Wyłącz monitorowanie uprawnień/)).toBeTruthy();
 });

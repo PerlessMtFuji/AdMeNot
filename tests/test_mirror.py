@@ -8,12 +8,21 @@ from demalware.engine.mirror import Mirror, MirrorUnavailable, args_for
 FIXTURES = Path(__file__).parent / "fixtures" / "scrcpy"
 OPPO = (FIXTURES / "oppo-cph2271-4.1.txt").read_text("utf-8").splitlines()
 FAILURE = (FIXTURES / "start-failure-4.1.txt").read_text("utf-8").splitlines()
-# Nie nagrane (brak Xiaomi przy tworzeniu planu) — potwierdzić przy próbie w Task 14.
 # Nagrane na Redmi 22101316G (Android 13, MIUI) 2026-09-30 po kliknięciu w okno scrcpy.
 BLOCKED = [("[server] ERROR: Injecting input events requires the caller (or the source of the "
             "instrumentation, if any) to have the INJECT_EVENTS permission."),
            ('[server] ERROR: Make sure you have enabled "USB debugging (Security Settings)" '
             "and then rebooted your device.")]
+# Nagrane na realme RMX3474 (Android 12) 2026-09-30: przy monitorowaniu uprawnień ColorOS
+# `--stay-awake` nie może zmienić ustawienia, a podgląd działa dalej.
+STAY_AWAKE_DENIED = [
+    "[server] ERROR: Could not invoke method",
+    ("Caused by: java.lang.SecurityException: Permission denial: writing to settings requires:"
+     "android.permission.WRITE_SECURE_SETTINGS"),
+    '[server] ERROR: Could not change "stay_on_while_plugged_in"',
+    ("com.genymobile.scrcpy.util.SettingsException: Could not access settings: "
+     "global put stay_on_while_plugged_in 7"),
+]
 EXE = Path("C:/tools/scrcpy.exe")
 
 
@@ -119,6 +128,25 @@ def test_blocked_control_warns_once_and_keeps_running():
     h.mirror.wait()
     assert h.warnings == [{"serial": "S1", "code": "control_blocked"}]
     assert ("failed", None) not in h.names() and h.names()[-1] == ("stopped", "closed")
+
+
+def test_stay_awake_denied_warns_once_and_keeps_running():
+    proc = FakeProc(OPPO[:1] + STAY_AWAKE_DENIED + OPPO[1:] + STAY_AWAKE_DENIED)
+    h = Harness(proc)
+    h.mirror.start("S1", "t")
+    proc.close_window(0)
+    h.mirror.wait()
+    assert h.warnings == [{"serial": "S1", "code": "stay_awake_blocked"}]
+    assert ("running", None) in h.names() and h.names()[-1] == ("stopped", "closed")
+
+
+def test_both_warnings_come_once_each():
+    proc = FakeProc(STAY_AWAKE_DENIED + OPPO + BLOCKED + STAY_AWAKE_DENIED + BLOCKED)
+    h = Harness(proc)
+    h.mirror.start("S1", "t")
+    proc.close_window(0)
+    h.mirror.wait()
+    assert [w["code"] for w in h.warnings] == ["stay_awake_blocked", "control_blocked"]
 
 
 def test_stop_kills_and_reports_stopped_exactly_once():

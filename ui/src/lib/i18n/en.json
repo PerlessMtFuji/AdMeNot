@@ -175,6 +175,7 @@
     "missing": "Screen view unavailable: bundled scrcpy is missing (run scripts\\fetch_tools.py).",
     "blocked_title": "Screen view works, but the phone blocks control.",
     "blocked_text": "On Xiaomi, turn on “USB debugging (Security settings)” in developer options, then close and reopen the screen view.",
+    "awake_blocked": "The phone screen may turn off: the phone did not let it stay on. On OPPO and realme turn on “Disable permission monitoring” in developer options, on Xiaomi “USB debugging (Security settings)”.",
     "wait_for_ad": "Open the screen view and wait for the ad",
     "show_phone": "Show the phone screen"
   },

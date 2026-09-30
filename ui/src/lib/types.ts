@@ -323,7 +323,7 @@ export interface EventMap {
   'job:end': { job_id: string; kind: string };
   'app:close_requested': { kind: string };
   'mirror:state': MirrorView;
-  'mirror:warning': { serial: string; code: 'control_blocked' };
+  'mirror:warning': { serial: string; code: 'control_blocked' | 'stay_awake_blocked' };
 }
 
 export type EventName = keyof EventMap;

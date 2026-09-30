@@ -175,6 +175,7 @@
     "missing": "Podgląd niedostępny: brak dołączonego scrcpy (uruchom scripts\\fetch_tools.py).",
     "blocked_title": "Podgląd działa, ale telefon blokuje sterowanie.",
     "blocked_text": "Na Xiaomi włącz w opcjach programisty „Debugowanie USB (ustawienia zabezpieczeń)”, potem zamknij i otwórz podgląd.",
+    "awake_blocked": "Ekran telefonu może gasnąć: telefon nie pozwolił go utrzymać włączonego. Na OPPO i realme włącz w opcjach programisty „Wyłącz monitorowanie uprawnień”, na Xiaomi „Debugowanie USB (ustawienia zabezpieczeń)”.",
     "wait_for_ad": "Otwórz podgląd i poczekaj na reklamę",
     "show_phone": "Pokaż ekran telefonu"
   },

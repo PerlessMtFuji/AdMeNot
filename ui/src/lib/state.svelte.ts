@@ -48,8 +48,8 @@ export class AppState {
   undoResult = $state<UndoDone | null>(null);
   reportBusy = $state<string | null>(null);
   reports = $state<Record<string, ReportResult>>({});
-  mirror = $state<{ available: boolean; serial: string | null; state: MirrorState; reason: string | null; blocked: boolean }>(
-    { available: false, serial: null, state: 'stopped', reason: null, blocked: false });
+  mirror = $state<{ available: boolean; serial: string | null; state: MirrorState; reason: string | null; blocked: boolean; awakeBlocked: boolean }>(
+    { available: false, serial: null, state: 'stopped', reason: null, blocked: false, awakeBlocked: false });
   shots = $state<Record<string, ShotsView>>({});
   lastShot = $state<ShotView | null>(null);
   lastShotSerial = $state<string | null>(null);

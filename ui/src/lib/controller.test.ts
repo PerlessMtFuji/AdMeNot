@@ -214,10 +214,13 @@ describe('screen mirror and screenshots (Plan 6b)', () => {
     expect(ctl.mirrorActive('OTHER')).toBe(false);
     bridge.emit('mirror:warning', { serial: 'R58T00TEST', code: 'control_blocked' });
     expect(s.mirror.blocked).toBe(true);
+    bridge.emit('mirror:warning', { serial: 'R58T00TEST', code: 'stay_awake_blocked' });
+    expect(s.mirror.awakeBlocked).toBe(true);
     await ctl.mirrorStop();
     await flush();
     expect(s.mirror.state).toBe('stopped');
     expect(s.mirror.blocked).toBe(false);
+    expect(s.mirror.awakeBlocked).toBe(false);
   });
 
   test('mirror failure becomes an error card', async () => {

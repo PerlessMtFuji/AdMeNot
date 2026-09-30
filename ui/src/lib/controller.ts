@@ -183,11 +183,14 @@ export class Controller {
       if (d.serial !== s.mirror.serial && active) return;
       const same = s.mirror.serial === d.serial;
       s.mirror = { ...s.mirror, serial: d.serial, state: d.state, reason: d.reason ?? null,
-                   blocked: same && d.state === 'running' ? s.mirror.blocked : false };
+                   blocked: same && d.state === 'running' ? s.mirror.blocked : false,
+                   awakeBlocked: same && d.state === 'running' ? s.mirror.awakeBlocked : false };
       if (d.state === 'failed') s.error = { key: 'mirror_failed', message: d.reason ?? '' };
     });
     on('mirror:warning', (d) => {
-      if (d.code === 'control_blocked' && s.mirror.serial === d.serial) s.mirror = { ...s.mirror, blocked: true };
+      if (s.mirror.serial !== d.serial) return;
+      if (d.code === 'control_blocked') s.mirror = { ...s.mirror, blocked: true };
+      else if (d.code === 'stay_awake_blocked') s.mirror = { ...s.mirror, awakeBlocked: true };
     });
   }
 
@@ -394,7 +397,7 @@ export class Controller {
 
   async mirrorStart(serial: string, name: string): Promise<void> {
     const s = this.state;
-    s.mirror = { ...s.mirror, serial, state: 'starting', reason: null, blocked: false };
+    s.mirror = { ...s.mirror, serial, state: 'starting', reason: null, blocked: false, awakeBlocked: false };
     // Stan przychodzi zdarzeniami `mirror:state` — wynik wywołania może być starszy niż one.
     const r = await this.call(this.api.mirror_start(serial, name));
     if (!r) {

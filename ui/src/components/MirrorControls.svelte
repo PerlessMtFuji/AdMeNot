@@ -32,5 +32,6 @@
   {#if mine && active && s.mirror.blocked}
     <Banner tone="warn" icon="info" title={t('mirror.blocked_title')}>{t('mirror.blocked_text')}</Banner>
   {/if}
+  {#if mine && active && s.mirror.awakeBlocked}<p class="text-xs text-mut">{t('mirror.awake_blocked')}</p>{/if}
   <ShotStatus {serial} />
 </div>
