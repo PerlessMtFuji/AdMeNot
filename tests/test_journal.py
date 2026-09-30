@@ -162,6 +162,16 @@ def test_attach_keeps_the_eight_newest_in_the_report(shots_journal):
     assert chosen == ids[-MAX_REPORT_SCREENSHOTS:]
 
 
+def test_attach_to_a_resumed_order_keeps_the_servicers_choice(shots_journal):
+    j = shots_journal
+    order = j.create_order("S1", None)
+    chosen = [j.add_screenshot("S1", CONTEXT, order.id).id for _ in range(MAX_REPORT_SCREENSHOTS - 2)]
+    waiting = [j.add_screenshot("S1", CONTEXT).id for _ in range(3)]
+    j.attach_screenshots(waiting, order.id)
+    in_report = [s.id for s in j.screenshots(order.id) if s.in_report]
+    assert in_report == chosen + waiting[-2:]
+
+
 def test_attach_never_moves_a_shot_from_another_order(shots_journal):
     j = shots_journal
     first = j.create_order("S1", None)
