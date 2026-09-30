@@ -9,9 +9,11 @@ FIXTURES = Path(__file__).parent / "fixtures" / "scrcpy"
 OPPO = (FIXTURES / "oppo-cph2271-4.1.txt").read_text("utf-8").splitlines()
 FAILURE = (FIXTURES / "start-failure-4.1.txt").read_text("utf-8").splitlines()
 # Nie nagrane (brak Xiaomi przy tworzeniu planu) — potwierdzić przy próbie w Task 14.
-BLOCKED = ["[server] ERROR: Exception on thread Thread[control-recv,5,main]",
-           ("java.lang.SecurityException: Injecting input events requires the caller (or the "
-            "source of the instrumentation, if any) to have the INJECT_EVENTS permission.")]
+# Nagrane na Redmi 22101316G (Android 13, MIUI) 2026-09-30 po kliknięciu w okno scrcpy.
+BLOCKED = [("[server] ERROR: Injecting input events requires the caller (or the source of the "
+            "instrumentation, if any) to have the INJECT_EVENTS permission."),
+           ('[server] ERROR: Make sure you have enabled "USB debugging (Security Settings)" '
+            "and then rebooted your device.")]
 EXE = Path("C:/tools/scrcpy.exe")
 
 

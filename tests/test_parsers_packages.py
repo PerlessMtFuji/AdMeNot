@@ -137,3 +137,35 @@ def test_parse_dumpsys_packages_without_requested_section():
     }
     assert d.granted == {"android.permission.RECEIVE_BOOT_COMPLETED",
                          "android.permission.REQUEST_DELETE_PACKAGES"}
+
+
+# Android 13 MIUI (Redmi 22101316G): biblioteki współdzielone wypisują „<lib> overlay paths:”
+# bez wcięcia w środku bloku pakietu — to nie jest nowa sekcja najwyższego poziomu.
+DUMPSYS_MIUI_OVERLAYS = """Packages:
+  Package [com.android.providers.telephony] (c754182):
+    versionCode=33 minSdk=33 targetSdk=33
+      firstInstallTime=2009-01-01 01:00:00
+      overlay paths:
+        /data/resource-cache/com.android.systemui-neutral-dR4e.frro
+      
+com.miui.system overlay paths:
+          /data/resource-cache/com.android.systemui-neutral-dR4e.frro
+      
+micloud-sdk overlay paths:
+          /data/resource-cache/com.android.systemui-accent-wQgI.frro
+  Package [com.clean.pro] (bba4d21):
+    versionCode=7 minSdk=24 targetSdk=33
+    install permissions:
+      android.permission.INTERNET: granted=true
+
+Hidden system packages:
+  Package [com.clean.pro] (f1):
+    versionCode=999
+"""
+
+
+def test_parse_dumpsys_packages_miui_unindented_overlay_lines():
+    dumps = parse_dumpsys_packages(DUMPSYS_MIUI_OVERLAYS)
+    assert set(dumps) == {"com.android.providers.telephony", "com.clean.pro"}
+    assert dumps["com.clean.pro"].version_code == 7
+    assert dumps["com.clean.pro"].granted == {"android.permission.INTERNET"}
