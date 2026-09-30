@@ -211,10 +211,13 @@ export class Controller {
   }
 
   newScan(): void {
+    // Powrót na ekran Połącz kończy sprawę: zrzut „przed skanem” należy już do następnego zlecenia.
+    const serial = this.state.device?.serial ?? this.state.serial;
+    if (serial) void this.call(this.api.close_order(serial));
     Object.assign(this.state, {
       phase: 'connect', screen: 'main', device: null, scan: null, result: null, order: null,
       plan: null, selection: {}, steps: [], disconnectedOrder: null, reports: {},
-      categoryFilter: [], sourceFilter: null,
+      categoryFilter: [], sourceFilter: null, lastShot: null, lastShotSerial: null, shotCount: 0,
     });
   }
 

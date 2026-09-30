@@ -239,6 +239,19 @@ describe('screen mirror and screenshots (Plan 6b)', () => {
     expect(s.shots['ZS/2026/0926/01'].items[0].in_report).toBe(false);
   });
 
+  test('new scan leaves the order: the phone stops collecting shots for it, the counter resets', async () => {
+    const { ctl, s, bridge } = await setupCtl('adware');
+    await ctl.startScan();
+    await vi.waitFor(() => expect(s.phase).toBe('results'));
+    await ctl.takeScreenshot('R58T00TEST');
+    expect(s.lastShot).not.toBeNull();
+    ctl.newScan();
+    await flush();
+    expect(bridge.calls.filter((c) => c.method === 'close_order').map((c) => c.args)).toEqual([['R58T00TEST']]);
+    expect(s.lastShot).toBeNull();
+    expect(s.shotCount).toBe(0);
+  });
+
   test('auto mirror starts once for the ready phone when enabled', async () => {
     const { ctl, s, bridge } = await setupCtl('empty');
     await ctl.saveSettings({ mirror_auto: true });

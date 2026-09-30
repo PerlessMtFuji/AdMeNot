@@ -288,6 +288,7 @@ export interface Api {
   mirror_start(serial: string, name: string | null): R<MirrorView>;
   mirror_stop(): R<{ ok: boolean }>;
   screenshot(serial: string): R<{ shot: ShotView; count: number }>;
+  close_order(serial: string): R<{ ok: boolean }>;
   screenshots(order: string): R<ShotsView>;
   set_screenshot_in_report(id: number, on: boolean): R<ShotView>;
   pick_folder(): R<{ path: string | null }>;

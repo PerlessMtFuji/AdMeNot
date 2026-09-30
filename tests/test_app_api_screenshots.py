@@ -73,6 +73,25 @@ def test_new_scan_closes_the_order_for_new_shots():
     assert api.screenshots(number)["items"] == []
 
 
+def test_leaving_the_order_makes_new_shots_wait_for_the_next_one():
+    # „Nowe skanowanie” wraca na ekran Połącz: zrzut „przed skanem” należy do następnej sprawy
+    # (próba 2026-09-30 na OPPO — trafiał do poprzedniego zlecenia).
+    api, rec = make_api(_phone())
+    _scan(api, rec)
+    first = _order(api, rec)
+    assert api.close_order(SERIAL) == {"ok": True}
+    shot = api.screenshot(SERIAL)["shot"]
+    assert api.screenshots(first)["items"] == []
+    _scan(api, rec)
+    second = _order(api, rec)
+    assert [i["id"] for i in api.screenshots(second)["items"]] == [shot["id"]]
+
+
+def test_close_order_rejects_a_bad_serial():
+    api, _ = make_api(_phone())
+    assert api.close_order("  ")["error"]["key"] == "bad_request"
+
+
 def test_pending_shots_attach_only_to_their_phone():
     phone = _phone()
     api, rec = make_api(phone)

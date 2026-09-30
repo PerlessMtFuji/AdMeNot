@@ -103,6 +103,8 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
         if (serial) replay([['mirror:state', { serial, state: 'stopped', reason: 'closed' }]]);
         return { ok: true };
       }
+      case 'close_order':
+        return { ok: true };
       case 'screenshot': {
         const chosen = shots.filter((x) => x.in_report).length;
         const shot: ShotView = { id: shots.length + 1, taken_at: '2026-09-26T14:31:00',
