@@ -188,7 +188,7 @@ def test_estimate_splits_long_commands_into_batches(tmp_path):
     facts = [AppFacts(f"com.app{i}", apk_path=f"/data/app/~~{'q' * 40}{i}==/com.app{i}-{'z' * 40}==/base.apk")
              for i in range(150)]
     batches = C._stat_paths(facts)
-    assert len(batches) > 1 and all(len(C.stat_command(b)) < 8000 for b in batches)
+    assert len(batches) > 1 and all(len(C.stat_command(b)) <= C._MAX_COMMAND for b in batches)
     assert sum(len(b) for b in batches) == 300  # wzorzec + jawna ścieżka na aplikację
 
 
@@ -199,6 +199,19 @@ def test_estimate_shared_directory_uses_explicit_paths_only(tmp_path):
     assert paths == ["/system/app/Foo.apk", "/system/app/Bar.apk"]
     adb = FakeAdb({C.stat_command(paths): "10 /system/app/Foo.apk\n20 /system/app/Bar.apk\n"})
     assert C.estimate(adb, facts, tmp_path).sizes == {"com.foo": 10, "com.bar": 20}
+
+
+def test_estimate_single_target_in_shared_system_dir_uses_explicit_path(tmp_path):
+    # Single target in /system/app should NOT use *.apk glob, ignoring stray Bar.apk in stat output
+    facts = [AppFacts("com.foo", apk_path="/system/app/Foo.apk")]
+    paths = C._stat_paths(facts)[0]
+    assert "*.apk" not in C.stat_command(paths)
+    assert paths == ["/system/app/Foo.apk"]
+    adb = FakeAdb({
+        C.stat_command(paths): "10 /system/app/Foo.apk\n20 /system/app/Bar.apk\n"
+    })
+    est = C.estimate(adb, facts, tmp_path)
+    assert est.sizes == {"com.foo": 10}
 
 
 def test_fits_counts_space_freed_by_pruning_other_scans(tmp_path, disk):
