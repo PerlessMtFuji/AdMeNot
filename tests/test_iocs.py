@@ -1,6 +1,7 @@
 from datetime import date
 
 import pytest
+import yaml
 
 from demalware.engine.apk.iocs import load_default_iocs, parse_iocs
 from demalware.engine.facts import AppFacts
@@ -60,3 +61,37 @@ def test_ioc_finding_counts_for_trusted_apps_and_bypasses_system_cap(monkeypatch
     result = score_app(facts, [finding], trusted=True, low_behavior_data=False)
     assert result.score == 80
     assert (result.verdict, result.confidence) == ("malicious", "high")
+
+
+def _iocs(entries):
+    return parse_iocs(yaml.safe_dump({"version": 1, "entries": entries}))
+
+
+SIGNER = {"kind": "signer", "value": "a" * 64, "family": "Fam", "source": "https://ex.org/r",
+          "added": date(2026, 10, 1)}
+
+
+def test_shared_signer_match_is_weaker_than_a_sample_hash(monkeypatch):
+    monkeypatch.setattr(python_rules, "load_default_iocs", lambda: _iocs([SIGNER]))
+    f = python_rules.rule_ioc(AppFacts("com.x", cert_sha256=("a" * 64,)))
+    assert (f.rule_id, f.weight, f.basis) == ("DM-IOC-02", 30, "declared")
+    assert "potwierdzon" not in f.text("pl").lower() + f.label_text("pl").lower()
+
+
+def test_exclusive_signer_is_confirmed(monkeypatch):
+    monkeypatch.setattr(python_rules, "load_default_iocs", lambda: _iocs([{**SIGNER, "exclusive": True}]))
+    f = python_rules.rule_ioc(AppFacts("com.x", cert_sha256=("a" * 64,)))
+    assert (f.rule_id, f.weight, f.basis) == ("DM-IOC-02", 60, "confirmed")
+
+
+def test_exclusive_only_for_signers():
+    with pytest.raises(ValueError, match="exclusive"):
+        _iocs([{**SIGNER, "kind": "sha256", "exclusive": True}])
+
+
+def test_shared_signer_does_not_override_the_trust_list(monkeypatch):
+    # Zaufanie obala tylko potwierdzony wskaźnik; wspólny podpisujący nim nie jest.
+    monkeypatch.setattr(python_rules, "load_default_iocs", lambda: _iocs([SIGNER]))
+    facts = AppFacts("com.x", cert_sha256=("a" * 64,))
+    result = score_app(facts, [python_rules.rule_ioc(facts)], trusted=True, low_behavior_data=False)
+    assert result.score == 0
