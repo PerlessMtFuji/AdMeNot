@@ -1,4 +1,4 @@
-"""Ocena silnika na nagraniach z etykietami: python scripts/evaluate.py [katalog_nagrania ...]"""
+"""Ocena silnika na nagraniach z etykietami: python scripts/evaluate.py [--ablation] [katalog_nagrania ...]"""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from demalware.engine.apk.providers import StoredApkProvider
 from demalware.engine.evaluation import (
     LABELS_FILE,
     evaluate,
+    format_contribution_table,
     format_evaluation,
     format_label_audit,
     format_threshold_table,
@@ -26,6 +27,8 @@ FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures"
 
 
 def main(argv: list[str]) -> int:
+    ablation = "--ablation" in argv
+    argv = [a for a in argv if a != "--ablation"]
     dirs = [Path(a) for a in argv] or sorted(p.parent for p in FIXTURES.glob(f"*/{LABELS_FILE}"))
     if not dirs:
         print(f"Brak nagrań z plikiem {LABELS_FILE}.", file=sys.stderr)
@@ -46,6 +49,11 @@ def main(argv: list[str]) -> int:
         print(format_evaluation(evaluate(report.results, labels)))
         sets = load_label_sets(d) or {}
         print(format_threshold_table(report.results, labels, sets))
+        if ablation:
+            print(format_contribution_table(report, labels, sets))
+            bare = run_scan(FakeAdb.from_capture(d), apk=None)
+            print("  Bez analizy APK (skan bez raportów):")
+            print(format_threshold_table(bare.results, labels, sets))
         aged = evaluate(with_install_age(report, 30.0), labels)
         print(f"  Stabilność (instalacja +30 dni): TP {len(evaluate(report.results, labels).tp)} → {len(aged.tp)}")
     return 0

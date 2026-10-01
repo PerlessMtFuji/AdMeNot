@@ -1,17 +1,22 @@
 import pytest
 
 from demalware.engine.evaluation import (
+    ABLATIONS,
     LabelMeta,
     evaluate,
+    format_contribution_table,
     format_evaluation,
     format_label_audit,
     format_threshold_table,
     parse_label_meta,
     parse_label_sets,
     parse_labels,
+    rescore_without,
 )
 from demalware.engine.facts import AppFacts
-from demalware.engine.scoring import AppResult
+from demalware.engine.rules.model import Finding
+from demalware.engine.scoring import AppResult, score_app
+from demalware.engine.session import ScanReport
 
 
 def _r(package: str, verdict: str, score: int = 0) -> AppResult:
@@ -112,3 +117,22 @@ def test_label_audit_flags_draft_labels_and_missing_basis():
     assert "PROJEKT" in out
     assert "bez podstawy klasyfikacji: 1/2" in out
     assert "holdout: 0" in out
+
+
+def test_rescore_without_apk_drops_apk_points_and_recomputes_combos():
+    facts = AppFacts("com.ads", installed_days=30.0)
+    sdk = Finding("DM-ADSDK-02", "apk", 25, {}, {}, {}, category="ads")
+    notif = Finding("DM-NOTIF-01", "behavior", 20, {}, {}, {}, category="notif", basis="observed")
+    result = score_app(facts, [sdk, notif], trusted=False, low_behavior_data=False)
+    assert any(f.rule_id == "DM-COMBO-03" for f in result.findings)
+    report = ScanReport(device=None, collectors={}, low_behavior_data=False, results=[result])
+    (again,) = rescore_without(report, frozenset({"apk"}))
+    assert [f.rule_id for f in again.findings] == ["DM-NOTIF-01"]
+    assert again.score == 20
+
+
+def test_contribution_table_has_one_row_per_ablation():
+    report = ScanReport(device=None, collectors={}, low_behavior_data=False, results=[])
+    out = format_contribution_table(report, {}, {})
+    for name, _ in ABLATIONS:
+        assert name in out
