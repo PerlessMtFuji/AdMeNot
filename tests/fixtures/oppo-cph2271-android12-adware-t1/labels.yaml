@@ -1,6 +1,6 @@
 # Etykiety wzorcowe — ustalone PRZED obejrzeniem werdyktów silnika.
 # harmful: szkodliwa (oszustwo, kradzież danych) | adware: natrętne reklamy / zaśmiecanie — powinna być oznaczona
-# clean: porządna aplikacja — powinna być „Bezpieczna” | unsure: nie wiadomo — pomijana w metrykach
+# clean: porządna aplikacja — powinna dostać „Brak istotnych sygnałów” | unsure: nie wiadomo — pomijana w metrykach
 # Aplikacje fabryczne (bez etykiety) nie wchodzą do metryk.
 
 # Czyszczenie, przyspieszanie, bateria

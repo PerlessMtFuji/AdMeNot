@@ -102,7 +102,7 @@
     "apk_running": "Analiza APK w tle: {done}/{total}"
   },
   "level": { "silence": "WYCISZ", "disable": "WYŁĄCZ", "remove": "USUŃ", "review": "SPRAWDŹ", "none": "—" },
-  "verdict": { "malicious": "Szkodliwa", "suspicious": "Podejrzana", "review": "Do sprawdzenia", "safe": "Bezpieczna" },
+  "verdict": { "malicious": "Szkodliwa", "suspicious": "Podejrzana", "review": "Do sprawdzenia", "safe": "Brak istotnych sygnałów" },
   "expert": {
     "malicious": "Szkodliwe", "suspicious": "Podejrzane", "non_play": "Spoza Play", "admins": "Admin urządz.",
     "col_app": "Aplikacja", "col_problems": "Problemy", "col_score": "Wynik", "col_source": "Źródło", "col_action": "Akcja",

@@ -52,8 +52,19 @@ def test_labels():
     assert level_label("remove", "en") == "REMOVE"
     assert level_label("weird", "pl") == "weird"
     assert verdict_label("review", "pl") == "Do sprawdzenia"
+    assert verdict_label("safe", "pl") == "Brak istotnych sygnałów"
+    assert verdict_label("safe_incomplete", "pl") == "Brak istotnych sygnałów (ocena niepełna)"
+    assert verdict_label("safe", "en") == "No significant signals"
+    assert verdict_label("safe_incomplete", "en") == "No significant signals (incomplete)"
     assert reason_text("protected", "pl", "com.x").endswith("--unlock com.x)")
     assert warning_text("home_not_switched", "en").startswith("home screen")
+
+
+def test_no_verdict_text_claims_the_app_is_safe():
+    """Ocena 2026-10-01 §5.5: zakres analizy nie uzasadnia słowa „bezpieczna”."""
+    for lang, labels in VERDICT_LABELS.items():
+        for text in labels.values():
+            assert "bezpieczn" not in text.lower() and "safe" not in text.lower(), (lang, text)
 
 
 def test_order_status_label_looks_up_section_and_falls_back_to_status():

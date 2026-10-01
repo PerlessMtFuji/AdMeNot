@@ -161,7 +161,7 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
       collectors: { ...scan.collectors, ok: scan.collectors.total - 1,
         failed: [{ name: 'device_policy', error: 'timeout' }] },
       apps: scan.apps.map((a) => ({ ...a, incomplete: true, gaps: [GAP],
-        verdict_label: a.verdict === 'safe' ? 'Brak oznak (ocena niepełna)' : a.verdict_label })),
+        verdict_label: a.verdict === 'safe' ? 'Brak istotnych sygnałów (ocena niepełna)' : a.verdict_label })),
     };
   }
 

@@ -102,7 +102,7 @@
     "apk_running": "APK analysis in the background: {done}/{total}"
   },
   "level": { "silence": "SILENCE", "disable": "DISABLE", "remove": "REMOVE", "review": "CHECK", "none": "—" },
-  "verdict": { "malicious": "Malicious", "suspicious": "Suspicious", "review": "Review", "safe": "Safe" },
+  "verdict": { "malicious": "Malicious", "suspicious": "Suspicious", "review": "Review", "safe": "No significant signals" },
   "expert": {
     "malicious": "Malicious", "suspicious": "Suspicious", "non_play": "Outside Play", "admins": "Device admins",
     "col_app": "App", "col_problems": "Problems", "col_score": "Score", "col_source": "Source", "col_action": "Action",

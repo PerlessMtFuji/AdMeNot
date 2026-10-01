@@ -111,7 +111,7 @@ def test_no_flagged_apps_says_no_signs_within_the_scope(photo):
                        ServiceInfo(), GENERATED)
     assert "Nie wykryto oznak zagrożenia w zakresie wykonanego skanu." in html
     assert "Aplikacje bez uwag" not in html and "Wyciszono" in html
-    assert "Bezpieczna" not in html  # bez etykiety werdyktu przy aplikacji bez uwag
+    assert "Brak istotnych sygnałów" not in html  # bez etykiety werdyktu przy aplikacji bez uwag
 
 
 def test_zero_clean_apps_with_flagged_rows_shows_no_headline(photo):
@@ -135,7 +135,7 @@ def test_limited_scope_and_incomplete_rows(photo):
     for text in ("Zakres skanu", "inne profile użytkownika (10)", "statystyki z 3 h",
                  "Aplikacje bez uwag z oceną niepełną", ": 2.",
                  "ocena niepełna — brak danych: statystyki użycia, analiza pliku APK",
-                 "Brak oznak (ocena niepełna)", "Skan nie objął wszystkiego"):
+                 "Brak istotnych sygnałów (ocena niepełna)", "Skan nie objął wszystkiego"):
         assert text in html, text
     assert "✓ Aplikacje bez uwag: 37" in html  # są aplikacje z uwagami: licznik zostaje
 
