@@ -1,3 +1,5 @@
+from collections import namedtuple
+
 import pytest
 from apphelpers import SlowApk, make_api, names
 from conftest import SERIAL
@@ -5,8 +7,14 @@ from fakephone import make_cli_phone
 
 from demalware.engine.actions.steps import Step
 from demalware.engine.adb.transport import AdbError
+from demalware.engine.apk import cache as C
+from demalware.engine.apk.analyze import ApkReport
+from demalware.engine.apk.fetch import FetchedApks, default_cache_dir
+from demalware.engine.apk.providers import DeviceApkProvider
 from demalware.engine.journal.db import Journal
 from demalware.engine.paths import journal_path
+
+Disk = namedtuple("Disk", "total used free")
 
 
 @pytest.fixture(autouse=True)
@@ -90,3 +98,99 @@ def test_new_scan_abandons_the_running_apk_analysis():
     rec.wait_for("apk:done")
     rec.wait_for("apk:stopped")
     assert len(rec.of("apk:done")) == 1
+
+
+def _fake_fetch(cache_dir, package):
+    """Pobranie bez telefonu: 1 bajt we wpisie `<pakiet>/id`, jak gotowy wpis `fetch_apks`."""
+    entry = cache_dir / package / "id"
+    entry.mkdir(parents=True, exist_ok=True)
+    (entry / "base.apk").write_bytes(b"x")
+    return FetchedApks([entry / "base.apk"], verified=True)
+
+
+def _policy_factory(policies):
+    """Prawdziwy `DeviceApkProvider` z polityką od `Api`; `stat` podaje 1 GB na każdy cel."""
+    def factory(adb, policy=None):
+        policies.append(policy)
+        real = adb.shell
+
+        def shell(command, timeout=20.0):
+            if command.startswith("stat -c"):
+                paths = [a.strip("'") for a in command.split() if a.endswith(".apk'") or
+                         (a.endswith(".apk") and "*" not in a)]
+                return "".join(f"{C.GB} {path}\n" for path in paths)
+            return real(command, timeout)
+
+        adb.shell = shell
+        return DeviceApkProvider(adb, cache_dir=default_cache_dir(), workers=1,
+                                 fetch=lambda a, package, d: _fake_fetch(d, package),
+                                 analyze=lambda package, paths: ApkReport(package, class_count=1),
+                                 policy=policy)
+    return factory
+
+
+def _policy_api(monkeypatch, free, sync=True):
+    monkeypatch.setattr(C, "disk_usage", lambda path: Disk(500 * C.GB, 0, free))
+    api, rec = make_api(make_cli_phone(), sync=sync)
+    policies = []
+    api._apk_factory = _policy_factory(policies)
+    return api, rec, policies
+
+
+def test_estimate_event_before_apk_progress_and_limit_from_settings(monkeypatch):
+    api, rec, policies = _policy_api(monkeypatch, free=500 * C.GB)
+    api.start_scan(SERIAL)
+    seq = names(rec)
+    assert seq.index("apk:estimate") < seq.index("apk:progress")
+    est = rec.of("apk:estimate")[0]
+    assert est["limit_bytes"] == 10 * C.GB and est["apps"] >= 1 and est["to_fetch_bytes"] >= C.GB
+    assert policies[0].limit_bytes == 10 * C.GB
+    assert rec.of("apk:question") == []
+
+
+def test_space_question_skip_marks_all_apps(monkeypatch):
+    api, rec, _ = _policy_api(monkeypatch, free=C.RESERVE + C.GB, sync=False)
+    api.start_scan(SERIAL)
+    question = rec.wait_for("apk:question")
+    assert question["kind"] == "no_space" and question["largest_bytes"] == 2 * C.GB
+    api.answer(question["job_id"], "skip")
+    scan = rec.wait_for("apk:done")["scan"]
+    assert scan["apk"]["stopped_no_space"] is True and scan["apk"]["analyzed"] == 0
+
+
+def test_stopping_during_the_space_question_skips_the_analysis(monkeypatch):
+    api, rec, _ = _policy_api(monkeypatch, free=C.RESERVE + C.GB, sync=False)
+    api.start_scan(SERIAL)
+    question = rec.wait_for("apk:question")
+    api.stop(question["job_id"])  # `job.ask` zwraca None → pominięcie, potem `job.check` kończy
+    rec.wait_for("apk:stopped")
+    assert C.cache_size(default_cache_dir()) == 0
+
+
+def test_apk_cache_status_and_clear(monkeypatch):
+    monkeypatch.setattr(C, "disk_usage", lambda path: Disk(120 * C.GB, 0, 4 * C.GB))
+    api, _ = make_api(make_cli_phone())
+    _fake_fetch(default_cache_dir(), "com.a")
+    status = api.apk_cache()
+    assert status["size_bytes"] == 1 and status["limit_bytes"] == 10 * C.GB
+    assert status["effective_bytes"] == 2 * C.GB + 1
+    assert status["path"] == str(default_cache_dir())
+    assert api.clear_apk_cache() == {"freed_bytes": 1}
+
+
+def test_clear_apk_cache_is_refused_while_a_job_runs():
+    slow = SlowApk()
+    api, rec = make_api(make_cli_phone(), sync=False, apk=slow)
+    api.start_scan(SERIAL)
+    rec.wait_for("apk:progress")
+    assert api.clear_apk_cache()["error"]["key"] == "busy"
+    slow.release.set()
+    rec.wait_for("apk:done")
+
+
+def test_cache_limit_above_the_disk_is_refused(monkeypatch):
+    monkeypatch.setattr(C, "disk_usage", lambda path: Disk(120 * C.GB, 0, 4 * C.GB))
+    api, _ = make_api(make_cli_phone())
+    assert api.save_settings({"apk_cache_limit_gb": 121})["error"]["key"] == "bad_request"
+    assert api.save_settings({"apk_cache_limit_gb": 120})["apk_cache_limit_gb"] == 120
+    assert api.save_settings({"apk_cache_limit_gb": 0})["error"]["key"] == "bad_request"

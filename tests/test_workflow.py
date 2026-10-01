@@ -7,9 +7,12 @@ from demalware.engine.actions.planner import Blocked
 from demalware.engine.journal.db import Journal
 from demalware.engine.phones.provider import PhoneImageProvider
 from demalware.engine.session import run_scan
+from demalware.engine.settings import Settings
 from demalware.engine.workflow import (
     AppStatus,
     OrderInterrupted,
+    OrderResult,
+    clear_cache_after_repair,
     execute_order,
     plan_order,
     recommended_requests,
@@ -194,3 +197,17 @@ def test_resume_overwrites_the_verification(tmp_path):
     journal.save_verification(order.id, {"com.wlive.forecast": ["enabled"]})  # nieaktualna
     execute_order(phone, journal, order, ExecOptions(), resume)
     assert journal.verification(order.id) == {}
+
+
+def test_clear_cache_after_repair_only_when_enabled_and_finished(tmp_path):
+    entry = tmp_path / "com.a" / "id"
+    entry.mkdir(parents=True)
+    (entry / "base.apk").write_bytes(b"x" * 10)
+    on, off = Settings(apk_cache_clear_after_repair=True), Settings()
+    stopped = OrderResult(order=None, apps=[], stopped=True)
+    finished = OrderResult(order=None, apps=[], stopped=False)
+    assert clear_cache_after_repair(finished, off, tmp_path) is None
+    assert clear_cache_after_repair(stopped, on, tmp_path) is None
+    assert entry.exists()
+    assert clear_cache_after_repair(finished, on, tmp_path) == 10
+    assert not entry.exists()

@@ -178,3 +178,36 @@ def test_execute_stores_the_snapshot_from_the_scan():
         assert snap["device"]["serial"] == SERIAL and snap["phone"]["confidence"] == "none"
         assert snap["app_count"] == len(api._report.results)
         assert j.verification(order.id) == {}
+
+
+def test_finished_repair_clears_the_apk_cache_when_enabled():
+    from demalware.engine.apk.fetch import default_cache_dir
+    _, api, rec = _scanned()
+    api.save_settings({"apk_cache_clear_after_repair": True})
+    entry = default_cache_dir() / "com.old" / "id"
+    entry.mkdir(parents=True)
+    (entry / "base.apk").write_bytes(b"x")
+    api.execute(WLIVE, [])
+    assert rec.of("exec:done") and not entry.exists()
+
+
+def test_stopped_repair_keeps_the_apk_cache():
+    from demalware.engine.apk.fetch import default_cache_dir
+    _, api, _ = _scanned()
+    api.save_settings({"apk_cache_clear_after_repair": True})
+    entry = default_cache_dir() / "com.old" / "id"
+    entry.mkdir(parents=True)
+    (entry / "base.apk").write_bytes(b"x")
+
+    class StopAfterFirstDone(RecordingEmitter):  # jak w test_stop_then_resume
+        def emit(self, name, detail=None):
+            super().emit(name, detail)
+            if name == "exec:step" and detail["status"] == "done":
+                api.stop(api._jobs.current().id)
+
+    stopper = StopAfterFirstDone()
+    api._emitter = stopper
+    api._jobs._emitter = stopper
+    api.execute(WLIVE, [])
+    assert stopper.of("exec:done")[0]["stopped"] is True
+    assert entry.exists()
