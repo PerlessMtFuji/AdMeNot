@@ -397,7 +397,9 @@
            "evidence": {},
            "category": "data",
            "label": "Czyta powiadomienia",
-           "basis": "granted"
+           "basis": "granted",
+           "source": "phone",
+           "locations": []
           }
          ],
          "apk_error": null,
@@ -450,7 +452,9 @@
            "evidence": {},
            "category": "removal",
            "label": "Ustawiona jako ekran główny",
-           "basis": "granted"
+           "basis": "granted",
+           "source": "phone",
+           "locations": []
           }
          ],
          "apk_error": null,
@@ -561,7 +565,9 @@
            "evidence": {},
            "category": "data",
            "label": "Czyta powiadomienia",
-           "basis": "granted"
+           "basis": "granted",
+           "source": "phone",
+           "locations": []
           }
          ],
          "apk_error": null,
@@ -614,7 +620,9 @@
            "evidence": {},
            "category": "removal",
            "label": "Ustawiona jako ekran główny",
-           "basis": "granted"
+           "basis": "granted",
+           "source": "phone",
+           "locations": []
           }
          ],
          "apk_error": null,

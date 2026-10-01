@@ -139,9 +139,9 @@ describe('formatting', () => {
     expect(levelTag(null)).toBe('tag-gray');
     const a = app('x.y', 'malicious', {
       findings: [
-        { rule_id: 'DM-ADMIN-01', class: 'position', weight: 20, text: '', text_expert: '', evidence: {}, category: 'removal', label: '', basis: 'granted' },
-        { rule_id: 'DM-ADMIN-02', class: 'position', weight: 5, text: '', text_expert: '', evidence: {}, category: 'removal', label: '', basis: 'granted' },
-        { rule_id: 'DM-BOOT-01', class: 'context', weight: 3, text: '', text_expert: '', evidence: {}, category: 'background', label: '', basis: 'declared' },
+        { rule_id: 'DM-ADMIN-01', class: 'position', weight: 20, text: '', text_expert: '', evidence: {}, category: 'removal', label: '', basis: 'granted', source: 'phone', locations: [] },
+        { rule_id: 'DM-ADMIN-02', class: 'position', weight: 5, text: '', text_expert: '', evidence: {}, category: 'removal', label: '', basis: 'granted', source: 'phone', locations: [] },
+        { rule_id: 'DM-BOOT-01', class: 'context', weight: 3, text: '', text_expert: '', evidence: {}, category: 'background', label: '', basis: 'declared', source: 'phone', locations: [] },
       ],
     });
     expect(signalChips(a)).toEqual([{ label: 'admin', bad: true }, { label: 'boot', bad: false }]);

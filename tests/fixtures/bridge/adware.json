@@ -412,7 +412,9 @@
            "evidence": {},
            "category": "removal",
            "label": "Administrator urządzenia",
-           "basis": "granted"
+           "basis": "granted",
+           "source": "phone",
+           "locations": []
           },
           {
            "rule_id": "DM-OVERLAY-01",
@@ -425,7 +427,9 @@
            },
            "category": "ads",
            "label": "Okna nad innymi aplikacjami",
-           "basis": "observed"
+           "basis": "observed",
+           "source": "phone",
+           "locations": []
           },
           {
            "rule_id": "DM-COMBO-01",
@@ -436,7 +440,9 @@
            "evidence": {},
            "category": "combo",
            "label": "Bez ikony, spoza Play, okna nad innymi",
-           "basis": "declared"
+           "basis": "declared",
+           "source": "phone",
+           "locations": []
           },
           {
            "rule_id": "DM-FSI-01",
@@ -449,7 +455,9 @@
            },
            "category": "ads",
            "label": "Powiadomienie pełnoekranowe",
-           "basis": "observed"
+           "basis": "observed",
+           "source": "phone",
+           "locations": []
           },
           {
            "rule_id": "DM-ALARM-01",
@@ -463,7 +471,9 @@
            },
            "category": "background",
            "label": "Częste wybudzanie telefonu",
-           "basis": "observed"
+           "basis": "observed",
+           "source": "phone",
+           "locations": []
           },
           {
            "rule_id": "DM-HIDDEN-01",
@@ -474,7 +484,9 @@
            "evidence": {},
            "category": "removal",
            "label": "Ukryta ikona",
-           "basis": "declared"
+           "basis": "declared",
+           "source": "phone",
+           "locations": []
           },
           {
            "rule_id": "DM-SRC-01",
@@ -487,7 +499,9 @@
            },
            "category": "origin",
            "label": "Spoza Sklepu Play",
-           "basis": "declared"
+           "basis": "declared",
+           "source": "phone",
+           "locations": []
           },
           {
            "rule_id": "DM-NAME-01",
@@ -500,7 +514,9 @@
            },
            "category": "disguise",
            "label": "Nazwa udaje systemową",
-           "basis": "declared"
+           "basis": "declared",
+           "source": "phone",
+           "locations": []
           },
           {
            "rule_id": "DM-PERM-01",
@@ -511,7 +527,9 @@
            "evidence": {},
            "category": "background",
            "label": "Start z telefonem, lista aplikacji",
-           "basis": "declared"
+           "basis": "declared",
+           "source": "phone",
+           "locations": []
           },
           {
            "rule_id": "DM-FSIPERM-01",
@@ -522,7 +540,9 @@
            "evidence": {},
            "category": "ads",
            "label": "Uprawnienie do pełnego ekranu",
-           "basis": "declared"
+           "basis": "declared",
+           "source": "phone",
+           "locations": []
           },
           {
            "rule_id": "DM-FRESH-01",
@@ -535,7 +555,9 @@
            },
            "category": "origin",
            "label": "Świeża instalacja",
-           "basis": "declared"
+           "basis": "declared",
+           "source": "phone",
+           "locations": []
           }
          ],
          "apk_error": null,
@@ -611,7 +633,9 @@
            },
            "category": "notif",
            "label": "Zalew powiadomień",
-           "basis": "observed"
+           "basis": "observed",
+           "source": "phone",
+           "locations": []
           }
          ],
          "apk_error": null,
@@ -664,7 +688,9 @@
            "evidence": {},
            "category": "data",
            "label": "Czyta powiadomienia",
-           "basis": "granted"
+           "basis": "granted",
+           "source": "phone",
+           "locations": []
           }
          ],
          "apk_error": null,
@@ -717,7 +743,9 @@
            "evidence": {},
            "category": "removal",
            "label": "Ustawiona jako ekran główny",
-           "basis": "granted"
+           "basis": "granted",
+           "source": "phone",
+           "locations": []
           }
          ],
          "apk_error": null,
@@ -830,7 +858,9 @@
            "evidence": {},
            "category": "removal",
            "label": "Administrator urządzenia",
-           "basis": "granted"
+           "basis": "granted",
+           "source": "phone",
+           "locations": []
           },
           {
            "rule_id": "DM-OVERLAY-01",
@@ -843,7 +873,9 @@
            },
            "category": "ads",
            "label": "Okna nad innymi aplikacjami",
-           "basis": "observed"
+           "basis": "observed",
+           "source": "phone",
+           "locations": []
           },
           {
            "rule_id": "DM-COMBO-01",
@@ -854,7 +886,9 @@
            "evidence": {},
            "category": "combo",
            "label": "Bez ikony, spoza Play, okna nad innymi",
-           "basis": "declared"
+           "basis": "declared",
+           "source": "phone",
+           "locations": []
           },
           {
            "rule_id": "DM-FSI-01",
@@ -867,7 +901,9 @@
            },
            "category": "ads",
            "label": "Powiadomienie pełnoekranowe",
-           "basis": "observed"
+           "basis": "observed",
+           "source": "phone",
+           "locations": []
           },
           {
            "rule_id": "DM-ALARM-01",
@@ -881,7 +917,9 @@
            },
            "category": "background",
            "label": "Częste wybudzanie telefonu",
-           "basis": "observed"
+           "basis": "observed",
+           "source": "phone",
+           "locations": []
           },
           {
            "rule_id": "DM-HIDDEN-01",
@@ -892,7 +930,9 @@
            "evidence": {},
            "category": "removal",
            "label": "Ukryta ikona",
-           "basis": "declared"
+           "basis": "declared",
+           "source": "phone",
+           "locations": []
           },
           {
            "rule_id": "DM-SRC-01",
@@ -905,7 +945,9 @@
            },
            "category": "origin",
            "label": "Spoza Sklepu Play",
-           "basis": "declared"
+           "basis": "declared",
+           "source": "phone",
+           "locations": []
           },
           {
            "rule_id": "DM-NAME-01",
@@ -918,7 +960,9 @@
            },
            "category": "disguise",
            "label": "Nazwa udaje systemową",
-           "basis": "declared"
+           "basis": "declared",
+           "source": "phone",
+           "locations": []
           },
           {
            "rule_id": "DM-PERM-01",
@@ -929,7 +973,9 @@
            "evidence": {},
            "category": "background",
            "label": "Start z telefonem, lista aplikacji",
-           "basis": "declared"
+           "basis": "declared",
+           "source": "phone",
+           "locations": []
           },
           {
            "rule_id": "DM-FSIPERM-01",
@@ -940,7 +986,9 @@
            "evidence": {},
            "category": "ads",
            "label": "Uprawnienie do pełnego ekranu",
-           "basis": "declared"
+           "basis": "declared",
+           "source": "phone",
+           "locations": []
           },
           {
            "rule_id": "DM-FRESH-01",
@@ -953,7 +1001,9 @@
            },
            "category": "origin",
            "label": "Świeża instalacja",
-           "basis": "declared"
+           "basis": "declared",
+           "source": "phone",
+           "locations": []
           }
          ],
          "apk_error": null,
@@ -1024,7 +1074,9 @@
            },
            "category": "notif",
            "label": "Zalew powiadomień",
-           "basis": "observed"
+           "basis": "observed",
+           "source": "phone",
+           "locations": []
           }
          ],
          "apk_error": null,
@@ -1072,7 +1124,9 @@
            "evidence": {},
            "category": "data",
            "label": "Czyta powiadomienia",
-           "basis": "granted"
+           "basis": "granted",
+           "source": "phone",
+           "locations": []
           }
          ],
          "apk_error": null,
@@ -1125,7 +1179,9 @@
            "evidence": {},
            "category": "removal",
            "label": "Ustawiona jako ekran główny",
-           "basis": "granted"
+           "basis": "granted",
+           "source": "phone",
+           "locations": []
           }
          ],
          "apk_error": null,

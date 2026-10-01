@@ -72,7 +72,9 @@ export interface Finding {
   evidence: Record<string, unknown>;
   category: Category | 'combo';
   label: string;
-  basis: 'declared' | 'granted' | 'observed' | 'confirmed';
+  basis: 'declared' | 'static' | 'granted' | 'observed' | 'confirmed';
+  source: 'phone' | 'apk' | 'ioc';
+  locations: string[];
 }
 
 export interface AppView {

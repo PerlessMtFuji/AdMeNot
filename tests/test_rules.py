@@ -296,3 +296,17 @@ def test_roles_are_context_signals():
     rules = {r.id: r for r in load_default_ruleset().yaml_rules}
     assert {rules[i].rule_class for i in ("DM-HOME-01", "DM-HOME-02", "DM-SMS-01",
                                          "DM-BROWSER-01")} == {"context"}
+
+
+def test_rule_source_defaults_by_class_and_can_be_set():
+    rules = {r.id: r for r in load_default_ruleset().yaml_rules}
+    assert rules["DM-ADSDK-02"].source == "apk"
+    assert rules["DM-NOTIF-01"].source == "phone"
+    assert rules["DM-LABEL-01"].source == "apk"
+    [rule] = parse_rules([_rule(source="ioc")])
+    assert rule.evaluate(AppFacts("com.a", notif_interruptions_24h=240)).source == "ioc"
+
+
+def test_unknown_rule_source_is_rejected():
+    with pytest.raises(ValueError, match="source"):
+        parse_rules([_rule(source="radio")])

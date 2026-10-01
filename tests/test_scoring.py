@@ -157,3 +157,8 @@ def test_combo_03_many_ad_networks_plus_behavior():
     both = score_app(facts, [F("DM-ADSDK-02", "apk", 20), F("DM-NOTIF-01", "behavior", 15)],
                      trusted=False, low_behavior_data=False)
     assert both.score == 50 and "DM-COMBO-03" in {f.rule_id for f in both.findings}
+
+
+def test_static_code_path_is_not_an_observation():
+    static = Finding("DM-CODE-BOOTUI-01", "apk", 5, {}, {}, {}, category="background", basis="static")
+    assert confidence_for([static], incomplete=False) == "low"

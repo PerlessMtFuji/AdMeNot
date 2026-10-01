@@ -48,7 +48,8 @@ def test_snapshot_keeps_device_photo_scope_and_flagged_apps(tmp_path):
     result = next(r for r in report.results if r.facts.package == BOOST)
     assert [f["rule_id"] for f in boost["findings"]] == [f.rule_id for f in result.findings]
     first = boost["findings"][0]
-    assert set(first) == {"rule_id", "class", "weight", "basis", "evidence", "text"}
+    assert set(first) == {"rule_id", "class", "weight", "basis", "source", "locations", "evidence",
+                        "text"}
     assert set(first["text"]) == {"pl", "en"} and first["text"]["pl"]
     for lang in ("pl", "en"):
         assert 1 <= len(boost["problems"][lang]) <= MAX_PROBLEMS
