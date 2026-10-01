@@ -1,9 +1,12 @@
 import pytest
 
 from demalware.engine.evaluation import (
+    LabelMeta,
     evaluate,
     format_evaluation,
+    format_label_audit,
     format_threshold_table,
+    parse_label_meta,
     parse_label_sets,
     parse_labels,
 )
@@ -86,3 +89,26 @@ def test_threshold_table_lists_every_threshold():
     table = format_threshold_table([_r("com.a", "review", 30)], {"com.a": "adware"}, {"com.a": "tune"})
     for word in ("review", "suspicious", "malicious", "tune"):
         assert word in table
+
+
+def test_label_meta_reads_both_forms():
+    meta = parse_label_meta(
+        "a.b: adware\n"
+        "c.d: {label: clean, set: holdout, group: g1, basis: 'ręcznie, 2026-09-28'}\n")
+    assert meta["a.b"] == LabelMeta("adware", "tune", None, None)
+    assert meta["c.d"] == LabelMeta("clean", "holdout", "g1", "ręcznie, 2026-09-28")
+
+
+def test_group_spanning_tune_and_holdout_is_rejected():
+    text = ("a.v1: {label: adware, set: tune, group: fam}\n"
+            "a.v2: {label: adware, set: holdout, group: fam}\n")
+    with pytest.raises(ValueError, match="fam"):
+        parse_label_meta(text)
+
+
+def test_label_audit_flags_draft_labels_and_missing_basis():
+    meta = parse_label_meta("a.b: adware\nc.d: {label: clean, basis: x}\n")
+    out = format_label_audit(meta, "draft")
+    assert "PROJEKT" in out
+    assert "bez podstawy klasyfikacji: 1/2" in out
+    assert "holdout: 0" in out

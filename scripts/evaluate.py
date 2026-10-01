@@ -5,15 +5,19 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import yaml
+
 from demalware.engine.adb.fake import FakeAdb
 from demalware.engine.apk.providers import StoredApkProvider
 from demalware.engine.evaluation import (
     LABELS_FILE,
     evaluate,
     format_evaluation,
+    format_label_audit,
     format_threshold_table,
     load_label_sets,
     load_labels,
+    parse_label_meta,
     with_install_age,
 )
 from demalware.engine.session import run_scan
@@ -35,6 +39,10 @@ def main(argv: list[str]) -> int:
         provider = StoredApkProvider(apk_dir) if apk_dir.is_dir() else None
         report = run_scan(FakeAdb.from_capture(d), apk=provider)
         print(f"== {d.name}")
+        targets_path = d / "targets.yaml"
+        status = (yaml.safe_load(targets_path.read_text("utf-8")) or {}).get("labels_status")\
+            if targets_path.exists() else None
+        print(format_label_audit(parse_label_meta((d / LABELS_FILE).read_text("utf-8")), status))
         print(format_evaluation(evaluate(report.results, labels)))
         sets = load_label_sets(d) or {}
         print(format_threshold_table(report.results, labels, sets))

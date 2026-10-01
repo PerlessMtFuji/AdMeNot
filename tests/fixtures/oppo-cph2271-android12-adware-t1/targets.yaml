@@ -7,3 +7,5 @@ max_false_positives: 2
 
 # Plan 4b (2026-09-27): czyste aplikacje nie mogą być „Podejrzana” ani wyżej.
 max_false_positives_suspicious: 0
+# etykiety ustalone przed obejrzeniem werdyktów (2026-09-26)
+labels_status: reviewed
