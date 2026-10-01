@@ -167,6 +167,7 @@ def test_estimate_sums_splits_and_counts_unknown(tmp_path):
     est = C.estimate(_adb(_stat_out()), _facts(), tmp_path)
     assert est.sizes == {"com.a": 300, "com.b": 1000, "com.vivo.widget": 50}
     assert (est.total_bytes, est.to_fetch_bytes, est.apps, est.unknown) == (1350, 1350, 4, 1)
+    assert est.cached == 0
     assert est.largest_bytes == 1300  # dwie największe: 1000 + 300
 
 
@@ -176,6 +177,7 @@ def test_estimate_skips_what_is_already_cached(tmp_path):
     (entry / "base.apk").write_bytes(b"x" * 1000)
     est = C.estimate(_adb(_stat_out()), _facts(), tmp_path)
     assert est.to_fetch_bytes == 350 and est.largest_bytes == 350
+    assert est.cached == 1
 
 
 def test_estimate_without_stat_or_with_unknown_output_is_none(tmp_path):

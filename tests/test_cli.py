@@ -258,3 +258,26 @@ def test_apk_estimate_uses_polish_plural_forms():
         "14 aplikacji", "21 aplikacji", "22 aplikacje", "24 aplikacje", "25 aplikacji",
         "112 aplikacji", "122 aplikacje"]
     assert [_apps(n, "en") for n in (1, 2, 0)] == ["1 app", "2 apps", "0 apps"]
+
+
+def test_apk_estimate_says_what_is_already_cached(capsys, monkeypatch, tmp_path):
+    from demalware.cli import main as M
+    from demalware.engine.apk import cache as C
+    from demalware.engine.apk.cache import Estimate
+
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    provider = M._apk_provider(FakeAdb(), "pl")
+    use = C.CacheUsage(0, 100 * C.GB, 100 * C.GB, 10 * C.GB, 10 * C.GB)
+    sizes = {"a": C.GB, "b": C.GB, "c": 30 * 1024**2}
+    provider.policy.on_estimate(Estimate(3 * C.GB, 0, 3, 0, 0, sizes), use)
+    provider.policy.on_estimate(Estimate(3 * C.GB, 30 * 1024**2, 3, 0, 0, sizes, frozenset({"c"})), use)
+    err = capsys.readouterr().err
+    assert "Pliki wszystkich aplikacji do analizy APK (3) są już na komputerze" in err
+    assert "Analiza APK pobierze ok. 30 MB (1 z 3 aplikacji, pozostałe są już na komputerze)." in err
+
+
+def test_apk_size_switches_to_mb_below_a_tenth_of_a_gigabyte():
+    from demalware.cli.main import _size
+
+    assert [_size(n, "pl") for n in (0, 1, 30 * 1024**2, 1024**3 // 10 + 1, 7 * 1024**3)] == [
+        "0,0 GB", "1 MB", "30 MB", "0,1 GB", "7,0 GB"]

@@ -212,17 +212,31 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     const { s, bridge } = await scanned();
     const GB = 1024 ** 3;
     s.apk = { ...s.apk, running: true };
-    bridge.emit('apk:estimate', { to_fetch_bytes: 7.2 * GB, total_bytes: 7.2 * GB, apps: 142, unknown: 3,
+    bridge.emit('apk:estimate', { to_fetch_bytes: 7.2 * GB, total_bytes: 7.2 * GB, apps: 142, unknown: 3, cached: 0,
       largest_bytes: 3 * GB, limit_bytes: 10 * GB, effective_bytes: 2 * GB, free_bytes: 4 * GB });
     expect(await screen.findByText(/Analiza pobierze ok. 7,2 GB \(142 aplikacje\)/)).toBeTruthy();
     expect(screen.getByText(/Na dysku jest miejsce na 2,0 GB/)).toBeTruthy();
-    expect(tp('apk_cache.estimate', 5, { gb: '1,0' })).toBe('Analiza pobierze ok. 1,0 GB (5 aplikacji)');
+    expect(tp('apk_cache.estimate', 5, { size: '1,0 GB' })).toBe('Analiza pobierze ok. 1,0 GB (5 aplikacji)');
     bridge.emit('apk:question', { job_id: 'job-9', kind: 'no_space', to_fetch_bytes: 7.2 * GB, total_bytes: 7.2 * GB,
-      apps: 142, unknown: 0, largest_bytes: 3 * GB, limit_bytes: 10 * GB, effective_bytes: 2 * GB, free_bytes: 4 * GB });
+      apps: 142, unknown: 0, cached: 0, largest_bytes: 3 * GB, limit_bytes: 10 * GB, effective_bytes: 2 * GB, free_bytes: 4 * GB });
     await fireEvent.click(await screen.findByRole('button', { name: 'Wyczyść i analizuj' }));
     expect(bridge.calls.at(-1)).toEqual({ method: 'answer', args: ['job-9', 'clear'] });
     const stopped = { ...JSON.parse(JSON.stringify(s.scan)), apk: { requested: 142, analyzed: 61, failed: {}, stopped_no_space: true } };
     bridge.emit('apk:done', { scan: stopped });
     expect(await screen.findByText('Zabrakło miejsca na dysku. Przeanalizowano 61 ze 142 aplikacji.')).toBeTruthy();
+  });
+
+  test('APK estimate says what is already on the computer', async () => {
+    const { s, bridge } = await scanned();
+    const GB = 1024 ** 3;
+    const base = { total_bytes: 5 * GB, unknown: 0, largest_bytes: 0, limit_bytes: 10 * GB,
+      effective_bytes: 10 * GB, free_bytes: 50 * GB };
+    s.apk = { ...s.apk, running: true };
+    bridge.emit('apk:estimate', { ...base, to_fetch_bytes: 0, apps: 89, cached: 89 });
+    expect(await screen.findByText(
+      'Pliki wszystkich aplikacji do analizy (89) są już na komputerze — nic nie trzeba pobierać.')).toBeTruthy();
+    bridge.emit('apk:estimate', { ...base, to_fetch_bytes: 30 * 1024 ** 2, apps: 89, cached: 87 });
+    expect(await screen.findByText(
+      'Analiza pobierze ok. 30 MB (2 z 89 aplikacji, pozostałe są już na komputerze).')).toBeTruthy();
   });
 });

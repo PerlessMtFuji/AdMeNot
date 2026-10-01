@@ -25,7 +25,7 @@ export interface CacheUsage {
 }
 
 export interface ApkEstimate {
-  to_fetch_bytes: number; total_bytes: number; apps: number; unknown: number;
+  to_fetch_bytes: number; total_bytes: number; apps: number; unknown: number; cached: number;
   largest_bytes: number; limit_bytes: number; effective_bytes: number; free_bytes: number;
 }
 

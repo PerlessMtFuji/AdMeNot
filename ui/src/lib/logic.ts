@@ -272,3 +272,9 @@ export function formatGb(bytes: number, lang: string): string {
   return new Intl.NumberFormat(lang === 'pl' ? 'pl-PL' : 'en-US',
     { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(bytes / 1024 ** 3);
 }
+
+// Poniżej 0,1 GB w MB (co najmniej 1 MB), żeby kilka małych aplikacji nie dawało „0,0 GB”.
+export function formatSize(bytes: number, lang: string): string {
+  if (bytes > 0 && bytes < 1024 ** 3 / 10) return `${Math.max(1, Math.round(bytes / 1024 ** 2))} MB`;
+  return `${formatGb(bytes, lang)} GB`;
+}

@@ -27,6 +27,7 @@ import {
   upsertStep,
   visibleApps,
   formatGb,
+  formatSize,
 } from './logic';
 import type { AppView, Category, StepEvent } from './types';
 
@@ -245,4 +246,11 @@ test('formatGb uses one decimal and the language separator', () => {
   expect(formatGb(7.2 * 1024 ** 3, 'pl')).toBe('7,2');
   expect(formatGb(7.2 * 1024 ** 3, 'en')).toBe('7.2');
   expect(formatGb(0, 'pl')).toBe('0,0');
+});
+
+test('formatSize switches to MB below a tenth of a gigabyte', () => {
+  expect(formatSize(30 * 1024 ** 2, 'pl')).toBe('30 MB');
+  expect(formatSize(1, 'en')).toBe('1 MB');
+  expect(formatSize(0, 'pl')).toBe('0,0 GB');
+  expect(formatSize(7.2 * 1024 ** 3, 'en')).toBe('7.2 GB');
 });

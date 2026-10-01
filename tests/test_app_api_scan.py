@@ -144,6 +144,7 @@ def test_estimate_event_before_apk_progress_and_limit_from_settings(monkeypatch)
     assert seq.index("apk:estimate") < seq.index("apk:progress")
     est = rec.of("apk:estimate")[0]
     assert est["limit_bytes"] == 10 * C.GB and est["apps"] >= 1 and est["to_fetch_bytes"] >= C.GB
+    assert est["cached"] == 0
     assert policies[0].limit_bytes == 10 * C.GB
     assert rec.of("apk:question") == []
 

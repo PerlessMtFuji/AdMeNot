@@ -221,7 +221,9 @@
     "cache_cleared": "Usunięto {gb} GB."
   },
   "apk_cache": {
-    "estimate": { "one": "Analiza pobierze ok. {gb} GB ({count} aplikacja)", "few": "Analiza pobierze ok. {gb} GB ({count} aplikacje)", "many": "Analiza pobierze ok. {gb} GB ({count} aplikacji)", "other": "Analiza pobierze ok. {gb} GB ({count} aplikacji)" },
+    "estimate": { "one": "Analiza pobierze ok. {size} ({count} aplikacja)", "few": "Analiza pobierze ok. {size} ({count} aplikacje)", "many": "Analiza pobierze ok. {size} ({count} aplikacji)", "other": "Analiza pobierze ok. {size} ({count} aplikacji)" },
+    "estimate_part": "Analiza pobierze ok. {size} ({fetch} z {count} aplikacji, pozostałe są już na komputerze)",
+    "all_cached": "Pliki wszystkich aplikacji do analizy ({count}) są już na komputerze — nic nie trzeba pobierać",
     "unknown": "(bez {count} aplikacji o nieznanym rozmiarze)",
     "over": "Na dysku jest miejsce na {gb} GB — pliki będą usuwane na bieżąco, po analizie zostaną tylko pliki aplikacji do naprawy.",
     "question_title": "Za mało miejsca na dysku",
