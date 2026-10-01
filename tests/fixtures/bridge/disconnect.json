@@ -593,7 +593,39 @@
          "source": {
           "label": "Chrome",
           "days": 6
-         }
+         },
+         "capabilities": [
+          {
+           "key": "overlay",
+           "label": "Okna nad innymi aplikacjami",
+           "levels": {
+            "declared": true,
+            "code": null,
+            "granted": true,
+            "observed": true
+           }
+          },
+          {
+           "key": "boot",
+           "label": "Start z telefonem",
+           "levels": {
+            "declared": null,
+            "code": null,
+            "granted": true,
+            "observed": null
+           }
+          },
+          {
+           "key": "hide_icon",
+           "label": "Ukrywanie ikony",
+           "levels": {
+            "declared": null,
+            "code": null,
+            "granted": null,
+            "observed": true
+           }
+          }
+         ]
         },
         {
          "package": "com.wlive.forecast",
@@ -651,7 +683,8 @@
          "source": {
           "label": "Sklep Play",
           "days": 117
-         }
+         },
+         "capabilities": []
         },
         {
          "package": "com.whatsapp",
@@ -706,7 +739,8 @@
          "source": {
           "label": "Sklep Play",
           "days": 624
-         }
+         },
+         "capabilities": []
         },
         {
          "package": "com.sec.android.app.launcher",
@@ -761,7 +795,19 @@
          "source": {
           "label": "systemowa",
           "days": 6478
-         }
+         },
+         "capabilities": [
+          {
+           "key": "hide_icon",
+           "label": "Ukrywanie ikony",
+           "levels": {
+            "declared": null,
+            "code": null,
+            "granted": null,
+            "observed": true
+           }
+          }
+         ]
         }
        ],
        "profiles": {
@@ -1039,7 +1085,39 @@
          "source": {
           "label": "Chrome",
           "days": 6
-         }
+         },
+         "capabilities": [
+          {
+           "key": "overlay",
+           "label": "Okna nad innymi aplikacjami",
+           "levels": {
+            "declared": true,
+            "code": null,
+            "granted": true,
+            "observed": true
+           }
+          },
+          {
+           "key": "boot",
+           "label": "Start z telefonem",
+           "levels": {
+            "declared": null,
+            "code": null,
+            "granted": true,
+            "observed": null
+           }
+          },
+          {
+           "key": "hide_icon",
+           "label": "Ukrywanie ikony",
+           "levels": {
+            "declared": null,
+            "code": null,
+            "granted": null,
+            "observed": true
+           }
+          }
+         ]
         },
         {
          "package": "com.wlive.forecast",
@@ -1092,7 +1170,8 @@
          "source": {
           "label": "Sklep Play",
           "days": 117
-         }
+         },
+         "capabilities": []
         },
         {
          "package": "com.whatsapp",
@@ -1142,7 +1221,8 @@
          "source": {
           "label": "Sklep Play",
           "days": 624
-         }
+         },
+         "capabilities": []
         },
         {
          "package": "com.sec.android.app.launcher",
@@ -1197,7 +1277,19 @@
          "source": {
           "label": "systemowa",
           "days": 6478
-         }
+         },
+         "capabilities": [
+          {
+           "key": "hide_icon",
+           "label": "Ukrywanie ikony",
+           "levels": {
+            "declared": null,
+            "code": null,
+            "granted": null,
+            "observed": true
+           }
+          }
+         ]
         }
        ],
        "profiles": {

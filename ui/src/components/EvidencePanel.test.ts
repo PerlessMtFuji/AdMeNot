@@ -86,3 +86,20 @@ test('evidence: incomplete without gaps and APK scope notes still show the limit
   expect(screen.getByText('Mało danych o zachowaniu aplikacji')).toBeTruthy();
   expect(screen.getByText('Kod w dużej części zaciemniony')).toBeTruthy();
 });
+
+test('capability ladder: four columns, check / dash / question mark', () => {
+  const app = {
+    package: 'com.x', name: 'X', score: 10, verdict: 'review', verdict_label: 'Do sprawdzenia',
+    confidence: 'low', confidence_label: 'niska', gaps: [], trusted: false, incomplete: false,
+    is_system: false, from_play: false, installer: null, is_admin: false, default_level: null,
+    problems: [], apk_error: null, ad_sdks: null, symptoms: [], source: { label: 'Chrome', days: 1 },
+    findings: [],
+    capabilities: [{ key: 'overlay', label: 'Okna nad innymi aplikacjami', levels: { declared: true, code: null, granted: false, observed: null } }],
+  };
+  render(EvidencePanel, { props: { app: app as never } });
+  for (const h of ['Prosi', 'W kodzie', 'Przyznane', 'Zaobserwowane']) expect(screen.getByRole('columnheader', { name: h })).toBeTruthy();
+  const row = screen.getByRole('row', { name: /Okna nad innymi aplikacjami/ });
+  expect(row.textContent).toContain('✓');
+  expect(row.textContent).toContain('—');
+  expect(row.textContent).toContain('?');
+});

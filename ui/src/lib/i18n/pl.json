@@ -114,7 +114,7 @@
     "days": { "one": "{count} dzień temu", "few": "{count} dni temu", "many": "{count} dni temu", "other": "{count} dnia temu" }
   },
   "evidence": {
-    "title": "Szczegóły aplikacji", "score": "Wynik", "why": "Dlaczego", "raw": "Surowe dane z telefonu", "ad_sdks": "Biblioteki reklamowe",
+    "title": "Szczegóły aplikacji", "score": "Wynik", "why": "Dlaczego", "capabilities": "Możliwości aplikacji", "levels": { "declared": "Prosi", "code": "W kodzie", "granted": "Przyznane", "observed": "Zaobserwowane" }, "raw": "Surowe dane z telefonu", "ad_sdks": "Biblioteki reklamowe",
     "none": "Wybierz aplikację w tabeli.", "plan": "Plan", "fix": "Napraw ({count})",
     "zone": { "safe": "bez uwag", "review": "do sprawdzenia", "suspicious": "podejrzana", "malicious": "szkodliwa" },
     "limits": "Ograniczenia oceny", "incomplete_data": "Mało danych o zachowaniu aplikacji", "confidence": "Pewność wniosku"

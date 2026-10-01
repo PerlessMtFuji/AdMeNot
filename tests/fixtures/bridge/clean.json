@@ -415,7 +415,8 @@
          "source": {
           "label": "Sklep Play",
           "days": 624
-         }
+         },
+         "capabilities": []
         },
         {
          "package": "com.sec.android.app.launcher",
@@ -470,7 +471,19 @@
          "source": {
           "label": "systemowa",
           "days": 6478
-         }
+         },
+         "capabilities": [
+          {
+           "key": "hide_icon",
+           "label": "Ukrywanie ikony",
+           "levels": {
+            "declared": null,
+            "code": null,
+            "granted": null,
+            "observed": true
+           }
+          }
+         ]
         }
        ],
        "profiles": {
@@ -583,7 +596,8 @@
          "source": {
           "label": "Sklep Play",
           "days": 624
-         }
+         },
+         "capabilities": []
         },
         {
          "package": "com.sec.android.app.launcher",
@@ -638,7 +652,19 @@
          "source": {
           "label": "systemowa",
           "days": 6478
-         }
+         },
+         "capabilities": [
+          {
+           "key": "hide_icon",
+           "label": "Ukrywanie ikony",
+           "levels": {
+            "declared": null,
+            "code": null,
+            "granted": null,
+            "observed": true
+           }
+          }
+         ]
         }
        ],
        "profiles": {

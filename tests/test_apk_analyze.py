@@ -72,7 +72,7 @@ def test_analyze_apk_reports_sdks_labels_and_dynamic_code(tmp_path):
     })
     split = make_apk(tmp_path / "split_config.arm64_v8a.apk", {})
     report = analyze_apk("com.clean.x", [split, base], read_manifest=_manifest("\xa0Super Cleaner"),
-                         sdks=load_default_ad_sdks())
+                         sdks=load_default_ad_sdks(), read_certs=lambda p: ("ab" * 32,))
     assert report.error is None
     assert (report.package, report.version_code) == ("com.clean.x", 42)
     assert (report.label, report.label_padded) == ("Super Cleaner", True)
@@ -210,7 +210,8 @@ def test_report_lists_hash_of_every_file(tmp_path):
         with zipfile.ZipFile(p, "w") as z:
             z.writestr("x.txt", p.name)
     report = analyze_apk("com.x", [base, split],
-                         read_manifest=lambda p: ManifestInfo("com.x", 5, "X", ("ab" * 32,)))
+                         read_manifest=lambda p: ManifestInfo("com.x", 5, "X", ("ab" * 32,)),
+                         read_certs=lambda p: ("ab" * 32,))
     assert set(report.files) == {"base.apk", "split_config.apk"}
     assert report.files["base.apk"] == report.sha256
 
@@ -298,3 +299,24 @@ def test_scope_notes_describe_limits_without_scoring():
     assert scope_notes(plain) == []
     hard = AppFacts("com.c", ad_sdks=set(), dynamic_code=True, obfuscation_ratio=0.8)
     assert scope_notes(hard) == ["obfuscated", "dynamic_code"]
+
+
+def test_split_signed_by_other_certificate_is_an_identity_error(tmp_path):
+    base, split = tmp_path / "base.apk", tmp_path / "split_a.apk"
+    for p in (base, split):
+        p.write_bytes(b"PK")
+    certs = {"base.apk": ("aa",), "split_a.apk": ("bb",)}
+    report = analyze_apk("com.x", [base, split],
+                         read_manifest=lambda p: ManifestInfo("com.x", 1, "X", ("aa",)),
+                         read_certs=lambda p: certs[p.name])
+    assert "signers: split_a.apk signed by a different certificate than base.apk" in report.error
+
+
+def test_splits_with_the_base_signer_are_fine(tmp_path):
+    base, split = tmp_path / "base.apk", tmp_path / "split_a.apk"
+    for p in (base, split):
+        p.write_bytes(b"PK")
+    report = analyze_apk("com.x", [base, split],
+                         read_manifest=lambda p: ManifestInfo("com.x", 1, "X", ("aa",)),
+                         read_certs=lambda p: ("aa",))
+    assert "signers" not in (report.error or "")

@@ -114,7 +114,7 @@
     "days": { "one": "{count} day ago", "few": "{count} days ago", "many": "{count} days ago", "other": "{count} days ago" }
   },
   "evidence": {
-    "title": "App details", "score": "Score", "why": "Why", "raw": "Raw data from the phone", "ad_sdks": "Ad libraries",
+    "title": "App details", "score": "Score", "why": "Why", "capabilities": "App capabilities", "levels": { "declared": "Requests", "code": "In code", "granted": "Granted", "observed": "Observed" }, "raw": "Raw data from the phone", "ad_sdks": "Ad libraries",
     "none": "Select an app in the table.", "plan": "Plan", "fix": "Fix ({count})",
     "zone": { "safe": "no issues", "review": "to review", "suspicious": "suspicious", "malicious": "malicious" },
     "limits": "Assessment limits", "incomplete_data": "Little data about the app's behavior", "confidence": "Confidence"

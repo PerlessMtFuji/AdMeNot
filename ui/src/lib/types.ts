@@ -77,6 +77,8 @@ export interface Finding {
   locations: string[];
 }
 
+export type CapabilityLevels = Record<'declared' | 'code' | 'granted' | 'observed', boolean | null>;
+
 export interface AppView {
   package: string;
   name: string;
@@ -101,6 +103,7 @@ export interface AppView {
   ad_sdks: string[] | null;
   symptoms: Symptom[];
   source: { label: string; days: number | null };
+  capabilities: { key: string; label: string; levels: CapabilityLevels }[];
 }
 
 export interface ScanCounts {

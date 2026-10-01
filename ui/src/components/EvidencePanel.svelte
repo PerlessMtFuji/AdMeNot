@@ -24,6 +24,8 @@
       rows.push({ key: 'ad_sdks', label: t('evidence.ad_sdks'), text: app.ad_sdks.join(', ') });
     return rows;
   });
+  const LEVELS = ['declared', 'code', 'granted', 'observed'] as const;
+  const mark = (v: boolean | null) => (v === null ? '?' : v ? '✓' : '—');
   const AVATAR = { malicious: 'bg-bad text-bad', suspicious: 'bg-warn-strong text-warn-strong', review: 'bg-soft text-soft', safe: 'bg-ok text-ok' };
 </script>
 
@@ -64,6 +66,25 @@
       <div class="flex items-center gap-2 text-xs text-mut"><Icon name="triangle-alert" />{t('expert.apk_error')}: {app.apk_error}</div>
     {/if}
   </div>
+  {#if app.capabilities?.length}
+    <span class="lbl">{t('evidence.capabilities')}</span>
+    <table class="well w-full text-xs">
+      <thead>
+        <tr class="text-left text-soft">
+          <th scope="col" class="p-2 font-semibold"><span class="sr-only">{t('evidence.capabilities')}</span></th>
+          {#each LEVELS as l (l)}<th scope="col" class="p-2 text-center font-semibold">{t(`evidence.levels.${l}`)}</th>{/each}
+        </tr>
+      </thead>
+      <tbody>
+        {#each app.capabilities as c (c.key)}
+          <tr class="border-t border-line">
+            <th scope="row" class="p-2 text-left font-semibold">{c.label}</th>
+            {#each LEVELS as l (l)}<td class="p-2 text-center tabular-nums">{mark(c.levels[l])}</td>{/each}
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  {/if}
   <details class="group text-xs">
     <summary class="flex cursor-pointer list-none items-center gap-1.5 font-semibold text-accent">
       <Icon name="chevron-right" size={14} class="transition-transform duration-150 group-open:rotate-90" />{t('evidence.raw')}
