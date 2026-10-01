@@ -82,9 +82,10 @@ def test_cache_size_and_clean_keep_backups(capsys, tmp_path):
     backup.mkdir(parents=True)
     (backup / "base.apk").write_bytes(b"x")
     assert main(["cache"], host=FakeAdb()) == 0
-    assert "2 MB" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "2 MB" in out and "10 GB" in out
     assert main(["cache", "--clean"], host=FakeAdb()) == 0
-    assert not (tmp_path / "DeMalware" / "apk-cache").exists()
+    assert not (tmp_path / "DeMalware" / "apk-cache" / "com.x").exists()
     assert (backup / "base.apk").exists()
 
 

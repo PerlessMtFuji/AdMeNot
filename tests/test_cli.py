@@ -190,3 +190,24 @@ def test_scan_output_says_when_the_profile_list_is_unknown(capsys):
     adb.responses[PM_USERS] = AdbError("command_failed", "pm list users: denied")
     assert main(["scan", "--lang", "en"], host=adb) == 0
     assert "Could not read the list of user profiles" in capsys.readouterr().out
+
+
+def test_apk_provider_uses_the_limit_and_skips_without_asking(monkeypatch, tmp_path, capsys):
+    from collections import namedtuple
+
+    from demalware.cli import main as M
+    from demalware.engine.apk import cache as C
+    from demalware.engine.apk.cache import Estimate
+    from demalware.engine.settings import save_settings
+
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    save_settings({"apk_cache_limit_gb": 3})
+    provider = M._apk_provider(FakeAdb(), "pl")
+    assert provider.policy.limit_bytes == 3 * C.GB
+    est = Estimate(5 * C.GB, 5 * C.GB, 10, 0, 2 * C.GB, {})
+    Use = namedtuple("Use", "size_bytes free_bytes disk_bytes limit_bytes effective_bytes")
+    use = Use(0, C.GB, 100 * C.GB, 3 * C.GB, 0)
+    provider.policy.on_estimate(est, use)
+    assert provider.policy.decide(est, use) == "skip"
+    err = capsys.readouterr().err
+    assert "5,0 GB" in err and "Za mało miejsca" in err
