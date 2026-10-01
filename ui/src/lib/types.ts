@@ -15,7 +15,21 @@ export interface Settings {
   backups_dir: string | null;
   theme: Theme;
   mirror_auto: boolean;
+  apk_cache_limit_gb: number;
+  apk_cache_clear_after_repair: boolean;
 }
+
+export interface CacheUsage {
+  size_bytes: number; free_bytes: number; disk_bytes: number;
+  limit_bytes: number; effective_bytes: number; path: string;
+}
+
+export interface ApkEstimate {
+  to_fetch_bytes: number; total_bytes: number; apps: number; unknown: number;
+  largest_bytes: number; limit_bytes: number; effective_bytes: number; free_bytes: number;
+}
+
+export interface ApkQuestion extends ApkEstimate { job_id: string; kind: 'no_space' }
 
 export interface Symptom {
   category: Category;
@@ -106,7 +120,7 @@ export interface ScanView {
     partial?: { name: string; count: number }[];
   };
   low_behavior_data: boolean;
-  apk: { requested: number; analyzed: number; failed: Record<string, string> } | null;
+  apk: { requested: number; analyzed: number; failed: Record<string, string>; stopped_no_space: boolean } | null;
   apps: AppView[];
   profiles: { others: number[]; known: boolean };
   usage_window_h: number | null;
@@ -270,6 +284,8 @@ export interface WhoView { resumed: WhoEntry | null; overlays: WhoEntry[] | null
 export interface Api {
   get_settings(): R<Settings>;
   save_settings(changes: Partial<Settings>): R<Settings>;
+  apk_cache(): R<CacheUsage>;
+  clear_apk_cache(): R<{ freed_bytes: number }>;
   list_devices(): R<DevicesPayload>;
   watch_devices(on: boolean): R<{ ok: boolean }>;
   start_scan(serial: string, client: string | null): R<{ job_id: string }>;
@@ -305,6 +321,8 @@ export interface EventMap {
   'scan:device': { device: PhoneCard };
   'scan:done': { scan: ScanView; interrupted: string[]; client: string | null };
   'apk:progress': { done: number; total: number; package: string };
+  'apk:estimate': ApkEstimate;
+  'apk:question': ApkQuestion;
   'apk:done': { scan: ScanView };
   'apk:stopped': Record<string, never>;
   'exec:order': { order: string; plan: PlanView | null };

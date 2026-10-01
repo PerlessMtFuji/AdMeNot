@@ -1,8 +1,9 @@
 <script lang="ts">
   import { getContext, onMount } from 'svelte';
   import type { Controller } from '../lib/controller';
-  import { t } from '../lib/i18n/index.svelte';
-  import type { Lang, Mode, Theme } from '../lib/types';
+  import { i18n, t } from '../lib/i18n/index.svelte';
+  import { formatGb } from '../lib/logic';
+  import type { CacheUsage, Lang, Mode, Theme } from '../lib/types';
   import Button from '../ui/Button.svelte';
   import Card from '../ui/Card.svelte';
   import Icon from '../ui/Icon.svelte';
@@ -29,10 +30,34 @@
   let svc = $state({ name: '', address: '', phone: '', logo: '' });
   let svcSaved = $state(false);
 
+  let limit = $state(String(s.settings.apk_cache_limit_gb));
+  let limitBad = $state(false);
+  let cache = $state<CacheUsage | null>(null);
+  let freed = $state<number | null>(null);
+  const gb = (b: number) => formatGb(b, i18n.lang);
+  const gbWhole = (b: number) => String(Math.round(b / 1024 ** 3));
+
   onMount(async () => {
-    const r = await ctl.loadService();
+    const [r, c] = await Promise.all([ctl.loadService(), ctl.loadApkCache()]);
     if (r) svc = { name: r.name ?? '', address: r.address ?? '', phone: r.phone ?? '', logo: r.logo ?? '' };
+    cache = c;
   });
+
+  async function saveLimit() {
+    const n = Number(limit);
+    limitBad = !Number.isInteger(n) || n < 1 || (cache !== null && n * 1024 ** 3 > cache.disk_bytes);
+    if (limitBad) return;
+    const r = await ctl.saveSettings({ apk_cache_limit_gb: n });
+    limitBad = r === null;
+    // Błąd walidacji limitu pokazuje komunikat przy polu, nie ogólna karta błędu.
+    if (r === null && s.error?.key === 'bad_request') s.error = null;
+    if (r) cache = await ctl.loadApkCache();
+  }
+
+  async function clearNow() {
+    const r = await ctl.clearApkCache();
+    if (r) { freed = r.freed_bytes; cache = await ctl.loadApkCache(); }
+  }
 
   async function chooseLogo() {
     const r = await ctl.pickLogo();
@@ -113,6 +138,31 @@
         <span>{t('settings.mirror_auto')}</span>
       </label>
       <span class="text-xs text-mut">{t('settings.mirror_auto_hint')}</span>
+    </div></Card>
+
+    <Card><div class="flex flex-col gap-4 p-6">
+      <span class="lbl">{t('settings.cache_title')}</span>
+      <div class="flex flex-col gap-1">
+        <label class="font-semibold" for="cache-limit">{t('settings.cache_limit')}</label>
+        <div class="flex gap-2">
+          <input id="cache-limit" type="number" min="1" step="1" class="{FIELD} max-w-[140px]" bind:value={limit} />
+          <Button onclick={saveLimit}>{t('settings.cache_save')}</Button>
+        </div>
+        {#if limitBad}<span class="flex items-center gap-1.5 text-bad"><Icon name="x" />{t('settings.cache_limit_bad')}</span>{/if}
+        {#if cache}
+          <span class="text-xs text-mut">{t('settings.cache_status', { size: gb(cache.size_bytes), limit: gbWhole(cache.limit_bytes) })}{#if cache.effective_bytes < cache.limit_bytes}{t('settings.cache_status_effective', { effective: gb(cache.effective_bytes), free: gb(cache.free_bytes) })}{/if}</span>
+        {/if}
+      </div>
+      <label class="flex items-center gap-3">
+        <input type="checkbox" checked={s.settings.apk_cache_clear_after_repair}
+          onchange={(e) => ctl.saveSettings({ apk_cache_clear_after_repair: e.currentTarget.checked })} />
+        <span>{t('settings.cache_clear_after')}</span>
+      </label>
+      <span class="text-xs text-mut">{t('settings.cache_clear_after_hint')}</span>
+      <div class="flex items-center gap-3">
+        <Button onclick={clearNow} disabled={s.apk.running}>{t('settings.cache_clear_now')}</Button>
+        {#if freed !== null}<span class="flex items-center gap-1 text-ok"><Icon name="check" />{t('settings.cache_cleared', { gb: gb(freed) })}</span>{/if}
+      </div>
     </div></Card>
 
     <Card><div class="flex flex-col gap-5 p-6">

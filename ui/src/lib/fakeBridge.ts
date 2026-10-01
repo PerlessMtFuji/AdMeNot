@@ -44,7 +44,8 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
   }
   const target = new EventTarget();
   const calls: FakeBridge['calls'] = [];
-  let settings: Settings = { lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system', mirror_auto: false };
+  let settings: Settings = { lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system', mirror_auto: false,
+    apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false };
   let service: ServiceInfo = { name: null, address: null, phone: null, logo: null };
   let lastScan: ScanView | null = null;
   let mirror: { serial: string | null; state: string } = { serial: null, state: 'stopped' };
@@ -75,9 +76,20 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
     switch (method) {
       case 'get_settings':
         return { ...settings };
-      case 'save_settings':
-        settings = { ...settings, ...(args[0] as Partial<Settings>) };
+      case 'save_settings': {
+        const changes = args[0] as Partial<Settings>;
+        if ((changes.apk_cache_limit_gb ?? 0) > 120) return { error: { key: 'bad_request', message: 'apk_cache_limit_gb' } };
+        settings = { ...settings, ...changes };
         return { ...settings };
+      }
+      case 'apk_cache': {
+        const GB = 1024 ** 3;
+        const limit = settings.apk_cache_limit_gb * GB;
+        return { size_bytes: 3.4 * GB, free_bytes: 4 * GB, disk_bytes: 120 * GB, limit_bytes: limit,
+                 effective_bytes: Math.min(limit, 5.4 * GB), path: 'C:\\Users\\serwis\\AppData\\Local\\DeMalware\\apk-cache' };
+      }
+      case 'clear_apk_cache':
+        return { freed_bytes: 3.4 * 1024 ** 3 };
       case 'rerender':
         return { scan: lastScan };
       case 'list_devices':

@@ -68,3 +68,21 @@ test('screen view setting and adb source', async () => {
   await flush();
   expect(screen.getByText(/· dołączony$/)).toBeTruthy();
 });
+
+test('settings: APK cache limit, status, clear after repair and clear now', async () => {
+  const { ctl, bridge } = await setupCtl('empty');
+  render(App, { props: { ctl } });
+  await fireEvent.click(screen.getByRole('button', { name: 'Ustawienia' }));
+  expect(await screen.findByText(/Zajęte: 3,4 GB · limit 10 GB · teraz zmieści się 5,4 GB/)).toBeTruthy();
+  const limit = screen.getByLabelText('Limit (GB)');
+  await fireEvent.input(limit, { target: { value: '200' } });
+  await fireEvent.click(screen.getByRole('button', { name: 'Zapisz limit' }));
+  expect(await screen.findByText(/Limit nie może być większy niż dysk/)).toBeTruthy();
+  await fireEvent.input(limit, { target: { value: '5' } });
+  await fireEvent.click(screen.getByRole('button', { name: 'Zapisz limit' }));
+  await vi.waitFor(() => expect(bridge.calls).toContainEqual({ method: 'save_settings', args: [{ apk_cache_limit_gb: 5 }] }));
+  await fireEvent.click(screen.getByLabelText('Po zakończonej naprawie usuń pamięć podręczną APK'));
+  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ apk_cache_clear_after_repair: true }] });
+  await fireEvent.click(screen.getByRole('button', { name: 'Wyczyść teraz' }));
+  expect(await screen.findByText(/Usunięto 3,4 GB/)).toBeTruthy();
+});

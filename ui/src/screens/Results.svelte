@@ -2,6 +2,7 @@
   import { getContext } from 'svelte';
   import { flip } from 'svelte/animate';
   import { fade } from 'svelte/transition';
+  import ApkSpace from '../components/ApkSpace.svelte';
   import AppCard from '../components/AppCard.svelte';
   import EvidencePanel from '../components/EvidencePanel.svelte';
   import ExpertTable from '../components/ExpertTable.svelte';
@@ -80,6 +81,7 @@
         <div class="w-40"><Progress value={s.apk.total ? s.apk.done / s.apk.total : 0} label={t('scan.stage.apk')} /></div>
       </div>
     {/if}
+    <ApkSpace />
     {#if s.interrupted.length}<InterruptedBanner orders={s.interrupted} />{/if}
     {#if s.scan?.low_behavior_data}<Banner tone="warn" icon="info" title={t('summary.low_data', { hours: s.scan.usage_window_h?.toFixed(1) ?? '?' })} />{/if}
     {#if missing.length}<Banner tone="warn" icon="info" title={t('summary.incomplete', { count: withGaps, names: missing.join(', ') })} />{/if}

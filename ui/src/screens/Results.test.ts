@@ -207,4 +207,21 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     expect(t('summary.low_data', { hours: '1.5' })).toContain('1.5 h');
     expect(screen.getByText(t('summary.profiles', { ids: '10, 11' }))).toBeTruthy();
   });
+
+  test('APK estimate, space question and no-space stop', async () => {
+    const { s, bridge } = await scanned();
+    const GB = 1024 ** 3;
+    s.apk = { ...s.apk, running: true };
+    bridge.emit('apk:estimate', { to_fetch_bytes: 7.2 * GB, total_bytes: 7.2 * GB, apps: 142, unknown: 3,
+      largest_bytes: 3 * GB, limit_bytes: 10 * GB, effective_bytes: 2 * GB, free_bytes: 4 * GB });
+    expect(await screen.findByText(/Analiza pobierze ok. 7,2 GB \(142 aplikacje\)/)).toBeTruthy();
+    expect(screen.getByText(/Na dysku jest miejsce na 2,0 GB/)).toBeTruthy();
+    bridge.emit('apk:question', { job_id: 'job-9', kind: 'no_space', to_fetch_bytes: 7.2 * GB, total_bytes: 7.2 * GB,
+      apps: 142, unknown: 0, largest_bytes: 3 * GB, limit_bytes: 10 * GB, effective_bytes: 2 * GB, free_bytes: 4 * GB });
+    await fireEvent.click(await screen.findByRole('button', { name: 'Wyczyść i analizuj' }));
+    expect(bridge.calls.at(-1)).toEqual({ method: 'answer', args: ['job-9', 'clear'] });
+    const stopped = { ...JSON.parse(JSON.stringify(s.scan)), apk: { requested: 142, analyzed: 61, failed: {}, stopped_no_space: true } };
+    bridge.emit('apk:done', { scan: stopped });
+    expect(await screen.findByText('Zabrakło miejsca na dysku. Przeanalizowano 61 ze 142 aplikacji.')).toBeTruthy();
+  });
 });

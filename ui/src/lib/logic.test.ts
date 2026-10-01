@@ -26,6 +26,7 @@ import {
   stageStates,
   upsertStep,
   visibleApps,
+  formatGb,
 } from './logic';
 import type { AppView, Category, StepEvent } from './types';
 
@@ -238,4 +239,10 @@ test('dayKey', () => {
   expect(dayKey('2026-09-27T08:15', now)).toBe('today');
   expect(dayKey('2026-09-26T23:59', now)).toBe('yesterday');
   expect(dayKey('2026-08-12T09:12', now)).toBe('date');
+});
+
+test('formatGb uses one decimal and the language separator', () => {
+  expect(formatGb(7.2 * 1024 ** 3, 'pl')).toBe('7,2');
+  expect(formatGb(7.2 * 1024 ** 3, 'en')).toBe('7.2');
+  expect(formatGb(0, 'pl')).toBe('0,0');
 });

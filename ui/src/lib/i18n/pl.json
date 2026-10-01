@@ -208,7 +208,28 @@
     "service_logo": "Logo",
     "choose_logo": "Wybierz logo…",
     "logo_hint": "PNG, JPG, WebP albo SVG, najwyżej 1 MB.",
-    "save_service": "Zapisz dane serwisu"
+    "save_service": "Zapisz dane serwisu",
+    "cache_title": "Pamięć podręczna APK",
+    "cache_limit": "Limit (GB)",
+    "cache_save": "Zapisz limit",
+    "cache_limit_bad": "Limit nie może być większy niż dysk ani mniejszy niż 1 GB.",
+    "cache_status": "Zajęte: {size} GB · limit {limit} GB",
+    "cache_status_effective": " · teraz zmieści się {effective} GB (wolne {free} GB − 2 GB zapasu)",
+    "cache_clear_after": "Po zakończonej naprawie usuń pamięć podręczną APK",
+    "cache_clear_after_hint": "Kopie zapasowe usuniętych aplikacji zostają.",
+    "cache_clear_now": "Wyczyść teraz",
+    "cache_cleared": "Usunięto {gb} GB."
+  },
+  "apk_cache": {
+    "estimate": "Analiza pobierze ok. {gb} GB ({apps} aplikacje)",
+    "unknown": "(bez {count} aplikacji o nieznanym rozmiarze)",
+    "over": "Na dysku jest miejsce na {gb} GB — pliki będą usuwane na bieżąco, po analizie zostaną tylko pliki aplikacji do naprawy.",
+    "question_title": "Za mało miejsca na dysku",
+    "question_text": "Wolne: {free} GB. Dwie największe aplikacje potrzebują naraz {need} GB (z zapasem).",
+    "clear": "Wyczyść i analizuj",
+    "skip": "Pomiń analizę APK",
+    "run": "Analizuj mimo to",
+    "stopped": "Zabrakło miejsca na dysku. Przeanalizowano {done} ze {total} aplikacji."
   },
   "console": {
     "title": "Konsola ADB", "placeholder": "polecenie adb shell, np. dumpsys package com.example", "run": "Wykonaj",

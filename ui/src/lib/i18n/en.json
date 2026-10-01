@@ -208,7 +208,28 @@
     "service_logo": "Logo",
     "choose_logo": "Choose logo…",
     "logo_hint": "PNG, JPG, WebP or SVG, up to 1 MB.",
-    "save_service": "Save service details"
+    "save_service": "Save service details",
+    "cache_title": "APK cache",
+    "cache_limit": "Limit (GB)",
+    "cache_save": "Save limit",
+    "cache_limit_bad": "The limit cannot be larger than the disk or smaller than 1 GB.",
+    "cache_status": "Used: {size} GB · limit {limit} GB",
+    "cache_status_effective": " · room now for {effective} GB (free {free} GB − 2 GB reserve)",
+    "cache_clear_after": "Clear the APK cache after a finished repair",
+    "cache_clear_after_hint": "Backups of removed apps are kept.",
+    "cache_clear_now": "Clear now",
+    "cache_cleared": "Removed {gb} GB."
+  },
+  "apk_cache": {
+    "estimate": "The analysis will download about {gb} GB ({apps} apps)",
+    "unknown": "(not counting {count} apps of unknown size)",
+    "over": "The disk has room for {gb} GB — files will be removed as the analysis goes; only the files of apps to repair will stay.",
+    "question_title": "Not enough disk space",
+    "question_text": "Free: {free} GB. The two largest apps need {need} GB at once (with the reserve).",
+    "clear": "Clear and analyze",
+    "skip": "Skip the APK analysis",
+    "run": "Analyze anyway",
+    "stopped": "Ran out of disk space. Analyzed {done} of {total} apps."
   },
   "console": {
     "title": "ADB console", "placeholder": "adb shell command, e.g. dumpsys package com.example", "run": "Run",

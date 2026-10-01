@@ -1,6 +1,6 @@
 import type { Phase } from './logic';
 import type {
-  ApiErrorBody, Category, ConsoleEntry, DeviceEntry, HistoryView, Level, MirrorState, OrderResult, PhoneCard,
+  ApiErrorBody, ApkEstimate, ApkQuestion, Category, ConsoleEntry, DeviceEntry, HistoryView, Level, MirrorState, OrderResult, PhoneCard,
   PlanView, Question, ReportResult, ScanView, Settings, ShotsView, ShotView, StepEvent, UndoDone, Verdict,
 } from './types';
 
@@ -10,7 +10,8 @@ const ORDER_KINDS = ['exec', 'resume', 'undo'];
 export class AppState {
   phase = $state<Phase>('connect');
   screen = $state<Screen>('main');
-  settings = $state<Settings>({ lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system', mirror_auto: false });
+  settings = $state<Settings>({ lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system', mirror_auto: false,
+    apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false });
   devices = $state<DeviceEntry[]>([]);
   devicesError = $state<string | null>(null);
   knownSerials = $state<string[]>([]);
@@ -20,6 +21,8 @@ export class AppState {
   device = $state<PhoneCard | null>(null);
   scan = $state<ScanView | null>(null);
   apk = $state({ done: 0, total: 0, running: false, changed: [] as string[] });
+  apkEstimate = $state<ApkEstimate | null>(null);
+  apkQuestion = $state<ApkQuestion | null>(null);
   interrupted = $state<string[]>([]);
   selection = $state<Record<string, Level>>({});
   touched = $state<string[]>([]);

@@ -4,7 +4,7 @@ import { changedVerdicts, defaultSelection, mergeSelection, upsertStep } from '.
 import type { AppState } from './state.svelte';
 import { applyTheme } from './theme';
 import type {
-  ApiError, AppView, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, Theme,
+  ApiError, AppView, CacheUsage, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, Theme,
 } from './types';
 
 const CONSOLE_LIMIT = 500;
@@ -96,16 +96,21 @@ export class Controller {
       s.unlocked = [];
       s.expanded = [];
       s.apk = { done: 0, total: 0, running: true, changed: [] };
+      s.apkEstimate = null;
+      s.apkQuestion = null;
       s.phase = 'results';
     });
+    on('apk:estimate', (d) => { s.apkEstimate = d; });
+    on('apk:question', (d) => { s.apkQuestion = d; });
     on('apk:progress', (d) => { s.apk = { ...s.apk, done: d.done, total: d.total, running: true }; });
     on('apk:done', (d) => {
       const changed = changedVerdicts(s.scan?.apps ?? [], d.scan.apps);
       s.selection = mergeSelection(s.selection, d.scan.apps, s.touched);
       s.scan = d.scan;
+      s.apkQuestion = null;
       s.apk = { ...s.apk, running: false, changed };
     });
-    on('apk:stopped', () => { s.apk = { ...s.apk, running: false }; });
+    on('apk:stopped', () => { s.apkQuestion = null; s.apk = { ...s.apk, running: false }; });
     on('exec:order', (d) => {
       s.order = d.order;
       s.execPlan = d.plan;
@@ -160,6 +165,7 @@ export class Controller {
         s.phase = 'connect';
         s.device = null;
       } else if (d.kind === 'apk') {
+        s.apkQuestion = null;
         s.apk = { ...s.apk, running: false };
       } else if ((d.kind === 'exec' || d.kind === 'resume') && s.phase === 'executing') {
         if (s.order && !s.interrupted.includes(s.order)) s.interrupted = [...s.interrupted, s.order];
@@ -208,6 +214,8 @@ export class Controller {
       result: null, order: null, disconnectedOrder: null, steps: [], screen: 'main',
     });
     s.apk = { done: 0, total: 0, running: false, changed: [] };
+    s.apkEstimate = null;
+    s.apkQuestion = null;
     const r = await this.call(this.api.start_scan(s.serial, s.client.trim() || null));
     if (r) this.setJob(r.job_id, 'scan');
     else s.phase = 'connect';
@@ -343,6 +351,21 @@ export class Controller {
 
   setLang(lang: Lang): Promise<Settings | null> {
     return this.saveSettings({ lang });
+  }
+
+  async answerApk(value: 'clear' | 'skip' | 'run'): Promise<void> {
+    const q = this.state.apkQuestion;
+    if (!q) return;
+    this.state.apkQuestion = null;
+    await this.call(this.api.answer(q.job_id, value));
+  }
+
+  loadApkCache(): Promise<CacheUsage | null> {
+    return this.call(this.api.apk_cache());
+  }
+
+  clearApkCache(): Promise<{ freed_bytes: number } | null> {
+    return this.call(this.api.clear_apk_cache());
   }
 
   setTheme(theme: Theme): Promise<Settings | null> {

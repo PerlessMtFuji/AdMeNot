@@ -267,3 +267,8 @@ export function dayKey(iso: string, now: Date): 'today' | 'yesterday' | 'date' {
   const diff = Math.round((today - day) / 86_400_000);
   return diff === 0 ? 'today' : diff === 1 ? 'yesterday' : 'date';
 }
+
+export function formatGb(bytes: number, lang: string): string {
+  return new Intl.NumberFormat(lang === 'pl' ? 'pl-PL' : 'en-US',
+    { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(bytes / 1024 ** 3);
+}
