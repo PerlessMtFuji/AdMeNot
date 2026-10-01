@@ -1,11 +1,14 @@
+import errno
 import hashlib
 import json
+import os
 import threading
 
 import pytest
 
 from demalware.engine.adb.fake import FakeAdb
 from demalware.engine.adb.transport import AdbError
+from demalware.engine.apk.cache import NoSpace
 from demalware.engine.apk.fetch import PM_PATH, fetch_apks, parse_pm_path, sha256_command
 
 BASE = "/data/app/~~Rg8wIz5Z==/com.clean.x-a1B2==/base.apk"
@@ -153,3 +156,41 @@ def test_backup_without_sha256sum_copies_this_phones_files(tmp_path):
     target = tmp_path / "backups" / "com.clean.x" / "unknown"
     saved = backup_apks(_adb(sha=_NO_SHA, serial="PHONE-A"), "com.clean.x", None, target, cache)
     assert [p.read_bytes() for p in saved] == [b"base-bytes", b"split"]
+
+
+def test_cache_hit_refreshes_last_use(tmp_path):
+    first = fetch_apks(_adb(), "com.clean.x", tmp_path)
+    entry = first.paths[0].parent
+    os.utime(entry, (1_000_000, 1_000_000))
+    fetch_apks(_adb(), "com.clean.x", tmp_path)
+    assert entry.stat().st_mtime > 1_000_000
+
+
+@pytest.mark.parametrize("message", [
+    "adb: error: cannot create 'x': No space left on device",
+    "failed to copy: There is not enough space on the disk.",
+])
+def test_pull_without_space_is_no_space_and_leaves_nothing(tmp_path, message):
+    adb = _adb()
+    real_run = adb.run
+
+    def run(args, timeout=20.0):
+        if args[0] == "pull":
+            raise AdbError("command_failed", message)
+        return real_run(args, timeout)
+
+    adb.run = run
+    with pytest.raises(NoSpace):
+        fetch_apks(adb, "com.clean.x", tmp_path)
+    assert list((tmp_path / "com.clean.x").iterdir()) == []
+
+
+def test_disk_full_while_writing_is_no_space(tmp_path):
+    adb = _adb()
+
+    def run(args, timeout=20.0):
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+    adb.run = run
+    with pytest.raises(NoSpace):
+        fetch_apks(adb, "com.clean.x", tmp_path)
