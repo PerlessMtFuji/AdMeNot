@@ -211,3 +211,40 @@ def test_apk_provider_uses_the_limit_and_skips_without_asking(monkeypatch, tmp_p
     assert provider.policy.decide(est, use) == "skip"
     err = capsys.readouterr().err
     assert "5,0 GB" in err and "Za mało miejsca" in err
+
+
+def test_scan_apk_skipped_for_no_space_keeps_exit_code_and_says_so(capsys, monkeypatch):
+    from demalware.engine.apk import cache as C
+    from demalware.engine.apk.cache import Estimate
+
+    class NoSpace(_FakeDeviceProvider):
+        def __init__(self, adb, policy=None):
+            self.policy = policy
+
+        def reports_for(self, apps, progress=None, flagged=frozenset()):
+            est = Estimate(5 * C.GB, 5 * C.GB, len(apps), 0, 2 * C.GB, {})
+            use = C.CacheUsage(0, C.GB, 100 * C.GB, 3 * C.GB, 0)
+            self.policy.on_estimate(est, use)
+            assert self.policy.decide(est, use) == "skip"
+            return {f.package: ApkReport(f.package, error=C.NO_SPACE) for f in apps}
+
+    monkeypatch.setattr("demalware.cli.main.DeviceApkProvider", NoSpace)
+    assert main(["scan", "--apk"], host=make_synthetic_adb()) == 0
+    captured = capsys.readouterr()
+    assert "Za mało miejsca" in captured.err
+    assert "Zabrakło miejsca na dysku: przeanalizowano 0 z 3 aplikacji." in captured.out
+
+
+def test_print_report_says_when_the_analysis_ran_out_of_space(capsys):
+    from datetime import datetime
+
+    from demalware.cli.main import _print_report
+    from demalware.engine.device.info import DeviceInfo
+    from demalware.engine.session import ApkStatus, ScanReport
+
+    device = DeviceInfo("S", "b", "m", "model", "dev", None, "14", 34, None, 0.0, datetime(2026, 1, 1))
+    report = ScanReport(device=device, collectors={}, low_behavior_data=False,
+                        results=[], apk=ApkStatus(10, 4, {}, stopped_no_space=True))
+    _print_report(report, "en", False)
+    out = capsys.readouterr().out
+    assert "Ran out of disk space: analyzed 4 of 10 apps." in out

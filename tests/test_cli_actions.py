@@ -156,3 +156,16 @@ def test_fix_with_apk_stores_app_names_and_icons_for_the_report(monkeypatch, tmp
     with Journal(journal_path()) as j:
         app = next(a for a in j.scan(order.id)["apps"] if a["package"] == "com.wlive.forecast")
     assert (app["label"], app["icon"]) == ("Pogoda Live", icon)
+
+
+def test_fix_clears_the_apk_cache_after_a_finished_repair(capsys, data_dir):
+    from demalware.engine.settings import save_settings
+
+    save_settings({"apk_cache_clear_after_repair": True})
+    entry = data_dir / "DeMalware" / "apk-cache" / "com.x" / "1"
+    entry.mkdir(parents=True)
+    (entry / "base.apk").write_bytes(b"x" * 1_000_000)
+    assert main(["fix", "--app", "com.wlive.forecast=disable", "--yes"], host=make_cli_phone()) == 0
+    out = capsys.readouterr().out
+    assert "Usunięto pamięć podręczną APK po naprawie (1 MB)" in out
+    assert not (data_dir / "DeMalware" / "apk-cache" / "com.x").exists()

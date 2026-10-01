@@ -113,3 +113,17 @@ def test_undo_unknown_app_in_order(capsys):
     order = _fix(phone, "com.wlive.forecast=disable")
     assert main(["undo", "--order", order.number, "--app", "com.wlive.forcast"], host=phone) == 2
     assert "Nie ma takiej aplikacji ani kroku" in capsys.readouterr().err
+
+
+def test_cache_status_survives_unreadable_disk(capsys, tmp_path, monkeypatch):
+    cache = tmp_path / "DeMalware" / "apk-cache" / "com.x" / "1"
+    cache.mkdir(parents=True)
+    (cache / "base.apk").write_bytes(b"x" * 2_000_000)
+
+    def broken(path, limit):
+        raise OSError("disk gone")
+
+    monkeypatch.setattr("demalware.cli.actions_cli.usage", broken)
+    assert main(["cache"], host=FakeAdb()) == 0
+    out = capsys.readouterr().out
+    assert "2 MB" in out and "nie udało się odczytać" in out and "room" not in out
