@@ -7,7 +7,7 @@ import pytest
 from demalware.engine.adb.fake import FakeAdb
 from demalware.engine.adb.transport import AdbError
 from demalware.engine.apk import cache as C
-from demalware.engine.apk.analyze import ApkReport, report_to_json
+from demalware.engine.apk.analyze import ApkReport, apply_apk_report, report_to_json, scope_notes
 from demalware.engine.apk.fetch import FetchedApks
 from demalware.engine.apk.isolated import IsolatedAnalyzer
 from demalware.engine.apk.providers import (
@@ -432,3 +432,19 @@ def test_deep_runs_without_verified_hashes_but_is_not_stored(tmp_path):
     make().reports_for([AppFacts("com.a")])
     assert report.deep and "unverified" in report.error
     assert calls == ["com.a", "com.a"]  # bez zweryfikowanych skrótów nie ma klucza pamięci
+
+
+def test_failed_deep_analysis_keeps_the_normal_result(tmp_path):
+    # Próba na OPPO: MemoryError w głębokiej analizie zamienił „Do sprawdzenia” w 0 pkt.
+    expected = {"base.apk": "a" * 64}
+    provider = DeviceApkProvider(
+        FakeAdb(), cache_dir=tmp_path / "apk-cache", deep=frozenset({"com.a"}),
+        deep_analyze=lambda package, paths: ApkReport(package, error="MemoryError: "),
+        fetch=lambda adb, package, cache_dir: FetchedApks([tmp_path / "base.apk"], True, expected),
+        analyze=lambda package, paths: ApkReport(package, class_count=9, files=dict(expected), ad_sdks=["x"]))
+    report = provider.reports_for([AppFacts("com.a")])["com.a"]
+    assert report.class_count == 9 and report.ad_sdks == ["x"] and report.error is None
+    assert not report.deep and report.code_paths == [] and report.undetermined == ["deep_failed"]
+    facts = AppFacts("com.a")
+    apply_apk_report(facts, report)
+    assert facts.code_hides_icon is None and "code_undetermined" in scope_notes(facts)
