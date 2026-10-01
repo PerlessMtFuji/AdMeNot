@@ -298,3 +298,36 @@ def test_scan_deep_passes_the_packages_to_the_provider(capsys, monkeypatch):
 def test_scan_deep_rejects_a_bad_package_name(capsys):
     assert main(["scan", "--apk", "--deep", "com.a;rm -rf"], host=make_synthetic_adb()) == 2
     assert "com.a;rm -rf" in capsys.readouterr().err
+
+
+def test_who_watch_records_an_incident_that_the_next_scan_uses(capsys, monkeypatch, tmp_path):
+    from demalware.engine.incident import Sample, Timeline
+
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    timeline = Timeline([Sample(0.0, "com.game", ["com.clean.pro.boost"], None, [])], marks=[0.0])
+    seen = {}
+
+    def fake_record(adb, duration_s, interval_s, **kw):
+        seen.update(duration=duration_s, interval=interval_s, poll=kw["poll_mark"]())
+        return timeline
+
+    monkeypatch.setattr("demalware.cli.main.record", fake_record)
+    assert main(["who", "--watch", "30", "--interval", "1.5"], host=make_synthetic_adb()) == 0
+    out = capsys.readouterr().out
+    assert seen == {"duration": 30.0, "interval": 1.5, "poll": False}
+    assert "com.clean.pro.boost" in out and "com.game" in out
+    assert (tmp_path / "DeMalware" / "incidents" / f"{SERIAL}.json").exists()
+
+    assert main(["scan", "--json"], host=make_synthetic_adb()) == 0
+    results = {r["package"]: r for r in json.loads(capsys.readouterr().out)["results"]}
+    assert "DM-INCIDENT-01" in {f["rule_id"] for f in results["com.clean.pro.boost"]["findings"]}
+
+
+def test_who_watch_without_marks_says_nothing_was_marked(capsys, monkeypatch, tmp_path):
+    from demalware.engine.incident import Sample, Timeline
+
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr("demalware.cli.main.record",
+                        lambda adb, d, i, **kw: Timeline([Sample(0.0, "com.game", [], None, [])], []))
+    assert main(["who", "--watch", "5"], host=make_synthetic_adb()) == 0
+    assert "Enter" in capsys.readouterr().out

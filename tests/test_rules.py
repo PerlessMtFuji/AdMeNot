@@ -62,7 +62,7 @@ EXPECTED_CATEGORIES = {
     "DM-ADSDK-01": "ads", "DM-ADSDK-02": "ads",
     "DM-ALARM-01": "background", "DM-PERM-01": "background", "DM-DYNDEX-01": "background",
     "DM-CODE-BOOTUI-01": "background", "DM-CODE-HIDE-01": "disguise", "DM-CODE-OVERLAY-01": "ads",
-    "DM-CODE-DYNLOAD-01": "background",
+    "DM-CODE-DYNLOAD-01": "background", "DM-INCIDENT-01": "ads",
     "DM-ADMIN-01": "removal", "DM-HOME-01": "removal", "DM-HOME-02": "removal",
     "DM-HIDDEN-01": "removal",
     "DM-A11Y-01": "data", "DM-NLS-01": "data", "DM-SMS-01": "data", "DM-BROWSER-01": "data",
@@ -328,3 +328,12 @@ def test_boot_ui_path_rule_is_static_and_weak():
 def test_code_rules_do_not_fire_without_deep_analysis():
     ids = {f.rule_id for f in load_default_ruleset().evaluate(AppFacts("com.x"))}
     assert not any(i.startswith("DM-CODE-") for i in ids)
+
+
+def test_incident_rule_is_observed_weak_and_in_the_overlay_group():
+    facts = AppFacts("com.ads", incident_hits=1, incident_over="com.game")
+    (f,) = [f for f in load_default_ruleset().evaluate(facts) if f.rule_id == "DM-INCIDENT-01"]
+    assert (f.rule_class, f.basis, f.group) == ("behavior", "observed", "overlay") and f.weight <= 5
+    assert "com.game" in f.text("pl") and "com.game" in f.text("en")
+    for hits in (None, 0):
+        assert "DM-INCIDENT-01" not in _ids(AppFacts("com.ads", incident_hits=hits))
