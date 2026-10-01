@@ -1,6 +1,5 @@
 import json
 import threading
-import time
 from collections import namedtuple
 
 import pytest
@@ -161,13 +160,17 @@ def test_pruning_keeps_flagged_apps_for_the_repair(tmp_path, free):
 def test_no_space_stops_the_rest_without_pulling(tmp_path, free):
     pulled = []
     lock = threading.Lock()
+    app1_failed = threading.Event()
 
     def fetch(adb, package, cache_dir):
         with lock:
             pulled.append(package)
         if package == "com.app1":
-            raise C.NoSpace(package)
-        time.sleep(0.2)  # app0 trwa dłużej: kolejne zadania startują już po NoSpace z app1
+            try:
+                raise C.NoSpace(package)
+            finally:
+                app1_failed.set()
+        app1_failed.wait(5)  # app0 czeka na NoSpace z app1: kolejne zadania startują po nim
         return FetchedApks([], verified=True)
 
     reports = _provider(tmp_path, CachePolicy(limit_bytes=C.GB), fetch, workers=2).reports_for(_apps(8))
@@ -239,4 +242,18 @@ def test_broken_disk_usage_disables_the_policy(tmp_path, monkeypatch):
 
     monkeypatch.setattr(C, "disk_usage", broken)
     reports = _provider(tmp_path, CachePolicy(limit_bytes=1), _writing_fetch(10)).reports_for(_apps(2))
+    assert all(r.error is None for r in reports.values())
+
+
+def test_disk_usage_failing_midway_does_not_break_the_run(tmp_path, monkeypatch):
+    calls = {"n": 0}
+
+    def flaky(path):
+        calls["n"] += 1
+        if calls["n"] > 1:
+            raise OSError("gone")
+        return Disk(500 * C.GB, 0, 100 * C.GB)
+
+    monkeypatch.setattr(C, "disk_usage", flaky)
+    reports = _provider(tmp_path, CachePolicy(limit_bytes=1), _writing_fetch(10)).reports_for(_apps(3))
     assert all(r.error is None for r in reports.values())
