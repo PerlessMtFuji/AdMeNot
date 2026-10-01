@@ -84,6 +84,7 @@ export interface AppView {
   confidence: 'low' | 'medium' | 'high';
   confidence_label: string;
   gaps: { key: string; label: string }[];
+  scope: { key: string; label: string }[];
   trusted: boolean;
   incomplete: boolean;
   is_system: boolean;

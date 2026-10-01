@@ -71,3 +71,18 @@ test('evidence: data gaps show an "Assessment limits" section and the confidence
   expect(screen.getByText('Pewność wniosku')).toBeTruthy();
   expect(screen.getByText('niska — …')).toBeTruthy();
 });
+
+test('evidence: incomplete without gaps and APK scope notes still show the limits section', () => {
+  const app = {
+    package: 'com.x', name: 'X', score: 0, verdict: 'safe', verdict_label: 'Brak istotnych sygnałów (ocena niepełna)',
+    confidence: 'low', confidence_label: 'niska', gaps: [], incomplete: true,
+    scope: [{ key: 'obfuscated', label: 'Kod w dużej części zaciemniony' }],
+    trusted: false, is_system: false, from_play: false, installer: null, is_admin: false,
+    default_level: null, problems: [], apk_error: null, ad_sdks: [], symptoms: [],
+    source: { label: 'Chrome', days: 1 }, findings: [],
+  };
+  render(EvidencePanel, { props: { app: app as never } });
+  expect(screen.getByText('Ograniczenia oceny')).toBeTruthy();
+  expect(screen.getByText('Mało danych o zachowaniu aplikacji')).toBeTruthy();
+  expect(screen.getByText('Kod w dużej części zaciemniony')).toBeTruthy();
+});

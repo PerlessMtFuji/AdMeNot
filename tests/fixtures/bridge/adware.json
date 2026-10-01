@@ -384,6 +384,12 @@
          "confidence": "high",
          "confidence_label": "wysoka — potwierdzony wskaźnik lub zachowanie kilku rodzajów",
          "gaps": [],
+         "scope": [
+          {
+           "key": "not_analyzed",
+           "label": "Kod aplikacji nie był analizowany — ocena tylko z danych telefonu"
+          }
+         ],
          "trusted": false,
          "incomplete": false,
          "is_system": false,
@@ -576,6 +582,12 @@
          "confidence": "medium",
          "confidence_label": "średnia — zaobserwowane zachowanie",
          "gaps": [],
+         "scope": [
+          {
+           "key": "not_analyzed",
+           "label": "Kod aplikacji nie był analizowany — ocena tylko z danych telefonu"
+          }
+         ],
          "trusted": false,
          "incomplete": false,
          "is_system": false,
@@ -626,6 +638,12 @@
          "confidence": "low",
          "confidence_label": "niska — tylko cechy pakietu i przyznane uprawnienia",
          "gaps": [],
+         "scope": [
+          {
+           "key": "not_analyzed",
+           "label": "Kod aplikacji nie był analizowany — ocena tylko z danych telefonu"
+          }
+         ],
          "trusted": false,
          "incomplete": false,
          "is_system": false,
@@ -673,6 +691,12 @@
          "confidence": "low",
          "confidence_label": "niska — tylko cechy pakietu i przyznane uprawnienia",
          "gaps": [],
+         "scope": [
+          {
+           "key": "not_analyzed",
+           "label": "Kod aplikacji nie był analizowany — ocena tylko z danych telefonu"
+          }
+         ],
          "trusted": false,
          "incomplete": false,
          "is_system": true,
@@ -783,6 +807,7 @@
          "confidence": "high",
          "confidence_label": "wysoka — potwierdzony wskaźnik lub zachowanie kilku rodzajów",
          "gaps": [],
+         "scope": [],
          "trusted": false,
          "incomplete": false,
          "is_system": false,
@@ -975,6 +1000,7 @@
          "confidence": "medium",
          "confidence_label": "średnia — zaobserwowane zachowanie",
          "gaps": [],
+         "scope": [],
          "trusted": false,
          "incomplete": false,
          "is_system": false,
@@ -1025,6 +1051,7 @@
          "confidence": "low",
          "confidence_label": "niska — tylko cechy pakietu i przyznane uprawnienia",
          "gaps": [],
+         "scope": [],
          "trusted": false,
          "incomplete": false,
          "is_system": false,
@@ -1072,6 +1099,12 @@
          "confidence": "low",
          "confidence_label": "niska — tylko cechy pakietu i przyznane uprawnienia",
          "gaps": [],
+         "scope": [
+          {
+           "key": "not_analyzed",
+           "label": "Kod aplikacji nie był analizowany — ocena tylko z danych telefonu"
+          }
+         ],
          "trusted": false,
          "incomplete": false,
          "is_system": true,

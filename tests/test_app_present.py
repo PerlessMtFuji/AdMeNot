@@ -219,3 +219,11 @@ def test_history_devices_show_phone_name_model_and_photo(tmp_path):
     assert a14["image"] == image_uri(photo)
     assert (old["serial"], old["name"], old["model"]) == ("OLD1", "Redmi_Note_8", "Redmi_Note_8")
     assert old["image"] == image_uri(SILHOUETTE)
+
+
+def test_app_view_lists_analysis_scope_for_a_quiet_app():
+    from demalware.engine.scoring import AppResult
+
+    facts = AppFacts("com.x", ad_sdks=set(), dynamic_code=True, obfuscation_ratio=0.9)
+    view = app_view(AppResult(facts, [], 0, "safe", False, False), "pl")
+    assert [s["key"] for s in view["scope"]] == ["obfuscated", "dynamic_code"]

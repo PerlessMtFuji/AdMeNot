@@ -117,7 +117,7 @@
     "title": "Szczegóły aplikacji", "score": "Wynik", "why": "Dlaczego", "raw": "Surowe dane z telefonu", "ad_sdks": "Biblioteki reklamowe",
     "none": "Wybierz aplikację w tabeli.", "plan": "Plan", "fix": "Napraw ({count})",
     "zone": { "safe": "bez uwag", "review": "do sprawdzenia", "suspicious": "podejrzana", "malicious": "szkodliwa" },
-    "limits": "Ograniczenia oceny", "confidence": "Pewność wniosku"
+    "limits": "Ograniczenia oceny", "incomplete_data": "Mało danych o zachowaniu aplikacji", "confidence": "Pewność wniosku"
   },
   "actions": { "console": "Konsola ADB", "fix": "Napraw zaznaczone ({count})", "rescan": "Skanuj ponownie" },
   "plan": { "title": "Plan naprawy", "confirm_title": "Co zrobię na telefonie", "blocked": "Pominięta", "unlock": "Odblokuj", "undo_hint": "Każdą zmianę można cofnąć w Historii.", "run": "Wykonaj ({count})", "nothing": "Nic do wykonania — wszystkie aplikacje są zablokowane." },

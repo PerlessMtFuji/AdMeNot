@@ -8,6 +8,7 @@ from demalware.engine.texts import (
     level_label,
     order_status_label,
     reason_text,
+    scope_label,
     step_label,
     verdict_label,
     warning_text,
@@ -65,6 +66,11 @@ def test_no_verdict_text_claims_the_app_is_safe():
     for lang, labels in VERDICT_LABELS.items():
         for text in labels.values():
             assert "bezpieczn" not in text.lower() and "safe" not in text.lower(), (lang, text)
+
+
+def test_every_scope_note_has_labels():
+    for key in ("not_analyzed", "obfuscated", "dynamic_code"):
+        assert scope_label(key, "pl") != key and scope_label(key, "en") != key
 
 
 def test_order_status_label_looks_up_section_and_falls_back_to_status():

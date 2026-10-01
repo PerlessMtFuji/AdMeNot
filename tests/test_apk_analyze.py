@@ -12,6 +12,7 @@ from demalware.engine.apk.analyze import (
     clean_label,
     report_from_json,
     report_to_json,
+    scope_notes,
 )
 from demalware.engine.apk.manifest import ICON_MAX_BYTES, ManifestInfo, _read_icon, icon_uri
 from demalware.engine.apk.sdks import load_default_ad_sdks, parse_ad_sdks
@@ -289,3 +290,11 @@ def test_read_manifest_combines_version_code_major(monkeypatch, tmp_path):
 
     monkeypatch.setattr(androguard_apk, "APK", FakeApk)
     assert read_manifest(tmp_path / "base.apk").version_code == LONG_CODE
+
+
+def test_scope_notes_describe_limits_without_scoring():
+    assert scope_notes(AppFacts("com.a")) == ["not_analyzed"]
+    plain = AppFacts("com.b", ad_sdks=set(), dynamic_code=False, obfuscation_ratio=0.1)
+    assert scope_notes(plain) == []
+    hard = AppFacts("com.c", ad_sdks=set(), dynamic_code=True, obfuscation_ratio=0.8)
+    assert scope_notes(hard) == ["obfuscated", "dynamic_code"]

@@ -37,10 +37,14 @@
   </div>
   <div><span class="lbl">{t('evidence.score')}</span><ScoreScale score={app.score} verdict={app.verdict} /></div>
   <div class="text-xs text-mut"><span class="lbl">{t('evidence.confidence')}</span> {app.confidence_label}</div>
-  {#if app.gaps.length}
+  {#if app.gaps.length || app.scope?.length || app.incomplete}
     <div class="well p-3 text-xs">
       <span class="lbl block">{t('evidence.limits')}</span>
-      <ul class="mt-1 list-disc pl-4">{#each app.gaps as g (g.key)}<li>{g.label}</li>{/each}</ul>
+      <ul class="mt-1 list-disc pl-4">
+        {#each app.gaps as g (g.key)}<li>{g.label}</li>{/each}
+        {#if app.incomplete && !app.gaps.length}<li>{t('evidence.incomplete_data')}</li>{/if}
+        {#each app.scope ?? [] as s (s.key)}<li>{s.label}</li>{/each}
+      </ul>
     </div>
   {/if}
   <span class="lbl">{t('evidence.why')}</span>
