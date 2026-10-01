@@ -1,3 +1,4 @@
+from demalware.engine.apk.callgraph import CodePath
 from demalware.engine.apk.components import A11yConfig, Component
 from demalware.engine.evidence import ladders
 from demalware.engine.facts import AppFacts
@@ -42,3 +43,9 @@ def test_accessibility_declared_unknown_without_components():
 
 def test_quiet_app_has_no_ladders():
     assert ladders(AppFacts("com.x")) == []
+
+
+def test_code_level_comes_from_code_paths():
+    path = CodePath("hide_icon", "com.x.Main", None, ("com.x.Main.onCreate",), "app")
+    facts = AppFacts("com.x", code_paths=(path,), has_launcher_icon=False)
+    assert _by_cap(facts)["hide_icon"] == {"declared": None, "code": True, "granted": None, "observed": True}

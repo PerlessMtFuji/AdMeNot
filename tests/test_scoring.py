@@ -162,3 +162,14 @@ def test_combo_03_many_ad_networks_plus_behavior():
 def test_static_code_path_is_not_an_observation():
     static = Finding("DM-CODE-BOOTUI-01", "apk", 5, {}, {}, {}, category="background", basis="static")
     assert confidence_for([static], incomplete=False) == "low"
+
+
+def test_findings_in_one_group_count_once():
+    facts = AppFacts("com.x", installed_days=30.0)
+    observed = Finding("DM-OVERLAY-01", "behavior", 25, {}, {}, {}, category="ads",
+                       basis="observed", group="overlay")
+    code = Finding("DM-CODE-OVERLAY-01", "apk", 5, {}, {}, {}, category="ads",
+                   basis="static", group="overlay")
+    assert score_app(facts, [observed, code], False, False).score == 25
+    other = Finding("DM-ADSDK-01", "apk", 3, {}, {}, {}, category="ads")
+    assert score_app(facts, [observed, code, other], False, False).score == 28

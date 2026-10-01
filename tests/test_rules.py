@@ -1,5 +1,6 @@
 import pytest
 
+from demalware.engine.apk.callgraph import CodePath
 from demalware.engine.facts import AppFacts
 from demalware.engine.parsers.appops import AppOpState
 from demalware.engine.rules.conditions import check
@@ -60,6 +61,8 @@ EXPECTED_CATEGORIES = {
     "DM-OVERLAY-01": "ads", "DM-FSI-01": "ads", "DM-BGACT-01": "ads", "DM-FSIPERM-01": "ads",
     "DM-ADSDK-01": "ads", "DM-ADSDK-02": "ads",
     "DM-ALARM-01": "background", "DM-PERM-01": "background", "DM-DYNDEX-01": "background",
+    "DM-CODE-BOOTUI-01": "background", "DM-CODE-HIDE-01": "disguise", "DM-CODE-OVERLAY-01": "ads",
+    "DM-CODE-DYNLOAD-01": "background",
     "DM-ADMIN-01": "removal", "DM-HOME-01": "removal", "DM-HOME-02": "removal",
     "DM-HIDDEN-01": "removal",
     "DM-A11Y-01": "data", "DM-NLS-01": "data", "DM-SMS-01": "data", "DM-BROWSER-01": "data",
@@ -87,6 +90,7 @@ def test_default_rules_have_categories_and_labels():
     {"evidence": ["no_such_field"]},
     {"text": {"simple": {"pl": "x"}, "expert": {"pl": "x", "en": "x"}}},
     {"basis": "guessed"},
+    {"group": 3},
 ])
 def test_parse_rules_rejects_invalid(bad):
     with pytest.raises(ValueError):
@@ -310,3 +314,17 @@ def test_rule_source_defaults_by_class_and_can_be_set():
 def test_unknown_rule_source_is_rejected():
     with pytest.raises(ValueError, match="source"):
         parse_rules([_rule(source="radio")])
+
+
+def test_boot_ui_path_rule_is_static_and_weak():
+    path = CodePath("boot_start_activity", "com.x.Boot", "android.intent.action.BOOT_COMPLETED",
+                    ("com.x.Boot.onReceive", "com.x.Ad.show"), "app")
+    facts = AppFacts("com.x", code_paths=(path,))
+    (f,) = [f for f in load_default_ruleset().evaluate(facts) if f.rule_id == "DM-CODE-BOOTUI-01"]
+    assert f.basis == "static" and f.weight <= 5 and f.group == "boot"
+    assert "com.x.Ad.show" in f.text("pl", expert=True)
+
+
+def test_code_rules_do_not_fire_without_deep_analysis():
+    ids = {f.rule_id for f in load_default_ruleset().evaluate(AppFacts("com.x"))}
+    assert not any(i.startswith("DM-CODE-") for i in ids)
