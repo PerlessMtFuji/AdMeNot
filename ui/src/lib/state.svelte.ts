@@ -1,6 +1,6 @@
 import type { Phase } from './logic';
 import type {
-  ApiErrorBody, ApkEstimate, ApkQuestion, Category, ConsoleEntry, DeviceEntry, HistoryView, Level, MirrorState, OrderResult, PhoneCard,
+  ApiErrorBody, ApkEstimate, ApkQuestion, Category, ConsoleEntry, DeviceEntry, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
   PlanView, Question, ReportResult, ScanView, Settings, ShotsView, ShotView, StepEvent, UndoDone, Verdict,
 } from './types';
 
@@ -36,6 +36,7 @@ export class AppState {
   focused = $state<string | null>(null);
   plan = $state<PlanView | null>(null);
   job = $state<{ id: string; kind: string } | null>(null);
+  incident = $state<{ recording: boolean; marks: number; result: IncidentDone | null }>({ recording: false, marks: 0, result: null });
   order = $state<string | null>(null);
   execPlan = $state<PlanView | null>(null);
   steps = $state<StepEvent[]>([]);

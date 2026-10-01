@@ -285,6 +285,8 @@ export type JobError = ApiErrorBody & { job_id: string; kind: string };
 type R<T> = Promise<T | ApiError>;
 
 export interface WhoEntry { package: string; name: string }
+export interface IncidentHit { mark: number; package: string; name: string; kind: 'overlay' | 'new_notification' | 'foreground'; over: string | null; over_name: string | null }
+export interface IncidentDone { marks: number; hits: IncidentHit[]; error?: ApiErrorBody }
 export interface WhoView { resumed: WhoEntry | null; overlays: WhoEntry[] | null; errors: string[] }
 
 export interface Api {
@@ -296,6 +298,8 @@ export interface Api {
   watch_devices(on: boolean): R<{ ok: boolean }>;
   start_scan(serial: string, client: string | null): R<{ job_id: string }>;
   deep_analyze(pkg: string): R<{ job_id: string }>;
+  start_incident(seconds: number): R<{ ok: boolean }>;
+  mark_incident(): R<{ ok: boolean }>;
   rerender(): R<{ scan: ScanView | null }>;
   preview_plan(requests: Record<string, Level>, unlocked: string[]): R<PlanView>;
   execute(requests: Record<string, Level>, unlocked: string[]): R<{ job_id: string }>;
@@ -349,6 +353,8 @@ export interface EventMap {
   'app:close_requested': { kind: string };
   'mirror:state': MirrorView;
   'mirror:warning': { serial: string; code: 'control_blocked' | 'stay_awake_blocked' };
+  'incident:state': { recording: boolean; seconds: number };
+  'incident:done': IncidentDone;
 }
 
 export type EventName = keyof EventMap;

@@ -53,3 +53,31 @@ test('a screenshot saved with the description is confirmed right under the butto
   await tick();
   expect(screen.getByText('1 zrzut do protokołu')).toBeTruthy();
 });
+
+test('incident recording: mark the ad moment, then see who drew the window', async () => {
+  const { s, bridge } = await renderWith(WhoIsShowing, 'empty', { ask: async () => null });
+  s.device = { serial: 'S1' } as never;
+  await tick();
+  await fireEvent.click(screen.getByRole('button', { name: 'Nagraj zgłoszenie reklamy (2 min)' }));
+  await flush();
+  expect(bridge.calls.some((c) => c.method === 'start_incident' && c.args[0] === 120)).toBe(true);
+  await fireEvent.click(await screen.findByRole('button', { name: 'Reklama jest teraz na ekranie' }));
+  await flush();
+  expect(bridge.calls.filter((c) => c.method === 'mark_incident')).toHaveLength(1);
+  bridge.emit('incident:done', { marks: 1, hits: [
+    { mark: 4, package: 'com.ads', name: 'Cleaner', kind: 'overlay', over: 'com.game', over_name: 'Game' },
+  ] });
+  await tick();
+  expect(screen.getByText('Okno nad Game: Cleaner', { exact: false })).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Reklama jest teraz na ekranie' })).toBeNull();
+});
+
+test('incident recording without a mark says nothing was attributed', async () => {
+  const { s, bridge } = await renderWith(WhoIsShowing, 'empty', { ask: async () => null });
+  s.device = { serial: 'S1' } as never;
+  s.incident = { recording: true, marks: 0, result: null };
+  await tick();
+  bridge.emit('incident:done', { marks: 0, hits: [] });
+  await tick();
+  expect(screen.getByText('Nie zaznaczono chwili reklamy — nic nie przypisano.')).toBeTruthy();
+});

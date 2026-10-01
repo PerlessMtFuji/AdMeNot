@@ -41,6 +41,29 @@
         onclick={() => ctl.mirrorStart(serial, s.device?.name ?? serial)}>{t('mirror.wait_for_ad')}</button>
     {/if}
   </div>
+  <div class="flex flex-wrap items-center gap-3">
+    {#if s.incident.recording}
+      <Button variant="primary" onclick={() => ctl.markIncident()}><Icon name="megaphone" />{t('incident.mark')}</Button>
+      <span class="text-xs text-mut" role="status">{t('incident.recording', { marks: s.incident.marks })}</span>
+    {:else}
+      <Button variant="ghost" disabled={!s.device} onclick={() => ctl.startIncident(120)}><Icon name="eye" />{t('incident.start')}</Button>
+      <span class="text-xs text-mut">{t('incident.hint')}</span>
+    {/if}
+  </div>
+  {#if !s.incident.recording && s.incident.result}
+    <div class="well p-3 text-sm" role="status">
+      {#if !s.incident.result.marks}<p>{t('incident.none')}</p>
+      {:else}
+        <ul class="flex flex-col gap-1">
+          {#each s.incident.result.hits as h (`${h.mark}-${h.kind}-${h.package}`)}
+            <li>{t(`incident.kind.${h.kind}`, { name: h.name, over: h.over_name ?? '?', t: Math.round(h.mark) })}</li>
+          {/each}
+          {#if !s.incident.result.hits.length}<li>{t('incident.undetermined')}</li>{/if}
+        </ul>
+        <p class="mt-1 text-xs text-mut">{t('incident.next_scan')}</p>
+      {/if}
+    </div>
+  {/if}
   {#if view}
     <div class="well p-3 text-sm" role="status">
       <p>{view.resumed ? t('who.resumed', { name: view.resumed.name }) : t('who.unknown')}</p>

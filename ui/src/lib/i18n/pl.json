@@ -94,6 +94,14 @@
     "overlays_unknown": "Nie udało się odczytać okien nad innymi aplikacjami.",
     "unknown": "Nie udało się ustalić aplikacji na pierwszym planie."
   },
+  "incident": {
+    "start": "Nagraj zgłoszenie reklamy (2 min)", "hint": "Odtwórz problem; gdy reklama pojawi się na telefonie, kliknij „Reklama jest teraz na ekranie”.",
+    "mark": "Reklama jest teraz na ekranie", "recording": "Nagrywam… zaznaczono: {marks}",
+    "none": "Nie zaznaczono chwili reklamy — nic nie przypisano.",
+    "undetermined": "Nie ustalono — w pobliżu znacznika nie odczytano ekranu.",
+    "next_scan": "Następny skan tego telefonu uwzględni nagranie (przez 24 h). Samo okno nie przesądza, że pokazywało reklamę.",
+    "kind": { "overlay": "Okno nad {over}: {name} ({t} s)", "new_notification": "Nowe powiadomienie: {name} ({t} s)", "foreground": "Na pierwszym planie: {name} ({t} s)" }
+  },
   "summary": {
     "low_data": "Mało danych o zachowaniu (statystyki z {hours} h lub niedawny restart) — użyj telefonu kilkanaście minut, odtwórz problem i zeskanuj ponownie albo użyj „Kto to wyświetla?”.",
     "profiles": "Na telefonie są inne profile użytkownika ({ids}) — ich aplikacje nie zostały sprawdzone.",

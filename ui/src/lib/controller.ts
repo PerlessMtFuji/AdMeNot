@@ -110,6 +110,11 @@ export class Controller {
       s.apkQuestion = null;
       s.apk = { ...s.apk, running: false, changed };
     });
+    on('incident:state', (d) => { s.incident = { recording: d.recording, marks: 0, result: null }; });
+    on('incident:done', (d) => {
+      s.incident = { recording: false, marks: d.marks, result: d };
+      if (d.error) s.error = d.error;
+    });
     on('apk:stopped', () => { s.apkQuestion = null; s.apk = { ...s.apk, running: false }; });
     on('exec:order', (d) => {
       s.order = d.order;
@@ -219,6 +224,16 @@ export class Controller {
     const r = await this.call(this.api.start_scan(s.serial, s.client.trim() || null));
     if (r) this.setJob(r.job_id, 'scan');
     else s.phase = 'connect';
+  }
+
+  async startIncident(seconds = 120): Promise<void> {
+    const r = await this.call(this.api.start_incident(seconds));
+    if (r && !this.state.incident.result) this.state.incident = { recording: true, marks: 0, result: null };
+  }
+
+  async markIncident(): Promise<void> {
+    const r = await this.call(this.api.mark_incident());
+    if (r) this.state.incident = { ...this.state.incident, marks: this.state.incident.marks + 1 };
   }
 
   async deepAnalyze(pkg: string): Promise<void> {
