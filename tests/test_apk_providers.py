@@ -345,3 +345,29 @@ def test_estimate_failing_with_oserror_runs_without_estimate(tmp_path, free, mon
     monkeypatch.setattr(P, "estimate", broken)
     reports = _provider(tmp_path, CachePolicy(limit_bytes=C.GB), _writing_fetch(10)).reports_for(_apps(2))
     assert all(r.error is None for r in reports.values())
+
+
+def test_files_changed_after_verification_discard_the_analysis(tmp_path):
+    expected = {"base.apk": "a" * 64}
+    provider = DeviceApkProvider(
+        FakeAdb(), cache_dir=tmp_path,
+        fetch=lambda adb, package, cache_dir: FetchedApks(
+            [tmp_path / "base.apk"], verified=True, expected=expected),
+        analyze=lambda package, paths: ApkReport(
+            package, class_count=10, ad_sdks=["admob"], files={"base.apk": "b" * 64}))
+    report = provider.reports_for([AppFacts("com.a", version_code=7)])["com.a"]
+    assert report.ad_sdks == [] and report.class_count == 0
+    assert report.version_code == 7
+    assert report.error == "identity: base.apk differs from the verified file"
+
+
+def test_matching_files_keep_the_analysis(tmp_path):
+    expected = {"base.apk": "a" * 64}
+    provider = DeviceApkProvider(
+        FakeAdb(), cache_dir=tmp_path,
+        fetch=lambda adb, package, cache_dir: FetchedApks(
+            [tmp_path / "base.apk"], verified=True, expected=expected),
+        analyze=lambda package, paths: ApkReport(
+            package, class_count=10, ad_sdks=["admob"], files=dict(expected)))
+    report = provider.reports_for([AppFacts("com.a")])["com.a"]
+    assert report.ad_sdks == ["admob"] and report.error is None

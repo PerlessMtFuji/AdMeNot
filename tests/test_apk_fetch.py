@@ -232,3 +232,12 @@ def test_cached_entry_with_unreadable_file_is_fetched_again(tmp_path):
     adb = _adb()
     fetch_apks(adb, "com.clean.x", tmp_path)
     assert _pulls(adb)
+
+
+def test_fetch_returns_the_hashes_it_verified(tmp_path):
+    fetched = fetch_apks(_adb(), "com.clean.x", tmp_path)
+    assert fetched.expected == {"base.apk": _sha(b"base-bytes"),
+                                "split_config.arm64_v8a.apk": _sha(b"split")}
+    again = fetch_apks(_adb(), "com.clean.x", tmp_path)  # trafienie w pamięci podręcznej
+    assert again.expected == fetched.expected
+    assert fetch_apks(_adb(sha=None), "com.clean.x", tmp_path).expected is None
