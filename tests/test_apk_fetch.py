@@ -194,3 +194,4 @@ def test_disk_full_while_writing_is_no_space(tmp_path):
     adb.run = run
     with pytest.raises(NoSpace):
         fetch_apks(adb, "com.clean.x", tmp_path)
+    assert not list(tmp_path.glob("com.clean.x/.part-*"))  # katalog roboczy usunięty

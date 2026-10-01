@@ -238,3 +238,35 @@ def test_entries_skip_a_package_dir_that_cannot_be_listed(tmp_path, monkeypatch)
 
     monkeypatch.setattr(Path, "iterdir", iterdir)
     assert [e.package for e in C._entries(tmp_path, time.time())] == ["com.good"]
+
+
+def test_prune_frees_room_for_the_next_download_below_the_limit(tmp_path, disk):
+    """Pod limitem efektywnym przycinanie zwalnia jeszcze `need_bytes` + zapas (spec §3.6)."""
+    a = _entry(tmp_path, "com.a", "id1", 1000, age_s=20)
+    b = _entry(tmp_path, "com.b", "id1", 1000, age_s=10)
+    disk["free"] = C.RESERVE + 500
+    assert C.prune(tmp_path, 10 * GB) == 0  # w limicie: bez potrzeby nic
+    assert C.prune(tmp_path, 10 * GB, need_bytes=1200) == 1000  # brakuje 700: najstarszy wpis
+    assert not a.exists() and b.exists()
+    assert C.has_room(tmp_path, 1200)
+
+
+def test_cached_sets_of_an_unlistable_package_dir_is_empty(tmp_path, monkeypatch):
+    (tmp_path / "com.gone" / "id").mkdir(parents=True)
+    real = Path.iterdir
+
+    def iterdir(self):
+        if self.name == "com.gone":
+            raise PermissionError(self)
+        return real(self)
+
+    monkeypatch.setattr(Path, "iterdir", iterdir)
+    assert C._cached_sets(tmp_path, "com.gone") == []
+
+
+def test_estimate_lists_only_apps_that_need_fetching(tmp_path):
+    entry = tmp_path / "com.b" / "abc"
+    entry.mkdir(parents=True)
+    (entry / "base.apk").write_bytes(b"x" * 1000)
+    est = C.estimate(_adb(_stat_out()), _facts(), tmp_path)
+    assert est.to_fetch == frozenset({"com.a", "com.vivo.widget"})

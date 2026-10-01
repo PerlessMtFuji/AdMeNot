@@ -257,3 +257,91 @@ def test_disk_usage_failing_midway_does_not_break_the_run(tmp_path, monkeypatch)
     monkeypatch.setattr(C, "disk_usage", flaky)
     reports = _provider(tmp_path, CachePolicy(limit_bytes=1), _writing_fetch(10)).reports_for(_apps(3))
     assert all(r.error is None for r in reports.values())
+
+
+def test_spec_example_prunes_enough_room_before_each_pull(tmp_path, monkeypatch):
+    """Spec §3.2 w skali 1 GB = 1000 B: wolne 4 GB, limit 10 GB, 10 aplikacji po 600 MB.
+
+    Wolne miejsce maleje z każdym zapisanym plikiem — kontrola przed pobraniem musi przyciąć
+    tyle, żeby zmieściło się kolejne pobranie, a nie tylko do limitu efektywnego.
+    """
+    unit = 1000
+    monkeypatch.setattr(C, "RESERVE", 2 * unit)
+    free_at_start = 4 * unit
+    monkeypatch.setattr(C, "disk_usage",
+                        lambda path: Disk(120 * unit, 0, free_at_start - C.cache_size(tmp_path)))
+    size, apps = 600, _apps(10)
+    adb = FakeAdb()
+    out = "".join(f"{size} /data/app/a{i}/base.apk\n" for i in range(len(apps)))
+    adb.responses[C.stat_command(C._stat_paths(apps)[0])] = out
+    peak = {"bytes": 0}
+    write = _writing_fetch(size)
+    lock = threading.Lock()
+
+    def fetch(adb, package, cache_dir):
+        fetched = write(adb, package, cache_dir)
+        with lock:
+            peak["bytes"] = max(peak["bytes"], C.cache_size(tmp_path))
+        return fetched
+
+    provider = DeviceApkProvider(adb, cache_dir=tmp_path, workers=2, fetch=fetch,
+                                 analyze=lambda package, paths: ApkReport(package, class_count=1),
+                                 policy=CachePolicy(limit_bytes=10 * unit))
+    reports = provider.reports_for(apps)
+    assert {p: r.error for p, r in reports.items()} == {f.package: None for f in apps}
+    effective = 2 * unit  # min(10 GB, 0 + 4 GB − 2 GB)
+    assert C.cache_size(tmp_path) <= effective
+    assert peak["bytes"] <= effective + 2 * size
+
+
+def test_cached_app_needs_no_room_for_a_download(tmp_path, free, monkeypatch):
+    """Trafienie w pamięci podręcznej nie pobiera nic — kontrola nie wymaga miejsca na plik,
+    a przycinanie przed pobraniem nie usuwa wpisu tej aplikacji."""
+    apps = _apps(1)
+    entry = tmp_path / "com.app0" / "id"
+    entry.mkdir(parents=True)
+    (entry / "base.apk").write_bytes(b"x" * 500)
+    adb = FakeAdb()
+    adb.responses[C.stat_command(C._stat_paths(apps)[0])] = "500 /data/app/a0/base.apk\n"
+    free["free"] = C.RESERVE + 100  # mniej niż 500 na pobranie
+
+    def fetch(adb, package, cache_dir):
+        assert (cache_dir / package / "id" / "base.apk").exists()
+        return FetchedApks([cache_dir / package / "id" / "base.apk"], verified=True)
+
+    provider = DeviceApkProvider(adb, cache_dir=tmp_path, workers=1, fetch=fetch,
+                                 analyze=lambda package, paths: ApkReport(package, class_count=1),
+                                 policy=CachePolicy(limit_bytes=10 * C.GB))
+    assert provider.reports_for(apps)["com.app0"].error is None
+
+
+def test_own_entry_is_not_pruned_before_its_fetch(tmp_path, monkeypatch):
+    """Pakiet trafia do `busy` przed przycinaniem: jego wpis nie jest usuwany i pobierany od nowa."""
+    apps = _apps(1)
+    for package in ("com.app0", "com.other"):
+        entry = tmp_path / package / "old"
+        entry.mkdir(parents=True)
+        (entry / "base.apk").write_bytes(b"x" * 500)
+    # Wolne rośnie z usuwaniem; bez `com.other` mieści się (brak szacunku: need 0).
+    monkeypatch.setattr(C, "disk_usage",
+                        lambda path: Disk(500 * C.GB, 0, C.RESERVE + 700 - C.cache_size(tmp_path)))
+    seen = []
+
+    def fetch(adb, package, cache_dir):
+        seen.append((cache_dir / package / "old").exists())
+        return FetchedApks([], verified=True)
+
+    _provider(tmp_path, CachePolicy(limit_bytes=1), fetch).reports_for(apps)
+    assert seen == [True]
+    assert not (tmp_path / "com.other").exists()
+
+
+def test_estimate_failing_with_oserror_runs_without_estimate(tmp_path, free, monkeypatch):
+    from demalware.engine.apk import providers as P
+
+    def broken(*a, **kw):
+        raise OSError("cache dir vanished")
+
+    monkeypatch.setattr(P, "estimate", broken)
+    reports = _provider(tmp_path, CachePolicy(limit_bytes=C.GB), _writing_fetch(10)).reports_for(_apps(2))
+    assert all(r.error is None for r in reports.values())
