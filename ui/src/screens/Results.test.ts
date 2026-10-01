@@ -216,6 +216,7 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
       largest_bytes: 3 * GB, limit_bytes: 10 * GB, effective_bytes: 2 * GB, free_bytes: 4 * GB });
     expect(await screen.findByText(/Analiza pobierze ok. 7,2 GB \(142 aplikacje\)/)).toBeTruthy();
     expect(screen.getByText(/Na dysku jest miejsce na 2,0 GB/)).toBeTruthy();
+    expect(tp('apk_cache.estimate', 5, { gb: '1,0' })).toBe('Analiza pobierze ok. 1,0 GB (5 aplikacji)');
     bridge.emit('apk:question', { job_id: 'job-9', kind: 'no_space', to_fetch_bytes: 7.2 * GB, total_bytes: 7.2 * GB,
       apps: 142, unknown: 0, largest_bytes: 3 * GB, limit_bytes: 10 * GB, effective_bytes: 2 * GB, free_bytes: 4 * GB });
     await fireEvent.click(await screen.findByRole('button', { name: 'Wyczyść i analizuj' }));

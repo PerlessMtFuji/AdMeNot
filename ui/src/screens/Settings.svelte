@@ -48,9 +48,9 @@
     limitBad = !Number.isInteger(n) || n < 1 || (cache !== null && n * 1024 ** 3 > cache.disk_bytes);
     if (limitBad) return;
     const r = await ctl.saveSettings({ apk_cache_limit_gb: n });
-    limitBad = r === null;
-    // Błąd walidacji limitu pokazuje komunikat przy polu, nie ogólna karta błędu.
-    if (r === null && s.error?.key === 'bad_request') s.error = null;
+    // Błąd walidacji limitu pokazuje komunikat przy polu; inne błędy zostają na ogólnej karcie błędu.
+    limitBad = r === null && s.error?.key === 'bad_request';
+    if (limitBad) s.error = null;
     if (r) cache = await ctl.loadApkCache();
   }
 

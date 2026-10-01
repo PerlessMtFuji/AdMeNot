@@ -221,7 +221,7 @@
     "cache_cleared": "Removed {gb} GB."
   },
   "apk_cache": {
-    "estimate": "The analysis will download about {gb} GB ({apps} apps)",
+    "estimate": { "one": "The analysis will download about {gb} GB ({count} app)", "few": "The analysis will download about {gb} GB ({count} apps)", "many": "The analysis will download about {gb} GB ({count} apps)", "other": "The analysis will download about {gb} GB ({count} apps)" },
     "unknown": "(not counting {count} apps of unknown size)",
     "over": "The disk has room for {gb} GB — files will be removed as the analysis goes; only the files of apps to repair will stay.",
     "question_title": "Not enough disk space",

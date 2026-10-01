@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import type { Controller } from '../lib/controller';
-  import { i18n, t } from '../lib/i18n/index.svelte';
+  import { i18n, t, tp } from '../lib/i18n/index.svelte';
   import { formatGb } from '../lib/logic';
   import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
@@ -17,7 +17,7 @@
 
 {#if s.apk.running && e}
   <p class="text-sm text-mut">
-    {t('apk_cache.estimate', { gb: gb(e.to_fetch_bytes), apps: e.apps })}{#if e.unknown} {t('apk_cache.unknown', { count: e.unknown })}{/if}.
+    {tp('apk_cache.estimate', e.apps, { gb: gb(e.to_fetch_bytes) })}{#if e.unknown} {t('apk_cache.unknown', { count: e.unknown })}{/if}.
     {#if e.to_fetch_bytes > e.effective_bytes}{t('apk_cache.over', { gb: gb(e.effective_bytes) })}{/if}
   </p>
 {/if}
