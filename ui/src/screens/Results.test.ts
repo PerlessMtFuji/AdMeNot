@@ -14,6 +14,9 @@ async function scanned(scenario = 'adware') {
   return env;
 }
 
+// Tylko wiersze tabeli aplikacji — panel szczegółów ma własną tabelę (możliwości aplikacji).
+const appRows = () => within(screen.getByRole('group', { name: 'Tabela aplikacji' })).getAllByRole('row');
+
 describe('Results', () => {
   test('header shows the phone thumbnail next to the device name, in both modes', async () => {
     const { ctl, s } = await scanned();
@@ -78,7 +81,7 @@ describe('Results', () => {
     await tick();
     expect(screen.getByRole('columnheader', { name: 'Aplikacja' })).toBeTruthy();
     const flagged = s.scan!.apps.filter((a) => a.verdict !== 'safe');
-    expect(screen.getAllByRole('row')).toHaveLength(flagged.length + 1);
+    expect(appRows()).toHaveLength(flagged.length + 1);
     const panel = screen.getByRole('complementary', { name: 'Szczegóły aplikacji' });
     expect(within(panel).getByText(flagged[0].name)).toBeTruthy();
     expect(panel.textContent).not.toMatch(/DM-/);
@@ -91,10 +94,10 @@ describe('Results', () => {
     await fireEvent.keyDown(table, { key: ' ' });
     expect(s.focused! in s.selection).toBe(!before);
     await fireEvent.input(screen.getByRole('searchbox'), { target: { value: 'forecast' } });
-    expect(screen.getAllByRole('row')).toHaveLength(2);
+    expect(appRows()).toHaveLength(2);
     expect(within(panel).getByText('com.wlive.forecast')).toBeTruthy();
     await fireEvent.input(screen.getByRole('searchbox'), { target: { value: 'zzz-nothing' } });
-    expect(screen.getAllByRole('row')).toHaveLength(1);
+    expect(appRows()).toHaveLength(1);
     expect(within(panel).getByText('Wybierz aplikację w tabeli.')).toBeTruthy();
     await fireEvent.keyDown(table, { key: 'ArrowUp' });
     await fireEvent.input(screen.getByRole('searchbox'), { target: { value: '' } });
@@ -102,7 +105,7 @@ describe('Results', () => {
       { target: { value: 'silence' } });
     expect(s.selection['com.wlive.forecast']).toBe('silence');
     await fireEvent.click(screen.getByRole('button', { name: `Wszystkie · ${s.scan!.apps.length}` }));
-    expect(screen.getAllByRole('row')).toHaveLength(s.scan!.apps.length + 1);
+    expect(appRows()).toHaveLength(s.scan!.apps.length + 1);
   });
   test('expert filters: problem type chips and source list narrow the table, clear brings it back', async () => {
     const { s, ctl } = await scanned();
@@ -114,15 +117,15 @@ describe('Results', () => {
     expect(ads.getAttribute('aria-pressed')).toBe('false');
     await fireEvent.click(ads);
     expect(ads.getAttribute('aria-pressed')).toBe('true');
-    expect(screen.getAllByRole('row')).toHaveLength(2);
+    expect(appRows()).toHaveLength(2);
     expect(screen.getByRole('checkbox', { name: 'com.clean.pro.boost' })).toBeTruthy();
     const source = screen.getByRole('combobox', { name: 'Filtr źródła' });
     expect(within(source).getByRole('option', { name: 'Wszystkie źródła' })).toBeTruthy();
     await fireEvent.change(source, { target: { value: 'Sklep Play' } });
-    expect(screen.getAllByRole('row')).toHaveLength(1);
+    expect(appRows()).toHaveLength(1);
     expect(screen.getByText('Brak aplikacji pasujących do filtrów.')).toBeTruthy();
     await fireEvent.click(screen.getByRole('button', { name: 'Wyczyść filtry' }));
-    expect(screen.getAllByRole('row')).toHaveLength(flagged.length + 1);
+    expect(appRows()).toHaveLength(flagged.length + 1);
     expect(s.categoryFilter).toEqual([]);
     expect(s.sourceFilter).toBeNull();
     await fireEvent.change(source, { target: { value: 'Chrome' } });
