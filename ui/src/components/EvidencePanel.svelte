@@ -85,6 +85,12 @@
       </tbody>
     </table>
   {/if}
+  {#if ctl}
+    <div class="flex items-center gap-2.5 text-xs text-mut">
+      <span class="min-w-0 flex-1">{t('evidence.deep_hint')}</span>
+      <Button disabled={!ctl.state.device || ctl.state.job !== null || ctl.state.orderRunning} onclick={() => ctl.deepAnalyze(app.package)}>{t('evidence.deep')}</Button>
+    </div>
+  {/if}
   <details class="group text-xs">
     <summary class="flex cursor-pointer list-none items-center gap-1.5 font-semibold text-accent">
       <Icon name="chevron-right" size={14} class="transition-transform duration-150 group-open:rotate-90" />{t('evidence.raw')}

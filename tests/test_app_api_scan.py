@@ -110,7 +110,7 @@ def _fake_fetch(cache_dir, package):
 
 def _policy_factory(policies):
     """Prawdziwy `DeviceApkProvider` z polityką od `Api`; `stat` podaje 1 GB na każdy cel."""
-    def factory(adb, policy=None):
+    def factory(adb, policy=None, **kw):
         policies.append(policy)
         real = adb.shell
 
@@ -205,3 +205,40 @@ def test_limit_check_is_skipped_when_the_disk_size_is_unknown(monkeypatch):
     monkeypatch.setattr(C, "disk_usage", broken)
     api, _ = make_api(make_cli_phone())
     assert api.save_settings({"apk_cache_limit_gb": 500})["apk_cache_limit_gb"] == 500
+
+
+class _DeepApk:
+    """Zapamiętuje, z jakim zbiorem `deep` powstał dostawca i które aplikacje dostał."""
+
+    def __init__(self):
+        self.deep, self.asked = [], []
+
+    def factory(self, adb, policy=None, deep=frozenset()):
+        self.deep.append(deep)
+        return self
+
+    def reports_for(self, apps, progress=None, flagged=frozenset()):
+        self.asked.append([f.package for f in apps])
+        return {f.package: ApkReport(f.package, f.version_code, class_count=1, deep=bool(self.deep[-1]))
+                for f in apps}
+
+
+def test_deep_analysis_is_a_job_for_one_app_and_refreshes_the_scan():
+    api, rec = make_api(make_cli_phone())
+    deep = _DeepApk()
+    api._apk_factory = deep.factory
+    api.start_scan(SERIAL)
+    assert api.deep_analyze("com.whatsapp") == {"job_id": "job-2"}
+    assert deep.deep[-1] == frozenset({"com.whatsapp"}) and deep.asked[-1] == ["com.whatsapp"]
+    assert names(rec)[-2:] == ["apk:done", "job:end"]
+    assert rec.of("job:end")[-1] == {"job_id": "job-2", "kind": "deep"}
+    assert api._report.apk_reports["com.whatsapp"].deep
+    assert "com.clean.pro.boost" in api._report.apk_reports  # wyniki pozostałych aplikacji zostają
+
+
+def test_deep_analysis_needs_a_scan_and_a_known_package():
+    api, _ = make_api(make_cli_phone())
+    assert api.deep_analyze("com.whatsapp")["error"]["key"] == "no_scan"
+    api.start_scan(SERIAL)
+    assert api.deep_analyze("com.not.installed")["error"]["key"] == "bad_request"
+    assert api.deep_analyze("com.a;rm")["error"]["key"] == "bad_request"

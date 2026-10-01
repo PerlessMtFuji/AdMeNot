@@ -117,7 +117,7 @@
     "title": "App details", "score": "Score", "why": "Why", "capabilities": "App capabilities", "levels": { "declared": "Requests", "code": "In code", "granted": "Granted", "observed": "Observed" }, "raw": "Raw data from the phone", "ad_sdks": "Ad libraries",
     "none": "Select an app in the table.", "plan": "Plan", "fix": "Fix ({count})",
     "zone": { "safe": "no issues", "review": "to review", "suspicious": "suspicious", "malicious": "malicious" },
-    "limits": "Assessment limits", "incomplete_data": "Little data about the app's behavior", "confidence": "Confidence"
+    "deep": "Deep analysis", "deep_hint": "Looks in the app code for possible paths to sensitive calls. Takes up to a few minutes.", "limits": "Assessment limits", "incomplete_data": "Little data about the app's behavior", "confidence": "Confidence"
   },
   "actions": { "console": "ADB console", "fix": "Fix selected ({count})", "rescan": "Scan again" },
   "plan": { "title": "Repair plan", "confirm_title": "What I will do on the phone", "blocked": "Skipped", "unlock": "Unlock", "undo_hint": "Every change can be undone in History.", "run": "Run ({count})", "nothing": "Nothing to run — all apps are blocked." },

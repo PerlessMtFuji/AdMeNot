@@ -49,7 +49,7 @@ def make_api(phone, *, sync=True, apk=None, **kw):
     rec = RecordingEmitter()
     kw.setdefault("open_file", lambda path: None)
     provider = apk or NoApk()
-    api = Api(rec, host_factory=lambda path: phone, apk_factory=lambda adb, policy=None: provider,
+    api = Api(rec, host_factory=lambda path: phone, apk_factory=lambda adb, policy=None, **kw: provider,
               sync_jobs=sync, now=lambda: NOW, **kw)
     return api, rec
 

@@ -141,7 +141,7 @@ def test_fix_with_apk_stores_app_names_and_icons_for_the_report(monkeypatch, tmp
     icon = "data:image/png;base64,iVBORw0KGgo="
 
     class Provider:
-        def __init__(self, adb, policy=None):
+        def __init__(self, adb, policy=None, **kwargs):
             pass
 
         def reports_for(self, targets, progress=None, flagged=frozenset()):

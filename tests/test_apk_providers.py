@@ -371,3 +371,22 @@ def test_matching_files_keep_the_analysis(tmp_path):
             package, class_count=10, ad_sdks=["admob"], files=dict(expected)))
     report = provider.reports_for([AppFacts("com.a")])["com.a"]
     assert report.ad_sdks == ["admob"] and report.error is None
+
+
+def test_deep_report_is_reused_by_verified_hashes(tmp_path):
+    calls = []
+    expected = {"base.apk": "a" * 64}
+
+    def deep(package, paths):
+        calls.append(package)
+        return ApkReport(package, class_count=1, deep=True, files=dict(expected))
+
+    def make():
+        return DeviceApkProvider(
+            FakeAdb(), cache_dir=tmp_path / "apk-cache", deep=frozenset({"com.a"}), deep_analyze=deep,
+            fetch=lambda adb, package, cache_dir: FetchedApks([tmp_path / "base.apk"], True, expected),
+            analyze=lambda package, paths: ApkReport(package, class_count=1, files=dict(expected)))
+
+    assert make().reports_for([AppFacts("com.a")])["com.a"].deep
+    assert make().reports_for([AppFacts("com.a")])["com.a"].deep
+    assert calls == ["com.a"]  # drugi raz z pamięci wyników

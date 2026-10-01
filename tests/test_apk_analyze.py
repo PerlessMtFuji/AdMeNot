@@ -109,7 +109,7 @@ def test_analyze_apk_without_files():
 def test_report_json_roundtrip():
     report = ApkReport("com.x", 3, "f" * 64, "X", False, ["aa"], ["admob"], True, 10, 0.5, None)
     data = json.loads(json.dumps(report_to_json(report)))
-    assert data["version"] == 2
+    assert data["version"] == 3
     assert report_from_json(data) == report
 
 

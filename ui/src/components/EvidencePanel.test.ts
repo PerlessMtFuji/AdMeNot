@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
+import { tick } from 'svelte';
 import { expect, test } from 'vitest';
 import { renderWith } from '../test-utils';
 import EvidencePanel from './EvidencePanel.svelte';
@@ -102,4 +103,21 @@ test('capability ladder: four columns, check / dash / question mark', () => {
   expect(row.textContent).toContain('✓');
   expect(row.textContent).toContain('—');
   expect(row.textContent).toContain('?');
+});
+
+test('deep analysis button for every app, also without findings; disabled without a phone', async () => {
+  const app = {
+    package: 'com.quiet.app', name: 'Quiet', score: 0, verdict: 'safe', verdict_label: 'Brak istotnych sygnałów',
+    confidence: 'high', confidence_label: 'wysoka', gaps: [], trusted: false, incomplete: false, is_system: false,
+    from_play: true, installer: 'com.android.vending', is_admin: false, default_level: null, problems: [],
+    apk_error: null, ad_sdks: [], symptoms: [], source: { label: 'Sklep Play', days: 30 }, findings: [],
+  };
+  const { s, bridge, getByRole } = await renderWith(EvidencePanel, 'empty', { app });
+  const button = getByRole('button', { name: 'Głęboka analiza' }) as HTMLButtonElement;
+  expect(button.disabled).toBe(true); // bez telefonu
+  s.device = { serial: 'S1' } as never;
+  await tick();
+  expect(button.disabled).toBe(false);
+  await fireEvent.click(button);
+  expect(bridge.calls.some((c) => c.method === 'deep_analyze' && c.args[0] === 'com.quiet.app')).toBe(true);
 });

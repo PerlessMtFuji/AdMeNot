@@ -164,7 +164,7 @@ export class Controller {
       if (d.kind === 'scan' && s.phase === 'scanning') {
         s.phase = 'connect';
         s.device = null;
-      } else if (d.kind === 'apk') {
+      } else if (d.kind === 'apk' || d.kind === 'deep') {
         s.apkQuestion = null;
         s.apk = { ...s.apk, running: false };
       } else if ((d.kind === 'exec' || d.kind === 'resume') && s.phase === 'executing') {
@@ -219,6 +219,14 @@ export class Controller {
     const r = await this.call(this.api.start_scan(s.serial, s.client.trim() || null));
     if (r) this.setJob(r.job_id, 'scan');
     else s.phase = 'connect';
+  }
+
+  async deepAnalyze(pkg: string): Promise<void> {
+    const s = this.state;
+    const r = await this.call(this.api.deep_analyze(pkg));
+    if (!r) return;
+    s.apk = { ...s.apk, done: 0, total: 1, running: true, changed: [] };
+    this.setJob(r.job_id, 'deep');
   }
 
   newScan(): void {

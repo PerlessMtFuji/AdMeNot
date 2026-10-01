@@ -295,6 +295,7 @@ export interface Api {
   list_devices(): R<DevicesPayload>;
   watch_devices(on: boolean): R<{ ok: boolean }>;
   start_scan(serial: string, client: string | null): R<{ job_id: string }>;
+  deep_analyze(pkg: string): R<{ job_id: string }>;
   rerender(): R<{ scan: ScanView | null }>;
   preview_plan(requests: Record<string, Level>, unlocked: string[]): R<PlanView>;
   execute(requests: Record<string, Level>, unlocked: string[]): R<{ job_id: string }>;

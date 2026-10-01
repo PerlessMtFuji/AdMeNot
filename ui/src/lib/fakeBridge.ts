@@ -88,6 +88,8 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
         return { size_bytes: 3.4 * GB, free_bytes: 4 * GB, disk_bytes: 120 * GB, limit_bytes: limit,
                  effective_bytes: Math.min(limit, 5.4 * GB), path: 'C:\\Users\\serwis\\AppData\\Local\\DeMalware\\apk-cache' };
       }
+      case 'deep_analyze':
+        return { job_id: 'job-deep' };
       case 'clear_apk_cache':
         return { freed_bytes: 3.4 * 1024 ** 3 };
       case 'rerender':

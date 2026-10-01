@@ -218,7 +218,7 @@ def test_scan_apk_skipped_for_no_space_keeps_exit_code_and_says_so(capsys, monke
     from demalware.engine.apk.cache import Estimate
 
     class NoSpace(_FakeDeviceProvider):
-        def __init__(self, adb, policy=None):
+        def __init__(self, adb, policy=None, **kwargs):
             self.policy = policy
 
         def reports_for(self, apps, progress=None, flagged=frozenset()):
@@ -281,3 +281,20 @@ def test_apk_size_switches_to_mb_below_a_tenth_of_a_gigabyte():
 
     assert [_size(n, "pl") for n in (0, 1, 30 * 1024**2, 1024**3 // 10 + 1, 7 * 1024**3)] == [
         "0,0 GB", "1 MB", "30 MB", "0,1 GB", "7,0 GB"]
+
+
+def test_scan_deep_passes_the_packages_to_the_provider(capsys, monkeypatch):
+    made = {}
+
+    class Recording(_FakeDeviceProvider):
+        def __init__(self, adb, *args, **kwargs):
+            made.update(kwargs)
+
+    monkeypatch.setattr("demalware.cli.main.DeviceApkProvider", Recording)
+    assert main(["scan", "--deep", "com.a.b,com.c.d"], host=make_synthetic_adb()) == 0
+    assert made["deep"] == frozenset({"com.a.b", "com.c.d"})  # --deep włącza analizę APK
+
+
+def test_scan_deep_rejects_a_bad_package_name(capsys):
+    assert main(["scan", "--apk", "--deep", "com.a;rm -rf"], host=make_synthetic_adb()) == 2
+    assert "com.a;rm -rf" in capsys.readouterr().err
