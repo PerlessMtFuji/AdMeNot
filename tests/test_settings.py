@@ -140,3 +140,23 @@ def test_check_logo(data_dir):
         with pytest.raises(LogoError) as exc:
             check_logo(path)
         assert exc.value.key == key
+
+
+def test_apk_cache_settings_defaults_and_validation():
+    assert S.load_settings().apk_cache_limit_gb == 10
+    assert S.load_settings().apk_cache_clear_after_repair is False
+    saved = S.save_settings({"apk_cache_limit_gb": 3, "apk_cache_clear_after_repair": True})
+    assert (saved.apk_cache_limit_gb, saved.apk_cache_clear_after_repair) == (3, True)
+    for bad in (0, -5, 2.5, "10", True, None):
+        with pytest.raises(ValueError):
+            S.save_settings({"apk_cache_limit_gb": bad})
+    with pytest.raises(ValueError):
+        S.save_settings({"apk_cache_clear_after_repair": "yes"})
+
+
+def test_apk_cache_limit_out_of_range_in_file_falls_back_to_default():
+    path = settings_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"apk_cache_limit_gb": 0, "apk_cache_clear_after_repair": 1}), "utf-8")
+    loaded = S.load_settings()
+    assert (loaded.apk_cache_limit_gb, loaded.apk_cache_clear_after_repair) == (10, False)
