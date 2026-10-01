@@ -248,3 +248,13 @@ def test_print_report_says_when_the_analysis_ran_out_of_space(capsys):
     _print_report(report, "en", False)
     out = capsys.readouterr().out
     assert "Ran out of disk space: analyzed 4 of 10 apps." in out
+
+
+def test_apk_estimate_uses_polish_plural_forms():
+    from demalware.cli.main import _apps
+
+    assert [_apps(n, "pl") for n in (1, 2, 4, 5, 12, 14, 21, 22, 24, 25, 112, 122)] == [
+        "1 aplikacja", "2 aplikacje", "4 aplikacje", "5 aplikacji", "12 aplikacji",
+        "14 aplikacji", "21 aplikacji", "22 aplikacje", "24 aplikacje", "25 aplikacji",
+        "112 aplikacji", "122 aplikacje"]
+    assert [_apps(n, "en") for n in (1, 2, 0)] == ["1 app", "2 apps", "0 apps"]
