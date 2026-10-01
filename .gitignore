@@ -18,3 +18,7 @@ src/demalware/app/web/
 
 # Nagranie z prywatnego telefonu właściciela (T2, Plan 4b) — tylko lokalnie, decyzja z 2026-09-28.
 tests/fixtures/vivo-v2405a-android16-t2/
+
+# Zrzuty awarii narzędzi (msys bash, JVM)
+*.stackdump
+hs_err_pid*.log

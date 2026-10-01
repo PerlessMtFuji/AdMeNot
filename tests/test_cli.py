@@ -337,3 +337,12 @@ def test_scan_deep_warns_about_packages_it_did_not_analyze(capsys, monkeypatch):
     monkeypatch.setattr("demalware.cli.main.DeviceApkProvider", _FakeDeviceProvider)
     assert main(["scan", "--deep", "com.not.there"], host=make_synthetic_adb()) == 0
     assert "com.not.there" in capsys.readouterr().err
+
+
+def test_who_watch_rejects_a_bad_interval(capsys):
+    import pytest as _pytest
+
+    for bad in (["--interval", "-1"], ["--interval", "0"], ["--watch", "-5"]):
+        with _pytest.raises(SystemExit) as exc:
+            main(["who", "--watch", "30", *bad], host=make_synthetic_adb())
+        assert exc.value.code == 2

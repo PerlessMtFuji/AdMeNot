@@ -73,3 +73,49 @@ def test_scan_with_an_incident_sets_hits_and_fires_the_rule():
     assert "DM-INCIDENT-01" in {f.rule_id for f in hit.findings}
     assert by_pkg["com.whatsapp"].facts.incident_hits == 0  # nagranie było: brak trafień to 0, nie „nie wiadomo”
     assert run_scan(make_synthetic_adb()).results[0].facts.incident_hits is None
+
+
+def test_recording_without_marks_does_not_replace_a_good_one(tmp_path):
+    from datetime import datetime, timedelta
+
+    from demalware.engine.incident import load_incident, save_incident
+
+    path, at = tmp_path / "S.json", datetime(2026, 10, 1, 12, 0)
+    assert save_incident(path, Timeline([_s(0.0, resumed="com.game", overlays=["com.ads"])], [0.0]), at)
+    assert not save_incident(path, Timeline([_s(0.0)], marks=[]), at + timedelta(minutes=5))
+    assert load_incident(path, at + timedelta(minutes=10)) == {"com.ads": (1, "com.game")}
+
+
+def test_marks_with_nothing_read_are_undetermined_not_zero(tmp_path):
+    from datetime import datetime
+
+    from demalware.engine.incident import load_incident, save_incident
+
+    path, at = tmp_path / "S.json", datetime(2026, 10, 1, 12, 0)
+    unread = Timeline([Sample(0.0, None, None, None, ["windows: timeout"])], marks=[0.0])
+    assert save_incident(path, unread, at)
+    assert load_incident(path, at) is None  # nic nie odczytano: brak trafień nie znaczy „0”
+
+
+def test_record_keeps_a_mark_from_the_last_interval_and_survives_ctrl_c():
+    now = [0.0]
+    adb = FakeAdb({ACTIVITIES: "", WINDOWS: "", NOTIFICATIONS: ""})
+    marks = iter([False, False, True])
+
+    def sleep(s):
+        now[0] += s
+
+    tl = record(adb, 2.0, 1.0, clock=lambda: now[0], sleep=sleep, poll_mark=lambda: next(marks, False))
+    assert len(tl.samples) == 2 and tl.marks == [2.0]  # Enter w ostatnim odstępie
+
+    calls = [0]
+
+    def interrupted(s):
+        calls[0] += 1
+        if calls[0] == 2:
+            raise KeyboardInterrupt
+        now[0] += s
+
+    now[0] = 0.0
+    tl = record(adb, 10.0, 1.0, clock=lambda: now[0], sleep=interrupted, poll_mark=lambda: True)
+    assert len(tl.samples) == 2 and tl.marks == [0.0, 1.0]  # Ctrl+C kończy nagranie, nie gubi go

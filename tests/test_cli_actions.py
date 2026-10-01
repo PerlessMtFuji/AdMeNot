@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import pytest
 from conftest import SERIAL
 from fakephone import LISTENERS, make_cli_phone
@@ -169,3 +171,24 @@ def test_fix_clears_the_apk_cache_after_a_finished_repair(capsys, data_dir):
     out = capsys.readouterr().out
     assert "Usunięto pamięć podręczną APK po naprawie (1 MB)" in out
     assert not (data_dir / "DeMalware" / "apk-cache" / "com.x").exists()
+
+
+def test_fix_uses_the_incident_recording_like_scan(monkeypatch, tmp_path):
+    from demalware.cli import actions_cli
+    from demalware.engine.incident import Sample, Timeline, save_incident
+    from demalware.engine.paths import incident_path
+
+    monkeypatch.setenv("DEMALWARE_ASSETS", str(tmp_path / "no-assets"))
+    phone = make_cli_phone()
+    save_incident(incident_path(phone.serial),
+                  Timeline([Sample(0.0, "com.game", ["com.wlive.forecast"], None, [])], [0.0]), datetime.now())
+    seen = {}
+    real = actions_cli.run_scan
+
+    def spy(adb, **kw):
+        seen.update(kw)
+        return real(adb, **kw)
+
+    monkeypatch.setattr(actions_cli, "run_scan", spy)
+    assert main(["fix", "--app", "com.wlive.forecast=disable", "--yes"], host=phone) == 0
+    assert seen["incidents"] == {"com.wlive.forecast": (1, "com.game")}
