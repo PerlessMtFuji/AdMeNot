@@ -144,7 +144,7 @@ def test_fix_with_apk_stores_app_names_and_icons_for_the_report(monkeypatch, tmp
         def __init__(self, adb):
             pass
 
-        def reports_for(self, targets, progress=None):
+        def reports_for(self, targets, progress=None, flagged=frozenset()):
             return {"com.wlive.forecast": ApkReport("com.wlive.forecast", label="Pogoda Live",
                                                     icon=icon, class_count=1)}
 

@@ -72,7 +72,7 @@ class _FakeDeviceProvider:
     def __init__(self, adb, *args, **kwargs):
         pass
 
-    def reports_for(self, apps, progress=None):
+    def reports_for(self, apps, progress=None, flagged=frozenset()):
         for i, f in enumerate(apps, start=1):
             if progress:
                 progress(i, len(apps), f.package)
@@ -92,7 +92,7 @@ def test_scan_apk_shows_labels_and_progress(capsys, monkeypatch):
 
 def test_scan_apk_lists_failures(capsys, monkeypatch):
     class Failing(_FakeDeviceProvider):
-        def reports_for(self, apps, progress=None):
+        def reports_for(self, apps, progress=None, flagged=frozenset()):
             return {"com.clean.pro.boost": ApkReport("com.clean.pro.boost", error="timeout")}
 
     monkeypatch.setattr("demalware.cli.main.DeviceApkProvider", Failing)

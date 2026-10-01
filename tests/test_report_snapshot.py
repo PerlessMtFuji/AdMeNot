@@ -79,7 +79,8 @@ def test_snapshot_adds_chosen_and_incomplete_apps_and_apk_identity(tmp_path):
     assert apps[BOOST]["chosen_level"] == "disable" and apps[BOOST]["default_level"] == "remove"
     assert apps[BOOST]["apk"] == {"files": {"base.apk": "ab" * 32}, "signers": ["cd" * 32],
                                   "error": None}
-    assert snap["scope"]["apk"] == {"requested": 2, "analyzed": 1, "failed": {"x": "timeout"}}
+    assert snap["scope"]["apk"] == {"requested": 2, "analyzed": 1, "failed": {"x": "timeout"},
+                                   "stopped_no_space": False}
     assert apps[BOOST]["icon"] == icon and apps[FORECAST]["icon"] is None
 
 

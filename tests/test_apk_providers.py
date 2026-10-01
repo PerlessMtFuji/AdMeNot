@@ -1,11 +1,18 @@
 import json
+import threading
+import time
+from collections import namedtuple
+
+import pytest
 
 from demalware.engine.adb.fake import FakeAdb
 from demalware.engine.adb.transport import AdbError
+from demalware.engine.apk import cache as C
 from demalware.engine.apk.analyze import ApkReport, report_to_json
 from demalware.engine.apk.fetch import FetchedApks
 from demalware.engine.apk.isolated import IsolatedAnalyzer
 from demalware.engine.apk.providers import (
+    CachePolicy,
     DeviceApkProvider,
     StoredApkProvider,
     select_apk_targets,
@@ -105,3 +112,131 @@ def test_device_provider_isolates_analysis_by_default(tmp_path):
     reports = provider.reports_for([AppFacts("com.a"), AppFacts("com.b")])
     assert {p: r.class_count for p, r in reports.items()} == {"com.a": 1, "com.b": 1}
     assert len(made) == 1 and made[0]._proc is None  # jeden proces na wątek, zamknięty na końcu
+
+
+Disk = namedtuple("Disk", "total used free")
+
+
+def _apps(n):
+    return [AppFacts(f"com.app{i}", version_code=1, apk_path=f"/data/app/a{i}/base.apk")
+            for i in range(n)]
+
+
+def _writing_fetch(size):
+    """Pobranie, które zapisuje `size` bajtów do wpisu `<pakiet>/id`, jak `fetch_apks`."""
+    def fetch(adb, package, cache_dir):
+        entry = cache_dir / package / "id"
+        entry.mkdir(parents=True, exist_ok=True)
+        (entry / "base.apk").write_bytes(b"x" * size)
+        return FetchedApks([entry / "base.apk"], verified=True)
+    return fetch
+
+
+@pytest.fixture
+def free(monkeypatch):
+    state = {"free": 100 * C.GB}
+    monkeypatch.setattr(C, "disk_usage", lambda path: Disk(500 * C.GB, 0, state["free"]))
+    return state
+
+
+def _provider(tmp_path, policy, fetch, workers=1):
+    return DeviceApkProvider(FakeAdb(), cache_dir=tmp_path, workers=workers, fetch=fetch,
+                             analyze=lambda package, paths: ApkReport(package, class_count=1),
+                             policy=policy)
+
+
+def test_limit_below_one_app_still_analyzes_everything(tmp_path, free):
+    reports = _provider(tmp_path, CachePolicy(limit_bytes=1), _writing_fetch(1000)).reports_for(_apps(4))
+    assert all(r.error is None for r in reports.values())
+    assert C.cache_size(tmp_path) <= 1000  # zostaje najwyżej wpis ostatniej aplikacji w toku
+
+
+def test_pruning_keeps_flagged_apps_for_the_repair(tmp_path, free):
+    _provider(tmp_path, CachePolicy(limit_bytes=2000), _writing_fetch(1000)).reports_for(
+        _apps(4), flagged=frozenset({"com.app0"}))
+    assert (tmp_path / "com.app0").exists()
+    assert C.cache_size(tmp_path) <= 2000
+
+
+def test_no_space_stops_the_rest_without_pulling(tmp_path, free):
+    pulled = []
+    lock = threading.Lock()
+
+    def fetch(adb, package, cache_dir):
+        with lock:
+            pulled.append(package)
+        if package == "com.app1":
+            raise C.NoSpace(package)
+        time.sleep(0.2)  # app0 trwa dłużej: kolejne zadania startują już po NoSpace z app1
+        return FetchedApks([], verified=True)
+
+    reports = _provider(tmp_path, CachePolicy(limit_bytes=C.GB), fetch, workers=2).reports_for(_apps(8))
+    assert set(pulled) == {"com.app0", "com.app1"}
+    assert reports["com.app0"].error is None
+    assert sorted(p for p, r in reports.items() if r.error == C.NO_SPACE) == [
+        f"com.app{i}" for i in range(1, 8)]
+
+
+def test_low_free_space_before_a_pull_is_no_space(tmp_path, free):
+    free["free"] = C.RESERVE - 1
+    reports = _provider(tmp_path, CachePolicy(limit_bytes=C.GB), _writing_fetch(10)).reports_for(_apps(2))
+    assert {r.error for r in reports.values()} == {C.NO_SPACE}
+    assert not tmp_path.joinpath("com.app0").exists()
+
+
+def _estimating(tmp_path, sizes, answer, seen):
+    adb = FakeAdb()
+    apps = _apps(len(sizes))
+    out = "".join(f"{s} /data/app/a{i}/base.apk\n" for i, s in enumerate(sizes))
+    adb.responses[C.stat_command(C._stat_paths(apps)[0])] = out
+    policy = CachePolicy(limit_bytes=10 * C.GB,
+                         on_estimate=lambda est, use: seen.append(("estimate", est.to_fetch_bytes)),
+                         decide=lambda est, use: seen.append(("decide", est.largest_bytes)) or answer)
+    provider = DeviceApkProvider(adb, cache_dir=tmp_path, workers=1, fetch=_writing_fetch(10),
+                                 analyze=lambda package, paths: ApkReport(package, class_count=1),
+                                 policy=policy)
+    return provider, apps
+
+
+def test_estimate_is_shown_and_no_question_when_it_fits(tmp_path, free):
+    seen = []
+    provider, apps = _estimating(tmp_path, [100, 200], "skip", seen)
+    reports = provider.reports_for(apps)
+    assert seen == [("estimate", 300)]
+    assert all(r.error is None for r in reports.values())
+
+
+@pytest.mark.parametrize("answer", ["skip", "run", "clear"])
+def test_question_when_two_largest_do_not_fit(tmp_path, free, answer):
+    old = tmp_path / "com.old" / "id"
+    old.mkdir(parents=True)
+    (old / "base.apk").write_bytes(b"x" * 5)
+    free["free"] = C.RESERVE + 250  # 250 wolne + 5 do przycięcia < 300 (dwie największe)
+    seen = []
+    provider, apps = _estimating(tmp_path, [100, 200], answer, seen)
+    reports = provider.reports_for(apps)
+    assert seen == [("estimate", 300), ("decide", 300)]
+    if answer == "skip":
+        assert {r.error for r in reports.values()} == {C.NO_SPACE}
+        assert old.exists()
+    else:
+        assert all(r.error is None for r in reports.values())  # każda osobno mieści się w 250
+        assert old.exists() == (answer == "run")
+
+
+def test_without_policy_no_space_from_fetch_is_reported(tmp_path):
+    def fetch(adb, package, cache_dir):
+        raise C.NoSpace(package)
+
+    provider = DeviceApkProvider(FakeAdb(), cache_dir=tmp_path, fetch=fetch,
+                                 analyze=lambda package, paths: ApkReport(package))
+    assert provider.reports_for([AppFacts("com.a")])["com.a"].error == C.NO_SPACE
+
+
+def test_broken_disk_usage_disables_the_policy(tmp_path, monkeypatch):
+    def broken(path):
+        raise OSError("no such device")
+
+    monkeypatch.setattr(C, "disk_usage", broken)
+    reports = _provider(tmp_path, CachePolicy(limit_bytes=1), _writing_fetch(10)).reports_for(_apps(2))
+    assert all(r.error is None for r in reports.values())

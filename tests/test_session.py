@@ -77,7 +77,7 @@ class _RecordingProvider:
         self.reports = reports
         self.asked = []
 
-    def reports_for(self, apps, progress=None):
+    def reports_for(self, apps, progress=None, flagged=frozenset()):
         self.asked = [f.package for f in apps]
         return {p: r for p, r in self.reports.items() if p in self.asked}
 
@@ -132,7 +132,7 @@ class _OneReport:
     def __init__(self, reports):
         self.reports = reports
 
-    def reports_for(self, apps, progress=None):
+    def reports_for(self, apps, progress=None, flagged=frozenset()):
         for i, facts in enumerate(apps, start=1):
             if progress:
                 progress(i, len(apps), facts.package)
@@ -227,3 +227,18 @@ def test_apk_target_without_any_report_is_a_gap(synthetic_adb):
     whatsapp = _by_pkg(report)["com.whatsapp"]
     assert "apk" in whatsapp.facts.gaps and whatsapp.incomplete
     assert "apk" not in _by_pkg(report)["com.wlive.forecast"].facts.gaps
+
+
+def test_no_space_marks_the_apk_status_and_passes_flagged(synthetic_adb):
+    seen = {}
+
+    class Full:
+        def reports_for(self, apps, progress=None, flagged=frozenset()):
+            seen["flagged"] = flagged
+            return {f.package: ApkReport(f.package, error="no_space") for f in apps}
+
+    report = run_scan(synthetic_adb, apk=Full())
+    assert report.apk.stopped_no_space is True and report.apk.analyzed == 0
+    before = run_scan(synthetic_adb)  # werdykty sprzed analizy APK
+    assert seen["flagged"] == {r.facts.package for r in before.results if r.verdict != "safe"}
+    assert all("apk" in r.facts.gaps for r in report.results if r.facts.package in report.apk.failed)

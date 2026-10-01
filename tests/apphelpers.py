@@ -20,7 +20,7 @@ class NoApk:
     raport bez klas `apply_apk_report` traktuje jako niepełną analizę.
     """
 
-    def reports_for(self, apps, progress=None):
+    def reports_for(self, apps, progress=None, flagged=frozenset()):
         reports = {}
         for i, facts in enumerate(apps, start=1):
             reports[facts.package] = ApkReport(facts.package, facts.version_code, class_count=1)
@@ -35,7 +35,7 @@ class SlowApk:
     def __init__(self):
         self.release = threading.Event()
 
-    def reports_for(self, apps, progress=None):
+    def reports_for(self, apps, progress=None, flagged=frozenset()):
         progress(1, len(apps), apps[0].package)
         self.release.wait(5)
         progress(len(apps), len(apps), apps[-1].package)

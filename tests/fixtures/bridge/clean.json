@@ -515,7 +515,8 @@
        "apk": {
         "requested": 3,
         "analyzed": 3,
-        "failed": {}
+        "failed": {},
+        "stopped_no_space": false
        },
        "apps": [
         {
