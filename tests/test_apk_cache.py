@@ -5,7 +5,10 @@ from collections import namedtuple
 
 import pytest
 
+from demalware.engine.adb.fake import FakeAdb
+from demalware.engine.adb.transport import AdbError
 from demalware.engine.apk import cache as C
+from demalware.engine.facts import AppFacts
 
 GB = C.GB
 Disk = namedtuple("Disk", "total used free")
@@ -128,3 +131,80 @@ def test_has_room_and_prunable(tmp_path, disk):
     disk["free"] = C.RESERVE + 100
     assert C.has_room(tmp_path, 100) and not C.has_room(tmp_path, 101)
     assert C.prunable_bytes(tmp_path, frozenset({"com.mine"})) == 700
+
+
+A_DIR = "/data/app/~~r1==/com.a-x1=="
+B_DIR = "/data/app/~~r2==/com.b-y2=="
+PRE = "/data/preload/com.vivo.widget"
+
+
+def _facts():
+    return [AppFacts("com.a", apk_path=f"{A_DIR}/base.apk"),
+            AppFacts("com.b", apk_path=f"{B_DIR}/base.apk"),
+            AppFacts("com.vivo.widget", apk_path=f"{PRE}/widget.apk"),
+            AppFacts("com.nopath")]
+
+
+def _stat_out():
+    # Vivo (spec §3.4): katalogu /data/preload nie da się wylistować — tylko jawna ścieżka
+    return (f"100 {A_DIR}/base.apk\n200 {A_DIR}/split_config.arm64_v8a.apk\n100 {A_DIR}/base.apk\n"
+            f"1000 {B_DIR}/base.apk\n1000 {B_DIR}/base.apk\n50 {PRE}/widget.apk\n")
+
+
+def _adb(out):
+    facts = [f for f in _facts() if f.apk_path]
+    return FakeAdb({C.stat_command(C._stat_paths(facts)[0]): out})
+
+
+def test_stat_command_globs_directories_and_names_base_paths():
+    paths = C._stat_paths([AppFacts("com.a", apk_path=f"{A_DIR}/base.apk")])[0]
+    assert C.stat_command(paths) == (
+        f"stat -c '%s %n' '{A_DIR}'/*.apk '{A_DIR}/base.apk' 2>/dev/null; true")
+
+
+def test_estimate_sums_splits_and_counts_unknown(tmp_path):
+    est = C.estimate(_adb(_stat_out()), _facts(), tmp_path)
+    assert est.sizes == {"com.a": 300, "com.b": 1000, "com.vivo.widget": 50}
+    assert (est.total_bytes, est.to_fetch_bytes, est.apps, est.unknown) == (1350, 1350, 4, 1)
+    assert est.largest_bytes == 1300  # dwie największe: 1000 + 300
+
+
+def test_estimate_skips_what_is_already_cached(tmp_path):
+    entry = tmp_path / "com.b" / "abc"
+    entry.mkdir(parents=True)
+    (entry / "base.apk").write_bytes(b"x" * 1000)
+    est = C.estimate(_adb(_stat_out()), _facts(), tmp_path)
+    assert est.to_fetch_bytes == 350 and est.largest_bytes == 350
+
+
+def test_estimate_without_stat_or_with_unknown_output_is_none(tmp_path):
+    facts = [f for f in _facts() if f.apk_path]
+    failing = FakeAdb({C.stat_command(C._stat_paths(facts)[0]): AdbError("command_failed", "x")})
+    assert C.estimate(failing, _facts(), tmp_path) is None
+    assert C.estimate(_adb("stat: not found\n"), _facts(), tmp_path) is None
+
+
+def test_estimate_splits_long_commands_into_batches(tmp_path):
+    facts = [AppFacts(f"com.app{i}", apk_path=f"/data/app/~~{'q' * 40}{i}==/com.app{i}-{'z' * 40}==/base.apk")
+             for i in range(150)]
+    batches = C._stat_paths(facts)
+    assert len(batches) > 1 and all(len(C.stat_command(b)) < 8000 for b in batches)
+    assert sum(len(b) for b in batches) == 300  # wzorzec + jawna ścieżka na aplikację
+
+
+def test_estimate_shared_directory_uses_explicit_paths_only(tmp_path):
+    facts = [AppFacts("com.foo", apk_path="/system/app/Foo.apk"),
+             AppFacts("com.bar", apk_path="/system/app/Bar.apk")]
+    paths = C._stat_paths(facts)[0]
+    assert paths == ["/system/app/Foo.apk", "/system/app/Bar.apk"]
+    adb = FakeAdb({C.stat_command(paths): "10 /system/app/Foo.apk\n20 /system/app/Bar.apk\n"})
+    assert C.estimate(adb, facts, tmp_path).sizes == {"com.foo": 10, "com.bar": 20}
+
+
+def test_fits_counts_space_freed_by_pruning_other_scans(tmp_path, disk):
+    _entry(tmp_path, "com.other", "id1", 1000)
+    est = C.Estimate(total_bytes=5000, to_fetch_bytes=5000, apps=3, unknown=0,
+                     largest_bytes=1500, sizes={})
+    disk["free"] = C.RESERVE + 600
+    assert C.fits(est, tmp_path, frozenset({"com.a"}))      # 600 wolne + 1000 do przycięcia
+    assert not C.fits(est, tmp_path, frozenset({"com.other"}))  # wpis z tego skanu się nie liczy
