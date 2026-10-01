@@ -9,7 +9,7 @@ import pytest
 from demalware.engine.adb.fake import FakeAdb
 from demalware.engine.adb.transport import AdbError
 from demalware.engine.apk.cache import NoSpace
-from demalware.engine.apk.fetch import PM_PATH, fetch_apks, parse_pm_path, sha256_command
+from demalware.engine.apk.fetch import PM_PATH, _cached, fetch_apks, parse_pm_path, sha256_command
 
 BASE = "/data/app/~~Rg8wIz5Z==/com.clean.x-a1B2==/base.apk"
 SPLIT = "/data/app/~~Rg8wIz5Z==/com.clean.x-a1B2==/split_config.arm64_v8a.apk"
@@ -195,3 +195,40 @@ def test_disk_full_while_writing_is_no_space(tmp_path):
     with pytest.raises(NoSpace):
         fetch_apks(adb, "com.clean.x", tmp_path)
     assert not list(tmp_path.glob("com.clean.x/.part-*"))  # katalog roboczy usunięty
+
+
+def test_cached_rejects_changed_content(tmp_path):
+    """Odtworzenie próby z oceny 2026-10-01 §5.4: files.json zgodny, bajty nie."""
+    target = tmp_path / "entry"
+    target.mkdir()
+    expected = {"base.apk": _sha(b"original")}
+    (target / "files.json").write_text(json.dumps(expected), "utf-8")
+    (target / "base.apk").write_bytes(b"changed")
+    assert _cached(target, expected) is None
+
+
+def test_changed_base_is_not_reused_and_is_fetched_again(tmp_path):
+    first = fetch_apks(_adb(), "com.clean.x", tmp_path)
+    first.paths[0].write_bytes(b"changed")
+    adb = _adb()
+    fetched = fetch_apks(adb, "com.clean.x", tmp_path)
+    assert _pulls(adb)
+    assert fetched.verified
+    assert fetched.paths[0].read_bytes() == b"base-bytes"
+
+
+def test_changed_split_is_detected_and_fetched_again(tmp_path):
+    first = fetch_apks(_adb(), "com.clean.x", tmp_path)
+    first.paths[1].write_bytes(b"tampered split")
+    adb = _adb()
+    fetched = fetch_apks(adb, "com.clean.x", tmp_path)
+    assert len(_pulls(adb)) == 2
+    assert fetched.paths[1].read_bytes() == b"split"
+
+
+def test_cached_entry_with_unreadable_file_is_fetched_again(tmp_path):
+    first = fetch_apks(_adb(), "com.clean.x", tmp_path)
+    first.paths[1].unlink()
+    adb = _adb()
+    fetch_apks(adb, "com.clean.x", tmp_path)
+    assert _pulls(adb)
