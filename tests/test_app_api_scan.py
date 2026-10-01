@@ -164,6 +164,7 @@ def test_stopping_during_the_space_question_skips_the_analysis(monkeypatch):
     question = rec.wait_for("apk:question")
     api.stop(question["job_id"])  # `job.ask` zwraca None → pominięcie, potem `job.check` kończy
     rec.wait_for("apk:stopped")
+    assert rec.of("apk:done") == []
     assert C.cache_size(default_cache_dir()) == 0
 
 
@@ -194,3 +195,12 @@ def test_cache_limit_above_the_disk_is_refused(monkeypatch):
     assert api.save_settings({"apk_cache_limit_gb": 121})["error"]["key"] == "bad_request"
     assert api.save_settings({"apk_cache_limit_gb": 120})["apk_cache_limit_gb"] == 120
     assert api.save_settings({"apk_cache_limit_gb": 0})["error"]["key"] == "bad_request"
+
+
+def test_limit_check_is_skipped_when_the_disk_size_is_unknown(monkeypatch):
+    def broken(path):
+        raise OSError("no disk")
+
+    monkeypatch.setattr(C, "disk_usage", broken)
+    api, _ = make_api(make_cli_phone())
+    assert api.save_settings({"apk_cache_limit_gb": 500})["apk_cache_limit_gb"] == 500

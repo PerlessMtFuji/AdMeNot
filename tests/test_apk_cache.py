@@ -2,6 +2,7 @@ import os
 import shutil
 import time
 from collections import namedtuple
+from pathlib import Path
 
 import pytest
 
@@ -221,3 +222,19 @@ def test_fits_counts_space_freed_by_pruning_other_scans(tmp_path, disk):
     disk["free"] = C.RESERVE + 600
     assert C.fits(est, tmp_path, frozenset({"com.a"}))      # 600 wolne + 1000 do przycięcia
     assert not C.fits(est, tmp_path, frozenset({"com.other"}))  # wpis z tego skanu się nie liczy
+
+
+def test_entries_skip_a_package_dir_that_cannot_be_listed(tmp_path, monkeypatch):
+    good = tmp_path / "com.good" / "id"
+    good.mkdir(parents=True)
+    (good / "base.apk").write_bytes(b"x")
+    (tmp_path / "com.gone" / "id").mkdir(parents=True)
+    real = Path.iterdir
+
+    def iterdir(self):
+        if self.name == "com.gone":
+            raise FileNotFoundError(self)
+        return real(self)
+
+    monkeypatch.setattr(Path, "iterdir", iterdir)
+    assert [e.package for e in C._entries(tmp_path, time.time())] == ["com.good"]

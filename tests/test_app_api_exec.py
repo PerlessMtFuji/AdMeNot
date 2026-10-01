@@ -211,3 +211,16 @@ def test_stopped_repair_keeps_the_apk_cache():
     api.execute(WLIVE, [])
     assert stopper.of("exec:done")[0]["stopped"] is True
     assert entry.exists()
+
+
+def test_failing_cache_clear_does_not_fail_a_finished_repair(monkeypatch):
+    from demalware.engine import workflow
+
+    def boom(cache_dir):
+        raise OSError("locked")
+
+    monkeypatch.setattr(workflow, "clear_cache", boom)
+    _, api, rec = _scanned()
+    api.save_settings({"apk_cache_clear_after_repair": True})
+    api.execute(WLIVE, [])
+    assert rec.of("exec:done") and rec.of("job:error") == []
