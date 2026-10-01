@@ -8,6 +8,7 @@ from demalware.engine.actions.executor import ExecOptions, run_order, start_orde
 from demalware.engine.actions.planner import plan_app
 from demalware.engine.adb.transport import AdbError
 from demalware.engine.allowlist.trust import load_protected_list
+from demalware.engine.apk.fetch import fetch_apks
 from demalware.engine.facts import AppFacts
 from demalware.engine.journal.db import Journal
 
@@ -22,11 +23,11 @@ def journal(tmp_path):
         yield j
 
 
-def _phone(keeps_apk=False):
+def _phone(keeps_apk=False, sha256sum=False):
     return FakePhone([
         FakeApp("com.spam", version_code=7, apks=SPLITS, keeps_apk=keeps_apk),
         FakeApp("com.android.launcher", system=True, home_activity=".Launcher"),
-    ], sdk=31)
+    ], sdk=31, sha256sum=sha256sum)
 
 
 def _remove(phone, journal, tmp_path, options=None):
@@ -86,12 +87,9 @@ def test_uninstall_failure_with_exit_code_zero(journal, tmp_path):
 
 
 def test_backup_reuses_apk_cache_and_is_not_refetched(journal, tmp_path):
-    cache = tmp_path / "apk-cache" / "com.spam" / "7"
-    cache.mkdir(parents=True)
-    for name in SPLITS:
-        (cache / name).write_bytes(apk_bytes("com.spam", name))
-    (cache / ".complete").write_text("", encoding="utf-8")
-    phone = _phone(keeps_apk=True)
+    phone = _phone(keeps_apk=True, sha256sum=True)
+    fetch_apks(phone, "com.spam", tmp_path / "apk-cache")  # jak analiza APK przed naprawą
+    phone.calls.clear()
     order, _ = _remove(phone, journal, tmp_path, ExecOptions(apk_cache_dir=tmp_path / "apk-cache"))
     assert not [c for c in phone.calls if c.startswith("host:pull")]
     assert tmp_path.joinpath(*BACKUP, "split_config.arm64_v8a.apk").exists()

@@ -5,8 +5,10 @@ Polecenia skanu, których FakePhone nie modeluje, bierze z `static` (jak FakeAdb
 
 from __future__ import annotations
 
+import hashlib
 import io
 import re
+import shlex
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -82,6 +84,7 @@ class FakePhone:
         serial: str = "FAKE",
         static: dict[str, str | AdbError] | None = None,
         host: dict[str, str | AdbError] | None = None,
+        sha256sum: bool = False,
     ) -> None:
         self.serial: str | None = serial
         self.sdk = sdk
@@ -90,6 +93,7 @@ class FakePhone:
         self.home = home  # komponent domyślnego launchera albo None
         self.static = dict(static or {})
         self.host = dict(host or {})
+        self.sha256sum = sha256sum
         self.fail: dict[str, AdbError | str] = {}  # polecenie → wyjątek albo wyjście z kodem 0
         self.lose_response: set[str] = set()  # wykonuje się, ale odpowiedź ginie (odłączenie)
         self.disconnected = False
@@ -203,7 +207,20 @@ class FakePhone:
             return self._uninstall(m[1])
         if m := re.fullmatch(r"cmd package install-existing --user 0 (\S+)", command):
             return self._install_existing(m[1])
+        if self.sha256sum and command.startswith("sha256sum "):
+            return self._sha256(shlex.split(command)[1:])
         return None
+
+    def _sha256(self, remotes: list[str]) -> str:
+        lines = []
+        for remote in remotes:
+            for app in self._present():
+                prefix = APK_DIR.format(package=app.package) + "/"
+                name = remote[len(prefix):]
+                if remote.startswith(prefix) and name in app.apks:
+                    digest = hashlib.sha256(apk_bytes(app.package, name)).hexdigest()
+                    lines.append(f"{digest}  {remote}\n")
+        return "".join(lines)
 
     def _present(self) -> list[FakeApp]:
         return [a for a in self.apps.values() if a.installed]
