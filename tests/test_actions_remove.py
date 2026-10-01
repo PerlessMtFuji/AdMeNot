@@ -134,3 +134,37 @@ def test_failed_restore_keeps_other_steps_for_a_later_undo(journal, tmp_path):
     assert undo(phone, journal, order.id) == []
     assert phone.apps["com.spam"].installed and phone.home == "com.spam/.Home"
     assert journal.order(order.id).status == "undone"
+
+
+def test_backup_fails_when_the_cache_entry_vanished_after_fetch(journal, tmp_path, monkeypatch):
+    """Wpis przycięty (np. przez CLI obok) między `fetch_apks` a kopią: bez kopii nie odinstalowujemy."""
+    from demalware.engine.actions import backup as B
+    from demalware.engine.apk.fetch import FetchedApks
+
+    gone = tmp_path / "apk-cache" / "com.spam" / "id"
+    monkeypatch.setattr(B, "fetch_apks", lambda adb, package, cache_dir: FetchedApks(
+        [gone / name for name in SPLITS], verified=True))
+    phone = _phone()
+    _, (outcome,) = _remove(phone, journal, tmp_path)
+    assert outcome.failed == [("backup", "backup_failed"), ("installed", "skipped")]
+    assert phone.apps["com.spam"].installed
+    backup = tmp_path.joinpath(*BACKUP)
+    assert not B.is_complete(backup) and not (backup / ".complete").exists()
+    assert not backup.with_name(backup.name + ".part").exists()
+
+
+def test_backup_copies_exactly_the_fetched_files(tmp_path, monkeypatch):
+    """Inny plik w katalogu wpisu (np. z innej instalacji) nie trafia do kopii."""
+    from demalware.engine.actions import backup as B
+    from demalware.engine.apk.fetch import FetchedApks
+
+    cached = tmp_path / "apk-cache" / "com.spam" / "id"
+    cached.mkdir(parents=True)
+    for name in (*SPLITS, "stray.apk"):
+        (cached / name).write_bytes(name.encode())
+    monkeypatch.setattr(B, "fetch_apks", lambda adb, package, cache_dir: FetchedApks(
+        [cached / name for name in SPLITS], verified=True))
+    target = tmp_path / "backups" / "S" / "com.spam" / "7"
+    paths = B.backup_apks(None, "com.spam", 7, target, tmp_path / "apk-cache")
+    assert sorted(p.name for p in paths) == sorted(SPLITS)
+    assert B.is_complete(target)
