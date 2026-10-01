@@ -96,13 +96,19 @@ def test_node_budget_is_reported_as_undetermined():
     assert all(p.entry is None for p in result.paths)
 
 
-def test_found_path_with_unexplored_deep_branch_is_not_undetermined():
+def test_found_path_with_a_cut_off_branch_is_still_undetermined():
+    # Recenzja Etapu 4: odcięta gałąź mogła prowadzić do innego komponentu (np. odbiornika BOOT).
     deep = {SHOW: (ON_RECEIVE, MethodRef("com.x.D", "d0"))}
     deep.update({MethodRef("com.x.D", f"d{i}"): (MethodRef("com.x.D", f"d{i + 1}"),) for i in range(20)})
     graph = FakeGraph(deep, {"hide_icon": (SHOW,)})
     result = find_paths(graph, (RECEIVER,), origin_of=_origin)
     assert [p.entry for p in result.paths] == ["com.x.Boot"]
-    assert result.undetermined == []
+    assert result.undetermined == ["limit"]
+
+
+def test_fully_explored_search_is_not_undetermined():
+    graph = FakeGraph({SHOW: (ON_RECEIVE,)}, {"hide_icon": (SHOW,)})
+    assert find_paths(graph, (RECEIVER,), origin_of=_origin).undetermined == []
 
 
 # --- adapter na sztucznym `dx` (kształt jak androguard 4.1.4: xref = (ClassAnalysis, MethodAnalysis, offset))

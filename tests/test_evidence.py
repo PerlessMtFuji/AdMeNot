@@ -49,3 +49,19 @@ def test_code_level_comes_from_code_paths():
     path = CodePath("hide_icon", "com.x.Main", None, ("com.x.Main.onCreate",), "app")
     facts = AppFacts("com.x", code_paths=(path,), has_launcher_icon=False)
     assert _by_cap(facts)["hide_icon"] == {"declared": None, "code": True, "granted": None, "observed": True}
+
+
+def test_library_hide_icon_path_is_not_the_app_hiding_its_icon():
+    # WorkManager włącza własną usługę przez setComponentEnabledSetting — to nie ukrywanie ikony.
+    path = CodePath("hide_icon", "androidx.work.impl.background.systemjob.SystemJobService", None,
+                    ("androidx.work.impl.background.systemjob.SystemJobService.onCreate",), "library")
+    facts = AppFacts("com.x", code_paths=(path,), has_launcher_icon=True)
+    assert facts.code_hides_icon is False
+    assert "hide_icon" not in _by_cap(facts)
+
+
+def test_undetermined_search_never_reads_as_no():
+    facts = AppFacts("com.x", code_paths=(), code_undetermined=("limit",), has_launcher_icon=False,
+                     apk_components=(Component("receiver", "com.x.Boot", True, None, ("android.intent.action.BOOT_COMPLETED",)),))
+    assert facts.code_boot_ui is None and facts.code_hides_icon is None
+    assert _by_cap(facts)["boot"]["code"] is None and _by_cap(facts)["hide_icon"]["code"] is None

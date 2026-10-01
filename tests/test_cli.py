@@ -331,3 +331,9 @@ def test_who_watch_without_marks_says_nothing_was_marked(capsys, monkeypatch, tm
                         lambda adb, d, i, **kw: Timeline([Sample(0.0, "com.game", [], None, [])], []))
     assert main(["who", "--watch", "5"], host=make_synthetic_adb()) == 0
     assert "Enter" in capsys.readouterr().out
+
+
+def test_scan_deep_warns_about_packages_it_did_not_analyze(capsys, monkeypatch):
+    monkeypatch.setattr("demalware.cli.main.DeviceApkProvider", _FakeDeviceProvider)
+    assert main(["scan", "--deep", "com.not.there"], host=make_synthetic_adb()) == 0
+    assert "com.not.there" in capsys.readouterr().err

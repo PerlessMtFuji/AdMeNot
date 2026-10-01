@@ -379,7 +379,7 @@ def test_deep_report_is_reused_by_verified_hashes(tmp_path):
 
     def deep(package, paths):
         calls.append(package)
-        return ApkReport(package, class_count=1, deep=True, files=dict(expected))
+        return ApkReport(package, class_count=1, deep=True, files=dict(expected), code_paths=[])
 
     def make():
         return DeviceApkProvider(
@@ -390,3 +390,45 @@ def test_deep_report_is_reused_by_verified_hashes(tmp_path):
     assert make().reports_for([AppFacts("com.a")])["com.a"].deep
     assert make().reports_for([AppFacts("com.a")])["com.a"].deep
     assert calls == ["com.a"]  # drugi raz z pamięci wyników
+
+
+def test_stored_deep_result_is_joined_with_a_fresh_normal_analysis(tmp_path):
+    # Recenzja Etapu 4: pamięć trzyma tylko ścieżki kodu; reszta raportu jest zawsze świeża.
+    expected = {"base.apk": "a" * 64}
+    path = {"sink": "dex_load", "entry": "com.a.Main", "entry_action": None, "chain": ["com.a.Main.onCreate"],
+            "origin": "app"}
+
+    def deep(package, paths):
+        return ApkReport(package, class_count=1, deep=True, files=dict(expected), ad_sdks=["old"],
+                         code_paths=[path], undetermined=["reflection"])
+
+    def make():
+        return DeviceApkProvider(
+            FakeAdb(), cache_dir=tmp_path / "apk-cache", deep=frozenset({"com.a"}), deep_analyze=deep,
+            fetch=lambda adb, package, cache_dir: FetchedApks([tmp_path / "base.apk"], True, expected),
+            analyze=lambda package, paths: ApkReport(package, class_count=1, files=dict(expected),
+                                                     ad_sdks=["new"]))
+
+    make().reports_for([AppFacts("com.a")])
+    second = make().reports_for([AppFacts("com.a")])["com.a"]
+    assert second.deep and second.code_paths == [path] and second.undetermined == ["reflection"]
+    assert second.ad_sdks == ["new"]  # świeża zwykła analiza, nie zapisany raport
+
+
+def test_deep_runs_without_verified_hashes_but_is_not_stored(tmp_path):
+    calls = []
+
+    def deep(package, paths):
+        calls.append(package)
+        return ApkReport(package, class_count=1, deep=True)
+
+    def make():
+        return DeviceApkProvider(
+            FakeAdb(), cache_dir=tmp_path / "apk-cache", deep=frozenset({"com.a"}), deep_analyze=deep,
+            fetch=lambda adb, package, cache_dir: FetchedApks([tmp_path / "base.apk"], False, None),
+            analyze=lambda package, paths: ApkReport(package, class_count=1))
+
+    report = make().reports_for([AppFacts("com.a")])["com.a"]
+    make().reports_for([AppFacts("com.a")])
+    assert report.deep and "unverified" in report.error
+    assert calls == ["com.a", "com.a"]  # bez zweryfikowanych skrótów nie ma klucza pamięci

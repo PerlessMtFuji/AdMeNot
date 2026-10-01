@@ -337,3 +337,16 @@ def test_incident_rule_is_observed_weak_and_in_the_overlay_group():
     assert "com.game" in f.text("pl") and "com.game" in f.text("en")
     for hits in (None, 0):
         assert "DM-INCIDENT-01" not in _ids(AppFacts("com.ads", incident_hits=hits))
+
+
+def test_library_paths_do_not_fire_code_rules():
+    lib = [CodePath(s, "androidx.x.Comp", None, ("androidx.x.Comp.onCreate",), "library")
+           for s in ("hide_icon", "overlay_add", "dex_load")]
+    ids = _ids(AppFacts("com.x", code_paths=tuple(lib)))
+    assert not ids & {"DM-CODE-HIDE-01", "DM-CODE-OVERLAY-01", "DM-CODE-DYNLOAD-01"}
+
+
+def test_code_overlay_text_does_not_claim_a_window_over_other_apps():
+    rule = next(r for r in load_default_ruleset().yaml_rules if r.id == "DM-CODE-OVERLAY-01")
+    texts = " ".join([*rule.text_simple.values(), *rule.label.values()]).lower()
+    assert "nad innymi" not in texts and "over other apps" not in texts and "reklamow" not in texts
