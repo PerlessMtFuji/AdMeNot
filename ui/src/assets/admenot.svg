@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#818cf8"/>
+      <stop offset="0.55" stop-color="#4f46e5"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="url(#tile)"/>
+  <rect x="48" y="66" width="160" height="124" rx="20" fill="#ffffff"/>
+  <path d="M48 86a20 20 0 0 1 20-20h120a20 20 0 0 1 20 20v10H48z" fill="#e0e3ff"/>
+  <circle cx="68" cy="81" r="5" fill="#a5b4fc"/>
+  <circle cx="84" cy="81" r="5" fill="#a5b4fc"/>
+  <path d="M88.4 164 101.6 120.8H113.8L127 164H118.6L106.8 125.9H108.4L96.8 164ZM96.3 155V147.4H119.1V155ZM130.4 164V120.8H144.4Q144.9 120.8 146.5 120.8Q148.1 120.9 149.5 121Q154.8 121.7 158.4 124.7Q162 127.7 163.9 132.3Q165.8 136.9 165.8 142.4Q165.8 147.9 163.9 152.5Q162 157.1 158.4 160.1Q154.8 163.1 149.5 163.8Q148.1 163.9 146.5 164Q144.9 164 144.4 164ZM138.7 156.3H144.4Q145.2 156.3 146.6 156.3Q147.9 156.2 149.1 156Q151.9 155.4 153.7 153.4Q155.4 151.3 156.3 148.4Q157.2 145.5 157.2 142.4Q157.2 139.2 156.3 136.2Q155.4 133.3 153.6 131.3Q151.8 129.3 149.1 128.8Q147.9 128.5 146.6 128.5Q145.2 128.5 144.4 128.5H138.7Z" fill="#4338ca"/>
+  <circle cx="196" cy="70" r="36" fill="#ef4444" stroke="#4f46e5" stroke-width="10"/>
+  <path d="M182 56L210 84M210 56L182 84" stroke="#ffffff" stroke-width="11" stroke-linecap="round"/>
+</svg>
