@@ -2,7 +2,7 @@
 
 Program na Windows, który po podłączeniu telefonu z Androidem (debugowanie USB) heurystycznie wykrywa aplikacje intruzywne (reklamy, spam powiadomień, nakładki, fałszywe launchery, administratorzy urządzenia), pozwala je wyciszyć, wyłączyć albo usunąć i cofnąć każdą zmianę.
 
-Specyfikacja: `docs/superpowers/specs/2026-09-26-admenot-design.md`. Plany: `docs/superpowers/plans/`.
+Specyfikacja: `docs/superpowers/specs/2026-09-26-demalware-design.md`. Plany: `docs/superpowers/plans/`.
 
 ## Wymagania
 
@@ -17,6 +17,7 @@ Specyfikacja: `docs/superpowers/specs/2026-09-26-admenot-design.md`. Plany: `doc
     python scripts\build_phone_db.py            # baza telefonów i zdjęcia (Plan 3)
     python scripts\fetch_tools.py               # scrcpy 4.1 z adb (podgląd ekranu, Plan 6b)
     powershell -ExecutionPolicy Bypass -File scripts\build_ui.ps1
+    python scripts\build_icons.py               # tylko po zmianie assets\icon\*.svg (PNG, ICO, kopia dla UI)
 
 ## Uruchomienie GUI
 
