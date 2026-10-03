@@ -17,6 +17,7 @@ export interface Settings {
   mirror_auto: boolean;
   apk_cache_limit_gb: number;
   apk_cache_clear_after_repair: boolean;
+  select_level: Level;
 }
 
 export interface CacheUsage {

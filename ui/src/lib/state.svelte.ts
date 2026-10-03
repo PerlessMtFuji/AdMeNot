@@ -11,7 +11,7 @@ export class AppState {
   phase = $state<Phase>('connect');
   screen = $state<Screen>('main');
   settings = $state<Settings>({ lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system', mirror_auto: false,
-    apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false });
+    apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false, select_level: 'silence' });
   devices = $state<DeviceEntry[]>([]);
   devicesError = $state<string | null>(null);
   knownSerials = $state<string[]>([]);

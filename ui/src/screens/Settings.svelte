@@ -2,8 +2,8 @@
   import { getContext, onMount } from 'svelte';
   import type { Controller } from '../lib/controller';
   import { i18n, t } from '../lib/i18n/index.svelte';
-  import { formatGb } from '../lib/logic';
-  import type { CacheUsage, Lang, Mode, Theme } from '../lib/types';
+  import { formatGb, LEVEL_TONE } from '../lib/logic';
+  import type { CacheUsage, Lang, Level, Mode, Theme } from '../lib/types';
   import Button from '../ui/Button.svelte';
   import Card from '../ui/Card.svelte';
   import Icon from '../ui/Icon.svelte';
@@ -25,6 +25,7 @@
     { value: 'simple' as Mode, label: t('settings.mode_simple') },
     { value: 'expert' as Mode, label: t('settings.mode_expert') },
   ]);
+  const levels = $derived((['silence', 'disable', 'remove'] as Level[]).map((value) => ({ value, label: t(`choice.${value}`), tone: LEVEL_TONE[value] })));
   const INPUT = 'field mono min-w-0 flex-1 rounded-xl px-3.5 py-2.5';
   const FIELD = 'field min-w-0 flex-1 rounded-xl px-3.5 py-2.5';
   let svc = $state({ name: '', address: '', phone: '', logo: '' });
@@ -128,6 +129,14 @@
         <Button variant="primary" onclick={savePaths}>{t('common.save')}</Button>
         {#if saved}<span class="flex items-center gap-1 text-ok"><Icon name="check" />{t('common.saved')}</span>{/if}
       </div>
+    </div></Card>
+
+    <Card><div class="flex flex-col gap-3 p-6">
+      <span class="lbl">{t('settings.select_title')}</span>
+      <div class="flex items-center justify-between gap-4"><span>{t('settings.select_level')}</span>
+        <Segmented label={t('settings.select_level')} value={s.settings.select_level} options={levels}
+          onchange={(v) => ctl.saveSettings({ select_level: v })} /></div>
+      <span class="text-xs text-mut">{t('settings.select_level_hint')}</span>
     </div></Card>
 
     <Card><div class="flex flex-col gap-3 p-6">

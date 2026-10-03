@@ -45,7 +45,7 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
   const target = new EventTarget();
   const calls: FakeBridge['calls'] = [];
   let settings: Settings = { lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system', mirror_auto: false,
-    apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false };
+    apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false, select_level: 'silence' };
   let service: ServiceInfo = { name: null, address: null, phone: null, logo: null };
   let lastScan: ScanView | null = null;
   let mirror: { serial: string | null; state: string } = { serial: null, state: 'stopped' };

@@ -267,7 +267,13 @@ export class Controller {
   }
 
   toggle(app: AppView): void {
-    this.setLevel(app.package, this.state.selection[app.package] ? null : app.default_level ?? 'silence');
+    this.setLevel(app.package, this.state.selection[app.package] ? null : app.default_level ?? this.selectLevel(app));
+  }
+
+  /** Akcja z ustawień dla aplikacji bez propozycji silnika; producenta nie usuwamy domyślnie (planner.default_level). */
+  private selectLevel(app: AppView): Level {
+    const level = this.state.settings.select_level;
+    return app.is_system && level === 'remove' ? 'disable' : level;
   }
 
   focus(pkg: string | null): void {

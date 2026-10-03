@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { expect, test, vi } from 'vitest';
 import App from '../App.svelte';
@@ -67,6 +67,16 @@ test('screen view setting and adb source', async () => {
   await fireEvent.click(screen.getByRole('button', { name: 'Sprawdź' }));
   await flush();
   expect(screen.getByText(/· dołączony$/)).toBeTruthy();
+});
+
+test('action when an app is selected', async () => {
+  const { s, bridge } = await renderWith(Settings, 'empty');
+  const group = screen.getByRole('group', { name: 'Akcja po zaznaczeniu' });
+  expect(within(group).getByRole('button', { name: 'Wycisz' }).getAttribute('aria-pressed')).toBe('true');
+  await fireEvent.click(within(group).getByRole('button', { name: 'Wyłącz' }));
+  await flush();
+  expect(s.settings.select_level).toBe('disable');
+  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ select_level: 'disable' }] });
 });
 
 test('settings: APK cache limit, status, clear after repair and clear now', async () => {

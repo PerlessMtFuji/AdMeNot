@@ -81,6 +81,16 @@ def test_mirror_auto_is_a_boolean(tmp_path):
         S.save_settings({"mirror_auto": "yes"}, path)
 
 
+def test_select_level_is_one_of_the_action_levels(tmp_path):
+    path = tmp_path / "settings.json"
+    assert S.load_settings(path).select_level == "silence"
+    assert S.save_settings({"select_level": "remove"}, path).select_level == "remove"
+    with pytest.raises(ValueError):
+        S.save_settings({"select_level": "review"}, path)
+    path.write_text('{"select_level": "nuke"}', "utf-8")
+    assert S.load_settings(path).select_level == "silence"
+
+
 @pytest.mark.parametrize(("locale_name", "lang"), [
     (("Polish_Poland", "1250"), "pl"), (("pl_PL", "UTF-8"), "pl"),
     (("en_US", "UTF-8"), "en"), ((None, None), "en"),

@@ -64,6 +64,25 @@ describe('controller with the adware scenario', () => {
     expect(s.touched).toContain('com.clean.pro.boost');
   });
 
+  test('selecting an app without an engine proposal uses the action from settings', async () => {
+    const { ctl, s } = setup('adware');
+    await ctl.init();
+    await ctl.startScan();
+    await vi.waitFor(() => expect(s.phase).toBe('results'));
+    const app = (pkg: string) => s.scan!.apps.find((a) => a.package === pkg)!;
+    ctl.toggle(app('com.wlive.forecast'));
+    expect(s.selection['com.wlive.forecast']).toBe('silence');
+    await ctl.saveSettings({ select_level: 'remove' });
+    ctl.toggle(app('com.wlive.forecast'));
+    ctl.toggle(app('com.wlive.forecast'));
+    expect(s.selection['com.wlive.forecast']).toBe('remove');
+    ctl.toggle(app('com.sec.android.app.launcher'));
+    expect(s.selection['com.sec.android.app.launcher']).toBe('disable'); // producenta nie usuwamy domyślnie
+    ctl.toggle(app('com.clean.pro.boost'));
+    ctl.toggle(app('com.clean.pro.boost'));
+    expect(s.selection['com.clean.pro.boost']).toBe('remove'); // propozycja silnika ma pierwszeństwo
+  });
+
   test('language change re-renders the scan', async () => {
     const { ctl, s, bridge } = setup('adware');
     await ctl.init();
