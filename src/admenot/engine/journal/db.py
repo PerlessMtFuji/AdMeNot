@@ -1,19 +1,23 @@
 """Dziennik zleceń i akcji (SQLite, spec §7.4). Każdy krok trafia tu PRZED wykonaniem na telefonie.
 
 `order_scans` trzyma migawkę skanu i wynik weryfikacji zlecenia — z nich powstaje protokół (§9.3).
+
+Wersja schematu siedzi w `PRAGMA user_version`; `MIGRATIONS[i]` podnosi bazę z wersji i do i+1.
+Migracji się nie zmienia po wydaniu — nowa zmiana schematu to nowy element na końcu krotki.
 """
 
 from __future__ import annotations
 
 import json
 import sqlite3
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Self
 
-SCHEMA = """
+_SCHEMA_V1 = """
 CREATE TABLE IF NOT EXISTS orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     number TEXT NOT NULL UNIQUE,
@@ -53,10 +57,23 @@ CREATE TABLE IF NOT EXISTS screenshots (
 CREATE INDEX IF NOT EXISTS screenshots_by_order ON screenshots(order_id);
 """
 
+# v1 to schemat sprzed wersjonowania — `IF NOT EXISTS` przyjmuje też bazy z user_version = 0.
+MIGRATIONS: tuple[str, ...] = (_SCHEMA_V1,)
+
 ORDER_STATUSES = frozenset({"running", "done", "failed", "undone", "partially_undone"})
 ACTION_STATUSES = frozenset({"pending", "done", "failed", "undone"})
 
 MAX_REPORT_SCREENSHOTS = 8  # protokół pokazuje najwyżej tyle zrzutów (Plan 6b §5.3)
+
+
+class JournalTooNew(Exception):
+    """Dziennik zapisała nowsza wersja programu — starsza go nie rusza."""
+
+    def __init__(self, found: int, known: int) -> None:
+        super().__init__(f"Dziennik zleceń pochodzi z nowszej wersji AdMeNot (schemat {found}, "
+                         f"ten program zna {known}). Zaktualizuj program.")
+        self.found = found
+        self.known = known
 
 
 class ScreenshotLimit(Exception):
@@ -107,6 +124,25 @@ def _load(text: str | None) -> dict[str, Any] | None:
     return None if text is None else json.loads(text)
 
 
+def _migrate(db: sqlite3.Connection, path: Path | str, migrations: Sequence[str]) -> None:
+    current = db.execute("PRAGMA user_version").fetchone()[0]
+    if current > len(migrations):
+        raise JournalTooNew(current, len(migrations))
+    if current == len(migrations):
+        return
+    if current >= 1 and str(path) != ":memory:":
+        with closing(sqlite3.connect(f"{path}.bak-v{current}")) as backup:
+            db.backup(backup)
+    for version in range(current + 1, len(migrations) + 1):
+        try:
+            db.executescript(f"BEGIN;\n{migrations[version - 1]}\n"
+                             f"PRAGMA user_version = {version};\nCOMMIT;")
+        except sqlite3.Error:
+            if db.in_transaction:
+                db.rollback()
+            raise
+
+
 def _order(row: sqlite3.Row) -> Order:
     return Order(row["id"], row["number"], row["device_serial"], row["device_model"],
                  row["client_name"], datetime.fromisoformat(row["created_at"]), row["status"])
@@ -124,12 +160,17 @@ def _screenshot(row: sqlite3.Row) -> Screenshot:
 
 
 class Journal:
-    def __init__(self, path: Path | str, now: Callable[[], datetime] = datetime.now) -> None:
+    def __init__(self, path: Path | str, now: Callable[[], datetime] = datetime.now,
+                 migrations: Sequence[str] = MIGRATIONS) -> None:
         if str(path) != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
         self._db = sqlite3.connect(str(path))
         self._db.row_factory = sqlite3.Row
-        self._db.executescript(SCHEMA)
+        try:
+            _migrate(self._db, path, migrations)
+        except BaseException:
+            self._db.close()
+            raise
         self._now = now
 
     def close(self) -> None:
