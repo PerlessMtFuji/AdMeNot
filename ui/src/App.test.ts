@@ -8,6 +8,11 @@ test('shell: brand, five stages in the rail, history and settings toggle', async
   const { ctl, s } = await setupCtl('empty');
   render(App, { props: { ctl } });
   expect(screen.getByText('AdMeNot')).toBeTruthy();
+  const logo = screen.getByRole('navigation').querySelector('img');
+  // Vite wstawia małe pliki jako data URI — wtedy rozpoznajemy ikonę po kolorze plakietki.
+  const src = logo?.getAttribute('src') ?? '';
+  expect(src.endsWith('admenot.svg') || decodeURIComponent(src).includes('#ef4444')).toBe(true);
+  expect(logo?.getAttribute('alt')).toBe('');
   const stages = screen.getByRole('list', { name: 'Etapy' });
   expect(stages.children).toHaveLength(5);
   expect(stages.children[0].getAttribute('aria-current')).toBe('step');

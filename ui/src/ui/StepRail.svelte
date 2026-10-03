@@ -4,6 +4,7 @@
   import { t } from '../lib/i18n/index.svelte';
   import { type StageState, stageStates } from '../lib/logic';
   import Icon from './Icon.svelte';
+  import logo from '../assets/admenot.svg';
 
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
@@ -22,7 +23,8 @@
 
 <nav aria-label={t('rail.label')} class="flex w-[200px] flex-none flex-col gap-1 border-r border-line bg-surface/90 px-3.5 py-5 backdrop-blur-xl">
   <div class="mb-5 flex items-center gap-2.5 px-1.5 text-lg font-extrabold tracking-[-.01em]">
-    <span class="h-7 w-7 rounded-[9px] bg-[linear-gradient(135deg,#818cf8,#4f46e5_55%,#3b82f6)] shadow-[inset_0_1px_0_rgb(255_255_255/.35),0_4px_14px_-2px_var(--glow-accent)]" aria-hidden="true"></span>
+    <img src={logo} alt="" aria-hidden="true" width="28" height="28"
+      class="h-7 w-7 drop-shadow-[0_4px_10px_var(--glow-accent)]" />
     AdMeNot
   </div>
   {#if s.screen === 'main'}
