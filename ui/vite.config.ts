@@ -7,7 +7,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [tailwindcss(), svelte()],
   base: './',
   build: {
-    outDir: mode === 'e2e' ? 'dist-e2e' : '../src/demalware/app/web',
+    outDir: mode === 'e2e' ? 'dist-e2e' : '../src/admenot/app/web',
     emptyOutDir: true,
     target: 'es2022',
   },

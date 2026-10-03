@@ -3,8 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from demalware.engine.report import pdf as pdf_mod
-from demalware.engine.report.pdf import PdfError, edge_command, find_edge, html_to_pdf
+from admenot.engine.report import pdf as pdf_mod
+from admenot.engine.report.pdf import PdfError, edge_command, find_edge, html_to_pdf
 
 
 class FakeRun:
@@ -104,9 +104,9 @@ def test_find_edge(tmp_path):
     assert find_edge({"ProgramFiles": str(tmp_path / "none")}) is None
     custom = tmp_path / "edge.exe"
     custom.write_bytes(b"")
-    assert find_edge({"DEMALWARE_EDGE": str(custom),
+    assert find_edge({"ADMENOT_EDGE": str(custom),
                       "ProgramFiles(x86)": str(tmp_path / "PF86")}) == custom
-    assert find_edge({"DEMALWARE_EDGE": str(tmp_path / "missing.exe"),
+    assert find_edge({"ADMENOT_EDGE": str(tmp_path / "missing.exe"),
                       "ProgramFiles(x86)": str(tmp_path / "PF86")}) is None
 
 

@@ -5,10 +5,10 @@ from pathlib import Path
 import pytest
 import yaml
 
-from demalware.engine.adb.fake import FakeAdb
-from demalware.engine.apk.providers import StoredApkProvider
-from demalware.engine.evaluation import evaluate, format_evaluation, load_labels, with_install_age
-from demalware.engine.session import run_scan
+from admenot.engine.adb.fake import FakeAdb
+from admenot.engine.apk.providers import StoredApkProvider
+from admenot.engine.evaluation import evaluate, format_evaluation, load_labels, with_install_age
+from admenot.engine.session import run_scan
 
 FIXTURES = sorted(p.parent for p in (Path(__file__).parent / "fixtures").glob("*/targets.yaml"))
 

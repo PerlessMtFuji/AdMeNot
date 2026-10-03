@@ -1,6 +1,6 @@
 import threading
 
-from demalware.app.watcher import DeviceWatcher
+from admenot.app.watcher import DeviceWatcher
 
 
 def test_poll_once_emits_only_changes_and_respects_pause():

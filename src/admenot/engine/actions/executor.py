@@ -1,0 +1,296 @@
+"""Wykonanie, cofanie i weryfikacja zleceń (spec §3.2 kroki 7–8, §7.4).
+
+Każdy krok jest w dzienniku, zanim dotknie telefonu. Stan sprzed zmiany i krok odwrotny
+zapisujemy przed wykonaniem; po odłączeniu krok zostaje „pending”.
+"""
+
+from __future__ import annotations
+
+import time
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+from admenot.engine.actions import steps as S
+from admenot.engine.actions.errors import ActionError
+from admenot.engine.actions.planner import AppPlan
+from admenot.engine.actions.steps import Step
+from admenot.engine.adb.transport import AdbTransport
+from admenot.engine.journal.db import Action, Journal, Order
+
+Event = dict[str, Any]
+BLOCKING_KINDS = frozenset({"backup"})  # bez kopii APK nie odinstalowujemy
+VERIFIED_KINDS = frozenset({"appop", "permission", "secure_list", "home", "enabled", "installed"})
+ADMIN_BLOCKED_KINDS = frozenset({"enabled", "installed"})  # blokowane przez aktywnego admina
+
+
+def _ignore(event: Event) -> None:
+    pass
+
+
+def _skip(package: str) -> str:
+    return "skip"
+
+
+def _never() -> bool:
+    return False
+
+
+@dataclass
+class ExecOptions:
+    apk_cache_dir: Path | None = None
+    admin_timeout: float = 180.0
+    poll_interval: float = 1.0
+    sleep: Callable[[float], None] = time.sleep
+    clock: Callable[[], float] = time.monotonic
+    on_event: Callable[[Event], None] = _ignore
+    on_admin_timeout: Callable[[str], str] = _skip  # "retry" | "skip"
+    should_stop: Callable[[], bool] = _never  # „Wstrzymaj”: sprawdzane przed każdym krokiem
+
+
+@dataclass
+class AppOutcome:
+    package: str
+    failed: list[tuple[str, str]] = field(default_factory=list)  # (rodzaj kroku, klucz błędu)
+
+    @property
+    def ok(self) -> bool:
+        return not self.failed
+
+
+def start_order(
+    journal: Journal,
+    serial: str,
+    model: str | None,
+    plans: Iterable[AppPlan],
+    client_name: str | None = None,
+) -> Order:
+    """Zakłada zlecenie i zapisuje wszystkie kroki jako „pending”, zanim coś trafi na telefon."""
+    order = journal.create_order(serial, model, client_name)
+    for plan in plans:
+        for step in plan.steps:
+            journal.add_action(order.id, plan.package, plan.level, step.to_dict(),
+                               S.command_for(step))
+    return order
+
+
+def _emit(options: ExecOptions, type_: str, row: Action, status: str,
+          error: str | None = None, **extra: Any) -> None:
+    options.on_event({"type": type_, "action_id": row.id, "package": row.package,
+                      "step": row.step, "status": status, "error": error, **extra})
+
+
+def _execute(adb: AdbTransport, journal: Journal, row: Action, options: ExecOptions) -> None:
+    step = Step.from_dict(row.step)
+    state = S.probe(adb, step)
+    if S.is_applied(step, state):
+        if row.prev_state is None:
+            journal.record_prev_state(row.id, state, None)  # nic nie zmieniamy — nic do cofnięcia
+        return  # przerwane zlecenie: krok zdążył się wykonać, odwrotność jest już zapisana
+    if row.prev_state is None:
+        inverse = S.inverse(step, state)
+        journal.record_prev_state(row.id, state, inverse.to_dict() if inverse else None)
+    if step.kind == "admin":
+        # Zaległy krok z przerwanego zlecenia: nikt już nie czeka na telefonie — tylko sprawdzamy stan.
+        raise ActionError("admin_timeout")
+    S.apply(adb, step, options.apk_cache_dir)
+
+
+def _recover(adb: AdbTransport, journal: Journal, row: Action, exc: ActionError,
+             options: ExecOptions) -> str | None:
+    """Próba naprawy po błędzie kroku. None = krok ostatecznie wykonany, inaczej klucz błędu.
+
+    Aktywny administrator urządzenia blokuje wyłączenie i usunięcie (spec §7.2): otwieramy ekran
+    administratorów na telefonie, czekamy na „Dezaktywuj” i ponawiamy krok.
+    """
+    if exc.key != "device_admin" or row.step["kind"] not in ADMIN_BLOCKED_KINDS:
+        return exc.key
+    if not _admin_path(adb, journal, row, options):
+        return exc.key
+    try:
+        _execute(adb, journal, journal.action(row.id), options)
+    except ActionError as again:
+        if again.uncertain:
+            raise
+        return again.key
+    return None
+
+
+def _admin_path(adb: AdbTransport, journal: Journal, row: Action, options: ExecOptions) -> bool:
+    step = Step("admin", row.package)
+    admin_id = journal.add_action(row.order_id, row.package, row.level, step.to_dict(),
+                                  S.command_for(step))
+    admin_row = journal.action(admin_id)
+    state = S.probe(adb, step)
+    journal.record_prev_state(admin_id, state, None)
+    if S.is_applied(step, state):
+        journal.set_action_status(admin_id, "failed", "not_admin")  # błąd polityki bez admina
+        return False
+    while True:
+        S.apply(adb, step)
+        _emit(options, "admin_wait", admin_row, "running", timeout=options.admin_timeout)
+        deadline = options.clock() + options.admin_timeout
+        while options.clock() < deadline:
+            if S.is_applied(step, S.probe(adb, step)):
+                journal.set_action_status(admin_id, "done")
+                _emit(options, "admin_done", admin_row, "done")
+                return True
+            if options.should_stop():
+                break
+            options.sleep(options.poll_interval)
+        if options.should_stop() or options.on_admin_timeout(row.package) != "retry":
+            journal.set_action_status(admin_id, "failed", "admin_timeout")
+            _emit(options, "admin_done", admin_row, "failed", "admin_timeout")
+            return False
+
+
+def _finish(journal: Journal, order_id: int) -> None:
+    if journal.order(order_id).status in ("undone", "partially_undone"):
+        return  # wznowienie po cofnięciu nie może udawać, że zlecenie jest wykonane
+    statuses = {a.status for a in journal.actions(order_id)}
+    if "pending" not in statuses:
+        journal.set_order_status(order_id, "failed" if "failed" in statuses else "done")
+
+
+def run_order(adb: AdbTransport, journal: Journal, order_id: int,
+              options: ExecOptions | None = None) -> list[AppOutcome]:
+    """Wykonuje kroki „pending” po kolei. `should_stop` przerywa przed kolejnym krokiem:
+    reszta zostaje „pending”, a zlecenie — przerwane, do dokończenia (`resume`) albo cofnięcia."""
+    options = options or ExecOptions()
+    outcomes: dict[str, AppOutcome] = {}
+    blocked: set[str] = set()
+    for row in journal.actions(order_id):
+        if row.status != "pending":
+            continue
+        if options.should_stop():
+            options.on_event({"type": "stopped"})
+            break
+        outcome = outcomes.setdefault(row.package, AppOutcome(row.package))
+        kind = row.step["kind"]
+        if row.package in blocked:
+            journal.set_action_status(row.id, "failed", "skipped")
+            outcome.failed.append((kind, "skipped"))
+            _emit(options, "step", row, "skipped", "skipped")
+            continue
+        _emit(options, "step", row, "running")
+        try:
+            _execute(adb, journal, row, options)
+            error = None
+        except ActionError as exc:
+            if exc.uncertain:
+                raise  # telefon zniknął: krok zostaje „pending” do dokończenia albo cofnięcia
+            error = _recover(adb, journal, row, exc, options)
+        if error is not None:
+            journal.set_action_status(row.id, "failed", error)
+            outcome.failed.append((kind, error))
+            if kind in BLOCKING_KINDS:
+                blocked.add(row.package)
+            _emit(options, "step", row, "failed", error)
+            continue
+        journal.set_action_status(row.id, "done")
+        _emit(options, "step", row, "done")
+    _finish(journal, order_id)
+    return list(outcomes.values())
+
+
+def resume(adb: AdbTransport, journal: Journal, order_id: int,
+           options: ExecOptions | None = None) -> list[AppOutcome]:
+    """Dokończenie przerwanego zlecenia (spec §7.5).
+
+    Kroki „pending” są sprawdzane na telefonie: jeśli zdążyły się wykonać, dostają „done” bez
+    ponownego polecenia. Stan sprzed zmiany i krok odwrotny zostają te z dziennika, więc
+    późniejsze cofnięcie przywraca telefon sprzed naprawy, a nie sprzed wznowienia.
+    """
+    return run_order(adb, journal, order_id, options)
+
+
+def _is_installed(adb: AdbTransport, package: str, cache: dict[str, bool]) -> bool:
+    if package not in cache:
+        probe = Step("installed", package, {"installed": "1", "backup_dir": ""})
+        cache[package] = S.is_applied(probe, S.probe(adb, probe))
+    return cache[package]
+
+
+def undo(
+    adb: AdbTransport,
+    journal: Journal,
+    order_id: int,
+    package: str | None = None,
+    action_id: int | None = None,
+    options: ExecOptions | None = None,
+) -> list[tuple[Action, str]]:
+    """Cofa kroki w odwrotnej kolejności: jeden krok, jedną aplikację albo całe zlecenie."""
+    options = options or ExecOptions()
+    everything = journal.actions(order_id)
+    rows = [a for a in everything
+            if (package is None or a.package == package) and (action_id is None or a.id == action_id)]
+    if not rows:
+        raise ValueError(f"nothing matches package={package!r} action={action_id!r}")
+    # Aplikacje, które to zlecenie odinstalowało: ich brak na telefonie to nasza zmiana.
+    removed = {a.package for a in everything if a.status == "done"
+               and a.step["kind"] == "installed" and a.step["params"].get("installed") == "0"}
+    errors: list[tuple[Action, str]] = []
+    installed: dict[str, bool] = {}
+    for row in reversed(rows):
+        if row.status == "undone":
+            continue
+        if row.status == "failed" and (row.prev_state is None or row.inverse is None):
+            continue  # krok nie zdążył niczego zmienić albo nie ma czego odwracać
+        # Krok „failed” z zapisanym stanem mógł się wykonać (np. adb: „error: closed”):
+        # odwrotność jest idempotentna, więc bez zmiany na telefonie nic nie zostanie wysłane.
+        if row.prev_state is None:  # przerwane zlecenie: krok nie zdążył się zacząć
+            journal.set_action_status(row.id, "undone", "not_started")
+            _emit(options, "undo", row, "undone", "not_started")
+            continue
+        try:
+            if row.inverse is not None:
+                inverse = Step.from_dict(row.inverse)
+                if inverse.kind != "installed" and not _is_installed(adb, row.package, installed):
+                    if row.package in removed:
+                        # Sami ją usunęliśmy, a przywrócenie się nie udało: krok czeka na ponowne undo.
+                        errors.append((row, "skipped"))
+                        _emit(options, "undo", row, "failed", "skipped")
+                        continue
+                    # Użytkownik sam odinstalował aplikację: nie ma czego cofać.
+                    journal.set_action_status(row.id, "undone", "app_gone")
+                    _emit(options, "undo", row, "undone", "app_gone")
+                    continue
+                if not S.is_applied(inverse, S.probe(adb, inverse)):
+                    S.apply(adb, inverse, options.apk_cache_dir)
+                if inverse.kind == "installed":
+                    installed[row.package] = inverse.params["installed"] == "1"
+        except ActionError as exc:
+            if exc.uncertain:
+                raise
+            errors.append((row, exc.key))
+            _emit(options, "undo", row, "failed", exc.key)
+            continue
+        journal.set_action_status(row.id, "undone")
+        _emit(options, "undo", row, "undone")
+    remaining = {a.status for a in journal.actions(order_id)}
+    journal.set_order_status(
+        order_id, "partially_undone" if remaining & {"done", "pending"} else "undone")
+    return errors
+
+
+def verify(adb: AdbTransport, journal: Journal, order_id: int) -> dict[str, list[str]]:
+    """Ponowny odczyt stanu po wykonaniu: które kroki nie trzymają (np. aplikacja cofnęła zmianę)."""
+    rows = [a for a in journal.actions(order_id)
+            if a.status == "done" and a.step["kind"] in VERIFIED_KINDS]
+    removed = {a.package for a in rows
+               if a.step["kind"] == "installed" and a.step["params"].get("installed") == "0"}
+    problems: dict[str, list[str]] = {}
+    for row in rows:
+        if row.package in removed and row.step["kind"] != "installed":
+            continue  # usuniętej aplikacji nie da się odpytać o appops — liczy się samo usunięcie
+        step = Step.from_dict(row.step)
+        try:
+            holds = S.is_applied(step, S.probe(adb, step))
+        except ActionError as exc:
+            if exc.uncertain:
+                raise
+            holds = False
+        if not holds:
+            problems.setdefault(row.package, []).append(step.kind)
+    return problems

@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from demalware.engine.adb.fake import FakeAdb
-from demalware.engine.adb.transport import AdbError
-from demalware.engine.foreground import (
+from admenot.engine.adb.fake import FakeAdb
+from admenot.engine.adb.transport import AdbError
+from admenot.engine.foreground import (
     ACTIVITIES,
     WINDOWS,
     Foreground,

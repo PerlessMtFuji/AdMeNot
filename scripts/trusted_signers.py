@@ -2,7 +2,7 @@
 
 python scripts/trusted_signers.py KATALOG_Z_RAPORTAMI_APK [...]
 
-KATALOG to np. tests/fixtures/<nagranie>/apk albo katalog z `demalware capture --apk`.
+KATALOG to np. tests/fixtures/<nagranie>/apk albo katalog z `admenot capture --apk`.
 Wypisuje tylko pakiety pasujące do nazw z trusted.yaml. Wynik trzeba potwierdzić drugim
 źródłem (inny telefon z aplikacją ze Sklepu Play) przed wklejeniem do trusted.yaml.
 """
@@ -14,7 +14,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-from demalware.engine.allowlist.trust import load_default_trust_list
+from admenot.engine.allowlist.trust import load_default_trust_list
 
 
 def main(argv: list[str]) -> int:

@@ -1,7 +1,7 @@
 import pytest
 from phonedb import make_device, make_phone_assets
 
-from demalware.engine.phones.provider import PhoneImageProvider
+from admenot.engine.phones.provider import PhoneImageProvider
 
 
 @pytest.fixture(scope="module")

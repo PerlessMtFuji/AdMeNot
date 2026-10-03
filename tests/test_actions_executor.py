@@ -1,9 +1,9 @@
 import pytest
 from fakephone import GEARHEAD, LISTENERS, POST, FakeApp, FakePhone
 
-from demalware.engine.actions import commands as C
-from demalware.engine.actions.context import read_phone_context
-from demalware.engine.actions.executor import (
+from admenot.engine.actions import commands as C
+from admenot.engine.actions.context import read_phone_context
+from admenot.engine.actions.executor import (
     ExecOptions,
     resume,
     run_order,
@@ -11,11 +11,11 @@ from demalware.engine.actions.executor import (
     undo,
     verify,
 )
-from demalware.engine.actions.planner import plan_app
-from demalware.engine.adb.transport import AdbError
-from demalware.engine.allowlist.trust import load_protected_list
-from demalware.engine.facts import AppFacts
-from demalware.engine.journal.db import Journal
+from admenot.engine.actions.planner import plan_app
+from admenot.engine.adb.transport import AdbError
+from admenot.engine.allowlist.trust import load_protected_list
+from admenot.engine.facts import AppFacts
+from admenot.engine.journal.db import Journal
 
 AD_LISTENER = "com.ad/com.ad.Listener"
 SAW = "android.permission.SYSTEM_ALERT_WINDOW"  # aplikacje w tych testach mogą rysować nad innymi

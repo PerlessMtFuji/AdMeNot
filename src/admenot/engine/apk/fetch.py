@@ -1,0 +1,215 @@
+"""Pobieranie APK (base + splity) do pamięci podręcznej przypiętej do bajtów z telefonu.
+
+Klucz to skróty SHA-256 plików odczytane na podłączonym telefonie (`sha256sum`), nie nazwa i
+versionCode: inny telefon albo przepakowana aplikacja z tą samą wersją ma inne bajty, więc
+trafia do innego katalogu. Telefon jest pytany przy każdym skanie (`pm path` + `sha256sum`).
+"""
+
+from __future__ import annotations
+
+import errno
+import hashlib
+import json
+import os
+import re
+import shlex
+import shutil
+import tempfile
+import threading
+import time
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
+
+from admenot.engine.adb.transport import AdbError, AdbTransport
+from admenot.engine.apk.cache import PART, UNVERIFIED, UNVERIFIED_MAX_AGE, NoSpace
+
+PM_PATH = "pm path {package}"
+PULL_TIMEOUT = 180.0
+SHA_TIMEOUT = 60.0
+_FILES = "files.json"
+_PACKAGE = re.compile(r"^[A-Za-z][\w]*(\.[\w]+)+$")
+
+
+def is_package_name(name: str) -> bool:
+    return bool(_PACKAGE.match(name))
+
+
+_APK_NAME = re.compile(r"^[\w.\-]+\.apk$")
+_SHA_LINE = re.compile(r"^([0-9a-fA-F]{64})\s+\*?(\S.*)$")
+_LOCKS: dict[str, threading.Lock] = {}
+_LOCKS_GUARD = threading.Lock()
+_NO_SPACE = ("no space left on device", "not enough space")  # adb pull: Linux / Windows
+
+
+def _touch(path: Path) -> None:
+    """Czas ostatniego użycia wpisu — `cache.prune` usuwa najdawniej używane."""
+    try:
+        os.utime(path)
+    except OSError:
+        pass
+
+
+@dataclass(frozen=True)
+class FetchedApks:
+    paths: list[Path]
+    verified: bool  # True: bajty zgodne z SHA-256 zainstalowanych plików na telefonie
+    expected: dict[str, str] | None = None  # nazwa pliku → SHA-256 z telefonu (gdy verified)
+
+
+def default_cache_dir() -> Path:
+    base = os.environ.get("LOCALAPPDATA")
+    if base:
+        return Path(base) / "AdMeNot" / "apk-cache"
+    return Path.home() / ".cache" / "admenot" / "apk-cache"
+
+
+def parse_pm_path(text: str) -> list[str]:
+    return [line.strip()[len("package:"):] for line in text.splitlines()
+            if line.strip().startswith("package:")]
+
+
+def sha256_command(remotes: list[str]) -> str:
+    return "sha256sum " + " ".join(shlex.quote(r) for r in remotes)
+
+
+def _remote_hashes(adb: AdbTransport, remotes: list[str]) -> dict[str, str] | None:
+    """Skróty zainstalowanych plików albo None (brak `sha256sum`, niepełny wynik)."""
+    try:
+        text = adb.shell(sha256_command(remotes), timeout=SHA_TIMEOUT)
+    except AdbError:
+        return None
+    hashes = {m.group(2).strip(): m.group(1).lower()
+              for line in text.splitlines() if (m := _SHA_LINE.match(line.strip()))}
+    return hashes if set(hashes) == set(remotes) else None
+
+
+def _sha256(path: Path) -> str:
+    with path.open("rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
+
+
+def _lock(package: str) -> threading.Lock:
+    with _LOCKS_GUARD:
+        return _LOCKS.setdefault(package, threading.Lock())
+
+
+def _install_id(expected: dict[str, str]) -> str:
+    joined = "\n".join(f"{name}={digest}" for name, digest in sorted(expected.items()))
+    return hashlib.sha256(joined.encode()).hexdigest()[:32]
+
+
+def _cached(target: Path, expected: dict[str, str]) -> list[Path] | None:
+    """Wpis zgodny z instalacją: `files.json` i rzeczywiste skróty każdego pliku (base + splity).
+
+    Sam `files.json` nie wystarcza: plik mógł zostać uszkodzony albo podmieniony po zapisie.
+    """
+    try:
+        recorded = json.loads((target / _FILES).read_text("utf-8"))
+    except (OSError, ValueError):
+        return None
+    if recorded != expected:
+        return None
+    paths = [target / name for name in sorted(expected)]
+    try:
+        if any(_sha256(p) != expected[p.name] for p in paths):
+            return None
+    except OSError:
+        return None
+    return paths
+
+
+def _pull_all(adb: AdbTransport, remotes: list[str], into: Path) -> dict[str, Path]:
+    local: dict[str, Path] = {}
+    for remote in remotes:
+        name = PurePosixPath(remote).name
+        if not _APK_NAME.match(name) or ".." in PurePosixPath(remote).parts or name in local:
+            raise AdbError("command_failed", f"unexpected APK path {remote!r}")
+        path = into / name
+        try:
+            adb.run(["pull", remote, str(path)], timeout=PULL_TIMEOUT)
+        except AdbError as exc:
+            if any(s in exc.message.lower() for s in _NO_SPACE):
+                raise NoSpace(remote) from exc
+            raise
+        except OSError as exc:
+            if exc.errno == errno.ENOSPC:
+                raise NoSpace(remote) from exc
+            raise
+        if not path.exists() or path.stat().st_size == 0:
+            raise AdbError("command_failed", f"pull {remote}: empty file")
+        local[remote] = path
+    return local
+
+
+def _sweep_unverified(root: Path) -> None:
+    """Usuwa stare katalogi niezweryfikowanych pobrań (świeże może jeszcze czytać inny skan)."""
+    cutoff = time.time() - UNVERIFIED_MAX_AGE
+    for old in root.glob(UNVERIFIED + "*"):
+        try:
+            if old.is_dir() and old.stat().st_mtime < cutoff:
+                shutil.rmtree(old, ignore_errors=True)
+        except OSError:
+            continue
+
+
+def _fetch_unverified(adb: AdbTransport, remotes: list[str], root: Path) -> FetchedApks:
+    """Bez skrótów z telefonu: pliki zostają w unikalnym katalogu tego pobrania.
+
+    Wspólna nazwa (np. `.unverified`) byłaby nadpisana przez skan innego telefonu, zanim ten
+    przeczyta zwrócone ścieżki (analiza w procesie potomnym, kopia przed usunięciem).
+    """
+    _sweep_unverified(root)
+    own = Path(tempfile.mkdtemp(prefix=UNVERIFIED + "-", dir=root))
+    try:
+        local = _pull_all(adb, remotes, own)
+    except BaseException:
+        shutil.rmtree(own, ignore_errors=True)
+        raise
+    return FetchedApks([local[r] for r in sorted(remotes, key=lambda r: PurePosixPath(r).name)],
+                       verified=False)
+
+
+def fetch_apks(adb: AdbTransport, package: str, cache_dir: Path) -> FetchedApks:
+    if not is_package_name(package):
+        raise ValueError(f"invalid package name: {package!r}")
+    remotes = parse_pm_path(adb.shell(PM_PATH.format(package=package)))
+    if not remotes:
+        raise AdbError("command_failed", f"pm path {package}: no APK (uninstalled?)")
+    hashes = _remote_hashes(adb, remotes)
+    root = Path(cache_dir) / package
+    root.mkdir(parents=True, exist_ok=True)
+
+    if hashes is None:
+        return _fetch_unverified(adb, remotes, root)
+
+    with _lock(package):
+        expected = {PurePosixPath(r).name: hashes[r] for r in remotes}
+        target = root / _install_id(expected)
+        if (paths := _cached(target, expected)) is not None:
+            _touch(target)
+            return FetchedApks(paths, verified=True, expected=expected)
+
+        # Unikalny katalog roboczy: inny proces (CLI obok okna) nie zobaczy połowy plików.
+        partial = Path(tempfile.mkdtemp(prefix=PART, dir=root))
+        try:
+            local = _pull_all(adb, remotes, partial)
+            for remote, path in local.items():
+                if _sha256(path) != hashes[remote]:
+                    raise AdbError("command_failed",
+                                   f"pull {remote}: sha256 differs from the installed file")
+            (partial / _FILES).write_text(json.dumps(expected, sort_keys=True), "utf-8")
+            if target.exists() and _cached(target, expected) is None:
+                shutil.rmtree(target, ignore_errors=True)
+            try:
+                partial.rename(target)
+                _touch(target)
+            except OSError:
+                # Inny proces zdążył zapisać ten sam zestaw — jego pliki mają te same skróty.
+                if _cached(target, expected) is None:
+                    raise
+                shutil.rmtree(partial, ignore_errors=True)
+        except BaseException:
+            shutil.rmtree(partial, ignore_errors=True)
+            raise
+    names = sorted(PurePosixPath(r).name for r in remotes)
+    return FetchedApks([target / n for n in names], verified=True, expected=expected)

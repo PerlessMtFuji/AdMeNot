@@ -2,13 +2,13 @@ import json
 
 from conftest import SERIAL, make_synthetic_adb
 
-from demalware.cli.main import main
-from demalware.engine.adb.fake import FakeAdb
-from demalware.engine.adb.transport import AdbError
-from demalware.engine.apk.analyze import ApkReport
-from demalware.engine.collectors.profiles import PM_USERS
-from demalware.engine.collectors.system import DEVICE_POLICY
-from demalware.engine.foreground import ACTIVITIES, WINDOWS
+from admenot.cli.main import main
+from admenot.engine.adb.fake import FakeAdb
+from admenot.engine.adb.transport import AdbError
+from admenot.engine.apk.analyze import ApkReport
+from admenot.engine.collectors.profiles import PM_USERS
+from admenot.engine.collectors.system import DEVICE_POLICY
+from admenot.engine.foreground import ACTIVITIES, WINDOWS
 
 
 def test_devices_lists_entries(capsys):
@@ -82,7 +82,7 @@ class _FakeDeviceProvider:
 
 
 def test_scan_apk_shows_labels_and_progress(capsys, monkeypatch):
-    monkeypatch.setattr("demalware.cli.main.DeviceApkProvider", _FakeDeviceProvider)
+    monkeypatch.setattr("admenot.cli.main.DeviceApkProvider", _FakeDeviceProvider)
     assert main(["scan", "--apk"], host=make_synthetic_adb()) == 0
     captured = capsys.readouterr()
     assert "Weather Live (com.wlive.forecast)" in captured.out  # oczyszczona etykieta
@@ -95,7 +95,7 @@ def test_scan_apk_lists_failures(capsys, monkeypatch):
         def reports_for(self, apps, progress=None, flagged=frozenset()):
             return {"com.clean.pro.boost": ApkReport("com.clean.pro.boost", error="timeout")}
 
-    monkeypatch.setattr("demalware.cli.main.DeviceApkProvider", Failing)
+    monkeypatch.setattr("admenot.cli.main.DeviceApkProvider", Failing)
     assert main(["scan", "--apk"], host=make_synthetic_adb()) == 0
     assert "[apk] com.clean.pro.boost: timeout" in capsys.readouterr().out
 
@@ -132,7 +132,7 @@ def test_scan_output_explains_incomplete_results_and_profiles(capsys):
 def _safe_only_report(adb):
     import dataclasses
 
-    from demalware.engine.session import run_scan
+    from admenot.engine.session import run_scan
 
     report = run_scan(adb)
     return dataclasses.replace(report, results=[r for r in report.results if r.verdict == "safe"])
@@ -140,7 +140,7 @@ def _safe_only_report(adb):
 
 def test_default_scan_counts_incomplete_safe_apps_separately(capsys):
     """Przegląd końcowy I2: „bez uwag” nigdy nie obejmuje aplikacji z oceną niepełną."""
-    from demalware.cli.main import _print_report
+    from admenot.cli.main import _print_report
 
     adb = make_synthetic_adb()
     adb.responses[DEVICE_POLICY] = AdbError("timeout", "slow")
@@ -159,7 +159,7 @@ def test_default_scan_counts_incomplete_safe_apps_separately(capsys):
 
 
 def test_default_scan_all_clean_only_when_nothing_is_missing(capsys):
-    from demalware.cli.main import _print_report
+    from admenot.cli.main import _print_report
 
     report = _safe_only_report(make_synthetic_adb())
     assert report.results and not any(r.incomplete for r in report.results)
@@ -169,7 +169,7 @@ def test_default_scan_all_clean_only_when_nothing_is_missing(capsys):
 
 
 def test_scan_output_lists_collector_partial(capsys):
-    from demalware.engine.collectors.behavior import APPOPS_GET
+    from admenot.engine.collectors.behavior import APPOPS_GET
 
     adb = make_synthetic_adb()
     adb.responses[APPOPS_GET.format(package="com.whatsapp")] = AdbError("command_failed", "x")
@@ -195,10 +195,10 @@ def test_scan_output_says_when_the_profile_list_is_unknown(capsys):
 def test_apk_provider_uses_the_limit_and_skips_without_asking(monkeypatch, tmp_path, capsys):
     from collections import namedtuple
 
-    from demalware.cli import main as M
-    from demalware.engine.apk import cache as C
-    from demalware.engine.apk.cache import Estimate
-    from demalware.engine.settings import save_settings
+    from admenot.cli import main as M
+    from admenot.engine.apk import cache as C
+    from admenot.engine.apk.cache import Estimate
+    from admenot.engine.settings import save_settings
 
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     save_settings({"apk_cache_limit_gb": 3})
@@ -214,8 +214,8 @@ def test_apk_provider_uses_the_limit_and_skips_without_asking(monkeypatch, tmp_p
 
 
 def test_scan_apk_skipped_for_no_space_keeps_exit_code_and_says_so(capsys, monkeypatch):
-    from demalware.engine.apk import cache as C
-    from demalware.engine.apk.cache import Estimate
+    from admenot.engine.apk import cache as C
+    from admenot.engine.apk.cache import Estimate
 
     class NoSpace(_FakeDeviceProvider):
         def __init__(self, adb, policy=None, **kwargs):
@@ -228,7 +228,7 @@ def test_scan_apk_skipped_for_no_space_keeps_exit_code_and_says_so(capsys, monke
             assert self.policy.decide(est, use) == "skip"
             return {f.package: ApkReport(f.package, error=C.NO_SPACE) for f in apps}
 
-    monkeypatch.setattr("demalware.cli.main.DeviceApkProvider", NoSpace)
+    monkeypatch.setattr("admenot.cli.main.DeviceApkProvider", NoSpace)
     assert main(["scan", "--apk"], host=make_synthetic_adb()) == 0
     captured = capsys.readouterr()
     assert "Za mało miejsca" in captured.err
@@ -238,9 +238,9 @@ def test_scan_apk_skipped_for_no_space_keeps_exit_code_and_says_so(capsys, monke
 def test_print_report_says_when_the_analysis_ran_out_of_space(capsys):
     from datetime import datetime
 
-    from demalware.cli.main import _print_report
-    from demalware.engine.device.info import DeviceInfo
-    from demalware.engine.session import ApkStatus, ScanReport
+    from admenot.cli.main import _print_report
+    from admenot.engine.device.info import DeviceInfo
+    from admenot.engine.session import ApkStatus, ScanReport
 
     device = DeviceInfo("S", "b", "m", "model", "dev", None, "14", 34, None, 0.0, datetime(2026, 1, 1))
     report = ScanReport(device=device, collectors={}, low_behavior_data=False,
@@ -251,7 +251,7 @@ def test_print_report_says_when_the_analysis_ran_out_of_space(capsys):
 
 
 def test_apk_estimate_uses_polish_plural_forms():
-    from demalware.cli.main import _apps
+    from admenot.cli.main import _apps
 
     assert [_apps(n, "pl") for n in (1, 2, 4, 5, 12, 14, 21, 22, 24, 25, 112, 122)] == [
         "1 aplikacja", "2 aplikacje", "4 aplikacje", "5 aplikacji", "12 aplikacji",
@@ -261,9 +261,9 @@ def test_apk_estimate_uses_polish_plural_forms():
 
 
 def test_apk_estimate_says_what_is_already_cached(capsys, monkeypatch, tmp_path):
-    from demalware.cli import main as M
-    from demalware.engine.apk import cache as C
-    from demalware.engine.apk.cache import Estimate
+    from admenot.cli import main as M
+    from admenot.engine.apk import cache as C
+    from admenot.engine.apk.cache import Estimate
 
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     provider = M._apk_provider(FakeAdb(), "pl")
@@ -277,7 +277,7 @@ def test_apk_estimate_says_what_is_already_cached(capsys, monkeypatch, tmp_path)
 
 
 def test_apk_size_switches_to_mb_below_a_tenth_of_a_gigabyte():
-    from demalware.cli.main import _size
+    from admenot.cli.main import _size
 
     assert [_size(n, "pl") for n in (0, 1, 30 * 1024**2, 1024**3 // 10 + 1, 7 * 1024**3)] == [
         "0,0 GB", "1 MB", "30 MB", "0,1 GB", "7,0 GB"]
@@ -290,7 +290,7 @@ def test_scan_deep_passes_the_packages_to_the_provider(capsys, monkeypatch):
         def __init__(self, adb, *args, **kwargs):
             made.update(kwargs)
 
-    monkeypatch.setattr("demalware.cli.main.DeviceApkProvider", Recording)
+    monkeypatch.setattr("admenot.cli.main.DeviceApkProvider", Recording)
     assert main(["scan", "--deep", "com.a.b,com.c.d"], host=make_synthetic_adb()) == 0
     assert made["deep"] == frozenset({"com.a.b", "com.c.d"})  # --deep włącza analizę APK
 
@@ -301,7 +301,7 @@ def test_scan_deep_rejects_a_bad_package_name(capsys):
 
 
 def test_who_watch_records_an_incident_that_the_next_scan_uses(capsys, monkeypatch, tmp_path):
-    from demalware.engine.incident import Sample, Timeline
+    from admenot.engine.incident import Sample, Timeline
 
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     timeline = Timeline([Sample(0.0, "com.game", ["com.clean.pro.boost"], None, [])], marks=[0.0])
@@ -311,12 +311,12 @@ def test_who_watch_records_an_incident_that_the_next_scan_uses(capsys, monkeypat
         seen.update(duration=duration_s, interval=interval_s, poll=kw["poll_mark"]())
         return timeline
 
-    monkeypatch.setattr("demalware.cli.main.record", fake_record)
+    monkeypatch.setattr("admenot.cli.main.record", fake_record)
     assert main(["who", "--watch", "30", "--interval", "1.5"], host=make_synthetic_adb()) == 0
     out = capsys.readouterr().out
     assert seen == {"duration": 30.0, "interval": 1.5, "poll": False}
     assert "com.clean.pro.boost" in out and "com.game" in out
-    assert (tmp_path / "DeMalware" / "incidents" / f"{SERIAL}.json").exists()
+    assert (tmp_path / "AdMeNot" / "incidents" / f"{SERIAL}.json").exists()
 
     assert main(["scan", "--json"], host=make_synthetic_adb()) == 0
     results = {r["package"]: r for r in json.loads(capsys.readouterr().out)["results"]}
@@ -324,17 +324,17 @@ def test_who_watch_records_an_incident_that_the_next_scan_uses(capsys, monkeypat
 
 
 def test_who_watch_without_marks_says_nothing_was_marked(capsys, monkeypatch, tmp_path):
-    from demalware.engine.incident import Sample, Timeline
+    from admenot.engine.incident import Sample, Timeline
 
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
-    monkeypatch.setattr("demalware.cli.main.record",
+    monkeypatch.setattr("admenot.cli.main.record",
                         lambda adb, d, i, **kw: Timeline([Sample(0.0, "com.game", [], None, [])], []))
     assert main(["who", "--watch", "5"], host=make_synthetic_adb()) == 0
     assert "Enter" in capsys.readouterr().out
 
 
 def test_scan_deep_warns_about_packages_it_did_not_analyze(capsys, monkeypatch):
-    monkeypatch.setattr("demalware.cli.main.DeviceApkProvider", _FakeDeviceProvider)
+    monkeypatch.setattr("admenot.cli.main.DeviceApkProvider", _FakeDeviceProvider)
     assert main(["scan", "--deep", "com.not.there"], host=make_synthetic_adb()) == 0
     assert "com.not.there" in capsys.readouterr().err
 

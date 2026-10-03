@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from dexutil import make_apk, make_dex
 
-from demalware.engine.apk.analyze import (
+from admenot.engine.apk.analyze import (
     ApkReport,
     analyze_apk,
     apply_apk_report,
@@ -14,9 +14,9 @@ from demalware.engine.apk.analyze import (
     report_to_json,
     scope_notes,
 )
-from demalware.engine.apk.manifest import ICON_MAX_BYTES, ManifestInfo, _read_icon, icon_uri
-from demalware.engine.apk.sdks import load_default_ad_sdks, parse_ad_sdks
-from demalware.engine.facts import AppFacts
+from admenot.engine.apk.manifest import ICON_MAX_BYTES, ManifestInfo, _read_icon, icon_uri
+from admenot.engine.apk.sdks import load_default_ad_sdks, parse_ad_sdks
+from admenot.engine.facts import AppFacts
 
 AD_CLASSES = [
     "com.applovin.sdk.AppLovinSdk", "com.mbridge.msdk.out.MBridgeSDKFactory",
@@ -265,7 +265,7 @@ def test_long_version_code_still_detects_a_different_install():
 def test_read_manifest_combines_version_code_major(monkeypatch, tmp_path):
     import androguard.core.apk as androguard_apk
 
-    from demalware.engine.apk.manifest import read_manifest
+    from admenot.engine.apk.manifest import read_manifest
 
     class FakeApk:
         def __init__(self, path):

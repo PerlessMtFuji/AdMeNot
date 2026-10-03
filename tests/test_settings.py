@@ -2,9 +2,9 @@ import json
 
 import pytest
 
-from demalware.engine import settings as S
-from demalware.engine.paths import backups_dir, reports_dir, settings_path
-from demalware.engine.settings import (
+from admenot.engine import settings as S
+from admenot.engine.paths import backups_dir, reports_dir, settings_path
+from admenot.engine.settings import (
     MAX_LOGO_BYTES,
     LogoError,
     ServiceInfo,
@@ -59,7 +59,7 @@ def test_bad_values_in_file_are_ignored_and_rejected_on_save():
 
 
 def test_backups_dir_follows_the_setting(data_dir):
-    assert backups_dir() == data_dir / "DeMalware" / "backups"
+    assert backups_dir() == data_dir / "AdMeNot" / "backups"
     S.save_settings({"backups_dir": str(data_dir / "kopie")})
     assert backups_dir() == data_dir / "kopie"
 
@@ -103,7 +103,7 @@ def test_system_lang(monkeypatch, locale_name, lang):
 
 
 def test_reports_dir(data_dir):
-    assert reports_dir() == data_dir / "DeMalware" / "reports"
+    assert reports_dir() == data_dir / "AdMeNot" / "reports"
 
 
 def test_service_round_trip_keeps_other_settings(data_dir):

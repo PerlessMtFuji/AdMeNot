@@ -1,11 +1,11 @@
 from conftest import NOTIFICATIONS_OUT, SERIAL, make_synthetic_adb
 
-from demalware.cli.main import main
-from demalware.engine.adb.fake import FakeAdb
-from demalware.engine.capture import anonymize
-from demalware.engine.device.info import GETPROP
-from demalware.engine.parsers.notifications import parse_notifications
-from demalware.engine.session import run_scan
+from admenot.cli.main import main
+from admenot.engine.adb.fake import FakeAdb
+from admenot.engine.capture import anonymize
+from admenot.engine.device.info import GETPROP
+from admenot.engine.parsers.notifications import parse_notifications
+from admenot.engine.session import run_scan
 
 
 def test_anonymize_getprop_whitelist():
@@ -187,9 +187,9 @@ def test_capture_roundtrip(tmp_path, capsys):
 def test_capture_with_apk_reports_roundtrip(tmp_path, capsys, monkeypatch):
     from test_cli import _FakeDeviceProvider
 
-    from demalware.engine.apk.providers import StoredApkProvider
+    from admenot.engine.apk.providers import StoredApkProvider
 
-    monkeypatch.setattr("demalware.cli.main.DeviceApkProvider", _FakeDeviceProvider)
+    monkeypatch.setattr("admenot.cli.main.DeviceApkProvider", _FakeDeviceProvider)
     out_dir = tmp_path / "a14"
     assert main(["capture", "--apk", "--out", str(out_dir)], host=make_synthetic_adb()) == 0
     stored = out_dir / "apk" / "com.wlive.forecast.json"

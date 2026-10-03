@@ -3,14 +3,14 @@ from apphelpers import make_api
 from conftest import SERIAL
 from fakephone import make_cli_phone
 
-from demalware.engine.incident import Sample, Timeline
-from demalware.engine.paths import incident_path
+from admenot.engine.incident import Sample, Timeline
+from admenot.engine.paths import incident_path
 
 
 @pytest.fixture(autouse=True)
 def env(monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "data"))
-    monkeypatch.setenv("DEMALWARE_ASSETS", str(tmp_path / "no-assets"))
+    monkeypatch.setenv("ADMENOT_ASSETS", str(tmp_path / "no-assets"))
 
 
 def _recording(api, overlays=("com.clean.pro.boost",)):

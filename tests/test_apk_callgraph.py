@@ -1,5 +1,5 @@
-from demalware.engine.apk.callgraph import SINKS, AndroguardGraph, MethodRef, Sink, find_paths
-from demalware.engine.apk.components import Component
+from admenot.engine.apk.callgraph import SINKS, AndroguardGraph, MethodRef, Sink, find_paths
+from admenot.engine.apk.components import Component
 
 BOOT = "android.intent.action.BOOT_COMPLETED"
 

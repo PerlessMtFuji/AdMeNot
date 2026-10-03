@@ -1,11 +1,11 @@
 import pytest
 
-from demalware.engine.tools import ToolPath, resolve_adb, resolve_scrcpy, tools_dir
+from admenot.engine.tools import ToolPath, resolve_adb, resolve_scrcpy, tools_dir
 
 
 @pytest.fixture
 def assets(monkeypatch, tmp_path):
-    monkeypatch.setenv("DEMALWARE_ASSETS", str(tmp_path / "assets"))
+    monkeypatch.setenv("ADMENOT_ASSETS", str(tmp_path / "assets"))
     return tmp_path / "assets"
 
 

@@ -1793,7 +1793,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "host:pull /data/app/~~fake==/com.clean.pro.boost-1/base.apk <tmp>\\data\\DeMalware\\apk-cache\\com.clean.pro.boost\\.unverified-X\\base.apk",
+      "command": "host:pull /data/app/~~fake==/com.clean.pro.boost-1/base.apk <tmp>\\data\\AdMeNot\\apk-cache\\com.clean.pro.boost\\.unverified-X\\base.apk",
       "status": "ok",
       "duration": 0.0,
       "output": "/data/app/~~fake==/com.clean.pro.boost-1/base.apk: 1 file pulled\n",
@@ -1805,7 +1805,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "host:pull /data/app/~~fake==/com.clean.pro.boost-1/split_config.arm64_v8a.apk <tmp>\\data\\DeMalware\\apk-cache\\com.clean.pro.boost\\.unverified-X\\split_config.arm64_v8a.apk",
+      "command": "host:pull /data/app/~~fake==/com.clean.pro.boost-1/split_config.arm64_v8a.apk <tmp>\\data\\AdMeNot\\apk-cache\\com.clean.pro.boost\\.unverified-X\\split_config.arm64_v8a.apk",
       "status": "ok",
       "duration": 0.0,
       "output": "/data/app/~~fake==/com.clean.pro.boost-1/split_config.arm64_v8a.apk: 1 file pulled\n",
@@ -2638,7 +2638,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "host:install-multiple <tmp>\\data\\DeMalware\\backups\\R58T00TEST\\com.clean.pro.boost\\7\\base.apk <tmp>\\data\\DeMalware\\backups\\R58T00TEST\\com.clean.pro.boost\\7\\split_config.arm64_v8a.apk",
+      "command": "host:install-multiple <tmp>\\data\\AdMeNot\\backups\\R58T00TEST\\com.clean.pro.boost\\7\\base.apk <tmp>\\data\\AdMeNot\\backups\\R58T00TEST\\com.clean.pro.boost\\7\\split_config.arm64_v8a.apk",
       "status": "ok",
       "duration": 0.0,
       "output": "Success\n",

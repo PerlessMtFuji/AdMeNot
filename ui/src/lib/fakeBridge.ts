@@ -86,7 +86,7 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
         const GB = 1024 ** 3;
         const limit = settings.apk_cache_limit_gb * GB;
         return { size_bytes: 3.4 * GB, free_bytes: 4 * GB, disk_bytes: 120 * GB, limit_bytes: limit,
-                 effective_bytes: Math.min(limit, 5.4 * GB), path: 'C:\\Users\\serwis\\AppData\\Local\\DeMalware\\apk-cache' };
+                 effective_bytes: Math.min(limit, 5.4 * GB), path: 'C:\\Users\\serwis\\AppData\\Local\\AdMeNot\\apk-cache' };
       }
       case 'start_incident':
       case 'mark_incident':
@@ -103,7 +103,7 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
         return { serial: null, serials: [], orders: [], devices: [] };
       case 'check_adb':
         return { ok: true, version: 'Android Debug Bridge version 1.0.41', message: '', source: 'bundled',
-                 path: 'C:\\DeMalware\\tools\\scrcpy\\adb.exe' };
+                 path: 'C:\\AdMeNot\\tools\\scrcpy\\adb.exe' };
       case 'mirror_status':
         return { available: true, serial: mirror.serial, state: mirror.state, reason: null };
       case 'mirror_start': {
@@ -141,17 +141,17 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
         return { ...shot };
       }
       case 'pick_folder':
-        return { path: 'D:\\DeMalware\\kopie' };
+        return { path: 'D:\\AdMeNot\\kopie' };
       case 'service':
         return { ...service };
       case 'save_service':
         service = { ...service, ...(args[0] as Partial<ServiceInfo>) };
         return { ...service };
       case 'pick_logo':
-        return { path: 'D:\\DeMalware\\logo.png' };
+        return { path: 'D:\\AdMeNot\\logo.png' };
       case 'report': {
         const stem = String(args[0]).replaceAll('/', '-');
-        const dir = 'C:\\Users\\serwis\\AppData\\Local\\DeMalware\\reports';
+        const dir = 'C:\\Users\\serwis\\AppData\\Local\\AdMeNot\\reports';
         return { order: args[0], html: `${dir}\\${stem}.html`, pdf: `${dir}\\${stem}.pdf`,
                  error: null, opened: `${dir}\\${stem}.pdf` };
       }

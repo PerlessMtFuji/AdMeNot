@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from demalware.engine.mirror import Mirror, MirrorUnavailable, args_for
+from admenot.engine.mirror import Mirror, MirrorUnavailable, args_for
 
 FIXTURES = Path(__file__).parent / "fixtures" / "scrcpy"
 OPPO = (FIXTURES / "oppo-cph2271-4.1.txt").read_text("utf-8").splitlines()
@@ -77,18 +77,18 @@ class Harness:
 
 
 def test_args_match_the_plan():
-    assert args_for("S1", "DeMalware — OPPO") == [
-        "--serial", "S1", "--window-title", "DeMalware — OPPO", "--no-audio",
+    assert args_for("S1", "AdMeNot — OPPO") == [
+        "--serial", "S1", "--window-title", "AdMeNot — OPPO", "--no-audio",
         "--max-size", "1280", "--stay-awake"]
 
 
 def test_first_frame_means_running_and_lines_reach_the_log():
     proc = FakeProc(OPPO)
     h = Harness(proc)
-    view = h.mirror.start("S1", "DeMalware — OPPO")
+    view = h.mirror.start("S1", "AdMeNot — OPPO")
     assert view == {"serial": "S1", "state": "starting", "reason": None}
     cmd, env = h.spawned[0]
-    assert cmd == [str(EXE), *args_for("S1", "DeMalware — OPPO")]
+    assert cmd == [str(EXE), *args_for("S1", "AdMeNot — OPPO")]
     assert env["ADB"] == "C:/tools/adb.exe"
     proc.close_window(0)
     h.mirror.wait()
@@ -236,4 +236,4 @@ def test_state_callbacks_never_run_on_the_caller_thread_and_do_not_deadlock():
     mirror.wait()
     assert reached_stopped.wait(5)
     assert seen and caller not in seen
-    assert all(t.name == "demalware-mirror-events" for t in seen)
+    assert all(t.name == "admenot-mirror-events" for t in seen)

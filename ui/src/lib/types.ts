@@ -1,4 +1,4 @@
-// Kształt danych z src/demalware/app/present.py i zdarzeń z src/demalware/app/api.py.
+// Kształt danych z src/admenot/app/present.py i zdarzeń z src/admenot/app/api.py.
 
 export type Lang = 'pl' | 'en';
 export type Mode = 'simple' | 'expert';

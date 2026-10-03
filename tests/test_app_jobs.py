@@ -2,9 +2,9 @@ import threading
 
 import pytest
 
-from demalware.app.errors import AppError
-from demalware.app.events import RecordingEmitter
-from demalware.app.jobs import JobRunner, Stopped
+from admenot.app.errors import AppError
+from admenot.app.events import RecordingEmitter
+from admenot.app.jobs import JobRunner, Stopped
 
 
 @pytest.fixture(autouse=True)

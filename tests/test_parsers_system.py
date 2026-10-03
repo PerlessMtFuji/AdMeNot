@@ -1,5 +1,5 @@
-from demalware.engine.parsers.common import parse_components
-from demalware.engine.parsers.system import (
+from admenot.engine.parsers.common import parse_components
+from admenot.engine.parsers.system import (
     parse_device_admins,
     parse_resolved_component,
     parse_resolved_home,

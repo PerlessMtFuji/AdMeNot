@@ -6,15 +6,15 @@ __pycache__/
 node_modules/
 dist/
 build/
-src/demalware/assets/phones/
-src/demalware/assets/phones.db
-src/demalware/assets/phones.db.tmp
-src/demalware/assets/tools/
+src/admenot/assets/phones/
+src/admenot/assets/phones.db
+src/admenot/assets/phones.db.tmp
+src/admenot/assets/tools/
 ui/node_modules/
 ui/dist-e2e/
 ui/test-results/
 ui/playwright-report/
-src/demalware/app/web/
+src/admenot/app/web/
 
 # Nagranie z prywatnego telefonu właściciela (T2, Plan 4b) — tylko lokalnie, decyzja z 2026-09-28.
 tests/fixtures/vivo-v2405a-android16-t2/

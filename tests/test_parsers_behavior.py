@@ -2,9 +2,9 @@ from datetime import datetime
 
 import pytest
 
-from demalware.engine.parsers.common import UnrecognizedOutput
-from demalware.engine.parsers.notifications import NotifStats, parse_notifications
-from demalware.engine.parsers.usagestats import UsageCounts, observed_since, parse_usage_events
+from admenot.engine.parsers.common import UnrecognizedOutput
+from admenot.engine.parsers.notifications import NotifStats, parse_notifications
+from admenot.engine.parsers.usagestats import UsageCounts, observed_since, parse_usage_events
 
 NOTIF = """Current Notification Manager state:
   Notification List:

@@ -1,10 +1,10 @@
 import pytest
 from fakephone import GEARHEAD, LISTENERS, POST, FakeApp, FakePhone
 
-from demalware.engine.actions import commands as C
-from demalware.engine.actions import steps as S
-from demalware.engine.actions.errors import ActionError, classify, hint_key
-from demalware.engine.actions.steps import Step
+from admenot.engine.actions import commands as C
+from admenot.engine.actions import steps as S
+from admenot.engine.actions.errors import ActionError, classify, hint_key
+from admenot.engine.actions.steps import Step
 
 AD_LISTENER = "com.ad/com.ad.notify.NotifyListenerService"
 

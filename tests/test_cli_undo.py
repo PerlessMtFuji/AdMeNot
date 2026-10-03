@@ -2,10 +2,10 @@ import pytest
 from conftest import SERIAL
 from fakephone import LISTENERS, POST, make_cli_phone
 
-from demalware.cli.main import main
-from demalware.engine.adb.fake import FakeAdb
-from demalware.engine.journal.db import Journal
-from demalware.engine.paths import journal_path
+from admenot.cli.main import main
+from admenot.engine.adb.fake import FakeAdb
+from admenot.engine.journal.db import Journal
+from admenot.engine.paths import journal_path
 
 DISABLE = "pm disable-user --user 0 com.wlive.forecast"
 
@@ -75,23 +75,23 @@ def test_resume_after_disconnect(capsys):
 
 
 def test_cache_size_and_clean_keep_backups(capsys, tmp_path):
-    cache = tmp_path / "DeMalware" / "apk-cache" / "com.x" / "1"
+    cache = tmp_path / "AdMeNot" / "apk-cache" / "com.x" / "1"
     cache.mkdir(parents=True)
     (cache / "base.apk").write_bytes(b"x" * 2_000_000)
-    backup = tmp_path / "DeMalware" / "backups" / "S" / "com.x" / "1"
+    backup = tmp_path / "AdMeNot" / "backups" / "S" / "com.x" / "1"
     backup.mkdir(parents=True)
     (backup / "base.apk").write_bytes(b"x")
     assert main(["cache"], host=FakeAdb()) == 0
     out = capsys.readouterr().out
     assert "2 MB" in out and "10 GB" in out
     assert main(["cache", "--clean"], host=FakeAdb()) == 0
-    assert not (tmp_path / "DeMalware" / "apk-cache" / "com.x").exists()
+    assert not (tmp_path / "AdMeNot" / "apk-cache" / "com.x").exists()
     assert (backup / "base.apk").exists()
 
 
 def test_fix_writes_session_log(tmp_path):
     _fix(make_cli_phone(), "com.wlive.forecast=disable")
-    (log,) = (tmp_path / "DeMalware" / "logs").glob("*.log")
+    (log,) = (tmp_path / "AdMeNot" / "logs").glob("*.log")
     lines = log.read_text("utf-8").splitlines()
     assert any(line.split("\t")[2] == "ok" and line.endswith("\t" + DISABLE) for line in lines)
 
@@ -116,14 +116,14 @@ def test_undo_unknown_app_in_order(capsys):
 
 
 def test_cache_status_survives_unreadable_disk(capsys, tmp_path, monkeypatch):
-    cache = tmp_path / "DeMalware" / "apk-cache" / "com.x" / "1"
+    cache = tmp_path / "AdMeNot" / "apk-cache" / "com.x" / "1"
     cache.mkdir(parents=True)
     (cache / "base.apk").write_bytes(b"x" * 2_000_000)
 
     def broken(path, limit):
         raise OSError("disk gone")
 
-    monkeypatch.setattr("demalware.cli.actions_cli.usage", broken)
+    monkeypatch.setattr("admenot.cli.actions_cli.usage", broken)
     assert main(["cache"], host=FakeAdb()) == 0
     out = capsys.readouterr().out
     assert "2 MB" in out and "nie udało się odczytać" in out and "room" not in out

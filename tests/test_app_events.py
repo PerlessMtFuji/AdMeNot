@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from demalware.app.errors import AppError, error_payload, log_exception, report_error
-from demalware.app.events import RecordingEmitter, WindowEmitter, js_event
-from demalware.engine.actions.errors import ActionError
-from demalware.engine.adb.transport import AdbError
+from admenot.app.errors import AppError, error_payload, log_exception, report_error
+from admenot.app.events import RecordingEmitter, WindowEmitter, js_event
+from admenot.engine.actions.errors import ActionError
+from admenot.engine.adb.transport import AdbError
 
 
 @pytest.fixture(autouse=True)
@@ -20,10 +20,10 @@ def data_dir(monkeypatch, tmp_path):
 def test_js_event_is_safe_for_any_text():
     detail = {"label": '<script>alert("x")</script> &   Źdźbło'}
     script = js_event("scan:done", detail)
-    assert script.startswith('window.dispatchEvent(new CustomEvent("demalware:scan:done", {detail: ')
+    assert script.startswith('window.dispatchEvent(new CustomEvent("admenot:scan:done", {detail: ')
     assert script.endswith("}));")
     assert " " not in script and "\\u2028" in script
-    payload = script[len('window.dispatchEvent(new CustomEvent("demalware:scan:done", {detail: '):-4]
+    payload = script[len('window.dispatchEvent(new CustomEvent("admenot:scan:done", {detail: '):-4]
     assert json.loads(payload) == detail
 
 
@@ -77,7 +77,7 @@ def test_internal_errors_are_logged(data_dir):
     except RuntimeError as exc:
         payload = report_error(exc)
     path = Path(payload["log"])
-    assert payload["key"] == "internal" and path.parent == data_dir / "DeMalware" / "logs"
+    assert payload["key"] == "internal" and path.parent == data_dir / "AdMeNot" / "logs"
     text = path.read_text("utf-8")
     assert "RuntimeError: boom" in text and "Traceback" in text
     assert "log" not in report_error(AppError("busy"))

@@ -2,9 +2,9 @@ from datetime import datetime
 
 import pytest
 
-from demalware.engine.journal.db import Journal
-from demalware.engine.phones.provider import SILHOUETTE
-from demalware.engine.report.model import AppRow, Recommendation, ScanScope, build_protocol
+from admenot.engine.journal.db import Journal
+from admenot.engine.phones.provider import SILHOUETTE
+from admenot.engine.report.model import AppRow, Recommendation, ScanScope, build_protocol
 
 NOW = datetime(2026, 9, 26, 14, 5)
 BOOST, FORECAST, GAME = "com.clean.pro.boost", "com.wlive.forecast", "com.game"
@@ -222,7 +222,7 @@ def test_photo_relocated_after_app_moved(journal, tmp_path, monkeypatch):
     (assets / "phones").mkdir(parents=True)
     relocated = assets / "phones" / "samsung-galaxy-a14.webp"
     relocated.write_bytes(b"RIFF\0\0\0\0WEBP")
-    monkeypatch.setenv("DEMALWARE_ASSETS", str(assets))
+    monkeypatch.setenv("ADMENOT_ASSETS", str(assets))
     old_path = tmp_path / "old-install" / "samsung-galaxy-a14.webp"  # katalog już nie istnieje
     order = make_order(journal, snapshot(old_path))
     p = build_protocol(journal, order.id, "pl")
@@ -243,9 +243,9 @@ def test_safe_app_chosen_by_the_technician_is_a_row(journal, photo):
 
 
 def test_protocol_takes_the_eight_newest_chosen_shots_with_a_jpeg(monkeypatch, tmp_path):
-    from demalware.engine import paths
-    from demalware.engine.journal.db import Journal
-    from demalware.engine.report.model import build_protocol
+    from admenot.engine import paths
+    from admenot.engine.journal.db import Journal
+    from admenot.engine.report.model import build_protocol
 
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     context = {"foreground": None, "overlays": [], "black": False}

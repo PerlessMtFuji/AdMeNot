@@ -4,18 +4,18 @@ import pytest
 from fakephone import make_cli_phone
 from phonedb import make_phone_assets
 
-from demalware.cli.main import main
-from demalware.engine.adb.fake import FakeAdb
-from demalware.engine.journal.db import Journal
-from demalware.engine.paths import journal_path
-from demalware.engine.report.pdf import PdfError
-from demalware.engine.settings import ServiceInfo, load_service
+from admenot.cli.main import main
+from admenot.engine.adb.fake import FakeAdb
+from admenot.engine.journal.db import Journal
+from admenot.engine.paths import journal_path
+from admenot.engine.report.pdf import PdfError
+from admenot.engine.settings import ServiceInfo, load_service
 
 
 @pytest.fixture(autouse=True)
 def data_dir(monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
-    monkeypatch.setenv("DEMALWARE_ASSETS", str(make_phone_assets(tmp_path / "phones")))
+    monkeypatch.setenv("ADMENOT_ASSETS", str(make_phone_assets(tmp_path / "phones")))
     return tmp_path
 
 
@@ -25,7 +25,7 @@ def no_phone() -> FakeAdb:
 
 def test_service_shows_hint_when_empty(capsys):
     assert main(["service"], host=no_phone()) == 0
-    assert "demalware service --name" in capsys.readouterr().out
+    assert "admenot service --name" in capsys.readouterr().out
 
 
 def test_service_sets_fields_and_logo(capsys, data_dir):
@@ -63,7 +63,7 @@ class FakeEdge:
 @pytest.fixture
 def edge(monkeypatch):
     fake = FakeEdge()
-    monkeypatch.setattr("demalware.engine.report.files.html_to_pdf", fake)
+    monkeypatch.setattr("admenot.engine.report.files.html_to_pdf", fake)
     return fake
 
 
@@ -81,7 +81,7 @@ def test_report_after_fix_without_a_phone(capsys, edge, data_dir):
     number = fixed_order(capsys)
     phone = no_phone()
     assert main(["report", "--order", number], host=phone) == 0
-    pdf = data_dir / "DeMalware" / "reports" / f"{number.replace('/', '-')}.pdf"
+    pdf = data_dir / "AdMeNot" / "reports" / f"{number.replace('/', '-')}.pdf"
     assert str(pdf) in capsys.readouterr().out
     assert pdf.read_bytes().startswith(b"%PDF") and edge.calls == [(pdf.with_suffix(".html"), pdf)]
     html = pdf.with_suffix(".html").read_text("utf-8")
@@ -96,7 +96,7 @@ def test_report_after_fix_without_a_phone(capsys, edge, data_dir):
 def test_report_html_only(capsys, edge, data_dir):
     number = fixed_order(capsys)
     assert main(["report", "--order", number, "--html"], host=no_phone()) == 0
-    html = data_dir / "DeMalware" / "reports" / f"{number.replace('/', '-')}.html"
+    html = data_dir / "AdMeNot" / "reports" / f"{number.replace('/', '-')}.html"
     assert str(html) in capsys.readouterr().out and html.is_file()
     assert edge.calls == [] and not html.with_suffix(".pdf").exists()
 
@@ -114,7 +114,7 @@ def test_report_includes_service_details(capsys, edge, data_dir):
     number = fixed_order(capsys)
     main(["service", "--name", "Serwis Ząb & Syn"], host=no_phone())
     main(["report", "--order", number], host=no_phone())
-    html = next((data_dir / "DeMalware" / "reports").glob("*.html")).read_text("utf-8")
+    html = next((data_dir / "AdMeNot" / "reports").glob("*.html")).read_text("utf-8")
     assert "Serwis Ząb &amp; Syn" in html
 
 
@@ -132,10 +132,10 @@ def test_report_unknown_order(capsys, edge):
 ])
 def test_report_pdf_failure_keeps_html(capsys, monkeypatch, data_dir, key, text):
     number = fixed_order(capsys)
-    monkeypatch.setattr("demalware.engine.report.files.html_to_pdf", FakeEdge(error=key))
+    monkeypatch.setattr("admenot.engine.report.files.html_to_pdf", FakeEdge(error=key))
     assert main(["report", "--order", number], host=no_phone()) == 6
     err = capsys.readouterr().err
-    html = data_dir / "DeMalware" / "reports" / f"{number.replace('/', '-')}.html"
+    html = data_dir / "AdMeNot" / "reports" / f"{number.replace('/', '-')}.html"
     assert text in err and str(html) in err and html.is_file()
 
 
@@ -146,6 +146,6 @@ def test_report_for_order_from_before_plan_6(capsys, edge, data_dir):
                            {"kind": "force_stop", "package": "com.x", "params": {}}, "cmd")
         j.set_action_status(aid, "done")
     assert main(["report", "--order", order.number], host=no_phone()) == 0
-    html = next((data_dir / "DeMalware" / "reports").glob("*.html")).read_text("utf-8")
+    html = next((data_dir / "AdMeNot" / "reports").glob("*.html")).read_text("utf-8")
     assert "Brak zapisu skanu" in html and "Usunięto" in html and "<td>—</td>" in html
     assert "data:image/svg+xml;base64," in html

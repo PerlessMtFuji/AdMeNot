@@ -1,7 +1,7 @@
 import re
 
-from demalware.engine.session import report_to_dict, run_scan
-from demalware.engine.versions import engine_versions
+from admenot.engine.session import report_to_dict, run_scan
+from admenot.engine.versions import engine_versions
 
 
 def test_versions_identify_engine_and_every_data_file():

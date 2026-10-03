@@ -6,9 +6,9 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from demalware.engine.device.info import DeviceInfo
-from demalware.engine.phones.build import build_phone_db
-from demalware.engine.phones.names import record_slugs
+from admenot.engine.device.info import DeviceInfo
+from admenot.engine.phones.build import build_phone_db
+from admenot.engine.phones.names import record_slugs
 
 GSM = "https://www.gsmarena.com/"
 

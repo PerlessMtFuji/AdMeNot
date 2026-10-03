@@ -1,0 +1,55 @@
+"""Faza 1 skanu: lista pakietów. Bez niej skan nie ma sensu, więc błędy ADB propagują."""
+
+from __future__ import annotations
+
+from datetime import datetime
+
+from admenot.engine.adb.transport import AdbError, AdbTransport
+from admenot.engine.facts import AppFacts
+from admenot.engine.parsers.common import parse_package_list
+from admenot.engine.parsers.packages import parse_dumpsys_packages, parse_pm_list
+
+PM_LIST = "pm list packages -f -i -U --user 0"
+PM_SYSTEM = "pm list packages -s --user 0"
+PM_DISABLED = "pm list packages -d --user 0"
+DUMPSYS_PACKAGES = "dumpsys package packages"
+
+
+def collect_packages(adb: AdbTransport, now: datetime) -> dict[str, AppFacts]:
+    entries = parse_pm_list(adb.shell(PM_LIST))
+    system = parse_package_list(adb.shell(PM_SYSTEM))
+    # Każdy telefon ma pakiety systemowe: pusta lista albo lista bez nich to nieznany format,
+    # a nie „telefon bez aplikacji” — skan bez inwentaryzacji nie ma sensu.
+    if not entries or not (system & entries.keys()):
+        raise AdbError("command_failed",
+                       f"pm list packages: unrecognized output ({len(entries)} entries, "
+                       f"{len(system & entries.keys())} system)")
+    disabled = parse_package_list(adb.shell(PM_DISABLED))
+    try:
+        dumps = parse_dumpsys_packages(adb.shell(DUMPSYS_PACKAGES, timeout=30))
+    except AdbError:
+        dumps = {}
+
+    facts: dict[str, AppFacts] = {}
+    for package, entry in entries.items():
+        dump = dumps.get(package)
+        f = AppFacts(
+            package=package,
+            apk_path=entry.apk_path,
+            installer=entry.installer or (dump.installer if dump else None),
+            uid=entry.uid,
+            is_system=package in system,
+            enabled=package not in disabled,
+        )
+        if dump:
+            f.version_code = dump.version_code
+            f.first_install = dump.first_install
+            f.requested_permissions = set(dump.requested)
+            f.granted_permissions = set(dump.granted)
+            # Instalacja „w przyszłości” = zegar telefonu cofnięty; wiek nieznany, nie ujemny.
+            if dump.first_install and dump.first_install <= now:
+                f.installed_days = (now - dump.first_install).total_seconds() / 86400
+        else:
+            f.gaps.add("packages")  # bez wersji, uprawnień i daty instalacji
+        facts[package] = f
+    return facts

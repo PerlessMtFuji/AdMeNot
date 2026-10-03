@@ -9,7 +9,7 @@ from fakephone import make_cli_phone
 @pytest.fixture(autouse=True)
 def env(monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "data"))
-    monkeypatch.setenv("DEMALWARE_ASSETS", str(tmp_path / "no-assets"))
+    monkeypatch.setenv("ADMENOT_ASSETS", str(tmp_path / "no-assets"))
     monkeypatch.setattr("shutil.which", lambda name: None)
     return tmp_path
 
@@ -25,7 +25,7 @@ def test_start_emits_states_and_logs_scrcpy_lines():
     assert api.mirror_status() == {"available": True, "serial": None, "state": "stopped"}
     view = api.mirror_start(SERIAL, " Galaxy A14 ")
     assert view == {"serial": SERIAL, "state": "starting", "reason": None}
-    assert fake.cmds[0][fake.cmds[0].index("--window-title") + 1] == "DeMalware — Galaxy A14"
+    assert fake.cmds[0][fake.cmds[0].index("--window-title") + 1] == "AdMeNot — Galaxy A14"
     assert rec.wait_for("mirror:state") and api._mirror.status()["state"] in ("starting", "running")
     fake.procs[0].ended.set()
     api._mirror.wait()
@@ -38,7 +38,7 @@ def test_start_emits_states_and_logs_scrcpy_lines():
 def test_title_falls_back_to_the_serial():
     fake, api, _rec = _api()
     api.mirror_start(SERIAL)
-    assert fake.cmds[0][fake.cmds[0].index("--window-title") + 1] == f"DeMalware — {SERIAL}"
+    assert fake.cmds[0][fake.cmds[0].index("--window-title") + 1] == f"AdMeNot — {SERIAL}"
     api.mirror_stop()
 
 

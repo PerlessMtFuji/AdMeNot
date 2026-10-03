@@ -1,0 +1,126 @@
+"""Reguły, których nie da się wyrazić prostym warunkiem YAML."""
+
+from __future__ import annotations
+
+from admenot.engine.apk.iocs import load_default_iocs
+from admenot.engine.facts import AppFacts
+from admenot.engine.rules.model import Finding
+
+MIMIC_TOKENS = (
+    "system", "update", "service", "security", "cleaner", "clean", "booster", "boost",
+    "battery", "optimizer", "antivirus", "virus", "guard", "google", "android",
+    "samsung", "xiaomi",
+)
+_GENERIC_SEGMENTS = {"com", "org", "net", "io", "app", "apps", "android", "mobile", "pl", "de"}
+_VOWELS = set("aeiouy")
+
+
+def rule_name_mimic(facts: AppFacts) -> Finding | None:
+    if facts.is_system or facts.from_play:
+        return None
+    segments = facts.package.lower().split(".")
+    hits = [t for t in MIMIC_TOKENS if any(t in s for s in segments)]
+    if not hits:
+        return None
+    tokens = ", ".join(hits)
+    return Finding(
+        rule_id="DM-NAME-01",
+        rule_class="context",
+        weight=6,
+        evidence={"tokens": tokens},
+        text_simple={
+            "pl": "Nazwa pakietu zawiera słowa kojarzone z aplikacjami systemowymi lub „czyszczącymi” ({tokens}).",
+            "en": "The package name contains words associated with system or “cleaner” apps ({tokens}).",
+        },
+        text_expert={
+            "pl": "Nazwa pakietu zawiera tokeny podszywania się: {tokens}",
+            "en": "Package name contains impersonation tokens: {tokens}",
+        },
+        category="disguise",
+        label={"pl": "Nazwa udaje systemową", "en": "Name imitates a system app"},
+        basis="declared",
+        source="phone",
+    )
+
+
+def _looks_random(segment: str) -> bool:
+    if len(segment) < 7 or segment in _GENERIC_SEGMENTS:
+        return False
+    letters = [c for c in segment if c.isalpha()]
+    digits = sum(c.isdigit() for c in segment)
+    if not letters:
+        return True
+    vowel_ratio = sum(c in _VOWELS for c in letters) / len(letters)
+    return vowel_ratio < 0.15 or digits / len(segment) > 0.3
+
+
+def rule_random_name(facts: AppFacts) -> Finding | None:
+    if facts.is_system or facts.from_play:
+        return None
+    random_segments = [s for s in facts.package.lower().split(".") if _looks_random(s)]
+    if not random_segments:
+        return None
+    segments = ", ".join(random_segments)
+    return Finding(
+        rule_id="DM-NAME-02",
+        rule_class="context",
+        weight=5,
+        evidence={"segments": segments},
+        text_simple={
+            "pl": "Nazwa pakietu wygląda na losową.",
+            "en": "The package name looks random.",
+        },
+        text_expert={
+            "pl": "Losowo wyglądające segmenty nazwy pakietu: {segments}",
+            "en": "Random-looking package name segments: {segments}",
+        },
+        category="disguise",
+        label={"pl": "Losowa nazwa", "en": "Random name"},
+        basis="declared",
+        source="phone",
+    )
+
+
+def rule_ioc(facts: AppFacts) -> Finding | None:
+    hits = load_default_iocs().match(facts)
+    if not hits:
+        return None
+    families = ", ".join(sorted({i.family for i in hits}))
+    sources = ", ".join(sorted({i.source for i in hits}))
+    text_simple = {
+        "pl": "Plik lub podpisujący aplikacji jest w bazie potwierdzonych zagrożeń ({families}).",
+        "en": "The app's file or signer is in the confirmed threat database ({families}).",
+    }
+    label = {"pl": "Potwierdzone zagrożenie", "en": "Confirmed threat"}
+    if any(i.kind == "sha256" for i in hits):
+        rule_id, weight, basis = "DM-IOC-01", 80, "confirmed"
+    elif any(i.exclusive for i in hits):
+        rule_id, weight, basis = "DM-IOC-02", 60, "confirmed"
+    else:
+        # Wspólny podpisujący nie zawsze znaczy tę samą klasyfikację (ocena 2026-10-01 §7.7):
+        # sygnał bez pewności „potwierdzone” — sam nie da werdyktu „Szkodliwa”.
+        rule_id, weight, basis = "DM-IOC-02", 30, "declared"
+        text_simple = {
+            "pl": "Aplikację podpisał certyfikat, którym podpisano też próbki z bazy zagrożeń ({families}).",
+            "en": "The app is signed with a certificate that also signed samples in the threat database "
+                  "({families}).",
+        }
+        label = {"pl": "Podpisujący z bazy zagrożeń", "en": "Signer from the threat database"}
+    return Finding(
+        rule_id=rule_id,
+        rule_class="ioc",
+        weight=weight,
+        evidence={"families": families, "sources": sources},
+        text_simple=text_simple,
+        text_expert={
+            "pl": "IOC: {families} — źródła: {sources}",
+            "en": "IOC: {families} — sources: {sources}",
+        },
+        category="origin",
+        label=label,
+        basis=basis,
+        source="ioc",
+    )
+
+
+PYTHON_RULES = (rule_name_mimic, rule_random_name, rule_ioc)

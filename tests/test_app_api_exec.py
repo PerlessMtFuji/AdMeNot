@@ -3,9 +3,9 @@ from apphelpers import SlowApk, make_api, names
 from conftest import SERIAL
 from fakephone import make_cli_phone
 
-from demalware.app.events import RecordingEmitter
-from demalware.engine.journal.db import Journal
-from demalware.engine.paths import journal_path
+from admenot.app.events import RecordingEmitter
+from admenot.engine.journal.db import Journal
+from admenot.engine.paths import journal_path
 
 DISABLE = "pm disable-user --user 0 com.wlive.forecast"
 WLIVE = {"com.wlive.forecast": "disable"}
@@ -14,7 +14,7 @@ WLIVE = {"com.wlive.forecast": "disable"}
 @pytest.fixture(autouse=True)
 def env(monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "data"))
-    monkeypatch.setenv("DEMALWARE_ASSETS", str(tmp_path / "no-assets"))
+    monkeypatch.setenv("ADMENOT_ASSETS", str(tmp_path / "no-assets"))
 
 
 def _scanned(phone=None, **kw):
@@ -181,7 +181,7 @@ def test_execute_stores_the_snapshot_from_the_scan():
 
 
 def test_finished_repair_clears_the_apk_cache_when_enabled():
-    from demalware.engine.apk.fetch import default_cache_dir
+    from admenot.engine.apk.fetch import default_cache_dir
     _, api, rec = _scanned()
     api.save_settings({"apk_cache_clear_after_repair": True})
     entry = default_cache_dir() / "com.old" / "id"
@@ -192,7 +192,7 @@ def test_finished_repair_clears_the_apk_cache_when_enabled():
 
 
 def test_stopped_repair_keeps_the_apk_cache():
-    from demalware.engine.apk.fetch import default_cache_dir
+    from admenot.engine.apk.fetch import default_cache_dir
     _, api, _ = _scanned()
     api.save_settings({"apk_cache_clear_after_repair": True})
     entry = default_cache_dir() / "com.old" / "id"
@@ -214,7 +214,7 @@ def test_stopped_repair_keeps_the_apk_cache():
 
 
 def test_failing_cache_clear_does_not_fail_a_finished_repair(monkeypatch):
-    from demalware.engine import workflow
+    from admenot.engine import workflow
 
     def boom(cache_dir):
         raise OSError("locked")

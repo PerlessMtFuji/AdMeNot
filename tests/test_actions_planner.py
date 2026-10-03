@@ -3,11 +3,11 @@ from pathlib import Path
 
 from fakephone import A11Y, GEARHEAD, LISTENERS, FakeApp, FakePhone
 
-from demalware.engine.actions.context import PhoneContext, read_phone_context
-from demalware.engine.actions.planner import AppPlan, Blocked, default_level, plan_app
-from demalware.engine.allowlist.trust import load_protected_list, parse_package_patterns
-from demalware.engine.facts import AppFacts
-from demalware.engine.scoring import AppResult
+from admenot.engine.actions.context import PhoneContext, read_phone_context
+from admenot.engine.actions.planner import AppPlan, Blocked, default_level, plan_app
+from admenot.engine.allowlist.trust import load_protected_list, parse_package_patterns
+from admenot.engine.facts import AppFacts
+from admenot.engine.scoring import AppResult
 
 AD = "com.intelli.clean"
 AD_HOME = f"{AD}/com.star.james.ui.activity.launcher.LauncherActivity"

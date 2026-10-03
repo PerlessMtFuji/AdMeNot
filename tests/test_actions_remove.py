@@ -3,14 +3,14 @@ import shutil
 import pytest
 from fakephone import FakeApp, FakePhone, apk_bytes
 
-from demalware.engine.actions.context import read_phone_context
-from demalware.engine.actions.executor import ExecOptions, run_order, start_order, undo, verify
-from demalware.engine.actions.planner import plan_app
-from demalware.engine.adb.transport import AdbError
-from demalware.engine.allowlist.trust import load_protected_list
-from demalware.engine.apk.fetch import fetch_apks
-from demalware.engine.facts import AppFacts
-from demalware.engine.journal.db import Journal
+from admenot.engine.actions.context import read_phone_context
+from admenot.engine.actions.executor import ExecOptions, run_order, start_order, undo, verify
+from admenot.engine.actions.planner import plan_app
+from admenot.engine.adb.transport import AdbError
+from admenot.engine.allowlist.trust import load_protected_list
+from admenot.engine.apk.fetch import fetch_apks
+from admenot.engine.facts import AppFacts
+from admenot.engine.journal.db import Journal
 
 SAW = "android.permission.SYSTEM_ALERT_WINDOW"  # aplikacje w tych testach mogą rysować nad innymi
 SPLITS = ("base.apk", "split_config.arm64_v8a.apk")
@@ -138,8 +138,8 @@ def test_failed_restore_keeps_other_steps_for_a_later_undo(journal, tmp_path):
 
 def test_backup_fails_when_the_cache_entry_vanished_after_fetch(journal, tmp_path, monkeypatch):
     """Wpis przycięty (np. przez CLI obok) między `fetch_apks` a kopią: bez kopii nie odinstalowujemy."""
-    from demalware.engine.actions import backup as B
-    from demalware.engine.apk.fetch import FetchedApks
+    from admenot.engine.actions import backup as B
+    from admenot.engine.apk.fetch import FetchedApks
 
     gone = tmp_path / "apk-cache" / "com.spam" / "id"
     monkeypatch.setattr(B, "fetch_apks", lambda adb, package, cache_dir: FetchedApks(
@@ -155,8 +155,8 @@ def test_backup_fails_when_the_cache_entry_vanished_after_fetch(journal, tmp_pat
 
 def test_backup_copies_exactly_the_fetched_files(tmp_path, monkeypatch):
     """Inny plik w katalogu wpisu (np. z innej instalacji) nie trafia do kopii."""
-    from demalware.engine.actions import backup as B
-    from demalware.engine.apk.fetch import FetchedApks
+    from admenot.engine.actions import backup as B
+    from admenot.engine.apk.fetch import FetchedApks
 
     cached = tmp_path / "apk-cache" / "com.spam" / "id"
     cached.mkdir(parents=True)

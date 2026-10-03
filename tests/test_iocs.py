@@ -3,10 +3,10 @@ from datetime import date
 import pytest
 import yaml
 
-from demalware.engine.apk.iocs import load_default_iocs, parse_iocs
-from demalware.engine.facts import AppFacts
-from demalware.engine.rules import python_rules
-from demalware.engine.scoring import score_app
+from admenot.engine.apk.iocs import load_default_iocs, parse_iocs
+from admenot.engine.facts import AppFacts
+from admenot.engine.rules import python_rules
+from admenot.engine.scoring import score_app
 
 H = "ab" * 32
 S = "cd" * 32

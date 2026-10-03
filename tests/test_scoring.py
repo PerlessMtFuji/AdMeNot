@@ -1,10 +1,10 @@
 import pytest
 
-from demalware.engine.facts import AppFacts
-from demalware.engine.parsers.appops import AppOpState
-from demalware.engine.rules.engine import load_default_ruleset
-from demalware.engine.rules.model import Finding
-from demalware.engine.scoring import confidence_for, score_app, verdict_for
+from admenot.engine.facts import AppFacts
+from admenot.engine.parsers.appops import AppOpState
+from admenot.engine.rules.engine import load_default_ruleset
+from admenot.engine.rules.model import Finding
+from admenot.engine.scoring import confidence_for, score_app, verdict_for
 
 
 def F(rule_id, cls, weight):
@@ -126,7 +126,7 @@ def test_trusted_app_with_only_identity_signals_is_safe():
 
 
 def test_combo_findings_carry_category_and_label():
-    from demalware.engine.scoring import COMBOS, _combo_findings
+    from admenot.engine.scoring import COMBOS, _combo_findings
 
     def make(rule_id, cls, weight):
         return Finding(rule_id, cls, weight, {}, {"pl": rule_id, "en": rule_id}, {"pl": "", "en": ""})

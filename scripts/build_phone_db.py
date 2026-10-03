@@ -1,7 +1,7 @@
 """Buduje bazę telefonów i katalog zdjęć (spec §4.2). Uruchamiane przy budowaniu wersji.
 
 python scripts/build_phone_db.py [--source F:\\Szklodo] [--gplay data/supported_devices.csv]
-                                 [--out src/demalware/assets]
+                                 [--out src/admenot/assets]
 
 Aktualna lista Google: https://storage.googleapis.com/play_public/supported_devices.csv
 (zapisz bez zmian jako data/supported_devices.csv; plik jest w UTF-16).
@@ -14,8 +14,8 @@ import json
 import sys
 from pathlib import Path
 
-from demalware.engine.paths import PACKAGE_ASSETS
-from demalware.engine.phones.build import build_phone_db
+from admenot.engine.paths import PACKAGE_ASSETS
+from admenot.engine.phones.build import build_phone_db
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_SOURCE = Path(r"F:\Szklodo")

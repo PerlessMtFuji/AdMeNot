@@ -1,0 +1,71 @@
+"""`admenot screenshot` (Plan 6b §5.4): zrzut do zlecenia w dzienniku albo do pliku PNG."""
+
+from __future__ import annotations
+
+import argparse
+import shutil
+import sys
+from pathlib import Path
+
+from admenot.cli.actions_cli import with_session_log
+from admenot.engine.adb.transport import AdbTransport
+from admenot.engine.journal.db import Journal
+from admenot.engine.paths import journal_path, screenshot_files
+from admenot.engine.screenshot import capture_png, take_screenshot
+from admenot.engine.texts import screenshot_caption
+
+MESSAGES = {
+    "pl": {
+        "target": "Podaj --order (zrzut do zlecenia) albo --out (plik PNG).",
+        "unknown_order": "Nie ma zlecenia {order} w dzienniku.",
+        "wrong_device": "Zlecenie {order} dotyczy telefonu {serial}, a wybrany jest {picked}.",
+        "saved": "Zapisano zrzut {id} w zleceniu {order}: {caption}",
+        "file": "Zapisano {path}",
+        "write_failed": "Nie można zapisać zrzutu w {path}: {error}",
+    },
+    "en": {
+        "target": "Give --order (screenshot for an order) or --out (a PNG file).",
+        "unknown_order": "There is no order {order} in the journal.",
+        "wrong_device": "Order {order} is for phone {serial}, but {picked} is selected.",
+        "saved": "Saved screenshot {id} in order {order}: {caption}",
+        "file": "Saved {path}",
+        "write_failed": "Cannot save the screenshot to {path}: {error}",
+    },
+}
+
+
+def message(lang: str, key: str, **kw: object) -> str:
+    return MESSAGES[lang][key].format(**kw)
+
+
+def cmd_screenshot(args: argparse.Namespace, adb: AdbTransport, lang: str) -> int:
+    out = Path(args.out) if args.out else None
+    if not args.order:
+        assert out is not None  # main() sprawdza to przed wyborem telefonu
+        try:
+            out.write_bytes(capture_png(adb))
+        except OSError as exc:
+            print(message(lang, "write_failed", path=exc.filename or out or "", error=exc), file=sys.stderr)
+            return 6
+        print(message(lang, "file", path=out))
+        return 0
+    with Journal(journal_path()) as journal:
+        order = journal.order_by_number(args.order)
+        if order is None:
+            print(message(lang, "unknown_order", order=args.order), file=sys.stderr)
+            return 2
+        if order.device_serial != adb.serial:
+            print(message(lang, "wrong_device", order=order.number, serial=order.device_serial,
+                          picked=adb.serial), file=sys.stderr)
+            return 2
+        shot = take_screenshot(with_session_log(adb), journal, order.device_serial, {}, order.id)
+    print(message(lang, "saved", id=shot.id, order=order.number,
+                  caption=screenshot_caption(shot.context, lang)))
+    if out is not None:
+        try:
+            shutil.copyfile(screenshot_files(shot.id)[0], out)
+        except OSError as exc:
+            print(message(lang, "write_failed", path=exc.filename or out or "", error=exc), file=sys.stderr)
+            return 6
+        print(message(lang, "file", path=out))
+    return 0

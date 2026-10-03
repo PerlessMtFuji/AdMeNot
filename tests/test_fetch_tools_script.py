@@ -29,7 +29,7 @@ def test_pinned_release_is_scrcpy_4_1():
     assert m.VERSION == "4.1"
     assert m.SHA256 == "5b12172b3264b2889f4583ee64752ce832e29bc8b1089dca81093459697165db"
     assert m.URL.endswith("/v4.1/scrcpy-win64-v4.1.zip")
-    assert m.TARGET == ROOT / "src" / "demalware" / "assets" / "tools" / "scrcpy"
+    assert m.TARGET == ROOT / "src" / "admenot" / "assets" / "tools" / "scrcpy"
 
 
 def test_install_unpacks_and_writes_version(tmp_path):

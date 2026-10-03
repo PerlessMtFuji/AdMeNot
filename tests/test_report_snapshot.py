@@ -4,10 +4,10 @@ import json
 from conftest import SERIAL, make_synthetic_adb
 from phonedb import make_phone_assets
 
-from demalware.engine.apk.analyze import ApkReport
-from demalware.engine.phones.provider import SILHOUETTE, PhoneImageProvider
-from demalware.engine.report.snapshot import MAX_PROBLEMS, scan_snapshot
-from demalware.engine.session import ApkStatus, run_scan
+from admenot.engine.apk.analyze import ApkReport
+from admenot.engine.phones.provider import SILHOUETTE, PhoneImageProvider
+from admenot.engine.report.snapshot import MAX_PROBLEMS, scan_snapshot
+from admenot.engine.session import ApkStatus, run_scan
 
 BOOST, FORECAST = "com.clean.pro.boost", "com.wlive.forecast"
 

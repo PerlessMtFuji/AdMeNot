@@ -1,0 +1,85 @@
+"""FakeAdb — transport do testów i odtwarzania nagrań `capture`."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from admenot.engine.adb.transport import AdbError
+
+
+class FakeAdb:
+    def __init__(
+        self,
+        responses: dict[str, str | AdbError] | None = None,
+        serial: str = "FAKE",
+        host: dict[str, str | AdbError] | None = None,
+        files: dict[str, bytes] | None = None,
+        binary: dict[str, bytes | AdbError] | None = None,
+    ) -> None:
+        self.serial: str | None = serial
+        self.responses = dict(responses or {})
+        self.host = dict(host or {})
+        self.files = dict(files or {})
+        self.binary = dict(binary or {})
+        self.calls: list[str] = []
+
+    @classmethod
+    def from_capture(cls, directory: str | Path) -> FakeAdb:
+        path = Path(directory)
+        manifest = json.loads((path / "manifest.json").read_text("utf-8"))
+        responses: dict[str, str | AdbError] = {
+            command: (path / name).read_text("utf-8")
+            for command, name in manifest["commands"].items()
+        }
+        for command, kind in manifest.get("errors", {}).items():
+            responses[command] = AdbError(kind, "recorded error")
+        return cls(responses, serial="SERIAL")
+
+    def with_serial(self, serial: str) -> FakeAdb:
+        """Return a new FakeAdb with the given serial, shared responses/host, empty calls."""
+        new = FakeAdb.__new__(FakeAdb)
+        new.serial = serial
+        new.responses = self.responses  # Shared, not copied
+        new.host = self.host  # Shared, not copied
+        new.files = self.files  # Shared, not copied
+        new.binary = self.binary  # Shared, not copied
+        new.calls = []  # New empty list
+        return new
+
+    def shell(self, command: str, timeout: float = 20.0) -> str:
+        self.calls.append(command)
+        return self._answer(self.responses, command)
+
+    def run(self, args: list[str], timeout: float = 20.0) -> str:
+        if args and args[0] == "shell":
+            return self.shell(" ".join(args[1:]), timeout=timeout)
+        if len(args) == 3 and args[0] == "pull":
+            remote, local = args[1], args[2]
+            self.calls.append(f"host:pull {remote} {local}")
+            if remote not in self.files:
+                raise AdbError("command_failed", f"remote object '{remote}' does not exist")
+            Path(local).write_bytes(self.files[remote])
+            return f"{remote}: 1 file pulled"
+        key = " ".join(args)
+        self.calls.append(f"host:{key}")
+        return self._answer(self.host, key)
+
+    def run_bytes(self, args: list[str], timeout: float = 20.0) -> bytes:
+        key = " ".join(args)
+        self.calls.append(f"host-bytes:{key}")
+        if key not in self.binary:
+            raise AdbError("command_failed", f"FakeAdb: no bytes for {key!r}")
+        value = self.binary[key]
+        if isinstance(value, AdbError):
+            raise value
+        return value
+
+    @staticmethod
+    def _answer(table: dict[str, str | AdbError], key: str) -> str:
+        if key not in table:
+            raise AdbError("command_failed", f"FakeAdb: no response for {key!r}")
+        value = table[key]
+        if isinstance(value, AdbError):
+            raise value
+        return value

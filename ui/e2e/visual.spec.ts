@@ -8,7 +8,7 @@ async function scan(page: Page, scenario = 'adware') {
 }
 
 async function inject(page: Page, fn: (env: any) => void) {
-  await page.waitForFunction(() => (window as any).__demalware !== undefined);
+  await page.waitForFunction(() => (window as any).__admenot !== undefined);
   await page.evaluate(fn as never, undefined);
 }
 
@@ -31,7 +31,7 @@ for (const theme of ['light', 'dark'] as const) {
     test('scan', async ({ page }) => {
       await page.goto('/?scenario=adware');
       await inject(page, () => {
-        const { ctl } = (window as any).__demalware;
+        const { ctl } = (window as any).__admenot;
         ctl.state.phase = 'scanning';
         ctl.state.scanStage = 'collectors';
       });
@@ -56,7 +56,7 @@ for (const theme of ['light', 'dark'] as const) {
     test('execute: admin prompt and done', async ({ page }) => {
       await page.goto('/?scenario=empty');
       await inject(page, () => {
-        const { ctl, bridge } = (window as any).__demalware;
+        const { ctl, bridge } = (window as any).__admenot;
         ctl.state.phase = 'executing';
         ctl.state.order = 'ZS/2026/0926/01';
         bridge.emit('exec:step', { action_id: 1, package: 'com.clean.pro.boost', name: 'Cleaner Pro',

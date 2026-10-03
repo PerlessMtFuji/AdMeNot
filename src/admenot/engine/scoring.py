@@ -1,0 +1,147 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from admenot.engine.facts import AppFacts
+from admenot.engine.rules.model import COMBO, Finding
+
+CLASS_CAPS = {"behavior": 60, "position": 40, "context": 20, "apk": 30, "ioc": 100}
+SYSTEM_NO_BEHAVIOR_CAP = 24
+
+
+@dataclass(frozen=True)
+class Combo:
+    rule_id: str
+    all_of: frozenset[str]
+    any_of: frozenset[str]
+    bonus: int
+    text_simple: dict[str, str]
+    text_expert: dict[str, str]
+    label: dict[str, str]
+
+
+COMBOS = (
+    Combo(
+        "DM-COMBO-01",
+        frozenset({"DM-HIDDEN-01", "DM-OVERLAY-01", "DM-SRC-01"}),
+        frozenset(),
+        20,
+        {"pl": "Bez ikony, spoza Sklepu Play i korzysta z okien nad innymi aplikacjami — ten układ często ma adware.",
+         "en": "No icon, not from the Play Store and draws over other apps — a pattern common in adware."},
+        {"pl": "kombinacja: DM-HIDDEN-01 + DM-OVERLAY-01 + DM-SRC-01",
+         "en": "combination: DM-HIDDEN-01 + DM-OVERLAY-01 + DM-SRC-01"},
+        {"pl": "Bez ikony, spoza Play, okna nad innymi", "en": "No icon, non-Play, draws over apps"},
+    ),
+    Combo(
+        "DM-COMBO-02",
+        frozenset({"DM-ADMIN-01", "DM-SRC-01"}),
+        frozenset({"DM-OVERLAY-01", "DM-NOTIF-01", "DM-NOTIF-02", "DM-NOTIF-03", "DM-FSI-01"}),
+        15,
+        {"pl": "Administrator urządzenia spoza Sklepu Play, który jednocześnie wyświetla treści.",
+         "en": "A device administrator from outside the Play Store that also shows content."},
+        {"pl": "kombinacja: DM-ADMIN-01 + DM-SRC-01 + zachowanie reklamowe",
+         "en": "combination: DM-ADMIN-01 + DM-SRC-01 + ad-like behavior"},
+        {"pl": "Administrator spoza Play + wyświetlanie treści",
+         "en": "Non-Play admin + shows content"},
+    ),
+    Combo(
+        "DM-COMBO-03",
+        frozenset({"DM-ADSDK-02"}),
+        frozenset({"DM-NOTIF-01", "DM-NOTIF-02", "DM-NOTIF-03", "DM-OVERLAY-01", "DM-FSI-01",
+                   "DM-ALARM-01"}),
+        15,
+        {"pl": "Wiele bibliotek reklamowych i zaobserwowane zachowanie reklamowe na telefonie.",
+         "en": "Many ad libraries plus ad-like behavior observed on the phone."},
+        {"pl": "kombinacja: DM-ADSDK-02 + zachowanie reklamowe",
+         "en": "combination: DM-ADSDK-02 + ad-like behavior"},
+        {"pl": "Biblioteki reklamowe + zachowanie", "en": "Ad libraries + behavior"},
+    ),
+)
+
+
+@dataclass
+class AppResult:
+    facts: AppFacts
+    findings: list[Finding]
+    score: int
+    verdict: str
+    trusted: bool
+    incomplete: bool
+    confidence: str = "low"
+
+
+CONFIDENCE = ("low", "medium", "high")
+
+
+def confidence_for(findings: list[Finding], incomplete: bool) -> str:
+    """Pewność wniosku: z jakiego rodzaju dowodów wynika wynik, nie ile ma punktów."""
+    if any(f.basis == "confirmed" for f in findings):
+        return "high"
+    # „static” to możliwość, nie obserwacja
+    observed = {f.category for f in findings if f.basis == "observed"}
+    if len(observed) >= 2 and not incomplete:
+        return "high"
+    return "medium" if observed else "low"
+
+
+def verdict_for(score: int, confidence: str = "high") -> str:
+    if score >= 75 and confidence == "high":
+        return "malicious"
+    if score >= 50:
+        return "suspicious"
+    if score >= 25:
+        return "review"
+    return "safe"
+
+
+def _combo_findings(findings: list[Finding]) -> list[Finding]:
+    """Najwyżej jeden bonus: kombinacje dzielą sygnały, więc sumowanie liczyłoby je kilka razy."""
+    ids = {f.rule_id for f in findings}
+    matched = [c for c in COMBOS if c.all_of <= ids and (not c.any_of or c.any_of & ids)]
+    if not matched:
+        return []
+    combo = max(matched, key=lambda c: c.bonus)  # max() zwraca pierwszy przy remisie
+    return [Finding(combo.rule_id, "combo", combo.bonus, {}, combo.text_simple, combo.text_expert,
+                    category=COMBO, label=combo.label, basis="declared")]
+
+
+def score_app(
+    facts: AppFacts, findings: list[Finding], trusted: bool, low_behavior_data: bool
+) -> AppResult:
+    all_findings = list(findings) + _combo_findings(findings)
+    # Zaufanie potwierdza tożsamość, nie zachowanie: sygnały tożsamości (kontekst, pozycja,
+    # APK, kombinacje) nie liczą się, ale zaobserwowane zachowanie — w pełni. Potwierdzony
+    # wskaźnik (IOC) obala samo zaufanie, więc liczy się tak samo jak zachowanie; wspólny
+    # podpisujący bez potwierdzenia (DM-IOC-02, basis declared) — nie.
+    counted = [f for f in all_findings if not trusted or f.rule_class == "behavior"
+               or (f.rule_class == "ioc" and f.basis == "confirmed")]
+    # Sygnały jednego mechanizmu (zadeklarowany, w kodzie, zaobserwowany) nie mnożą punktów:
+    # z grupy liczy się najsilniejszy.
+    strongest: dict[str, Finding] = {}
+    for f in counted:
+        if f.group and (f.group not in strongest or f.weight > strongest[f.group].weight):
+            strongest[f.group] = f
+    counted = [f for f in counted if not f.group or strongest[f.group] is f]
+
+    per_class: dict[str, int] = {}
+    for f in counted:
+        per_class[f.rule_class] = per_class.get(f.rule_class, 0) + f.weight
+    score = sum(min(total, CLASS_CAPS.get(cls, total)) for cls, total in per_class.items())
+
+    score = min(score, 100)
+    if facts.is_system and not any(f.rule_class == "behavior" or f.basis == "confirmed"
+                                   for f in all_findings):
+        score = min(score, SYSTEM_NO_BEHAVIOR_CAP)
+    score = max(0, min(100, score))
+
+    incomplete = low_behavior_data or bool(facts.gaps)
+    confidence = confidence_for(all_findings, incomplete)
+    return AppResult(
+        facts=facts,
+        findings=sorted(all_findings, key=lambda f: -f.weight),
+        score=score,
+        verdict=verdict_for(score, confidence),
+        trusted=trusted,
+        incomplete=incomplete,
+        confidence=confidence,
+    )

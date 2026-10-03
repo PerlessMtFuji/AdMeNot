@@ -7,9 +7,9 @@ from pathlib import Path
 
 import yaml
 
-from demalware.engine.adb.fake import FakeAdb
-from demalware.engine.apk.providers import StoredApkProvider
-from demalware.engine.evaluation import (
+from admenot.engine.adb.fake import FakeAdb
+from admenot.engine.apk.providers import StoredApkProvider
+from admenot.engine.evaluation import (
     LABELS_FILE,
     evaluate,
     format_contribution_table,
@@ -21,7 +21,7 @@ from demalware.engine.evaluation import (
     parse_label_meta,
     with_install_age,
 )
-from demalware.engine.session import run_scan
+from admenot.engine.session import run_scan
 
 FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures"
 

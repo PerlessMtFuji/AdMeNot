@@ -1,0 +1,289 @@
+"""Polityka pamięci podręcznej APK (spec 2026-10-01): limit efektywny, przycinanie, czyszczenie,
+szacunek miejsca z telefonu i kontrola wolnego miejsca.
+
+Wpis to katalog `<pakiet>/<install_id>` z `fetch.py`. Każdy można usunąć: kopia przed usunięciem
+aplikacji leży w `backups/`, a brakujący plik `backup_apks` pobiera z telefonu ponownie.
+"""
+
+from __future__ import annotations
+
+import re
+import shlex
+import shutil
+import time
+from collections import Counter
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
+
+from admenot.engine.adb.transport import AdbError, AdbTransport
+from admenot.engine.facts import AppFacts
+
+GB = 1024**3
+RESERVE = 2 * GB  # własne pliki programu: dziennik, zrzuty, PDF, profil Edge przy wydruku
+NO_SPACE = "no_space"  # `ApkReport.error` aplikacji, której nie pobrano z braku miejsca
+UNVERIFIED_MAX_AGE = 3600.0  # młodsze `.unverified-*` może jeszcze czytać trwający skan
+PART = ".part-"  # przedrostek katalogu roboczego pobrania (`fetch.py`)
+UNVERIFIED = ".unverified"  # przedrostek katalogu niezweryfikowanego pobrania (`fetch.py`)
+STAT_TIMEOUT = 30.0
+_MAX_COMMAND = 7000
+_STAT_LINE = re.compile(r"^(\d+) (/\S.*\.apk)$")
+disk_usage = shutil.disk_usage  # testy podmieniają
+
+
+class NoSpace(Exception):
+    """Na dysku z pamięcią podręczną zabrakło miejsca na kolejne pobranie."""
+
+
+@dataclass(frozen=True)
+class CacheUsage:
+    size_bytes: int
+    free_bytes: int
+    disk_bytes: int
+    limit_bytes: int
+    effective_bytes: int
+
+
+@dataclass(frozen=True)
+class Estimate:
+    total_bytes: int
+    to_fetch_bytes: int  # bez aplikacji, których pliki już są w pamięci podręcznej
+    apps: int
+    unknown: int  # cele bez odczytanego rozmiaru (liczone jako 0)
+    largest_bytes: int  # dwie największe aplikacje do pobrania — tyle pobiera się naraz
+    sizes: dict[str, int]  # pakiet → bajty (base + splity)
+    to_fetch: frozenset[str] = frozenset()  # pakiety, których plików nie ma w pamięci podręcznej
+
+    @property
+    def cached(self) -> int:
+        """Cele, których pliki (te same nazwy i rozmiary) już są w pamięci podręcznej."""
+        return len(self.sizes) - len(self.to_fetch)
+
+
+@dataclass(frozen=True)
+class _Entry:
+    package: str
+    path: Path
+    size: int
+    mtime: float
+
+
+def _existing(path: Path) -> Path:
+    """Najbliższy istniejący katalog — `disk_usage` nie działa dla ścieżki, której jeszcze nie ma."""
+    path = Path(path)
+    while not path.exists() and path.parent != path:
+        path = path.parent
+    return path
+
+
+def _tree_size(path: Path) -> int:
+    total = 0
+    for f in Path(path).rglob("*"):
+        try:
+            if f.is_file():
+                total += f.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
+def cache_size(cache_dir: Path) -> int:
+    return _tree_size(cache_dir) if Path(cache_dir).exists() else 0
+
+
+def free_bytes(cache_dir: Path) -> int:
+    return disk_usage(_existing(cache_dir)).free
+
+
+def _effective(size: int, free: int, limit: int) -> int:
+    return max(0, min(limit, size + free - RESERVE))
+
+
+def disk_total(cache_dir: Path) -> int:
+    """Pojemność dysku z pamięcią podręczną, bez przeglądania jej zawartości."""
+    return disk_usage(_existing(cache_dir)).total
+
+
+def usage(cache_dir: Path, limit_bytes: int) -> CacheUsage:
+    disk = disk_usage(_existing(cache_dir))
+    size = cache_size(cache_dir)
+    return CacheUsage(size, disk.free, disk.total, limit_bytes,
+                      _effective(size, disk.free, limit_bytes))
+
+
+def has_room(cache_dir: Path, need_bytes: int) -> bool:
+    return free_bytes(cache_dir) >= need_bytes + RESERVE
+
+
+def _entries(cache_dir: Path, now: float) -> list[_Entry]:
+    """Gotowe wpisy i stare `.unverified-*`; nigdy `.part-*` ani świeże `.unverified-*`."""
+    root = Path(cache_dir)
+    if not root.is_dir():
+        return []
+    out: list[_Entry] = []
+    for package in root.iterdir():
+        if not package.is_dir():
+            continue
+        try:
+            children = list(package.iterdir())
+        except OSError:  # katalog zniknął albo jest zablokowany: pomijamy ten pakiet
+            continue
+        for entry in children:
+            try:
+                if not entry.is_dir() or entry.name.startswith(PART):
+                    continue
+                mtime = entry.stat().st_mtime
+                if entry.name.startswith(UNVERIFIED) and now - mtime < UNVERIFIED_MAX_AGE:
+                    continue
+                out.append(_Entry(package.name, entry, _tree_size(entry), mtime))
+            except OSError:
+                continue
+    return out
+
+
+def _remove(entry: _Entry) -> int:
+    shutil.rmtree(entry.path, ignore_errors=True)
+    if entry.path.exists():
+        return 0  # plik zajęty przez inny proces — wpis zostaje
+    try:
+        entry.path.parent.rmdir()  # pusty katalog pakietu
+    except OSError:
+        pass
+    return entry.size
+
+
+def prunable_bytes(cache_dir: Path, scan: frozenset[str]) -> int:
+    return sum(e.size for e in _entries(cache_dir, time.time()) if e.package not in scan)
+
+
+def prune(cache_dir: Path, limit_bytes: int, *, scan: frozenset[str] = frozenset(),
+          done: frozenset[str] = frozenset(), flagged: frozenset[str] = frozenset(),
+          busy: frozenset[str] = frozenset(), need_bytes: int = 0) -> int:
+    """Przycina do limitu efektywnego (spec §3.3), a z `need_bytes` także tyle, żeby zmieściło się
+    pobranie tej wielkości z zapasem (spec §3.6). Zwraca zwolnione bajty.
+
+    Kolejność: wpisy spoza skanu, przeanalizowane „bezpieczne" z tego skanu, reszta tego skanu
+    (podejrzane i jeszcze nieanalizowane); w każdej grupie od najdawniej używanego.
+    """
+    size = cache_size(cache_dir)
+    if size == 0:
+        return 0
+    free = free_bytes(cache_dir)
+    excess = max(size - _effective(size, free, limit_bytes), need_bytes + RESERVE - free)
+    if excess <= 0:
+        return 0
+
+    def group(e: _Entry) -> int:
+        if e.package not in scan:
+            return 0
+        return 1 if e.package in done and e.package not in flagged else 2
+
+    freed = 0
+    candidates = [e for e in _entries(cache_dir, time.time()) if e.package not in busy]
+    for entry in sorted(candidates, key=lambda e: (group(e), e.mtime)):
+        if freed >= excess:
+            break
+        freed += _remove(entry)
+    return freed
+
+
+def clear_cache(cache_dir: Path) -> int:
+    """Usuwa wszystkie wpisy poza katalogami roboczymi trwających pobrań. Zwraca zwolnione bajty."""
+    return sum(_remove(e) for e in _entries(cache_dir, time.time()))
+
+
+def stat_command(paths: list[str]) -> str:
+    # Kod 1, gdy któryś wzorzec nie pasuje: `AdbTransport.run` rzuciłby wyjątek i zgubił rozmiary.
+    return "stat -c '%s %n' " + " ".join(paths) + " 2>/dev/null; true"
+
+
+def _dir(facts: AppFacts) -> str:
+    return str(PurePosixPath(facts.apk_path).parent)
+
+
+def _glob_dirs(targets: list[AppFacts]) -> set[str]:
+    """Directories where exactly one target has base.apk (not a split like split_config*.apk).
+
+    Only these directories get a glob pattern `*.apk`; others use explicit paths only.
+    """
+    base_apk_targets = [
+        f for f in targets
+        if f.apk_path and PurePosixPath(f.apk_path).name == "base.apk"
+    ]
+    dir_counts = Counter(_dir(f) for f in base_apk_targets)
+    return {d for d, count in dir_counts.items() if count == 1}
+
+
+def _stat_paths(targets: list[AppFacts]) -> list[list[str]]:
+    """Paczki argumentów `stat`: wzorzec `<katalog>/*.apk` (base + splity) i jawna `apk_path`.
+
+    Jawna ścieżka pokrywa katalogi, których powłoka nie może wylistować (Vivo `/data/preload`).
+    Katalog wspólny dla kilku pakietów (`/system/app/*.apk`) idzie tylko jawnymi ścieżkami.
+    Glob tylko dla katalogów z dokładnie jednym celem o base.apk.
+    """
+    glob_dirs = _glob_dirs(targets)
+    batches: list[list[str]] = []
+    current: list[str] = []
+    for f in targets:
+        args = [shlex.quote(f.apk_path)]
+        if _dir(f) in glob_dirs:
+            args.insert(0, shlex.quote(_dir(f)) + "/*.apk")
+        if current and len(stat_command(current + args)) > _MAX_COMMAND:
+            batches.append(current)
+            current = []
+        current += args
+    if current:
+        batches.append(current)
+    return batches
+
+
+def _cached_sets(cache_dir: Path, package: str) -> list[dict[str, int]]:
+    root = Path(cache_dir) / package
+    try:
+        entries = list(root.iterdir()) if root.is_dir() else []
+    except OSError:  # katalog zniknął albo jest zablokowany: traktujemy jak brak wpisów
+        return []
+    sets = []
+    for entry in entries:
+        if not entry.is_dir() or entry.name.startswith("."):
+            continue
+        files = {}
+        for f in entry.glob("*.apk"):
+            try:
+                files[f.name] = f.stat().st_size
+            except OSError:
+                continue
+        sets.append(files)
+    return sets
+
+
+def estimate(adb: AdbTransport, targets: list[AppFacts], cache_dir: Path) -> Estimate | None:
+    """Rozmiary APK celów analizy z telefonu (spec §3.4); None, gdy `stat` nic nie dał."""
+    known = [f for f in targets if f.apk_path]
+    exact = {f.apk_path: f.package for f in known}
+    glob_dirs = _glob_dirs(known)
+    by_dir = {_dir(f) + "/": f.package for f in known if _dir(f) in glob_dirs}
+    files: dict[str, dict[str, int]] = {}
+    try:
+        for batch in _stat_paths(known):
+            for line in adb.shell(stat_command(batch), timeout=STAT_TIMEOUT).splitlines():
+                m = _STAT_LINE.match(line.strip())
+                if not m:
+                    continue
+                path = m.group(2)
+                package = exact.get(path) or by_dir.get(str(PurePosixPath(path).parent) + "/")
+                if package:
+                    files.setdefault(package, {})[PurePosixPath(path).name] = int(m.group(1))
+    except AdbError:
+        return None
+    if known and not files:
+        return None
+    sizes = {p: sum(v.values()) for p, v in files.items()}
+    to_fetch = {p: s for p, s in sizes.items() if files[p] not in _cached_sets(cache_dir, p)}
+    largest = sum(sorted(to_fetch.values(), reverse=True)[:2])
+    return Estimate(sum(sizes.values()), sum(to_fetch.values()), len(targets),
+                    len(targets) - len(sizes), largest, sizes, frozenset(to_fetch))
+
+
+def fits(est: Estimate, cache_dir: Path, scan: frozenset[str]) -> bool:
+    """Czy dwie największe aplikacje zmieszczą się naraz po przycięciu innych skanów (spec §3.5)."""
+    return est.largest_bytes + RESERVE <= free_bytes(cache_dir) + prunable_bytes(cache_dir, scan)

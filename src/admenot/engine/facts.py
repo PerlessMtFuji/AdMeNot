@@ -1,0 +1,178 @@
+"""AppFacts — znormalizowany opis jednej aplikacji, na którym działają reguły."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field, fields
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+from admenot.engine.parsers.appops import AppOpState
+
+if TYPE_CHECKING:
+    from admenot.engine.apk.callgraph import CodePath
+    from admenot.engine.apk.components import Component
+
+PLAY_INSTALLERS = frozenset({"com.android.vending", "com.google.android.feedback"})
+
+
+@dataclass
+class AppFacts:
+    package: str
+    apk_path: str | None = None
+    installer: str | None = None
+    uid: int | None = None
+    is_system: bool = False
+    enabled: bool = True
+    version_code: int | None = None
+    first_install: datetime | None = None
+    installed_days: float | None = None
+    requested_permissions: set[str] = field(default_factory=set)
+    granted_permissions: set[str] = field(default_factory=set)
+    # None = kolektor nie dostarczył danych (reguły wtedy nie odpalają)
+    has_launcher_icon: bool | None = None
+    is_home_candidate: bool = False
+    is_home_holder: bool = False
+    is_browser_holder: bool = False
+    is_sms_holder: bool = False
+    has_boot_receiver: bool = False
+    is_device_admin: bool = False
+    accessibility_enabled: bool = False
+    notification_listener: bool = False
+    appops: dict[str, AppOpState] = field(default_factory=dict)
+    notif_active: int = 0
+    notif_fsi: bool = False
+    notif_interruptions_24h: int | None = None
+    foreground_24h: int | None = None
+    unlock_launches_24h: int | None = None
+    notif_peak_1h: int | None = None  # najwięcej przerywających powiadomień w jednej godzinie
+    usage_window_h: float | None = None  # ile godzin obejmują statystyki użycia (≤ 24)
+    alarm_wakeups: int | None = None
+    alarm_window_h: float | None = None  # min(uptime, wiek instalacji), co najmniej 1 h
+    # Analiza APK (Plan 4); None = aplikacja nieanalizowana
+    label: str | None = None
+    label_padded: bool | None = None
+    ad_sdks: set[str] | None = None
+    dynamic_code: bool | None = None
+    obfuscation_ratio: float | None = None
+    cert_sha256: tuple[str, ...] | None = None
+    apk_sha256: tuple[str, ...] | None = None  # skróty analizowanych plików APK
+    icon: str | None = None  # data URI ikony z APK; tylko do wyświetlania, reguły jej nie używają
+    apk_error: str | None = None
+    apk_components: tuple[Component, ...] | None = None  # None = nie odczytano
+    # Możliwe ścieżki statyczne z głębokiej analizy (ocena §7.1); None = analizy nie było.
+    code_paths: tuple[CodePath, ...] | None = None
+    code_undetermined: tuple[str, ...] = ()  # czego głęboka analiza nie ustaliła (refleksja, limit)
+    # Nagranie incydentu (`who --watch`): ile zgłoszeń reklamy przypadło na okno tej aplikacji i nad
+    # czym ono było. None = nagrania nie było; 0 = było, bez trafień.
+    incident_hits: int | None = None
+    incident_over: str | None = None
+    # Źródła danych, których zabrakło dla tej aplikacji: nazwa kolektora, "packages" albo "apk".
+    # Pusty zbiór = wszystko, o co skan pytał, zostało odczytane.
+    gaps: set[str] = field(default_factory=set)
+
+    @property
+    def from_play(self) -> bool:
+        return self.installer in PLAY_INSTALLERS
+
+    @property
+    def notif_per_hour_24h(self) -> float | None:
+        if self.notif_interruptions_24h is None:
+            return None
+        return self.notif_interruptions_24h / 24.0
+
+    @property
+    def overlay_last_access_s(self) -> float | None:
+        op = self.appops.get("SYSTEM_ALERT_WINDOW")
+        return op.last_access_s if op else None
+
+    @property
+    def alarm_wakeups_per_hour(self) -> float | None:
+        if self.alarm_wakeups is None or not self.alarm_window_h:
+            return None
+        return self.alarm_wakeups / self.alarm_window_h
+
+    @property
+    def incident_over_text(self) -> str | None:
+        if self.incident_hits is None:
+            return None
+        return self.incident_over or "?"  # aplikacji pod oknem nie odczytano
+
+    @property
+    def ad_sdk_count(self) -> int | None:
+        return None if self.ad_sdks is None else len(self.ad_sdks)
+
+    @property
+    def ad_sdk_list(self) -> str | None:
+        return None if self.ad_sdks is None else ", ".join(sorted(self.ad_sdks))
+
+    def code_match(self, match) -> bool | None:
+        """Czy któraś ścieżka spełnia `match`; None, gdy analizy nie było albo jej nie dokończono
+        (refleksja, limit, kod w splitach) — „nie znaleziono” to wtedy nie „nie ma”."""
+        if self.code_paths is None:
+            return None
+        if any(match(p) for p in self.code_paths):
+            return True
+        return None if self.code_undetermined else False
+
+    def _code_text(self, match) -> str | None:
+        # Najpierw ścieżki z komponentu (punktu wejścia), potem same wywołania; najwyżej trzy.
+        paths = sorted((p for p in self.code_paths or () if match(p)), key=lambda p: p.entry is None)
+        return "; ".join(" → ".join(p.chain) for p in paths[:3]) or None
+
+    @staticmethod
+    def _boot_ui(p: CodePath) -> bool:
+        return p.sink == "boot_start_activity"
+
+    @staticmethod
+    def _hides_icon(p: CodePath) -> bool:
+        return p.sink == "hide_icon" and bool(p.entry) and p.origin not in ("sdk", "library")
+
+    @staticmethod
+    def _overlay(p: CodePath) -> bool:
+        return p.sink == "overlay_add" and bool(p.entry) and p.origin not in ("sdk", "library")
+
+    @staticmethod
+    def _dynload(p: CodePath) -> bool:
+        return p.sink.startswith("dex_load") and bool(p.entry) and p.origin != "library"
+
+    @property
+    def code_boot_ui(self) -> bool | None:
+        return self.code_match(self._boot_ui)
+
+    @property
+    def code_hides_icon(self) -> bool | None:
+        return self.code_match(self._hides_icon)
+
+    @property
+    def code_overlay(self) -> bool | None:
+        return self.code_match(self._overlay)
+
+    @property
+    def code_dynload(self) -> bool | None:
+        return self.code_match(self._dynload)
+
+    @property
+    def code_paths_text(self) -> str | None:
+        return self._code_text(lambda p: True)
+
+    @property
+    def code_boot_ui_text(self) -> str | None:
+        return self._code_text(self._boot_ui)
+
+    @property
+    def code_hides_icon_text(self) -> str | None:
+        return self._code_text(self._hides_icon)
+
+    @property
+    def code_overlay_text(self) -> str | None:
+        return self._code_text(self._overlay)
+
+    @property
+    def code_dynload_text(self) -> str | None:
+        return self._code_text(self._dynload)
+
+
+FACT_NAMES = frozenset(
+    {f.name for f in fields(AppFacts)}
+    | {name for name, value in vars(AppFacts).items() if isinstance(value, property)}
+)

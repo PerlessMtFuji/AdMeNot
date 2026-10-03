@@ -203,7 +203,7 @@
     "appearance": "Wygląd", "theme": "Motyw", "theme_system": "System", "theme_light": "Jasny", "theme_dark": "Ciemny", "paths": "Programy i katalogi",
     "title": "Ustawienia", "lang": "Język", "mode": "Tryb domyślny", "mode_simple": "Prosty", "mode_expert": "Ekspercki",
     "adb": "Ścieżka do adb.exe", "adb_hint": "Puste = adb dołączony do programu (a bez niego adb z PATH)", "check": "Sprawdź", "adb_ok": "Działa: {version}", "adb_fail": "Nie działa: {message}",
-    "backups": "Katalog kopii APK", "backups_hint": "Puste = domyślny katalog w %LOCALAPPDATA%\\DeMalware", "choose": "Wybierz…",
+    "backups": "Katalog kopii APK", "backups_hint": "Puste = domyślny katalog w %LOCALAPPDATA%\\AdMeNot", "choose": "Wybierz…",
     "select_title": "Wybór aplikacji",
     "select_level": "Akcja po zaznaczeniu",
     "select_level_hint": "Dotyczy aplikacji, dla których program nic nie proponuje (np. „Do sprawdzenia”). Aplikacji producenta nie usuwamy domyślnie — dostaną „Wyłącz”.",

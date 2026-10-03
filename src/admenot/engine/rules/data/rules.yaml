@@ -1,0 +1,477 @@
+# Reguły heurystyczne AdMeNot. Pola `when`/`evidence` = nazwy z admenot.engine.facts.FACT_NAMES.
+# Operatory: eq, ne, gt, gte, lt, lte, in, not_in, contains, not_contains.
+# Klasy i limity: behavior ≤ 60, position ≤ 40, context ≤ 20, apk ≤ 30, ioc ≤ 100 (scoring.py).
+# category: ads | notif | removal | data | disguise | background | origin; label: krótka etykieta PL/EN (tryb ekspercki).
+# basis: declared | granted | observed | confirmed (rules/model.py BASES).
+# Opisy mówią, co zaobserwowano lub co deklaruje pakiet — nie przypisują intencji (audyt 2026-09-27).
+
+- id: DM-NOTIF-01
+  class: behavior
+  weight: 15
+  category: notif
+  basis: observed
+  label: {pl: "Dużo powiadomień", en: "Many notifications"}
+  when: {notif_per_hour_24h: {gte: 8, lt: 20}}
+  evidence: [notif_interruptions_24h, notif_per_hour_24h]
+  text:
+    simple:
+      pl: "Często wyświetla powiadomienia z dźwiękiem lub wyskakujące — średnio {notif_per_hour_24h:.0f} na godzinę w ciągu doby."
+      en: "Often shows notifications that sound or pop up — {notif_per_hour_24h:.0f} per hour on average over a day."
+    expert:
+      pl: "usagestats: {notif_interruptions_24h} × NOTIFICATION_INTERRUPTION (powiadomienia przerywające: dźwięk, wibracja lub wyskakujące) / 24 h ({notif_per_hour_24h:.1f}/h)"
+      en: "usagestats: {notif_interruptions_24h} × NOTIFICATION_INTERRUPTION (interruptive: sound, vibration or heads-up) / 24 h ({notif_per_hour_24h:.1f}/h)"
+
+- id: DM-NOTIF-02
+  class: behavior
+  weight: 25
+  category: notif
+  basis: observed
+  label: {pl: "Zalew powiadomień", en: "Notification flood"}
+  when: {notif_per_hour_24h: {gte: 20}}
+  evidence: [notif_interruptions_24h, notif_per_hour_24h]
+  text:
+    simple:
+      pl: "Bardzo często wyświetla powiadomienia z dźwiękiem lub wyskakujące — średnio {notif_per_hour_24h:.0f} na godzinę w ciągu doby."
+      en: "Very often shows notifications that sound or pop up — {notif_per_hour_24h:.0f} per hour on average over a day."
+    expert:
+      pl: "usagestats: {notif_interruptions_24h} × NOTIFICATION_INTERRUPTION (przerywające) / 24 h ({notif_per_hour_24h:.1f}/h)"
+      en: "usagestats: {notif_interruptions_24h} × NOTIFICATION_INTERRUPTION (interruptive) / 24 h ({notif_per_hour_24h:.1f}/h)"
+
+- id: DM-NOTIF-03
+  class: behavior
+  weight: 15
+  category: notif
+  basis: observed
+  label: {pl: "Seria powiadomień", en: "Notification burst"}
+  # Seria, której średnia dobowa nie pokazuje; nie dubluje DM-NOTIF-01/02.
+  when: {notif_peak_1h: {gte: 30}, notif_per_hour_24h: {lt: 8}}
+  evidence: [notif_peak_1h]
+  text:
+    simple:
+      pl: "W ciągu jednej godziny wyświetliła {notif_peak_1h} powiadomień z dźwiękiem lub wyskakujących."
+      en: "Showed {notif_peak_1h} notifications that sound or pop up within a single hour."
+    expert:
+      pl: "usagestats: maks. {notif_peak_1h} × NOTIFICATION_INTERRUPTION w oknie 60 min"
+      en: "usagestats: max {notif_peak_1h} × NOTIFICATION_INTERRUPTION in a 60-min window"
+
+# Nagranie incydentu (who --watch): okno aplikacji w chwili, gdy użytkownik zgłosił reklamę (ocena
+# §7.4). Waga 5 do czasu pomiaru na holdout (plan 2026-10-01, Global Constraints; ruling R6).
+- id: DM-INCIDENT-01
+  class: behavior
+  weight: 5
+  category: ads
+  basis: observed
+  group: overlay
+  label: {pl: "Okno w chwili zgłoszenia reklamy", en: "Window at the reported ad"}
+  when: {incident_hits: {gte: 1}}
+  evidence: [incident_hits, incident_over_text]
+  text:
+    simple:
+      pl: "W chwili zgłoszenia reklamy aplikacja miała widoczne okno nad {incident_over_text} (samo okno nie przesądza, że pokazywało reklamę)."
+      en: "When the ad was reported, the app had a visible window over {incident_over_text} (the window alone does not prove it showed the ad)."
+    expert:
+      pl: "who --watch: okno nad innymi aplikacjami przy {incident_hits} znacznikach zgłoszenia, nad {incident_over_text}"
+      en: "who --watch: window over other apps at {incident_hits} report marks, over {incident_over_text}"
+
+- id: DM-OVERLAY-01
+  class: behavior
+  weight: 20
+  category: ads
+  basis: observed
+  group: overlay
+  label: {pl: "Okna nad innymi aplikacjami", en: "Draws over other apps"}
+  when: {overlay_last_access_s: {lte: 86400}}
+  evidence: [overlay_last_access_s]
+  text:
+    simple:
+      pl: "W ciągu ostatniej doby korzystała z wyświetlania okien nad innymi aplikacjami."
+      en: "Used drawing over other apps within the last day."
+    expert:
+      pl: "appops SYSTEM_ALERT_WINDOW: ostatnie użycie {overlay_last_access_s:.0f} s temu"
+      en: "appops SYSTEM_ALERT_WINDOW: last used {overlay_last_access_s:.0f} s ago"
+
+- id: DM-FSI-01
+  class: behavior
+  weight: 15
+  category: ads
+  basis: observed
+  label: {pl: "Powiadomienie pełnoekranowe", en: "Full-screen notification"}
+  when: {notif_fsi: true}
+  evidence: [notif_active]
+  text:
+    simple:
+      pl: "Ma aktywne powiadomienie pełnoekranowe."
+      en: "Has an active full-screen notification."
+    expert:
+      pl: "dumpsys notification: aktywne powiadomienie z fullscreenIntent ({notif_active} aktywnych)"
+      en: "dumpsys notification: active notification with fullscreenIntent ({notif_active} active)"
+
+- id: DM-ALARM-01
+  class: behavior
+  weight: 10
+  category: background
+  basis: observed
+  label: {pl: "Częste wybudzanie telefonu", en: "Frequent wake-ups"}
+  when: {alarm_wakeups_per_hour: {gte: 6}, is_system: false}
+  evidence: [alarm_wakeups, alarm_wakeups_per_hour]
+  text:
+    simple:
+      pl: "Często budzi telefon — średnio {alarm_wakeups_per_hour:.0f} razy na godzinę."
+      en: "Wakes the phone often — {alarm_wakeups_per_hour:.0f} times per hour on average."
+    expert:
+      pl: "dumpsys alarm: {alarm_wakeups} wybudzeń ({alarm_wakeups_per_hour:.1f}/h)"
+      en: "dumpsys alarm: {alarm_wakeups} wakeups ({alarm_wakeups_per_hour:.1f}/h)"
+
+- id: DM-BGACT-01
+  class: behavior
+  weight: 12
+  category: ads
+  basis: observed
+  label: {pl: "Na pierwszym planie po odblokowaniu", en: "In front right after unlock"}
+  when: {unlock_launches_24h: {gte: 3}, is_system: false, is_home_holder: false}
+  evidence: [unlock_launches_24h]
+  text:
+    simple:
+      pl: "Pojawiała się na pierwszym planie zaraz po odblokowaniu telefonu ({unlock_launches_24h} razy w ciągu doby)."
+      en: "Came to the foreground right after the phone was unlocked ({unlock_launches_24h} times in a day)."
+    expert:
+      pl: "usagestats: pierwsze ACTIVITY_RESUMED ≤ 10 s po SCREEN_INTERACTIVE/KEYGUARD_HIDDEN, bez USER_INTERACTION/SHORTCUT_INVOCATION, {unlock_launches_24h}× / 24 h"
+      en: "usagestats: first ACTIVITY_RESUMED ≤ 10 s after SCREEN_INTERACTIVE/KEYGUARD_HIDDEN, no USER_INTERACTION/SHORTCUT_INVOCATION, {unlock_launches_24h}× / 24 h"
+
+- id: DM-ADMIN-01
+  class: position
+  weight: 25
+  category: removal
+  basis: granted
+  label: {pl: "Administrator urządzenia", en: "Device administrator"}
+  when: {is_device_admin: true}
+  evidence: []
+  text:
+    simple:
+      pl: "Jest aktywnym administratorem urządzenia — przed wyłączeniem lub usunięciem trzeba odebrać te uprawnienia."
+      en: "Is an active device administrator — these rights must be revoked before disabling or removing it."
+    expert:
+      pl: "dumpsys device_policy: aktywny administrator urządzenia"
+      en: "dumpsys device_policy: active device admin"
+
+- id: DM-HOME-01
+  class: context
+  weight: 8
+  category: removal
+  basis: granted
+  label: {pl: "Ustawiona jako ekran główny", en: "Set as the home screen"}
+  when: {is_home_holder: true}
+  evidence: []
+  text:
+    simple:
+      pl: "Jest ustawiona jako ekran główny telefonu."
+      en: "Is set as the phone's home screen."
+    expert:
+      pl: "rola android.app.role.HOME"
+      en: "holds android.app.role.HOME"
+
+- id: DM-HOME-02
+  class: context
+  weight: 4
+  category: removal
+  basis: declared
+  label: {pl: "Może zastąpić ekran główny", en: "Can replace the home screen"}
+  when: {is_home_candidate: true, is_home_holder: false, is_system: false}
+  evidence: []
+  text:
+    simple:
+      pl: "Może zastąpić ekran główny telefonu."
+      en: "Can replace the phone's home screen."
+    expert:
+      pl: "aktywność z filtrem MAIN/HOME"
+      en: "activity with MAIN/HOME intent filter"
+
+- id: DM-A11Y-01
+  class: position
+  weight: 20
+  category: data
+  basis: granted
+  label: {pl: "Ułatwienia dostępu", en: "Accessibility access"}
+  when: {accessibility_enabled: true}
+  evidence: []
+  text:
+    simple:
+      pl: "Ma włączoną usługę ułatwień dostępu — taka usługa może odczytywać ekran i wykonywać czynności za użytkownika."
+      en: "Has an enabled accessibility service — such a service can read the screen and act for the user."
+    expert:
+      pl: "secure/enabled_accessibility_services zawiera usługę aplikacji"
+      en: "secure/enabled_accessibility_services contains the app's service"
+
+- id: DM-NLS-01
+  class: position
+  weight: 10
+  category: data
+  basis: granted
+  label: {pl: "Czyta powiadomienia", en: "Reads notifications"}
+  when: {notification_listener: true}
+  evidence: []
+  text:
+    simple:
+      pl: "Czyta powiadomienia z innych aplikacji."
+      en: "Reads notifications from other apps."
+    expert:
+      pl: "secure/enabled_notification_listeners zawiera usługę aplikacji"
+      en: "secure/enabled_notification_listeners contains the app's service"
+
+- id: DM-SMS-01
+  class: context
+  weight: 8
+  category: data
+  basis: granted
+  label: {pl: "Domyślna aplikacja SMS", en: "Default SMS app"}
+  when: {is_sms_holder: true, is_system: false}
+  evidence: []
+  text:
+    simple:
+      pl: "Jest domyślną aplikacją SMS — ma dostęp do wiadomości."
+      en: "Is the default SMS app — it has access to text messages."
+    expert:
+      pl: "rola android.app.role.SMS"
+      en: "holds android.app.role.SMS"
+
+- id: DM-BROWSER-01
+  class: context
+  weight: 4
+  category: data
+  basis: granted
+  label: {pl: "Domyślna przeglądarka", en: "Default browser"}
+  when: {is_browser_holder: true, is_system: false}
+  evidence: []
+  text:
+    simple:
+      pl: "Jest ustawiona jako domyślna przeglądarka."
+      en: "Is set as the default browser."
+    expert:
+      pl: "rola android.app.role.BROWSER"
+      en: "holds android.app.role.BROWSER"
+
+- id: DM-HIDDEN-01
+  class: position
+  weight: 10
+  category: removal
+  basis: declared
+  group: hidden
+  label: {pl: "Ukryta ikona", en: "Hidden icon"}
+  when: {has_launcher_icon: false, is_system: false}
+  evidence: []
+  text:
+    simple:
+      pl: "Nie ma ikony na liście aplikacji (brak aktywności startowej)."
+      en: "Has no icon in the app drawer (no launcher activity)."
+    expert:
+      pl: "brak aktywności MAIN/LAUNCHER"
+      en: "no MAIN/LAUNCHER activity"
+
+- id: DM-SRC-01
+  class: context
+  weight: 8
+  category: origin
+  basis: declared
+  label: {pl: "Spoza Sklepu Play", en: "Not from the Play Store"}
+  when: {from_play: false, is_system: false}
+  evidence: [installer]
+  text:
+    simple:
+      pl: "Zainstalowana spoza Sklepu Play."
+      en: "Installed from outside the Play Store."
+    expert:
+      pl: "instalator: {installer}"
+      en: "installer: {installer}"
+
+- id: DM-FRESH-01
+  class: context
+  weight: 0
+  # Informacja do powiązania z początkiem problemów, nie sygnał ryzyka (audyt 2026-09-27).
+  category: origin
+  basis: declared
+  label: {pl: "Świeża instalacja", en: "Recently installed"}
+  when: {installed_days: {lte: 14}, is_system: false}
+  evidence: [installed_days]
+  text:
+    simple:
+      pl: "Zainstalowana niedawno ({installed_days:.0f} dni temu)."
+      en: "Installed recently ({installed_days:.0f} days ago)."
+    expert:
+      pl: "firstInstallTime: {installed_days:.1f} dni temu"
+      en: "firstInstallTime: {installed_days:.1f} days ago"
+
+- id: DM-PERM-01
+  class: context
+  weight: 4
+  category: background
+  basis: declared
+  label: {pl: "Start z telefonem, lista aplikacji", en: "Starts at boot, lists apps"}
+  when:
+    has_boot_receiver: true
+    requested_permissions: {contains: android.permission.QUERY_ALL_PACKAGES}
+    is_system: false
+  evidence: []
+  text:
+    simple:
+      pl: "Deklaruje uruchamianie po włączeniu telefonu i dostęp do listy zainstalowanych aplikacji."
+      en: "Declares starting at boot and access to the list of installed apps."
+    expert:
+      pl: "BOOT_COMPLETED receiver + QUERY_ALL_PACKAGES"
+      en: "BOOT_COMPLETED receiver + QUERY_ALL_PACKAGES"
+
+- id: DM-FSIPERM-01
+  class: context
+  weight: 4
+  category: ads
+  basis: declared
+  label: {pl: "Uprawnienie do pełnego ekranu", en: "Full-screen permission"}
+  when:
+    requested_permissions: {contains: android.permission.USE_FULL_SCREEN_INTENT}
+    from_play: false
+    is_system: false
+  evidence: []
+  text:
+    simple:
+      pl: "Deklaruje uprawnienie do powiadomień pełnoekranowych."
+      en: "Declares the full-screen notification permission."
+    expert:
+      pl: "żąda USE_FULL_SCREEN_INTENT (instalacja spoza Play)"
+      en: "requests USE_FULL_SCREEN_INTENT (non-Play install)"
+
+# --- Analiza APK (Plan 4). Fakty są None dla aplikacji nieanalizowanych — reguły wtedy nie odpalają.
+
+- id: DM-ADSDK-01
+  class: apk
+  weight: 3
+  category: ads
+  basis: declared
+  label: {pl: "Biblioteki reklamowe", en: "Ad libraries"}
+  when: {ad_sdk_count: {gte: 1, lt: 5}, is_system: false}
+  evidence: [ad_sdk_count, ad_sdk_list]
+  text:
+    simple:
+      pl: "Zawiera biblioteki reklamowe ({ad_sdk_count})."
+      en: "Contains advertising libraries ({ad_sdk_count})."
+    expert:
+      pl: "SDK reklamowe: {ad_sdk_list}"
+      en: "Ad SDKs: {ad_sdk_list}"
+
+- id: DM-ADSDK-02
+  class: apk
+  weight: 25
+  category: ads
+  basis: declared
+  label: {pl: "Wiele sieci reklamowych", en: "Many ad networks"}
+  when: {ad_sdk_count: {gte: 5}, is_system: false}
+  evidence: [ad_sdk_count, ad_sdk_list]
+  text:
+    simple:
+      pl: "Zawiera biblioteki {ad_sdk_count} sieci reklamowych."
+      en: "Contains libraries of {ad_sdk_count} ad networks."
+    expert:
+      pl: "SDK reklamowe ({ad_sdk_count}): {ad_sdk_list}"
+      en: "Ad SDKs ({ad_sdk_count}): {ad_sdk_list}"
+
+- id: DM-DYNDEX-01
+  class: apk
+  weight: 3
+  category: background
+  basis: declared
+  group: dyncode
+  label: {pl: "Ładowanie dodatkowego kodu", en: "Loads extra code"}
+  when: {dynamic_code: true, is_system: false}
+  evidence: []
+  text:
+    simple:
+      pl: "Zawiera mechanizm ładowania dodatkowego kodu w trakcie działania."
+      en: "Contains a mechanism for loading extra code at run time."
+    expert:
+      pl: "odwołanie do DexClassLoader / InMemoryDexClassLoader"
+      en: "references DexClassLoader / InMemoryDexClassLoader"
+
+# Ścieżki w kodzie z głębokiej analizy (na żądanie). Możliwość statyczna, nie dowód wykonania
+# (ocena 2026-10-01 §7.1); waga 5 do czasu pomiaru na holdout (plan 2026-10-01, Global Constraints).
+- id: DM-CODE-BOOTUI-01
+  class: apk
+  weight: 5
+  category: background
+  basis: static
+  group: boot
+  label: {pl: "Start z telefonem otwiera ekran", en: "Opens a screen at boot"}
+  when: {code_boot_ui: true, is_system: false}
+  evidence: [code_boot_ui_text]
+  text:
+    simple:
+      pl: "Kod aplikacji może otworzyć ekran zaraz po włączeniu telefonu."
+      en: "The app's code can open a screen right after the phone starts."
+    expert:
+      pl: "możliwa ścieżka statyczna (bez obserwacji wykonania): {code_boot_ui_text}"
+      en: "possible static path (execution not observed): {code_boot_ui_text}"
+
+- id: DM-CODE-HIDE-01
+  class: apk
+  weight: 5
+  category: disguise
+  basis: static
+  group: hidden
+  label: {pl: "Kod przełącza składniki aplikacji", en: "Code toggles app components"}
+  when: {code_hides_icon: true, is_system: false}
+  evidence: [code_hides_icon_text]
+  text:
+    simple:
+      pl: "Kod aplikacji może wyłączać własne składniki — w ten sposób można też wyłączyć ikonę na liście aplikacji."
+      en: "The app's code can disable its own components — this is also how an icon can be removed from the app drawer."
+    expert:
+      pl: "możliwa ścieżka statyczna (bez obserwacji wykonania): {code_hides_icon_text}"
+      en: "possible static path (execution not observed): {code_hides_icon_text}"
+
+- id: DM-CODE-OVERLAY-01
+  class: apk
+  weight: 5
+  category: ads
+  basis: static
+  group: overlay
+  label: {pl: "Kod dodaje okno do ekranu", en: "Code adds a window"}
+  when: {code_overlay: true, is_system: false}
+  evidence: [code_overlay_text]
+  text:
+    simple:
+      pl: "Kod aplikacji może dodać własne okno do ekranu (rodzaju okna nie ustalono)."
+      en: "The app's code can add its own window to the screen (window type not determined)."
+    expert:
+      pl: "możliwa ścieżka statyczna do WindowManager.addView (bez obserwacji wykonania, rodzaju okna nie ustalono): {code_overlay_text}"
+      en: "possible static path to WindowManager.addView (execution not observed, window type not determined): {code_overlay_text}"
+
+- id: DM-CODE-DYNLOAD-01
+  class: apk
+  weight: 5
+  category: background
+  basis: static
+  group: dyncode
+  label: {pl: "Kod ładuje dodatkowy kod", en: "Code loads extra code"}
+  when: {code_dynload: true, is_system: false}
+  evidence: [code_dynload_text]
+  text:
+    simple:
+      pl: "Kod aplikacji może załadować dodatkowy kod, którego nie było w pakiecie."
+      en: "The app's code can load extra code that was not in the package."
+    expert:
+      pl: "możliwa ścieżka statyczna (bez obserwacji wykonania): {code_dynload_text}"
+      en: "possible static path (execution not observed): {code_dynload_text}"
+
+- id: DM-LABEL-01
+  class: context
+  weight: 8
+  category: disguise
+  basis: declared
+  source: apk
+  label: {pl: "Niewidoczne znaki w nazwie", en: "Invisible characters in the name"}
+  when: {label_padded: true, is_system: false}
+  evidence: [label]
+  text:
+    simple:
+      pl: "Nazwa aplikacji („{label}”) zaczyna się od niewidocznych znaków — przez to wyświetla się na początku listy."
+      en: "The app name (“{label}”) starts with invisible characters — so it sorts to the top of the list."
+    expert:
+      pl: "etykieta zaczyna się od białego/niewidocznego znaku"
+      en: "label starts with a whitespace/invisible character"

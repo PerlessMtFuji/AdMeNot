@@ -6,10 +6,10 @@ import threading
 
 import pytest
 
-from demalware.engine.adb.fake import FakeAdb
-from demalware.engine.adb.transport import AdbError
-from demalware.engine.apk.cache import NoSpace
-from demalware.engine.apk.fetch import PM_PATH, _cached, fetch_apks, parse_pm_path, sha256_command
+from admenot.engine.adb.fake import FakeAdb
+from admenot.engine.adb.transport import AdbError
+from admenot.engine.apk.cache import NoSpace
+from admenot.engine.apk.fetch import PM_PATH, _cached, fetch_apks, parse_pm_path, sha256_command
 
 BASE = "/data/app/~~Rg8wIz5Z==/com.clean.x-a1B2==/base.apk"
 SPLIT = "/data/app/~~Rg8wIz5Z==/com.clean.x-a1B2==/split_config.arm64_v8a.apk"
@@ -148,7 +148,7 @@ def test_old_unverified_dirs_are_swept_but_fresh_ones_kept(tmp_path):
 
 
 def test_backup_without_sha256sum_copies_this_phones_files(tmp_path):
-    from demalware.engine.actions.backup import backup_apks
+    from admenot.engine.actions.backup import backup_apks
 
     cache = tmp_path / "cache"
     fetch_apks(_adb(files={BASE: b"phone-b-base", SPLIT: b"phone-b-split"}, sha=_NO_SHA,

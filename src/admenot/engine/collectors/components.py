@@ -1,0 +1,29 @@
+from __future__ import annotations
+
+from admenot.engine.adb.transport import AdbTransport
+from admenot.engine.facts import AppFacts
+from admenot.engine.parsers.common import query_packages
+
+LAUNCHER_QUERY = ("cmd package query-activities --brief -a android.intent.action.MAIN "
+                  "-c android.intent.category.LAUNCHER")
+HOME_QUERY = ("cmd package query-activities --brief -a android.intent.action.MAIN "
+              "-c android.intent.category.HOME")
+BOOT_QUERY = "cmd package query-receivers --brief -a android.intent.action.BOOT_COMPLETED"
+
+
+class ComponentsCollector:
+    name = "components"
+
+    def collect(self, adb: AdbTransport, apps: list[AppFacts]) -> dict[str, set[str]]:
+        return {
+            # Każdy telefon ma aktywności LAUNCHER i HOME — pusta lista to nieznany format.
+            "launcher": query_packages(adb.shell(LAUNCHER_QUERY), expect_some=True),
+            "home": query_packages(adb.shell(HOME_QUERY), expect_some=True),
+            "boot": query_packages(adb.shell(BOOT_QUERY)),
+        }
+
+    def apply(self, facts: dict[str, AppFacts], data: dict[str, set[str]]) -> None:
+        for f in facts.values():
+            f.has_launcher_icon = f.package in data["launcher"]
+            f.is_home_candidate = f.package in data["home"]
+            f.has_boot_receiver = f.package in data["boot"]

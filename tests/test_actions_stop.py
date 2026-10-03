@@ -1,11 +1,11 @@
 from fakephone import make_cli_phone
 
-from demalware.engine.actions.context import read_phone_context
-from demalware.engine.actions.executor import ExecOptions, resume, run_order, start_order
-from demalware.engine.actions.planner import plan_app
-from demalware.engine.allowlist.trust import load_protected_list
-from demalware.engine.journal.db import Journal
-from demalware.engine.session import run_scan
+from admenot.engine.actions.context import read_phone_context
+from admenot.engine.actions.executor import ExecOptions, resume, run_order, start_order
+from admenot.engine.actions.planner import plan_app
+from admenot.engine.allowlist.trust import load_protected_list
+from admenot.engine.journal.db import Journal
+from admenot.engine.session import run_scan
 
 
 def _order(tmp_path, phone, requests):

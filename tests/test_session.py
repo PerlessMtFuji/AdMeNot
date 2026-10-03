@@ -1,14 +1,14 @@
 import json
 
-from demalware.engine.adb.transport import AdbError
-from demalware.engine.allowlist.trust import parse_trust_list
-from demalware.engine.apk.analyze import ApkReport, report_to_json
-from demalware.engine.apk.providers import StoredApkProvider
-from demalware.engine.collectors.behavior import USAGESTATS
-from demalware.engine.collectors.profiles import PM_USERS, ProfileScope
-from demalware.engine.collectors.system import DEVICE_POLICY
-from demalware.engine.device.info import UPTIME, read_device_info
-from demalware.engine.session import SCAN_STAGES, analyze_apks, report_to_dict, run_scan
+from admenot.engine.adb.transport import AdbError
+from admenot.engine.allowlist.trust import parse_trust_list
+from admenot.engine.apk.analyze import ApkReport, report_to_json
+from admenot.engine.apk.providers import StoredApkProvider
+from admenot.engine.collectors.behavior import USAGESTATS
+from admenot.engine.collectors.profiles import PM_USERS, ProfileScope
+from admenot.engine.collectors.system import DEVICE_POLICY
+from admenot.engine.device.info import UPTIME, read_device_info
+from admenot.engine.session import SCAN_STAGES, analyze_apks, report_to_dict, run_scan
 
 
 def _by_pkg(report):

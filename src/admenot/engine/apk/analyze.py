@@ -1,0 +1,224 @@
+"""Statyczna analiza APK → ApkReport (mały, serializowalny wynik; zapisywany też w nagraniach)."""
+
+from __future__ import annotations
+
+import base64
+import hashlib
+import re
+from collections.abc import Callable
+from dataclasses import asdict, dataclass, field, fields
+from pathlib import Path
+from typing import Any
+
+from admenot.engine.apk.callgraph import CodePath
+from admenot.engine.apk.components import component_from_json
+from admenot.engine.apk.dex import read_apk_types
+from admenot.engine.apk.manifest import ManifestInfo, icon_uri, read_manifest
+from admenot.engine.apk.sdks import AdSdkList, load_default_ad_sdks
+from admenot.engine.facts import AppFacts
+
+REPORT_VERSION = 3
+# v1 (nagrania T1/T2): bez komponentów — pole zostaje None; v2: bez ścieżek kodu (głęboka analiza)
+_READABLE_VERSIONS = (1, 2, 3)
+DYNAMIC_LOADERS = frozenset({"dalvik.system.DexClassLoader", "dalvik.system.InMemoryDexClassLoader"})
+# Białe znaki, znaki zerowej szerokości, sterowanie kierunkiem tekstu, wypełniacze Hangul.
+_INVISIBLE = r"\s\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180e\u200b-\u200f\u202a-\u202e" \
+             r"\u2060-\u2064\u206a-\u206f\u3164\ufeff\uffa0"
+_LEADING_INVISIBLE = re.compile(f"^[{_INVISIBLE}]")
+# + znaki steruj\u0105ce C0/C1 (poza bia\u0142ymi): etykiet\u0119 ustawia autor aplikacji, a ESC/CSI
+# w konsoli pozwoli\u0142yby np. ukry\u0107 linie z wynikami skanu.
+_FORMAT_CHARS = re.compile(r"[\u00ad\u034f\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2064"
+                           r"\u206a-\u206f\ufeff\x00-\x08\x0e-\x1f\x7f-\x84\x86-\x9f]")
+_OBFUSCATED_MAX_LEN = 2
+_ICON_URI = re.compile(r"^data:image/(png|webp|jpeg);base64,[A-Za-z0-9+/]+={0,2}$")
+
+
+@dataclass
+class ApkReport:
+    package: str
+    version_code: int | None = None
+    sha256: str | None = None  # base.apk
+    label: str | None = None
+    label_padded: bool = False
+    cert_sha256: list[str] = field(default_factory=list)
+    ad_sdks: list[str] = field(default_factory=list)
+    dynamic_code: bool = False
+    class_count: int = 0
+    obfuscation_ratio: float = 0.0
+    error: str | None = None  # analiza niepełna — powód
+    icon: str | None = None  # data URI bitmapy (PNG/WebP/JPEG)
+    files: dict[str, str] = field(default_factory=dict)  # nazwa pliku → sha256
+    components: list[dict[str, Any]] | None = None  # None = nie odczytano (też raport v1)
+    code_paths: list[dict[str, Any]] | None = None  # CodePath jako dict; None = bez głębokiej analizy
+    undetermined: list[str] = field(default_factory=list)  # czego głęboka analiza nie ustaliła
+    deep: bool = False
+
+
+def clean_label(raw: str | None) -> tuple[str | None, bool]:
+    """Etykieta do wyświetlenia + czy zaczyna się od niewidocznych znaków (sztuczka „na górę listy”)."""
+    if raw is None:
+        return None, False
+    padded = bool(_LEADING_INVISIBLE.match(raw))
+    text = _FORMAT_CHARS.sub("", raw)
+    label = " ".join(text.replace("\u3164", " ").replace("\uffa0", " ").split())
+    return label or None, padded
+
+
+def safe_icon(uri: str | None) -> str | None:
+    """Ikona z raportu, jeśli to naprawdę bitmapa — raporty z JSON mogą pochodzić z cudzych nagrań."""
+    if not isinstance(uri, str) or not _ICON_URI.match(uri):
+        return None
+    try:
+        data = base64.b64decode(uri.split(",", 1)[1], validate=True)
+    except ValueError:
+        return None
+    return icon_uri(data)
+
+
+def _sha256(path: Path) -> str:
+    with path.open("rb") as f:
+        return hashlib.file_digest(f, "sha256").hexdigest()
+
+
+# Udział klas o 1–2-znakowych nazwach, od którego nazwy klas mówią o kodzie mało. Tylko opis
+# zakresu analizy — ocena 2026-10-01 §5.1: zaciemnienie samo w sobie nie dodaje punktów.
+OBFUSCATED_SCOPE_RATIO = 0.5
+
+
+def scope_notes(facts: AppFacts) -> list[str]:
+    """Czego analiza APK tej aplikacji nie objęła (klucze tekstów `SCOPE_LABELS`)."""
+    if facts.ad_sdks is None:
+        return ["not_analyzed"]
+    notes = []
+    if (facts.obfuscation_ratio or 0.0) >= OBFUSCATED_SCOPE_RATIO:
+        notes.append("obfuscated")
+    if facts.dynamic_code:
+        notes.append("dynamic_code")
+    if facts.code_undetermined:
+        notes.append("code_undetermined")
+    return notes
+
+
+def _obfuscation_ratio(defined: set[str]) -> float:
+    if not defined:
+        return 0.0
+    short = sum(
+        1 for name in defined
+        if len(name.rsplit(".", 1)[-1].split("$", 1)[0]) <= _OBFUSCATED_MAX_LEN
+    )
+    return round(short / len(defined), 3)
+
+
+def _split_certs(path: Path) -> tuple[str, ...]:
+    from loguru import logger
+
+    logger.disable("androguard")
+    from androguard.core.apk import APK
+
+    return tuple(sorted(c.sha256.hex() for c in APK(str(path)).get_certificates()))
+
+
+def analyze_apk(
+    package: str,
+    apk_paths: list[Path],
+    read_manifest: Callable[[Path], ManifestInfo] = read_manifest,
+    sdks: AdSdkList | None = None,
+    read_certs: Callable[[Path], tuple[str, ...]] = _split_certs,
+) -> ApkReport:
+    report = ApkReport(package)
+    paths = [Path(p) for p in apk_paths]
+    if not paths:
+        report.error = "no APK files"
+        return report
+    base = next((p for p in paths if p.name == "base.apk"), paths[0])
+    errors: list[str] = []
+
+    for p in paths:
+        try:
+            report.files[p.name] = _sha256(p)
+        except OSError as exc:
+            errors.append(f"{p.name}: {exc}")
+
+    try:
+        report.sha256 = report.files.get(base.name)
+        manifest = read_manifest(base)
+        report.version_code = manifest.version_code
+        report.label, report.label_padded = clean_label(manifest.label)
+        report.cert_sha256 = list(manifest.cert_sha256)
+        report.icon = manifest.icon
+        report.components = ([c.to_json() for c in manifest.components]
+                             if manifest.components is not None else None)
+        if manifest.package and manifest.package != package:
+            errors.append(f"manifest: package {manifest.package!r} != {package!r}")
+    except Exception as exc:  # noqa: BLE001 — nietypowy manifest nie może przerwać analizy kodu
+        errors.append(f"manifest: {type(exc).__name__}: {exc}")
+
+    if report.cert_sha256:
+        for p in paths:
+            if p == base:
+                continue
+            try:
+                if read_certs(p) != tuple(report.cert_sha256):
+                    errors.append(f"signers: {p.name} signed by a different certificate than {base.name}")
+            except Exception as exc:  # noqa: BLE001 — nieczytelny podpis splitu: błąd, nie przerwanie
+                errors.append(f"signers: {p.name}: {type(exc).__name__}")
+
+    types, dex_errors = read_apk_types(paths)
+    errors += dex_errors
+    report.ad_sdks = sorted((sdks or load_default_ad_sdks()).detect(types.defined))
+    report.dynamic_code = bool(types.referenced & DYNAMIC_LOADERS)
+    report.class_count = len(types.defined)
+    report.obfuscation_ratio = _obfuscation_ratio(types.defined)
+    report.error = "; ".join(errors) or None
+    return report
+
+
+def report_to_json(report: ApkReport) -> dict[str, Any]:
+    return {"version": REPORT_VERSION, **asdict(report)}
+
+
+def report_from_json(data: dict[str, Any]) -> ApkReport:
+    if data.get("version") not in _READABLE_VERSIONS:
+        raise ValueError(f"unsupported ApkReport version: {data.get('version')!r}")
+    known = {f.name for f in fields(ApkReport)}
+    return ApkReport(**{k: v for k, v in data.items() if k in known})
+
+
+def _same_version(analyzed: int, installed: int) -> bool:
+    """dumpsys podaje długi kod (versionCodeMajor << 32 | versionCode). Raport bez odczytanego
+    versionCodeMajor (starsza pamięć podręczna, nietypowy manifest) ma tylko dolne 32 bity."""
+    if analyzed == installed:
+        return True
+    return analyzed < (1 << 32) and analyzed == installed & 0xFFFFFFFF
+
+
+def apply_apk_report(facts: AppFacts, report: ApkReport) -> None:
+    errors = [report.error] if report.error else []
+    if (report.version_code is not None and facts.version_code is not None
+            and not _same_version(report.version_code, facts.version_code)):
+        # Plik z innej instalacji niż ta na telefonie: wyniki nie opisują tej aplikacji.
+        errors.append(f"stale: analyzed versionCode {report.version_code}, "
+                      f"installed {facts.version_code}")
+        facts.apk_error = "; ".join(errors)
+        facts.gaps.add("apk")
+        return
+    facts.apk_error = "; ".join(errors) or None
+    has_code = report.class_count > 0
+    if errors or not has_code:
+        facts.gaps.add("apk")
+    has_manifest = report.label is not None or report.label_padded or bool(report.cert_sha256)
+    if has_manifest:
+        facts.label = clean_label(report.label)[0]  # raporty z JSON mogą pochodzić z cudzych nagrań
+        facts.label_padded = report.label_padded
+        facts.cert_sha256 = tuple(report.cert_sha256) or None
+    if report.components is not None:
+        facts.apk_components = tuple(component_from_json(c) for c in report.components)
+    if report.code_paths is not None:
+        facts.code_paths = tuple(CodePath(**{**p, "chain": tuple(p["chain"])}) for p in report.code_paths)
+        facts.code_undetermined = tuple(report.undetermined)
+    facts.icon = safe_icon(report.icon)
+    facts.apk_sha256 = tuple(sorted(set(report.files.values()))) or None
+    if has_code:
+        facts.ad_sdks = set(report.ad_sdks)
+        facts.dynamic_code = report.dynamic_code
+        facts.obfuscation_ratio = report.obfuscation_ratio

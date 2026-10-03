@@ -2,8 +2,8 @@ from datetime import datetime
 
 import pytest
 
-from demalware.engine.journal.db import MAX_REPORT_SCREENSHOTS, Journal, ScreenshotLimit
-from demalware.engine.paths import backups_dir, journal_path, logs_dir
+from admenot.engine.journal.db import MAX_REPORT_SCREENSHOTS, Journal, ScreenshotLimit
+from admenot.engine.paths import backups_dir, journal_path, logs_dir
 
 
 def _step(package, kind="force_stop"):
@@ -79,9 +79,9 @@ def test_failed_action_keeps_error_key_and_invalid_status_is_rejected(tmp_path):
 
 def test_data_paths_follow_localappdata(monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
-    assert journal_path() == tmp_path / "DeMalware" / "journal.db"
-    assert backups_dir() == tmp_path / "DeMalware" / "backups"
-    assert logs_dir() == tmp_path / "DeMalware" / "logs"
+    assert journal_path() == tmp_path / "AdMeNot" / "journal.db"
+    assert backups_dir() == tmp_path / "AdMeNot" / "backups"
+    assert logs_dir() == tmp_path / "AdMeNot" / "logs"
 
 
 def test_recent_serials_newest_first(tmp_path):
@@ -209,9 +209,9 @@ def test_orphans_and_delete(shots_journal):
 
 
 def test_screenshot_paths(monkeypatch, tmp_path):
-    from demalware.engine import paths
+    from admenot.engine import paths
 
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
-    assert paths.screenshots_dir() == tmp_path / "DeMalware" / "screenshots"
-    assert paths.screenshot_files(7) == (tmp_path / "DeMalware" / "screenshots" / "7.png",
-                                         tmp_path / "DeMalware" / "screenshots" / "7.jpg")
+    assert paths.screenshots_dir() == tmp_path / "AdMeNot" / "screenshots"
+    assert paths.screenshot_files(7) == (tmp_path / "AdMeNot" / "screenshots" / "7.png",
+                                         tmp_path / "AdMeNot" / "screenshots" / "7.jpg")

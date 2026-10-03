@@ -28,8 +28,8 @@ from apphelpers import make_api
 from conftest import SERIAL
 from fakephone import make_cli_phone
 
-from demalware.engine.report.pdf import PdfError
-from demalware.engine.settings import save_settings
+from admenot.engine.report.pdf import PdfError
+from admenot.engine.settings import save_settings
 
 CLIENT = "Anna K."
 DISABLE = "pm disable-user --user 0 com.wlive.forecast"
@@ -99,11 +99,11 @@ def _normalize(value: Any, tmp: str) -> Any:
 
 @contextmanager
 def _isolated() -> Iterator[str]:
-    keys = ("LOCALAPPDATA", "DEMALWARE_ASSETS")
+    keys = ("LOCALAPPDATA", "ADMENOT_ASSETS")
     saved = {k: os.environ.get(k) for k in keys}
     with tempfile.TemporaryDirectory() as tmp:
         os.environ["LOCALAPPDATA"] = str(Path(tmp) / "data")
-        os.environ["DEMALWARE_ASSETS"] = str(Path(tmp) / "no-assets")
+        os.environ["ADMENOT_ASSETS"] = str(Path(tmp) / "no-assets")
         # Ruling F2: nagranie nie może zależeć od locale Windows -- język na sztywno zanim
         # jakikolwiek `Api` wczyta ustawienia (make_api robi to samo, ale robimy to i tu, na
         # wszelki wypadek, gdyby krok scenariusza zbudował `Api` inaczej).
@@ -164,9 +164,9 @@ def _report(r: Recorder, phone: Any) -> None:
     r.call("preview_plan", {"com.wlive.forecast": "disable"}, [])  # „Napraw zaznaczone”
     r.call("execute", {"com.wlive.forecast": "disable"}, [])
     number = r.events("exec:order")[0]["order"]
-    with mock.patch("demalware.engine.report.files.html_to_pdf", _fake_pdf):
+    with mock.patch("admenot.engine.report.files.html_to_pdf", _fake_pdf):
         r.call("report", number)
-    with mock.patch("demalware.engine.report.files.html_to_pdf",
+    with mock.patch("admenot.engine.report.files.html_to_pdf",
                     mock.Mock(side_effect=PdfError("locked"))):
         r.call("report", number)
     r.call("service")

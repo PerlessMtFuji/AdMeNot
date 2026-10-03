@@ -1,4 +1,4 @@
-# Buduje UI (Svelte) do src/demalware/app/web. Użycie: powershell -ExecutionPolicy Bypass -File scripts/build_ui.ps1
+# Buduje UI (Svelte) do src/admenot/app/web. Użycie: powershell -ExecutionPolicy Bypass -File scripts/build_ui.ps1
 $ErrorActionPreference = "Stop"
 Push-Location (Join-Path $PSScriptRoot "..\ui")
 try {
@@ -8,7 +8,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "UI tests failed" }
     npm run build
     if ($LASTEXITCODE -ne 0) { throw "UI build failed" }
-    Write-Host "UI zbudowane: src\demalware\app\web"
+    Write-Host "UI zbudowane: src\admenot\app\web"
 } finally {
     Pop-Location
 }

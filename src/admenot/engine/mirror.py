@@ -1,0 +1,228 @@
+"""Podgląd ekranu (Plan 6b, spec §4.1): jeden proces scrcpy sterowany z programu.
+
+scrcpy dostaje w środowisku `ADB` ten sam adb co program — dwa serwery adb w różnych wersjach
+ubijają się nawzajem. Wyjście scrcpy 4.1 (nagranie OPPO CPH2271, tests/fixtures/scrcpy/):
+- `INFO: Texture: 576x1280` — pierwsza klatka, stan `running`;
+- linia z `INJECT_EVENTS` — telefon blokuje sterowanie (Xiaomi bez „Debugowania USB (ustawienia
+  zabezpieczeń)”); podgląd działa dalej;
+- kod wyjścia 0: okno zamknięte, 1: błąd startu, 2: telefon odłączony. Zamknięcie przez
+  `taskkill` też daje 1, więc zatrzymanie zlecone przez program rozpoznajemy po `stop()`.
+
+`on_state`/`on_warning` NIGDY nie są wołane pod `_lock` i nigdy na wątku wołającego
+(`start()`/`stop()`/wątek czytający). Most (`Api`) woła je z zamkniętego okna przez
+`window.run_js`, które czeka na wątek GUI — gdyby to wywołanie szło z wątku trzymającego
+`_lock`, a wątek GUI próbował w tym czasie zamknąć podgląd (`_on_closing` → `stop()`),
+powstałoby zakleszczenie (GUI czeka na `_lock`, wątek czytający czeka na GUI w `run_js`).
+Zamiast tego zmiana stanu pod `_lock` tylko wstawia zdarzenie do `_events` (kolejka FIFO —
+kolejność wstawiania = kolejność zmian stanu), a jeden wątek-dyspozytor (`_dispatch`) woła
+`on_state`/`on_warning` już bez żadnej blokady. `on_line` zostaje na wątku czytającym, poza
+`_lock` (jak dotychczas) — nie dotyka stanu, więc nie trzeba go przepuszczać przez kolejkę.
+"""
+
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+import threading
+import time
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, field
+from pathlib import Path
+from queue import Queue
+from typing import Any, Protocol
+
+from admenot.engine.tools import resolve_scrcpy
+
+FIRST_FRAME = "INFO: Texture:"
+CONTROL_BLOCKED = "INJECT_EVENTS"
+# OPPO/realme/Xiaomi przy monitorowaniu uprawnień: `--stay-awake` nie zmieni ustawienia, ekran gaśnie.
+STAY_AWAKE_BLOCKED = 'Could not change "stay_on_while_plugged_in"'
+_WARNINGS = ((STAY_AWAKE_BLOCKED, "stay_awake_blocked"), (CONTROL_BLOCKED, "control_blocked"))
+EXIT_CLOSED = 0
+EXIT_DISCONNECTED = 2
+_CREATE_NO_WINDOW = 0x08000000
+
+
+class MirrorUnavailable(Exception):
+    """Brak dołączonego scrcpy (`scripts/fetch_tools.py`)."""
+
+
+class Process(Protocol):
+    pid: int
+
+    @property
+    def stdout(self) -> Iterable[bytes] | None: ...
+
+    def wait(self, timeout: float | None = None) -> int: ...
+
+
+def args_for(serial: str, title: str) -> list[str]:
+    return ["--serial", serial, "--window-title", title, "--no-audio", "--max-size", "1280",
+            "--stay-awake"]
+
+
+def _spawn(cmd: list[str], env: dict[str, str]) -> Process:
+    flags = _CREATE_NO_WINDOW if sys.platform == "win32" else 0  # bez konsoli; okno SDL zostaje
+    return subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            stdin=subprocess.DEVNULL, env=env, creationflags=flags)
+
+
+def _kill(proc: Process) -> None:
+    if sys.platform == "win32":
+        # /T: razem z procesami adb uruchomionymi przez scrcpy (serwer na telefonie sprząta sam)
+        subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], capture_output=True,
+                       stdin=subprocess.DEVNULL, creationflags=_CREATE_NO_WINDOW, check=False)
+    else:
+        proc.terminate()  # type: ignore[attr-defined]
+
+
+@dataclass
+class _Run:
+    serial: str
+    proc: Process
+    state: str = "starting"
+    warned: set[str] = field(default_factory=set)
+    last_error: str | None = None
+
+
+View = dict[str, Any]
+
+
+class Mirror:
+    def __init__(self, on_state: Callable[[View], None], on_warning: Callable[[View], None],
+                 on_line: Callable[[str, str], None], *, adb: Callable[[], str | None],
+                 scrcpy: Callable[[], Path | None] = resolve_scrcpy,
+                 spawn: Callable[[list[str], dict[str, str]], Process] = _spawn,
+                 kill: Callable[[Process], None] = _kill) -> None:
+        self._on_state = on_state
+        self._on_warning = on_warning
+        self._on_line = on_line
+        self._adb = adb
+        self._scrcpy = scrcpy
+        self._spawn = spawn
+        self._kill = kill
+        self._lock = threading.RLock()  # start() woła stop() pod tym samym zamkiem
+        self._run: _Run | None = None
+        self._thread: threading.Thread | None = None
+        self._events: Queue[tuple[str, View]] = Queue()
+        self._dispatcher = threading.Thread(target=self._dispatch, daemon=True,
+                                            name="admenot-mirror-events")
+        self._dispatcher.start()
+
+    def available(self) -> bool:
+        return self._scrcpy() is not None
+
+    def status(self) -> View:
+        with self._lock:
+            run = self._run
+            return {"available": self.available(), "serial": run.serial if run else None,
+                    "state": run.state if run else "stopped"}
+
+    def start(self, serial: str, title: str) -> View:
+        exe = self._scrcpy()
+        if exe is None:
+            raise MirrorUnavailable
+        with self._lock:  # dwa kliknięcia naraz: drugi widzi już pierwszy proces
+            if self._run is not None and self._run.serial == serial:
+                return self._view(self._run)
+            self.stop()
+            env = dict(os.environ)
+            adb = self._adb()
+            if adb:
+                env["ADB"] = adb
+            try:
+                proc = self._spawn([str(exe), *args_for(serial, title)], env)
+            except OSError as exc:
+                view = {"serial": serial, "state": "failed", "reason": str(exc)}
+                self._events.put(("state", view))
+                return view
+            run = _Run(serial, proc)
+            self._run = run
+            view = self._view(run)
+            self._events.put(("state", view))
+            self._thread = threading.Thread(target=self._read, args=(run,), daemon=True,
+                                            name="admenot-mirror")
+            self._thread.start()
+            return view
+
+    def stop(self) -> None:
+        with self._lock:
+            run, self._run = self._run, None
+            if run is None:
+                return
+            run.state = "stopped"
+            self._kill(run.proc)  # taskkill: teraz bezpieczne pod `_lock` — nikt inny pod nim
+                                  # nie woła `on_state`/`on_warning` (mogłyby czekać na GUI)
+            self._events.put(("state", {"serial": run.serial, "state": "stopped",
+                                        "reason": "closed"}))
+
+    def wait(self, timeout: float = 5.0) -> None:
+        """Czeka na zakończenie wątku czytającego bieżące uruchomienie i na opróżnienie kolejki
+        zdarzeń — każde z osobnym, pełnym `timeout` (a nie jednym wspólnym budżetem): sesja
+        bieżącego uruchomienia może zostać naprawdę uruchomiona (test celowo nie zamyka okna),
+        więc dołączenie do jej wątku wyczerpie cały budżet i nie może zjeść czasu potrzebnego,
+        by potwierdzić opróżnienie kolejki po zdarzeniu z INNEGO, już zakończonego uruchomienia.
+        """
+        thread = self._thread
+        if thread is not None:
+            thread.join(timeout)
+        # queue.Queue.join() nie ma limitu czasu — czekamy na tym samym warunku co ono, ale
+        # z ograniczeniem, żeby zepsuty dyspozytor nie zawiesił testu/wyłączenia na zawsze.
+        deadline = time.monotonic() + timeout
+        with self._events.all_tasks_done:
+            while self._events.unfinished_tasks:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return
+                self._events.all_tasks_done.wait(remaining)
+
+    @staticmethod
+    def _view(run: _Run) -> View:
+        return {"serial": run.serial, "state": run.state, "reason": None}
+
+    def _current(self, run: _Run) -> bool:
+        return self._run is run
+
+    def _dispatch(self) -> None:
+        while True:
+            kind, view = self._events.get()
+            try:
+                if kind == "state":
+                    self._on_state(view)
+                else:
+                    self._on_warning(view)
+            finally:
+                self._events.task_done()
+
+    def _read(self, run: _Run) -> None:
+        for raw in run.proc.stdout or ():
+            line = raw.decode("utf-8", errors="replace").rstrip()
+            if not line:
+                continue
+            self._on_line(run.serial, line)
+            if "ERROR" in line:
+                run.last_error = line
+            with self._lock:
+                if not self._current(run):
+                    continue
+                if run.state == "starting" and FIRST_FRAME in line:
+                    run.state = "running"
+                    self._events.put(("state", self._view(run)))
+                for marker, code in _WARNINGS:
+                    if marker in line and code not in run.warned:
+                        run.warned.add(code)
+                        self._events.put(("warning", {"serial": run.serial, "code": code}))
+        code = run.proc.wait()
+        with self._lock:
+            if not self._current(run):  # stop() już zgłosił koniec
+                return
+            self._run = None
+            if code == EXIT_CLOSED:
+                state, reason = "stopped", "closed"
+            elif code == EXIT_DISCONNECTED:
+                state, reason = "stopped", "disconnected"
+            else:
+                state, reason = "failed", run.last_error or f"exit {code}"
+            run.state = state
+            self._events.put(("state", {"serial": run.serial, "state": state, "reason": reason}))

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from fakephone import make_cli_phone
 
-from demalware.app.present import (
+from admenot.app.present import (
     app_name,
     app_view,
     device_card,
@@ -20,16 +20,16 @@ from demalware.app.present import (
     step_view,
     symptoms,
 )
-from demalware.engine.actions.executor import ExecOptions
-from demalware.engine.adb.transport import AdbError
-from demalware.engine.collectors.profiles import PM_USERS
-from demalware.engine.collectors.system import DEVICE_POLICY
-from demalware.engine.facts import AppFacts
-from demalware.engine.journal.db import Journal
-from demalware.engine.phones.provider import SILHOUETTE, PhoneMatch
-from demalware.engine.rules.model import Finding
-from demalware.engine.session import run_scan
-from demalware.engine.workflow import execute_order, plan_order, start
+from admenot.engine.actions.executor import ExecOptions
+from admenot.engine.adb.transport import AdbError
+from admenot.engine.collectors.profiles import PM_USERS
+from admenot.engine.collectors.system import DEVICE_POLICY
+from admenot.engine.facts import AppFacts
+from admenot.engine.journal.db import Journal
+from admenot.engine.phones.provider import SILHOUETTE, PhoneMatch
+from admenot.engine.rules.model import Finding
+from admenot.engine.session import run_scan
+from admenot.engine.workflow import execute_order, plan_order, start
 
 
 @pytest.fixture(autouse=True)
@@ -166,7 +166,7 @@ def test_plan_step_result_and_history_views(tmp_path):
 
 
 def test_app_view_passes_icon():
-    from demalware.engine.scoring import AppResult
+    from admenot.engine.scoring import AppResult
 
     facts = AppFacts("com.x", icon="data:image/png;base64,iVBORw0KGgo=")
     view = app_view(AppResult(facts, [], 0, "safe", False, False), "pl")
@@ -193,7 +193,7 @@ def test_scan_view_reports_other_profiles_and_usage_window(synthetic_adb):
 
 def test_scan_view_reports_partial_collectors(synthetic_adb):
     """Przegląd końcowy I2: częściowa awaria kolektora musi być widoczna w GUI."""
-    from demalware.engine.collectors.behavior import APPOPS_GET
+    from admenot.engine.collectors.behavior import APPOPS_GET
 
     synthetic_adb.responses[APPOPS_GET.format(package="com.whatsapp")] = AdbError("command_failed", "x")
     view = scan_view(run_scan(synthetic_adb), "pl")
@@ -222,7 +222,7 @@ def test_history_devices_show_phone_name_model_and_photo(tmp_path):
 
 
 def test_app_view_lists_analysis_scope_for_a_quiet_app():
-    from demalware.engine.scoring import AppResult
+    from admenot.engine.scoring import AppResult
 
     facts = AppFacts("com.x", ad_sdks=set(), dynamic_code=True, obfuscation_ratio=0.9)
     view = app_view(AppResult(facts, [], 0, "safe", False, False), "pl")

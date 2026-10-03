@@ -1,5 +1,5 @@
-from demalware.engine.apk.analyze import ApkReport
-from demalware.engine.apk.results import ResultStore, result_key
+from admenot.engine.apk.analyze import ApkReport
+from admenot.engine.apk.results import ResultStore, result_key
 
 
 def test_key_depends_on_all_files_and_analyzer_version():
@@ -25,7 +25,7 @@ def test_corrupt_entry_is_a_miss(tmp_path):
 
 
 def test_deep_origin_separates_framework_libraries():
-    from demalware.engine.apk.deep import _origin_of
+    from admenot.engine.apk.deep import _origin_of
 
     origin = _origin_of("com.x")
     assert origin("androidx.work.impl.utils.PackageManagerHelper") == "library"
@@ -34,6 +34,6 @@ def test_deep_origin_separates_framework_libraries():
 
 
 def test_deep_version_follows_the_sdk_list():
-    from demalware.engine.apk.deep import deep_version
+    from admenot.engine.apk.deep import deep_version
 
     assert deep_version(b"a").startswith("deep-2+") and deep_version(b"a") != deep_version(b"b")

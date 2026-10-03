@@ -4,10 +4,10 @@ import pytest
 from conftest import SERIAL
 from fakephone import LISTENERS, make_cli_phone
 
-from demalware.cli.main import main
-from demalware.engine.adb.fake import FakeAdb
-from demalware.engine.journal.db import Journal
-from demalware.engine.paths import journal_path
+from admenot.cli.main import main
+from admenot.engine.adb.fake import FakeAdb
+from admenot.engine.journal.db import Journal
+from admenot.engine.paths import journal_path
 
 WRITES = ("pm disable", "pm uninstall", "appops set", "pm revoke", "settings put", "am force-stop")
 
@@ -114,18 +114,18 @@ def test_fix_treats_closed_stdin_as_no(capsys, monkeypatch):
 
 
 def test_fix_disconnect_before_planning_is_reported_without_traceback(capsys, monkeypatch):
-    from demalware.engine.actions.errors import ActionError
+    from admenot.engine.actions.errors import ActionError
 
     def gone(adb, manufacturer=""):
         raise ActionError("disconnected", "device not found")
 
-    monkeypatch.setattr("demalware.cli.actions_cli.read_phone_context", gone)
+    monkeypatch.setattr("admenot.cli.actions_cli.read_phone_context", gone)
     assert main(["fix", "--app", "com.wlive.forecast=disable", "--yes"], host=make_cli_phone()) == 3
     assert "Podłącz" in capsys.readouterr().err
 
 
 def test_fix_stores_scan_snapshot_and_verification(monkeypatch, tmp_path, capsys):
-    monkeypatch.setenv("DEMALWARE_ASSETS", str(tmp_path / "no-assets"))
+    monkeypatch.setenv("ADMENOT_ASSETS", str(tmp_path / "no-assets"))
     phone = make_cli_phone()
     assert main(["fix", "--app", "com.wlive.forecast=disable", "--yes"], host=phone) == 0
     (order,) = _orders()
@@ -138,7 +138,7 @@ def test_fix_stores_scan_snapshot_and_verification(monkeypatch, tmp_path, capsys
 
 
 def test_fix_with_apk_stores_app_names_and_icons_for_the_report(monkeypatch, tmp_path):
-    from demalware.engine.apk.analyze import ApkReport
+    from admenot.engine.apk.analyze import ApkReport
 
     icon = "data:image/png;base64,iVBORw0KGgo="
 
@@ -150,8 +150,8 @@ def test_fix_with_apk_stores_app_names_and_icons_for_the_report(monkeypatch, tmp
             return {"com.wlive.forecast": ApkReport("com.wlive.forecast", label="Pogoda Live",
                                                     icon=icon, class_count=1)}
 
-    monkeypatch.setenv("DEMALWARE_ASSETS", str(tmp_path / "no-assets"))
-    monkeypatch.setattr("demalware.cli.main.DeviceApkProvider", Provider)
+    monkeypatch.setenv("ADMENOT_ASSETS", str(tmp_path / "no-assets"))
+    monkeypatch.setattr("admenot.cli.main.DeviceApkProvider", Provider)
     assert main(["fix", "--apk", "--app", "com.wlive.forecast=disable", "--yes"],
                 host=make_cli_phone()) == 0
     (order,) = _orders()
@@ -161,24 +161,24 @@ def test_fix_with_apk_stores_app_names_and_icons_for_the_report(monkeypatch, tmp
 
 
 def test_fix_clears_the_apk_cache_after_a_finished_repair(capsys, data_dir):
-    from demalware.engine.settings import save_settings
+    from admenot.engine.settings import save_settings
 
     save_settings({"apk_cache_clear_after_repair": True})
-    entry = data_dir / "DeMalware" / "apk-cache" / "com.x" / "1"
+    entry = data_dir / "AdMeNot" / "apk-cache" / "com.x" / "1"
     entry.mkdir(parents=True)
     (entry / "base.apk").write_bytes(b"x" * 1_000_000)
     assert main(["fix", "--app", "com.wlive.forecast=disable", "--yes"], host=make_cli_phone()) == 0
     out = capsys.readouterr().out
     assert "Usunięto pamięć podręczną APK po naprawie (1 MB)" in out
-    assert not (data_dir / "DeMalware" / "apk-cache" / "com.x").exists()
+    assert not (data_dir / "AdMeNot" / "apk-cache" / "com.x").exists()
 
 
 def test_fix_uses_the_incident_recording_like_scan(monkeypatch, tmp_path):
-    from demalware.cli import actions_cli
-    from demalware.engine.incident import Sample, Timeline, save_incident
-    from demalware.engine.paths import incident_path
+    from admenot.cli import actions_cli
+    from admenot.engine.incident import Sample, Timeline, save_incident
+    from admenot.engine.paths import incident_path
 
-    monkeypatch.setenv("DEMALWARE_ASSETS", str(tmp_path / "no-assets"))
+    monkeypatch.setenv("ADMENOT_ASSETS", str(tmp_path / "no-assets"))
     phone = make_cli_phone()
     save_incident(incident_path(phone.serial),
                   Timeline([Sample(0.0, "com.game", ["com.wlive.forecast"], None, [])], [0.0]), datetime.now())

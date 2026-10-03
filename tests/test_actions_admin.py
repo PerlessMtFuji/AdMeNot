@@ -1,14 +1,14 @@
 import pytest
 from fakephone import FakeApp, FakePhone
 
-from demalware.engine.actions import commands as C
-from demalware.engine.actions.context import read_phone_context
-from demalware.engine.actions.executor import ExecOptions, run_order, start_order, undo
-from demalware.engine.actions.planner import plan_app
-from demalware.engine.adb.transport import AdbError
-from demalware.engine.allowlist.trust import load_protected_list
-from demalware.engine.facts import AppFacts
-from demalware.engine.journal.db import Journal
+from admenot.engine.actions import commands as C
+from admenot.engine.actions.context import read_phone_context
+from admenot.engine.actions.executor import ExecOptions, run_order, start_order, undo
+from admenot.engine.actions.planner import plan_app
+from admenot.engine.adb.transport import AdbError
+from admenot.engine.allowlist.trust import load_protected_list
+from admenot.engine.facts import AppFacts
+from admenot.engine.journal.db import Journal
 
 
 class FakeClock:

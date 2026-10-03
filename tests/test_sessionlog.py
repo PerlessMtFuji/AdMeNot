@@ -2,9 +2,9 @@ from datetime import datetime
 
 import pytest
 
-from demalware.engine.adb.fake import FakeAdb
-from demalware.engine.adb.sessionlog import OUTPUT_LIMIT, SessionLogAdb, session_log_path
-from demalware.engine.adb.transport import AdbError
+from admenot.engine.adb.fake import FakeAdb
+from admenot.engine.adb.sessionlog import OUTPUT_LIMIT, SessionLogAdb, session_log_path
+from admenot.engine.adb.transport import AdbError
 
 
 def test_session_log_records_commands_without_output(tmp_path):

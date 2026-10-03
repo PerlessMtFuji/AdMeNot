@@ -1,4 +1,4 @@
-"""Pobiera dołączone narzędzia do src/demalware/assets/tools/ (Plan 6b, spec §3.1).
+"""Pobiera dołączone narzędzia do src/admenot/assets/tools/ (Plan 6b, spec §3.1).
 
     .venv\\Scripts\\python scripts\\fetch_tools.py
 
@@ -19,7 +19,7 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
-TARGET = ROOT / "src" / "demalware" / "assets" / "tools" / "scrcpy"
+TARGET = ROOT / "src" / "admenot" / "assets" / "tools" / "scrcpy"
 VERSION = "4.1"
 ARCHIVE = f"scrcpy-win64-v{VERSION}.zip"
 URL = f"https://github.com/Genymobile/scrcpy/releases/download/v{VERSION}/{ARCHIVE}"

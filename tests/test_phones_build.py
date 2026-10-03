@@ -3,9 +3,9 @@ import sqlite3
 import pytest
 from phonedb import RECORDS, make_phone_assets, write_sources
 
-from demalware.engine import paths
-from demalware.engine.phones import build
-from demalware.engine.phones.build import build_phone_db, read_gplay_csv
+from admenot.engine import paths
+from admenot.engine.phones import build
+from admenot.engine.phones.build import build_phone_db, read_gplay_csv
 
 
 def _rows(db, sql):
@@ -127,8 +127,8 @@ def test_interrupted_sync_keeps_previous_db(tmp_path, monkeypatch):
 
 
 def test_assets_dir_env_override(monkeypatch, tmp_path):
-    monkeypatch.setenv("DEMALWARE_ASSETS", str(tmp_path))
+    monkeypatch.setenv("ADMENOT_ASSETS", str(tmp_path))
     assert paths.assets_dir() == tmp_path
-    monkeypatch.delenv("DEMALWARE_ASSETS")
+    monkeypatch.delenv("ADMENOT_ASSETS")
     assert paths.assets_dir() == paths.PACKAGE_ASSETS
-    assert paths.PACKAGE_ASSETS.parent.name == "demalware"
+    assert paths.PACKAGE_ASSETS.parent.name == "admenot"

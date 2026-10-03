@@ -2,8 +2,8 @@ import sys
 
 import pytest
 
-from demalware.app import main as app_main
-from demalware.cli.main import main as cli_main
+from admenot.app import main as app_main
+from admenot.cli.main import main as cli_main
 
 
 @pytest.fixture(autouse=True)
@@ -65,7 +65,7 @@ def test_window_is_created_with_the_api(monkeypatch, tmp_path):
 
     monkeypatch.setitem(sys.modules, "webview", FakeWebview)
     assert app_main.run_gui() == 0
-    assert created["title"] == "DeMalware" and created["url"] == str(web / "index.html")
+    assert created["title"] == "AdMeNot" and created["url"] == str(web / "index.html")
     assert created["min_size"] == (1024, 700) and created["start"]["http_server"] is True
     assert created["closing"].__self__ is created["js_api"]
 

@@ -1,0 +1,133 @@
+from __future__ import annotations
+
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
+from datetime import datetime
+
+from admenot.engine.adb.transport import AdbError, AdbTransport
+from admenot.engine.facts import AppFacts
+from admenot.engine.parsers.alarm import AlarmStats, parse_alarm_stats
+from admenot.engine.parsers.appops import AppOpState, parse_appops
+from admenot.engine.parsers.notifications import NotifStats, parse_notifications
+from admenot.engine.parsers.usagestats import UsageCounts, observed_since, parse_usage_events
+
+APPOPS_GET = "appops get {package}"
+NOTIFICATIONS = "dumpsys notification"
+USAGESTATS = "dumpsys usagestats"
+ALARM = "dumpsys alarm"
+
+
+@dataclass
+class AppOpsData:
+    ops: dict[str, dict[str, AppOpState]] = field(default_factory=dict)
+    failed: list[str] = field(default_factory=list)
+
+
+class AppOpsCollector:
+    name = "appops"
+
+    SAW = "android.permission.SYSTEM_ALERT_WINDOW"
+
+    def __init__(self, workers: int = 4) -> None:
+        self.workers = workers
+
+    def covers(self, facts: AppFacts) -> bool:
+        # Systemowe tylko z uprawnieniem do okien nad innymi: pełna lista to setki wywołań.
+        return not facts.is_system or self.SAW in facts.requested_permissions
+
+    def collect(self, adb: AdbTransport, apps: list[AppFacts]) -> AppOpsData:
+        targets = [a.package for a in apps if self.covers(a)]
+
+        def one(package: str) -> tuple[str, dict[str, AppOpState] | None]:
+            try:
+                text = adb.shell(APPOPS_GET.format(package=package))
+                ops = parse_appops(text)
+            except Exception:  # noqa: BLE001 — jeden nietypowy wynik nie może skasować danych pozostałych aplikacji
+                return package, None
+            if not ops and "No operations" not in text:
+                return package, None  # tekst, którego parser nie zna — brak danych, nie „brak operacji”
+            return package, ops
+
+        data = AppOpsData()
+        with ThreadPoolExecutor(max_workers=self.workers) as pool:
+            for package, ops in pool.map(one, targets):
+                if ops is None:
+                    data.failed.append(package)
+                else:
+                    data.ops[package] = ops
+        if targets and not data.ops:
+            raise AdbError("command_failed", "appops returned no data for any package")
+        return data
+
+    def apply(self, facts: dict[str, AppFacts], data: AppOpsData) -> None:
+        for package, ops in data.ops.items():
+            if package in facts:
+                facts[package].appops = ops
+        for package in data.failed:
+            if package in facts:
+                facts[package].gaps.add(self.name)
+
+
+class NotificationsCollector:
+    name = "notifications"
+
+    def collect(self, adb: AdbTransport, apps: list[AppFacts]) -> dict[str, NotifStats]:
+        return parse_notifications(adb.shell(NOTIFICATIONS, timeout=30))
+
+    def apply(self, facts: dict[str, AppFacts], data: dict[str, NotifStats]) -> None:
+        for f in facts.values():
+            stats = data.get(f.package)
+            f.notif_active = stats.active if stats else 0
+            f.notif_fsi = bool(stats and stats.fsi)
+
+
+class UsageStatsCollector:
+    name = "usagestats"
+
+    def __init__(self, now: datetime) -> None:
+        self.now = now
+
+    def collect(self, adb: AdbTransport, apps: list[AppFacts]) -> tuple[dict[str, UsageCounts], float]:
+        text = adb.shell(USAGESTATS, timeout=30)
+        counts = parse_usage_events(text, self.now)
+        if counts is None:
+            raise ValueError("no usage events in dumpsys usagestats")
+        since = observed_since(text, self.now)
+        window_h = 0.0 if since is None else max(0.0, (self.now - since).total_seconds() / 3600)
+        return counts, round(min(window_h, 24.0), 2)
+
+    def apply(self, facts: dict[str, AppFacts], data: tuple[dict[str, UsageCounts], float]) -> None:
+        counts_by_pkg, window_h = data
+        for f in facts.values():
+            counts = counts_by_pkg.get(f.package)
+            f.notif_interruptions_24h = counts.notif_interruptions if counts else 0
+            f.foreground_24h = counts.foreground if counts else 0
+            f.unlock_launches_24h = counts.unlock_launches if counts else 0
+            f.notif_peak_1h = counts.notif_peak_1h if counts else 0
+            f.usage_window_h = window_h
+
+
+class AlarmCollector:
+    name = "alarm"
+
+    def __init__(self, uptime_s: float) -> None:
+        self.uptime_h = uptime_s / 3600
+
+    def covers(self, facts: AppFacts) -> bool:
+        # Wybudzenia czyta tylko DM-ALARM-01 (is_system: false) — awaria nie jest luką systemowych.
+        return not facts.is_system
+
+    def collect(self, adb: AdbTransport, apps: list[AppFacts]) -> dict[str, AlarmStats]:
+        stats = parse_alarm_stats(adb.shell(ALARM, timeout=30))
+        if stats is None:
+            raise ValueError("no 'Alarm Stats:' section in dumpsys alarm")
+        return stats
+
+    def apply(self, facts: dict[str, AppFacts], data: dict[str, AlarmStats]) -> None:
+        for f in facts.values():
+            stats = data.get(f.package)
+            f.alarm_wakeups = stats.wakeups if stats else 0
+            window = self.uptime_h
+            if f.installed_days is not None:
+                window = min(window, f.installed_days * 24)
+            f.alarm_window_h = max(window, 1.0)

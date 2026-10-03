@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from demalware.engine.adb.fake import FakeAdb
-from demalware.engine.apk.providers import StoredApkProvider
-from demalware.engine.session import run_scan
+from admenot.engine.adb.fake import FakeAdb
+from admenot.engine.apk.providers import StoredApkProvider
+from admenot.engine.session import run_scan
 
 FIXTURES = sorted(p.parent for p in (Path(__file__).parent / "fixtures").glob("*/manifest.json"))
 

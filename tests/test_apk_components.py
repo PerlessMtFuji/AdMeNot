@@ -1,13 +1,13 @@
 import xml.etree.ElementTree as ET
 
-from demalware.engine.apk.analyze import (
+from admenot.engine.apk.analyze import (
     ApkReport,
     apply_apk_report,
     report_from_json,
     report_to_json,
 )
-from demalware.engine.apk.components import A11yConfig, parse_components
-from demalware.engine.facts import AppFacts
+from admenot.engine.apk.components import A11yConfig, parse_components
+from admenot.engine.facts import AppFacts
 
 A = "http://schemas.android.com/apk/res/android"
 MANIFEST = f"""<manifest xmlns:android="{A}" package="com.x">

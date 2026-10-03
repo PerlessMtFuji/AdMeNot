@@ -5,16 +5,16 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from demalware.engine.adb.fake import FakeAdb
-from demalware.engine.collectors.behavior import ALARM, APPOPS_GET, NOTIFICATIONS, USAGESTATS
-from demalware.engine.collectors.components import BOOT_QUERY, HOME_QUERY, LAUNCHER_QUERY
-from demalware.engine.collectors.packages import (
+from admenot.engine.adb.fake import FakeAdb
+from admenot.engine.collectors.behavior import ALARM, APPOPS_GET, NOTIFICATIONS, USAGESTATS
+from admenot.engine.collectors.components import BOOT_QUERY, HOME_QUERY, LAUNCHER_QUERY
+from admenot.engine.collectors.packages import (
     DUMPSYS_PACKAGES,
     PM_DISABLED,
     PM_LIST,
     PM_SYSTEM,
 )
-from demalware.engine.collectors.system import (
+from admenot.engine.collectors.system import (
     A11Y_SERVICES,
     DEVICE_POLICY,
     NOTIF_LISTENERS,
@@ -22,7 +22,7 @@ from demalware.engine.collectors.system import (
     ROLE_HOME,
     ROLE_SMS,
 )
-from demalware.engine.device.info import GETPROP, LOCAL_NOW, UPTIME
+from admenot.engine.device.info import GETPROP, LOCAL_NOW, UPTIME
 
 SERIAL = "R58T00TEST"
 NOW = datetime(2026, 9, 26, 14, 0, 0)

@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 import pytest
 from phonedb import make_device, make_phone_assets
 
-from demalware.engine.phones.provider import SILHOUETTE, PhoneImageProvider
+from admenot.engine.phones.provider import SILHOUETTE, PhoneImageProvider
 
 
 @pytest.fixture(scope="module")

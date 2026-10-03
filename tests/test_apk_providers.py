@@ -4,21 +4,21 @@ from collections import namedtuple
 
 import pytest
 
-from demalware.engine.adb.fake import FakeAdb
-from demalware.engine.adb.transport import AdbError
-from demalware.engine.apk import cache as C
-from demalware.engine.apk.analyze import ApkReport, apply_apk_report, report_to_json, scope_notes
-from demalware.engine.apk.fetch import FetchedApks
-from demalware.engine.apk.isolated import IsolatedAnalyzer
-from demalware.engine.apk.providers import (
+from admenot.engine.adb.fake import FakeAdb
+from admenot.engine.adb.transport import AdbError
+from admenot.engine.apk import cache as C
+from admenot.engine.apk.analyze import ApkReport, apply_apk_report, report_to_json, scope_notes
+from admenot.engine.apk.fetch import FetchedApks
+from admenot.engine.apk.isolated import IsolatedAnalyzer
+from admenot.engine.apk.providers import (
     CachePolicy,
     DeviceApkProvider,
     StoredApkProvider,
     select_apk_targets,
 )
-from demalware.engine.facts import AppFacts
-from demalware.engine.rules.model import Finding
-from demalware.engine.scoring import AppResult
+from admenot.engine.facts import AppFacts
+from admenot.engine.rules.model import Finding
+from admenot.engine.scoring import AppResult
 
 
 def _result(package, verdict="safe", trusted=False, is_system=False):
@@ -337,7 +337,7 @@ def test_own_entry_is_not_pruned_before_its_fetch(tmp_path, monkeypatch):
 
 
 def test_estimate_failing_with_oserror_runs_without_estimate(tmp_path, free, monkeypatch):
-    from demalware.engine.apk import providers as P
+    from admenot.engine.apk import providers as P
 
     def broken(*a, **kw):
         raise OSError("cache dir vanished")

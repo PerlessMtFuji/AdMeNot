@@ -1,6 +1,6 @@
-from demalware.engine.capture import anonymize
-from demalware.engine.collectors.behavior import ALARM
-from demalware.engine.parsers.alarm import AlarmStats, parse_alarm_stats
+from admenot.engine.capture import anonymize
+from admenot.engine.collectors.behavior import ALARM
+from admenot.engine.parsers.alarm import AlarmStats, parse_alarm_stats
 
 ALARM_OUT = """Current Alarm Manager state:
   Pending alarm batches: 2

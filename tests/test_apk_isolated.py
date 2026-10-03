@@ -1,8 +1,8 @@
 import os
 import time
 
-from demalware.engine.apk.analyze import ApkReport
-from demalware.engine.apk.isolated import IsolatedAnalyzer
+from admenot.engine.apk.analyze import ApkReport
+from admenot.engine.apk.isolated import IsolatedAnalyzer
 
 
 def _analyze(package, paths):

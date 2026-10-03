@@ -1,0 +1,30 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from admenot.engine.adb.transport import AdbTransport
+
+
+@dataclass(frozen=True)
+class DeviceEntry:
+    serial: str
+    state: str  # device | unauthorized | offline | ...
+    model: str | None = None
+
+
+def parse_devices(output: str) -> list[DeviceEntry]:
+    entries: list[DeviceEntry] = []
+    for raw in output.splitlines():
+        line = raw.strip()
+        if not line or line.startswith(("*", "List of devices")):
+            continue
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        attrs = dict(p.split(":", 1) for p in parts[2:] if ":" in p)
+        entries.append(DeviceEntry(parts[0], parts[1], attrs.get("model")))
+    return entries
+
+
+def list_devices(host: AdbTransport) -> list[DeviceEntry]:
+    return parse_devices(host.run(["devices", "-l"]))

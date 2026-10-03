@@ -1,4 +1,4 @@
-from demalware.engine.texts import (
+from admenot.engine.texts import (
     SHOT_TEXTS,
     TEXTS,
     VERDICT_LABELS,

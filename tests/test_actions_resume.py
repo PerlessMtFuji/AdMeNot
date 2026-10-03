@@ -1,14 +1,14 @@
 import pytest
 from fakephone import FakeApp, FakePhone
 
-from demalware.engine.actions import commands as C
-from demalware.engine.actions.context import read_phone_context
-from demalware.engine.actions.errors import ActionError
-from demalware.engine.actions.executor import resume, run_order, start_order, undo
-from demalware.engine.actions.planner import plan_app
-from demalware.engine.allowlist.trust import load_protected_list
-from demalware.engine.facts import AppFacts
-from demalware.engine.journal.db import Journal
+from admenot.engine.actions import commands as C
+from admenot.engine.actions.context import read_phone_context
+from admenot.engine.actions.errors import ActionError
+from admenot.engine.actions.executor import resume, run_order, start_order, undo
+from admenot.engine.actions.planner import plan_app
+from admenot.engine.allowlist.trust import load_protected_list
+from admenot.engine.facts import AppFacts
+from admenot.engine.journal.db import Journal
 
 SAW = "android.permission.SYSTEM_ALERT_WINDOW"  # aplikacje w tych testach mogą rysować nad innymi
 DISABLE = C.PM_DISABLE.format(package="com.spam")

@@ -1,6 +1,6 @@
 import pytest
 
-from demalware.engine.parsers.appops import AppOpState, parse_appops
+from admenot.engine.parsers.appops import AppOpState, parse_appops
 
 LEGACY = """SYSTEM_ALERT_WINDOW: allow; time=+4m12s123ms ago; duration=+2s
 POST_NOTIFICATION: allow; time=+1h ago; rejectTime=+2d ago

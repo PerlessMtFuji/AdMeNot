@@ -1,8 +1,8 @@
 from datetime import datetime
 
-from demalware.engine.adb.devices import DeviceEntry, list_devices, parse_devices
-from demalware.engine.adb.fake import FakeAdb
-from demalware.engine.device.info import (
+from admenot.engine.adb.devices import DeviceEntry, list_devices, parse_devices
+from admenot.engine.adb.fake import FakeAdb
+from admenot.engine.device.info import (
     GETPROP,
     LOCAL_NOW,
     UPTIME,

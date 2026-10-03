@@ -1,14 +1,14 @@
 import pytest
 from fakephone import make_cli_phone
 
-from demalware.engine.actions import commands as C
-from demalware.engine.actions.executor import ExecOptions, resume, run_order
-from demalware.engine.actions.planner import Blocked
-from demalware.engine.journal.db import Journal
-from demalware.engine.phones.provider import PhoneImageProvider
-from demalware.engine.session import run_scan
-from demalware.engine.settings import Settings
-from demalware.engine.workflow import (
+from admenot.engine.actions import commands as C
+from admenot.engine.actions.executor import ExecOptions, resume, run_order
+from admenot.engine.actions.planner import Blocked
+from admenot.engine.journal.db import Journal
+from admenot.engine.phones.provider import PhoneImageProvider
+from admenot.engine.session import run_scan
+from admenot.engine.settings import Settings
+from admenot.engine.workflow import (
     AppStatus,
     OrderInterrupted,
     OrderResult,

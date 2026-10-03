@@ -7,7 +7,7 @@ import { setupCtl } from './test-utils';
 test('shell: brand, five stages in the rail, history and settings toggle', async () => {
   const { ctl, s } = await setupCtl('empty');
   render(App, { props: { ctl } });
-  expect(screen.getByText('DeMalware')).toBeTruthy();
+  expect(screen.getByText('AdMeNot')).toBeTruthy();
   const stages = screen.getByRole('list', { name: 'Etapy' });
   expect(stages.children).toHaveLength(5);
   expect(stages.children[0].getAttribute('aria-current')).toBe('step');

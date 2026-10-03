@@ -5,8 +5,8 @@ from apphelpers import SlowApk, make_api
 from conftest import SERIAL
 from fakephone import make_cli_phone
 
-from demalware.engine.report.pdf import PdfError
-from demalware.engine.settings import ServiceInfo, load_service
+from admenot.engine.report.pdf import PdfError
+from admenot.engine.settings import ServiceInfo, load_service
 
 WLIVE = {"com.wlive.forecast": "disable"}
 
@@ -14,7 +14,7 @@ WLIVE = {"com.wlive.forecast": "disable"}
 @pytest.fixture(autouse=True)
 def env(monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "data"))
-    monkeypatch.setenv("DEMALWARE_ASSETS", str(tmp_path / "no-assets"))
+    monkeypatch.setenv("ADMENOT_ASSETS", str(tmp_path / "no-assets"))
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ def edge(monkeypatch):
         calls.append((html, pdf))
         pdf.write_bytes(b"%PDF-1.4 fake")
 
-    monkeypatch.setattr("demalware.engine.report.files.html_to_pdf", fake)
+    monkeypatch.setattr("admenot.engine.report.files.html_to_pdf", fake)
     return calls
 
 
@@ -40,7 +40,7 @@ def _executed(**kw):
 def test_report_writes_pdf_and_opens_it(edge, tmp_path):
     api, _, number, opened = _executed()
     r = api.report(number)
-    reports = tmp_path / "data" / "DeMalware" / "reports"
+    reports = tmp_path / "data" / "AdMeNot" / "reports"
     stem = number.replace("/", "-")
     assert r == {"order": number, "html": str(reports / f"{stem}.html"),
                  "pdf": str(reports / f"{stem}.pdf"), "error": None,
@@ -53,7 +53,7 @@ def test_pdf_failure_opens_the_html(monkeypatch):
     def broken(html, pdf):
         raise PdfError("locked")
 
-    monkeypatch.setattr("demalware.engine.report.files.html_to_pdf", broken)
+    monkeypatch.setattr("admenot.engine.report.files.html_to_pdf", broken)
     api, _, number, opened = _executed()
     r = api.report(number)
     assert r["pdf"] is None and r["error"] == "locked" and r["opened"] == r["html"]

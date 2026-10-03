@@ -5,14 +5,14 @@ from apphelpers import make_api
 from conftest import SERIAL
 from fakephone import make_cli_phone
 
-from demalware.engine.adb.transport import AdbError
-from demalware.engine.foreground import ACTIVITIES, WINDOWS
+from admenot.engine.adb.transport import AdbError
+from admenot.engine.foreground import ACTIVITIES, WINDOWS
 
 
 @pytest.fixture(autouse=True)
 def env(monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "data"))
-    monkeypatch.setenv("DEMALWARE_ASSETS", str(tmp_path / "no-assets"))
+    monkeypatch.setenv("ADMENOT_ASSETS", str(tmp_path / "no-assets"))
     return tmp_path
 
 
@@ -35,7 +35,7 @@ def test_console_runs_commands_and_marks_them(env):
     assert result["ok"] is True and "ro.product.model" in result["output"]
     (entry,) = rec.of("adb:command")
     assert entry["tag"] == "console" and entry["command"] == "getprop"
-    log = next((env / "data" / "DeMalware" / "logs").glob("*.log")).read_text("utf-8")
+    log = next((env / "data" / "AdMeNot" / "logs").glob("*.log")).read_text("utf-8")
     assert "\tconsole:getprop" in log
     failed = api.adb_shell("no-such-command")
     assert failed["ok"] is False and "no response" in failed["output"]
@@ -153,7 +153,7 @@ def test_closing_without_an_order_closes_at_once():
 
 def test_unexpected_errors_are_logged_not_raised(monkeypatch):
     api, _ = make_api(make_cli_phone())
-    monkeypatch.setattr("demalware.app.api.history_view",
+    monkeypatch.setattr("admenot.app.api.history_view",
                         lambda *a: (_ for _ in ()).throw(RuntimeError("boom")))
     error = api.history()["error"]
     assert error["key"] == "internal" and "boom" in error["message"] and error["log"]

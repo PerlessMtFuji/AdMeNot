@@ -15,12 +15,12 @@ from pathlib import Path
 
 from conftest import SERIAL, SYNTHETIC_DEVICES, make_synthetic_adb
 
-from demalware.engine.actions import commands as C
-from demalware.engine.adb.transport import AdbError
-from demalware.engine.collectors.components import HOME_QUERY
-from demalware.engine.collectors.packages import PM_DISABLED, PM_SYSTEM
-from demalware.engine.collectors.profiles import PM_USERS
-from demalware.engine.collectors.system import DEVICE_POLICY, RESOLVE_HOME
+from admenot.engine.actions import commands as C
+from admenot.engine.adb.transport import AdbError
+from admenot.engine.collectors.components import HOME_QUERY
+from admenot.engine.collectors.packages import PM_DISABLED, PM_SYSTEM
+from admenot.engine.collectors.profiles import PM_USERS
+from admenot.engine.collectors.system import DEVICE_POLICY, RESOLVE_HOME
 
 POST = "android.permission.POST_NOTIFICATIONS"
 LISTENERS = "enabled_notification_listeners"

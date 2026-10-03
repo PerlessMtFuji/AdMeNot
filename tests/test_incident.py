@@ -1,7 +1,7 @@
-from demalware.engine.adb.fake import FakeAdb
-from demalware.engine.collectors.behavior import NOTIFICATIONS
-from demalware.engine.foreground import ACTIVITIES, WINDOWS
-from demalware.engine.incident import Sample, Timeline, attribute, incident_facts, record
+from admenot.engine.adb.fake import FakeAdb
+from admenot.engine.collectors.behavior import NOTIFICATIONS
+from admenot.engine.foreground import ACTIVITIES, WINDOWS
+from admenot.engine.incident import Sample, Timeline, attribute, incident_facts, record
 
 
 def _s(t, resumed="com.android.launcher", overlays=(), notif=None):
@@ -48,7 +48,7 @@ def test_record_samples_until_duration_and_keeps_marks():
 def test_saved_incident_feeds_the_next_scan_only_while_fresh(tmp_path):
     from datetime import datetime, timedelta
 
-    from demalware.engine.incident import load_incident, save_incident
+    from admenot.engine.incident import load_incident, save_incident
 
     tl = Timeline([_s(0.0, resumed="com.game", overlays=["com.ads"])], marks=[0.0])
     path = tmp_path / "incidents" / "SERIAL.json"
@@ -64,7 +64,7 @@ def test_saved_incident_feeds_the_next_scan_only_while_fresh(tmp_path):
 def test_scan_with_an_incident_sets_hits_and_fires_the_rule():
     from conftest import make_synthetic_adb
 
-    from demalware.engine.session import run_scan
+    from admenot.engine.session import run_scan
 
     report = run_scan(make_synthetic_adb(), incidents={"com.clean.pro.boost": (1, "com.game")})
     by_pkg = {r.facts.package: r for r in report.results}
@@ -78,7 +78,7 @@ def test_scan_with_an_incident_sets_hits_and_fires_the_rule():
 def test_recording_without_marks_does_not_replace_a_good_one(tmp_path):
     from datetime import datetime, timedelta
 
-    from demalware.engine.incident import load_incident, save_incident
+    from admenot.engine.incident import load_incident, save_incident
 
     path, at = tmp_path / "S.json", datetime(2026, 10, 1, 12, 0)
     assert save_incident(path, Timeline([_s(0.0, resumed="com.game", overlays=["com.ads"])], [0.0]), at)
@@ -89,7 +89,7 @@ def test_recording_without_marks_does_not_replace_a_good_one(tmp_path):
 def test_marks_with_nothing_read_are_undetermined_not_zero(tmp_path):
     from datetime import datetime
 
-    from demalware.engine.incident import load_incident, save_incident
+    from admenot.engine.incident import load_incident, save_incident
 
     path, at = tmp_path / "S.json", datetime(2026, 10, 1, 12, 0)
     unread = Timeline([Sample(0.0, None, None, None, ["windows: timeout"])], marks=[0.0])

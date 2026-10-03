@@ -1,13 +1,13 @@
 import pytest
 
-from demalware.engine.apk.callgraph import CodePath
-from demalware.engine.facts import AppFacts
-from demalware.engine.parsers.appops import AppOpState
-from demalware.engine.rules.conditions import check
-from demalware.engine.rules.engine import load_default_ruleset, load_yaml_rules, parse_rules
-from demalware.engine.rules.model import BASES, Finding
-from demalware.engine.rules.python_rules import rule_name_mimic, rule_random_name
-from demalware.engine.scoring import COMBOS
+from admenot.engine.apk.callgraph import CodePath
+from admenot.engine.facts import AppFacts
+from admenot.engine.parsers.appops import AppOpState
+from admenot.engine.rules.conditions import check
+from admenot.engine.rules.engine import load_default_ruleset, load_yaml_rules, parse_rules
+from admenot.engine.rules.model import BASES, Finding
+from admenot.engine.rules.python_rules import rule_name_mimic, rule_random_name
+from admenot.engine.scoring import COMBOS
 
 
 def test_check_operators():

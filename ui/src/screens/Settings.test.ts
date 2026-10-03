@@ -28,10 +28,10 @@ test('settings: theme, language, mode, adb check, folder and save', async () => 
   expect(bridge.calls.at(-1)).toEqual({ method: 'check_adb', args: ['C:\\pt\\adb.exe'] });
   await fireEvent.click(screen.getByRole('button', { name: 'Wybierz…' }));
   await vi.waitFor(() => expect((screen.getByLabelText('Katalog kopii APK') as HTMLInputElement).value)
-    .toBe('D:\\DeMalware\\kopie'));
+    .toBe('D:\\AdMeNot\\kopie'));
   await fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
   expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings',
-    args: [{ adb_path: 'C:\\pt\\adb.exe', backups_dir: 'D:\\DeMalware\\kopie' }] });
+    args: [{ adb_path: 'C:\\pt\\adb.exe', backups_dir: 'D:\\AdMeNot\\kopie' }] });
   expect(await screen.findByText(/Zapisano/)).toBeTruthy();
   await fireEvent.click(screen.getByRole('button', { name: 'English' }));
   await vi.waitFor(() => expect(i18n.lang).toBe('en'));
@@ -50,10 +50,10 @@ test('settings: service details and logo', async () => {
   await fireEvent.input(screen.getByLabelText('Telefon serwisu'), { target: { value: '600 000 000' } });
   await fireEvent.click(screen.getByRole('button', { name: 'Wybierz logo…' }));
   await vi.waitFor(() => expect((screen.getByLabelText('Logo') as HTMLInputElement).value)
-    .toBe('D:\\DeMalware\\logo.png'));
+    .toBe('D:\\AdMeNot\\logo.png'));
   await fireEvent.click(screen.getByRole('button', { name: 'Zapisz dane serwisu' }));
   expect(bridge.calls.at(-1)).toEqual({ method: 'save_service', args: [{
-    name: 'Serwis Ząb', address: null, phone: '600 000 000', logo: 'D:\\DeMalware\\logo.png' }] });
+    name: 'Serwis Ząb', address: null, phone: '600 000 000', logo: 'D:\\AdMeNot\\logo.png' }] });
   expect(await screen.findByText(/Zapisano/)).toBeTruthy();
 });
 

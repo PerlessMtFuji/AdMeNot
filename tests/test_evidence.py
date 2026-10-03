@@ -1,8 +1,8 @@
-from demalware.engine.apk.callgraph import CodePath
-from demalware.engine.apk.components import A11yConfig, Component
-from demalware.engine.evidence import ladders
-from demalware.engine.facts import AppFacts
-from demalware.engine.parsers.appops import AppOpState
+from admenot.engine.apk.callgraph import CodePath
+from admenot.engine.apk.components import A11yConfig, Component
+from admenot.engine.evidence import ladders
+from admenot.engine.facts import AppFacts
+from admenot.engine.parsers.appops import AppOpState
 
 
 def _by_cap(facts):

@@ -4,8 +4,8 @@ import zipfile
 import pytest
 from dexutil import make_apk, make_dex
 
-from demalware.engine.apk import dex as dexmod
-from demalware.engine.apk.dex import DexFormatError, read_apk_types, read_dex_types
+from admenot.engine.apk import dex as dexmod
+from admenot.engine.apk.dex import DexFormatError, read_apk_types, read_dex_types
 
 
 def test_read_dex_types_defined_and_referenced():

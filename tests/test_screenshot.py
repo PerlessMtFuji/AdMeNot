@@ -2,11 +2,11 @@ import pytest
 from fakephone import make_cli_phone, png_bytes
 from PIL import Image
 
-from demalware.engine import paths
-from demalware.engine.adb.transport import AdbError
-from demalware.engine.foreground import ACTIVITIES, WINDOWS, Foreground
-from demalware.engine.journal.db import Journal
-from demalware.engine.screenshot import (
+from admenot.engine import paths
+from admenot.engine.adb.transport import AdbError
+from admenot.engine.foreground import ACTIVITIES, WINDOWS, Foreground
+from admenot.engine.journal.db import Journal
+from admenot.engine.screenshot import (
     capture_png,
     context_of,
     delete_shots,
@@ -14,7 +14,7 @@ from demalware.engine.screenshot import (
     take_screenshot,
     write_report_copy,
 )
-from demalware.engine.texts import screenshot_caption
+from admenot.engine.texts import screenshot_caption
 
 
 @pytest.fixture(autouse=True)

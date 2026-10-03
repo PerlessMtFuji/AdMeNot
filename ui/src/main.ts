@@ -12,7 +12,7 @@ window.addEventListener('unhandledrejection', (e) => { state.fatal = String(e.re
 const bridge = await connectBridge();
 const ctl = new Controller(state, bridge);
 if (import.meta.env.VITE_FAKE_BRIDGE === '1') {
-  (window as unknown as { __demalware: unknown }).__demalware = { ctl, bridge };
+  (window as unknown as { __admenot: unknown }).__admenot = { ctl, bridge };
 }
 mount(App, { target: document.getElementById('app')!, props: { ctl } });
 void ctl.init();

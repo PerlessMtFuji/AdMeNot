@@ -1,0 +1,249 @@
+"""Rozpoznanie modelu telefonu i jego zdjęcie (spec §4.3). Jedyny moduł, który czyta `phones.db`."""
+
+from __future__ import annotations
+
+import json
+import os
+import sqlite3
+import threading
+from contextlib import closing
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+from admenot.engine import paths
+from admenot.engine.device.info import DeviceInfo
+from admenot.engine.phones.build import DB_NAME, IMAGES_DIR
+from admenot.engine.phones.names import (
+    canonical_brand,
+    key_tokens,
+    model_key,
+    name_tokens,
+    norm_name,
+    with_brand,
+)
+
+SILHOUETTE = paths.PACKAGE_ASSETS / "silhouette.svg"
+FUZZY_THRESHOLD = 0.5
+
+# tokeny nazwy, tokeny numeru modelu, slug
+_Entry = tuple[list[str], frozenset[str], str]
+
+
+@dataclass(frozen=True)
+class PhoneRecord:
+    slug: str
+    name: str
+    brand: str
+    year: int | None
+    display_in: float | None
+    battery_mah: int | None
+
+
+@dataclass(frozen=True)
+class PhoneMatch:
+    confidence: str  # manual | exact | approximate | none
+    step: str        # override | model_code | market_name | gplay | fuzzy | silhouette | no_db
+    image: Path
+    phone: PhoneRecord | None = None
+    matched: str | None = None  # kod albo znormalizowana nazwa, po której dopasowano
+
+    @property
+    def has_photo(self) -> bool:
+        return self.image.suffix == ".webp"
+
+    def to_dict(self) -> dict:
+        return {
+            "confidence": self.confidence, "step": self.step, "matched": self.matched,
+            "has_photo": self.has_photo, "image": str(self.image),
+            "phone": asdict(self.phone) if self.phone else None,
+        }
+
+
+class PhoneImageProvider:
+    """Baza telefonów i zdjęcia. Wymiana źródła zdjęć (§4.4) dotyczy tylko tego modułu i build.py."""
+
+    def __init__(self, assets: Path, overrides: Path) -> None:
+        self.db_path = assets / DB_NAME
+        self.images = assets / IMAGES_DIR
+        self.overrides_path = overrides
+        self._entries: list[_Entry] | None = None
+        self._by_brand: dict[str, list[_Entry]] = {}
+        self._index_lock = threading.Lock()
+
+    @classmethod
+    def default(cls) -> PhoneImageProvider:
+        return cls(paths.assets_dir(), paths.phone_overrides_path())
+
+    @property
+    def available(self) -> bool:
+        return self.db_path.is_file()
+
+    def match(self, device: DeviceInfo) -> PhoneMatch:
+        if not self.available:
+            return PhoneMatch("none", "no_db", SILHOUETTE)
+        try:
+            with self._connect() as con:
+                found = self._match(con, device)
+        except sqlite3.Error:
+            return PhoneMatch("none", "no_db", SILHOUETTE)
+        return found or PhoneMatch("none", "silhouette", SILHOUETTE)
+
+    def phone(self, slug: str) -> PhoneRecord | None:
+        if not self.available:
+            return None
+        try:
+            with self._connect() as con:
+                return self._record(con, slug)
+        except sqlite3.Error:
+            return None
+
+    def search(self, text: str, limit: int = 10) -> list[PhoneRecord]:
+        words = name_tokens(text)
+        if not words or not self.available:
+            return []
+        try:
+            with self._connect() as con:
+                slugs: list[str] = []
+                for tokens, _, slug in self._index(con):
+                    if slug in slugs:
+                        continue
+                    if all(any(t.startswith(w) for t in tokens) for w in words):
+                        slugs.append(slug)
+                        if len(slugs) == limit:
+                            break
+                return [r for s in slugs if (r := self._record(con, s))]
+        except sqlite3.Error:
+            return []
+
+    def set_override(self, model: str, slug: str) -> None:
+        key = model_key(model)
+        if key is None:
+            raise ValueError("brak kodu modelu")
+        if self.phone(slug) is None:
+            raise KeyError(slug)
+        data = self._load_overrides()
+        data[key] = slug
+        self._save_overrides(data)
+
+    def clear_override(self, model: str) -> bool:
+        key = model_key(model)
+        data = self._load_overrides()
+        if key is None or key not in data:
+            return False
+        del data[key]
+        self._save_overrides(data)
+        return True
+
+    def _load_overrides(self) -> dict[str, str]:
+        try:
+            data = json.loads(self.overrides_path.read_text("utf-8"))
+        except (OSError, ValueError):
+            return {}  # brak albo uszkodzony plik: jak bez ręcznych wyborów
+        if not isinstance(data, dict):
+            return {}
+        return {k: v for k, v in data.items() if isinstance(v, str)}
+
+    def _save_overrides(self, data: dict[str, str]) -> None:
+        self.overrides_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.overrides_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True), "utf-8")
+        os.replace(tmp, self.overrides_path)
+
+    def _match(self, con: sqlite3.Connection, device: DeviceInfo) -> PhoneMatch | None:
+        key = model_key(device.model)
+        if key:
+            chosen = self._load_overrides().get(key)
+            if chosen and (found := self._hit(con, "manual", "override", chosen, key)):
+                return found
+            row = con.execute("SELECT slug FROM model_codes WHERE code = ?", (key,)).fetchone()
+            if row and (found := self._hit(con, "exact", "model_code", row[0], key)):
+                return found
+        brands = [b for b in dict.fromkeys(
+            (canonical_brand(device.brand), canonical_brand(device.manufacturer))) if b]
+        queries: list[str] = []
+        if device.market_name:
+            names = _candidates(brands, device.market_name)
+            if found := self._exact_name(con, names, "market_name"):
+                return found
+            queries += names
+        rows = con.execute("SELECT brand, market_name FROM gplay WHERE device = ? AND model = ?",
+                           (device.device, device.model)).fetchall()
+        for retail, market in rows:
+            names = _candidates([canonical_brand(retail), *brands], market)
+            if found := self._exact_name(con, names, "gplay"):
+                return found
+            queries += names
+        if device.model:
+            queries += _candidates(brands, device.model)
+        return self._fuzzy(con, queries)
+
+    def _exact_name(self, con: sqlite3.Connection, names: list[str],
+                    step: str) -> PhoneMatch | None:
+        for name in names:
+            row = con.execute("SELECT slug FROM market_names WHERE norm_name = ?",
+                              (name,)).fetchone()
+            if row and (found := self._hit(con, "exact", step, row[0], name)):
+                return found
+        return None
+
+    def _fuzzy(self, con: sqlite3.Connection, queries: list[str]) -> PhoneMatch | None:
+        self._index(con)
+        best: tuple[float, int] | None = None
+        hit: tuple[str, str] | None = None
+        for query in dict.fromkeys(queries):
+            q = query.split()
+            key = key_tokens(q)
+            # sama marka i goła liczba („huawei 8”) to za mało, by wskazać model
+            if not key or not any(not t.isdigit() for t in q[1:]):
+                continue
+            for tokens, entry_key, slug in self._by_brand.get(q[0], []):
+                if entry_key != key:
+                    continue
+                score = len(set(q) & set(tokens)) / len(set(q) | set(tokens))
+                rank = (score, -len(tokens))
+                if score >= FUZZY_THRESHOLD and (best is None or rank > best):
+                    best, hit = rank, (slug, query)
+        if hit is None:
+            return None
+        return self._hit(con, "approximate", "fuzzy", *hit)
+
+    def _index(self, con: sqlite3.Connection) -> list[_Entry]:
+        if self._entries is not None:
+            return self._entries
+        with self._index_lock:
+            if self._entries is not None:
+                return self._entries
+            entries: list[_Entry] = []
+            by_brand: dict[str, list[_Entry]] = {}
+            for name, slug in con.execute("SELECT norm_name, slug FROM market_names ORDER BY rowid"):
+                tokens = name.split()
+                entry = (tokens, key_tokens(tokens), slug)
+                entries.append(entry)
+                by_brand.setdefault(tokens[0], []).append(entry)
+            self._by_brand = by_brand
+            self._entries = entries
+        return self._entries
+
+    def _hit(self, con: sqlite3.Connection, confidence: str, step: str, slug: str,
+             matched: str) -> PhoneMatch | None:
+        phone = self._record(con, slug)
+        if phone is None:
+            return None
+        image = self.images / f"{slug}.webp"
+        return PhoneMatch(confidence, step, image if image.is_file() else SILHOUETTE, phone, matched)
+
+    @staticmethod
+    def _record(con: sqlite3.Connection, slug: str) -> PhoneRecord | None:
+        row = con.execute("SELECT slug, name, brand, year, display_in, battery_mah "
+                          "FROM phones WHERE slug = ?", (slug,)).fetchone()
+        return PhoneRecord(*row) if row else None
+
+    def _connect(self) -> closing[sqlite3.Connection]:
+        # nowe połączenie na każde wywołanie: GUI (Plan 5) woła z różnych wątków
+        uri = f"{self.db_path.resolve().as_uri()}?mode=ro"
+        return closing(sqlite3.connect(uri, uri=True))
+
+
+def _candidates(brands: list[str], name: str) -> list[str]:
+    names = [with_brand(b, name) for b in brands] + [norm_name(name)]
+    return [n for n in dict.fromkeys(names) if n]

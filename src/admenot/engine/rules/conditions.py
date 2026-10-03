@@ -1,0 +1,34 @@
+from __future__ import annotations
+
+from typing import Any
+
+from admenot.engine.facts import AppFacts
+
+_OPS = {
+    "eq": lambda a, b: a == b,
+    "ne": lambda a, b: a != b,
+    "gt": lambda a, b: a > b,
+    "gte": lambda a, b: a >= b,
+    "lt": lambda a, b: a < b,
+    "lte": lambda a, b: a <= b,
+    "in": lambda a, b: a in b,
+    "not_in": lambda a, b: a not in b,
+    "contains": lambda a, b: b in a,
+    "not_contains": lambda a, b: b not in a,
+}
+OPERATORS = frozenset(_OPS)
+
+
+def check(actual: Any, expected: Any) -> bool:
+    if isinstance(expected, dict):
+        unknown = set(expected) - OPERATORS
+        if unknown:
+            raise ValueError(f"unknown operator(s): {sorted(unknown)}")
+        if actual is None:
+            return False
+        return all(_OPS[op](actual, value) for op, value in expected.items())
+    return actual == expected
+
+
+def matches(facts: AppFacts, when: dict[str, Any]) -> bool:
+    return all(check(getattr(facts, name), expected) for name, expected in when.items())

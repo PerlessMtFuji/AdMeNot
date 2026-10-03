@@ -29,8 +29,8 @@ function waitForPywebview(): Promise<Api> {
 function windowEvents(): Bridge['on'] {
   return (name, handler) => {
     const listener = (e: Event) => handler((e as CustomEvent).detail);
-    window.addEventListener(`demalware:${name}`, listener);
-    return () => window.removeEventListener(`demalware:${name}`, listener);
+    window.addEventListener(`admenot:${name}`, listener);
+    return () => window.removeEventListener(`admenot:${name}`, listener);
   };
 }
 

@@ -3,7 +3,7 @@ requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"
 
 [project]
-name = "demalware"
+name = "admenot"
 version = "0.1.0"
 description = "Heurystyczne wykrywanie intruzywnych aplikacji Android przez ADB"
 requires-python = ">=3.13"
@@ -14,11 +14,11 @@ dev = ["pytest>=8.0", "ruff>=0.6"]
 gui = ["pywebview>=6.2"]
 
 [project.scripts]
-demalware = "demalware.cli.main:main"
-demalware-gui = "demalware.app.main:main"
+admenot = "admenot.cli.main:main"
+admenot-gui = "admenot.app.main:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/demalware"]
+packages = ["src/admenot"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

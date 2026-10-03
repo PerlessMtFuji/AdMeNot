@@ -2,17 +2,17 @@ from datetime import datetime
 
 import pytest
 
-from demalware.engine.adb.fake import FakeAdb
-from demalware.engine.adb.transport import AdbError
-from demalware.engine.collectors.packages import (
+from admenot.engine.adb.fake import FakeAdb
+from admenot.engine.adb.transport import AdbError
+from admenot.engine.collectors.packages import (
     DUMPSYS_PACKAGES,
     PM_DISABLED,
     PM_LIST,
     PM_SYSTEM,
     collect_packages,
 )
-from demalware.engine.facts import FACT_NAMES, AppFacts
-from demalware.engine.parsers.appops import AppOpState
+from admenot.engine.facts import FACT_NAMES, AppFacts
+from admenot.engine.parsers.appops import AppOpState
 
 NOW = datetime(2026, 9, 26, 14, 0, 0)
 

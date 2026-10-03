@@ -1,11 +1,11 @@
 import pytest
 
-from demalware.engine.allowlist.trust import (
+from admenot.engine.allowlist.trust import (
     load_default_trust_list,
     load_protected_list,
     parse_trust_list,
 )
-from demalware.engine.facts import AppFacts
+from admenot.engine.facts import AppFacts
 
 GOOD = "a1" * 32
 OLD = "b2" * 32

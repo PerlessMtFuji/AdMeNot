@@ -3,17 +3,17 @@ from datetime import datetime
 
 import pytest
 
-from demalware.engine.phones.provider import SILHOUETTE
-from demalware.engine.report.model import (
+from admenot.engine.phones.provider import SILHOUETTE
+from admenot.engine.report.model import (
     AppRow,
     DeviceBlock,
     Protocol,
     Recommendation,
     ScanScope,
 )
-from demalware.engine.report.render import action_text, data_uri, render_html, scope_lines
-from demalware.engine.report.texts import TEXTS
-from demalware.engine.settings import ServiceInfo
+from admenot.engine.report.render import action_text, data_uri, render_html, scope_lines
+from admenot.engine.report.texts import TEXTS
+from admenot.engine.settings import ServiceInfo
 
 GENERATED = datetime(2026, 9, 26, 14, 30)
 FULL_SCOPE = ScanScope([], True, False, 72.0, 0)
@@ -267,7 +267,7 @@ def test_both_languages_have_the_same_keys():
 
 
 def test_screenshots_are_an_attachment_page(photo, tmp_path):
-    from demalware.engine.report.model import ProtocolShot
+    from admenot.engine.report.model import ProtocolShot
 
     jpg = tmp_path / "1.jpg"
     jpg.write_bytes(b"\xff\xd8jpeg")

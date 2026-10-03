@@ -1,6 +1,6 @@
 import pytest
 
-from demalware.engine.evaluation import (
+from admenot.engine.evaluation import (
     ABLATIONS,
     LabelMeta,
     evaluate,
@@ -13,10 +13,10 @@ from demalware.engine.evaluation import (
     parse_labels,
     rescore_without,
 )
-from demalware.engine.facts import AppFacts
-from demalware.engine.rules.model import Finding
-from demalware.engine.scoring import AppResult, score_app
-from demalware.engine.session import ScanReport
+from admenot.engine.facts import AppFacts
+from admenot.engine.rules.model import Finding
+from admenot.engine.scoring import AppResult, score_app
+from admenot.engine.session import ScanReport
 
 
 def _r(package: str, verdict: str, score: int = 0) -> AppResult:

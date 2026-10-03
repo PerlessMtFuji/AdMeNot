@@ -5,14 +5,14 @@ from apphelpers import SlowApk, make_api, names
 from conftest import SERIAL
 from fakephone import make_cli_phone
 
-from demalware.engine.actions.steps import Step
-from demalware.engine.adb.transport import AdbError
-from demalware.engine.apk import cache as C
-from demalware.engine.apk.analyze import ApkReport
-from demalware.engine.apk.fetch import FetchedApks, default_cache_dir
-from demalware.engine.apk.providers import DeviceApkProvider
-from demalware.engine.journal.db import Journal
-from demalware.engine.paths import journal_path
+from admenot.engine.actions.steps import Step
+from admenot.engine.adb.transport import AdbError
+from admenot.engine.apk import cache as C
+from admenot.engine.apk.analyze import ApkReport
+from admenot.engine.apk.fetch import FetchedApks, default_cache_dir
+from admenot.engine.apk.providers import DeviceApkProvider
+from admenot.engine.journal.db import Journal
+from admenot.engine.paths import journal_path
 
 Disk = namedtuple("Disk", "total used free")
 
@@ -20,7 +20,7 @@ Disk = namedtuple("Disk", "total used free")
 @pytest.fixture(autouse=True)
 def env(monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "data"))
-    monkeypatch.setenv("DEMALWARE_ASSETS", str(tmp_path / "no-assets"))
+    monkeypatch.setenv("ADMENOT_ASSETS", str(tmp_path / "no-assets"))
 
 
 def test_settings_roundtrip_and_errors():

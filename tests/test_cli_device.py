@@ -4,14 +4,14 @@ import pytest
 from conftest import make_synthetic_adb
 from phonedb import make_phone_assets
 
-from demalware.cli.main import main
+from admenot.cli.main import main
 
 
 @pytest.fixture(autouse=True)
 def assets(monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "data"))
     path = make_phone_assets(tmp_path / "phones")
-    monkeypatch.setenv("DEMALWARE_ASSETS", str(path))
+    monkeypatch.setenv("ADMENOT_ASSETS", str(path))
     return path
 
 
@@ -71,7 +71,7 @@ def test_set_photo_unknown_slug(capsys):
 
 
 def test_device_without_db_shows_silhouette(capsys, monkeypatch, tmp_path):
-    monkeypatch.setenv("DEMALWARE_ASSETS", str(tmp_path / "empty"))
+    monkeypatch.setenv("ADMENOT_ASSETS", str(tmp_path / "empty"))
     assert main(["device"], host=make_synthetic_adb()) == 0
     out = capsys.readouterr().out
     assert out.splitlines()[0] == "samsung SM-A145R"

@@ -1,4 +1,4 @@
-"""Prawdziwe APK z lokalnego korpusu (DEMALWARE_APK_CORPUS) — bez korpusu test się pomija."""
+"""Prawdziwe APK z lokalnego korpusu (ADMENOT_APK_CORPUS) — bez korpusu test się pomija."""
 
 import json
 import os
@@ -7,15 +7,15 @@ from pathlib import Path
 
 import pytest
 
-from demalware.engine.apk.analyze import report_from_json
-from demalware.engine.apk.callgraph import AndroguardGraph, find_paths
-from demalware.engine.apk.isolated import IsolatedAnalyzer
-from demalware.engine.apk.manifest import read_manifest
-from demalware.engine.apk.sdks import load_default_ad_sdks
+from admenot.engine.apk.analyze import report_from_json
+from admenot.engine.apk.callgraph import AndroguardGraph, find_paths
+from admenot.engine.apk.isolated import IsolatedAnalyzer
+from admenot.engine.apk.manifest import read_manifest
+from admenot.engine.apk.sdks import load_default_ad_sdks
 
-CORPUS = Path(os.environ.get("DEMALWARE_APK_CORPUS", "")) if os.environ.get("DEMALWARE_APK_CORPUS") else None
+CORPUS = Path(os.environ.get("ADMENOT_APK_CORPUS", "")) if os.environ.get("ADMENOT_APK_CORPUS") else None
 STORED = Path(__file__).parent / "fixtures" / "oppo-cph2271-android12-adware-t1" / "apk"
-pytestmark = pytest.mark.skipif(CORPUS is None or not CORPUS.is_dir(), reason="brak DEMALWARE_APK_CORPUS")
+pytestmark = pytest.mark.skipif(CORPUS is None or not CORPUS.is_dir(), reason="brak ADMENOT_APK_CORPUS")
 
 
 def _packages():

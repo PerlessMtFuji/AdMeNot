@@ -4,16 +4,16 @@ import pytest
 from conftest import SERIAL
 from fakephone import make_cli_phone
 
-from demalware.cli.main import main
-from demalware.engine import paths
-from demalware.engine.foreground import ACTIVITIES, WINDOWS
-from demalware.engine.journal.db import Journal
+from admenot.cli.main import main
+from admenot.engine import paths
+from admenot.engine.foreground import ACTIVITIES, WINDOWS
+from admenot.engine.journal.db import Journal
 
 
 @pytest.fixture(autouse=True)
 def env(monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "data"))
-    monkeypatch.setenv("DEMALWARE_ASSETS", str(tmp_path / "no-assets"))
+    monkeypatch.setenv("ADMENOT_ASSETS", str(tmp_path / "no-assets"))
     return tmp_path
 
 

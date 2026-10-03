@@ -1,0 +1,90 @@
+"""Zrzut ekranu telefonu (Plan 6b, spec §4.2): PNG z `adb exec-out screencap -p` + kontekst.
+
+Kontekst to aplikacja na pierwszym planie i okna nakładek w chwili zrzutu (`foreground.py`) —
+podpis w protokole mówi, kto rysował ekran. Czarny obraz daje uśpiony telefon albo aplikacja
+z FLAG_SECURE (np. bankowa); nie da się tego obejść, więc zrzut zapisujemy z flagą `black`.
+"""
+
+from __future__ import annotations
+
+import io
+import os
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Any
+
+from PIL import Image
+
+from admenot.engine.adb.transport import AdbError, AdbTransport
+from admenot.engine.foreground import Foreground, read_foreground
+from admenot.engine.journal.db import Journal, Screenshot
+from admenot.engine.paths import screenshot_files
+
+SCREENCAP = ["exec-out", "screencap", "-p"]
+PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+REPORT_MAX = 1280
+REPORT_QUALITY = 80
+BLACK_MAX = 8  # kompresja i podświetlenie: „czarny" to kanały do 8, nie dokładnie 0
+
+
+def capture_png(adb: AdbTransport) -> bytes:
+    data = adb.run_bytes(SCREENCAP, timeout=30)
+    if not data.startswith(PNG_MAGIC):
+        raise AdbError("command_failed", "screencap: no PNG image")
+    return data
+
+
+def is_black(png: bytes) -> bool:
+    try:
+        with Image.open(io.BytesIO(png)) as img:
+            extrema = img.convert("RGB").getextrema()
+    except (OSError, ValueError):  # UnidentifiedImageError dziedziczy po OSError
+        return False
+    return all(high <= BLACK_MAX for _low, high in extrema)
+
+
+def write_report_copy(png: bytes, target: Path) -> bool:
+    tmp = target.with_name(target.name + ".tmp")
+    try:
+        with Image.open(io.BytesIO(png)) as img:
+            copy = img.convert("RGB")
+        copy.thumbnail((REPORT_MAX, REPORT_MAX))
+        copy.save(tmp, "JPEG", quality=REPORT_QUALITY)
+        os.replace(tmp, target)
+    except (OSError, ValueError):
+        tmp.unlink(missing_ok=True)
+        return False
+    return True
+
+
+def context_of(fg: Foreground, names: Mapping[str, str], black: bool) -> dict[str, Any]:
+    def entry(package: str) -> dict[str, str]:
+        return {"package": package, "name": names.get(package, package)}
+
+    return {"foreground": entry(fg.resumed) if fg.resumed else None,
+            "overlays": None if fg.overlays is None else [entry(p) for p in fg.overlays],
+            "black": black}
+
+
+def take_screenshot(adb: AdbTransport, journal: Journal, serial: str,
+                    names: Mapping[str, str], order_id: int | None) -> Screenshot:
+    png = capture_png(adb)
+    context = context_of(read_foreground(adb), names, is_black(png))
+    shot = journal.add_screenshot(serial, context, order_id)
+    png_path, jpg_path = screenshot_files(shot.id)
+    try:
+        png_path.parent.mkdir(parents=True, exist_ok=True)
+        png_path.write_bytes(png)
+    except OSError:
+        png_path.unlink(missing_ok=True)
+        journal.delete_screenshots([shot.id])
+        raise
+    write_report_copy(png, jpg_path)  # bez kopii protokół pominie ten zrzut
+    return shot
+
+
+def delete_shots(journal: Journal, ids: list[int]) -> None:
+    for shot_id in ids:
+        for path in screenshot_files(shot_id):
+            path.unlink(missing_ok=True)
+    journal.delete_screenshots(ids)

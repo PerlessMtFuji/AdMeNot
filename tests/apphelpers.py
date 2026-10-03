@@ -4,10 +4,10 @@ import threading
 from datetime import datetime
 from typing import ClassVar
 
-from demalware.app.api import Api
-from demalware.app.events import RecordingEmitter
-from demalware.engine.apk.analyze import ApkReport
-from demalware.engine.settings import save_settings
+from admenot.app.api import Api
+from admenot.app.events import RecordingEmitter
+from admenot.engine.apk.analyze import ApkReport
+from admenot.engine.settings import save_settings
 
 NOW = datetime(2026, 9, 26, 14, 30, 0)
 
@@ -104,7 +104,7 @@ class FakeScrcpy:
 def mirror_factory(fake: FakeScrcpy):
     from pathlib import Path
 
-    from demalware.engine.mirror import Mirror
+    from admenot.engine.mirror import Mirror
 
     def build(on_state, on_warning, on_line, *, adb):
         return Mirror(on_state, on_warning, on_line, adb=adb,

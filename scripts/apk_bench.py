@@ -10,7 +10,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from demalware.engine.apk.isolated import IsolatedAnalyzer
+from admenot.engine.apk.isolated import IsolatedAnalyzer
 
 
 @dataclass(frozen=True)

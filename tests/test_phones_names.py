@@ -1,6 +1,6 @@
 import pytest
 
-from demalware.engine.phones.names import (
+from admenot.engine.phones.names import (
     canonical_brand,
     key_tokens,
     model_key,

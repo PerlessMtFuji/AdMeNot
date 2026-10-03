@@ -1,0 +1,41 @@
+"""Pamięć wyników kosztownej analizy według skrótów wszystkich APK i wersji analizatora.
+
+Trzyma dowody, nie werdykt: reguły przelicza się przy każdym skanie (ocena 2026-10-01 §6).
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import tempfile
+from pathlib import Path
+
+from admenot.engine.apk.analyze import ApkReport, report_from_json, report_to_json
+
+
+def result_key(file_hashes: dict[str, str], analyzer_version: str) -> str:
+    joined = "\n".join(f"{n}={d}" for n, d in sorted(file_hashes.items()))
+    return hashlib.sha256(f"{analyzer_version}\n{joined}".encode()).hexdigest()
+
+
+class ResultStore:
+    def __init__(self, root: Path) -> None:
+        self.root = Path(root)
+
+    def get(self, key: str) -> ApkReport | None:
+        try:
+            return report_from_json(json.loads((self.root / f"{key}.json").read_text("utf-8")))
+        except (OSError, ValueError, TypeError):
+            return None
+
+    def put(self, key: str, report: ApkReport) -> None:
+        self.root.mkdir(parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=self.root, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(report_to_json(report), f)
+            os.replace(tmp, self.root / f"{key}.json")
+        except OSError:
+            Path(tmp).unlink(missing_ok=True)
+            raise

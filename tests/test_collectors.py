@@ -5,10 +5,10 @@ from unittest import mock
 
 import pytest
 
-from demalware.engine.adb.fake import FakeAdb
-from demalware.engine.adb.transport import AdbError
-from demalware.engine.collectors.base import run_collectors
-from demalware.engine.collectors.behavior import (
+from admenot.engine.adb.fake import FakeAdb
+from admenot.engine.adb.transport import AdbError
+from admenot.engine.collectors.base import run_collectors
+from admenot.engine.collectors.behavior import (
     ALARM,
     APPOPS_GET,
     NOTIFICATIONS,
@@ -18,14 +18,14 @@ from demalware.engine.collectors.behavior import (
     NotificationsCollector,
     UsageStatsCollector,
 )
-from demalware.engine.collectors.components import (
+from admenot.engine.collectors.components import (
     BOOT_QUERY,
     HOME_QUERY,
     LAUNCHER_QUERY,
     ComponentsCollector,
 )
-from demalware.engine.collectors.registry import default_collectors
-from demalware.engine.collectors.system import (
+from admenot.engine.collectors.registry import default_collectors
+from admenot.engine.collectors.system import (
     A11Y_SERVICES,
     DEVICE_POLICY,
     NOTIF_LISTENERS,
@@ -37,8 +37,8 @@ from demalware.engine.collectors.system import (
     RolesCollector,
     SecureSettingsCollector,
 )
-from demalware.engine.facts import AppFacts
-from demalware.engine.parsers.common import UnrecognizedOutput, query_packages
+from admenot.engine.facts import AppFacts
+from admenot.engine.parsers.common import UnrecognizedOutput, query_packages
 
 NOW = datetime(2026, 9, 26, 14, 0, 0)
 
@@ -137,14 +137,14 @@ def test_broken_collector_does_not_stop_others():
 
 def test_appops_collector_handles_parser_errors():
     """Malformed appops output for one package doesn't fail the collector."""
-    original_parse_appops = __import__('demalware.engine.parsers.appops', fromlist=['parse_appops']).parse_appops
+    original_parse_appops = __import__('admenot.engine.parsers.appops', fromlist=['parse_appops']).parse_appops
 
     def patched_parse(text):
         if "BROKEN" in text:
             raise ValueError("malformed appops output")
         return original_parse_appops(text)
 
-    with mock.patch('demalware.engine.collectors.behavior.parse_appops', side_effect=patched_parse):
+    with mock.patch('admenot.engine.collectors.behavior.parse_appops', side_effect=patched_parse):
         adb = FakeAdb({
             APPOPS_GET.format(package="com.a"): "SYSTEM_ALERT_WINDOW: allow; time=+10s ago\n",
             APPOPS_GET.format(package="com.b"): "BROKEN\n",

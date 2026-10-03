@@ -1,0 +1,95 @@
+"""Lista zaufanych (pakiet + podpisujący) i lista chroniona (same nazwy, dla akcji)."""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from importlib import resources
+
+import yaml
+
+from admenot.engine.facts import AppFacts
+
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+
+
+@dataclass(frozen=True)
+class PackagePatterns:
+    exact: frozenset[str]
+    prefixes: tuple[str, ...]
+
+    def matches(self, package: str) -> bool:
+        return package in self.exact or package.startswith(self.prefixes)
+
+
+def parse_package_patterns(text: str, key: str) -> PackagePatterns:
+    entries = (yaml.safe_load(text) or {}).get(key) or []
+    exact = frozenset(e for e in entries if not e.endswith(".*"))
+    prefixes = tuple(e[:-1] for e in entries if e.endswith(".*"))  # "com.x.*" → "com.x."
+    return PackagePatterns(exact, prefixes)
+
+
+@dataclass(frozen=True)
+class TrustEntry:
+    pattern: str  # pełna nazwa albo prefiks zakończony kropką
+    prefix: bool
+    signers: frozenset[str]  # SHA-256 certyfikatów; kilka = rotacja kluczy
+
+
+@dataclass(frozen=True)
+class TrustList:
+    entries: tuple[TrustEntry, ...]
+
+    def entry_for(self, package: str) -> TrustEntry | None:
+        exact = next((e for e in self.entries if not e.prefix and e.pattern == package), None)
+        if exact is not None:
+            return exact
+        prefixed = [e for e in self.entries if e.prefix and package.startswith(e.pattern)]
+        return max(prefixed, key=lambda e: len(e.pattern), default=None)
+
+    def matches(self, package: str) -> bool:
+        return self.entry_for(package) is not None
+
+    def is_trusted(self, facts: AppFacts) -> bool:
+        entry = self.entry_for(facts.package)
+        if entry is None:
+            return False
+        if facts.is_system:
+            # Obraz systemu: użytkownik nie podmieni go bez roota, a aktualizacja aplikacji
+            # systemowej musi mieć ten sam podpis.
+            return True
+        # Nazwa i instalator to nie dowód pochodzenia (`adb install -i` ustawia dowolny).
+        # Certyfikat liczy się tylko z pliku zgodnego z instalacją (Task 3–4: bez braku "apk").
+        certs = set(facts.cert_sha256 or ())
+        return "apk" not in facts.gaps and bool(certs & entry.signers)
+
+
+def parse_trust_list(text: str) -> TrustList:
+    raw = (yaml.safe_load(text) or {}).get("trusted") or []
+    entries: list[TrustEntry] = []
+    for item in raw:
+        if not isinstance(item, dict) or not isinstance(item.get("package"), str):
+            # ValueError (nie TypeError): to błąd schematu w trusted.yaml, tak jak inne walidacje niżej.
+            raise ValueError(f"trusted: entry must be a map with 'package': {item!r}")  # noqa: TRY004
+        if "signers" not in item or not isinstance(item["signers"], list):
+            raise ValueError(f"trusted: {item['package']}: 'signers' list is required")
+        signers = frozenset(str(s).lower() for s in item["signers"])
+        bad = [s for s in signers if not _SHA256.match(s)]
+        if bad:
+            raise ValueError(f"trusted: {item['package']}: not a SHA-256: {bad}")
+        package = item["package"]
+        prefix = package.endswith(".*")
+        entries.append(TrustEntry(package[:-1] if prefix else package, prefix, signers))
+    return TrustList(tuple(entries))
+
+
+def _read(name: str) -> str:
+    return resources.files("admenot.engine.allowlist").joinpath(f"data/{name}").read_text("utf-8")
+
+
+def load_default_trust_list() -> TrustList:
+    return parse_trust_list(_read("trusted.yaml"))
+
+
+def load_protected_list() -> PackagePatterns:
+    return parse_package_patterns(_read("protected.yaml"), "protected")

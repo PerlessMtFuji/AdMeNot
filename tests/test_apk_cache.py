@@ -6,10 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from demalware.engine.adb.fake import FakeAdb
-from demalware.engine.adb.transport import AdbError
-from demalware.engine.apk import cache as C
-from demalware.engine.facts import AppFacts
+from admenot.engine.adb.fake import FakeAdb
+from admenot.engine.adb.transport import AdbError
+from admenot.engine.apk import cache as C
+from admenot.engine.facts import AppFacts
 
 GB = C.GB
 Disk = namedtuple("Disk", "total used free")

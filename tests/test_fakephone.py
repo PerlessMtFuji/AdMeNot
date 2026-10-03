@@ -1,9 +1,9 @@
 import pytest
 from fakephone import GEARHEAD, LISTENERS, FakeApp, FakePhone
 
-from demalware.engine.actions import commands as C
-from demalware.engine.adb.transport import AdbError
-from demalware.engine.collectors.packages import PM_DISABLED
+from admenot.engine.actions import commands as C
+from admenot.engine.adb.transport import AdbError
+from admenot.engine.collectors.packages import PM_DISABLED
 
 
 def _phone(**kw):
