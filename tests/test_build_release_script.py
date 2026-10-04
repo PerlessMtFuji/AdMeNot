@@ -92,3 +92,16 @@ def test_sha256_file_next_to_the_setup(tmp_path):
     assert digest == hashlib.sha256(b"setup").hexdigest()
     sha_file = tmp_path / "AdMeNot-0.9.0-setup.exe.sha256"
     assert sha_file.read_text("utf-8") == f"{digest} *AdMeNot-0.9.0-setup.exe\n"
+
+
+def test_release_notes_with_and_without_virustotal(tmp_path):
+    m = _module()
+    setup = tmp_path / "AdMeNot-0.9.0-setup.exe"
+    setup.write_bytes(b"x" * 2 * 1024 * 1024)
+    notes = m.release_notes("0.9.0", setup, "ab" * 32, signed=False, vt=None)
+    assert "# AdMeNot 0.9.0" in notes and "2.0 MB" in notes and "ab" * 32 in notes
+    assert m.UNSIGNED in notes and "VirusTotal: nie sprawdzono" in notes
+    vt = m.virustotal.VtResult("https://vt/x", 2, 70, ("Alpha", "Zeta"))
+    notes = m.release_notes("0.9.0", setup, "ab" * 32, signed=True, vt=vt)
+    assert "VirusTotal: 2/70 — https://vt/x" in notes and "Alpha, Zeta" in notes
+    assert "Podpis: podpisany" in notes

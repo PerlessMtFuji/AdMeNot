@@ -12,10 +12,14 @@ from __future__ import annotations
 import hashlib
 import re
 import subprocess
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # moduły obok skryptu
+import virustotal
+
 DIST = ROOT / "dist"
 BUNDLE = DIST / "AdMeNot"
 RELEASE = DIST / "release"
@@ -87,3 +91,21 @@ def write_sha256(path: Path) -> str:
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     path.with_name(path.name + ".sha256").write_text(f"{digest} *{path.name}\n", "utf-8")
     return digest
+
+
+def release_notes(version: str, setup: Path, digest: str, signed: bool,
+                  vt: virustotal.VtResult | None) -> str:
+    size = setup.stat().st_size / 1024**2
+    lines = [f"# AdMeNot {version}", "",
+             f"- Plik: `{setup.name}` ({size:.1f} MB)",
+             f"- SHA-256: `{digest}`",
+             f"- Podpis: {'podpisany' if signed else UNSIGNED}"]
+    if vt is None:
+        lines.append("- VirusTotal: nie sprawdzono")
+    else:
+        lines.append(f"- VirusTotal: {vt.detections}/{vt.engines} — {vt.link}")
+        if vt.flagged:
+            lines.append(f"  - zgłosiły: {', '.join(vt.flagged)}")
+    lines += ["", "## Uwagi", "",
+              "(wynik listy kontrolnej z docs/release.md; czego nie sprawdzono — wprost)", ""]
+    return "\n".join(lines)
