@@ -1,5 +1,5 @@
 """CLI AdMeNot: devices | device | scan | capture | who | fix | undo | resume | history | cache | gui |
-service | report | screenshot."""
+service | report | screenshot | selfcheck."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from collections.abc import Callable
 from datetime import datetime
 
 from admenot import __version__
-from admenot.cli import screenshot_cli
+from admenot.cli import screenshot_cli, selfcheck_cli
 from admenot.cli.actions_cli import (
     cmd_cache,
     cmd_fix,
@@ -448,7 +448,11 @@ def build_parser() -> argparse.ArgumentParser:
     shot.add_argument("--serial")
     shot.add_argument("--order")
     shot.add_argument("--out", metavar="PNG")
-    for p in (device, who, fix, history, undo, resume, cache, service, report, shot):
+    check = sub.add_parser("selfcheck")
+    check.add_argument("--device", action="store_true")  # dodatkowo skan telefonu (Task 5)
+    check.add_argument("--serial")
+    check.add_argument("--reference", metavar="FILE")
+    for p in (device, who, fix, history, undo, resume, cache, service, report, shot, check):
         p.add_argument("--lang", choices=["pl", "en"], default=argparse.SUPPRESS)
     return parser
 
@@ -463,6 +467,8 @@ def _run(args: argparse.Namespace, host: AdbTransport) -> int:
         for e in list_devices(host):
             print(f"{e.serial}\t{e.state}\t{e.model or ''}")
         return 0
+    if args.command == "selfcheck" and not args.device:
+        return selfcheck_cli.cmd_selfcheck(lang)  # bez telefonu
     if args.command == "cache":
         return cmd_cache(args, lang)
     if args.command == "service":
