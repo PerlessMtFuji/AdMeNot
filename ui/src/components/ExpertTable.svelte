@@ -145,16 +145,17 @@
     <tbody>
       {#each rows as a (a.package)}
         {@const level = s.selection[a.package] ?? null}
+        {@const done = s.acted[a.package] ?? null}
         <tr aria-selected={a.package === focused} onclick={() => ctl.focus(a.package)}
           class="cursor-pointer border-b border-[var(--color-surface-2)] {a.package === focused ? 'bg-accent-soft/70 shadow-[inset_3px_0_0_var(--color-accent),inset_0_0_24px_-12px_var(--glow-accent)]' : 'hover:bg-surface-2'} {s.apk.changed.includes(a.package) ? 'flash' : ''}">
-          <td class="px-4 py-3"><input type="checkbox" class="h-4 w-4 accent-[var(--color-accent)]" checked={level !== null} aria-label={a.package}
+          <td class="px-4 py-3"><input type="checkbox" class="h-4 w-4 accent-[var(--color-accent)]" checked={level !== null} disabled={done === 'remove'} aria-label={a.package}
             onclick={(e) => e.stopPropagation()} onchange={() => ctl.toggle(a)} /></td>
           <td class="w-full max-w-0 px-3 py-3">
             <div class="flex items-center gap-3">
               <AppIcon icon={a.icon} class="h-8 w-8">
                 <span class="grid h-8 w-8 flex-none place-items-center rounded-[10px] text-sm font-extrabold text-white shadow-[inset_0_1px_0_rgb(255_255_255/.3)] {BAR[a.verdict]}" aria-hidden="true">{initial(a.name)}</span>
               </AppIcon>
-              <div class="min-w-0"><b class="block truncate">{a.name}</b><span class="mono block truncate text-2xs text-soft">{a.package}</span></div>
+              <div class="min-w-0"><b class="block truncate">{a.name}</b><span class="mono block truncate text-2xs text-soft">{a.package}{#if done} · <span class="text-ok">{t(`history.level_done.${done}`)}</span>{/if}</span></div>
             </div>
           </td>
           <td class="px-3 py-3 whitespace-nowrap"><div class="flex items-center gap-2">
@@ -170,7 +171,7 @@
           </span></td>
           <td class="px-3 py-3 whitespace-nowrap">{a.source.label}<span class="block text-2xs text-soft">{when(a.source.days)}</span></td>
           <td class="px-3 py-3">
-            <select aria-label="{t('expert.col_action')} {a.package}" value={level ?? ''} onclick={(e) => e.stopPropagation()}
+            <select aria-label="{t('expert.col_action')} {a.package}" value={level ?? ''} disabled={done === 'remove'} onclick={(e) => e.stopPropagation()}
               onchange={(e) => ctl.setLevel(a.package, (e.currentTarget.value || null) as Level | null)}
               class="field rounded-[10px] px-2.5 py-1.5 text-sm font-bold {level ? LEVEL_TEXT[LEVEL_TONE[level]] : 'text-mut'}">
               <option value="">{t('level.none')}</option>

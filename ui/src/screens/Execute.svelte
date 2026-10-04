@@ -172,6 +172,10 @@
           <Button variant="primary" size="lg" disabled={s.orderRunning} onclick={() => ctl.resume(order)}>{t('exec.resume')}</Button>
         {/if}
         <Button variant={s.result.stopped ? 'secondary' : 'primary'} size="lg" onclick={() => ctl.newScan()}>{t('exec.new_scan')}</Button>
+        <!-- Kolejne akcje na tym samym telefonie bez ponownego skanu (długi przy zaśmieconym telefonie) -->
+        {#if !s.result.stopped && s.scan}
+          <Button size="lg" disabled={s.orderRunning} onclick={() => ctl.backToRepair()}><Icon name="arrow-left" />{t('exec.back_to_repair')}</Button>
+        {/if}
         <ScreenshotStrip {order} />
         <ReportButton order={order} size="lg" />
         <Button variant="ghost" disabled={s.orderRunning} onclick={() => undoAll(order)}><Icon name="undo-2" />{t('exec.undo_all')}</Button>

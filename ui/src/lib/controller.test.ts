@@ -50,6 +50,33 @@ describe('controller with the adware scenario', () => {
     await vi.waitFor(() => expect(s.history?.orders[0].status).toBe('undone'));
   });
 
+  test('back to repair after an order keeps the scan and remembers what was done', async () => {
+    const { ctl, s, bridge } = setup('adware');
+    await ctl.init();
+    await ctl.startScan();
+    await vi.waitFor(() => expect(s.phase).toBe('results'));
+    const scan = s.scan;
+    await ctl.openPlan();
+    await ctl.execute();
+    await vi.waitFor(() => expect(s.phase).toBe('done'));
+    const levels = Object.fromEntries(s.execPlan!.apps.map((a) => [a.package, a.level]));
+    expect(levels['com.clean.pro.boost']).toBe('remove');
+    ctl.backToRepair();
+    expect(s.phase).toBe('results');
+    expect(s.scan).toBe(scan); // bez ponownego skanu
+    expect([s.result, s.order, s.plan]).toEqual([null, null, null]);
+    expect(s.selection).toEqual({}); // propozycje silnika już wykonane — nie zaznaczamy ich znowu
+    expect(s.acted).toEqual(levels);
+    expect(bridge.calls.map((c) => c.method)).toContain('close_order'); // zrzuty idą do następnego zlecenia
+    const app = (pkg: string) => s.scan!.apps.find((a) => a.package === pkg)!;
+    ctl.toggle(app('com.clean.pro.boost'));
+    expect(s.selection['com.clean.pro.boost']).toBeUndefined(); // usuniętej nie ma już czego zmieniać
+    ctl.setLevel('com.wlive.forecast', 'remove');
+    expect(s.selection['com.wlive.forecast']).toBe('remove'); // wyłączoną można jeszcze usunąć
+    ctl.newScan();
+    expect(s.acted).toEqual({});
+  });
+
   test('user choices survive the APK re-score and toggles work', async () => {
     const { ctl, s } = setup('adware');
     await ctl.init();

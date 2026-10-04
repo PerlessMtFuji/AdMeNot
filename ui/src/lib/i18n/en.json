@@ -140,7 +140,7 @@
     "state": { "queued": "waiting", "running": "in progress", "ok": "done", "still_active": "still active", "failed": "failed", "stopped": "paused" },
     "waiting": "Queued", "stop": "Pause", "stopping": "Pausing after the current step…",
     "verifying": "Checking that the changes hold…", "stopped": "Order paused. You can finish or undo it.",
-    "resume": "Finish", "undo_all": "Undo the whole order", "new_scan": "New scan",
+    "resume": "Finish", "undo_all": "Undo the whole order", "new_scan": "New scan", "back_to_repair": "Back to repair",
     "apps": { "one": "{count} app", "few": "{count} apps", "many": "{count} apps", "other": "{count} apps" },
     "steps": { "one": "{count} step", "few": "{count} steps", "many": "{count} steps", "other": "{count} steps" }
   },

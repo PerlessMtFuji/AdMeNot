@@ -1,6 +1,6 @@
 import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
-import { changedVerdicts, defaultSelection, mergeSelection, notificationsManual, upsertStep } from './logic';
+import { actedAfter, changedVerdicts, defaultSelection, mergeSelection, notificationsManual, upsertStep } from './logic';
 import type { AppState } from './state.svelte';
 import { applyTheme } from './theme';
 import type {
@@ -92,6 +92,7 @@ export class Controller {
       s.scan = d.scan;
       s.interrupted = d.interrupted;
       s.selection = defaultSelection(d.scan.apps);
+      s.acted = {};
       s.touched = [];
       s.unlocked = [];
       s.expanded = [];
@@ -138,6 +139,7 @@ export class Controller {
     on('exec:stopped', () => { s.stopped = true; });
     on('exec:done', (d) => {
       s.result = d;
+      s.acted = actedAfter(s.acted, s.execPlan, d);
       s.verifying = false;
       s.admin = null;
       s.question = null;
@@ -250,15 +252,27 @@ export class Controller {
     if (serial) void this.call(this.api.close_order(serial));
     Object.assign(this.state, {
       phase: 'connect', screen: 'main', device: null, scan: null, result: null, order: null,
-      plan: null, selection: {}, steps: [], disconnectedOrder: null, reports: {},
+      plan: null, selection: {}, acted: {}, steps: [], disconnectedOrder: null, reports: {},
       categoryFilter: [], sourceFilter: null, lastShot: null, lastShotSerial: null, shotCount: 0,
     });
+  }
+
+  /** Z Protokołu z powrotem do Naprawy: ten sam skan, kolejne akcje jako nowe zlecenie. */
+  backToRepair(): void {
+    const s = this.state;
+    if (!s.scan || !s.result || s.result.stopped) return;
+    // jak przy „Nowe skanowanie”: zrzuty od teraz należą do następnego zlecenia
+    const serial = s.device?.serial ?? s.serial;
+    if (serial) void this.call(this.api.close_order(serial));
+    Object.assign(s, { phase: 'results', screen: 'main', result: null, order: null, execPlan: null, plan: null,
+      selection: {}, touched: Object.keys(s.acted), steps: [], lastShot: null, lastShotSerial: null, shotCount: 0 });
   }
 
   // --- wybór akcji i plan ------------------------------------------------------------------------
 
   setLevel(pkg: string, level: Level | null): void {
     const s = this.state;
+    if (level && s.acted[pkg] === 'remove') return; // usunięta w tym zleceniu: nie ma czego zmieniać
     const next = { ...s.selection };
     if (level) next[pkg] = level;
     else delete next[pkg];

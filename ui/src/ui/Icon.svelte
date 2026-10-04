@@ -1,4 +1,5 @@
 <script lang="ts" module>
+  import ArrowLeft from '@lucide/svelte/icons/arrow-left';
   import BellRing from '@lucide/svelte/icons/bell-ring';
   import Camera from '@lucide/svelte/icons/camera';
   import Check from '@lucide/svelte/icons/check';
@@ -35,7 +36,7 @@
   export const ICONS = {
     megaphone: Megaphone, 'bell-ring': BellRing, lock: Lock, 'lock-open': LockOpen, eye: Eye,
     'venetian-mask': VenetianMask, clock: Clock, download: Download, zap: Zap, check: Check, x: X,
-    'triangle-alert': TriangleAlert, info: Info, 'undo-2': Undo2, 'rotate-ccw': RotateCcw,
+    'triangle-alert': TriangleAlert, info: Info, 'undo-2': Undo2, 'rotate-ccw': RotateCcw, 'arrow-left': ArrowLeft,
     'chevron-down': ChevronDown, 'chevron-right': ChevronRight, search: Search, terminal: Terminal,
     history: HistoryIcon, settings: SettingsIcon, plus: Plus, pause: Pause, smartphone: Smartphone,
     'shield-x': ShieldX, 'shield-alert': ShieldAlert, 'shield-user': ShieldUser, 'scan-search': ScanSearch,

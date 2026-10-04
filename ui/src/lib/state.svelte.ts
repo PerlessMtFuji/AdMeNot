@@ -46,6 +46,8 @@ export class AppState {
   stopping = $state(false);
   stopped = $state(false);
   result = $state<OrderResult | null>(null);
+  /** Co już zrobiono na tym telefonie od skanu (powrót do naprawy bez ponownego skanu). */
+  acted = $state<Record<string, Level>>({});
   disconnectedOrder = $state<string | null>(null);
   history = $state<HistoryView | null>(null);
   undoSteps = $state<StepEvent[]>([]);

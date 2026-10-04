@@ -1,5 +1,5 @@
 import { CATEGORY_ORDER } from './categories';
-import type { AppView, Category, DeviceEntry, Finding, HistoryAction, Level, StepEvent, Verdict } from './types';
+import type { AppView, Category, DeviceEntry, Finding, HistoryAction, Level, OrderResult, PlanView, StepEvent, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done';
 export type StageState = 'done' | 'now' | 'todo';
@@ -283,4 +283,18 @@ export function formatGb(bytes: number, lang: string): string {
 export function formatSize(bytes: number, lang: string): string {
   if (bytes > 0 && bytes < 1024 ** 3 / 10) return `${Math.max(1, Math.round(bytes / 1024 ** 2))} MB`;
   return `${formatGb(bytes, lang)} GB`;
+}
+
+const LEVEL_RANK: Record<Level, number> = { silence: 1, disable: 2, remove: 3 };
+
+/** Najmocniejszy poziom wykonany na każdej aplikacji (bez zatrzymanych i nieudanych). */
+export function actedAfter(acted: Record<string, Level>, plan: PlanView | null, result: OrderResult): Record<string, Level> {
+  const next = { ...acted };
+  const levels = new Map((plan?.apps ?? []).filter((a) => !a.blocked).map((a) => [a.package, a.level]));
+  for (const app of result.apps) {
+    const level = levels.get(app.package);
+    if (app.outcome !== 'ok' || !level) continue;
+    if (!next[app.package] || LEVEL_RANK[level] > LEVEL_RANK[next[app.package]]) next[app.package] = level;
+  }
+  return next;
 }

@@ -8,8 +8,10 @@
   import AppIcon from './AppIcon.svelte';
   import SymptomList from './SymptomList.svelte';
 
-  type Props = { app: AppView; level: Level | null; flash?: boolean; onlevel: (level: Level) => void; ontoggle: () => void };
-  let { app, level, flash = false, onlevel, ontoggle }: Props = $props();
+  type Props = { app: AppView; level: Level | null; done?: Level | null; flash?: boolean; onlevel: (level: Level) => void;
+    ontoggle: () => void };
+  let { app, level, done = null, flash = false, onlevel, ontoggle }: Props = $props();
+  const gone = $derived(done === 'remove'); // usunięta w tym zleceniu: nie ma czego wybierać
   const STRIPE = { malicious: 'bad', suspicious: 'warn', review: 'neutral', safe: null } as const;
   const AVATAR = { malicious: 'bg-bad text-bad', suspicious: 'bg-warn-strong text-warn-strong', review: 'bg-soft text-soft', safe: 'bg-ok text-ok' };
   const options = $derived([
@@ -22,7 +24,7 @@
 <Card stripe={STRIPE[app.verdict]} class={flash ? 'flash' : ''} role="article" label={app.name}>
   <div class="flex items-center gap-3.5 py-4 pr-5 pl-6">
     <input type="checkbox" class="h-[18px] w-[18px] flex-none accent-[var(--color-accent)]" checked={level !== null}
-      aria-label={app.name} onchange={ontoggle} />
+      disabled={gone} aria-label={app.name} onchange={ontoggle} />
     <AppIcon icon={app.icon} class="h-11 w-11">
       <span class="grid h-11 w-11 flex-none place-items-center rounded-[13px] shadow-[inset_0_1px_0_rgb(255_255_255/.3),0_6px_14px_-6px_currentColor] {AVATAR[app.verdict]}"
         aria-hidden="true"><span class="text-lg font-extrabold text-white">{initial(app.name)}</span></span>
@@ -32,11 +34,12 @@
         <b class="truncate text-md">{app.name}</b>
         <Pill tone={VERDICT_TONE[app.verdict]}>{app.verdict_label}</Pill>
         {#if app.incomplete && app.verdict !== 'safe'}<Pill tone="neutral">{t('results.incomplete')}</Pill>{/if}
+        {#if done}<Pill tone="ok">{t(`history.level_done.${done}`)}</Pill>{/if}
       </div>
       <div class="mono truncate text-2xs text-soft">{app.package}</div>
     </div>
     <div class="w-[240px] flex-none">
-      <Segmented stretch size="sm" label={t('results.action_for', { name: app.name })} value={level} {options} onchange={onlevel} />
+      <Segmented stretch size="sm" label={t('results.action_for', { name: app.name })} value={level} {options} disabled={gone} onchange={onlevel} />
     </div>
   </div>
   <SymptomList symptoms={app.symptoms} />

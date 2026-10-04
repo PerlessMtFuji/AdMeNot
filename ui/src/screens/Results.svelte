@@ -111,7 +111,7 @@
       <div class="flex flex-col gap-3.5">
         {#each flagged as app, i (app.package)}
           <div animate:flip={{ duration: ms(DUR.flip) }} in:enter={{ delay: stagger(i) }}>
-            <AppCard {app} level={s.selection[app.package] ?? null} flash={s.apk.changed.includes(app.package)}
+            <AppCard {app} level={s.selection[app.package] ?? null} done={s.acted[app.package] ?? null} flash={s.apk.changed.includes(app.package)}
               onlevel={(level) => ctl.setLevel(app.package, level)} ontoggle={() => ctl.toggle(app)} />
           </div>
         {/each}

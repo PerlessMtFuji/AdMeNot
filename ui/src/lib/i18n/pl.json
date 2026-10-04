@@ -140,7 +140,7 @@
     "state": { "queued": "czeka", "running": "w toku", "ok": "gotowe", "still_active": "nadal aktywna", "failed": "błąd", "stopped": "wstrzymana" },
     "waiting": "Czeka w kolejce", "stop": "Wstrzymaj", "stopping": "Wstrzymuję po bieżącym kroku…",
     "verifying": "Sprawdzam, czy zmiany się utrzymały…", "stopped": "Zlecenie wstrzymane. Możesz je dokończyć albo cofnąć.",
-    "resume": "Dokończ", "undo_all": "Cofnij całe zlecenie", "new_scan": "Nowe skanowanie",
+    "resume": "Dokończ", "undo_all": "Cofnij całe zlecenie", "new_scan": "Nowe skanowanie", "back_to_repair": "Wr\u00f3\u0107 do naprawy",
     "apps": { "one": "{count} aplikacja", "few": "{count} aplikacje", "many": "{count} aplikacji", "other": "{count} aplikacji" },
     "steps": { "one": "{count} krok", "few": "{count} kroki", "many": "{count} kroków", "other": "{count} kroku" }
   },

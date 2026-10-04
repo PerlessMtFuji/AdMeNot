@@ -52,6 +52,21 @@ describe('plan and execution', () => {
     expect(s.phase).toBe('connect');
   });
 
+  test('back to repair: same results, done apps marked, a removed app cannot be picked again', async () => {
+    const { s } = await scanned();
+    await fireEvent.click(screen.getByRole('button', { name: /Napraw zaznaczone/ }));
+    await fireEvent.click(await screen.findByRole('button', { name: /^Wykonaj/ }));
+    await vi.waitFor(() => expect(s.phase).toBe('done'));
+    await tick();
+    await fireEvent.click(screen.getByRole('button', { name: 'Wróć do naprawy' }));
+    await tick();
+    expect(s.phase).toBe('results');
+    const boost = s.scan!.apps.find((a) => a.package === 'com.clean.pro.boost')!;
+    const card = screen.getByRole('article', { name: boost.name });
+    expect(card.textContent).toContain('usunięta');
+    expect((card.querySelector('input[type="checkbox"]') as HTMLInputElement).disabled).toBe(true);
+  });
+
   test('undo from the result goes to history', async () => {
     const { s } = await scanned();
     await fireEvent.click(screen.getByRole('button', { name: /Napraw zaznaczone/ }));
