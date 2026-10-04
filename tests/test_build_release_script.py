@@ -153,8 +153,9 @@ def test_build_runs_the_steps_in_order_and_writes_the_outputs(staged):
     assert not any("--device" in c for c in calls if isinstance(c, list))
     iscc = calls[_step(calls, "ISCC.exe")]
     # podstawiony git zwraca puste stdout, więc drzewo jest czyste mimo --allow-dirty
-    assert "/DAppVersion=0.9.0" in iscc and "/DWinVersion=0.9.0.0" in iscc
-    assert "/FAdMeNot-0.9.0-setup" in iscc
+    v = admenot.__version__
+    assert f"/DAppVersion={v}" in iscc and f"/DWinVersion={v}.0" in iscc
+    assert f"/FAdMeNot-{v}-setup" in iscc
     assert not any(a.startswith("/S") for a in iscc)
     assert (m.BUNDLE / "THIRD_PARTY_NOTICES.txt").read_text("utf-8") == "NOTICES"
     setup = next(m.RELEASE.glob("*-setup.exe"))
