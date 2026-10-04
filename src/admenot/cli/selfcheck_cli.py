@@ -7,8 +7,10 @@ manifestu po cichu). Kod 0 = wszystko OK, 1 = czegoś brakuje.
 
 from __future__ import annotations
 
+import difflib
 import importlib
 import importlib.util
+import re
 import sqlite3
 import tempfile
 from collections.abc import Callable
@@ -111,3 +113,37 @@ def cmd_selfcheck(lang: str) -> int:
         detail = "" if r.ok else f" — {r.detail}"
         print(f"{word:<7} {r.name}{detail}")  # kolumna 7 znaków: „MISSING” mieści się bez obcinania
     return 0 if all(r.ok for r in results) else 1
+
+
+DEVICE_MESSAGES = {
+    "pl": {"same": "Skan z paczki jest taki sam jak referencyjny.",
+           "differs": "Skan z paczki różni się od referencyjnego:"},
+    "en": {"same": "The bundle scan matches the reference.",
+           "differs": "The bundle scan differs from the reference:"},
+}
+UPTIME = re.compile(r"uptime \d+(?:\.\d+)? h")
+
+
+def _normalized(text: str) -> list[str]:
+    return [UPTIME.sub("uptime ? h", line).rstrip() for line in text.splitlines()]
+
+
+def scan_diff(reference: str, actual: str) -> list[str]:
+    """Linie, którymi różnią się skany (czas pracy telefonu pominięty); [] = skany równe."""
+    diff = difflib.unified_diff(_normalized(reference), _normalized(actual), n=0, lineterm="")
+    return [line for line in diff if line[:1] in "+-" and not line.startswith(("+++", "---"))]
+
+
+def cmd_device(scan_text: str, reference: str | None, lang: str) -> int:
+    print(scan_text, end="")
+    if reference is None:
+        return 0
+    diff = scan_diff(Path(reference).read_text("utf-8"), scan_text)
+    text = DEVICE_MESSAGES[lang]
+    if not diff:
+        print(text["same"])
+        return 0
+    print(text["differs"])
+    for line in diff:
+        print(line)
+    return 1

@@ -1,8 +1,10 @@
 import sqlite3
 
 import pytest
+from conftest import make_synthetic_adb
 
 from admenot.app import main as app_main
+from admenot.cli import main as cli_main
 from admenot.cli import selfcheck_cli
 from admenot.cli.main import main
 
@@ -66,3 +68,35 @@ def test_missing_androguard_resources_are_reported(installed, monkeypatch, tmp_p
 def test_cli_command(installed, capsys):
     assert main(["selfcheck"]) == 0
     assert "OK" in capsys.readouterr().out
+
+
+def test_scan_diff_ignores_uptime_only():
+    ref = "OPPO A16 · Android 12 · uptime 77.8 h\n  10  Reklamy  com.a\n"
+    same = "OPPO A16 · Android 12 · uptime 80.1 h\n  10  Reklamy  com.a\n"
+    other = "OPPO A16 · Android 12 · uptime 80.1 h\n  12  Reklamy  com.a\n"
+    assert selfcheck_cli.scan_diff(ref, same) == []
+    assert selfcheck_cli.scan_diff(ref, other) == ["-  10  Reklamy  com.a", "+  12  Reklamy  com.a"]
+
+
+def test_device_check_compares_the_scan_with_the_reference(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "data"))
+    real_scan = cli_main._scan
+
+    def scan_without_apk(adb, serial, lang, deep=frozenset(), apk=False):
+        return real_scan(adb, serial, lang, deep)  # syntetyczny telefon nie ma plików APK
+
+    monkeypatch.setattr(cli_main, "_scan", scan_without_apk)
+    assert main(["scan", "--all"], host=make_synthetic_adb()) == 0
+    reference = capsys.readouterr().out
+    assert "uptime 77.8 h" in reference
+    ref = tmp_path / "ref.txt"
+    ref.write_text(reference.replace("uptime 77.8 h", "uptime 1.0 h"), "utf-8")
+
+    args = ["selfcheck", "--device", "--reference", str(ref)]
+    assert main(args, host=make_synthetic_adb()) == 0
+    assert "taki sam jak referencyjny" in capsys.readouterr().out
+
+    ref.write_text(reference.replace("com.clean.pro.boost", "com.inna.apka"), "utf-8")
+    assert main(args, host=make_synthetic_adb()) == 1
+    out = capsys.readouterr().out
+    assert "różni się od referencyjnego" in out and "+" in out and "com.clean.pro.boost" in out

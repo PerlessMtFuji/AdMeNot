@@ -4,6 +4,8 @@ service | report | screenshot | selfcheck."""
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import json
 import multiprocessing
 import sys
@@ -457,6 +459,14 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _scan(adb: AdbTransport, serial: str, lang: str, deep: frozenset[str] = frozenset(),
+          apk: bool = False) -> ScanReport:
+    provider = _apk_provider(adb, lang, deep) if apk or deep else None
+    incidents = load_incident(incident_path(serial), datetime.now())
+    return run_scan(adb, apk=provider, progress=_progress(lang) if provider else None,
+                    incidents=incidents)
+
+
 def _run(args: argparse.Namespace, host: AdbTransport) -> int:
     lang = args.lang
     if args.command == "gui":
@@ -500,11 +510,14 @@ def _run(args: argparse.Namespace, host: AdbTransport) -> int:
         provider = _apk_provider(adb, lang) if args.apk else None
         return cmd_fix(args, with_session_log(adb), lang, apk=provider,
                        progress=_progress(lang) if provider else None)
+    if args.command == "selfcheck":  # --device: pełny skan z analizą APK, tylko odczyt
+        report = _scan(adb, serial, lang, apk=True)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            _print_report(report, lang, show_all=True)  # jak `scan --apk --all`
+        return selfcheck_cli.cmd_device(out.getvalue(), args.reference, lang)
     if args.command == "scan":
-        provider = _apk_provider(adb, lang, deep) if args.apk or deep else None
-        incidents = load_incident(incident_path(serial), datetime.now())
-        report = run_scan(adb, apk=provider, progress=_progress(lang) if provider else None,
-                          incidents=incidents)
+        report = _scan(adb, serial, lang, deep, apk=args.apk)
         missed = sorted(p for p in deep if not getattr(report.apk_reports.get(p), "deep", False))
         if missed:
             print(_msg(lang, "deep_missed", packages=", ".join(missed)), file=sys.stderr)
