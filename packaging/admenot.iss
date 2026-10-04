@@ -30,6 +30,8 @@ WizardStyle=modern
 SetupIconFile={#SourcePath}..\src\admenot\assets\icon\admenot.ico
 UninstallDisplayIcon={app}\AdMeNot.exe
 UninstallDisplayName=AdMeNot
+; AdMeNot zamyka użytkownik w PrepareToInstall; Restart Manager tylko domyka inne procesy
+; trzymające pliki w {app} (np. podgląd w Eksploratorze)
 CloseApplications=force
 RestartApplications=no
 ShowLanguageDialog=auto
@@ -44,10 +46,12 @@ Name: "en"; MessagesFile: "compiler:Default.isl"
 Name: "pl"; MessagesFile: "compiler:Languages\Polish.isl"
 
 [CustomMessages]
-pl.DeleteData=Usunąć też dane AdMeNot (dziennik zleceń, kopie, protokoły, zrzuty, pamięć podręczna APK)?%n%nDziennik jest potrzebny, żeby cofnąć zmiany na telefonach klientów.
-en.DeleteData=Also delete AdMeNot data (job journal, backups, reports, screenshots, APK cache)?%n%nThe journal is needed to undo changes on customers' phones.
+pl.DeleteData=Usunąć też folder danych %LOCALAPPDATA%\AdMeNot (dziennik zleceń, ustawienia, protokoły, zrzuty ekranu, pamięć podręczna APK i zapisane tam kopie)?%n%nDziennik jest potrzebny, żeby cofnąć zmiany na telefonach klientów.
+en.DeleteData=Also delete the AdMeNot data folder %LOCALAPPDATA%\AdMeNot (job journal, settings, reports, screenshots, APK cache and backups stored there)?%n%nThe journal is needed to undo changes on customers' phones.
 pl.CloseApp=AdMeNot jest uruchomiony. Zamknij program i kliknij OK.
 en.CloseApp=AdMeNot is running. Close the program and click OK.
+pl.InstallCancelled=Instalacja przerwana — zamknij AdMeNot i uruchom instalator ponownie.
+en.InstallCancelled=Setup cancelled — close AdMeNot and run Setup again.
 pl.InstallingWebView2=Instalowanie Microsoft Edge WebView2 Runtime...
 en.InstallingWebView2=Installing Microsoft Edge WebView2 Runtime...
 pl.WebView2Failed=Nie udało się zainstalować Microsoft Edge WebView2 Runtime, którego AdMeNot potrzebuje do wyświetlenia okna. Zainstaluj go ze strony:%nhttps://developer.microsoft.com/microsoft-edge/webview2/
@@ -93,23 +97,30 @@ begin
   Result := '''' + Path + '''';
 end;
 
-{ Spec §6.3: procesy z katalogu programu (adb, scrcpy, admenot-cli). Bez `adb kill-server` —
-  zatrzymałby też serwer adb z Android SDK na porcie 5037.
-  KeepApp: przy instalacji AdMeNot.exe zamyka Restart Manager (CloseApplications=force). }
-procedure StopBundleProcesses(AppDir: String; KeepApp: Boolean);
-var
-  Filter: String;
+{ Spec §6.3: procesy z katalogu programu (adb, scrcpy, admenot-cli) — dopiero po zamknięciu
+  okna AdMeNot (CloseAppGate). Bez `adb kill-server` — zatrzymałby też serwer adb z Android SDK
+  na porcie 5037. StartsWith zamiast -like: [, ] i ` w ścieżce nie są wzorcem, a nazwy procesów
+  zawężają filtr, gdyby /DIR= wskazał folder wspólny z innymi programami. }
+procedure StopBundleProcesses(AppDir: String);
 begin
-  Filter := '$_.Path -like ' + Quoted(AppDir + '\*');
-  if KeepApp then
-    Filter := Filter + ' -and $_.ProcessName -ne ''AdMeNot''';
-  PowerShell('Get-Process | Where-Object { ' + Filter + ' } | Stop-Process -Force');
+  PowerShell('Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith('
+    + Quoted(AppDir + '\') + ', [StringComparison]::OrdinalIgnoreCase)'
+    + ' -and $_.ProcessName -in ''adb'',''scrcpy'',''admenot-cli'' } | Stop-Process -Force');
 end;
 
 function AppRunning(AppDir: String): Boolean;
 begin
   Result := PowerShell('if (Get-Process AdMeNot -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq '
     + Quoted(AppDir + '\AdMeNot.exe') + ' }) { exit 1 }') = 1;
+end;
+
+{ okna nie zabijamy — przerwany zapis dziennika psuje dane do cofania zmian. Z /SUPPRESSMSGBOXES
+  domyślna odpowiedź to Anuluj, więc tryb cichy przy uruchomionym programie niczego nie zmienia. }
+function CloseAppGate(AppDir: String): Boolean;
+begin
+  Result := True;
+  while Result and AppRunning(AppDir) do
+    Result := SuppressibleMsgBox(CustomMessage('CloseApp'), mbError, MB_OKCANCEL, IDCANCEL) = IDOK;
 end;
 
 function HasVersion(RootKey: Integer; SubKey: String): Boolean;
@@ -142,9 +153,20 @@ begin
     SuppressibleMsgBox(CustomMessage('WebView2Failed'), mbError, MB_OK, IDOK);
 end;
 
+{ Inno woła PrepareToInstall przed sprawdzeniem plików w użyciu (Restart Manager), więc najpierw
+  użytkownik zamyka AdMeNot, a dopiero potem zatrzymujemy adb/scrcpy z paczki (spec §6.3).
+  Niepusty wynik zatrzymuje instalator na stronie przygotowania, zanim cokolwiek zmieni. }
 function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  AppDir: String;
 begin
-  StopBundleProcesses(ExpandConstant('{app}'), True);
+  AppDir := ExpandConstant('{app}');
+  if not CloseAppGate(AppDir) then
+  begin
+    Result := CustomMessage('InstallCancelled');
+    Exit;
+  end;
+  StopBundleProcesses(AppDir);
   Result := '';
 end;
 
@@ -159,12 +181,9 @@ var
   AppDir: String;
 begin
   AppDir := ExpandConstant('{app}');
-  Result := True;
-  { okna nie zabijamy — przerwany zapis dziennika psuje dane do cofania zmian }
-  while Result and AppRunning(AppDir) do
-    Result := SuppressibleMsgBox(CustomMessage('CloseApp'), mbError, MB_OKCANCEL, IDCANCEL) = IDOK;
+  Result := CloseAppGate(AppDir);
   if Result then
-    StopBundleProcesses(AppDir, False);
+    StopBundleProcesses(AppDir);
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

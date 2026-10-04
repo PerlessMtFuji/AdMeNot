@@ -26,13 +26,18 @@ Wynik każdego punktu wpisz w sekcji „Uwagi” notatek do wydania. Punkt, któ
 sprawdzić, zapisz wprost jako niesprawdzony.
 
 1. [ ] Build z `--device` na OPPO: `selfcheck --device: skan z paczki = skan deweloperski`.
-2. [ ] Maszyna testowa (czysty Windows): przywróć punkt kontrolny, skopiuj instalator, zainstaluj.
-       Brak okna UAC, skrót w menu Start i na pulpicie, program w `%LOCALAPPDATA%\Programs\AdMeNot`,
-       okno `AdMeNot <wersja> beta` się otwiera, `admenot-cli.exe selfcheck` → same `OK`.
+2. Instalacja:
+   - [ ] 2a. Na tym komputerze (obowiązkowo): brak okna UAC, skrót w menu Start i na pulpicie,
+         program w `%LOCALAPPDATA%\Programs\AdMeNot`, okno `AdMeNot <wersja> beta` się otwiera,
+         `admenot-cli.exe selfcheck` → same `OK`.
+   - [ ] 2b. To samo na maszynie testowej (czysty Windows): przywróć punkt kontrolny, skopiuj
+         instalator, zainstaluj i sprawdź jak w 2a. Można pominąć — wtedy zapisz to w „Uwagach”.
 
-       Restore-VMCheckpoint -VMName AdMeNot-Test -Name "czysty Windows" -Confirm:$false
+             Restore-VMCheckpoint -VMName AdMeNot-Test -Name "czysty Windows" -Confirm:$false
 
-3. [ ] Podgląd ekranu (scrcpy) z zainstalowanej wersji na tym komputerze.
+3. [ ] Podgląd ekranu (scrcpy) z wersji zainstalowanej w 2a. Sprawdza też, że adb z paczki sam
+       uruchamia swój serwer (`selfcheck --device` w buildzie korzysta z działającego już serwera
+       adb deweloperskiego) — przed testem zatrzymaj ten serwer (`adb kill-server` z Android SDK).
 4. [ ] Aktualizacja w miejscu: zainstaluj wydanie, potem build z podbitą wersją testową
        (`--allow-dirty`) na wierzch. Dziennik i ustawienia zostają, adb z katalogu programu
        zamknięty przed kopiowaniem, w `_internal` nie ma plików z poprzedniej wersji.
