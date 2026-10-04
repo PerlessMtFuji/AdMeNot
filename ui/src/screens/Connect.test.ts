@@ -20,6 +20,20 @@ describe('Connect', () => {
     expect(screen.queryByRole('button', { name: 'Skanuj' })).toBeNull();
   });
 
+  test('a ready phone shows its marketing name and IMEI, not the model code and serial', async () => {
+    const env = await setupCtl('clean');
+    env.s.devices = [{ serial: 'R58T00TEST', state: 'device', model: 'SM_A145R', name: 'Samsung Galaxy A14', imei: '499001200000004' }];
+    render(Connect, { context: new Map([['ctl', env.ctl]]) });
+    await tick();
+    expect(screen.getByText('Samsung Galaxy A14')).toBeTruthy();
+    expect(screen.getByText('IMEI 499001200000004')).toBeTruthy();
+    expect(screen.queryByText('R58T00TEST')).toBeNull();
+    env.s.devices = [{ serial: 'R58T00TEST', state: 'device', model: 'SM_A145R', name: null, imei: null }];
+    await tick();
+    expect(screen.getByText('SM A145R')).toBeTruthy();
+    expect(screen.getByText('R58T00TEST')).toBeTruthy();
+  });
+
   test('unauthorized phone asks for the permission on the phone', async () => {
     const { container } = await renderWith(Connect, 'unauthorized');
     expect(screen.getByRole('heading', { name: 'Potwierdź na telefonie' })).toBeTruthy();

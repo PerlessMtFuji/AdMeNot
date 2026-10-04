@@ -72,6 +72,14 @@ def test_polish_protocol_has_every_section(photo):
         assert absent not in html, absent
 
 
+def test_imei_replaces_the_serial_number(photo):
+    device = DeviceBlock("Samsung Galaxy A14", "SM-A145R", "14", "R58T00TEST", "2026-07-01",
+                         photo, "exact", "499001200000004")
+    html = render_html(make_protocol(photo, device=device), ServiceInfo(), GENERATED)
+    assert "<dt>IMEI</dt>" in html and "499001200000004" in html
+    assert "R58T00TEST" not in html and "Nr seryjny" not in html
+
+
 def test_user_and_phone_text_is_escaped(photo):
     html = render_html(make_protocol(photo),
                        ServiceInfo(name="Kowalski & <i>Syn</i>"), GENERATED)

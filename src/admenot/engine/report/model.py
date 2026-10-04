@@ -31,6 +31,7 @@ class DeviceBlock:
     security_patch: str | None
     image: Path
     photo: str  # exact | approximate | none
+    imei: str | None = None  # w protokole zamiast numeru seryjnego, gdy dało się go odczytać
 
 
 @dataclass(frozen=True)
@@ -155,6 +156,7 @@ def device_block(snap: dict[str, Any], order: Order) -> DeviceBlock:
         security_patch=dev.get("security_patch") or None,
         image=image,
         photo=photo,
+        imei=dev.get("imei") or None,
     )
 
 

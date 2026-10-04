@@ -24,6 +24,7 @@ def test_snapshot_keeps_device_photo_scope_and_flagged_apps(tmp_path):
     assert snap["device"] == {
         "serial": SERIAL, "brand": "samsung", "manufacturer": "samsung", "model": "SM-A145R",
         "market_name": None, "android_release": "14", "sdk": 34, "security_patch": "2026-07-01",
+        "imei": None,
     }
     assert snap["phone"]["slug"] == "samsung-galaxy-a14" and "Galaxy A14" in snap["phone"]["name"]
     assert snap["phone"]["confidence"] == "exact"

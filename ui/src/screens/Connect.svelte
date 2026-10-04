@@ -54,15 +54,15 @@
             <div class="flex flex-col gap-2">
               <label class="block cursor-pointer rounded-2xl {s.serial === d.serial ? 'ring-2 ring-accent' : ''}">
                 <input class="sr-only" type="radio" name="device" checked={s.serial === d.serial}
-                  aria-label="{modelName(d.model)} {d.serial}" onchange={() => ctl.selectDevice(d.serial)} />
-                <DeviceCard name={modelName(d.model)} details={t('connect.title.ready')} serial={d.serial} connected />
+                  aria-label="{d.name ?? modelName(d.model)} {d.serial}" onchange={() => ctl.selectDevice(d.serial)} />
+                <DeviceCard name={d.name ?? modelName(d.model)} details={t('connect.title.ready')} serial={d.serial} imei={d.imei} connected />
               </label>
-              <div class="pl-[80px]"><MirrorControls serial={d.serial} name={modelName(d.model)} /></div>
+              <div class="pl-[80px]"><MirrorControls serial={d.serial} name={d.name ?? modelName(d.model)} /></div>
             </div>
           {:else}
             <label class="block cursor-pointer rounded-2xl">
-              <DeviceCard name={modelName(d.model)} details={t('connect.title.ready')} serial={d.serial} connected>
-                <MirrorControls serial={d.serial} name={modelName(d.model)} />
+              <DeviceCard name={d.name ?? modelName(d.model)} details={t('connect.title.ready')} serial={d.serial} imei={d.imei} connected>
+                <MirrorControls serial={d.serial} name={d.name ?? modelName(d.model)} />
               </DeviceCard>
             </label>
           {/if}

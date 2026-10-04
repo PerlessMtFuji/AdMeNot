@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from admenot.engine.adb.transport import AdbTransport
+from admenot.engine.device.imei import read_imei
 
 GETPROP = "getprop"
 UPTIME = "cat /proc/uptime"
@@ -27,6 +28,7 @@ class DeviceInfo:
     security_patch: str | None
     uptime_s: float
     local_now: datetime
+    imei: str | None = None  # None: Android nie pozwala odczytać — zostaje numer seryjny
 
 
 def parse_getprop(text: str) -> dict[str, str]:
@@ -61,4 +63,5 @@ def read_device_info(adb: AdbTransport) -> DeviceInfo:
         security_patch=prop("ro.build.version.security_patch"),
         uptime_s=uptime_s,
         local_now=local_now,
+        imei=read_imei(adb),
     )

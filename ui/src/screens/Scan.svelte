@@ -10,7 +10,7 @@
 
   const s = getContext<Controller>('ctl').state;
   const entry = $derived(s.devices.find((d) => d.serial === s.serial) ?? null);
-  const name = $derived(s.device?.name ?? modelName(entry?.model ?? null));
+  const name = $derived(s.device?.name ?? entry?.name ?? modelName(entry?.model ?? null));
   const checks = $derived(scanChecklist(s.scanStage));
   const details = $derived(s.device
     ? `${s.device.model} · Android ${s.device.android}${s.device.patch ? ` · ${t('phone.patch')} ${s.device.patch}` : ''}`
@@ -40,7 +40,7 @@
     </div>
   </main>
   <SidePanel label={t('phone.subject')}>
-    <DeviceCard compact name={name} serial={s.serial ?? ''} image={s.device?.image ?? null}
+    <DeviceCard compact name={name} serial={s.serial ?? ''} imei={s.device?.imei ?? entry?.imei} image={s.device?.image ?? null}
       {details} connected>
       {#if s.serial}<MirrorControls serial={s.serial} {name} />{/if}
     </DeviceCard>

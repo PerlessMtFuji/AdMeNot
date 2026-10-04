@@ -25,7 +25,7 @@
 </script>
 
 {#if s.device}
-  <DeviceCard compact name={s.device.name} {details} serial={s.device.serial} image={s.device.image} connected>
+  <DeviceCard compact name={s.device.name} {details} serial={s.device.serial} imei={s.device.imei} image={s.device.image} connected>
     <MirrorControls serial={s.device.serial} name={s.device.name} />
   </DeviceCard>
   <div class="h-px bg-line"></div>

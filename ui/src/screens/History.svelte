@@ -108,7 +108,7 @@
         <span class="min-w-0 flex-1">
           <b class="line-clamp-2 break-words leading-snug">{modelName(d.name)}</b>
           {#if d.model && d.model !== d.name}<span class="block truncate text-xs text-mut">{modelName(d.model)}</span>{/if}
-          <span class="mono block truncate text-2xs text-soft">{d.serial}</span>
+          <span class="mono block truncate text-2xs text-soft">{d.imei ? `IMEI ${d.imei}` : d.serial}</span>
         </span>
         {#if s.device?.serial === d.serial}<span class="text-xs text-ok">● USB</span>{/if}
       </button>

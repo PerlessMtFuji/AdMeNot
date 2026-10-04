@@ -80,7 +80,7 @@ def test_rows_device_and_recommendations(journal, photo):
     d = p.device
     assert (d.name, d.model, d.android, d.serial, d.security_patch) == (
         "Samsung Galaxy A14", "SM-A145R", "14", "R58", "2026-07-01")
-    assert (d.image, d.photo) == (photo, "exact")
+    assert (d.image, d.photo, d.imei) == (photo, "exact", None)
     assert p.scope == ScanScope([], True, False, 72.0, 0) and not p.scope.limited
     assert p.recommendations == [
         Recommendation("review_left", {"apps": GAME}),
@@ -88,6 +88,12 @@ def test_rows_device_and_recommendations(journal, photo):
         Recommendation("disabled"),
         Recommendation("general"),
     ]
+
+
+def test_imei_from_the_snapshot(journal, photo):
+    snap = snapshot(photo)
+    snap["device"]["imei"] = "499001200000004"
+    assert build_protocol(journal, make_order(journal, snap).id, "pl").device.imei == "499001200000004"
 
 
 def test_many_apps_left_for_review_are_counted_not_listed(journal, photo):

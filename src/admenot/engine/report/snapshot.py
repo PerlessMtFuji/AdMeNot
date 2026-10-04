@@ -100,7 +100,7 @@ def scan_snapshot(report: ScanReport, match: PhoneMatch,
             "serial": d.serial, "brand": d.brand, "manufacturer": d.manufacturer,
             "model": d.model, "market_name": d.market_name,
             "android_release": d.android_release, "sdk": d.sdk,
-            "security_patch": d.security_patch,
+            "security_patch": d.security_patch, "imei": d.imei,
         },
         "phone": {
             "name": match.phone.name if match.phone else None,

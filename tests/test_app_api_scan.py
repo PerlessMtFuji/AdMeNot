@@ -34,14 +34,33 @@ def test_settings_roundtrip_and_errors():
     api.save_settings({"adb_path": "C:\\adb\\adb.exe"})
     assert paths == ["C:\\adb\\adb.exe"]
 
+IMEI_PARCEL = """Result: Parcel(
+  0x00000000: 00000000 0000000f 00390034 00300039 '........4.9.9.0.'
+  0x00000010: 00310030 00300032 00300030 00300030 '0.1.2.0.0.0.0.0.'
+  0x00000020: 00300030 00000034                   '0.0.4...        ')
+"""
+
 
 def test_list_devices_and_adb_missing():
     phone = make_cli_phone()
     api, _ = make_api(phone)
     assert api.list_devices() == {"devices": [{"serial": SERIAL, "state": "device",
-                                               "model": "SM_A145R"}], "error": None}
+                                               "model": "SM_A145R", "name": "samsung SM-A145R",
+                                               "imei": None}], "error": None}
     phone.host["devices -l"] = AdbError("adb_missing", "adb not found")
     assert api.list_devices() == {"devices": [], "error": "adb_missing"}
+
+
+def test_device_list_reads_name_and_imei_once_per_connection():
+    # Próba wydania 0.9.0: przy podłączeniu był sam kod modelu, nazwa handlowa dopiero w skanie.
+    phone = make_cli_phone()
+    phone.static["service call iphonesubinfo 1 s16 com.android.shell"] = IMEI_PARCEL
+    api, _ = make_api(phone)
+    (entry,) = api.list_devices()["devices"]
+    assert (entry["name"], entry["imei"]) == ("samsung SM-A145R", "499001200000004")
+    getprops = phone.calls.count("getprop")
+    api.list_devices()
+    assert phone.calls.count("getprop") == getprops  # odpytywanie listy nie męczy telefonu
 
 
 def test_scan_events_in_order_then_apk_in_background():

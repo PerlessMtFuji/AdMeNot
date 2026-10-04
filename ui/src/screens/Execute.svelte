@@ -143,7 +143,7 @@
 
   <SidePanel label={t('exec.panel')}>
     {#if s.device}
-      <DeviceCard compact name={s.device.name} details={`Android ${s.device.android}`} serial={s.device.serial}
+      <DeviceCard compact name={s.device.name} details={`Android ${s.device.android}`} serial={s.device.serial} imei={s.device.imei}
         image={s.device.image} connected={running}>
         <MirrorControls serial={s.device.serial} name={s.device.name} />
       </DeviceCard>

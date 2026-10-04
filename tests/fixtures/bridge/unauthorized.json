@@ -9,7 +9,9 @@
      {
       "serial": "R58T00TEST",
       "state": "unauthorized",
-      "model": null
+      "model": null,
+      "name": null,
+      "imei": null
      }
     ],
     "error": null

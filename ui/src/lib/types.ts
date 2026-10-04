@@ -42,6 +42,8 @@ export interface DeviceEntry {
   serial: string;
   state: string;
   model: string | null;
+  name?: string | null; // nazwa handlowa z bazy telefonów (Api._identity); brak → kod modelu
+  imei?: string | null;
 }
 
 export interface DevicesPayload {
@@ -60,6 +62,7 @@ export interface PhoneCard {
   sdk: number;
   patch: string | null;
   uptime_s: number;
+  imei?: string | null;
   match: { confidence: string; step: string; matched: string | null } | null;
   image: string;
 }
@@ -211,7 +214,7 @@ export interface HistoryView {
   serial: string | null;
   serials: string[];
   orders: HistoryOrder[];
-  devices: { serial: string; name: string; model: string | null; image: string }[];
+  devices: { serial: string; name: string; model: string | null; image: string; imei?: string | null }[];
 }
 
 export interface ConsoleEntry {

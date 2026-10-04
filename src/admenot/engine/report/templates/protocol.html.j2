@@ -36,7 +36,8 @@
     <dl>
       {% if p.device.model %}<dt>{{ t.model }}</dt><dd class="mono">{{ p.device.model }}</dd>{% endif %}
       {% if p.device.android %}<dt>{{ t.android }}</dt><dd>{{ p.device.android }}</dd>{% endif %}
-      <dt>{{ t.serial }}</dt><dd class="mono">{{ p.device.serial }}</dd>
+      {% if p.device.imei %}<dt>IMEI</dt><dd class="mono">{{ p.device.imei }}</dd>
+      {% else %}<dt>{{ t.serial }}</dt><dd class="mono">{{ p.device.serial }}</dd>{% endif %}
       {% if p.device.security_patch %}<dt>{{ t.patch }}</dt><dd class="mono">{{ p.device.security_patch }}</dd>{% endif %}
     </dl>
     </div>

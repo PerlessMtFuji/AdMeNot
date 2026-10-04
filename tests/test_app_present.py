@@ -160,7 +160,7 @@ def test_plan_step_result_and_history_views(tmp_path):
         assert o["status_label"] == "wykonane" and o["interrupted"] is False
         assert {a["status_label"] for a in o["actions"]} == {"wykonane"}
         assert hv["devices"] == [{"serial": phone.serial, "name": o["model"], "model": o["model"],
-                                  "image": image_uri(SILHOUETTE)}]
+                                  "image": image_uri(SILHOUETTE), "imei": None}]
         empty = history_view(journal, None, [], "pl")
         assert empty["orders"] == [] and empty["devices"] == []
 

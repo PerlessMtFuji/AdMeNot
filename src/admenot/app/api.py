@@ -163,6 +163,7 @@ class Api:
         self._incident_lock = threading.Lock()
         self._pick_file_fn: Callable[[], str | None] | None = None
         self._open_order: dict[str, int] = {}  # telefon → zlecenie, do którego idą nowe zrzuty
+        self._identities: dict[str, tuple[str | None, str | None]] = {}  # telefon → (nazwa, IMEI)
         self._pending: dict[str, list[int]] = {}  # telefon → zrzuty czekające na zlecenie
         self._shots_lock = threading.Lock()  # chroni _open_order/_pending; nigdy pod adb/screencap
         self._clean_screenshots()
@@ -231,8 +232,26 @@ class Api:
             entries = list_devices(self._host)
         except AdbError as exc:
             return {"devices": [], "error": error_payload(exc)["key"]}
-        return {"devices": [{"serial": e.serial, "state": e.state, "model": e.model}
-                            for e in entries], "error": None}
+        ready = {e.serial for e in entries if e.state == "device"}
+        for serial in set(self._identities) - ready:
+            self._identities.pop(serial, None)  # odłączony: przy następnym podłączeniu czytamy od nowa
+        devices = []
+        for e in entries:
+            name, imei = self._identity(e.serial) if e.serial in ready else (None, None)
+            devices.append({"serial": e.serial, "state": e.state, "model": e.model,
+                            "name": name, "imei": imei})
+        return {"devices": devices, "error": None}
+
+    def _identity(self, serial: str) -> tuple[str | None, str | None]:
+        """Nazwa handlowa i IMEI już na ekranie podłączenia — raz na podłączenie, nie co odpytanie."""
+        if serial not in self._identities:
+            try:
+                device = read_device_info(self._session(serial))
+            except AdbError:
+                return None, None  # np. telefon jeszcze się nie odblokował: spróbujemy przy następnym
+            self._identities[serial] = (device_card(device, self._provider.match(device))["name"],
+                                        device.imei)
+        return self._identities[serial]
 
     # --- ustawienia i telefony --------------------------------------------------------------
 
@@ -285,6 +304,7 @@ class Api:
             self._emit("scan:stage", {"stage": "identify"})
             device = read_device_info(adb)
             match = self._provider.match(device)
+            self._identities[device.serial] = (device_card(device, match)["name"], device.imei)
             self._adb, self._serial, self._client = adb, device.serial, name
             self._report, self._match = None, match
             self._emit("scan:device", {"device": device_card(device, match)})

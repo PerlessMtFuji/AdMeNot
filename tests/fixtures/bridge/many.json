@@ -9,17 +9,190 @@
      {
       "serial": "R58T00TEST",
       "state": "device",
-      "model": "SM_A145R"
+      "model": "SM_A145R",
+      "name": "samsung SM-A145R",
+      "imei": null
      },
      {
       "serial": "HT7A1B2C3",
       "state": "device",
-      "model": "Pixel_7"
+      "model": "Pixel_7",
+      "name": "samsung SM-A145R",
+      "imei": null
      }
     ],
     "error": null
    },
-   "events": []
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cat /proc/uptime",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "280000.12 500000.00\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "HT7A1B2C3",
+      "command": "cat /proc/uptime",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "280000.12 500000.00\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "date \"+%Y-%m-%d %H:%M:%S\"",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "2026-09-26 14:00:00\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "HT7A1B2C3",
+      "command": "date \"+%Y-%m-%d %H:%M:%S\"",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "2026-09-26 14:00:00\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "getprop",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "[ro.product.brand]: [samsung]\n[ro.product.manufacturer]: [samsung]\n[ro.product.model]: [SM-A145R]\n[ro.product.device]: [a14]\n[ro.build.version.release]: [14]\n[ro.build.version.sdk]: [34]\n[ro.build.version.security_patch]: [2026-07-01]\n[ro.serialno]: [R58T00TEST]\n[persist.sys.device_name]: [Telefon Anny]\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "HT7A1B2C3",
+      "command": "getprop",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "[ro.product.brand]: [samsung]\n[ro.product.manufacturer]: [samsung]\n[ro.product.model]: [SM-A145R]\n[ro.product.device]: [a14]\n[ro.build.version.release]: [14]\n[ro.build.version.sdk]: [34]\n[ro.build.version.security_patch]: [2026-07-01]\n[ro.serialno]: [R58T00TEST]\n[persist.sys.device_name]: [Telefon Anny]\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "service call iphonesubinfo 1 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 1 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "HT7A1B2C3",
+      "command": "service call iphonesubinfo 1 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 1 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "service call iphonesubinfo 2 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 2 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "HT7A1B2C3",
+      "command": "service call iphonesubinfo 2 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 2 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "service call iphonesubinfo 3 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 3 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "HT7A1B2C3",
+      "command": "service call iphonesubinfo 3 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 3 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "service call iphonesubinfo 4 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 4 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "HT7A1B2C3",
+      "command": "service call iphonesubinfo 4 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 4 s16 com.android.shell'",
+      "tag": null
+     }
+    ]
+   ]
   }
  ]
 }
