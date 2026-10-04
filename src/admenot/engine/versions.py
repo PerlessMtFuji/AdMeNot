@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import hashlib
 from functools import cache
-from importlib import metadata, resources
+from importlib import resources
 
+from admenot import __version__
 from admenot.engine.apk.iocs import load_default_iocs
 
 _DATA = {
@@ -22,11 +23,7 @@ def _digest(package: str, name: str) -> str:
 
 @cache
 def _versions() -> tuple[tuple[str, str], ...]:
-    try:
-        engine = metadata.version("admenot")
-    except metadata.PackageNotFoundError:
-        engine = "dev"
-    versions = {"engine": engine}
+    versions = {"engine": __version__}
     versions.update({key: _digest(*where) for key, where in _DATA.items()})
     versions["iocs"] = f"{load_default_iocs().version}-{versions['iocs']}"
     return tuple(versions.items())

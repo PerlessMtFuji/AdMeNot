@@ -12,6 +12,7 @@ import time
 from collections.abc import Callable
 from datetime import datetime
 
+from admenot import __version__
 from admenot.cli import screenshot_cli
 from admenot.cli.actions_cli import (
     cmd_cache,
@@ -382,6 +383,7 @@ def _seconds(minimum: float) -> Callable[[str], float]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="admenot")
     parser.add_argument("--lang", choices=["pl", "en"], default="pl")
+    parser.add_argument("--version", action="version", version=f"AdMeNot {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("devices")
     sub.add_parser("gui")

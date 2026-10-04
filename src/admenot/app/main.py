@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from admenot import __version__
 from admenot.app.api import Api
 from admenot.app.events import WindowEmitter
 from admenot.engine.settings import effective_lang, load_settings
@@ -35,6 +36,11 @@ MESSAGES = {
 }
 
 
+def window_title(version: str = __version__) -> str:
+    """„beta" w tytule, dopóki główny numer wersji to 0 (spec wydania §2)."""
+    return f"AdMeNot {version} beta" if version.startswith("0.") else f"AdMeNot {version}"
+
+
 def run_gui() -> int:
     lang = effective_lang(load_settings())
     text = MESSAGES[lang]
@@ -50,7 +56,7 @@ def run_gui() -> int:
     holder: dict[str, Any] = {}
     api = Api(WindowEmitter(lambda: holder.get("window")))
     # http_server=True: moduły ES z file:// są w Chromium blokowane
-    window = webview.create_window("AdMeNot", url=str(index), js_api=api,
+    window = webview.create_window(window_title(), url=str(index), js_api=api,
                                    background_color="#eef2f6", **WINDOW)
     holder["window"] = window
 
