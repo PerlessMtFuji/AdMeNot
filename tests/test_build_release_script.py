@@ -105,3 +105,93 @@ def test_release_notes_with_and_without_virustotal(tmp_path):
     notes = m.release_notes("0.9.0", setup, "ab" * 32, signed=True, vt=vt)
     assert "VirusTotal: 2/70 — https://vt/x" in notes and "Alpha, Zeta" in notes
     assert "Podpis: podpisany" in notes
+
+
+@pytest.fixture
+def staged(monkeypatch, tmp_path):
+    """build() z podstawionymi procesami i katalogami w tmp."""
+    m = _module()
+    bundle, release, build_dir = tmp_path / "dist" / "AdMeNot", tmp_path / "dist" / "release", tmp_path / "build"
+    bundle.mkdir(parents=True)
+    build_dir.mkdir()
+    (build_dir / "MicrosoftEdgeWebview2Setup.exe").write_bytes(b"wv2")
+    iscc = tmp_path / "ISCC.exe"
+    iscc.write_bytes(b"")
+    monkeypatch.setattr(m, "BUNDLE", bundle)
+    monkeypatch.setattr(m, "RELEASE", release)
+    monkeypatch.setattr(m, "BUILD", build_dir)
+    monkeypatch.setattr(m, "WEBVIEW2_SETUP", build_dir / "MicrosoftEdgeWebview2Setup.exe")
+    monkeypatch.setattr(m, "check_release_deps", lambda: None)
+    monkeypatch.setattr(m.third_party_notices, "build", lambda tools, ui: ("NOTICES", ["oddpkg"]))
+    monkeypatch.delenv("ADMENOT_SIGN_CMD", raising=False)
+    monkeypatch.delenv("VT_API_KEY", raising=False)
+    calls = []
+
+    def runner(command, **kw):
+        calls.append(command)
+        if isinstance(command, list) and command[0] == str(iscc):
+            name = next(a[2:] for a in command if a.startswith("/F"))
+            release.mkdir(parents=True, exist_ok=True)
+            (release / f"{name}.exe").write_bytes(b"setup")
+        stdout = "skan referencyjny\n" if "scan" in command else ""
+        return subprocess.CompletedProcess(command, 0, stdout, "")
+
+    args = m.parse_args(["--allow-dirty", "--iscc", str(iscc)])
+    return m, args, runner, calls, tmp_path
+
+
+def _step(calls, needle):
+    return next(i for i, c in enumerate(calls) if needle in " ".join(map(str, c if isinstance(c, list) else [c])))
+
+
+def test_build_runs_the_steps_in_order_and_writes_the_outputs(staged):
+    m, args, runner, calls, _ = staged
+    summary = m.build(args, runner)
+    order = [_step(calls, s) for s in ("git status", "fetch_tools.py", "build_phone_db.py",
+                                       "build_ui.ps1", "PyInstaller", "selfcheck", "ISCC.exe")]
+    assert order == sorted(order)
+    assert not any("--device" in c for c in calls if isinstance(c, list))
+    iscc = calls[_step(calls, "ISCC.exe")]
+    # podstawiony git zwraca puste stdout, więc drzewo jest czyste mimo --allow-dirty
+    assert "/DAppVersion=0.9.0" in iscc and "/DWinVersion=0.9.0.0" in iscc
+    assert "/FAdMeNot-0.9.0-setup" in iscc
+    assert not any(a.startswith("/S") for a in iscc)
+    assert (m.BUNDLE / "THIRD_PARTY_NOTICES.txt").read_text("utf-8") == "NOTICES"
+    setup = next(m.RELEASE.glob("*-setup.exe"))
+    assert setup.with_name(setup.name + ".sha256").is_file()
+    notes = next(m.RELEASE.glob("*-release-notes.md")).read_text("utf-8")
+    assert "VirusTotal: nie sprawdzono" in notes
+    assert summary[-1] == m.UNSIGNED
+    assert any("oddpkg" in line for line in summary) and any("VT_API_KEY" in line for line in summary)
+
+
+def test_build_signs_both_exes_and_the_setup_when_a_command_is_set(staged, monkeypatch):
+    m, args, runner, calls, _ = staged
+    monkeypatch.setenv("ADMENOT_SIGN_CMD", "signtool sign /a {file}")
+    summary = m.build(args, runner)
+    signed = [c for c in calls if isinstance(c, str) and c.startswith("signtool")]
+    assert signed == [f'signtool sign /a "{m.BUNDLE / "AdMeNot.exe"}"',
+                      f'signtool sign /a "{m.BUNDLE / "admenot-cli.exe"}"']
+    iscc = calls[_step(calls, "ISCC.exe")]
+    assert "/DSign" in iscc and "/Sadmenot=signtool sign /a $f" in iscc
+    assert summary[-1] == "Podpisane"
+
+
+def test_device_build_makes_a_reference_and_checks_the_bundle_against_it(staged):
+    m, _, runner, calls, _ = staged
+    args = m.parse_args(["--allow-dirty", "--device", "--iscc", str(staged[4] / "ISCC.exe")])
+    m.build(args, runner)
+    reference = m.BUILD / "scan-reference.txt"
+    assert reference.read_text("utf-8") == "skan referencyjny\n"
+    device = calls[_step(calls, "--reference")]
+    assert device[-3:] == ["--device", "--reference", str(reference)]
+    assert _step(calls, "scan --apk --all") < _step(calls, "PyInstaller") < _step(calls, "--reference")
+
+
+def test_dirty_tree_without_the_flag_stops_before_any_build_step(staged):
+    m, _, _, _, tmp_path = staged
+    calls = []
+    args = m.parse_args(["--iscc", str(tmp_path / "ISCC.exe")])
+    with pytest.raises(m.BuildError, match="--allow-dirty"):
+        m.build(args, fake_runner(calls, " M x\n"))
+    assert calls == [["git", "status", "--porcelain"]]
