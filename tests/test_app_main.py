@@ -1,3 +1,4 @@
+import subprocess
 import sys
 
 import pytest
@@ -120,3 +121,25 @@ def test_frozen_build_reports_a_missing_webview2_in_a_window(monkeypatch, tmp_pa
     monkeypatch.setitem(sys.modules, "webview", FakeWebview)
     assert app_main.run_gui() == 3
     assert "WebView2" in shown[0] and "developer.microsoft.com" in shown[0]
+
+
+def test_main_gives_a_windowed_process_writable_std_streams(monkeypatch):
+    # AdMeNot.exe (console=False) ma sys.stdout = None; proces analizy APK dziedziczy to przez
+    # freeze_support, a androguard przy imporcie bierze sys.stdout.write (próba wydania 0.9.0)
+    monkeypatch.setattr(sys, "stdout", None)
+    monkeypatch.setattr(sys, "stderr", None)
+    seen = {}
+    monkeypatch.setattr(app_main.multiprocessing, "freeze_support",
+                        lambda: seen.update(out=sys.stdout, err=sys.stderr))
+    monkeypatch.setattr(app_main, "run_gui", lambda: 0)
+    with pytest.raises(SystemExit):
+        app_main.main()
+    seen["out"].write("x")
+    seen["err"].write("x")
+
+
+def test_androguard_imports_without_a_console():
+    code = ("import sys; sys.stdout = sys.stderr = None\n"
+            "from admenot.app.main import ensure_std_streams; ensure_std_streams()\n"
+            "import androguard.core.apk\n")
+    assert subprocess.run([sys.executable, "-c", code], check=False).returncode == 0

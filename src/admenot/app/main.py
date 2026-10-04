@@ -6,6 +6,7 @@ Uruchomienie: `admenot gui` albo `admenot-gui`. UI buduje `scripts/build_ui.ps1`
 from __future__ import annotations
 
 import multiprocessing
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -96,6 +97,15 @@ def run_gui() -> int:
     return 0
 
 
+def ensure_std_streams() -> None:
+    """AdMeNot.exe (console=False) nie ma konsoli: sys.stdout/stderr to None, a androguard przy
+    imporcie bierze `sys.stdout.write` — bez tego w paczce padała analiza manifestu każdej aplikacji."""
+    for name in ("stdout", "stderr"):
+        if getattr(sys, name) is None:
+            setattr(sys, name, open(os.devnull, "w", encoding="utf-8"))  # noqa: SIM115 — do końca procesu
+
+
 def main() -> None:
+    ensure_std_streams()  # przed freeze_support: proces analizy APK startuje właśnie stąd
     multiprocessing.freeze_support()  # PyInstaller + `spawn`: bez tego proces potomny otwiera drugie okno
     raise SystemExit(run_gui())

@@ -8,7 +8,7 @@ from admenot.engine.report.pdf import PdfError, edge_command, find_edge, html_to
 
 
 class FakeRun:
-    def __init__(self, output=b"%PDF-1.4\n%fake\n", exc=None):
+    def __init__(self, output=b"%PDF-1.4\n%fake\n%%EOF\n", exc=None):
         self.output, self.exc = output, exc
         self.cmd, self.kw = None, None
 
@@ -20,6 +20,27 @@ class FakeRun:
         if self.output is not None:
             Path(target).write_bytes(self.output)
         return subprocess.CompletedProcess(cmd, 0)
+
+
+class Clock:
+    """Zamiast prawdziwego czekania: każde `sleep` przesuwa zegar."""
+
+    def __init__(self):
+        self.now, self.sleeps, self.on_sleep = 0.0, 0, None
+
+    def sleep(self, seconds):
+        self.now += seconds
+        self.sleeps += 1
+        if self.on_sleep:
+            self.on_sleep(self.sleeps)
+
+
+@pytest.fixture(autouse=True)
+def clock(monkeypatch):
+    c = Clock()
+    monkeypatch.setattr(pdf_mod, "_sleep", c.sleep)
+    monkeypatch.setattr(pdf_mod, "_clock", lambda: c.now)
+    return c
 
 
 @pytest.fixture
@@ -48,6 +69,25 @@ def test_prints_through_edge(files):
     assert any(a.startswith("--user-data-dir=") for a in run.cmd)
     assert run.kw["timeout"] == 60.0 and run.kw["check"] is False
     assert run.kw["stdout"] == subprocess.DEVNULL and run.kw["stdin"] == subprocess.DEVNULL
+
+
+def test_waits_for_edge_children_that_finish_the_pdf_later(files, clock):
+    # Edge w trakcie aktualizacji: msedge.exe kończy się, zanim proces potomny dopisze PDF
+    # (próba wydania 0.9.0 — protokół został jako *.tmp.pdf, a program zgłosił błąd)
+    html, pdf, edge = files
+    run = FakeRun(output=None)
+    tmp = pdf.with_name("p.tmp.pdf")
+    clock.on_sleep = lambda n: (n == 2 and tmp.write_bytes(b"%PDF-1.4\npart"),
+                                n == 4 and tmp.write_bytes(b"%PDF-1.4\npart\n%%EOF\n"))
+    html_to_pdf(html, pdf, edge=edge, run=run)
+    assert pdf.read_bytes().endswith(b"%%EOF\n") and not leftovers(pdf)
+
+
+def test_gives_up_on_a_truncated_pdf(files):
+    html, pdf, edge = files
+    with pytest.raises(PdfError) as exc:
+        html_to_pdf(html, pdf, edge=edge, run=FakeRun(output=b"%PDF-1.4\npart"))
+    assert exc.value.key == "failed" and not leftovers(pdf)
 
 
 def test_edge_command_uses_a_private_profile(tmp_path):
