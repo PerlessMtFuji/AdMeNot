@@ -13,7 +13,7 @@ Specyfikacja: `docs/superpowers/specs/2026-09-26-demalware-design.md`. Plany: `d
 ## Instalacja (środowisko deweloperskie)
 
     py -3.13 -m venv .venv
-    .venv\Scripts\pip install -e ".[dev,gui]"
+    .venv\Scripts\pip install -e ".[dev,gui,release]"
     python scripts\build_phone_db.py            # baza telefonów i zdjęcia (Plan 3)
     python scripts\fetch_tools.py               # scrcpy 4.1 z adb (podgląd ekranu, Plan 6b)
     powershell -ExecutionPolicy Bypass -File scripts\build_ui.ps1
@@ -34,11 +34,18 @@ Praca nad samym UI bez telefonu i bez Pythona (atrapa mostu odtwarza nagrane sce
 
 ## CLI
 
-    admenot devices | device | scan [--apk] | capture | fix | undo | resume | history | cache | service | report | screenshot | gui
+    admenot devices | device | scan [--apk] | capture | fix | undo | resume | history | cache | service | report | screenshot | selfcheck | gui
 
 - `service` — zapisuje dane serwisu (nazwa, adres, telefon, logo) do protokołu, np. `admenot service --name "…"`.
 - `report` — tworzy protokół serwisowy (PDF i HTML) dla zlecenia z dziennika, np. `admenot report --order ZS/…`.
 - `screenshot` — zrzut ekranu telefonu: `--order ZS/…` zapisuje go w zleceniu (trafia do protokołu), `--out plik.png` zapisuje sam plik.
+- `selfcheck` — sprawdza, czy program ma wszystkie pliki (dane, narzędzia, UI); `--device --reference plik` porównuje skan telefonu z wynikiem `scan --apk --all`.
+
+## Wydanie
+
+    .venv\Scripts\python scripts\build_release.py [--device]
+
+Daje `dist\release\AdMeNot-<wersja>-setup.exe` (instalacja per-user, bez uprawnień administratora). Numer wersji: tylko `src\admenot\__init__.py`. Pełna procedura i lista kontrolna: `docs/release.md`.
 
 ## Testy
 
