@@ -107,6 +107,8 @@
     "profiles": "The phone has other user profiles ({ids}) — their apps were not checked.",
     "profiles_unknown": "Could not read the list of user profiles — only the main profile was checked; apps in other profiles (e.g. a work profile) may have been missed.",
     "incomplete": "Incomplete assessment — could not read: {names}. Apps affected: {count}. “Without issues” here only means “no signs in the data that was read”.",
+    "notifications_manual": "Android 12 and older: app notifications cannot be turned off from the computer — only by hand on the phone (Settings › Apps › the app › Notifications). “Silence” stops the app and takes away e.g. the home screen role, notification access and drawing over other apps.",
+    "select_level_disable": "The default action from settings (“Silence”) is replaced with “Disable” on this phone.",
     "apk_running": "APK analysis in the background: {done}/{total}"
   },
   "level": { "silence": "SILENCE", "disable": "DISABLE", "remove": "REMOVE", "review": "CHECK", "none": "—" },

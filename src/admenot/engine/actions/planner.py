@@ -74,8 +74,10 @@ def _silence_steps(package: str, facts: AppFacts, ctx: PhoneContext,
                               {"key": key, "op": "remove", "components": ":".join(own)}))
     if ctx.sdk >= NOTIF_PERMISSION_MIN_SDK:
         steps.append(Step("permission", package, {"permission": POST_NOTIFICATIONS, "granted": "0"}))
-    else:
+    elif ctx.sdk == 0:  # wersja nieznana: appop to jedyne, co da się spróbować
         steps.append(Step("appop", package, {"op": "POST_NOTIFICATION", "mode": "ignore"}))
+    # Android ≤12: przez ADB powiadomień nie wyłączymy — appop POST_NOTIFICATION nie blokuje ich
+    # (OPPO CPH2271, 2026-10-04), a przełącznik zmienia tylko system; UI każe zrobić to ręcznie.
     if SYSTEM_ALERT_WINDOW in facts.requested_permissions:
         # Bez tego uprawnienia aplikacja i tak nie rysuje nad innymi, a Android 12 (OPPO)
         # przyjmuje `appops set` z kodem 0, nie zmieniając trybu — weryfikacja by go zgłosiła.

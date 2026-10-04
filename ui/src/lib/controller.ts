@@ -1,6 +1,6 @@
 import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
-import { changedVerdicts, defaultSelection, mergeSelection, upsertStep } from './logic';
+import { changedVerdicts, defaultSelection, mergeSelection, notificationsManual, upsertStep } from './logic';
 import type { AppState } from './state.svelte';
 import { applyTheme } from './theme';
 import type {
@@ -272,7 +272,8 @@ export class Controller {
 
   /** Akcja z ustawień dla aplikacji bez propozycji silnika; producenta nie usuwamy domyślnie (planner.default_level). */
   private selectLevel(app: AppView): Level {
-    const level = this.state.settings.select_level;
+    let level = this.state.settings.select_level;
+    if (level === 'silence' && notificationsManual(this.state.device?.sdk)) level = 'disable'; // komunikat w wynikach
     return app.is_system && level === 'remove' ? 'disable' : level;
   }
 

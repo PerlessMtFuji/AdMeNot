@@ -83,6 +83,16 @@ describe('controller with the adware scenario', () => {
     expect(s.selection['com.clean.pro.boost']).toBe('remove'); // propozycja silnika ma pierwszeństwo
   });
 
+  test('on Android 12 and older the silence default from settings becomes disable', async () => {
+    const { ctl, s } = setup('adware');
+    await ctl.init();
+    await ctl.startScan();
+    await vi.waitFor(() => expect(s.phase).toBe('results'));
+    s.device = { ...s.device!, sdk: 31 };
+    ctl.toggle(s.scan!.apps.find((a) => a.package === 'com.wlive.forecast')!);
+    expect(s.selection['com.wlive.forecast']).toBe('disable');
+  });
+
   test('language change re-renders the scan', async () => {
     const { ctl, s, bridge } = setup('adware');
     await ctl.init();

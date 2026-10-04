@@ -13,7 +13,7 @@
   import PlanPanel from '../components/PlanPanel.svelte';
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
-  import { facetCounts, flaggedApps, focusedApp, visibleApps } from '../lib/logic';
+  import { facetCounts, flaggedApps, focusedApp, notificationsManual, visibleApps } from '../lib/logic';
   import { DUR, enter, ms, stagger } from '../lib/motion';
   import type { Mode } from '../lib/types';
   import Banner from '../ui/Banner.svelte';
@@ -41,6 +41,7 @@
     return [...new Set([...(c?.failed ?? []), ...(c?.partial ?? [])].map((x) => x.name))];
   });
   const withGaps = $derived(apps.filter((a) => a.gaps.length > 0).length);
+  const notifManual = $derived(notificationsManual(s.device?.sdk));
   let showSafe = $state(false);
   // Liczniki filtrów rodzaju i źródła liczone po przełączniku i wyszukiwarce, przed samymi filtrami.
   const base = $derived(visibleApps(apps, { showAll: s.showAll, verdict: 'all', query: s.query }));
@@ -85,6 +86,8 @@
     {#if s.interrupted.length}<InterruptedBanner orders={s.interrupted} />{/if}
     {#if s.scan?.low_behavior_data}<Banner tone="warn" icon="info" title={t('summary.low_data', { hours: s.scan.usage_window_h?.toFixed(1) ?? '?' })} />{/if}
     {#if missing.length}<Banner tone="warn" icon="info" title={t('summary.incomplete', { count: withGaps, names: missing.join(', ') })} />{/if}
+    {#if notifManual}<Banner tone="info" icon="info" title={t('summary.notifications_manual')} />
+      {#if s.settings.select_level === 'silence'}<Banner tone="info" icon="info" title={t('summary.select_level_disable')} />{/if}{/if}
     {#if s.scan?.profiles.others.length}<Banner tone="warn" icon="info" title={t('summary.profiles', { ids: s.scan.profiles.others.join(', ') })} />
     {:else if s.scan && !s.scan.profiles.known}<Banner tone="warn" icon="info" title={t('summary.profiles_unknown')} />{/if}
     <WhoIsShowing ask={() => ctl.whoIsShowing()} />

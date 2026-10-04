@@ -39,12 +39,26 @@ def _plan(package, level, ctx=CTX, version_code=25, unlocked=frozenset(), reques
 def test_silence_launcher_hijacker_on_android_12():
     plan = _plan(AD, "silence")
     assert isinstance(plan, AppPlan) and plan.warnings == []
-    assert [s.kind for s in plan.steps] == ["home", "secure_list", "appop", "appop", "force_stop"]
-    home, listener, notif, overlay, _ = plan.steps
+    assert [s.kind for s in plan.steps] == ["home", "secure_list", "appop", "force_stop"]
+    home, listener, overlay, _ = plan.steps
     assert home.params == {"component": LAUNCHER}
     assert listener.params == {"key": LISTENERS, "op": "remove", "components": AD_LISTENER}
-    assert notif.params == {"op": "POST_NOTIFICATION", "mode": "ignore"}
     assert overlay.params == {"op": "SYSTEM_ALERT_WINDOW", "mode": "deny"}
+
+
+def test_android_12_has_no_notification_step():
+    # appop POST_NOTIFICATION nie blokuje powiadomień na Androidzie 12 (OPPO CPH2271, 2026-10-04:
+    # powiadomienie przyszło przy trybie ignore), a przełącznik w Ustawieniach zostaje włączony —
+    # krok „blokada powiadomień” w planie i protokole obiecywałby coś, czego nie robi.
+    for sdk in (26, 31, 32):
+        plan = _plan("com.other", "silence", ctx=replace(CTX, sdk=sdk), requested=())
+        assert [s.kind for s in plan.steps] == ["force_stop"]
+
+
+def test_unknown_android_version_keeps_the_appop():
+    plan = _plan("com.other", "silence", ctx=replace(CTX, sdk=0), requested=())
+    assert [(s.kind, s.params.get("op")) for s in plan.steps] == [
+        ("appop", "POST_NOTIFICATION"), ("force_stop", None)]
 
 
 def test_android_14_revokes_permission_and_blocks_full_screen_intents():
@@ -145,4 +159,4 @@ def test_overlay_step_only_when_app_can_draw_over_others():
     # uprawnienia kończy się kodem 0, ale tryb zostaje „default” — weryfikacja pokazałaby „nadal aktywna”.
     plan = _plan(AD, "silence", requested=())
     assert "SYSTEM_ALERT_WINDOW" not in [s.params.get("op") for s in plan.steps]
-    assert [s.kind for s in plan.steps] == ["home", "secure_list", "appop", "force_stop"]
+    assert [s.kind for s in plan.steps] == ["home", "secure_list", "force_stop"]

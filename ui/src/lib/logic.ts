@@ -175,6 +175,12 @@ export function modelName(model: string | null): string {
   return model ? model.replaceAll('_', ' ') : '?';
 }
 
+/** Android ≤12: powiadomień nie wyłączy się przez ADB (planner.NOTIF_PERMISSION_MIN_SDK) — tylko ręcznie na telefonie. */
+export const NOTIF_PERMISSION_MIN_SDK = 33;
+export function notificationsManual(sdk: number | undefined): boolean {
+  return !!sdk && sdk < NOTIF_PERMISSION_MIN_SDK;
+}
+
 export const LEVEL_TONE: Record<Level, 'accent' | 'warn' | 'bad'> = { silence: 'accent', disable: 'warn', remove: 'bad' };
 export const VERDICT_TONE: Record<Verdict, 'bad' | 'warn' | 'neutral' | 'ok'> = {
   malicious: 'bad', suspicious: 'warn', review: 'neutral', safe: 'ok',

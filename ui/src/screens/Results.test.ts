@@ -201,6 +201,18 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     expect(screen.queryByText(t('summary.profiles_unknown'))).toBeNull();
   });
 
+  test('Android 12 and older: notifications only by hand; default action silence becomes disable', async () => {
+    const { s } = await scanned('clean');
+    expect(screen.queryByText(t('summary.notifications_manual'))).toBeNull();
+    s.device = { ...s.device!, sdk: 31 };
+    await tick();
+    expect(screen.getByText(t('summary.notifications_manual'))).toBeTruthy();
+    expect(screen.getByText(t('summary.select_level_disable'))).toBeTruthy();
+    s.settings = { ...s.settings, select_level: 'remove' };
+    await tick();
+    expect(screen.queryByText(t('summary.select_level_disable'))).toBeNull();
+  });
+
   test('low-data banner shows the hours; other profiles banner lists their ids', async () => {
     const { s } = await scanned();
     s.scan = { ...s.scan!, low_behavior_data: true, usage_window_h: 1.5,
