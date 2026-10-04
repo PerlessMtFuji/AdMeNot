@@ -286,6 +286,7 @@
     "mirror_missing": "Brak dołączonego scrcpy — uruchom scripts\\fetch_tools.py.",
     "mirror_failed": "Nie udało się uruchomić podglądu ekranu.",
     "unknown_screenshot": "Nie ma takiego zrzutu ekranu.",
-    "shot_limit": "Do protokołu można wybrać najwyżej 8 zrzutów."
+    "shot_limit": "Do protokołu można wybrać najwyżej 8 zrzutów.",
+    "data_too_new": "Dane programu pochodzą z nowszej wersji AdMeNot — zaktualizuj program."
   }
 }

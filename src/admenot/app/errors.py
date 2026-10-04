@@ -9,7 +9,9 @@ from typing import Any
 
 from admenot.engine.actions.errors import ActionError
 from admenot.engine.adb.transport import AdbError
+from admenot.engine.journal.db import JournalTooNew
 from admenot.engine.paths import logs_dir
+from admenot.engine.settings import SettingsTooNew
 
 _ADB_KEYS = {"adb_missing": "adb_missing", "unauthorized": "unauthorized", "offline": "offline",
              "no_device": "disconnected", "timeout": "timeout"}
@@ -26,6 +28,8 @@ class AppError(Exception):
 def error_payload(exc: BaseException) -> dict[str, Any]:
     if isinstance(exc, AppError):
         return {"key": exc.key, "message": exc.message, **exc.extra}
+    if isinstance(exc, (SettingsTooNew, JournalTooNew)):
+        return {"key": "data_too_new", "message": str(exc)}
     if isinstance(exc, AdbError):
         return {"key": _ADB_KEYS.get(exc.kind, "adb_error"), "message": exc.message}
     if isinstance(exc, ActionError):

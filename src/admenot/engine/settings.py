@@ -3,6 +3,9 @@
 `Settings` to klucze ekranu ustawień (`KEYS`), `ServiceInfo` to sekcja `service` (dane serwisu
 do protokołu). Każdy zapis zmienia tylko swoją część pliku, reszta zostaje.
 Uszkodzony plik nie blokuje startu: wartości domyślne, a zły plik zostaje jako `.bad`.
+Plik ma pole `schema` (brak = 0). `MIGRATIONS[i]` podnosi dane z wersji i do i+1; odczyt stosuje
+brakujące migracje w pamięci, zapis zapisuje wynik z `schema = len(MIGRATIONS)`. Pliku z nowszej
+wersji programu nie nadpisujemy (`SettingsTooNew`) — tak jak dziennik (`journal/db.py`).
 """
 
 from __future__ import annotations
@@ -11,6 +14,7 @@ import json
 import locale
 import os
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -28,6 +32,23 @@ LOGO_TYPES = {
     ".webp": "image/webp", ".svg": "image/svg+xml",
 }
 MAX_LOGO_BYTES = 1_000_000
+SCHEMA_KEY = "schema"
+
+
+def _v1(data: dict[str, Any]) -> dict[str, Any]:
+    return data  # wersja 1 = format sprzed wersjonowania
+
+
+# Tylko dopisujemy na końcu — nigdy nie zmieniamy ani nie usuwamy istniejących migracji.
+MIGRATIONS: tuple[Callable[[dict[str, Any]], dict[str, Any]], ...] = (_v1,)
+
+
+class SettingsTooNew(Exception):
+    def __init__(self, found: int, known: int) -> None:
+        super().__init__(f"Ustawienia pochodzą z nowszej wersji AdMeNot (schemat {found}, "
+                         f"ten program zna {known}) — zaktualizuj program.")
+        self.found = found
+        self.known = known
 
 
 @dataclass(frozen=True)
@@ -80,6 +101,30 @@ def _write(path: Path, data: dict[str, Any]) -> None:
     os.replace(tmp, path)
 
 
+def _schema(data: dict[str, Any]) -> int:
+    value = data.get(SCHEMA_KEY, 0)
+    valid = isinstance(value, int) and not isinstance(value, bool) and value >= 0
+    return value if valid else 0
+
+
+def _load(path: Path) -> dict[str, Any]:
+    """Dane po brakujących migracjach; plik z nowszej wersji czytamy bez zmian (znane klucze)."""
+    data = _read(path)
+    for step in MIGRATIONS[_schema(data):]:
+        data = step(data)
+    return data
+
+
+def _save(path: Path, update: Callable[[dict[str, Any]], None]) -> None:
+    found = _schema(_read(path))
+    if found > len(MIGRATIONS):
+        raise SettingsTooNew(found, len(MIGRATIONS))
+    data = _load(path)
+    update(data)
+    data[SCHEMA_KEY] = len(MIGRATIONS)
+    _write(path, data)
+
+
 def _valid(key: str, value: Any) -> bool:
     if key in ("mirror_auto", "apk_cache_clear_after_repair"):
         return isinstance(value, bool)
@@ -98,7 +143,7 @@ def _valid(key: str, value: Any) -> bool:
 
 
 def load_settings(path: Path | None = None) -> Settings:
-    data = _read(path or settings_path())
+    data = _load(path or settings_path())
     return Settings(**{k: data[k] for k in KEYS if k in data and _valid(k, data[k])})
 
 
@@ -108,9 +153,7 @@ def save_settings(changes: dict[str, Any], path: Path | None = None) -> Settings
     bad = sorted(k for k, v in changes.items() if k in KEYS and not _valid(k, v))
     if unknown or bad:
         raise ValueError(f"unknown={unknown} bad={bad}")
-    data = _read(path)
-    data.update(changes)
-    _write(path, data)
+    _save(path, lambda data: data.update(changes))
     return load_settings(path)
 
 
@@ -129,7 +172,7 @@ def _text(raw: dict[str, Any], key: str) -> str | None:
 
 
 def load_service(path: Path | None = None) -> ServiceInfo:
-    raw = _read(path or settings_path()).get("service")
+    raw = _load(path or settings_path()).get("service")
     if not isinstance(raw, dict):
         return ServiceInfo()
     logo = _text(raw, "logo")
@@ -138,11 +181,9 @@ def load_service(path: Path | None = None) -> ServiceInfo:
 
 
 def save_service(info: ServiceInfo, path: Path | None = None) -> None:
-    path = path or settings_path()
-    data = _read(path)  # ustawienia ekranu (KEYS) zostają
-    data["service"] = {"name": info.name, "address": info.address, "phone": info.phone,
-                       "logo": str(info.logo) if info.logo else None}
-    _write(path, data)
+    service = {"name": info.name, "address": info.address, "phone": info.phone,
+               "logo": str(info.logo) if info.logo else None}
+    _save(path or settings_path(), lambda data: data.update(service=service))  # KEYS zostają
 
 
 def check_logo(path: Path) -> Path:

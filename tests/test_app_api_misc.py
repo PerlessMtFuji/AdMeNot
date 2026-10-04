@@ -5,8 +5,11 @@ from apphelpers import make_api
 from conftest import SERIAL
 from fakephone import make_cli_phone
 
+from admenot.app.errors import error_payload
 from admenot.engine.adb.transport import AdbError
 from admenot.engine.foreground import ACTIVITIES, WINDOWS
+from admenot.engine.journal.db import JournalTooNew
+from admenot.engine.settings import SettingsTooNew
 
 
 @pytest.fixture(autouse=True)
@@ -157,3 +160,9 @@ def test_unexpected_errors_are_logged_not_raised(monkeypatch):
                         lambda *a: (_ for _ in ()).throw(RuntimeError("boom")))
     error = api.history()["error"]
     assert error["key"] == "internal" and "boom" in error["message"] and error["log"]
+
+
+def test_data_from_a_newer_version_has_its_own_error_key():
+    payload = error_payload(SettingsTooNew(2, 1))
+    assert payload["key"] == "data_too_new" and "nowszej wersji" in payload["message"]
+    assert error_payload(JournalTooNew(3, 1))["key"] == "data_too_new"

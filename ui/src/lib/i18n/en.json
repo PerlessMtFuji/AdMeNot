@@ -286,6 +286,7 @@
     "mirror_missing": "Bundled scrcpy is missing — run scripts\\fetch_tools.py.",
     "mirror_failed": "Could not start the screen view.",
     "unknown_screenshot": "No such screenshot.",
-    "shot_limit": "You can choose at most 8 screenshots for the report."
+    "shot_limit": "You can choose at most 8 screenshots for the report.",
+    "data_too_new": "The program data comes from a newer version of AdMeNot — update the program."
   }
 }

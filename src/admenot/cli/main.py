@@ -33,9 +33,10 @@ from admenot.engine.apk.fetch import is_package_name
 from admenot.engine.apk.providers import CachePolicy, DeviceApkProvider
 from admenot.engine.foreground import read_foreground
 from admenot.engine.incident import Timeline, attribute, load_incident, record, save_incident
+from admenot.engine.journal.db import JournalTooNew
 from admenot.engine.paths import incident_path
 from admenot.engine.session import ScanReport, report_to_dict, run_scan
-from admenot.engine.settings import load_settings
+from admenot.engine.settings import SettingsTooNew, load_settings
 from admenot.engine.texts import VERDICT_LABELS, gap_label
 
 MESSAGES = {
@@ -549,6 +550,9 @@ def main(argv: list[str] | None = None, host: AdbTransport | None = None) -> int
             return 3
         print(_msg(args.lang, "adb_error", message=exc.detail or exc.key), file=sys.stderr)
         return 4
+    except (SettingsTooNew, JournalTooNew) as exc:  # dane z nowszej wersji — nic nie nadpisujemy
+        print(str(exc), file=sys.stderr)
+        return 5
 
 
 if __name__ == "__main__":

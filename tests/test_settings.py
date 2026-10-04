@@ -170,3 +170,64 @@ def test_apk_cache_limit_out_of_range_in_file_falls_back_to_default():
     path.write_text(json.dumps({"apk_cache_limit_gb": 0, "apk_cache_clear_after_repair": 1}), "utf-8")
     loaded = S.load_settings()
     assert (loaded.apk_cache_limit_gb, loaded.apk_cache_clear_after_repair) == (10, False)
+
+
+def _write_raw(data):
+    path = settings_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data), "utf-8")
+    return path
+
+
+def test_file_without_schema_is_read_as_before_and_saved_with_schema():
+    path = _write_raw({"mode": "expert", "custom": 1})
+    assert S.load_settings().mode == "expert"
+    assert "schema" not in json.loads(path.read_text("utf-8"))  # odczyt nigdy nie zapisuje
+    S.save_settings({"lang": "en"})
+    assert json.loads(path.read_text("utf-8")) == {
+        "mode": "expert", "custom": 1, "lang": "en", "schema": len(S.MIGRATIONS)}
+
+
+def test_save_service_writes_the_schema_too():
+    save_service(ServiceInfo(name="Serwis"))
+    assert json.loads(settings_path().read_text("utf-8"))["schema"] == len(S.MIGRATIONS)
+
+
+def test_schema_is_not_a_setting():
+    with pytest.raises(ValueError):
+        S.save_settings({"schema": 5})
+
+
+def test_newer_schema_is_read_but_never_overwritten():
+    path = _write_raw({"schema": len(S.MIGRATIONS) + 1, "mode": "expert",
+                       "service": {"name": "Serwis"}, "future": {"x": 1}})
+    before = path.read_bytes()
+    assert S.load_settings().mode == "expert"
+    assert load_service().name == "Serwis"
+    with pytest.raises(S.SettingsTooNew, match="nowszej wersji"):
+        S.save_settings({"lang": "en"})
+    with pytest.raises(S.SettingsTooNew):
+        save_service(ServiceInfo(name="Inny"))
+    assert path.read_bytes() == before
+
+
+def test_a_v2_migration_runs_on_read_and_is_written_on_save(monkeypatch):
+    def v2(data):
+        data = dict(data)
+        if "old_mode" in data:
+            data["mode"] = data.pop("old_mode")
+        return data
+
+    monkeypatch.setattr(S, "MIGRATIONS", (*S.MIGRATIONS, v2))
+    path = _write_raw({"schema": 1, "old_mode": "expert"})
+    assert S.load_settings().mode == "expert"
+    assert json.loads(path.read_text("utf-8")) == {"schema": 1, "old_mode": "expert"}
+    S.save_settings({"lang": "pl"})
+    assert json.loads(path.read_text("utf-8")) == {"schema": 2, "mode": "expert", "lang": "pl"}
+
+
+def test_a_broken_schema_value_counts_as_version_0():
+    path = _write_raw({"schema": "x", "mode": "expert"})
+    assert S.load_settings().mode == "expert"
+    S.save_settings({"lang": "pl"})
+    assert json.loads(path.read_text("utf-8"))["schema"] == len(S.MIGRATIONS)

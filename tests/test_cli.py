@@ -346,3 +346,13 @@ def test_who_watch_rejects_a_bad_interval(capsys):
         with _pytest.raises(SystemExit) as exc:
             main(["who", "--watch", "30", *bad], host=make_synthetic_adb())
         assert exc.value.code == 2
+
+
+def test_settings_from_a_newer_version_stop_the_command(capsys, monkeypatch, tmp_path):
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    path = tmp_path / "AdMeNot" / "settings.json"
+    path.parent.mkdir()
+    path.write_text('{"schema": 99}', "utf-8")
+    assert main(["service", "--name", "Serwis"], host=make_synthetic_adb()) == 5
+    assert "nowszej wersji" in capsys.readouterr().err
+    assert path.read_text("utf-8") == '{"schema": 99}'
