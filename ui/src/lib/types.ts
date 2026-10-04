@@ -161,6 +161,7 @@ export interface StepEvent {
   label: string;
   status: StepStatus;
   error: string | null;
+  restore_bytes?: number | null; // cofnięcie usunięcia: instalacja z kopii (UI: „to potrwa”)
 }
 
 export type Outcome = 'ok' | 'still_active' | 'failed' | 'stopped';

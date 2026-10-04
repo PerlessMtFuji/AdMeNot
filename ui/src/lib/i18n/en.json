@@ -171,6 +171,7 @@
     "restored": "restored", "pending": "waiting to be finished", "failed": "failed",
     "backup": "backup on the computer", "steps": "Steps",
     "other_serial": "Other serial number…", "serial_placeholder": "Serial number", "show": "Show",
+    "restoring": "Installing the app from the backup on this computer ({size}) — this can take up to a minute. Keep the phone connected.",
     "undoing": "Undoing changes…",
     "did": {
       "remove": { "one": "removed {count} app", "few": "removed {count} apps", "many": "removed {count} apps", "other": "removed {count} apps" },

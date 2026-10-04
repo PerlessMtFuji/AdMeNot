@@ -75,6 +75,15 @@ def start_order(
     return order
 
 
+def _restore_size(inverse: Step) -> dict[str, int]:
+    """Rozmiar kopii, z której cofnięcie może instalować (UI: „to potrwa”)."""
+    if inverse.kind != "installed" or inverse.params.get("installed") != "1":
+        return {}
+    backup = Path(inverse.params.get("backup_dir") or "")
+    sizes = [f.stat().st_size for f in backup.glob("*.apk")] if backup.is_dir() else []
+    return {"restore_bytes": sum(sizes)} if sizes else {}
+
+
 def _emit(options: ExecOptions, type_: str, row: Action, status: str,
           error: str | None = None, **extra: Any) -> None:
     options.on_event({"type": type_, "action_id": row.id, "package": row.package,
@@ -257,6 +266,7 @@ def undo(
                     _emit(options, "undo", row, "undone", "app_gone")
                     continue
                 if not S.is_applied(inverse, S.probe(adb, inverse)):
+                    _emit(options, "undo", row, "running", **_restore_size(inverse))
                     S.apply(adb, inverse, options.apk_cache_dir)
                 if inverse.kind == "installed":
                     installed[row.package] = inverse.params["installed"] == "1"

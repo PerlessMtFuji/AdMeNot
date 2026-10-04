@@ -171,6 +171,7 @@
     "restored": "przywrócona", "pending": "czeka na dokończenie", "failed": "błąd",
     "backup": "kopia na komputerze", "steps": "Kroki",
     "other_serial": "Inny numer seryjny…", "serial_placeholder": "Numer seryjny", "show": "Pokaż",
+    "restoring": "Instaluję aplikację z kopii na komputerze ({size}) — to może potrwać do minuty. Nie odłączaj telefonu.",
     "undoing": "Cofam zmiany…",
     "did": {
       "remove": { "one": "usunięto {count} aplikację", "few": "usunięto {count} aplikacje", "many": "usunięto {count} aplikacji", "other": "usunięto {count} aplikacji" },

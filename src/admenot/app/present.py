@@ -215,6 +215,7 @@ def step_view(event: dict[str, Any], lang: str, manufacturer: str,
         "kind": event["step"]["kind"], "label": step_label(event["step"], lang),
         "status": event["status"],
         "error": error_text(event["error"], lang, manufacturer) if event.get("error") else None,
+        "restore_bytes": event.get("restore_bytes"),
     }
 
 

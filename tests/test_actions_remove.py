@@ -68,6 +68,19 @@ def test_undo_reinstalls_from_backup_when_apk_is_gone(journal, tmp_path):
     assert install.startswith("host:install-multiple ") and "split_config.arm64_v8a.apk" in install
 
 
+def test_undo_announces_each_step_and_the_size_of_a_restore(journal, tmp_path):
+    # Przywrócenie z kopii trwa (próba wydania 0.9.0: 280 MB w 29 s) — UI musi wiedzieć, co trwa.
+    phone = _phone()
+    order, _ = _remove(phone, journal, tmp_path)
+    events = []
+    assert undo(phone, journal, order.id, options=ExecOptions(on_event=events.append)) == []
+    statuses = [(e["step"]["kind"], e["status"]) for e in events]
+    assert statuses[:2] == [("installed", "running"), ("installed", "undone")]
+    size = sum(f.stat().st_size for f in tmp_path.joinpath(*BACKUP).glob("*.apk"))
+    assert events[0]["restore_bytes"] == size > 0
+    assert not [e for e in events[1:] if "restore_bytes" in e]
+
+
 def test_failed_backup_blocks_uninstall(journal, tmp_path):
     phone = _phone()
     phone.fail["pm path com.spam"] = AdbError("command_failed", "")

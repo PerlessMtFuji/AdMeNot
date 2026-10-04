@@ -1605,7 +1605,8 @@
       "kind": "permission",
       "label": "odebranie zgody na powiadomienia",
       "status": "running",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -1641,7 +1642,8 @@
       "kind": "permission",
       "label": "odebranie zgody na powiadomienia",
       "status": "done",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -1653,7 +1655,8 @@
       "kind": "appop",
       "label": "blokada okien nad innymi aplikacjami",
       "status": "running",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -1689,7 +1692,8 @@
       "kind": "appop",
       "label": "blokada okien nad innymi aplikacjami",
       "status": "done",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -1701,7 +1705,8 @@
       "kind": "appop",
       "label": "blokada powiadomień pełnoekranowych",
       "status": "running",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -1737,7 +1742,8 @@
       "kind": "appop",
       "label": "blokada powiadomień pełnoekranowych",
       "status": "done",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -1749,7 +1755,8 @@
       "kind": "force_stop",
       "label": "zatrzymanie aplikacji",
       "status": "running",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -1773,7 +1780,8 @@
       "kind": "force_stop",
       "label": "zatrzymanie aplikacji",
       "status": "done",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -1785,7 +1793,8 @@
       "kind": "backup",
       "label": "kopia APK na komputerze",
       "status": "running",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -1845,7 +1854,8 @@
       "kind": "backup",
       "label": "kopia APK na komputerze",
       "status": "done",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -1857,7 +1867,8 @@
       "kind": "installed",
       "label": "odinstalowanie (użytkownik 0)",
       "status": "running",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -1992,7 +2003,8 @@
       "kind": "installed",
       "label": "odinstalowanie (użytkownik 0)",
       "status": "done",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2004,7 +2016,8 @@
       "kind": "permission",
       "label": "odebranie zgody na powiadomienia",
       "status": "running",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2040,7 +2053,8 @@
       "kind": "permission",
       "label": "odebranie zgody na powiadomienia",
       "status": "done",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2052,7 +2066,8 @@
       "kind": "appop",
       "label": "blokada powiadomień pełnoekranowych",
       "status": "running",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2088,7 +2103,8 @@
       "kind": "appop",
       "label": "blokada powiadomień pełnoekranowych",
       "status": "done",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2100,7 +2116,8 @@
       "kind": "force_stop",
       "label": "zatrzymanie aplikacji",
       "status": "running",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2124,7 +2141,8 @@
       "kind": "force_stop",
       "label": "zatrzymanie aplikacji",
       "status": "done",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2136,7 +2154,8 @@
       "kind": "enabled",
       "label": "wyłączenie aplikacji",
       "status": "running",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2172,7 +2191,8 @@
       "kind": "enabled",
       "label": "wyłączenie aplikacji",
       "status": "done",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2474,19 +2494,8 @@
       "kind": "admin",
       "label": "odebranie uprawnień administratora (na telefonie)",
       "status": "undone",
-      "error": null
-     }
-    ],
-    [
-     "adb:command",
-     {
-      "time": "2026-09-26T14:30:00",
-      "serial": "R58T00TEST",
-      "command": "pm enable --user 0 com.wlive.forecast",
-      "status": "ok",
-      "duration": 0.0,
-      "output": "Package com.wlive.forecast new state: enabled\n",
-      "tag": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2533,8 +2542,34 @@
       "name": "com.wlive.forecast",
       "kind": "enabled",
       "label": "wyłączenie aplikacji",
+      "status": "running",
+      "error": null,
+      "restore_bytes": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm enable --user 0 com.wlive.forecast",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Package com.wlive.forecast new state: enabled\n",
+      "tag": null
+     }
+    ],
+    [
+     "undo:step",
+     {
+      "action_id": 10,
+      "package": "com.wlive.forecast",
+      "name": "com.wlive.forecast",
+      "kind": "enabled",
+      "label": "wyłączenie aplikacji",
       "status": "undone",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2546,7 +2581,8 @@
       "kind": "force_stop",
       "label": "zatrzymanie aplikacji",
       "status": "undone",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2559,6 +2595,19 @@
       "duration": 0.0,
       "output": "USE_FULL_SCREEN_INTENT: deny\n",
       "tag": null
+     }
+    ],
+    [
+     "undo:step",
+     {
+      "action_id": 8,
+      "package": "com.wlive.forecast",
+      "name": "com.wlive.forecast",
+      "kind": "appop",
+      "label": "blokada powiadomień pełnoekranowych",
+      "status": "running",
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2582,7 +2631,8 @@
       "kind": "appop",
       "label": "blokada powiadomień pełnoekranowych",
       "status": "undone",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2595,6 +2645,19 @@
       "duration": 0.0,
       "output": "Domain verification status:\nFailure printing domain verification information\nPackages:\n  Package [com.wlive.forecast] (f00d):\n    versionCode=31 minSdk=26 targetSdk=34\n    User 0: ceDataInode=1 installed=true enabled=0\n      runtime permissions:\n        android.permission.POST_NOTIFICATIONS: granted=false\n",
       "tag": null
+     }
+    ],
+    [
+     "undo:step",
+     {
+      "action_id": 7,
+      "package": "com.wlive.forecast",
+      "name": "com.wlive.forecast",
+      "kind": "permission",
+      "label": "odebranie zgody na powiadomienia",
+      "status": "running",
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2618,7 +2681,33 @@
       "kind": "permission",
       "label": "odebranie zgody na powiadomienia",
       "status": "undone",
-      "error": null
+      "error": null,
+      "restore_bytes": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm list packages --user 0 com.clean.pro.boost",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "undo:step",
+     {
+      "action_id": 6,
+      "package": "com.clean.pro.boost",
+      "name": "com.clean.pro.boost",
+      "kind": "installed",
+      "label": "odinstalowanie (użytkownik 0)",
+      "status": "running",
+      "error": null,
+      "restore_bytes": 82
      }
     ],
     [
@@ -2658,18 +2747,6 @@
      }
     ],
     [
-     "adb:command",
-     {
-      "time": "2026-09-26T14:30:00",
-      "serial": "R58T00TEST",
-      "command": "pm list packages --user 0 com.clean.pro.boost",
-      "status": "ok",
-      "duration": 0.0,
-      "output": "",
-      "tag": null
-     }
-    ],
-    [
      "undo:step",
      {
       "action_id": 6,
@@ -2678,7 +2755,8 @@
       "kind": "installed",
       "label": "odinstalowanie (użytkownik 0)",
       "status": "undone",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2690,7 +2768,8 @@
       "kind": "backup",
       "label": "kopia APK na komputerze",
       "status": "undone",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2702,7 +2781,8 @@
       "kind": "force_stop",
       "label": "zatrzymanie aplikacji",
       "status": "undone",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2715,6 +2795,19 @@
       "duration": 0.0,
       "output": "USE_FULL_SCREEN_INTENT: deny\n",
       "tag": null
+     }
+    ],
+    [
+     "undo:step",
+     {
+      "action_id": 3,
+      "package": "com.clean.pro.boost",
+      "name": "com.clean.pro.boost",
+      "kind": "appop",
+      "label": "blokada powiadomień pełnoekranowych",
+      "status": "running",
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2738,7 +2831,8 @@
       "kind": "appop",
       "label": "blokada powiadomień pełnoekranowych",
       "status": "undone",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2751,6 +2845,19 @@
       "duration": 0.0,
       "output": "SYSTEM_ALERT_WINDOW: deny\n",
       "tag": null
+     }
+    ],
+    [
+     "undo:step",
+     {
+      "action_id": 2,
+      "package": "com.clean.pro.boost",
+      "name": "com.clean.pro.boost",
+      "kind": "appop",
+      "label": "blokada okien nad innymi aplikacjami",
+      "status": "running",
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2774,7 +2881,8 @@
       "kind": "appop",
       "label": "blokada okien nad innymi aplikacjami",
       "status": "undone",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2787,6 +2895,19 @@
       "duration": 0.0,
       "output": "Domain verification status:\nFailure printing domain verification information\nPackages:\n  Package [com.clean.pro.boost] (f00d):\n    versionCode=7 minSdk=26 targetSdk=34\n    User 0: ceDataInode=1 installed=true enabled=0\n      runtime permissions:\n        android.permission.POST_NOTIFICATIONS: granted=false\n",
       "tag": null
+     }
+    ],
+    [
+     "undo:step",
+     {
+      "action_id": 1,
+      "package": "com.clean.pro.boost",
+      "name": "com.clean.pro.boost",
+      "kind": "permission",
+      "label": "odebranie zgody na powiadomienia",
+      "status": "running",
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -2810,7 +2931,8 @@
       "kind": "permission",
       "label": "odebranie zgody na powiadomienia",
       "status": "undone",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [

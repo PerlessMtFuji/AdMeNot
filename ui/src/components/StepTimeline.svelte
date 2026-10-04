@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { i18n, t } from '../lib/i18n/index.svelte';
+  import { formatSize } from '../lib/logic';
   import type { StepEvent } from '../lib/types';
   import Icon from '../ui/Icon.svelte';
 
@@ -20,7 +22,7 @@
       {:else}
         <span class="mt-0.5 grid h-[18px] w-[18px] flex-none place-items-center">—</span>
       {/if}
-      <span class="min-w-0">{st.label}{#if st.error}<span class="block text-xs font-normal text-bad">{st.error}</span>{/if}</span>
+      <span class="min-w-0">{st.label}{#if st.error}<span class="block text-xs font-normal text-bad">{st.error}</span>{/if}{#if st.status === 'running' && st.restore_bytes}<span class="block text-xs font-normal text-soft">{t('history.restoring', { size: formatSize(st.restore_bytes, i18n.lang) })}</span>{/if}</span>
     </li>
   {/each}
 </ul>

@@ -1567,7 +1567,8 @@
       "kind": "permission",
       "label": "odebranie zgody na powiadomienia",
       "status": "running",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -1603,7 +1604,8 @@
       "kind": "permission",
       "label": "odebranie zgody na powiadomienia",
       "status": "done",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -1615,7 +1617,8 @@
       "kind": "appop",
       "label": "blokada powiadomień pełnoekranowych",
       "status": "running",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -1651,7 +1654,8 @@
       "kind": "appop",
       "label": "blokada powiadomień pełnoekranowych",
       "status": "done",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -1663,7 +1667,8 @@
       "kind": "force_stop",
       "label": "zatrzymanie aplikacji",
       "status": "running",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -1687,7 +1692,8 @@
       "kind": "force_stop",
       "label": "zatrzymanie aplikacji",
       "status": "done",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -1699,7 +1705,8 @@
       "kind": "enabled",
       "label": "wyłączenie aplikacji",
       "status": "running",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [
@@ -1735,7 +1742,8 @@
       "kind": "enabled",
       "label": "wyłączenie aplikacji",
       "status": "done",
-      "error": null
+      "error": null,
+      "restore_bytes": null
      }
     ],
     [

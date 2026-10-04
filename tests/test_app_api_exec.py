@@ -150,7 +150,7 @@ def test_undo_whole_order_and_single_action():
     done = rec.of("undo:done")[-1]
     assert done["status"] == "undone" and done["status_label"] == "cofnięte"
     assert done["admin_not_restored"] is False and done["errors"] == []
-    assert {s["status"] for s in rec.of("undo:step")} == {"undone"}
+    assert {s["status"] for s in rec.of("undo:step")} == {"running", "undone"}
     assert api.undo("ZS/1999/0101/01")["error"]["key"] == "unknown_order"
 
 
