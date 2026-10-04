@@ -89,3 +89,19 @@ def test_ui_components_cover_dependencies_and_bundled_dev_packages(tmp_path):
     components = m.ui_components(ui)
     assert [c.name for c in components] == sorted({"@lucide/svelte", *m.UI_BUNDLED})
     assert all(c.license == "ISC" and c.texts == (f"{c.name} license text",) for c in components)
+
+
+def test_license_override_fills_in_missing_metadata(tmp_path):
+    m = _module()
+    clr = _dist(tmp_path, "clr_loader", "0.3.1", [], license_text="MIT License\nclr authors")
+    assert m.license_of(clr) == "MIT"  # metadane bez licencji, tekst MIT jest w dist-info
+    assert m.missing_licenses(m.python_components([clr])) == []
+
+
+def test_webview2_sdk_component_carries_microsoft_bsd_text(tmp_path):
+    m = _module()
+    component = m._webview2_sdk(tmp_path / "brak.dll")  # brak pliku → wersja nieznana
+    assert component.name == "Microsoft Edge WebView2 SDK (via pywebview)"
+    assert component.version == "?"
+    assert component.license == "BSD-3-Clause (Microsoft WebView2 SDK)"
+    assert "Microsoft Corporation" in component.texts[0]

@@ -2,11 +2,13 @@
 
 Pakiety Pythona: domknięcie zależności `admenot` i `pywebview` w środowisku builda (bez
 extras i bez pakietów, których tu nie ma, np. tylko dla macOS) plus PyInstaller (bootloader
-w exe). Do tego Python, scrcpy z adb i biblioteki, które trafiają do zbudowanego UI.
+w exe). Do tego Python, scrcpy z adb, biblioteki WebView2 SDK z pywebview i biblioteki, które
+trafiają do zbudowanego UI.
 """
 
 from __future__ import annotations
 
+import ctypes
 import json
 import re
 import sys
@@ -20,6 +22,38 @@ UI_BUNDLED = ("@fontsource-variable/manrope", "svelte", "tailwindcss")
 LICENSE_FILE = re.compile(r"(^|/)(LICEN[CS]E|COPYING|NOTICE)[^/]*$", re.IGNORECASE)
 REQUIREMENT = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)")
 EXTRA = re.compile(r"\bextra\s*==")
+# pakiety bez licencji w metadanych, choć tekst licencji jest w dist-info (klucz: _key)
+LICENSE_OVERRIDES = {"clr-loader": "MIT"}
+# pywebview dołącza Microsoft.Web.WebView2.Core/WinForms.dll i WebView2Loader.dll; tekstu
+# licencji nie ma obok nich, więc wklejamy standardową licencję WebView2 SDK (BSD, Microsoft)
+WEBVIEW2_DLL = "webview/lib/Microsoft.Web.WebView2.Core.dll"
+WEBVIEW2_LICENSE = """Copyright (C) Microsoft Corporation. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+   * Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+   * Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with the
+distribution.
+   * The name of Microsoft Corporation, or the names of its contributors
+may not be used to endorse or promote products derived from this
+software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE."""
 
 
 @dataclass(frozen=True)
@@ -62,7 +96,8 @@ def license_of(d: metadata.Distribution) -> str | None:
         return text
     classifiers = [c.split(" :: ")[-1] for c in meta.get_all("Classifier") or []
                    if c.startswith("License ::")]
-    return ", ".join(classifiers) or (text.splitlines()[0] if text else None)
+    return (", ".join(classifiers) or (text.splitlines()[0] if text else None)
+            or LICENSE_OVERRIDES.get(_key(meta["Name"] or "")))
 
 
 def _license_texts(d: metadata.Distribution) -> tuple[str, ...]:
@@ -106,6 +141,27 @@ def _scrcpy(tools: Path) -> Component:
                      ((tools / "LICENSE.txt").read_text("utf-8", errors="replace"),))
 
 
+def _file_version(path: Path) -> str:
+    """Wersja pliku z zasobu VERSIONINFO (Windows); "?", gdy się nie da."""
+    try:
+        version = ctypes.windll.version
+        size = version.GetFileVersionInfoSizeW(str(path), None)
+        buffer = ctypes.create_string_buffer(size)
+        info, length = ctypes.c_void_p(), ctypes.c_uint()
+        if not (size and version.GetFileVersionInfoW(str(path), 0, size, buffer)
+                and version.VerQueryValueW(buffer, "\\", ctypes.byref(info), ctypes.byref(length))):
+            return "?"
+        ms, ls = ctypes.cast(info, ctypes.POINTER(ctypes.c_uint32 * 4)).contents[2:4]  # VS_FIXEDFILEINFO
+        return f"{ms >> 16}.{ms & 0xFFFF}.{ls >> 16}.{ls & 0xFFFF}"
+    except (AttributeError, OSError):
+        return "?"
+
+
+def _webview2_sdk(dll: Path) -> Component:
+    return Component("Microsoft Edge WebView2 SDK (via pywebview)", _file_version(dll),
+                     "BSD-3-Clause (Microsoft WebView2 SDK)", (WEBVIEW2_LICENSE,))
+
+
 def render(components: list[Component]) -> str:
     parts = ["AdMeNot — składniki innych autorów / third-party components", ""]
     for c in components:
@@ -124,5 +180,6 @@ def missing_licenses(components: list[Component]) -> list[str]:
 def build(tools: Path, ui_dir: Path) -> tuple[str, list[str]]:
     components = [_python(), *python_components(python_closure()),
                   *python_components([metadata.distribution("pyinstaller")]),
+                  _webview2_sdk(Path(metadata.distribution("pywebview").locate_file(WEBVIEW2_DLL))),
                   _scrcpy(tools), *ui_components(ui_dir)]
     return render(components), missing_licenses(components)

@@ -1,6 +1,8 @@
 import hashlib
+import http.client
 import importlib.util
 import sys
+import urllib.request
 from pathlib import Path
 
 import pytest
@@ -70,3 +72,14 @@ def test_unexpected_response_is_a_vt_error(tmp_path):
     setup.write_bytes(b"x")
     with pytest.raises(m.VtError):
         m.scan(setup, "KEY", request=lambda *a: {"error": "quota"}, sleep=lambda s: None)
+
+
+def test_http_exception_is_a_vt_error(monkeypatch):
+    m = _module()
+
+    def broken(req, timeout):
+        raise http.client.IncompleteRead(b"")
+
+    monkeypatch.setattr(urllib.request, "urlopen", broken)
+    with pytest.raises(m.VtError):
+        m.http_request("GET", "https://example.invalid/", {}, None)

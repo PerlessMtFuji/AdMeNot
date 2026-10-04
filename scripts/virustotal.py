@@ -7,6 +7,7 @@ Odpytywanie co 20 s mieści się w darmowym limicie 4 zapytań na minutę.
 from __future__ import annotations
 
 import hashlib
+import http.client
 import json
 import secrets
 import time
@@ -36,7 +37,8 @@ def http_request(method: str, url: str, headers: dict[str, str], body: bytes | N
     try:
         with urllib.request.urlopen(req, timeout=600) as response:
             return json.loads(response.read().decode("utf-8"))
-    except (OSError, ValueError) as exc:  # URLError i HTTPError to OSError
+    # URLError i HTTPError to OSError; IncompleteRead itp. to HTTPException (spec §4.7: pominięte)
+    except (OSError, ValueError, http.client.HTTPException) as exc:
         raise VtError(str(exc)) from exc
 
 
@@ -65,9 +67,9 @@ def scan(path: Path, key: str, request=http_request, sleep=time.sleep, clock=tim
         stats = report.get("stats", {})
         flagged = tuple(sorted(name for name, r in report.get("results", {}).items()
                                if r.get("category") in ("malicious", "suspicious")))
-    except (KeyError, TypeError) as exc:
+        detections = stats.get("malicious", 0) + stats.get("suspicious", 0)
+        engines = detections + stats.get("undetected", 0) + stats.get("harmless", 0)
+    except (KeyError, TypeError, AttributeError) as exc:
         raise VtError(f"nieoczekiwana odpowiedź VirusTotal: {exc!r}") from exc
-    detections = stats.get("malicious", 0) + stats.get("suspicious", 0)
-    engines = detections + stats.get("undetected", 0) + stats.get("harmless", 0)
     sha = hashlib.sha256(data).hexdigest()
     return VtResult(f"https://www.virustotal.com/gui/file/{sha}", detections, engines, flagged)
