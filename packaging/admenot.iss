@@ -19,6 +19,7 @@ VersionInfoVersion={#WinVersion}
 VersionInfoProductName=AdMeNot
 DefaultDirName={autopf}\AdMeNot
 DisableProgramGroupPage=yes
+DisableDirPage=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -92,16 +93,13 @@ begin
   Result := '''' + Path + '''';
 end;
 
-{ Spec §6.3: adb kill-server, potem procesy z katalogu programu. adb z innych miejsc zostaje.
+{ Spec §6.3: procesy z katalogu programu (adb, scrcpy, admenot-cli). Bez `adb kill-server` —
+  zatrzymałby też serwer adb z Android SDK na porcie 5037.
   KeepApp: przy instalacji AdMeNot.exe zamyka Restart Manager (CloseApplications=force). }
 procedure StopBundleProcesses(AppDir: String; KeepApp: Boolean);
 var
-  ResultCode: Integer;
-  Adb, Filter: String;
+  Filter: String;
 begin
-  Adb := AppDir + '\_internal\admenot\assets\tools\scrcpy\adb.exe';
-  if FileExists(Adb) then
-    Exec(Adb, 'kill-server', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Filter := '$_.Path -like ' + Quoted(AppDir + '\*');
   if KeepApp then
     Filter := Filter + ' -and $_.ProcessName -ne ''AdMeNot''';
