@@ -35,6 +35,22 @@ MESSAGES = {
     },
 }
 
+MB_ICONERROR = 0x10
+
+
+def _message_box(text: str) -> None:
+    import ctypes
+
+    ctypes.windll.user32.MessageBoxW(None, text, "AdMeNot", MB_ICONERROR)
+
+
+def _fail(text: str) -> None:
+    """Spakowany program nie ma konsoli — komunikat w oknie Windows (spec wydania §8)."""
+    if getattr(sys, "frozen", False):
+        _message_box(text)
+    else:
+        print(text, file=sys.stderr)
+
 
 def window_title(version: str = __version__) -> str:
     """„beta" w tytule, dopóki główny numer wersji to 0 (spec wydania §2)."""
@@ -46,12 +62,12 @@ def run_gui() -> int:
     text = MESSAGES[lang]
     index = WEB_DIR / "index.html"
     if not index.is_file():
-        print(text["no_ui"].format(path=WEB_DIR), file=sys.stderr)
+        _fail(text["no_ui"].format(path=WEB_DIR))
         return 2
     try:
         import webview
     except ImportError:
-        print(text["no_webview"], file=sys.stderr)
+        _fail(text["no_webview"])
         return 4
     holder: dict[str, Any] = {}
     api = Api(WindowEmitter(lambda: holder.get("window")))
@@ -75,7 +91,7 @@ def run_gui() -> int:
     try:
         webview.start(gui="edgechromium", http_server=True)
     except Exception as exc:  # noqa: BLE001 — np. brak WebView2 na Windows 10
-        print(text["no_webview2"].format(error=exc), file=sys.stderr)
+        _fail(text["no_webview2"].format(error=exc))
         return 3
     return 0
 

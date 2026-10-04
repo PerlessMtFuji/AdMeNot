@@ -73,3 +73,50 @@ def test_window_is_created_with_the_api(monkeypatch, tmp_path):
 def test_cli_gui_command(monkeypatch):
     monkeypatch.setattr(app_main, "run_gui", lambda: 7)
     assert cli_main(["gui"]) == 7
+
+
+def test_frozen_build_shows_startup_errors_in_a_window(monkeypatch, tmp_path, capsys):
+    monkeypatch.setattr(app_main, "WEB_DIR", tmp_path / "web")
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    shown = []
+    monkeypatch.setattr(app_main, "_message_box", shown.append)
+    assert app_main.run_gui() == 2
+    assert len(shown) == 1 and str(tmp_path / "web") in shown[0]
+    assert capsys.readouterr().err == ""
+
+
+def test_frozen_build_reports_a_missing_webview2_in_a_window(monkeypatch, tmp_path):
+    web = tmp_path / "web"
+    web.mkdir()
+    (web / "index.html").write_text("<!doctype html>", "utf-8")
+    monkeypatch.setattr(app_main, "WEB_DIR", web)
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    shown = []
+    monkeypatch.setattr(app_main, "_message_box", shown.append)
+
+    class Closing:
+        def __iadd__(self, handler):  # `window.events.closing += …` w run_gui
+            return self
+
+    class Window:
+        def __init__(self):
+            self.events = type("Events", (), {"closing": Closing()})()
+
+        def destroy(self):
+            pass
+
+    class FakeWebview:
+        class FileDialog:
+            FOLDER = "folder"
+
+        @staticmethod
+        def create_window(title, **kw):
+            return Window()
+
+        @staticmethod
+        def start(**kw):
+            raise RuntimeError("WebView2 not found")
+
+    monkeypatch.setitem(sys.modules, "webview", FakeWebview)
+    assert app_main.run_gui() == 3
+    assert "WebView2" in shown[0] and "developer.microsoft.com" in shown[0]
