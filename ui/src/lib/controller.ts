@@ -1,6 +1,6 @@
 import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
-import { actedAfter, changedVerdicts, defaultSelection, mergeSelection, notificationsManual, upsertStep } from './logic';
+import { actedAfter, changedVerdicts, defaultSelection, mergeSelection, notificationsManual, upsertStep, withoutUndone } from './logic';
 import type { AppState } from './state.svelte';
 import { applyTheme } from './theme';
 import type {
@@ -92,7 +92,8 @@ export class Controller {
       s.scan = d.scan;
       s.interrupted = d.interrupted;
       s.selection = defaultSelection(d.scan.apps);
-      s.acted = {};
+      s.actedLog = {};
+      s.undoTarget = null;
       s.touched = [];
       s.unlocked = [];
       s.expanded = [];
@@ -139,7 +140,7 @@ export class Controller {
     on('exec:stopped', () => { s.stopped = true; });
     on('exec:done', (d) => {
       s.result = d;
-      s.acted = actedAfter(s.acted, s.execPlan, d);
+      s.actedLog = actedAfter(s.actedLog, s.execPlan, d);
       s.verifying = false;
       s.admin = null;
       s.question = null;
@@ -161,6 +162,11 @@ export class Controller {
     on('undo:step', (d) => { s.undoSteps = upsertStep(s.undoSteps, d); });
     on('undo:done', (d) => {
       s.undoResult = d;
+      if (s.undoing && d.errors.length === 0) {
+        s.actedLog = withoutUndone(s.actedLog, s.undoing.order, s.undoing.pkg);
+        s.undoTarget = null;
+      }
+      s.undoing = null;
       void this.refreshHistory();
     });
     on('adb:command', (d) => { s.console = [...s.console.slice(-(CONSOLE_LIMIT - 1)), d]; });
@@ -252,7 +258,7 @@ export class Controller {
     if (serial) void this.call(this.api.close_order(serial));
     Object.assign(this.state, {
       phase: 'connect', screen: 'main', device: null, scan: null, result: null, order: null,
-      plan: null, selection: {}, acted: {}, steps: [], disconnectedOrder: null, reports: {},
+      plan: null, selection: {}, actedLog: {}, undoTarget: null, steps: [], disconnectedOrder: null, reports: {},
       categoryFilter: [], sourceFilter: null, lastShot: null, lastShotSerial: null, shotCount: 0,
     });
   }
@@ -266,6 +272,14 @@ export class Controller {
     if (serial) void this.call(this.api.close_order(serial));
     Object.assign(s, { phase: 'results', screen: 'main', result: null, order: null, execPlan: null, plan: null,
       selection: {}, touched: Object.keys(s.acted), steps: [], lastShot: null, lastShotSerial: null, shotCount: 0 });
+  }
+
+  /** Cofa jedną aplikację w jej najnowszym zleceniu, bez wychodzenia z listy wyników. */
+  async undoApp(pkg: string): Promise<void> {
+    const entry = this.state.actedLog[pkg]?.at(-1);
+    if (!entry || this.state.orderRunning) return;
+    this.state.undoTarget = pkg; // ustawiane przed undo: zdarzenia mogą przyjść, zanim wróci wywołanie
+    await this.undo(entry.order, null, pkg);
   }
 
   // --- wybór akcji i plan ------------------------------------------------------------------------
@@ -351,8 +365,10 @@ export class Controller {
     s.error = null;
     s.undoSteps = [];
     s.undoResult = null;
+    s.undoing = actionId === null ? { order, pkg } : null;
     const r = await this.call(this.api.undo(order, actionId, pkg));
     if (r) this.setJob(r.job_id, 'undo');
+    else s.undoing = s.undoTarget = null;
   }
 
   // --- historia, ustawienia, konsola -------------------------------------------------------------

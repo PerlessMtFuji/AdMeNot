@@ -287,14 +287,37 @@ export function formatSize(bytes: number, lang: string): string {
 
 const LEVEL_RANK: Record<Level, number> = { silence: 1, disable: 2, remove: 3 };
 
-/** Najmocniejszy poziom wykonany na każdej aplikacji (bez zatrzymanych i nieudanych). */
-export function actedAfter(acted: Record<string, Level>, plan: PlanView | null, result: OrderResult): Record<string, Level> {
-  const next = { ...acted };
+export type ActedLog = Record<string, { order: string; level: Level }[]>;
+
+/** Dopisuje aplikacje wykonane w zleceniu (bez zatrzymanych i nieudanych), najnowsze zlecenie na końcu. */
+export function actedAfter(log: ActedLog, plan: PlanView | null, result: OrderResult): ActedLog {
+  const next = { ...log };
   const levels = new Map((plan?.apps ?? []).filter((a) => !a.blocked).map((a) => [a.package, a.level]));
   for (const app of result.apps) {
     const level = levels.get(app.package);
     if (app.outcome !== 'ok' || !level) continue;
-    if (!next[app.package] || LEVEL_RANK[level] > LEVEL_RANK[next[app.package]]) next[app.package] = level;
+    next[app.package] = [...(next[app.package] ?? []), { order: result.order, level }];
+  }
+  return next;
+}
+
+/** Najmocniejszy poziom, który wciąż obowiązuje na każdej aplikacji. */
+export function actedLevels(log: ActedLog): Record<string, Level> {
+  const out: Record<string, Level> = {};
+  for (const [pkg, entries] of Object.entries(log)) {
+    for (const { level } of entries) {
+      if (!out[pkg] || LEVEL_RANK[level] > LEVEL_RANK[out[pkg]]) out[pkg] = level;
+    }
+  }
+  return out;
+}
+
+/** Po udanym cofnięciu: całe zlecenie (pkg null) albo jedna aplikacja w tym zleceniu. */
+export function withoutUndone(log: ActedLog, order: string, pkg: string | null): ActedLog {
+  const next: ActedLog = {};
+  for (const [p, entries] of Object.entries(log)) {
+    const kept = entries.filter((e) => e.order !== order || (pkg !== null && p !== pkg));
+    if (kept.length) next[p] = kept;
   }
   return next;
 }

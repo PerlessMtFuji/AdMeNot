@@ -3,6 +3,7 @@ import { setupCtl } from '../test-utils';
 import { Controller } from './controller';
 import { createFakeBridge } from './fakeBridge';
 import { i18n } from './i18n/index.svelte';
+import { actedAfter, actedLevels, withoutUndone } from './logic';
 import { AppState } from './state.svelte';
 
 function setup(scenario: string) {
@@ -75,6 +76,61 @@ describe('controller with the adware scenario', () => {
     expect(s.selection['com.wlive.forecast']).toBe('remove'); // wyłączoną można jeszcze usunąć
     ctl.newScan();
     expect(s.acted).toEqual({});
+  });
+
+  test('undo one app from the results after back to repair', async () => {
+    const { ctl, s, bridge } = setup('adware');
+    await ctl.init();
+    await ctl.startScan();
+    await vi.waitFor(() => expect(s.phase).toBe('results'));
+    await ctl.openPlan();
+    await ctl.execute();
+    await vi.waitFor(() => expect(s.phase).toBe('done'));
+    const order = s.order!;
+    ctl.backToRepair();
+    await vi.waitFor(() => expect(s.job).toBeNull());
+    await ctl.undoApp('com.clean.pro.boost');
+    expect(s.undoTarget).toBe('com.clean.pro.boost');
+    await vi.waitFor(() => expect(s.job).toBeNull());
+    expect(bridge.calls.filter((c) => c.method === 'undo').at(-1)!.args).toEqual([order, null, 'com.clean.pro.boost']);
+    expect(s.phase).toBe('results'); // zostajemy na liście, bez przejścia do Historii
+    expect(s.acted['com.clean.pro.boost']).toBeUndefined();
+    expect(s.acted['com.wlive.forecast']).toBeDefined(); // pozostałe aplikacje zlecenia bez zmian
+    expect(s.undoTarget).toBeNull();
+    ctl.setLevel('com.clean.pro.boost', 'remove');
+    expect(s.selection['com.clean.pro.boost']).toBe('remove'); // przywróconą można znowu wybrać
+  });
+
+  test('a failed undo keeps the app marked as done and shows why', async () => {
+    const { ctl, s, bridge } = setup('adware');
+    await ctl.init();
+    await ctl.startScan();
+    await vi.waitFor(() => expect(s.phase).toBe('results'));
+    await ctl.openPlan();
+    await ctl.execute();
+    await vi.waitFor(() => expect(s.phase).toBe('done'));
+    ctl.backToRepair();
+    s.undoTarget = 'com.clean.pro.boost';
+    s.undoing = { order: s.actedLog['com.clean.pro.boost'][0].order, pkg: 'com.clean.pro.boost' };
+    bridge.emit('undo:done', { order: 'X', status: 'partially_undone', status_label: '', errors: ['Brak kopii'], admin_not_restored: false });
+    expect(s.acted['com.clean.pro.boost']).toBe('remove');
+    expect(s.undoTarget).toBe('com.clean.pro.boost');
+    expect(s.undoResult?.errors).toEqual(['Brak kopii']);
+  });
+
+  test('two orders: undo goes to the newest one and falls back to the earlier level', () => {
+    const plan = (level: 'disable' | 'remove') => ({ runnable: 1, apps: [{ package: 'p', name: 'P', level, level_label: '',
+      blocked: false, reason: null, reason_text: null, steps: [], warnings: [] }] });
+    const result = (order: string) => ({ order, status: 'done', status_label: '', stopped: false,
+      apps: [{ package: 'p', name: 'P', outcome: 'ok' as const, errors: [], kinds: [] }] });
+    let log = actedAfter({}, plan('disable'), result('A'));
+    log = actedAfter(log, plan('remove'), result('B'));
+    expect(actedLevels(log)).toEqual({ p: 'remove' });
+    expect(log.p.at(-1)!.order).toBe('B');
+    expect(actedLevels(withoutUndone(log, 'B', 'q'))).toEqual({ p: 'remove' }); // inna aplikacja
+    log = withoutUndone(log, 'B', 'p');
+    expect(actedLevels(log)).toEqual({ p: 'disable' });
+    expect(actedLevels(withoutUndone(log, 'A', null))).toEqual({}); // całe zlecenie z Historii
   });
 
   test('user choices survive the APK re-score and toggles work', async () => {

@@ -109,6 +109,9 @@
     "incomplete": "Ocena niepełna — nie udało się odczytać: {names}. Aplikacje, których to dotyczy: {count}. „Bez uwag” znaczy tu tylko „brak oznak w odczytanych danych”.",
     "notifications_manual": "Android 12 i starsze: powiadomień aplikacji nie da się wyłączyć z komputera — tylko ręcznie na telefonie (Ustawienia › Aplikacje › aplikacja › Powiadomienia). „Wycisz” zatrzymuje aplikację i odbiera jej m.in. rolę ekranu głównego, nasłuch powiadomień i rysowanie nad innymi aplikacjami.",
     "select_level_disable": "Domyślna akcja z ustawień („Wycisz”) jest na tym telefonie zamieniona na „Wyłącz”.",
+    "undo_app": "Cofnij: {name}",
+    "undoing_app": "Cofam zmiany: {name}…",
+    "undo_app_failed": "Nie udało się cofnąć zmian: {name}",
     "apk_running": "Analiza APK w tle: {done}/{total}"
   },
   "level": { "silence": "WYCISZ", "disable": "WYŁĄCZ", "remove": "USUŃ", "review": "SPRAWDŹ", "none": "—" },

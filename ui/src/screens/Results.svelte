@@ -11,6 +11,7 @@
   import PhoneThumb from '../components/PhoneThumb.svelte';
   import PlanConfirm from '../components/PlanConfirm.svelte';
   import PlanPanel from '../components/PlanPanel.svelte';
+  import StepTimeline from '../components/StepTimeline.svelte';
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
   import { facetCounts, flaggedApps, focusedApp, notificationsManual, visibleApps } from '../lib/logic';
@@ -42,6 +43,7 @@
   });
   const withGaps = $derived(apps.filter((a) => a.gaps.length > 0).length);
   const notifManual = $derived(notificationsManual(s.device?.sdk));
+  const undoName = $derived(s.undoTarget ? (apps.find((a) => a.package === s.undoTarget)?.name ?? s.undoTarget) : null);
   let showSafe = $state(false);
   // Liczniki filtrów rodzaju i źródła liczone po przełączniku i wyszukiwarce, przed samymi filtrami.
   const base = $derived(visibleApps(apps, { showAll: s.showAll, verdict: 'all', query: s.query }));
@@ -86,6 +88,15 @@
     {#if s.interrupted.length}<InterruptedBanner orders={s.interrupted} />{/if}
     {#if s.scan?.low_behavior_data}<Banner tone="warn" icon="info" title={t('summary.low_data', { hours: s.scan.usage_window_h?.toFixed(1) ?? '?' })} />{/if}
     {#if missing.length}<Banner tone="warn" icon="info" title={t('summary.incomplete', { count: withGaps, names: missing.join(', ') })} />{/if}
+    {#if undoName && s.job?.kind === 'undo'}
+      <Banner tone="info" icon="undo-2" title={t('summary.undoing_app', { name: undoName })}>
+        {#if s.undoSteps.length}<StepTimeline steps={s.undoSteps} />{/if}
+      </Banner>
+    {:else if undoName && s.undoResult?.errors.length}
+      <Banner tone="bad" icon="triangle-alert" title={t('summary.undo_app_failed', { name: undoName })}>
+        <ul class="list-disc pl-5 text-sm">{#each s.undoResult.errors as e (e)}<li>{e}</li>{/each}</ul>
+      </Banner>
+    {/if}
     {#if notifManual}<Banner tone="info" icon="info" title={t('summary.notifications_manual')} />
       {#if s.settings.select_level === 'silence'}<Banner tone="info" icon="info" title={t('summary.select_level_disable')} />{/if}{/if}
     {#if s.scan?.profiles.others.length}<Banner tone="warn" icon="info" title={t('summary.profiles', { ids: s.scan.profiles.others.join(', ') })} />
@@ -111,7 +122,7 @@
       <div class="flex flex-col gap-3.5">
         {#each flagged as app, i (app.package)}
           <div animate:flip={{ duration: ms(DUR.flip) }} in:enter={{ delay: stagger(i) }}>
-            <AppCard {app} level={s.selection[app.package] ?? null} done={s.acted[app.package] ?? null} flash={s.apk.changed.includes(app.package)}
+            <AppCard {app} level={s.selection[app.package] ?? null} done={s.acted[app.package] ?? null} busy={s.orderRunning} onundo={() => ctl.undoApp(app.package)} flash={s.apk.changed.includes(app.package)}
               onlevel={(level) => ctl.setLevel(app.package, level)} ontoggle={() => ctl.toggle(app)} />
           </div>
         {/each}

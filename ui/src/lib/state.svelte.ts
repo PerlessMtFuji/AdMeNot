@@ -1,4 +1,4 @@
-import type { Phase } from './logic';
+import { actedLevels, type ActedLog, type Phase } from './logic';
 import type {
   ApiErrorBody, ApkEstimate, ApkQuestion, Category, ConsoleEntry, DeviceEntry, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
   PlanView, Question, ReportResult, ScanView, Settings, ShotsView, ShotView, StepEvent, UndoDone, Verdict,
@@ -46,8 +46,15 @@ export class AppState {
   stopping = $state(false);
   stopped = $state(false);
   result = $state<OrderResult | null>(null);
-  /** Co już zrobiono na tym telefonie od skanu (powrót do naprawy bez ponownego skanu). */
-  acted = $state<Record<string, Level>>({});
+  /** Co już zrobiono na tym telefonie od skanu, zlecenie po zleceniu (powrót do naprawy, cofanie aplikacji). */
+  actedLog = $state<ActedLog>({});
+  /** Trwające cofanie (undo:done zdejmuje cofnięte z actedLog); action_id → null, bo cofa tylko krok. */
+  undoing = $state<{ order: string; pkg: string | null } | null>(null);
+  /** Aplikacja cofana z listy wyników — tam pokazujemy postęp i błędy. */
+  undoTarget = $state<string | null>(null);
+  get acted(): Record<string, Level> {
+    return actedLevels(this.actedLog);
+  }
   disconnectedOrder = $state<string | null>(null);
   history = $state<HistoryView | null>(null);
   undoSteps = $state<StepEvent[]>([]);

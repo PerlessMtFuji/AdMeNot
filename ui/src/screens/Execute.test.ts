@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { describe, expect, test, vi } from 'vitest';
 import App from '../App.svelte';
@@ -65,6 +65,25 @@ describe('plan and execution', () => {
     const card = screen.getByRole('article', { name: boost.name });
     expect(card.textContent).toContain('usunięta');
     expect((card.querySelector('input[type="checkbox"]') as HTMLInputElement).disabled).toBe(true);
+  });
+
+  test('back to repair, then undo one app right from its card', async () => {
+    const { s } = await scanned();
+    await fireEvent.click(screen.getByRole('button', { name: /Napraw zaznaczone/ }));
+    await fireEvent.click(await screen.findByRole('button', { name: /^Wykonaj/ }));
+    await vi.waitFor(() => expect(s.phase).toBe('done'));
+    await tick();
+    await fireEvent.click(screen.getByRole('button', { name: 'Wróć do naprawy' }));
+    await vi.waitFor(() => expect(s.job).toBeNull());
+    await tick();
+    const boost = s.scan!.apps.find((a) => a.package === 'com.clean.pro.boost')!;
+    const card = screen.getByRole('article', { name: boost.name });
+    await fireEvent.click(within(card).getByRole('button', { name: `Cofnij: ${boost.name}` }));
+    await vi.waitFor(() => expect(s.job).toBeNull());
+    await tick();
+    expect(s.phase).toBe('results');
+    expect(card.textContent).not.toContain('usunięta');
+    expect((card.querySelector('input[type="checkbox"]') as HTMLInputElement).disabled).toBe(false);
   });
 
   test('undo from the result goes to history', async () => {

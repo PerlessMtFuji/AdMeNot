@@ -155,7 +155,9 @@
               <AppIcon icon={a.icon} class="h-8 w-8">
                 <span class="grid h-8 w-8 flex-none place-items-center rounded-[10px] text-sm font-extrabold text-white shadow-[inset_0_1px_0_rgb(255_255_255/.3)] {BAR[a.verdict]}" aria-hidden="true">{initial(a.name)}</span>
               </AppIcon>
-              <div class="min-w-0"><b class="block truncate">{a.name}</b><span class="mono block truncate text-2xs text-soft">{a.package}{#if done} · <span class="text-ok">{t(`history.level_done.${done}`)}</span>{/if}</span></div>
+              <div class="min-w-0"><b class="block truncate">{a.name}</b><span class="mono block truncate text-2xs text-soft">{a.package}{#if done} · <span class="text-ok">{t(`history.level_done.${done}`)}</span>
+                · <button type="button" class="font-sans font-semibold text-accent hover:underline disabled:opacity-50" disabled={s.orderRunning}
+                  aria-label={t('summary.undo_app', { name: a.name })} onclick={(e) => { e.stopPropagation(); void ctl.undoApp(a.package); }}>{t('history.undo_changes')}</button>{/if}</span></div>
             </div>
           </td>
           <td class="px-3 py-3 whitespace-nowrap"><div class="flex items-center gap-2">

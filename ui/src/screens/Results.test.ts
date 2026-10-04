@@ -213,6 +213,16 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     expect(screen.queryByText(t('summary.select_level_disable'))).toBeNull();
   });
 
+  test('a failed undo of one app is explained on the results list', async () => {
+    const { s } = await scanned('clean');
+    const app = s.scan!.apps[0];
+    s.undoTarget = app.package;
+    s.undoResult = { order: 'ZS', status: 'partially_undone', status_label: '', errors: ['Brak kopii aplikacji.'], admin_not_restored: false };
+    await tick();
+    expect(screen.getByText(t('summary.undo_app_failed', { name: app.name }))).toBeTruthy();
+    expect(screen.getByText('Brak kopii aplikacji.')).toBeTruthy();
+  });
+
   test('low-data banner shows the hours; other profiles banner lists their ids', async () => {
     const { s } = await scanned();
     s.scan = { ...s.scan!, low_behavior_data: true, usage_window_h: 1.5,

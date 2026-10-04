@@ -2,15 +2,17 @@
   import { t } from '../lib/i18n/index.svelte';
   import { initial, VERDICT_TONE } from '../lib/logic';
   import type { AppView, Level } from '../lib/types';
+  import Button from '../ui/Button.svelte';
   import Card from '../ui/Card.svelte';
+  import Icon from '../ui/Icon.svelte';
   import Pill from '../ui/Pill.svelte';
   import Segmented from '../ui/Segmented.svelte';
   import AppIcon from './AppIcon.svelte';
   import SymptomList from './SymptomList.svelte';
 
   type Props = { app: AppView; level: Level | null; done?: Level | null; flash?: boolean; onlevel: (level: Level) => void;
-    ontoggle: () => void };
-  let { app, level, done = null, flash = false, onlevel, ontoggle }: Props = $props();
+    ontoggle: () => void; onundo?: () => void; busy?: boolean };
+  let { app, level, done = null, flash = false, onlevel, ontoggle, onundo, busy = false }: Props = $props();
   const gone = $derived(done === 'remove'); // usunięta w tym zleceniu: nie ma czego wybierać
   const STRIPE = { malicious: 'bad', suspicious: 'warn', review: 'neutral', safe: null } as const;
   const AVATAR = { malicious: 'bg-bad text-bad', suspicious: 'bg-warn-strong text-warn-strong', review: 'bg-soft text-soft', safe: 'bg-ok text-ok' };
@@ -34,7 +36,9 @@
         <b class="truncate text-md">{app.name}</b>
         <Pill tone={VERDICT_TONE[app.verdict]}>{app.verdict_label}</Pill>
         {#if app.incomplete && app.verdict !== 'safe'}<Pill tone="neutral">{t('results.incomplete')}</Pill>{/if}
-        {#if done}<Pill tone="ok">{t(`history.level_done.${done}`)}</Pill>{/if}
+        {#if done}<Pill tone="ok">{t(`history.level_done.${done}`)}</Pill>
+          {#if onundo}<Button variant="ghost" size="sm" disabled={busy} label={t('summary.undo_app', { name: app.name })}
+            onclick={onundo}><Icon name="undo-2" size={14} />{t('history.undo_changes')}</Button>{/if}{/if}
       </div>
       <div class="mono truncate text-2xs text-soft">{app.package}</div>
     </div>
