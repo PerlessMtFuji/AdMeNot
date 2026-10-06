@@ -1,5 +1,5 @@
 import { CATEGORY_ORDER } from './categories';
-import type { AppView, Category, DeviceEntry, Finding, HistoryAction, Level, OrderResult, PlanView, StepEvent, Verdict } from './types';
+import type { AppView, Category, DeviceEntry, Finding, HistoryAction, Level, Mode, OrderResult, PlanView, ScanView, StepEvent, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done';
 export type StageState = 'done' | 'now' | 'todo';
@@ -320,4 +320,62 @@ export function withoutUndone(log: ActedLog, order: string, pkg: string | null):
     if (kept.length) next[p] = kept;
   }
   return next;
+}
+
+// --- ekran Naprawa: grupy, rozwinięcie, powody, komunikaty -----------------------------------------
+
+export const VERDICT_ORDER: Verdict[] = ['malicious', 'suspicious', 'review', 'safe'];
+
+/** Zawsze cztery grupy, także puste; kolejność aplikacji jak w skanie (wynik malejąco). */
+export function verdictGroups(apps: AppView[]): { verdict: Verdict; apps: AppView[] }[] {
+  return VERDICT_ORDER.map((verdict) => ({ verdict, apps: apps.filter((a) => a.verdict === verdict) }));
+}
+
+export type OpenGroups = Partial<Record<Verdict, boolean>>;
+
+/** Wyszukiwanie lub filtr rozwija wszystko; inaczej wybór użytkownika, a bez niego domyślne trybu. */
+export function groupOpen(verdict: Verdict, mode: Mode, open: OpenGroups, searching: boolean): boolean {
+  if (searching) return true;
+  const saved = open[verdict];
+  if (saved !== undefined) return saved;
+  if (verdict === 'safe') return false;
+  return !(verdict === 'review' && mode === 'simple');
+}
+
+export interface Reason { category: Category; label: string }
+
+/** Najmocniejsze znalezisko z każdej kategorii (bez combo i zerowych wag); bez znalezisk — nazwy kategorii objawów. */
+export function topReasons(app: AppView, n: number, categoryLabel: (c: Category) => string):
+  { items: Reason[]; more: Category[] } {
+  const best = new Map<Category, Finding>();
+  for (const f of app.findings) {
+    if (f.category === 'combo' || f.weight <= 0) continue;
+    const cur = best.get(f.category);
+    if (!cur || f.weight > cur.weight) best.set(f.category, f);
+  }
+  let all: Reason[] = [...best.entries()]
+    .sort(([ca, a], [cb, b]) => b.weight - a.weight || CATEGORY_ORDER.indexOf(ca) - CATEGORY_ORDER.indexOf(cb))
+    .map(([category, f]) => ({ category, label: f.label }));
+  if (!all.length) all = app.symptoms.map((sy) => ({ category: sy.category, label: categoryLabel(sy.category) }));
+  return { items: all.slice(0, n), more: all.slice(n).map((r) => r.category) };
+}
+
+export type NoticeKey = 'low_data' | 'incomplete' | 'profiles' | 'profiles_unknown' | 'notifications_manual'
+  | 'select_level_disable';
+export interface Notice { key: NoticeKey; tone: 'warn' | 'info'; params: Record<string, string | number> }
+
+/** Komunikaty informacyjne nad listą: najpierw ostrzeżenia, potem informacje (spec §3). */
+export function notices(input: { scan: ScanView | null; sdk: number | undefined; selectLevel: Level;
+  missing: string[]; withGaps: number }): Notice[] {
+  const { scan } = input;
+  const out: Notice[] = [];
+  if (scan?.low_behavior_data) out.push({ key: 'low_data', tone: 'warn', params: { hours: scan.usage_window_h?.toFixed(1) ?? '?' } });
+  if (input.missing.length) out.push({ key: 'incomplete', tone: 'warn', params: { count: input.withGaps, names: input.missing.join(', ') } });
+  if (scan?.profiles.others.length) out.push({ key: 'profiles', tone: 'warn', params: { ids: scan.profiles.others.join(', ') } });
+  else if (scan && !scan.profiles.known) out.push({ key: 'profiles_unknown', tone: 'warn', params: {} });
+  if (notificationsManual(input.sdk)) {
+    out.push({ key: 'notifications_manual', tone: 'info', params: {} });
+    if (input.selectLevel === 'silence') out.push({ key: 'select_level_disable', tone: 'info', params: {} });
+  }
+  return out;
 }

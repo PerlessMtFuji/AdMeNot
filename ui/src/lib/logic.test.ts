@@ -28,8 +28,12 @@ import {
   visibleApps,
   formatGb,
   formatSize,
+  verdictGroups,
+  groupOpen,
+  topReasons,
+  notices,
 } from './logic';
-import type { AppView, Category, StepEvent } from './types';
+import type { AppView, Category, StepEvent, Finding, ScanView } from './types';
 
 function app(pkg: string, verdict: AppView['verdict'], extra: Partial<AppView> = {}): AppView {
   const level = verdict === 'malicious' ? 'remove' : verdict === 'suspicious' ? 'disable' : null;
@@ -253,4 +257,85 @@ test('formatSize switches to MB below a tenth of a gigabyte', () => {
   expect(formatSize(1, 'en')).toBe('1 MB');
   expect(formatSize(0, 'pl')).toBe('0,0 GB');
   expect(formatSize(7.2 * 1024 ** 3, 'en')).toBe('7.2 GB');
+});
+
+describe('repair screen grouping', () => {
+  const apps = [app('a.rev', 'review'), app('b.bad', 'malicious'), app('c.ok', 'safe'), app('d.rev', 'review')];
+
+  test('verdictGroups: four groups in fixed order, empty ones included, input order kept', () => {
+    const g = verdictGroups(apps);
+    expect(g.map((x) => x.verdict)).toEqual(['malicious', 'suspicious', 'review', 'safe']);
+    expect(g[1].apps).toEqual([]);
+    expect(g[2].apps.map((a) => a.package)).toEqual(['a.rev', 'd.rev']);
+  });
+
+  test('groupOpen: defaults per mode, saved choice wins, search opens everything', () => {
+    expect(groupOpen('malicious', 'simple', {}, false)).toBe(true);
+    expect(groupOpen('suspicious', 'expert', {}, false)).toBe(true);
+    expect(groupOpen('review', 'expert', {}, false)).toBe(true);
+    expect(groupOpen('review', 'simple', {}, false)).toBe(false);
+    expect(groupOpen('safe', 'expert', {}, false)).toBe(false);
+    expect(groupOpen('safe', 'simple', {}, false)).toBe(false);
+    expect(groupOpen('review', 'simple', { review: true }, false)).toBe(true);
+    expect(groupOpen('malicious', 'expert', { malicious: false }, false)).toBe(false);
+    expect(groupOpen('safe', 'simple', { safe: false }, true)).toBe(true);
+  });
+});
+
+describe('topReasons', () => {
+  const f = (rule_id: string, category: Finding['category'], label: string, weight: number) =>
+    ({ rule_id, category, label, weight, class: '', text: '', text_expert: '', evidence: {}, basis: 'observed',
+      source: 'phone', locations: [] }) as Finding;
+  const label = (c: Category) => `cat:${c}`;
+
+  test('one label per category, by weight, combos and zero weights skipped, rest counted', () => {
+    const a = app('x.y', 'suspicious', { findings: [
+      f('A1', 'ads', 'Wiele sieci reklamowych', 25), f('A2', 'ads', 'Okna nad innymi', 10),
+      f('D1', 'data', 'Czyta powiadomienia', 10), f('C1', 'combo', 'Kombinacja', 30),
+      f('O1', 'origin', 'Świeża instalacja', 0), f('S1', 'disguise', 'Niewidoczne znaki', 8),
+    ] });
+    const r = topReasons(a, 2, label);
+    expect(r.items).toEqual([{ category: 'ads', label: 'Wiele sieci reklamowych' },
+      { category: 'data', label: 'Czyta powiadomienia' }]);
+    expect(r.more).toEqual(['disguise']);
+  });
+
+  test('equal weights fall back to the category order', () => {
+    const a = app('x.y', 'review', { findings: [f('B', 'background', 'Tło', 5), f('A', 'ads', 'Reklamy', 5)] });
+    expect(topReasons(a, 1, label).items[0].category).toBe('ads');
+  });
+
+  test('no findings: symptom categories by name, never an empty reason', () => {
+    const a = app('x.y', 'review', { symptoms: [{ category: 'notif', severity: 'warn', text: '…' },
+      { category: 'origin', severity: 'neutral', text: '…' }] });
+    expect(topReasons(a, 1, label)).toEqual({ items: [{ category: 'notif', label: 'cat:notif' }], more: ['origin'] });
+  });
+});
+
+describe('notices', () => {
+  const scan = (extra: Partial<ScanView> = {}) => ({
+    collectors: { ok: 8, total: 8, failed: [] }, low_behavior_data: false, apk: null, apps: [],
+    profiles: { others: [], known: true }, usage_window_h: 1.5,
+    counts: { malicious: 0, suspicious: 0, review: 0, safe: 0, non_play: 0, admins: 0, total: 0, user: 0 }, ...extra,
+  }) as ScanView;
+  const base = { sdk: 34, selectLevel: 'silence' as const, missing: [], withGaps: 0 };
+
+  test('nothing to say on a modern phone with full data', () => {
+    expect(notices({ ...base, scan: scan() })).toEqual([]);
+  });
+
+  test('warnings first, then info; params for the full texts', () => {
+    const n = notices({ ...base, sdk: 31, scan: scan({ low_behavior_data: true, profiles: { others: [10], known: true } }),
+      missing: ['device_policy'], withGaps: 3 });
+    expect(n.map((x) => x.key)).toEqual(['low_data', 'incomplete', 'profiles', 'notifications_manual', 'select_level_disable']);
+    expect(n.map((x) => x.tone)).toEqual(['warn', 'warn', 'warn', 'info', 'info']);
+    expect(n[0].params).toEqual({ hours: '1.5' });
+    expect(n[1].params).toEqual({ count: 3, names: 'device_policy' });
+    expect(n[2].params).toEqual({ ids: '10' });
+  });
+
+  test('unknown profile list; disable as the default action needs no swap note', () => {
+    const n = notices({ ...base, sdk: 31, selectLevel: 'disable', scan: scan({ profiles: { others: [], known: false } }) });
+    expect(n.map((x) => x.key)).toEqual(['profiles_unknown', 'notifications_manual']);
+  });
 });
