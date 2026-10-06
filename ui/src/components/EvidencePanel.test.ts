@@ -1,6 +1,7 @@
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
+import type { AppView } from '../lib/types';
 import { renderWith } from '../test-utils';
 import EvidencePanel from './EvidencePanel.svelte';
 
@@ -10,27 +11,50 @@ test('evidence: score meter, grouped reasons with muted points, raw data, no rul
   void s;
 });
 
-test('evidence for a flagged app', async () => {
-  const app = {
-    package: 'com.clean.pro.boost', name: 'Cleaner Pro', score: 100, verdict: 'malicious',
-    verdict_label: 'Szkodliwa', confidence: 'high', confidence_label: 'wysoka', gaps: [],
-    trusted: false, incomplete: false, is_system: false, from_play: false,
-    installer: 'com.android.chrome', is_admin: true, default_level: 'remove', problems: [],
-    apk_error: null, ad_sdks: null, symptoms: [], source: { label: 'Chrome', days: 3 },
-    findings: [
-      { rule_id: 'DM-OVERLAY-01', class: 'behavior', category: 'ads', label: 'Okna nad innymi aplikacjami', weight: 25, text: '', text_expert: 'appops SYSTEM_ALERT_WINDOW', evidence: {} },
-      { rule_id: 'DM-ADMIN-01', class: 'position', category: 'removal', label: 'Administrator urządzenia', weight: 25, text: '', text_expert: 'device_policy', evidence: {} },
-      { rule_id: 'DM-COMBO-02', class: 'combo', category: 'combo', label: 'Blokuje usunięcie i nachalnie wyświetla treści', weight: 15, text: '', text_expert: 'kombinacja', evidence: {} },
-    ],
-  } as const;
-  const { container } = render(EvidencePanel, { props: { app: app as never } });
-  expect(screen.getByRole('meter', { name: 'Wynik' }).getAttribute('aria-valuenow')).toBe('100');
-  expect(screen.getByText('Reklamy')).toBeTruthy();
-  expect(screen.getAllByText('Okna nad innymi aplikacjami')).toHaveLength(2); // powód + nagłówek surowego wpisu
-  expect(screen.getAllByText('+25')).toHaveLength(2);
-  expect(screen.getByText('Blokuje usunięcie i nachalnie wyświetla treści')).toBeTruthy();
+const flaggedApp = {
+  package: 'com.clean.pro.boost', name: 'Cleaner Pro', score: 100, verdict: 'malicious',
+  verdict_label: 'Szkodliwa', confidence: 'high', confidence_label: 'wysoka', gaps: [],
+  trusted: false, incomplete: false, is_system: false, from_play: false,
+  installer: 'com.android.chrome', is_admin: true, default_level: 'remove', problems: [],
+  apk_error: null, ad_sdks: null, symptoms: [], source: { label: 'Chrome', days: 3 },
+  findings: [
+    { rule_id: 'DM-OVERLAY-01', class: 'behavior', category: 'ads', label: 'Okna nad innymi aplikacjami', weight: 25, text: '', text_expert: 'appops SYSTEM_ALERT_WINDOW', evidence: {} },
+    { rule_id: 'DM-ADMIN-01', class: 'position', category: 'removal', label: 'Administrator urządzenia', weight: 25, text: '', text_expert: 'device_policy', evidence: {} },
+    { rule_id: 'DM-COMBO-02', class: 'combo', category: 'combo', label: 'Blokuje usunięcie i nachalnie wyświetla treści', weight: 15, text: '', text_expert: 'kombinacja', evidence: {} },
+  ],
+  capabilities: [], scope: [],
+} as never as AppView;
+
+test('evidence: verdict, one score line, reasons without points on top, details folded', async () => {
+  const { s, ctl, container } = await renderWith(EvidencePanel, 'empty', { app: flaggedApp });
+  expect(screen.getByTestId('score-line').textContent).toContain('100');
+  expect(screen.getByTestId('score-line').textContent).toContain('pewność wysoka');
+  const why = screen.getByRole('list', { name: 'Dlaczego' });
+  expect(within(why).getByText('Okna nad innymi aplikacjami')).toBeTruthy();
+  expect(why.textContent).not.toContain('+25');
+  expect(why.textContent).not.toContain('Blokuje usunięcie'); // combo tylko w szczegółach
+  const details = screen.getByText('Szczegóły techniczne').closest('details')!;
+  expect(details.open).toBe(false);
+  expect(within(details).getByRole('meter', { name: 'Wynik' }).getAttribute('aria-valuenow')).toBe('100');
+  expect(within(details).getAllByText('+25')).toHaveLength(2);
+  expect(within(details).getByText('Blokuje usunięcie i nachalnie wyświetla treści')).toBeTruthy();
+  await fireEvent.click(screen.getByText('Szczegóły techniczne'));
+  await vi.waitFor(() => expect(s.detailsOpen).toBe(true));
   expect(container.textContent).not.toMatch(/DM-/);
-  expect(screen.getByText('Surowe dane z telefonu')).toBeTruthy();
+  void ctl;
+});
+
+test('evidence: what to do sets the same level as the row, a second click clears it; removed app offers undo', async () => {
+  const { s } = await renderWith(EvidencePanel, 'empty', { app: flaggedApp });
+  const what = screen.getByRole('group', { name: 'Co zrobić' });
+  await fireEvent.click(within(what).getByRole('button', { name: 'Usuń' }));
+  expect(s.selection[flaggedApp.package]).toBe('remove');
+  await fireEvent.click(within(what).getByRole('button', { name: 'Usuń' }));
+  expect(s.selection[flaggedApp.package]).toBeUndefined();
+  s.actedLog = { [flaggedApp.package]: [{ order: 'ZS/1', level: 'remove' }] };
+  await tick();
+  expect(screen.queryByRole('group', { name: 'Co zrobić' })).toBeNull();
+  expect(screen.getByRole('button', { name: `Cofnij: ${flaggedApp.name}` })).toBeTruthy();
 });
 
 test('raw data: one entry per rule, ad SDK list only once', () => {
@@ -88,7 +112,7 @@ test('evidence: incomplete without gaps and APK scope notes still show the limit
   expect(screen.getByText('Kod w dużej części zaciemniony')).toBeTruthy();
 });
 
-test('capability ladder: four columns, check / dash / question mark', () => {
+test('capability ladder: four columns, check / dash / question mark', async () => {
   const app = {
     package: 'com.x', name: 'X', score: 10, verdict: 'review', verdict_label: 'Do sprawdzenia',
     confidence: 'low', confidence_label: 'niska', gaps: [], trusted: false, incomplete: false,
@@ -98,6 +122,7 @@ test('capability ladder: four columns, check / dash / question mark', () => {
     capabilities: [{ key: 'overlay', label: 'Okna nad innymi aplikacjami', levels: { declared: true, code: null, granted: false, observed: null } }],
   };
   render(EvidencePanel, { props: { app: app as never } });
+  screen.getByText('Szczegóły techniczne').closest('details')!.open = true; await tick(); // zamknięte <details> chowa treść przed zapytaniami o role
   for (const h of ['Prosi', 'W kodzie', 'Przyznane', 'Zaobserwowane']) expect(screen.getByRole('columnheader', { name: h })).toBeTruthy();
   const row = screen.getByRole('row', { name: /Okna nad innymi aplikacjami/ });
   expect(row.textContent).toContain('✓');

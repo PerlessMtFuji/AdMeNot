@@ -143,6 +143,7 @@
   },
   "evidence": {
     "title": "Szczegóły aplikacji", "score": "Wynik", "why": "Dlaczego", "capabilities": "Możliwości aplikacji", "levels": { "declared": "Prosi", "code": "W kodzie", "granted": "Przyznane", "observed": "Zaobserwowane" }, "raw": "Surowe dane z telefonu", "ad_sdks": "Biblioteki reklamowe",
+    "what_to_do": "Co zrobić", "technical": "Szczegóły techniczne", "points": "Punkty reguł", "conf": { "low": "pewność niska", "medium": "pewność średnia", "high": "pewność wysoka" }, "levels_short": { "declared": "Prosi", "code": "Kod", "granted": "Ma", "observed": "Użyła" },
     "none": "Wybierz aplikację w tabeli.", "plan": "Plan", "fix": "Napraw ({count})",
     "zone": { "safe": "bez uwag", "review": "do sprawdzenia", "suspicious": "podejrzana", "malicious": "szkodliwa" },
     "deep": "Głęboka analiza", "deep_hint": "Szuka w kodzie aplikacji możliwych ścieżek do wrażliwych wywołań. Trwa do kilku minut.", "limits": "Ograniczenia oceny", "incomplete_data": "Mało danych o zachowaniu aplikacji", "confidence": "Pewność wniosku"

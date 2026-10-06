@@ -143,6 +143,7 @@
   },
   "evidence": {
     "title": "App details", "score": "Score", "why": "Why", "capabilities": "App capabilities", "levels": { "declared": "Requests", "code": "In code", "granted": "Granted", "observed": "Observed" }, "raw": "Raw data from the phone", "ad_sdks": "Ad libraries",
+    "what_to_do": "What to do", "technical": "Technical details", "points": "Rule points", "conf": { "low": "low confidence", "medium": "medium confidence", "high": "high confidence" }, "levels_short": { "declared": "Asks", "code": "Code", "granted": "Has", "observed": "Used" },
     "none": "Select an app in the table.", "plan": "Plan", "fix": "Fix ({count})",
     "zone": { "safe": "no issues", "review": "to review", "suspicious": "suspicious", "malicious": "malicious" },
     "deep": "Deep analysis", "deep_hint": "Looks in the app code for possible paths to sensitive calls. Takes up to a few minutes.", "limits": "Assessment limits", "incomplete_data": "Little data about the app's behavior", "confidence": "Confidence"
