@@ -1,4 +1,6 @@
 {
+  "groups": { "malicious": "Malicious", "suspicious": "Suspicious", "review": "To review", "safe": "No issues",
+    "empty": "nothing found", "show": "show", "hide": "hide" },
   "common": { "cancel": "Cancel", "close": "Close", "back": "Back", "save": "Save", "saved": "Saved" },
   "category": { "ads": "Ads", "notif": "Notification spam", "removal": "Hard to remove", "data": "Access to data", "disguise": "Impersonation", "background": "Runs in background", "origin": "Origin", "combo": "Signal combination" },
   "choice": { "silence": "Silence", "disable": "Disable", "remove": "Remove" },

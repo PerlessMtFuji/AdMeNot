@@ -3,7 +3,7 @@
   import { flip } from 'svelte/animate';
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
-  import { flaggedApps, LEVEL_TONE, planEntries } from '../lib/logic';
+  import { flaggedApps, groupOpen, LEVEL_TONE, planEntries } from '../lib/logic';
   import { DUR, enter, ms } from '../lib/motion';
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
@@ -11,9 +11,15 @@
   import DeviceCard from './DeviceCard.svelte';
   import MirrorControls from './MirrorControls.svelte';
 
-  let { showSafe, ontoggleSafe }: { showSafe: boolean; ontoggleSafe: () => void } = $props();
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
+  const safeOpen = $derived(groupOpen('safe', s.settings.mode, s.openGroups, false));
+  // Rozwija/zwija sekcję „Bez uwag” i przewija do niej po rozwinięciu.
+  function showSafe() {
+    const opening = !safeOpen;
+    ctl.setGroupOpen('safe', opening);
+    if (opening) requestAnimationFrame(() => document.getElementById('group-safe')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+  }
   const apps = $derived(s.scan?.apps ?? []);
   const entries = $derived(planEntries(apps, s.selection));
   const safeIncomplete = $derived(apps.filter((a) => a.verdict === 'safe' && a.incomplete).length);
@@ -44,7 +50,7 @@
 </ul>
 {#each unchanged as a (a.package)}<p class="text-xs text-soft">{a.name} — {t('panel.unchanged')}</p>{/each}
 {#if s.scan && s.scan.counts.safe > 0}
-  <button type="button" aria-expanded={showSafe} onclick={ontoggleSafe}
+  <button type="button" aria-expanded={safeOpen} onclick={showSafe}
     class="flex items-center gap-3 rounded-2xl bg-ok-soft px-4 py-3 text-left ring-1 ring-ok/20 ring-inset transition duration-150 hover:ring-ok/40">
     {#if safeIncomplete}
       <span class="grid h-7 w-7 flex-none place-items-center rounded-full bg-warn-strong text-white shadow-[0_0_14px_-2px_var(--color-warn-strong)]"><Icon name="info" size={15} strokeWidth={3} /></span>
@@ -53,7 +59,7 @@
     {/if}
     <span><b class="block">{tp('results.safe', s.scan.counts.safe)}</b>
       {#if safeIncomplete}<span class="block text-xs font-semibold text-warn">{tp('results.safe_incomplete', safeIncomplete)}</span>{/if}
-      <span class="text-xs font-semibold text-accent">{showSafe ? t('results.safe_hide') : t('results.safe_show')}</span></span>
+      <span class="text-xs font-semibold text-accent">{safeOpen ? t('results.safe_hide') : t('results.safe_show')}</span></span>
   </button>
 {/if}
 <div class="mt-auto text-xs text-mut">{t('plan.undo_hint')}</div>

@@ -48,8 +48,38 @@ describe('Results', () => {
     expect(within(panel).getByRole('button', { name: `Napraw zaznaczone (${count - 1})` })).toBeTruthy();
     expect(within(panel).getByText('R58T00TEST')).toBeTruthy();
     await fireEvent.click(within(panel).getByRole('button', { name: new RegExp(tp('results.safe', s.scan!.counts.safe)) }));
-    const safe = screen.getByRole('list', { name: 'Aplikacje bez uwag' });
-    expect(safe.querySelectorAll('li')).toHaveLength(s.scan!.counts.safe);
+    const safe = screen.getByRole('region', { name: 'Bez uwag' });
+    expect(within(safe).getAllByRole('article')).toHaveLength(s.scan!.counts.safe);
+  });
+
+  test('simple mode: verdict sections, “to review” and “no issues” folded by default', async () => {
+    const { s, ctl } = await scanned();
+    const review = s.scan!.apps.filter((a) => a.verdict === 'review');
+    expect(screen.getByRole('region', { name: 'Szkodliwe' })).toBeTruthy();
+    expect(within(screen.getByRole('region', { name: 'Podejrzane' })).getByText(/nic nie znaleziono/)).toBeTruthy();
+    const toggle = screen.getByRole('button', { name: /^Do sprawdzenia/ });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('article', { name: review[0].name })).toBeNull();
+    await fireEvent.click(toggle);
+    expect(screen.getByRole('article', { name: review[0].name })).toBeTruthy();
+    expect(s.openGroups.review).toBe(true);
+    await ctl.setMode('expert');
+    await ctl.setMode('simple');
+    await tick();
+    expect(screen.queryByRole('article', { name: review[0].name })).toBeNull();
+  });
+
+  test('clean phone: the clean state, no empty danger lines, folded “no issues”', async () => {
+    const { s, ctl } = await scanned('clean');
+    // Tryb Ekspert wróci w Task 7.
+    for (const mode of ['simple'] as const) {
+      await ctl.setMode(mode);
+      await tick();
+      expect(screen.getByRole('heading', { name: 'Nie wykryto oznak zagrożenia' })).toBeTruthy();
+      expect(screen.queryByRole('region', { name: 'Szkodliwe' })).toBeNull();
+      expect(screen.getByRole('button', { name: /^Bez uwag/ }).getAttribute('aria-expanded')).toBe('false');
+    }
+    void s;
   });
 
   test('nothing selected: the panel says so and the fix button is disabled', async () => {
@@ -189,8 +219,8 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     const panel = screen.getByRole('complementary', { name: 'Plan naprawy' });
     const toggle = within(panel).getByRole('button', { name: new RegExp(tp('results.safe_incomplete', n)) });
     await fireEvent.click(toggle);
-    const list = screen.getByRole('list', { name: t('results.safe_list') });
-    expect(within(list).getAllByText(t('results.incomplete'))).toHaveLength(n);
+    const region = screen.getByRole('region', { name: 'Bez uwag' });
+    expect(within(region).getAllByText(t('results.incomplete'))).toHaveLength(n);
   });
 
   test('a failed or partial collector alone still shows the warn banner', async () => {

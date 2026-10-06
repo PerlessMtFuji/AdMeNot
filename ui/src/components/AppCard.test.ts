@@ -8,7 +8,7 @@ const finding = (rule_id: string, category: Finding['category'], label: string, 
     source: 'phone', locations: [] }) as Finding;
 
 const evil: AppView = {
-  package: 'com.evil', name: '<img src=x onerror=”alert(1)”> & „Cleaner”', score: 90,
+  package: 'com.evil', name: '<img src=x onerror="alert(1)"> & „Cleaner”', score: 90,
   verdict: 'malicious', verdict_label: 'Szkodliwa', confidence: 'high', confidence_label: 'wysoka',
   gaps: [], scope: [], trusted: false, incomplete: false,
   is_system: false, from_play: false, installer: 'com.android.chrome', is_admin: true,
@@ -25,7 +25,7 @@ test('app card: one compact line with two reasons, symptoms behind “Why?”', 
   const ontoggle = vi.fn();
   const { container } = render(AppCard, { props: { app: evil, level: 'remove', onlevel, ontoggle } });
   expect(container.querySelector('img')).toBeNull();
-  expect(screen.getByText('<img src=x onerror=”alert(1)”> & „Cleaner”')).toBeTruthy();
+  expect(screen.getByText('<img src=x onerror="alert(1)"> & „Cleaner”')).toBeTruthy();
   const reasons = screen.getByTestId('reasons');
   expect(reasons.textContent).toContain('Administrator urządzenia');
   expect(reasons.textContent).toContain('Okna nad innymi aplikacjami');

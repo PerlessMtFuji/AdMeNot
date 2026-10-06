@@ -1,4 +1,6 @@
 {
+  "groups": { "malicious": "Szkodliwe", "suspicious": "Podejrzane", "review": "Do sprawdzenia", "safe": "Bez uwag",
+    "empty": "nic nie znaleziono", "show": "pokaż", "hide": "ukryj" },
   "common": { "cancel": "Anuluj", "close": "Zamknij", "back": "Wróć", "save": "Zapisz", "saved": "Zapisano" },
   "category": { "ads": "Reklamy", "notif": "Spam powiadomień", "removal": "Utrudnia usunięcie", "data": "Dostęp do danych", "disguise": "Podszywa się", "background": "Działa w tle", "origin": "Pochodzenie", "combo": "Połączenie sygnałów" },
   "choice": { "silence": "Wycisz", "disable": "Wyłącz", "remove": "Usuń" },

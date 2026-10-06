@@ -12,12 +12,13 @@
   import PhoneThumb from '../components/PhoneThumb.svelte';
   import PlanConfirm from '../components/PlanConfirm.svelte';
   import PlanPanel from '../components/PlanPanel.svelte';
+  import VerdictSection from '../components/VerdictSection.svelte';
   import StepTimeline from '../components/StepTimeline.svelte';
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
-  import { facetCounts, flaggedApps, focusedApp, notices, visibleApps } from '../lib/logic';
+  import { facetCounts, flaggedApps, focusedApp, groupOpen, notices, verdictGroups, visibleApps } from '../lib/logic';
   import { DUR, enter, ms, stagger } from '../lib/motion';
-  import type { Mode } from '../lib/types';
+  import type { Mode, Verdict } from '../lib/types';
   import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
   import CountUp from '../ui/CountUp.svelte';
@@ -32,7 +33,6 @@
   const expert = $derived(s.settings.mode === 'expert');
   const apps = $derived(s.scan?.apps ?? []);
   const flagged = $derived(flaggedApps(apps));
-  const safeApps = $derived(apps.filter((a) => a.verdict === 'safe'));
   const anyIncomplete = $derived(apps.some((a) => a.incomplete));
   // Brakujące dane (Plan 6: nigdy samo „bez uwag”): etykiety luk z aplikacji, a gdy żadna
   // aplikacja ich nie ma — nazwy kolektorów, które zawiodły albo zadziałały częściowo.
@@ -49,7 +49,10 @@
   const noteDetails = $derived(expert ? { incomplete: (s.scan?.collectors.failed ?? [])
     .map((c) => t('expert.collector_failed', { name: c.name, error: c.error ?? '' })) } : {});
   const undoName = $derived(s.undoTarget ? (apps.find((a) => a.package === s.undoTarget)?.name ?? s.undoTarget) : null);
-  let showSafe = $state(false);
+  // Sekcje według werdyktu w trybie Prostym: groźne zawsze otwarte, „do sprawdzenia” i „bez uwag” zwinięte.
+  const DANGER: Verdict[] = ['malicious', 'suspicious'];
+  const simpleGroups = $derived(verdictGroups(apps));
+  const isOpen = (v: Verdict, searching = false) => groupOpen(v, s.settings.mode, s.openGroups, searching);
   // Liczniki filtrów rodzaju i źródła liczone po przełączniku i wyszukiwarce, przed samymi filtrami.
   const base = $derived(visibleApps(apps, { showAll: s.showAll, verdict: 'all', query: s.query }));
   const facets = $derived(facetCounts(base));
@@ -122,25 +125,30 @@
         <p class="mt-3 text-mut">{t('results.clean_sub', { count: s.scan?.counts.total ?? 0 })}</p>
       </div>
     {:else}
-      <div class="flex flex-col gap-3.5">
-        {#each flagged as app, i (app.package)}
-          <div animate:flip={{ duration: ms(DUR.flip) }} in:enter={{ delay: stagger(i) }}>
-            <AppCard {app} level={s.selection[app.package] ?? null} done={s.acted[app.package] ?? null} busy={s.orderRunning} onundo={() => ctl.undoApp(app.package)} flash={s.apk.changed.includes(app.package)}
-              onlevel={(level) => ctl.setLevel(app.package, level)} ontoggle={() => ctl.toggle(app)} />
-          </div>
-        {/each}
-      </div>
+      {#each simpleGroups.filter((g) => g.verdict !== 'safe') as g (g.verdict)}
+        {#if g.apps.length || DANGER.includes(g.verdict)}
+          <VerdictSection verdict={g.verdict} count={g.apps.length} open={isOpen(g.verdict)}
+            collapsible={g.apps.length > 0 && !DANGER.includes(g.verdict)}
+            ontoggle={() => ctl.setGroupOpen(g.verdict, !isOpen(g.verdict))}>
+            {#each g.apps as app, i (app.package)}
+              <div animate:flip={{ duration: ms(DUR.flip) }} in:enter={{ delay: stagger(i) }}>
+                <AppCard {app} level={s.selection[app.package] ?? null} done={s.acted[app.package] ?? null} busy={s.orderRunning}
+                  onundo={() => ctl.undoApp(app.package)} flash={s.apk.changed.includes(app.package)}
+                  onlevel={(level) => ctl.setLevel(app.package, level)} ontoggle={() => ctl.toggle(app)} />
+              </div>
+            {/each}
+          </VerdictSection>
+        {/if}
+      {/each}
     {/if}
-    {#if showSafe && !expert}
-      <section class="rounded-2xl card p-4" in:enter>
-        <span class="lbl">{t('results.safe_list')}</span>
-        <ul aria-label={t('results.safe_list')} class="mt-3 grid grid-cols-2 gap-x-6 gap-y-1.5">
-          {#each safeApps as a (a.package)}
-            <li class="flex min-w-0 items-center gap-2"><span class="truncate">{a.name}</span><span class="mono truncate text-2xs text-soft">{a.package}</span>
-              {#if a.incomplete}<span class="ml-auto flex-none" title={a.verdict_label}><Pill tone="warn">{t('results.incomplete')}</Pill></span>{/if}</li>
-          {/each}
-        </ul>
-      </section>
+    {#if !expert && simpleGroups[3].apps.length}
+      <VerdictSection verdict="safe" count={simpleGroups[3].apps.length} open={isOpen('safe')} collapsible
+        ontoggle={() => ctl.setGroupOpen('safe', !isOpen('safe'))}>
+        {#each simpleGroups[3].apps as app (app.package)}
+          <AppCard {app} level={s.selection[app.package] ?? null} done={s.acted[app.package] ?? null} busy={s.orderRunning}
+            onundo={() => ctl.undoApp(app.package)} onlevel={(level) => ctl.setLevel(app.package, level)} ontoggle={() => ctl.toggle(app)} />
+        {/each}
+      </VerdictSection>
     {/if}
   </main>
   <SidePanel width={expert ? 344 : undefined} label={s.plan ? t('panel.plan') : s.diagnostics ? t('diag.title') : expert ? t('evidence.title') : t('panel.plan')}>
@@ -163,7 +171,7 @@
       {:else}
         <div class="col-start-1 row-start-1 flex flex-col gap-3"
           in:fade={{ duration: ms(DUR.panel) }} out:fade={{ duration: ms(DUR.panel) }}>
-          <PlanPanel {showSafe} ontoggleSafe={() => (showSafe = !showSafe)} />
+          <PlanPanel />
         </div>
       {/if}
     </div>
