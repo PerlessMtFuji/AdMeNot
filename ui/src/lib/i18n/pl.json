@@ -15,10 +15,10 @@
   },
   "panel": {
     "apps": { "one": "{count} aplikacja", "few": "{count} aplikacje", "many": "{count} aplikacji", "other": "{count} aplikacji" },
-    "plan": "Plan naprawy", "empty": "Zaznacz aplikacje, które chcesz naprawić.", "unchanged": "bez zmian"
+    "plan": "Plan naprawy", "empty": "Zaznacz aplikacje, które chcesz naprawić."
   },
   "rail": { "label": "Menu", "new_order": "Nowe zlecenie", "back_to_order": "Wróć do zlecenia" },
-  "header": { "find_source": "Znajdź źródło reklamy", "find_source_recording": "Trwa nagrywanie zgłoszenia", "simple": "Prosty", "expert": "Ekspert", "history": "Historia", "settings": "Ustawienia" },
+  "header": { "find_source": "Znajdź źródło reklamy", "find_source_recording": "Znajdź źródło reklamy — trwa nagrywanie", "simple": "Prosty", "expert": "Ekspert", "history": "Historia", "settings": "Ustawienia" },
   "stage": { "label": "Etapy", "connect": "Połączenie", "read": "Odczyt", "analyze": "Analiza", "fix": "Naprawa", "report": "Protokół" },
   "connect": {
     "title": { "none": "Podłącz telefon", "unauthorized": "Potwierdź na telefonie", "offline": "Odłącz i podłącz kabel", "ready": "Połączono", "many": "Wybierz telefon", "adb_missing": "Brak programu adb" },
@@ -87,7 +87,7 @@
   "phone": {
     "subject": "Przedmiot zlecenia", "serial": "S/N", "patch": "Poprawka"
   },
-  "diag": { "title": "Znajdź źródło reklamy", "back": "Wróć", "mirror_hint": "Podgląd ekranu telefonu na komputerze — łatwiej złapać chwilę reklamy." },
+  "diag": { "title": "Znajdź źródło reklamy", "back": "Wróć" },
   "who": {
     "button": "Kto to wyświetla?",
     "hint": "Odtwórz problem na telefonie (np. odblokuj i poczekaj na reklamę), a potem kliknij.",
@@ -131,8 +131,8 @@
   "level": { "silence": "WYCISZ", "disable": "WYŁĄCZ", "remove": "USUŃ", "review": "SPRAWDŹ", "none": "—" },
   "verdict": { "malicious": "Szkodliwa", "suspicious": "Podejrzana", "review": "Do sprawdzenia", "safe": "Brak istotnych sygnałów" },
   "expert": {
-    "filters": "Filtry", "filters_active": "Filtry · {count}", "col_reason": "Powód", "search_in": "Szukaj w {count} aplikacjach…",
-    "col_app": "Aplikacja", "col_score": "Wynik", "col_source": "Źródło", "col_action": "Akcja",
+    "filters": "Filtry", "filters_active": "Filtry · {count}", "search_in": "Szukaj w {count} aplikacjach…",
+    "col_app": "Aplikacja", "col_problems": "Problemy", "col_score": "Wynik", "col_source": "Źródło", "col_action": "Akcja",
     "search": "Szukaj aplikacji lub pakietu",
     "apk_error": "APK: błąd", "collector_failed": "Kolektor {name}: {error}",
     "table": "Tabela aplikacji",
@@ -205,7 +205,9 @@
     "blocked_title": "Podgląd działa, ale telefon blokuje sterowanie.",
     "blocked_text": "Na Xiaomi włącz w opcjach programisty „Debugowanie USB (ustawienia zabezpieczeń)”, potem zamknij i otwórz podgląd.",
     "awake_blocked": "Ekran telefonu może gasnąć: telefon nie pozwolił go utrzymać włączonego. Na OPPO i realme włącz w opcjach programisty „Wyłącz monitorowanie uprawnień”, na Xiaomi „Debugowanie USB (ustawienia zabezpieczeń)”.",
-    "wait_for_ad": "Otwórz podgląd i poczekaj na reklamę",
+    "header_on": "Włącz podgląd ekranu",
+    "header_off": "Wyłącz podgląd ekranu",
+    "header_starting": "Uruchamianie podglądu…",
     "show_phone": "Pokaż ekran telefonu"
   },
   "shot": {

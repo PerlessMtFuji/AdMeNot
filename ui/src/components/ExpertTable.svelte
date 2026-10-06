@@ -1,13 +1,13 @@
 <script lang="ts">
   import { getContext, tick } from 'svelte';
-  import { categoryKey } from '../lib/categories';
-  import type { Controller } from '../lib/controller';
+    import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
-  import { groupOpen, initial, LEVEL_TONE, moveFocus, topReasons } from '../lib/logic';
+  import { groupOpen, initial, LEVEL_TONE, moveFocus } from '../lib/logic';
   import type { AppView, Category, Level, Verdict } from '../lib/types';
   import Icon from '../ui/Icon.svelte';
   import AppIcon from './AppIcon.svelte';
   import FiltersMenu from './FiltersMenu.svelte';
+  import ReasonTiles from './ReasonTiles.svelte';
   import VerdictSection from './VerdictSection.svelte';
 
   type Facets = { categories: { value: Category; count: number }[]; sources: { value: string; count: number }[]; nonPlay: number };
@@ -27,7 +27,6 @@
   const shown = $derived(groups.filter((g) => g.apps.length > 0 || (!searching && anyFlagged && DANGER.includes(g.verdict))));
   const firstWithRows = $derived(shown.find((g) => g.apps.length > 0 && isOpen(g.verdict))?.verdict ?? null);
   const total = $derived(s.scan!.counts.total);
-  const reason = (a: AppView) => topReasons(a, 1, (c) => t(categoryKey(c)));
   const filtered = $derived(s.categoryFilter.length > 0 || s.sourceFilter !== null);
 
   function clearFilters() {
@@ -76,14 +75,14 @@
       <div class="flex-none overflow-hidden rounded-2xl card">
         <table class="w-full table-fixed border-collapse">
           <colgroup>
-            <col class="w-10" /><col /><col class="w-[21%]" /><col class="w-[100px]" /><col class="w-[96px]" /><col class="w-[120px]" />
+            <col class="w-10" /><col /><col class="w-[180px]" /><col class="w-[100px]" /><col class="w-[96px]" /><col class="w-[120px]" />
           </colgroup>
           {#if g.verdict === firstWithRows}
             <thead>
               <tr class="bg-surface-2/60 text-left text-xs font-bold text-mut">
                 <th class="border-b border-line px-3 py-3"></th>
                 <th class="border-b border-line px-3 py-3">{t('expert.col_app')}</th>
-                <th class="border-b border-line px-3 py-3">{t('expert.col_reason')}</th>
+                <th class="border-b border-line px-3 py-3">{t('expert.col_problems')}</th>
                 <th class="border-b border-line px-3 py-3">{t('expert.col_score')}</th>
                 <th class="border-b border-line px-3 py-3">{t('expert.col_source')}</th>
                 <th class="border-b border-line px-3 py-3">{t('expert.col_action')}</th>
@@ -92,7 +91,6 @@
           {/if}
           <tbody>
             {#each g.apps as a (a.package)}
-              {@const r = reason(a)}
         {@const level = s.selection[a.package] ?? null}
         {@const done = s.acted[a.package] ?? null}
         <tr aria-selected={a.package === focused} onclick={() => ctl.focus(a.package)}
@@ -109,8 +107,7 @@
                   aria-label={t('summary.undo_app', { name: a.name })} onclick={(e) => { e.stopPropagation(); void ctl.undoApp(a.package); }}>{t('history.undo_changes')}</button>{/if}</span></div>
             </div>
           </td>
-          <td class="px-3 py-3 text-sm"><span class="line-clamp-2">{r.items[0]?.label ?? ''}</span>
-            {#if r.more.length}<span data-more class="text-xs text-soft" title={r.more.map((c) => t(categoryKey(c))).join(', ')}>+{r.more.length}</span>{/if}</td>
+          <td class="px-3 py-3"><ReasonTiles app={a} /></td>
           <td class="px-3 py-3 whitespace-nowrap"><div class="flex items-center gap-2">
             <b class="mono {SCORE[a.verdict]}">{a.score}</b>
             <span class="h-1.5 w-12 overflow-hidden rounded-full bg-neutral-soft shadow-[var(--shadow-well)]"><i class="block h-full rounded-full {BAR[a.verdict]}" style="width: {a.score}%"></i></span>

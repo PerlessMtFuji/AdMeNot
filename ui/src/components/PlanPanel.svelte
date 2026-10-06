@@ -3,7 +3,7 @@
   import { flip } from 'svelte/animate';
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
-  import { flaggedApps, groupOpen, LEVEL_TONE, planEntries } from '../lib/logic';
+  import { groupOpen, LEVEL_TONE, planEntries } from '../lib/logic';
   import { DUR, enter, ms } from '../lib/motion';
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
@@ -23,7 +23,6 @@
   const apps = $derived(s.scan?.apps ?? []);
   const entries = $derived(planEntries(apps, s.selection));
   const safeIncomplete = $derived(apps.filter((a) => a.verdict === 'safe' && a.incomplete).length);
-  const unchanged = $derived(flaggedApps(apps).filter((a) => !(a.package in s.selection)));
   const details = $derived(s.device
     ? `${s.device.model} · Android ${s.device.android}${s.device.patch ? ` · ${t('phone.patch')} ${s.device.patch}` : ''}`
     : '');
@@ -48,7 +47,6 @@
     </li>
   {/each}
 </ul>
-{#each unchanged as a (a.package)}<p class="text-xs text-soft">{a.name} — {t('panel.unchanged')}</p>{/each}
 {#if s.scan && s.scan.counts.safe > 0}
   <button type="button" aria-expanded={safeOpen} onclick={showSafe}
     class="flex items-center gap-3 rounded-2xl bg-ok-soft px-4 py-3 text-left ring-1 ring-ok/20 ring-inset transition duration-150 hover:ring-ok/40">

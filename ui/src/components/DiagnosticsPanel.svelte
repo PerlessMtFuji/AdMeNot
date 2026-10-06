@@ -14,7 +14,6 @@
   let saved = $state(false); // potwierdzenie tuż pod przyciskiem, nie tylko w panelu bocznym
   const view = $derived(s.who);
   const serial = $derived(s.device?.serial ?? s.serial);
-  const canMirror = $derived(serial !== null && s.mirror.available && !ctl.mirrorActive(serial));
 
   async function run() {
     busy = true;
@@ -84,11 +83,3 @@
     </div>
   {/if}
 </section>
-
-{#if canMirror && serial}
-  <div class="h-px bg-line"></div>
-  <section class="flex flex-col gap-2">
-    <Button variant="ghost" onclick={() => ctl.mirrorStart(serial, s.device?.name ?? serial)}><Icon name="screen-share" />{t('mirror.wait_for_ad')}</Button>
-    <p class="text-xs text-mut">{t('diag.mirror_hint')}</p>
-  </section>
-{/if}

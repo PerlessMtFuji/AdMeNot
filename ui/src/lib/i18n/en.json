@@ -15,10 +15,10 @@
   },
   "panel": {
     "apps": { "one": "{count} app", "few": "{count} apps", "many": "{count} apps", "other": "{count} apps" },
-    "plan": "Repair plan", "empty": "Select the apps you want to fix.", "unchanged": "no change"
+    "plan": "Repair plan", "empty": "Select the apps you want to fix."
   },
   "rail": { "label": "Menu", "new_order": "New order", "back_to_order": "Back to the order" },
-  "header": { "find_source": "Find the ad source", "find_source_recording": "Incident recording in progress", "simple": "Simple", "expert": "Expert", "history": "History", "settings": "Settings" },
+  "header": { "find_source": "Find the ad source", "find_source_recording": "Find the ad source — recording in progress", "simple": "Simple", "expert": "Expert", "history": "History", "settings": "Settings" },
   "stage": { "label": "Stages", "connect": "Connection", "read": "Reading", "analyze": "Analysis", "fix": "Repair", "report": "Report" },
   "connect": {
     "title": { "none": "Connect the phone", "unauthorized": "Confirm on the phone", "offline": "Unplug and reconnect the cable", "ready": "Connected", "many": "Choose a phone", "adb_missing": "adb not found" },
@@ -87,7 +87,7 @@
   "phone": {
     "subject": "Device", "serial": "S/N", "patch": "Patch"
   },
-  "diag": { "title": "Find the ad source", "back": "Back", "mirror_hint": "The phone screen on the computer — easier to catch the moment of the ad." },
+  "diag": { "title": "Find the ad source", "back": "Back" },
   "who": {
     "button": "Who is showing this?",
     "hint": "Reproduce the problem on the phone (e.g. unlock and wait for the ad), then click.",
@@ -131,8 +131,8 @@
   "level": { "silence": "SILENCE", "disable": "DISABLE", "remove": "REMOVE", "review": "CHECK", "none": "—" },
   "verdict": { "malicious": "Malicious", "suspicious": "Suspicious", "review": "Review", "safe": "No significant signals" },
   "expert": {
-    "filters": "Filters", "filters_active": "Filters · {count}", "col_reason": "Reason", "search_in": "Search {count} apps…",
-    "col_app": "App", "col_score": "Score", "col_source": "Source", "col_action": "Action",
+    "filters": "Filters", "filters_active": "Filters · {count}", "search_in": "Search {count} apps…",
+    "col_app": "App", "col_problems": "Problems", "col_score": "Score", "col_source": "Source", "col_action": "Action",
     "search": "Search app or package",
     "apk_error": "APK: error", "collector_failed": "Collector {name}: {error}",
     "table": "Apps table",
@@ -205,7 +205,9 @@
     "blocked_title": "Screen view works, but the phone blocks control.",
     "blocked_text": "On Xiaomi, turn on “USB debugging (Security settings)” in developer options, then close and reopen the screen view.",
     "awake_blocked": "The phone screen may turn off: the phone did not let it stay on. On OPPO and realme turn on “Disable permission monitoring” in developer options, on Xiaomi “USB debugging (Security settings)”.",
-    "wait_for_ad": "Open the screen view and wait for the ad",
+    "header_on": "Turn on screen view",
+    "header_off": "Turn off screen view",
+    "header_starting": "Starting screen view…",
     "show_phone": "Show the phone screen"
   },
   "shot": {

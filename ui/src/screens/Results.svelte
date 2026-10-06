@@ -27,6 +27,7 @@
   import Progress from '../ui/Progress.svelte';
   import Segmented from '../ui/Segmented.svelte';
   import SidePanel from '../ui/SidePanel.svelte';
+  import Tooltip from '../ui/Tooltip.svelte';
 
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
@@ -67,6 +68,13 @@
   const titleParts = $derived(tp('results.title', flagged.length, { count: '\u0000' }).split('\u0000'));
   const modes = $derived([{ value: 'simple' as Mode, label: t('header.simple') },
     { value: 'expert' as Mode, label: t('header.expert') }]);
+  // Podgląd ekranu: stan dotyczy tylko bieżącego telefonu; „starting” blokuje przycisk, brak scrcpy też.
+  const mirrorState = $derived(s.device && s.mirror.serial === s.device.serial ? s.mirror.state : 'stopped');
+  const mirrorOn = $derived(mirrorState === 'running');
+  const mirrorDisabled = $derived(!s.device || !s.mirror.available || mirrorState === 'starting');
+  const mirrorLabel = $derived(!s.mirror.available ? t('mirror.missing') : mirrorState === 'starting' ? t('mirror.header_starting')
+    : mirrorOn ? t('mirror.header_off') : t('mirror.header_on'));
+  const findLabel = $derived(t(s.incident.recording ? 'header.find_source_recording' : 'header.find_source'));
 </script>
 
 <div class="flex min-h-0 min-w-0 flex-1">
@@ -78,11 +86,23 @@
         {[s.client.trim(), s.device?.name].filter(Boolean).join(' · ')}
       </div>
       <div class="flex items-center gap-2">
-        <Button pressed={s.diagnostics} onclick={() => (s.diagnostics ? ctl.closeDiagnostics() : ctl.openDiagnostics())}>
-          <Icon name="scan-search" />{t('header.find_source')}
-          {#if s.incident.recording}<span data-recording class="h-2 w-2 rounded-full bg-bad" title={t('header.find_source_recording')}></span>{/if}
-        </Button>
         <Segmented label={t('results.mode')} value={s.settings.mode} options={modes} onchange={(m) => ctl.setMode(m)} />
+        <div class="flex items-center gap-1.5">
+          <Tooltip text={findLabel}>
+            <Button size="icon" pressed={s.diagnostics} label={findLabel}
+              onclick={() => (s.diagnostics ? ctl.closeDiagnostics() : ctl.openDiagnostics())}>
+              <span class="relative grid"><Icon name="scan-search" />
+                {#if s.incident.recording}<span data-recording class="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-bad ring-2 ring-[var(--color-surface)]"></span>{/if}
+              </span>
+            </Button>
+          </Tooltip>
+          <Tooltip text={mirrorLabel}>
+            <Button size="icon" pressed={mirrorOn} label={mirrorLabel} disabled={mirrorDisabled}
+              onclick={() => (mirrorOn ? ctl.mirrorStop() : ctl.mirrorStart(s.device!.serial, s.device!.name))}>
+              <Icon name={mirrorOn ? 'screen-share-off' : 'screen-share'} />
+            </Button>
+          </Tooltip>
+        </div>
         <Button onclick={() => ctl.newScan()}><Icon name="rotate-ccw" />{t('actions.rescan')}</Button>
       </div>
       {#if flagged.length > 0}

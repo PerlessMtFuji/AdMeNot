@@ -1,7 +1,6 @@
 <script lang="ts">
   import { t } from '../lib/i18n/index.svelte';
-  import { categoryKey } from '../lib/categories';
-  import { initial, topReasons } from '../lib/logic';
+    import { initial } from '../lib/logic';
   import type { AppView, Level } from '../lib/types';
   import Button from '../ui/Button.svelte';
   import Card from '../ui/Card.svelte';
@@ -9,6 +8,7 @@
   import Pill from '../ui/Pill.svelte';
   import Segmented from '../ui/Segmented.svelte';
   import AppIcon from './AppIcon.svelte';
+  import ReasonTiles from './ReasonTiles.svelte';
   import SymptomList from './SymptomList.svelte';
 
   type Props = { app: AppView; level: Level | null; done?: Level | null; flash?: boolean; onlevel: (level: Level) => void;
@@ -23,7 +23,6 @@
     { value: 'remove' as Level, label: t('choice.remove'), tone: 'bad' as const },
   ]);
   let open = $state(false);
-  const reasons = $derived(topReasons(app, 2, (c) => t(categoryKey(c))));
 </script>
 
 <Card stripe={STRIPE[app.verdict]} class={flash ? 'flash' : ''} role="article" label={app.name}>
@@ -42,13 +41,12 @@
           {#if onundo}<Button variant="ghost" size="sm" disabled={busy} label={t('summary.undo_app', { name: app.name })}
             onclick={onundo}><Icon name="undo-2" size={14} />{t('history.undo_changes')}</Button>{/if}{/if}
       </div>
-      <div data-testid="reasons" class="flex min-w-0 text-xs text-mut">
-        <span class="truncate">{reasons.items.map((r) => r.label).join(' · ')}</span>
-        {#if reasons.more.length}<span data-more class="flex-none whitespace-pre text-soft"> · +{reasons.more.length}</span>{/if}
-      </div>
       {#if app.symptoms.length}
-        <button type="button" class="mt-0.5 text-xs font-semibold text-accent hover:underline" aria-expanded={open}
-          onclick={() => (open = !open)}>{t('results.why')}</button>
+        <div data-testid="reasons" class="mt-1 flex min-w-0 items-center gap-2">
+          <ReasonTiles {app} />
+          <button type="button" class="text-xs font-semibold text-accent hover:underline" aria-expanded={open}
+            onclick={() => (open = !open)}>{t('results.why')}</button>
+        </div>
       {/if}
     </div>
     <div class="w-[240px] flex-none">

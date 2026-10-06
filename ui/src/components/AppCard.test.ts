@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { expect, test, vi } from 'vitest';
 import type { AppView, Finding } from '../lib/types';
 import AppCard from './AppCard.svelte';
@@ -20,20 +20,17 @@ const evil: AppView = {
   source: { label: 'Chrome', days: 3 },
 };
 
-test('app card: one compact line with two reasons, symptoms behind “Why?”', async () => {
+test('app card: reason tiles with “Why?” beside them, symptoms behind it', async () => {
   const onlevel = vi.fn();
   const ontoggle = vi.fn();
   const { container } = render(AppCard, { props: { app: evil, level: 'remove', onlevel, ontoggle } });
   expect(container.querySelector('img')).toBeNull();
   expect(screen.getByText('<img src=x onerror="alert(1)"> & „Cleaner”')).toBeTruthy();
+  // jeden kafelek na objaw, nazwany kategorią; przycisk „Dlaczego?” stoi w tej samej linii
   const reasons = screen.getByTestId('reasons');
-  expect(reasons.textContent).toContain('Administrator urządzenia');
-  expect(reasons.textContent).toContain('Okna nad innymi aplikacjami');
-  expect(reasons.textContent).toContain('+1');
-  // „+N” to osobny węzeł poza obciętą listą powodów, więc nie ginie przy długich etykietach
-  const more = reasons.querySelector('[data-more]')!;
-  expect(more.textContent).toContain('+1');
-  expect(more.closest('.truncate')).toBeNull();
+  expect(within(reasons).getAllByRole('img').map((x) => x.getAttribute('aria-label'))).toEqual(['Reklamy', 'Pochodzenie']);
+  expect(reasons.textContent).not.toContain('Administrator urządzenia');
+  expect(within(reasons).getByRole('button', { name: 'Dlaczego?' })).toBeTruthy();
   expect(screen.queryByText('Szkodliwa')).toBeNull(); // werdykt mówi sekcja
   expect(screen.queryByText('Pokazuje <b>reklamy</b>.')).toBeNull();
   const why = screen.getByRole('button', { name: 'Dlaczego?' });
@@ -67,9 +64,15 @@ test('app card: real icon from the APK, initial when it fails to load', async ()
   expect(initial()).not.toBeNull();
 });
 
-test('app card without findings names the symptom categories', () => {
+test('app card without findings still shows a tile per symptom category', () => {
   render(AppCard, { props: { app: { ...evil, findings: [] }, level: null, onlevel: vi.fn(), ontoggle: vi.fn() } });
-  expect(screen.getByTestId('reasons').textContent).toContain('Reklamy');
+  expect(screen.getByRole('img', { name: 'Reklamy' })).toBeTruthy();
+});
+
+test('app card without symptoms renders no tiles and no “Why?”', () => {
+  render(AppCard, { props: { app: { ...evil, symptoms: [] }, level: null, onlevel: vi.fn(), ontoggle: vi.fn() } });
+  expect(screen.queryAllByRole('img')).toHaveLength(0);
+  expect(screen.queryByRole('button', { name: 'Dlaczego?' })).toBeNull();
 });
 
 test('app card: incomplete assessment is visible', () => {

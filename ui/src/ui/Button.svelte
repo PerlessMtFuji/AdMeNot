@@ -3,7 +3,7 @@
 
   type Props = {
     variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
-    size?: 'sm' | 'md' | 'lg';
+    size?: 'sm' | 'md' | 'lg' | 'icon';
     disabled?: boolean;
     type?: 'button' | 'submit';
     pressed?: boolean;
@@ -26,6 +26,7 @@
     sm: 'rounded-[10px] px-3 py-1.5 text-sm',
     md: 'rounded-xl px-4 py-2.5',
     lg: 'rounded-[14px] px-5 py-3 text-md',
+    icon: 'rounded-xl p-2.5', // sam symbol, nazwę niesie aria-label i podpowiedź
   };
 </script>
 

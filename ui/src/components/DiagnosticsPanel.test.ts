@@ -26,12 +26,12 @@ test('who is showing: an unread window list is unknown, never "no windows"', asy
   expect(screen.getByText('Nie udało się ustalić aplikacji na pierwszym planie.')).toBeTruthy();
 });
 
-test('offers the screen view and a screenshot with the description', async () => {
+test('offers a screenshot with the description and no screen view button (it lives in the header)', async () => {
   const { s, bridge } = await renderWith(DiagnosticsPanel, 'empty', { ask: async () => ({ resumed: null, overlays: [], errors: [] }) });
   s.serial = 'R58T00TEST';
   await tick();
-  await fireEvent.click(screen.getByRole('button', { name: 'Otwórz podgląd i poczekaj na reklamę' }));
-  expect(bridge.calls.some((c) => c.method === 'mirror_start')).toBe(true);
+  expect(screen.queryByRole('button', { name: /podgląd/i })).toBeNull();
+  expect(screen.queryByText(/Podgląd ekranu telefonu na komputerze/)).toBeNull();
   await fireEvent.click(screen.getByRole('button', { name: 'Kto to wyświetla?' }));
   await flush();
   await tick();

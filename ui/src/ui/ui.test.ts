@@ -8,6 +8,7 @@ import Dialog from './Dialog.svelte';
 import Icon, { ICONS } from './Icon.svelte';
 import Progress from './Progress.svelte';
 import Segmented from './Segmented.svelte';
+import Tooltip from './Tooltip.svelte';
 
 describe('base components', () => {
   test('Segmented marks the chosen option and reports a change', async () => {
@@ -70,3 +71,54 @@ describe('base components', () => {
 function createActions() {
   return snippet('<button>Anuluj</button><button>Przerwij</button>');
 }
+
+describe('Tooltip', () => {
+  const setup = () => {
+    render(Tooltip, { props: { text: 'Podpowiedź', children: snippet('<button type="button">cel</button>') } });
+    return screen.getByRole('button', { name: 'cel' });
+  };
+
+  test('shows after a delay on hover and hides on leave', async () => {
+    vi.useFakeTimers();
+    try {
+      const trigger = setup();
+      await fireEvent.mouseEnter(trigger.closest('.relative')!);
+      expect(screen.queryByRole('tooltip')).toBeNull();
+      await vi.advanceTimersByTimeAsync(350);
+      expect(screen.getByRole('tooltip').textContent).toBe('Podpowiedź');
+      await fireEvent.mouseLeave(trigger.closest('.relative')!);
+      expect(screen.queryByRole('tooltip')).toBeNull();
+    } finally { vi.useRealTimers(); }
+  });
+
+  test('a short hover does not show it', async () => {
+    vi.useFakeTimers();
+    try {
+      const trigger = setup();
+      await fireEvent.mouseEnter(trigger.closest('.relative')!);
+      await vi.advanceTimersByTimeAsync(100);
+      await fireEvent.mouseLeave(trigger.closest('.relative')!);
+      await vi.advanceTimersByTimeAsync(500);
+      expect(screen.queryByRole('tooltip')).toBeNull();
+    } finally { vi.useRealTimers(); }
+  });
+
+  test('shows on keyboard focus, hides on Escape and on blur', async () => {
+    vi.useFakeTimers();
+    try {
+      const trigger = setup();
+      trigger.focus();
+      await vi.advanceTimersByTimeAsync(350);
+      expect(screen.getByRole('tooltip')).toBeTruthy();
+      await fireEvent.keyDown(trigger, { key: 'Escape' });
+      expect(screen.queryByRole('tooltip')).toBeNull();
+      trigger.blur();
+      trigger.focus();
+      await vi.advanceTimersByTimeAsync(350);
+      expect(screen.getByRole('tooltip')).toBeTruthy();
+      trigger.blur();
+      await tick();
+      expect(screen.queryByRole('tooltip')).toBeNull();
+    } finally { vi.useRealTimers(); }
+  });
+});

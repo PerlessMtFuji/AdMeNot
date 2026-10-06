@@ -34,7 +34,8 @@ describe('Results', () => {
     expect(screen.getByRole('heading', { name: tp('results.title', flagged.length) })).toBeTruthy();
     const boost = s.scan!.apps.find((a) => a.package === 'com.clean.pro.boost')!;
     const card = screen.getByRole('article', { name: boost.name });
-    expect(within(card).getByTestId('reasons')).toBeTruthy();
+    const tiles = within(within(card).getByTestId('reasons')).getAllByRole('img');
+    expect(tiles.map((x) => x.getAttribute('aria-label'))).toEqual(boost.symptoms.map((sy) => t(`category.${sy.category}`)));
     await fireEvent.click(within(card).getByRole('button', { name: 'Dlaczego?' }));
     expect(within(card).getByText(boost.symptoms[0].text)).toBeTruthy();
     const panel = screen.getByRole('complementary', { name: 'Plan naprawy' });
@@ -128,9 +129,8 @@ describe('Results', () => {
     const { s, ctl } = await scanned();
     await ctl.setMode('expert');
     await tick();
-    expect(screen.queryByText('Spoza Play')).toBeNull(); // bez kafelków
-    expect(screen.queryByRole('columnheader', { name: 'Problemy' })).toBeNull();
-    expect(screen.getByRole('columnheader', { name: 'Powód' })).toBeTruthy();
+    expect(screen.getByRole('columnheader', { name: 'Problemy' })).toBeTruthy();
+    expect(screen.queryByRole('columnheader', { name: 'Powód' })).toBeNull();
     expect(screen.getByRole('columnheader', { name: 'Aplikacja' })).toBeTruthy();
     const flagged = s.scan!.apps.filter((a) => a.verdict !== 'safe');
     expect(appRows()).toHaveLength(flagged.length + 1);
@@ -224,17 +224,6 @@ describe('Results', () => {
     await fireEvent.change(source, { target: { value: '__non_play__' } });
     expect(within(source).getByRole('option', { name: /^Spoza Sklepu Play/ })).toBeTruthy();
     expect(appRows()).toHaveLength(outside.length + 1);
-  });
-
-  test('expert reason column: strongest finding in words, +N with the other categories', async () => {
-    const { s, ctl } = await scanned();
-    await ctl.setMode('expert');
-    await tick();
-    const boost = s.scan!.apps.find((a) => a.package === 'com.clean.pro.boost')!;
-    const row = screen.getByRole('checkbox', { name: boost.package }).closest('tr')!;
-    const best = [...boost.findings].filter((f) => f.category !== 'combo').sort((a, b) => b.weight - a.weight)[0];
-    expect(row.textContent).toContain(best.label);
-    expect(row.querySelector('[data-more]')?.getAttribute('title')).toBeTruthy();
   });
 
   test('expert table: keys typed in a row control stay there, arrows keep the focused row in view', async () => {
@@ -410,6 +399,79 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     expect(screen.getByRole('complementary', { name: 'Plan naprawy' })).toBeTruthy();
     s.incident = { recording: true, marks: 0, result: null };
     await tick();
-    expect(screen.getByRole('button', { name: 'Znajdź źródło reklamy' }).querySelector('[data-recording]')).not.toBeNull();
+    expect(screen.getByRole('button', { name: /^Znajdź źródło reklamy/ }).querySelector('[data-recording]')).not.toBeNull();
+  });
+
+  test('expert row: one tile per symptom named by the category', async () => {
+    const { ctl, s } = await scanned();
+    await ctl.setMode('expert');
+    await tick();
+    const boost = s.scan!.apps.find((a) => a.package === 'com.clean.pro.boost')!;
+    const row = screen.getByRole('checkbox', { name: boost.package }).closest('tr')!;
+    expect(within(row).getAllByRole('img').map((x) => x.getAttribute('aria-label')))
+      .toEqual(boost.symptoms.map((sy) => t(`category.${sy.category}`)));
+    expect(row.querySelector('[data-more]')).toBeNull();
+  });
+
+  test('simple side panel lists only apps with an action, no "bez zmian"', async () => {
+    const { s } = await scanned();
+    s.selection = {};
+    await tick();
+    const panel = screen.getByRole('complementary', { name: 'Plan naprawy' });
+    expect(within(panel).queryByText(/bez zmian/)).toBeNull();
+  });
+
+  test('header order: mode, find source, screen view, rescan; icon buttons have names', async () => {
+    await scanned();
+    const header = screen.getByRole('main').querySelector('header')!;
+    const names = within(header).getAllByRole('button').map((b) => b.getAttribute('aria-label') ?? b.textContent!.trim());
+    expect(names).toEqual(['Prosty', 'Ekspert', 'Znajdź źródło reklamy', 'Włącz podgląd ekranu', 'Skanuj ponownie']);
+  });
+
+  test('find source tooltip and name while recording', async () => {
+    const { s } = await scanned();
+    s.incident = { recording: true, marks: 0, result: null };
+    await tick();
+    const btn = screen.getByRole('button', { name: /^Znajdź źródło reklamy/ });
+    expect(btn.getAttribute('aria-label')).toBe('Znajdź źródło reklamy — trwa nagrywanie');
+    expect(btn.querySelector('[data-recording]')).not.toBeNull();
+  });
+
+  test('mirror button toggles the screen view and reflects pressed', async () => {
+    const { s, bridge } = await scanned();
+    const btn = () => within(screen.getByRole('main').querySelector('header')!).getByRole('button', { name: /podgląd ekranu/i });
+    expect(btn().getAttribute('aria-pressed')).toBe('false');
+    expect(btn().getAttribute('aria-label')).toBe('Włącz podgląd ekranu');
+    await fireEvent.click(btn());
+    await vi.waitFor(() => expect(s.mirror.state).toBe('running'));
+    await tick();
+    expect(bridge.calls.some((c) => c.method === 'mirror_start')).toBe(true);
+    expect(btn().getAttribute('aria-pressed')).toBe('true');
+    expect(btn().getAttribute('aria-label')).toBe('Wyłącz podgląd ekranu');
+    await fireEvent.click(btn());
+    await vi.waitFor(() => expect(s.mirror.state).toBe('stopped'));
+    await tick();
+    expect(bridge.calls.some((c) => c.method === 'mirror_stop')).toBe(true);
+    expect(btn().getAttribute('aria-pressed')).toBe('false');
+  });
+
+  test('mirror button is disabled while starting and when scrcpy is missing', async () => {
+    const { s } = await scanned();
+    const btn = () => within(screen.getByRole('main').querySelector('header')!).getByRole('button', { name: /podgląd|scrcpy/i }) as HTMLButtonElement;
+    s.mirror = { ...s.mirror, serial: s.device!.serial, state: 'starting' };
+    await tick();
+    expect(btn().disabled).toBe(true);
+    expect(btn().getAttribute('aria-label')).toBe('Uruchamianie podglądu…');
+    s.mirror = { ...s.mirror, serial: null, state: 'stopped', available: false };
+    await tick();
+    expect(btn().disabled).toBe(true);
+    expect(btn().getAttribute('aria-label')).toContain('brak dołączonego scrcpy');
+  });
+
+  test('mirror button is disabled without a device', async () => {
+    const { s } = await scanned();
+    s.device = null;
+    await tick();
+    expect((within(screen.getByRole('main').querySelector('header')!).getByRole('button', { name: 'Włącz podgląd ekranu' }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
