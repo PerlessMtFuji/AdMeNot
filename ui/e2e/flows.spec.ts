@@ -86,7 +86,7 @@ test('expert table keeps every row reachable when the list is longer than the wi
   await page.setViewportSize({ width: 1280, height: 300 });
   await scan(page, 'adware');
   await page.getByRole('button', { name: 'Ekspert' }).click();
-  await page.getByRole('button', { name: /^Wszystkie/ }).click();
+  await page.getByRole('button', { name: /^Bez uwag/ }).click();
   const table = page.getByRole('group', { name: 'Tabela aplikacji' });
   const rows = table.locator('tbody tr');
   expect(await rows.count()).toBeGreaterThan(3);
@@ -94,6 +94,15 @@ test('expert table keeps every row reachable when the list is longer than the wi
   expect(clipped).toBe(0);
   await rows.last().scrollIntoViewIfNeeded();
   await expect(rows.last()).toBeInViewport();
+});
+
+test('find the ad source opens in the side panel and comes back to the plan', async ({ page }) => {
+  await scan(page, 'adware');
+  await page.getByRole('button', { name: 'Znajdź źródło reklamy' }).click();
+  const panel = page.getByRole('complementary', { name: 'Znajdź źródło reklamy' });
+  await expect(panel.getByRole('button', { name: 'Kto to wyświetla?' })).toBeVisible();
+  await panel.getByRole('button', { name: 'Wróć' }).click();
+  await expect(page.getByRole('complementary', { name: 'Plan naprawy' })).toBeVisible();
 });
 
 test('repair cards keep their full height when the order is longer than the window', async ({ page }) => {

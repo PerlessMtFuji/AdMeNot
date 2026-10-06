@@ -9,7 +9,7 @@
     "safe": { "one": "{count} aplikacja bez uwag", "few": "{count} aplikacje bez uwag", "many": "{count} aplikacji bez uwag", "other": "{count} aplikacji bez uwag" },
     "mode": "Tryb widoku", "action_for": "Akcja dla {name}",
     "clean_title": "Nie wykryto oznak zagrożenia", "clean_title_incomplete": "Nie wykryto oznak zagrożenia — ocena niepełna", "clean_sub": "W zakresie wykonanego skanu · sprawdzone aplikacje: {count}",
-    "safe_show": "Pokaż listę", "safe_hide": "Zwiń listę", "safe_list": "Aplikacje bez uwag",
+    "safe_show": "Pokaż listę", "safe_hide": "Zwiń listę",
     "incomplete": "Ocena niepełna", "why": "Dlaczego?",
     "safe_incomplete": { "one": "w tym {count} z oceną niepełną", "few": "w tym {count} z oceną niepełną", "many": "w tym {count} z oceną niepełną", "other": "w tym {count} z oceną niepełną" }
   },
@@ -132,13 +132,12 @@
   "verdict": { "malicious": "Szkodliwa", "suspicious": "Podejrzana", "review": "Do sprawdzenia", "safe": "Brak istotnych sygnałów" },
   "expert": {
     "filters": "Filtry", "filters_active": "Filtry · {count}", "col_reason": "Powód", "search_in": "Szukaj w {count} aplikacjach…",
-    "malicious": "Szkodliwe", "suspicious": "Podejrzane", "non_play": "Spoza Play", "admins": "Admin urządz.",
-    "col_app": "Aplikacja", "col_problems": "Problemy", "col_score": "Wynik", "col_source": "Źródło", "col_action": "Akcja",
+    "col_app": "Aplikacja", "col_score": "Wynik", "col_source": "Źródło", "col_action": "Akcja",
     "search": "Szukaj aplikacji lub pakietu",
     "apk_error": "APK: błąd", "collector_failed": "Kolektor {name}: {error}",
-    "table": "Tabela aplikacji", "filter": "Filtr", "filter_attention": "Wymagające uwagi · {count}", "filter_all": "Wszystkie · {count}",
+    "table": "Tabela aplikacji",
     "filter_types": "Rodzaj problemu", "filter_source": "Filtr źródła", "all_sources": "Wszystkie źródła", "no_match": "Brak aplikacji pasujących do filtrów.", "clear_filters": "Wyczyść filtry",
-    "collectors_apk": "kolektory {ok}/{total} · APK {analyzed}/{requested}", "collectors_only": "kolektory {ok}/{total}", "today": "dziś", "protected": "Aplikacja chroniona",
+    "today": "dziś", "protected": "Aplikacja chroniona",
     "days": { "one": "{count} dzień temu", "few": "{count} dni temu", "many": "{count} dni temu", "other": "{count} dnia temu" }
   },
   "evidence": {

@@ -44,6 +44,9 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(page).toHaveScreenshot(`results-simple-${theme}.png`);
       await page.getByRole('button', { name: 'Ekspert' }).click();
       await expect(page).toHaveScreenshot(`results-expert-${theme}.png`);
+      await page.getByRole('button', { name: 'Znajdź źródło reklamy' }).click();
+      await expect(page).toHaveScreenshot(`results-diagnostics-${theme}.png`);
+      await page.getByRole('button', { name: 'Wróć' }).click();
       await page.getByRole('button', { name: 'Konsola ADB' }).click();
       await expect(page).toHaveScreenshot(`results-console-${theme}.png`);
       await page.getByRole('button', { name: 'Konsola ADB' }).click();

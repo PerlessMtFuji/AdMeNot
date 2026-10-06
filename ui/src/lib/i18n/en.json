@@ -9,7 +9,7 @@
     "safe": { "one": "{count} app without issues", "few": "{count} apps without issues", "many": "{count} apps without issues", "other": "{count} apps without issues" },
     "mode": "View mode", "action_for": "Action for {name}",
     "clean_title": "No signs of a threat", "clean_title_incomplete": "No signs of a threat — incomplete assessment", "clean_sub": "Within the scope of this scan · apps checked: {count}",
-    "safe_show": "Show the list", "safe_hide": "Hide the list", "safe_list": "Apps without issues",
+    "safe_show": "Show the list", "safe_hide": "Hide the list",
     "incomplete": "Incomplete assessment", "why": "Why?",
     "safe_incomplete": { "one": "incl. {count} with an incomplete assessment", "few": "incl. {count} with an incomplete assessment", "many": "incl. {count} with an incomplete assessment", "other": "incl. {count} with an incomplete assessment" }
   },
@@ -132,13 +132,12 @@
   "verdict": { "malicious": "Malicious", "suspicious": "Suspicious", "review": "Review", "safe": "No significant signals" },
   "expert": {
     "filters": "Filters", "filters_active": "Filters · {count}", "col_reason": "Reason", "search_in": "Search {count} apps…",
-    "malicious": "Malicious", "suspicious": "Suspicious", "non_play": "Outside Play", "admins": "Device admins",
-    "col_app": "App", "col_problems": "Problems", "col_score": "Score", "col_source": "Source", "col_action": "Action",
+    "col_app": "App", "col_score": "Score", "col_source": "Source", "col_action": "Action",
     "search": "Search app or package",
     "apk_error": "APK: error", "collector_failed": "Collector {name}: {error}",
-    "table": "Apps table", "filter": "Filter", "filter_attention": "Needs attention · {count}", "filter_all": "All · {count}",
+    "table": "Apps table",
     "filter_types": "Problem type", "filter_source": "Source filter", "all_sources": "All sources", "no_match": "No apps match the filters.", "clear_filters": "Clear filters",
-    "collectors_apk": "collectors {ok}/{total} · APK {analyzed}/{requested}", "collectors_only": "collectors {ok}/{total}", "today": "today", "protected": "Protected app",
+    "today": "today", "protected": "Protected app",
     "days": { "one": "{count} day ago", "few": "{count} days ago", "many": "{count} days ago", "other": "{count} days ago" }
   },
   "evidence": {
