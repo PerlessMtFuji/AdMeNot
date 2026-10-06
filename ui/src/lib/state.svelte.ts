@@ -1,4 +1,4 @@
-import { actedLevels, type ActedLog, type Phase } from './logic';
+import { actedLevels, type ActedLog, type OpenGroups, type Phase } from './logic';
 import type {
   ApiErrorBody, ApkEstimate, ApkQuestion, Category, ConsoleEntry, DeviceEntry, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
   PlanView, Question, ReportResult, ScanView, Settings, ShotsView, ShotView, StepEvent, UndoDone, Verdict,
@@ -34,6 +34,12 @@ export class AppState {
   sourceFilter = $state<string | null>(null);
   expanded = $state<string[]>([]);
   focused = $state<string | null>(null);
+  /** Rozwinięte/zwinięte grupy werdyktu na ekranie Naprawa; puste = domyślne trybu (logic.groupOpen). */
+  openGroups = $state<OpenGroups>({});
+  /** Prawy panel pokazuje „Znajdź źródło reklamy" zamiast planu / szczegółów. */
+  diagnostics = $state(false);
+  /** „Szczegóły techniczne" w panelu Eksperta — pamiętane do zamknięcia programu. */
+  detailsOpen = $state(false);
   plan = $state<PlanView | null>(null);
   job = $state<{ id: string; kind: string } | null>(null);
   incident = $state<{ recording: boolean; marks: number; result: IncidentDone | null }>({ recording: false, marks: 0, result: null });

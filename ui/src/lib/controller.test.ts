@@ -420,3 +420,32 @@ describe('screen mirror and screenshots (Plan 6b)', () => {
     expect(s.mirror.state).toBe('running');
   });
 });
+
+describe('repair screen view state', () => {
+  test('groups, diagnostics and details: set, reset by scan, mode and new scan; plan closes diagnostics', async () => {
+    const { ctl, s } = await setupCtl('adware');
+    await ctl.startScan();
+    await vi.waitFor(() => expect(s.job).toBeNull());
+    ctl.setGroupOpen('review', true);
+    expect(s.openGroups).toEqual({ review: true });
+    await ctl.setMode('expert');
+    expect(s.openGroups).toEqual({});
+    ctl.setGroupOpen('safe', true);
+    ctl.openDiagnostics();
+    expect(s.diagnostics).toBe(true);
+    await ctl.openPlan();
+    expect(s.diagnostics).toBe(false);
+    expect(s.plan).not.toBeNull();
+    ctl.closePlan();
+    ctl.openDiagnostics();
+    ctl.closeDiagnostics();
+    expect(s.diagnostics).toBe(false);
+    ctl.setDetailsOpen(true);
+    expect(s.detailsOpen).toBe(true);
+    ctl.openDiagnostics();
+    ctl.newScan();
+    expect(s.openGroups).toEqual({});
+    expect(s.diagnostics).toBe(false);
+    expect(s.detailsOpen).toBe(true); // szczegóły techniczne: do zamknięcia programu
+  });
+});

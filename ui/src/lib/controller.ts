@@ -4,7 +4,7 @@ import { actedAfter, changedVerdicts, defaultSelection, mergeSelection, notifica
 import type { AppState } from './state.svelte';
 import { applyTheme } from './theme';
 import type {
-  ApiError, AppView, CacheUsage, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, Theme,
+  ApiError, AppView, CacheUsage, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, Theme, Verdict,
 } from './types';
 
 const CONSOLE_LIMIT = 500;
@@ -97,6 +97,8 @@ export class Controller {
       s.touched = [];
       s.unlocked = [];
       s.expanded = [];
+      s.openGroups = {};
+      s.diagnostics = false;
       s.apk = { done: 0, total: 0, running: true, changed: [] };
       s.apkEstimate = null;
       s.apkQuestion = null;
@@ -260,6 +262,7 @@ export class Controller {
       phase: 'connect', screen: 'main', device: null, scan: null, result: null, order: null,
       plan: null, selection: {}, actedLog: {}, undoTarget: null, steps: [], disconnectedOrder: null, reports: {},
       categoryFilter: [], sourceFilter: null, lastShot: null, lastShotSerial: null, shotCount: 0,
+      openGroups: {}, diagnostics: false,
     });
   }
 
@@ -314,8 +317,25 @@ export class Controller {
     s.expanded = s.expanded.includes(pkg) ? s.expanded.filter((p) => p !== pkg) : [...s.expanded, pkg];
   }
 
+  setGroupOpen(verdict: Verdict, open: boolean): void {
+    this.state.openGroups = { ...this.state.openGroups, [verdict]: open };
+  }
+
+  openDiagnostics(): void {
+    this.state.diagnostics = true;
+  }
+
+  closeDiagnostics(): void {
+    this.state.diagnostics = false;
+  }
+
+  setDetailsOpen(open: boolean): void {
+    this.state.detailsOpen = open;
+  }
+
   async openPlan(): Promise<void> {
     const s = this.state;
+    s.diagnostics = false;
     const r = await this.call(this.api.preview_plan({ ...s.selection }, [...s.unlocked]));
     if (r) s.plan = r;
   }
@@ -406,6 +426,7 @@ export class Controller {
   }
 
   setMode(mode: Mode): Promise<Settings | null> {
+    this.state.openGroups = {}; // nowy tryb — jego domyślne rozwinięcie grup
     return this.saveSettings({ mode });
   }
 
