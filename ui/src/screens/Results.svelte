@@ -8,13 +8,14 @@
   import ExpertTable from '../components/ExpertTable.svelte';
   import WhoIsShowing from '../components/WhoIsShowing.svelte';
   import InterruptedBanner from '../components/InterruptedBanner.svelte';
+  import NoticeLine from '../components/NoticeLine.svelte';
   import PhoneThumb from '../components/PhoneThumb.svelte';
   import PlanConfirm from '../components/PlanConfirm.svelte';
   import PlanPanel from '../components/PlanPanel.svelte';
   import StepTimeline from '../components/StepTimeline.svelte';
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
-  import { facetCounts, flaggedApps, focusedApp, notificationsManual, visibleApps } from '../lib/logic';
+  import { facetCounts, flaggedApps, focusedApp, notices, visibleApps } from '../lib/logic';
   import { DUR, enter, ms, stagger } from '../lib/motion';
   import type { Mode } from '../lib/types';
   import Banner from '../ui/Banner.svelte';
@@ -42,7 +43,11 @@
     return [...new Set([...(c?.failed ?? []), ...(c?.partial ?? [])].map((x) => x.name))];
   });
   const withGaps = $derived(apps.filter((a) => a.gaps.length > 0).length);
-  const notifManual = $derived(notificationsManual(s.device?.sdk));
+  const noteItems = $derived(notices({ scan: s.scan, sdk: s.device?.sdk, selectLevel: s.settings.select_level,
+    missing, withGaps }));
+  // Błędy kolektorów (dawny tooltip kafelka) — tylko dla eksperta, pod pełnym komunikatem o niepełnej ocenie.
+  const noteDetails = $derived(expert ? { incomplete: (s.scan?.collectors.failed ?? [])
+    .map((c) => t('expert.collector_failed', { name: c.name, error: c.error ?? '' })) } : {});
   const undoName = $derived(s.undoTarget ? (apps.find((a) => a.package === s.undoTarget)?.name ?? s.undoTarget) : null);
   let showSafe = $state(false);
   // Liczniki filtrów rodzaju i źródła liczone po przełączniku i wyszukiwarce, przed samymi filtrami.
@@ -86,8 +91,7 @@
     {/if}
     <ApkSpace />
     {#if s.interrupted.length}<InterruptedBanner orders={s.interrupted} />{/if}
-    {#if s.scan?.low_behavior_data}<Banner tone="warn" icon="info" title={t('summary.low_data', { hours: s.scan.usage_window_h?.toFixed(1) ?? '?' })} />{/if}
-    {#if missing.length}<Banner tone="warn" icon="info" title={t('summary.incomplete', { count: withGaps, names: missing.join(', ') })} />{/if}
+    <NoticeLine items={noteItems} details={noteDetails} />
     {#if undoName && s.job?.kind === 'undo'}
       <Banner tone="info" icon="undo-2" title={t('summary.undoing_app', { name: undoName })}>
         {#if s.undoSteps.length}<StepTimeline steps={s.undoSteps} />{/if}
@@ -97,10 +101,6 @@
         <ul class="list-disc pl-5 text-sm">{#each s.undoResult.errors as e (e)}<li>{e}</li>{/each}</ul>
       </Banner>
     {/if}
-    {#if notifManual}<Banner tone="info" icon="info" title={t('summary.notifications_manual')} />
-      {#if s.settings.select_level === 'silence'}<Banner tone="info" icon="info" title={t('summary.select_level_disable')} />{/if}{/if}
-    {#if s.scan?.profiles.others.length}<Banner tone="warn" icon="info" title={t('summary.profiles', { ids: s.scan.profiles.others.join(', ') })} />
-    {:else if s.scan && !s.scan.profiles.known}<Banner tone="warn" icon="info" title={t('summary.profiles_unknown')} />{/if}
     <WhoIsShowing ask={() => ctl.whoIsShowing()} />
 
     {#if expert}

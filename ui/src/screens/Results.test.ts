@@ -157,6 +157,13 @@ describe('Results', () => {
 describe('Results: missing data is never a plain "all clear" (final review I2/M2)', () => {
   const GAP = { key: 'device_policy', label: 'administratorzy urządzenia' };
 
+  // Linia uwag: krótki tekst widoczny od razu, pełne komunikaty dopiero po „Więcej”.
+  const notesLine = () => screen.getByRole('status', { name: 'Uwagi do skanu' });
+  async function openNotes() {
+    const line = notesLine();
+    if (line.querySelector('[aria-expanded="false"]')) await fireEvent.click(within(line).getByRole('button', { name: 'Więcej' }));
+  }
+
   function devicePolicyFailed(s: Awaited<ReturnType<typeof scanned>>['s']) {
     const scan = s.scan!;
     s.scan = {
@@ -175,6 +182,8 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     const n = s.scan!.apps.length;
     expect(screen.queryByRole('heading', { name: t('results.clean_title') })).toBeNull();
     expect(screen.getByRole('heading', { name: t('results.clean_title_incomplete') })).toBeTruthy();
+    expect(notesLine().textContent).toContain(t('notice.short.incomplete', { count: n }));
+    await openNotes();
     expect(screen.getByText(t('summary.incomplete', { count: n, names: GAP.label }))).toBeTruthy();
     const panel = screen.getByRole('complementary', { name: 'Plan naprawy' });
     const toggle = within(panel).getByRole('button', { name: new RegExp(tp('results.safe_incomplete', n)) });
@@ -188,6 +197,8 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     s.scan = { ...s.scan!, collectors: { ...s.scan!.collectors,
       partial: [{ name: 'appops', count: 1 }] } };
     await tick();
+    expect(notesLine().textContent).toContain(t('notice.short.incomplete', { count: 0 }));
+    await openNotes();
     expect(screen.getByText(t('summary.incomplete', { count: 0, names: 'appops' }))).toBeTruthy();
   });
 
@@ -195,9 +206,12 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     const { s } = await scanned('clean');
     s.scan = { ...s.scan!, profiles: { others: [], known: false } };
     await tick();
+    expect(notesLine().textContent).toContain(t('notice.short.profiles_unknown'));
+    await openNotes();
     expect(screen.getByText(t('summary.profiles_unknown'))).toBeTruthy();
     s.scan = { ...s.scan!, profiles: { others: [], known: true } };
     await tick();
+    expect(screen.queryByRole('status', { name: 'Uwagi do skanu' })).toBeNull();
     expect(screen.queryByText(t('summary.profiles_unknown'))).toBeNull();
   });
 
@@ -206,6 +220,8 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     expect(screen.queryByText(t('summary.notifications_manual'))).toBeNull();
     s.device = { ...s.device!, sdk: 31 };
     await tick();
+    expect(notesLine().textContent).toContain(t('notice.short.notifications_manual'));
+    await openNotes();
     expect(screen.getByText(t('summary.notifications_manual'))).toBeTruthy();
     expect(screen.getByText(t('summary.select_level_disable'))).toBeTruthy();
     s.settings = { ...s.settings, select_level: 'remove' };
@@ -228,6 +244,8 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     s.scan = { ...s.scan!, low_behavior_data: true, usage_window_h: 1.5,
       profiles: { others: [10, 11], known: true } };
     await tick();
+    expect(notesLine().textContent).toContain(t('notice.short.low_data', { hours: '1.5' }));
+    await openNotes();
     expect(screen.getByText(t('summary.low_data', { hours: '1.5' }))).toBeTruthy();
     expect(t('summary.low_data', { hours: '1.5' })).toContain('1.5 h');
     expect(screen.getByText(t('summary.profiles', { ids: '10, 11' }))).toBeTruthy();

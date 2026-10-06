@@ -103,7 +103,7 @@
     "kind": { "overlay": "Okno nad {over}: {name} ({t} s)", "new_notification": "Nowe powiadomienie: {name} ({t} s)", "foreground": "Na pierwszym planie: {name} ({t} s)" }
   },
   "summary": {
-    "low_data": "Mało danych o zachowaniu (statystyki z {hours} h lub niedawny restart) — użyj telefonu kilkanaście minut, odtwórz problem i zeskanuj ponownie albo użyj „Kto to wyświetla?”.",
+    "low_data": "Mało danych o zachowaniu (statystyki z {hours} h lub niedawny restart) — użyj telefonu kilkanaście minut, odtwórz problem i zeskanuj ponownie albo użyj „Znajdź źródło reklamy”.",
     "profiles": "Na telefonie są inne profile użytkownika ({ids}) — ich aplikacje nie zostały sprawdzone.",
     "profiles_unknown": "Nie udało się odczytać listy profili użytkownika — sprawdzono tylko profil główny; aplikacje z innych profili (np. służbowego) mogły zostać pominięte.",
     "incomplete": "Ocena niepełna — nie udało się odczytać: {names}. Aplikacje, których to dotyczy: {count}. „Bez uwag” znaczy tu tylko „brak oznak w odczytanych danych”.",
@@ -113,6 +113,17 @@
     "undoing_app": "Cofam zmiany: {name}…",
     "undo_app_failed": "Nie udało się cofnąć zmian: {name}",
     "apk_running": "Analiza APK w tle: {done}/{total}"
+  },
+  "notice": {
+    "label": "Uwagi do skanu", "more": "Więcej", "less": "Zwiń",
+    "short": {
+      "low_data": "Mało danych o zachowaniu ({hours} h).",
+      "incomplete": "Ocena niepełna — aplikacje: {count}.",
+      "profiles": "Inne profile użytkownika nie zostały sprawdzone.",
+      "profiles_unknown": "Nie odczytano listy profili użytkownika.",
+      "notifications_manual": "Android 12: powiadomienia wyłączysz tylko na telefonie.",
+      "select_level_disable": "Domyślne „Wycisz” zamienione tu na „Wyłącz”."
+    }
   },
   "level": { "silence": "WYCISZ", "disable": "WYŁĄCZ", "remove": "USUŃ", "review": "SPRAWDŹ", "none": "—" },
   "verdict": { "malicious": "Szkodliwa", "suspicious": "Podejrzana", "review": "Do sprawdzenia", "safe": "Brak istotnych sygnałów" },

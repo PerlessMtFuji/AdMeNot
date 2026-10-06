@@ -103,7 +103,7 @@
     "kind": { "overlay": "Window over {over}: {name} ({t} s)", "new_notification": "New notification: {name} ({t} s)", "foreground": "In the foreground: {name} ({t} s)" }
   },
   "summary": {
-    "low_data": "Little behavior data ({hours} h of statistics or a recent reboot) — use the phone for a few minutes, reproduce the problem and scan again, or use “Who is showing this?”.",
+    "low_data": "Little behavior data ({hours} h of statistics or a recent reboot) — use the phone for a few minutes, reproduce the problem and scan again, or use “Find the ad source”.",
     "profiles": "The phone has other user profiles ({ids}) — their apps were not checked.",
     "profiles_unknown": "Could not read the list of user profiles — only the main profile was checked; apps in other profiles (e.g. a work profile) may have been missed.",
     "incomplete": "Incomplete assessment — could not read: {names}. Apps affected: {count}. “Without issues” here only means “no signs in the data that was read”.",
@@ -113,6 +113,17 @@
     "undoing_app": "Undoing changes: {name}…",
     "undo_app_failed": "Could not undo the changes: {name}",
     "apk_running": "APK analysis in the background: {done}/{total}"
+  },
+  "notice": {
+    "label": "Scan notes", "more": "More", "less": "Less",
+    "short": {
+      "low_data": "Little behavior data ({hours} h).",
+      "incomplete": "Incomplete assessment — apps: {count}.",
+      "profiles": "Other user profiles were not checked.",
+      "profiles_unknown": "Could not read the list of user profiles.",
+      "notifications_manual": "Android 12: notifications can only be turned off on the phone.",
+      "select_level_disable": "The default “Silence” is replaced with “Disable” here."
+    }
   },
   "level": { "silence": "SILENCE", "disable": "DISABLE", "remove": "REMOVE", "review": "CHECK", "none": "—" },
   "verdict": { "malicious": "Malicious", "suspicious": "Suspicious", "review": "Review", "safe": "No significant signals" },
