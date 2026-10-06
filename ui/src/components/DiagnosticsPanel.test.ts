@@ -1,8 +1,8 @@
-import { fireEvent, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { expect, test, vi } from 'vitest';
 import { renderWith } from '../test-utils';
-import WhoIsShowing from './WhoIsShowing.svelte';
+import DiagnosticsPanel from './DiagnosticsPanel.svelte';
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
@@ -11,7 +11,7 @@ test('who is showing: asks the phone and lists the packages literally', async ()
     resumed: { package: 'com.evil', name: '<b>Evil</b>' },
     overlays: [{ package: 'com.evil', name: '<b>Evil</b>' }], errors: [],
   });
-  await renderWith(WhoIsShowing, 'empty', { ask });
+  await renderWith(DiagnosticsPanel, 'empty', { ask });
   await fireEvent.click(screen.getByRole('button', { name: 'Kto to wyświetla?' }));
   expect(ask).toHaveBeenCalledOnce();
   expect((await screen.findAllByText('<b>Evil</b>', { exact: false })).length).toBeGreaterThan(0);
@@ -19,7 +19,7 @@ test('who is showing: asks the phone and lists the packages literally', async ()
 
 test('who is showing: an unread window list is unknown, never "no windows"', async () => {
   const ask = vi.fn().mockResolvedValue({ resumed: null, overlays: null, errors: ['windows: timeout'] });
-  await renderWith(WhoIsShowing, 'empty', { ask });
+  await renderWith(DiagnosticsPanel, 'empty', { ask });
   await fireEvent.click(screen.getByRole('button', { name: 'Kto to wyświetla?' }));
   expect(await screen.findByText('Nie udało się odczytać okien nad innymi aplikacjami.')).toBeTruthy();
   expect(screen.queryByText('Brak okien nad innymi aplikacjami.')).toBeNull();
@@ -27,7 +27,7 @@ test('who is showing: an unread window list is unknown, never "no windows"', asy
 });
 
 test('offers the screen view and a screenshot with the description', async () => {
-  const { s, bridge } = await renderWith(WhoIsShowing, 'empty', { ask: async () => ({ resumed: null, overlays: [], errors: [] }) });
+  const { s, bridge } = await renderWith(DiagnosticsPanel, 'empty', { ask: async () => ({ resumed: null, overlays: [], errors: [] }) });
   s.serial = 'R58T00TEST';
   await tick();
   await fireEvent.click(screen.getByRole('button', { name: 'Otwórz podgląd i poczekaj na reklamę' }));
@@ -41,7 +41,7 @@ test('offers the screen view and a screenshot with the description', async () =>
 });
 
 test('a screenshot saved with the description is confirmed right under the button', async () => {
-  const { s } = await renderWith(WhoIsShowing, 'empty', { ask: async () => ({ resumed: null, overlays: [], errors: [] }) });
+  const { s } = await renderWith(DiagnosticsPanel, 'empty', { ask: async () => ({ resumed: null, overlays: [], errors: [] }) });
   s.serial = 'R58T00TEST';
   await tick();
   await fireEvent.click(screen.getByRole('button', { name: 'Kto to wyświetla?' }));
@@ -55,7 +55,7 @@ test('a screenshot saved with the description is confirmed right under the butto
 });
 
 test('incident recording: mark the ad moment, then see who drew the window', async () => {
-  const { s, bridge } = await renderWith(WhoIsShowing, 'empty', { ask: async () => null });
+  const { s, bridge } = await renderWith(DiagnosticsPanel, 'empty', { ask: async () => null });
   s.device = { serial: 'S1' } as never;
   await tick();
   await fireEvent.click(screen.getByRole('button', { name: 'Nagraj zgłoszenie reklamy (2 min)' }));
@@ -73,11 +73,30 @@ test('incident recording: mark the ad moment, then see who drew the window', asy
 });
 
 test('incident recording without a mark says nothing was attributed', async () => {
-  const { s, bridge } = await renderWith(WhoIsShowing, 'empty', { ask: async () => null });
+  const { s, bridge } = await renderWith(DiagnosticsPanel, 'empty', { ask: async () => null });
   s.device = { serial: 'S1' } as never;
   s.incident = { recording: true, marks: 0, result: null };
   await tick();
   bridge.emit('incident:done', { marks: 0, hits: [] });
   await tick();
   expect(screen.getByText('Nie zaznaczono chwili reklamy — nic nie przypisano.')).toBeTruthy();
+});
+
+test('diagnostics: title and back closes the panel', async () => {
+  const { s } = await renderWith(DiagnosticsPanel, 'empty', { ask: async () => null });
+  s.diagnostics = true;
+  expect(screen.getByRole('heading', { name: 'Znajdź źródło reklamy' })).toBeTruthy();
+  await fireEvent.click(screen.getByRole('button', { name: 'Wróć' }));
+  expect(s.diagnostics).toBe(false);
+});
+
+test('recording and the who result survive closing and reopening the panel', async () => {
+  const first = await renderWith(DiagnosticsPanel, 'empty', { ask: async () => null });
+  first.s.device = { serial: 'S1' } as never;
+  first.s.incident = { recording: true, marks: 0, result: null };
+  first.s.who = { resumed: null, overlays: [], errors: [] };
+  first.unmount();
+  render(DiagnosticsPanel, { props: { ask: async () => null }, context: new Map([['ctl', first.ctl]]) });
+  expect(screen.getByRole('button', { name: 'Reklama jest teraz na ekranie' })).toBeTruthy();
+  expect(screen.getByText('Brak okien nad innymi aplikacjami.')).toBeTruthy();
 });

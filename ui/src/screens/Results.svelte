@@ -6,7 +6,7 @@
   import AppCard from '../components/AppCard.svelte';
   import EvidencePanel from '../components/EvidencePanel.svelte';
   import ExpertTable from '../components/ExpertTable.svelte';
-  import WhoIsShowing from '../components/WhoIsShowing.svelte';
+  import DiagnosticsPanel from '../components/DiagnosticsPanel.svelte';
   import InterruptedBanner from '../components/InterruptedBanner.svelte';
   import NoticeLine from '../components/NoticeLine.svelte';
   import PhoneThumb from '../components/PhoneThumb.svelte';
@@ -71,6 +71,10 @@
         {[s.client.trim(), s.device?.name].filter(Boolean).join(' · ')}
       </div>
       <div class="flex items-center gap-2">
+        <Button pressed={s.diagnostics} onclick={() => (s.diagnostics ? ctl.closeDiagnostics() : ctl.openDiagnostics())}>
+          <Icon name="scan-search" />{t('header.find_source')}
+          {#if s.incident.recording}<span data-recording class="h-2 w-2 rounded-full bg-bad" title={t('header.find_source_recording')}></span>{/if}
+        </Button>
         <Segmented label={t('results.mode')} value={s.settings.mode} options={modes} onchange={(m) => ctl.setMode(m)} />
         <Button onclick={() => ctl.newScan()}><Icon name="rotate-ccw" />{t('actions.rescan')}</Button>
       </div>
@@ -101,7 +105,6 @@
       </Banner>
     {/if}
     <NoticeLine items={noteItems} details={noteDetails} />
-    <WhoIsShowing ask={() => ctl.whoIsShowing()} />
 
     {#if expert}
       <ExpertTable {rows} {focused} {facets} />
@@ -140,12 +143,17 @@
       </section>
     {/if}
   </main>
-  <SidePanel width={expert ? 344 : undefined} label={expert && !s.plan ? t('evidence.title') : t('panel.plan')}>
+  <SidePanel width={expert ? 344 : undefined} label={s.plan ? t('panel.plan') : s.diagnostics ? t('diag.title') : expert ? t('evidence.title') : t('panel.plan')}>
     <div class="grid flex-1 grid-cols-1 grid-rows-1">
       {#if s.plan}
         <div class="col-start-1 row-start-1 flex min-h-0 flex-col gap-3"
           in:fade={{ duration: ms(DUR.panel) }} out:fade={{ duration: ms(DUR.panel) }}>
           <PlanConfirm />
+        </div>
+      {:else if s.diagnostics}
+        <div class="col-start-1 row-start-1 flex min-h-0 flex-col gap-3"
+          in:fade={{ duration: ms(DUR.panel) }} out:fade={{ duration: ms(DUR.panel) }}>
+          <DiagnosticsPanel ask={() => ctl.whoIsShowing()} />
         </div>
       {:else if expert}
         <div class="col-start-1 row-start-1 flex min-h-0 flex-col gap-3"

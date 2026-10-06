@@ -99,6 +99,7 @@ export class Controller {
       s.expanded = [];
       s.openGroups = {};
       s.diagnostics = false;
+      s.who = null;
       s.apk = { done: 0, total: 0, running: true, changed: [] };
       s.apkEstimate = null;
       s.apkQuestion = null;
@@ -262,7 +263,7 @@ export class Controller {
       phase: 'connect', screen: 'main', device: null, scan: null, result: null, order: null,
       plan: null, selection: {}, actedLog: {}, undoTarget: null, steps: [], disconnectedOrder: null, reports: {},
       categoryFilter: [], sourceFilter: null, lastShot: null, lastShotSerial: null, shotCount: 0,
-      openGroups: {}, diagnostics: false,
+      openGroups: {}, diagnostics: false, who: null,
     });
   }
 

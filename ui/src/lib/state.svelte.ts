@@ -1,7 +1,7 @@
 import { actedLevels, type ActedLog, type OpenGroups, type Phase } from './logic';
 import type {
   ApiErrorBody, ApkEstimate, ApkQuestion, Category, ConsoleEntry, DeviceEntry, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
-  PlanView, Question, ReportResult, ScanView, Settings, ShotsView, ShotView, StepEvent, UndoDone, Verdict,
+  PlanView, Question, ReportResult, ScanView, Settings, ShotsView, ShotView, StepEvent, UndoDone, Verdict, WhoView,
 } from './types';
 
 export type Screen = 'main' | 'history' | 'settings';
@@ -38,6 +38,7 @@ export class AppState {
   openGroups = $state<OpenGroups>({});
   /** Prawy panel pokazuje „Znajdź źródło reklamy" zamiast planu / szczegółów. */
   diagnostics = $state(false);
+  who = $state<WhoView | null>(null); // wynik „Kto to wyświetla?” — żyje do nowego skanu
   /** „Szczegóły techniczne" w panelu Eksperta — pamiętane do zamknięcia programu. */
   detailsOpen = $state(false);
   plan = $state<PlanView | null>(null);

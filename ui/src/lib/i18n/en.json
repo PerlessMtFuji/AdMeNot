@@ -16,7 +16,7 @@
     "plan": "Repair plan", "empty": "Select the apps you want to fix.", "unchanged": "no change"
   },
   "rail": { "label": "Menu", "new_order": "New order", "back_to_order": "Back to the order" },
-  "header": { "simple": "Simple", "expert": "Expert", "history": "History", "settings": "Settings" },
+  "header": { "find_source": "Find the ad source", "find_source_recording": "Incident recording in progress", "simple": "Simple", "expert": "Expert", "history": "History", "settings": "Settings" },
   "stage": { "label": "Stages", "connect": "Connection", "read": "Reading", "analyze": "Analysis", "fix": "Repair", "report": "Report" },
   "connect": {
     "title": { "none": "Connect the phone", "unauthorized": "Confirm on the phone", "offline": "Unplug and reconnect the cable", "ready": "Connected", "many": "Choose a phone", "adb_missing": "adb not found" },
@@ -85,6 +85,7 @@
   "phone": {
     "subject": "Device", "serial": "S/N", "patch": "Patch"
   },
+  "diag": { "title": "Find the ad source", "back": "Back", "mirror_hint": "The phone screen on the computer — easier to catch the moment of the ad." },
   "who": {
     "button": "Who is showing this?",
     "hint": "Reproduce the problem on the phone (e.g. unlock and wait for the ad), then click.",

@@ -16,7 +16,7 @@
     "plan": "Plan naprawy", "empty": "Zaznacz aplikacje, które chcesz naprawić.", "unchanged": "bez zmian"
   },
   "rail": { "label": "Menu", "new_order": "Nowe zlecenie", "back_to_order": "Wróć do zlecenia" },
-  "header": { "simple": "Prosty", "expert": "Ekspert", "history": "Historia", "settings": "Ustawienia" },
+  "header": { "find_source": "Znajdź źródło reklamy", "find_source_recording": "Trwa nagrywanie zgłoszenia", "simple": "Prosty", "expert": "Ekspert", "history": "Historia", "settings": "Ustawienia" },
   "stage": { "label": "Etapy", "connect": "Połączenie", "read": "Odczyt", "analyze": "Analiza", "fix": "Naprawa", "report": "Protokół" },
   "connect": {
     "title": { "none": "Podłącz telefon", "unauthorized": "Potwierdź na telefonie", "offline": "Odłącz i podłącz kabel", "ready": "Połączono", "many": "Wybierz telefon", "adb_missing": "Brak programu adb" },
@@ -85,6 +85,7 @@
   "phone": {
     "subject": "Przedmiot zlecenia", "serial": "S/N", "patch": "Poprawka"
   },
+  "diag": { "title": "Znajdź źródło reklamy", "back": "Wróć", "mirror_hint": "Podgląd ekranu telefonu na komputerze — łatwiej złapać chwilę reklamy." },
   "who": {
     "button": "Kto to wyświetla?",
     "hint": "Odtwórz problem na telefonie (np. odblokuj i poczekaj na reklamę), a potem kliknij.",

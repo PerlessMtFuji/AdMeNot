@@ -295,4 +295,17 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     expect(await screen.findByText(
       'Analiza pobierze ok. 30 MB (2 z 89 aplikacji, pozostałe są już na komputerze).')).toBeTruthy();
   });
+
+  test('find the ad source: header button swaps the side panel, back and the plan close it', async () => {
+    const { s } = await scanned();
+    expect(screen.queryByRole('button', { name: 'Kto to wyświetla?' })).toBeNull();
+    await fireEvent.click(screen.getByRole('button', { name: 'Znajdź źródło reklamy' }));
+    const panel = screen.getByRole('complementary', { name: 'Znajdź źródło reklamy' });
+    expect(within(panel).getByRole('button', { name: 'Kto to wyświetla?' })).toBeTruthy();
+    await fireEvent.click(within(panel).getByRole('button', { name: 'Wróć' }));
+    expect(screen.getByRole('complementary', { name: 'Plan naprawy' })).toBeTruthy();
+    s.incident = { recording: true, marks: 0, result: null };
+    await tick();
+    expect(screen.getByRole('button', { name: 'Znajdź źródło reklamy' }).querySelector('[data-recording]')).not.toBeNull();
+  });
 });
