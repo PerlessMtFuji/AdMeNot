@@ -34,7 +34,8 @@ describe('Results', () => {
     expect(screen.getByRole('heading', { name: tp('results.title', flagged.length) })).toBeTruthy();
     const boost = s.scan!.apps.find((a) => a.package === 'com.clean.pro.boost')!;
     const card = screen.getByRole('article', { name: boost.name });
-    expect(within(card).getByText(t(`category.${boost.symptoms[0].category}`))).toBeTruthy();
+    expect(within(card).getByTestId('reasons')).toBeTruthy();
+    await fireEvent.click(within(card).getByRole('button', { name: 'Dlaczego?' }));
     expect(within(card).getByText(boost.symptoms[0].text)).toBeTruthy();
     const panel = screen.getByRole('complementary', { name: 'Plan naprawy' });
     const count = Object.keys(s.selection).length;

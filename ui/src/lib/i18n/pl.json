@@ -8,7 +8,7 @@
     "mode": "Tryb widoku", "action_for": "Akcja dla {name}",
     "clean_title": "Nie wykryto oznak zagrożenia", "clean_title_incomplete": "Nie wykryto oznak zagrożenia — ocena niepełna", "clean_sub": "W zakresie wykonanego skanu · sprawdzone aplikacje: {count}",
     "safe_show": "Pokaż listę", "safe_hide": "Zwiń listę", "safe_list": "Aplikacje bez uwag",
-    "incomplete": "Ocena niepełna",
+    "incomplete": "Ocena niepełna", "why": "Dlaczego?",
     "safe_incomplete": { "one": "w tym {count} z oceną niepełną", "few": "w tym {count} z oceną niepełną", "many": "w tym {count} z oceną niepełną", "other": "w tym {count} z oceną niepełną" }
   },
   "panel": {

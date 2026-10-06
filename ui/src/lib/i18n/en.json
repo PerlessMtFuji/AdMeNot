@@ -8,7 +8,7 @@
     "mode": "View mode", "action_for": "Action for {name}",
     "clean_title": "No signs of a threat", "clean_title_incomplete": "No signs of a threat — incomplete assessment", "clean_sub": "Within the scope of this scan · apps checked: {count}",
     "safe_show": "Show the list", "safe_hide": "Hide the list", "safe_list": "Apps without issues",
-    "incomplete": "Incomplete assessment",
+    "incomplete": "Incomplete assessment", "why": "Why?",
     "safe_incomplete": { "one": "incl. {count} with an incomplete assessment", "few": "incl. {count} with an incomplete assessment", "many": "incl. {count} with an incomplete assessment", "other": "incl. {count} with an incomplete assessment" }
   },
   "panel": {
