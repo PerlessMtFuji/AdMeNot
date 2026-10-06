@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t } from '../lib/i18n/index.svelte';
-    import { initial } from '../lib/logic';
+  import { initial } from '../lib/logic';
   import type { AppView, Level } from '../lib/types';
   import Button from '../ui/Button.svelte';
   import Card from '../ui/Card.svelte';

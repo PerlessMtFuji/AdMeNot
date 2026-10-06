@@ -38,3 +38,20 @@ test('category name appears as a tooltip on hover and on focus', async () => {
     expect(screen.getByRole('tooltip').textContent).toBe('Pochodzenie');
   } finally { vi.useRealTimers(); }
 });
+
+test('focusable=false removes the tab stop but keeps the hover tooltip', async () => {
+  vi.useFakeTimers();
+  try {
+    render(ReasonTiles, { props: { app, focusable: false } });
+    const [first] = screen.getAllByRole('img');
+    expect(first.hasAttribute('tabindex')).toBe(false);
+    await fireEvent.mouseEnter(first.closest('[data-tooltip-host]')!);
+    await vi.advanceTimersByTimeAsync(350);
+    expect(screen.getByRole('tooltip').textContent).toBe('Reklamy');
+  } finally { vi.useRealTimers(); }
+});
+
+test('tiles are focusable by default', () => {
+  render(ReasonTiles, { props: { app } });
+  expect(screen.getAllByRole('img').every((x) => x.getAttribute('tabindex') === '0')).toBe(true);
+});

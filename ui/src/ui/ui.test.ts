@@ -82,11 +82,11 @@ describe('Tooltip', () => {
     vi.useFakeTimers();
     try {
       const trigger = setup();
-      await fireEvent.mouseEnter(trigger.closest('.relative')!);
+      await fireEvent.mouseEnter(trigger.closest('[data-tooltip-host]')!);
       expect(screen.queryByRole('tooltip')).toBeNull();
       await vi.advanceTimersByTimeAsync(350);
       expect(screen.getByRole('tooltip').textContent).toBe('Podpowiedź');
-      await fireEvent.mouseLeave(trigger.closest('.relative')!);
+      await fireEvent.mouseLeave(trigger.closest('[data-tooltip-host]')!);
       expect(screen.queryByRole('tooltip')).toBeNull();
     } finally { vi.useRealTimers(); }
   });
@@ -95,9 +95,9 @@ describe('Tooltip', () => {
     vi.useFakeTimers();
     try {
       const trigger = setup();
-      await fireEvent.mouseEnter(trigger.closest('.relative')!);
+      await fireEvent.mouseEnter(trigger.closest('[data-tooltip-host]')!);
       await vi.advanceTimersByTimeAsync(100);
-      await fireEvent.mouseLeave(trigger.closest('.relative')!);
+      await fireEvent.mouseLeave(trigger.closest('[data-tooltip-host]')!);
       await vi.advanceTimersByTimeAsync(500);
       expect(screen.queryByRole('tooltip')).toBeNull();
     } finally { vi.useRealTimers(); }
@@ -118,6 +118,24 @@ describe('Tooltip', () => {
       expect(screen.getByRole('tooltip')).toBeTruthy();
       trigger.blur();
       await tick();
+      expect(screen.queryByRole('tooltip')).toBeNull();
+    } finally { vi.useRealTimers(); }
+  });
+
+  test('hides on click and on scroll so no stale bubble stays', async () => {
+    vi.useFakeTimers();
+    try {
+      const trigger = setup();
+      const host = trigger.closest('[data-tooltip-host]')!;
+      await fireEvent.mouseEnter(host);
+      await vi.advanceTimersByTimeAsync(350);
+      expect(screen.getByRole('tooltip')).toBeTruthy();
+      await fireEvent.click(trigger);
+      expect(screen.queryByRole('tooltip')).toBeNull();
+      await fireEvent.mouseEnter(host);
+      await vi.advanceTimersByTimeAsync(350);
+      expect(screen.getByRole('tooltip')).toBeTruthy();
+      await fireEvent.scroll(document.body);
       expect(screen.queryByRole('tooltip')).toBeNull();
     } finally { vi.useRealTimers(); }
   });

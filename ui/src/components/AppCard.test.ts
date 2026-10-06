@@ -30,6 +30,7 @@ test('app card: reason tiles with “Why?” beside them, symptoms behind it', a
   const reasons = screen.getByTestId('reasons');
   expect(within(reasons).getAllByRole('img').map((x) => x.getAttribute('aria-label'))).toEqual(['Reklamy', 'Pochodzenie']);
   expect(reasons.textContent).not.toContain('Administrator urządzenia');
+  expect(within(reasons).getAllByRole('img').every((x) => x.getAttribute('tabindex') === '0')).toBe(true);
   expect(within(reasons).getByRole('button', { name: 'Dlaczego?' })).toBeTruthy();
   expect(screen.queryByText('Szkodliwa')).toBeNull(); // werdykt mówi sekcja
   expect(screen.queryByText('Pokazuje <b>reklamy</b>.')).toBeNull();

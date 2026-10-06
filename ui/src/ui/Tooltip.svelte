@@ -23,11 +23,19 @@
     visible = false;
   }
 
+  // Przewijanie (także wewnętrznych kontenerów) zostawiłoby dymek w starym miejscu.
+  $effect(() => {
+    if (!visible) return;
+    window.addEventListener('scroll', hide, true);
+    return () => window.removeEventListener('scroll', hide, true);
+  });
+
   onDestroy(() => clearTimeout(timer));
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<span bind:this={host} class="relative inline-flex {cls}" onmouseenter={show} onmouseleave={hide}
+<span bind:this={host} data-tooltip-host class="relative inline-flex {cls}" onmouseenter={show} onmouseleave={hide}
+  onpointerdown={hide} onclick={hide}
   onfocusin={show} onfocusout={hide} onkeydown={(e) => { if (e.key === 'Escape') hide(); }}>
   {@render children()}
   {#if visible}

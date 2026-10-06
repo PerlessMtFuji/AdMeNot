@@ -411,6 +411,7 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     expect(within(row).getAllByRole('img').map((x) => x.getAttribute('aria-label')))
       .toEqual(boost.symptoms.map((sy) => t(`category.${sy.category}`)));
     expect(row.querySelector('[data-more]')).toBeNull();
+    expect(within(row).getAllByRole('img').some((x) => x.hasAttribute('tabindex'))).toBe(false);
   });
 
   test('simple side panel lists only apps with an action, no "bez zmian"', async () => {

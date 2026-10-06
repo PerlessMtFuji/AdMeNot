@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getContext, tick } from 'svelte';
-    import type { Controller } from '../lib/controller';
+  import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
   import { groupOpen, initial, LEVEL_TONE, moveFocus } from '../lib/logic';
   import type { AppView, Category, Level, Verdict } from '../lib/types';
@@ -107,7 +107,7 @@
                   aria-label={t('summary.undo_app', { name: a.name })} onclick={(e) => { e.stopPropagation(); void ctl.undoApp(a.package); }}>{t('history.undo_changes')}</button>{/if}</span></div>
             </div>
           </td>
-          <td class="px-3 py-3"><ReasonTiles app={a} /></td>
+          <td class="px-3 py-3"><ReasonTiles app={a} focusable={false} /></td>
           <td class="px-3 py-3 whitespace-nowrap"><div class="flex items-center gap-2">
             <b class="mono {SCORE[a.verdict]}">{a.score}</b>
             <span class="h-1.5 w-12 overflow-hidden rounded-full bg-neutral-soft shadow-[var(--shadow-well)]"><i class="block h-full rounded-full {BAR[a.verdict]}" style="width: {a.score}%"></i></span>

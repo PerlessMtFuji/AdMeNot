@@ -26,7 +26,7 @@
     sm: 'rounded-[10px] px-3 py-1.5 text-sm',
     md: 'rounded-xl px-4 py-2.5',
     lg: 'rounded-[14px] px-5 py-3 text-md',
-    icon: 'rounded-xl p-2.5', // sam symbol, nazwę niesie aria-label i podpowiedź
+    icon: 'aspect-square h-[calc(1.25rem+var(--text-base)*1.5)] rounded-xl p-0', // wysokość jak md (py-2.5 + linia tekstu); sam symbol, nazwę niesie aria-label i podpowiedź
   };
 </script>
 
