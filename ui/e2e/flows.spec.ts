@@ -100,9 +100,14 @@ test('find the ad source opens in the side panel and comes back to the plan', as
   await scan(page, 'adware');
   await page.getByRole('button', { name: 'Znajdź źródło reklamy' }).click();
   const panel = page.getByRole('complementary', { name: 'Znajdź źródło reklamy' });
-  await expect(panel.getByRole('button', { name: 'Kto to wyświetla?' })).toBeVisible();
+  await panel.getByRole('button', { name: 'Kto to wyświetla?' }).click();
+  await expect(panel.getByRole('status')).toBeVisible();
+  const result = await panel.getByRole('status').innerText();
   await panel.getByRole('button', { name: 'Wróć' }).click();
   await expect(page.getByRole('complementary', { name: 'Plan naprawy' })).toBeVisible();
+  // Wynik zostaje po powrocie do panelu (spec §4).
+  await page.getByRole('button', { name: 'Znajdź źródło reklamy' }).click();
+  await expect(panel.getByRole('status')).toHaveText(result);
 });
 
 test('repair cards keep their full height when the order is longer than the window', async ({ page }) => {

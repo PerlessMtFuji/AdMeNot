@@ -42,8 +42,9 @@
           {#if onundo}<Button variant="ghost" size="sm" disabled={busy} label={t('summary.undo_app', { name: app.name })}
             onclick={onundo}><Icon name="undo-2" size={14} />{t('history.undo_changes')}</Button>{/if}{/if}
       </div>
-      <div data-testid="reasons" class="truncate text-xs text-mut">
-        {reasons.items.map((r) => r.label).join(' · ')}{#if reasons.more.length}<span class="text-soft"> · +{reasons.more.length}</span>{/if}
+      <div data-testid="reasons" class="flex min-w-0 text-xs text-mut">
+        <span class="truncate">{reasons.items.map((r) => r.label).join(' · ')}</span>
+        {#if reasons.more.length}<span data-more class="flex-none whitespace-pre text-soft"> · +{reasons.more.length}</span>{/if}
       </div>
       {#if app.symptoms.length}
         <button type="button" class="mt-0.5 text-xs font-semibold text-accent hover:underline" aria-expanded={open}

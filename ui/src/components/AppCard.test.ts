@@ -30,6 +30,10 @@ test('app card: one compact line with two reasons, symptoms behind “Why?”', 
   expect(reasons.textContent).toContain('Administrator urządzenia');
   expect(reasons.textContent).toContain('Okna nad innymi aplikacjami');
   expect(reasons.textContent).toContain('+1');
+  // „+N” to osobny węzeł poza obciętą listą powodów, więc nie ginie przy długich etykietach
+  const more = reasons.querySelector('[data-more]')!;
+  expect(more.textContent).toContain('+1');
+  expect(more.closest('.truncate')).toBeNull();
   expect(screen.queryByText('Szkodliwa')).toBeNull(); // werdykt mówi sekcja
   expect(screen.queryByText('Pokazuje <b>reklamy</b>.')).toBeNull();
   const why = screen.getByRole('button', { name: 'Dlaczego?' });

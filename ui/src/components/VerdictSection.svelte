@@ -15,7 +15,7 @@
 <section id="group-{verdict}" aria-label={label} class="flex flex-col gap-2.5">
   <div class="flex items-center gap-2 text-xs font-bold tracking-wide text-soft uppercase">
     {#if collapsible}
-      <button type="button" class="flex flex-1 items-center gap-2 text-left hover:text-ink" aria-expanded={open} onclick={ontoggle}>
+      <button type="button" class="flex flex-1 items-center gap-2 text-left uppercase hover:text-ink" aria-expanded={open} onclick={ontoggle}>
         <Pill tone={VERDICT_TONE[verdict]}>{label}</Pill><span class="mono">{count}</span>
         <span class="ml-auto flex items-center gap-1 normal-case">{open ? t('groups.hide') : t('groups.show')}
           <Icon name="chevron-down" size={14} class="transition-transform duration-150 {open ? 'rotate-180' : ''}" /></span>

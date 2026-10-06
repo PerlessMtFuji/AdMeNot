@@ -14,7 +14,7 @@ test('nothing to say: no line at all', () => {
 
 test('one line with the first short note and +N; More shows every full text and details', async () => {
   render(NoticeLine, { props: { items: [warn, info], details: { low_data: ['adb: timeout'] } } });
-  const line = screen.getByRole('status', { name: 'Uwagi do skanu' });
+  const line = screen.getByRole('region', { name: 'Uwagi do skanu' });
   expect(line.textContent).toContain(t('notice.short.low_data', { hours: '1.5' }));
   expect(line.textContent).toContain('+1');
   expect(screen.queryByText(t('summary.notifications_manual'))).toBeNull();
@@ -28,9 +28,17 @@ test('one line with the first short note and +N; More shows every full text and 
   expect(screen.queryByText(t('summary.notifications_manual'))).toBeNull();
 });
 
+test('only the short text is a live region, not the expanding list', async () => {
+  render(NoticeLine, { props: { items: [warn, info] } });
+  const live = screen.getByRole('status');
+  expect(live.textContent).toContain(t('notice.short.low_data', { hours: '1.5' }));
+  await fireEvent.click(screen.getByRole('button', { name: 'Więcej' }));
+  expect(live.contains(screen.getByText(t('summary.notifications_manual')))).toBe(false);
+});
+
 test('info only: neutral tone, no +N for a single note', () => {
   render(NoticeLine, { props: { items: [info] } });
-  const line = screen.getByRole('status', { name: 'Uwagi do skanu' });
+  const line = screen.getByRole('region', { name: 'Uwagi do skanu' });
   expect(line.dataset.tone).toBe('info');
   expect(line.textContent).not.toContain('+');
 });
