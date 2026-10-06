@@ -53,13 +53,17 @@
   const DANGER: Verdict[] = ['malicious', 'suspicious'];
   const simpleGroups = $derived(verdictGroups(apps));
   const isOpen = (v: Verdict, searching = false) => groupOpen(v, s.settings.mode, s.openGroups, searching);
-  // Liczniki filtrów rodzaju i źródła liczone po przełączniku i wyszukiwarce, przed samymi filtrami.
-  const base = $derived(visibleApps(apps, { showAll: s.showAll, verdict: 'all', query: s.query }));
-  const facets = $derived(facetCounts(base));
-  const rows = $derived(visibleApps(base, { showAll: true, verdict: 'all', query: '',
+  // Liczniki filtrów rodzaju i źródła liczone po wyszukiwarce, przed samymi filtrami.
+  const searched = $derived(visibleApps(apps, { showAll: true, verdict: 'all', query: s.query }));
+  const facets = $derived(facetCounts(searched));
+  const rows = $derived(visibleApps(searched, { showAll: true, verdict: 'all', query: '',
     categories: s.categoryFilter, source: s.sourceFilter }));
-  const focused = $derived(focusedApp(rows.map((r) => r.package), s.focused));
-  const focusedRow = $derived(rows.find((r) => r.package === focused) ?? null);
+  const searching = $derived(s.query.trim() !== '' || s.categoryFilter.length > 0 || s.sourceFilter !== null);
+  const expertGroups = $derived(verdictGroups(rows));
+  const navRows = $derived(expertGroups.filter((g) => isOpen(g.verdict, searching)).flatMap((g) => g.apps));
+  const focused = $derived(focusedApp(navRows.map((r) => r.package), s.focused));
+  const focusedRow = $derived(navRows.find((r) => r.package === focused) ?? null);
+  const safeGroup = $derived(simpleGroups.find((g) => g.verdict === 'safe')!);
   const titleParts = $derived(tp('results.title', flagged.length, { count: '\u0000' }).split('\u0000'));
   const modes = $derived([{ value: 'simple' as Mode, label: t('header.simple') },
     { value: 'expert' as Mode, label: t('header.expert') }]);
@@ -109,8 +113,8 @@
     {/if}
     <NoticeLine items={noteItems} details={noteDetails} />
 
-    {#if expert}
-      <ExpertTable {rows} {focused} {facets} />
+    {#if expert && flagged.length > 0}
+      <ExpertTable groups={expertGroups} {focused} {facets} {searching} {navRows} />
     {:else if flagged.length === 0}
       <div class="grid place-items-center gap-2 py-10 text-center" in:enter>
         {#if anyIncomplete}
@@ -141,10 +145,10 @@
         {/if}
       {/each}
     {/if}
-    {#if !expert && simpleGroups[3].apps.length}
-      <VerdictSection verdict="safe" count={simpleGroups[3].apps.length} open={isOpen('safe')} collapsible
+    {#if (!expert || flagged.length === 0) && safeGroup.apps.length}
+      <VerdictSection verdict="safe" count={safeGroup.apps.length} open={isOpen('safe')} collapsible
         ontoggle={() => ctl.setGroupOpen('safe', !isOpen('safe'))}>
-        {#each simpleGroups[3].apps as app (app.package)}
+        {#each safeGroup.apps as app (app.package)}
           <AppCard {app} level={s.selection[app.package] ?? null} done={s.acted[app.package] ?? null} busy={s.orderRunning}
             onundo={() => ctl.undoApp(app.package)} onlevel={(level) => ctl.setLevel(app.package, level)} ontoggle={() => ctl.toggle(app)} />
         {/each}

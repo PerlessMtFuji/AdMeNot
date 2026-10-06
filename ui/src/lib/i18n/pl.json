@@ -131,6 +131,7 @@
   "level": { "silence": "WYCISZ", "disable": "WYŁĄCZ", "remove": "USUŃ", "review": "SPRAWDŹ", "none": "—" },
   "verdict": { "malicious": "Szkodliwa", "suspicious": "Podejrzana", "review": "Do sprawdzenia", "safe": "Brak istotnych sygnałów" },
   "expert": {
+    "filters": "Filtry", "filters_active": "Filtry · {count}", "col_reason": "Powód", "search_in": "Szukaj w {count} aplikacjach…",
     "malicious": "Szkodliwe", "suspicious": "Podejrzane", "non_play": "Spoza Play", "admins": "Admin urządz.",
     "col_app": "Aplikacja", "col_problems": "Problemy", "col_score": "Wynik", "col_source": "Źródło", "col_action": "Akcja",
     "search": "Szukaj aplikacji lub pakietu",

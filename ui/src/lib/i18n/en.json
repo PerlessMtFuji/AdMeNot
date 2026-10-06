@@ -131,6 +131,7 @@
   "level": { "silence": "SILENCE", "disable": "DISABLE", "remove": "REMOVE", "review": "CHECK", "none": "—" },
   "verdict": { "malicious": "Malicious", "suspicious": "Suspicious", "review": "Review", "safe": "No significant signals" },
   "expert": {
+    "filters": "Filters", "filters_active": "Filters · {count}", "col_reason": "Reason", "search_in": "Search {count} apps…",
     "malicious": "Malicious", "suspicious": "Suspicious", "non_play": "Outside Play", "admins": "Device admins",
     "col_app": "App", "col_problems": "Problems", "col_score": "Score", "col_source": "Source", "col_action": "Action",
     "search": "Search app or package",

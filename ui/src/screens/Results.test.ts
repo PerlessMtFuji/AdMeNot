@@ -70,16 +70,14 @@ describe('Results', () => {
   });
 
   test('clean phone: the clean state, no empty danger lines, folded “no issues”', async () => {
-    const { s, ctl } = await scanned('clean');
-    // Tryb Ekspert wróci w Task 7.
-    for (const mode of ['simple'] as const) {
+    const { ctl } = await scanned('clean');
+    for (const mode of ['simple', 'expert'] as const) {
       await ctl.setMode(mode);
       await tick();
       expect(screen.getByRole('heading', { name: 'Nie wykryto oznak zagrożenia' })).toBeTruthy();
       expect(screen.queryByRole('region', { name: 'Szkodliwe' })).toBeNull();
       expect(screen.getByRole('button', { name: /^Bez uwag/ }).getAttribute('aria-expanded')).toBe('false');
     }
-    void s;
   });
 
   test('nothing selected: the panel says so and the fix button is disabled', async () => {
@@ -106,10 +104,13 @@ describe('Results', () => {
     await vi.waitFor(() => expect(s.settings.mode).toBe('expert'));
   });
 
-  test('expert mode: tiles, filter, search, keyboard, evidence panel', async () => {
+  test('expert mode: sections, search, keyboard, evidence panel', async () => {
     const { s, ctl } = await scanned();
     await ctl.setMode('expert');
     await tick();
+    expect(screen.queryByText('Spoza Play')).toBeNull(); // bez kafelków
+    expect(screen.queryByRole('columnheader', { name: 'Problemy' })).toBeNull();
+    expect(screen.getByRole('columnheader', { name: 'Powód' })).toBeTruthy();
     expect(screen.getByRole('columnheader', { name: 'Aplikacja' })).toBeTruthy();
     const flagged = s.scan!.apps.filter((a) => a.verdict !== 'safe');
     expect(appRows()).toHaveLength(flagged.length + 1);
@@ -124,18 +125,24 @@ describe('Results', () => {
     const before = s.focused! in s.selection;
     await fireEvent.keyDown(table, { key: ' ' });
     expect(s.focused! in s.selection).toBe(!before);
-    await fireEvent.input(screen.getByRole('searchbox'), { target: { value: 'forecast' } });
+    await fireEvent.input(screen.getByRole('searchbox', { name: 'Szukaj aplikacji lub pakietu' }), { target: { value: 'forecast' } });
     expect(appRows()).toHaveLength(2);
     expect(within(panel).getByText('com.wlive.forecast')).toBeTruthy();
     await fireEvent.input(screen.getByRole('searchbox'), { target: { value: 'zzz-nothing' } });
-    expect(appRows()).toHaveLength(1);
+    expect(within(screen.getByRole('group', { name: 'Tabela aplikacji' })).queryAllByRole('row')).toHaveLength(0);
     expect(within(panel).getByText('Wybierz aplikację w tabeli.')).toBeTruthy();
     await fireEvent.keyDown(table, { key: 'ArrowUp' });
     await fireEvent.input(screen.getByRole('searchbox'), { target: { value: '' } });
     await fireEvent.change(screen.getByRole('combobox', { name: 'Akcja com.wlive.forecast' }),
       { target: { value: 'silence' } });
     expect(s.selection['com.wlive.forecast']).toBe('silence');
-    await fireEvent.click(screen.getByRole('button', { name: `Wszystkie · ${s.scan!.apps.length}` }));
+    const safeApp = s.scan!.apps.find((a) => a.verdict === 'safe')!;
+    await fireEvent.input(screen.getByRole('searchbox'), { target: { value: safeApp.package } });
+    expect(screen.getByRole('checkbox', { name: safeApp.package })).toBeTruthy(); // zwinięta grupa sama się rozwija
+    expect(s.openGroups.safe).toBeUndefined();
+    await fireEvent.input(screen.getByRole('searchbox'), { target: { value: '' } });
+    expect(screen.queryByRole('checkbox', { name: safeApp.package })).toBeNull();
+    await fireEvent.click(screen.getByRole('button', { name: /^Bez uwag/ }));
     expect(appRows()).toHaveLength(s.scan!.apps.length + 1);
   });
   test('expert filters: problem type chips and source list narrow the table, clear brings it back', async () => {
@@ -143,25 +150,43 @@ describe('Results', () => {
     await ctl.setMode('expert');
     await tick();
     const flagged = s.scan!.apps.filter((a) => a.verdict !== 'safe');
+    const menu = screen.getByRole('button', { name: 'Filtry' });
+    expect(menu.getAttribute('aria-expanded')).toBe('false');
+    await fireEvent.click(menu);
     const types = screen.getByRole('group', { name: 'Rodzaj problemu' });
     const ads = within(types).getByRole('button', { name: /^Reklamy/ });
     expect(ads.getAttribute('aria-pressed')).toBe('false');
     await fireEvent.click(ads);
     expect(ads.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Filtry · 1' })).toBeTruthy();
     expect(appRows()).toHaveLength(2);
     expect(screen.getByRole('checkbox', { name: 'com.clean.pro.boost' })).toBeTruthy();
     const source = screen.getByRole('combobox', { name: 'Filtr źródła' });
     expect(within(source).getByRole('option', { name: 'Wszystkie źródła' })).toBeTruthy();
     await fireEvent.change(source, { target: { value: 'Sklep Play' } });
-    expect(appRows()).toHaveLength(1);
+    expect(within(screen.getByRole('group', { name: 'Tabela aplikacji' })).queryAllByRole('row')).toHaveLength(0);
     expect(screen.getByText('Brak aplikacji pasujących do filtrów.')).toBeTruthy();
+    await fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('group', { name: 'Rodzaj problemu' })).toBeNull();
     await fireEvent.click(screen.getByRole('button', { name: 'Wyczyść filtry' }));
     expect(appRows()).toHaveLength(flagged.length + 1);
     expect(s.categoryFilter).toEqual([]);
     expect(s.sourceFilter).toBeNull();
-    await fireEvent.change(source, { target: { value: 'Chrome' } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Filtry' }));
+    await fireEvent.change(screen.getByRole('combobox', { name: 'Filtr źródła' }), { target: { value: 'Chrome' } });
     ctl.newScan();
     expect(s.sourceFilter).toBeNull();
+  });
+
+  test('expert reason column: strongest finding in words, +N with the other categories', async () => {
+    const { s, ctl } = await scanned();
+    await ctl.setMode('expert');
+    await tick();
+    const boost = s.scan!.apps.find((a) => a.package === 'com.clean.pro.boost')!;
+    const row = screen.getByRole('checkbox', { name: boost.package }).closest('tr')!;
+    const best = [...boost.findings].filter((f) => f.category !== 'combo').sort((a, b) => b.weight - a.weight)[0];
+    expect(row.textContent).toContain(best.label);
+    expect(row.querySelector('[data-more]')?.getAttribute('title')).toBeTruthy();
   });
 
   test('expert table: keys typed in a row control stay there, arrows keep the focused row in view', async () => {

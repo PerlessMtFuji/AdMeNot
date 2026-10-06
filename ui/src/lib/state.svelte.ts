@@ -27,7 +27,6 @@ export class AppState {
   selection = $state<Record<string, Level>>({});
   touched = $state<string[]>([]);
   unlocked = $state<string[]>([]);
-  showAll = $state(false);
   verdictFilter = $state<Verdict | 'all'>('all');
   query = $state('');
   categoryFilter = $state<Category[]>([]);
