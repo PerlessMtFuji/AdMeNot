@@ -182,7 +182,7 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     const n = s.scan!.apps.length;
     expect(screen.queryByRole('heading', { name: t('results.clean_title') })).toBeNull();
     expect(screen.getByRole('heading', { name: t('results.clean_title_incomplete') })).toBeTruthy();
-    expect(notesLine().textContent).toContain(t('notice.short.incomplete', { count: n }));
+    expect(notesLine().textContent).toContain(t('notice.short.incomplete'));
     await openNotes();
     expect(screen.getByText(t('summary.incomplete', { count: n, names: GAP.label }))).toBeTruthy();
     const panel = screen.getByRole('complementary', { name: 'Plan naprawy' });
@@ -197,9 +197,22 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     s.scan = { ...s.scan!, collectors: { ...s.scan!.collectors,
       partial: [{ name: 'appops', count: 1 }] } };
     await tick();
-    expect(notesLine().textContent).toContain(t('notice.short.incomplete', { count: 0 }));
+    expect(notesLine().textContent).toContain(t('notice.short.incomplete'));
     await openNotes();
     expect(screen.getByText(t('summary.incomplete', { count: 0, names: 'appops' }))).toBeTruthy();
+  });
+
+  test('collector errors under the incomplete note: expert only', async () => {
+    const { s, ctl } = await scanned('clean');
+    devicePolicyFailed(s);
+    await tick();
+    const line = t('expert.collector_failed', { name: 'device_policy', error: 'timeout' });
+    await openNotes();
+    expect(screen.queryByText(line)).toBeNull();
+    await ctl.setMode('expert');
+    await tick();
+    await openNotes();
+    expect(screen.getByText(line)).toBeTruthy();
   });
 
   test('unknown profile list gets its own banner; a known single profile does not', async () => {

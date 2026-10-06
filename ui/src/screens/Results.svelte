@@ -91,7 +91,6 @@
     {/if}
     <ApkSpace />
     {#if s.interrupted.length}<InterruptedBanner orders={s.interrupted} />{/if}
-    <NoticeLine items={noteItems} details={noteDetails} />
     {#if undoName && s.job?.kind === 'undo'}
       <Banner tone="info" icon="undo-2" title={t('summary.undoing_app', { name: undoName })}>
         {#if s.undoSteps.length}<StepTimeline steps={s.undoSteps} />{/if}
@@ -101,6 +100,7 @@
         <ul class="list-disc pl-5 text-sm">{#each s.undoResult.errors as e (e)}<li>{e}</li>{/each}</ul>
       </Banner>
     {/if}
+    <NoticeLine items={noteItems} details={noteDetails} />
     <WhoIsShowing ask={() => ctl.whoIsShowing()} />
 
     {#if expert}

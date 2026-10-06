@@ -118,7 +118,7 @@
     "label": "Uwagi do skanu", "more": "Więcej", "less": "Zwiń",
     "short": {
       "low_data": "Mało danych o zachowaniu ({hours} h).",
-      "incomplete": "Ocena niepełna — aplikacje: {count}.",
+      "incomplete": "Ocena niepełna — części danych nie odczytano.",
       "profiles": "Inne profile użytkownika nie zostały sprawdzone.",
       "profiles_unknown": "Nie odczytano listy profili użytkownika.",
       "notifications_manual": "Android 12: powiadomienia wyłączysz tylko na telefonie.",

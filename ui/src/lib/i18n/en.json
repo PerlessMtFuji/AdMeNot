@@ -118,7 +118,7 @@
     "label": "Scan notes", "more": "More", "less": "Less",
     "short": {
       "low_data": "Little behavior data ({hours} h).",
-      "incomplete": "Incomplete assessment — apps: {count}.",
+      "incomplete": "Incomplete assessment — some data could not be read.",
       "profiles": "Other user profiles were not checked.",
       "profiles_unknown": "Could not read the list of user profiles.",
       "notifications_manual": "Android 12: notifications can only be turned off on the phone.",
