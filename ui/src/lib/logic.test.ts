@@ -6,6 +6,7 @@ import {
   orderCounts,
   evidenceGroups,
   facetCounts,
+  SOURCE_NON_PLAY,
   focusedApp,
   moveFocus,
   connectChecklist,
@@ -103,8 +104,21 @@ describe('selection', () => {
     expect(visibleApps(faceted, { ...opts, source: null })).toHaveLength(4);
   });
 
+  test('synthetic “outside the Play Store” source: not Play and not system, with a count', () => {
+    const mixed = [
+      app('p.play', 'review', { from_play: true, is_system: false }),
+      app('p.side', 'suspicious', { from_play: false, is_system: false }),
+      app('p.side2', 'safe', { from_play: false, is_system: false }),
+      app('p.sys', 'safe', { from_play: false, is_system: true }),
+    ];
+    const opts = { showAll: true, verdict: 'all' as const, query: '' };
+    expect(visibleApps(mixed, { ...opts, source: SOURCE_NON_PLAY }).map((a) => a.package))
+      .toEqual(['p.side', 'p.side2']);
+    expect(facetCounts(mixed).nonPlay).toBe(2);
+  });
+
   test('facet counts: categories in fixed order, sources by count', () => {
-    expect(facetCounts(faceted)).toEqual({
+    expect(facetCounts(faceted)).toMatchObject({
       categories: [{ value: 'ads', count: 2 }, { value: 'notif', count: 1 }, { value: 'removal', count: 1 }],
       sources: [{ value: 'Sklep Play', count: 2 }, { value: 'Chrome', count: 1 }, { value: 'systemowa', count: 1 }],
     });

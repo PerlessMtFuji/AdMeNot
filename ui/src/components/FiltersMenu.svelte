@@ -3,10 +3,11 @@
   import { CATEGORY_ICON, categoryKey } from '../lib/categories';
   import type { Controller } from '../lib/controller';
   import { t } from '../lib/i18n/index.svelte';
+  import { SOURCE_NON_PLAY } from '../lib/logic';
   import type { Category } from '../lib/types';
   import Icon from '../ui/Icon.svelte';
 
-  type Facets = { categories: { value: Category; count: number }[]; sources: { value: string; count: number }[] };
+  type Facets = { categories: { value: Category; count: number }[]; sources: { value: string; count: number }[]; nonPlay: number };
   let { facets }: { facets: Facets } = $props();
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
@@ -16,7 +17,7 @@
   // Wybrana opcja zostaje na liście z zerem, gdy wyszukiwarka ją ukryje.
   const typeChips = $derived([...facets.categories, ...s.categoryFilter
     .filter((c) => !facets.categories.some((f) => f.value === c)).map((value) => ({ value, count: 0 }))]);
-  const sourceOptions = $derived(s.sourceFilter && !facets.sources.some((f) => f.value === s.sourceFilter)
+  const sourceOptions = $derived(s.sourceFilter && s.sourceFilter !== SOURCE_NON_PLAY && !facets.sources.some((f) => f.value === s.sourceFilter)
     ? [...facets.sources, { value: s.sourceFilter, count: 0 }] : facets.sources);
 
   function toggleType(c: Category) {
@@ -28,8 +29,9 @@
   }
 </script>
 
-<svelte:window onkeydown={(e) => { if (e.key === 'Escape') open = false; }}
-  onclick={(e) => { if (open && !root.contains(e.target as Node)) open = false; }} />
+<!-- Klik poza menu: composedPath zamiast contains, bo klik w „Wyczyść filtry” usuwa własny cel z DOM. -->
+<svelte:window onkeydown={(e) => { if (open && e.key === 'Escape') open = false; }}
+  onclick={(e) => { if (open && !e.composedPath().includes(root)) open = false; }} />
 
 <div class="relative" bind:this={root}>
   <button type="button" aria-expanded={open} onclick={() => (open = !open)}
@@ -53,6 +55,9 @@
         onchange={(e) => (s.sourceFilter = e.currentTarget.value || null)}
         class="field rounded-[10px] px-2.5 py-1.5 text-sm font-semibold {s.sourceFilter ? 'text-accent' : 'text-mut'}">
         <option value="">{t('expert.all_sources')}</option>
+        {#if facets.nonPlay > 0 || s.sourceFilter === SOURCE_NON_PLAY}
+          <option value={SOURCE_NON_PLAY}>{t('expert.source_non_play')} · {facets.nonPlay}</option>
+        {/if}
         {#each sourceOptions as o (o.value)}<option value={o.value}>{o.value} · {o.count}</option>{/each}
       </select>
       {#if active}<button type="button" class="self-start text-sm font-semibold text-accent hover:underline" onclick={clear}>{t('expert.clear_filters')}</button>{/if}

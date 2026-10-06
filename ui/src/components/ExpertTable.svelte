@@ -10,7 +10,7 @@
   import FiltersMenu from './FiltersMenu.svelte';
   import VerdictSection from './VerdictSection.svelte';
 
-  type Facets = { categories: { value: Category; count: number }[]; sources: { value: string; count: number }[] };
+  type Facets = { categories: { value: Category; count: number }[]; sources: { value: string; count: number }[]; nonPlay: number };
   type Group = { verdict: Verdict; apps: AppView[] };
   let { groups, focused, facets, searching, navRows }:
     { groups: Group[]; focused: string | null; facets: Facets; searching: boolean; navRows: AppView[] } = $props();
@@ -22,7 +22,9 @@
   // Groźne sekcje są zawsze otwarte; reszta według zapisu lub (przy wyszukiwaniu) sama się rozwija.
   const DANGER: Verdict[] = ['malicious', 'suspicious'];
   const isOpen = (v: Verdict) => groupOpen(v, s.settings.mode, s.openGroups, searching);
-  const shown = $derived(groups.filter((g) => g.apps.length > 0 || (!searching && DANGER.includes(g.verdict))));
+  // Puste linie „Szkodliwe 0 — nic nie znaleziono” tylko gdy coś jest oznaczone; na czystym telefonie zostaje samo „Bez uwag”.
+  const anyFlagged = $derived(groups.some((g) => g.verdict !== 'safe' && g.apps.length > 0));
+  const shown = $derived(groups.filter((g) => g.apps.length > 0 || (!searching && anyFlagged && DANGER.includes(g.verdict))));
   const firstWithRows = $derived(shown.find((g) => g.apps.length > 0 && isOpen(g.verdict))?.verdict ?? null);
   const total = $derived(s.scan!.counts.total);
   const reason = (a: AppView) => topReasons(a, 1, (c) => t(categoryKey(c)));
@@ -72,11 +74,14 @@
       collapsible={!searching && g.apps.length > 0 && !DANGER.includes(g.verdict)}
       ontoggle={() => ctl.setGroupOpen(g.verdict, !isOpen(g.verdict))}>
       <div class="flex-none overflow-hidden rounded-2xl card">
-        <table class="w-full border-collapse">
+        <table class="w-full table-fixed border-collapse">
+          <colgroup>
+            <col class="w-10" /><col /><col class="w-[21%]" /><col class="w-[100px]" /><col class="w-[96px]" /><col class="w-[120px]" />
+          </colgroup>
           {#if g.verdict === firstWithRows}
             <thead>
               <tr class="bg-surface-2/60 text-left text-xs font-bold text-mut">
-                <th class="w-10 border-b border-line px-4 py-3"></th>
+                <th class="border-b border-line px-3 py-3"></th>
                 <th class="border-b border-line px-3 py-3">{t('expert.col_app')}</th>
                 <th class="border-b border-line px-3 py-3">{t('expert.col_reason')}</th>
                 <th class="border-b border-line px-3 py-3">{t('expert.col_score')}</th>
@@ -92,9 +97,9 @@
         {@const done = s.acted[a.package] ?? null}
         <tr aria-selected={a.package === focused} onclick={() => ctl.focus(a.package)}
           class="cursor-pointer border-b border-[var(--color-surface-2)] {a.package === focused ? 'bg-accent-soft/70 shadow-[inset_3px_0_0_var(--color-accent),inset_0_0_24px_-12px_var(--glow-accent)]' : 'hover:bg-surface-2'} {s.apk.changed.includes(a.package) ? 'flash' : ''}">
-          <td class="px-4 py-3"><input type="checkbox" class="h-4 w-4 accent-[var(--color-accent)]" checked={level !== null} disabled={done === 'remove'} aria-label={a.package}
+          <td class="px-3 py-3"><input type="checkbox" class="h-4 w-4 accent-[var(--color-accent)]" checked={level !== null} disabled={done === 'remove'} aria-label={a.package}
             onclick={(e) => e.stopPropagation()} onchange={() => ctl.toggle(a)} /></td>
-          <td class="w-full max-w-0 px-3 py-3">
+          <td class="px-3 py-3">
             <div class="flex items-center gap-3">
               <AppIcon icon={a.icon} class="h-8 w-8">
                 <span class="grid h-8 w-8 flex-none place-items-center rounded-[10px] text-sm font-extrabold text-white shadow-[inset_0_1px_0_rgb(255_255_255/.3)] {BAR[a.verdict]}" aria-hidden="true">{initial(a.name)}</span>
@@ -104,7 +109,7 @@
                   aria-label={t('summary.undo_app', { name: a.name })} onclick={(e) => { e.stopPropagation(); void ctl.undoApp(a.package); }}>{t('history.undo_changes')}</button>{/if}</span></div>
             </div>
           </td>
-          <td class="max-w-[220px] px-3 py-3 text-sm"><span class="line-clamp-2">{r.items[0]?.label ?? ''}</span>
+          <td class="px-3 py-3 text-sm"><span class="line-clamp-2">{r.items[0]?.label ?? ''}</span>
             {#if r.more.length}<span data-more class="text-xs text-soft" title={r.more.map((c) => t(categoryKey(c))).join(', ')}>+{r.more.length}</span>{/if}</td>
           <td class="px-3 py-3 whitespace-nowrap"><div class="flex items-center gap-2">
             <b class="mono {SCORE[a.verdict]}">{a.score}</b>

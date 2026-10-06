@@ -113,9 +113,7 @@
     {/if}
     <NoticeLine items={noteItems} details={noteDetails} />
 
-    {#if expert && flagged.length > 0}
-      <ExpertTable groups={expertGroups} {focused} {facets} {searching} {navRows} />
-    {:else if flagged.length === 0}
+    {#if flagged.length === 0}
       <div class="grid place-items-center gap-2 py-10 text-center" in:enter>
         {#if anyIncomplete}
           <span class="grid h-20 w-20 place-items-center rounded-full bg-warn-strong text-white shadow-[0_0_0_12px_var(--color-warn-soft),0_0_40px_-4px_var(--color-warn-strong)] [animation:pop-in_.6s]">
@@ -128,7 +126,10 @@
         {/if}
         <p class="mt-3 text-mut">{t('results.clean_sub', { count: s.scan?.counts.total ?? 0 })}</p>
       </div>
-    {:else}
+    {/if}
+    {#if expert}
+      <ExpertTable groups={expertGroups} {focused} {facets} {searching} {navRows} />
+    {:else if flagged.length > 0}
       {#each simpleGroups.filter((g) => g.verdict !== 'safe') as g (g.verdict)}
         {#if g.apps.length || DANGER.includes(g.verdict)}
           <VerdictSection verdict={g.verdict} count={g.apps.length} open={isOpen(g.verdict)}
@@ -145,7 +146,7 @@
         {/if}
       {/each}
     {/if}
-    {#if (!expert || flagged.length === 0) && safeGroup.apps.length}
+    {#if !expert && safeGroup.apps.length}
       <VerdictSection verdict="safe" count={safeGroup.apps.length} open={isOpen('safe')} collapsible
         ontoggle={() => ctl.setGroupOpen('safe', !isOpen('safe'))}>
         {#each safeGroup.apps as app (app.package)}

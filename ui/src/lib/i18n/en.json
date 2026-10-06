@@ -136,7 +136,7 @@
     "search": "Search app or package",
     "apk_error": "APK: error", "collector_failed": "Collector {name}: {error}",
     "table": "Apps table",
-    "filter_types": "Problem type", "filter_source": "Source filter", "all_sources": "All sources", "no_match": "No apps match the filters.", "clear_filters": "Clear filters",
+    "filter_types": "Problem type", "filter_source": "Source filter", "all_sources": "All sources", "source_non_play": "Outside the Play Store", "no_match": "No apps match the filters.", "clear_filters": "Clear filters",
     "today": "today", "protected": "Protected app",
     "days": { "one": "{count} day ago", "few": "{count} days ago", "many": "{count} days ago", "other": "{count} days ago" }
   },

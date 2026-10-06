@@ -136,7 +136,7 @@
     "search": "Szukaj aplikacji lub pakietu",
     "apk_error": "APK: błąd", "collector_failed": "Kolektor {name}: {error}",
     "table": "Tabela aplikacji",
-    "filter_types": "Rodzaj problemu", "filter_source": "Filtr źródła", "all_sources": "Wszystkie źródła", "no_match": "Brak aplikacji pasujących do filtrów.", "clear_filters": "Wyczyść filtry",
+    "filter_types": "Rodzaj problemu", "filter_source": "Filtr źródła", "all_sources": "Wszystkie źródła", "source_non_play": "Spoza Sklepu Play", "no_match": "Brak aplikacji pasujących do filtrów.", "clear_filters": "Wyczyść filtry",
     "today": "dziś", "protected": "Aplikacja chroniona",
     "days": { "one": "{count} dzień temu", "few": "{count} dni temu", "many": "{count} dni temu", "other": "{count} dnia temu" }
   },

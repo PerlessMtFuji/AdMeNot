@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
-import { tick } from 'svelte';
+import { flushSync, tick } from 'svelte';
 import { describe, expect, test, vi } from 'vitest';
 import App from '../App.svelte';
 import { t, tp } from '../lib/i18n/index.svelte';
@@ -69,15 +69,35 @@ describe('Results', () => {
     expect(screen.queryByRole('article', { name: review[0].name })).toBeNull();
   });
 
-  test('clean phone: the clean state, no empty danger lines, folded “no issues”', async () => {
+  test('clean phone, simple: the clean state, no empty danger lines, folded “no issues”', async () => {
     const { ctl } = await scanned('clean');
-    for (const mode of ['simple', 'expert'] as const) {
-      await ctl.setMode(mode);
-      await tick();
-      expect(screen.getByRole('heading', { name: 'Nie wykryto oznak zagrożenia' })).toBeTruthy();
-      expect(screen.queryByRole('region', { name: 'Szkodliwe' })).toBeNull();
-      expect(screen.getByRole('button', { name: /^Bez uwag/ }).getAttribute('aria-expanded')).toBe('false');
-    }
+    await ctl.setMode('simple');
+    await tick();
+    expect(screen.getByRole('heading', { name: 'Nie wykryto oznak zagrożenia' })).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Szkodliwe' })).toBeNull();
+    expect(screen.getByRole('button', { name: /^Bez uwag/ }).getAttribute('aria-expanded')).toBe('false');
+  });
+
+  test('clean phone, expert: clean state above the table, search and filters, folded “no issues” reachable', async () => {
+    const { ctl, s } = await scanned('clean');
+    await ctl.setMode('expert');
+    await tick();
+    expect(screen.getByRole('heading', { name: 'Nie wykryto oznak zagrożenia' })).toBeTruthy();
+    expect(screen.getByRole('searchbox', { name: 'Szukaj aplikacji lub pakietu' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Filtry' })).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Szkodliwe' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Podejrzane' })).toBeNull();
+    const table = screen.getByRole('group', { name: 'Tabela aplikacji' });
+    const toggle = within(table).getByRole('button', { name: /^Bez uwag/ });
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(document.querySelectorAll('#group-safe')).toHaveLength(1);
+    await fireEvent.click(toggle);
+    const rows = appRows();
+    expect(rows.length).toBeGreaterThan(1);
+    const second = s.scan!.apps[1];
+    await fireEvent.click(rows.find((r) => r.textContent?.includes(second.package))!);
+    const panel = screen.getByRole('complementary', { name: 'Szczegóły aplikacji' });
+    expect(within(panel).getByText(second.name)).toBeTruthy();
   });
 
   test('nothing selected: the panel says so and the fix button is disabled', async () => {
@@ -178,6 +198,34 @@ describe('Results', () => {
     expect(s.sourceFilter).toBeNull();
   });
 
+  test('expert filters: the popover stays open after clearing filters from inside it', async () => {
+    const { ctl } = await scanned();
+    await ctl.setMode('expert');
+    await tick();
+    await fireEvent.click(screen.getByRole('button', { name: 'Filtry' }));
+    await fireEvent.click(within(screen.getByRole('group', { name: 'Rodzaj problemu' })).getByRole('button', { name: /^Reklamy/ }));
+    // Przeglądarka opróżnia mikrozadania między słuchaczami zdarzenia, więc przycisk znika przed oknem.
+    const flush = () => flushSync();
+    document.addEventListener('click', flush);
+    await fireEvent.click(screen.getByRole('button', { name: 'Wyczyść filtry' }));
+    document.removeEventListener('click', flush);
+    expect(screen.getByRole('group', { name: 'Rodzaj problemu' })).toBeTruthy();
+    await fireEvent.click(document.body);
+    expect(screen.queryByRole('group', { name: 'Rodzaj problemu' })).toBeNull();
+  });
+
+  test('expert filters: “Outside the Play Store” keeps only non-Play, non-system apps', async () => {
+    const { s, ctl } = await scanned();
+    await ctl.setMode('expert');
+    await tick();
+    const outside = s.scan!.apps.filter((a) => a.verdict !== 'safe' && !a.is_system && !a.from_play);
+    await fireEvent.click(screen.getByRole('button', { name: 'Filtry' }));
+    const source = screen.getByRole('combobox', { name: 'Filtr źródła' });
+    await fireEvent.change(source, { target: { value: '__non_play__' } });
+    expect(within(source).getByRole('option', { name: /^Spoza Sklepu Play/ })).toBeTruthy();
+    expect(appRows()).toHaveLength(outside.length + 1);
+  });
+
   test('expert reason column: strongest finding in words, +N with the other categories', async () => {
     const { s, ctl } = await scanned();
     await ctl.setMode('expert');
@@ -214,7 +262,7 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
   const GAP = { key: 'device_policy', label: 'administratorzy urządzenia' };
 
   // Linia uwag: krótki tekst widoczny od razu, pełne komunikaty dopiero po „Więcej”.
-  const notesLine = () => screen.getByRole('status', { name: 'Uwagi do skanu' });
+  const notesLine = () => screen.getByRole('region', { name: 'Uwagi do skanu' });
   async function openNotes() {
     const line = notesLine();
     if (line.querySelector('[aria-expanded="false"]')) await fireEvent.click(within(line).getByRole('button', { name: 'Więcej' }));
@@ -280,7 +328,7 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     expect(screen.getByText(t('summary.profiles_unknown'))).toBeTruthy();
     s.scan = { ...s.scan!, profiles: { others: [], known: true } };
     await tick();
-    expect(screen.queryByRole('status', { name: 'Uwagi do skanu' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Uwagi do skanu' })).toBeNull();
     expect(screen.queryByText(t('summary.profiles_unknown'))).toBeNull();
   });
 

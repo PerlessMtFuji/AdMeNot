@@ -31,6 +31,11 @@ export function flaggedApps(apps: AppView[]): AppView[] {
   return apps.filter((a) => a.verdict !== 'safe');
 }
 
+// Syntetyczna opcja filtra źródła „Spoza Sklepu Play”: ten sam warunek co dawny licznik non_play
+// (nie systemowa i nie ze Sklepu Play).
+export const SOURCE_NON_PLAY = '__non_play__';
+const isNonPlay = (a: AppView) => !a.is_system && !a.from_play;
+
 export function visibleApps(apps: AppView[],
   opts: { showAll: boolean; verdict: Verdict | 'all'; query: string; categories?: Category[];
     source?: string | null }): AppView[] {
@@ -41,13 +46,14 @@ export function visibleApps(apps: AppView[],
     && (opts.verdict === 'all' || a.verdict === opts.verdict)
     && (!q || a.name.toLowerCase().includes(q) || a.package.toLowerCase().includes(q))
     && (!cats.length || a.symptoms.some((sy) => cats.includes(sy.category)))
-    && (!opts.source || a.source.label === opts.source));
+    && (!opts.source || (opts.source === SOURCE_NON_PLAY ? isNonPlay(a) : a.source.label === opts.source)));
 }
 
 // Opcje filtrów tabeli eksperta: kategorie w stałej kolejności, źródła od najczęstszego.
 export function facetCounts(apps: AppView[]): {
   categories: { value: Category; count: number }[];
   sources: { value: string; count: number }[];
+  nonPlay: number;
 } {
   const categories = CATEGORY_ORDER
     .map((value) => ({ value, count: apps.filter((a) => a.symptoms.some((sy) => sy.category === value)).length }))
@@ -56,7 +62,7 @@ export function facetCounts(apps: AppView[]): {
   for (const a of apps) bySource.set(a.source.label, (bySource.get(a.source.label) ?? 0) + 1);
   const sources = [...bySource].map(([value, count]) => ({ value, count }))
     .sort((x, y) => y.count - x.count || x.value.localeCompare(y.value));
-  return { categories, sources };
+  return { categories, sources, nonPlay: apps.filter(isNonPlay).length };
 }
 
 export function upsertStep(steps: StepEvent[], step: StepEvent): StepEvent[] {
