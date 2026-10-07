@@ -21,8 +21,17 @@ def test_package_metadata_names_the_license():
     assert data["build-system"]["requires"] == ["hatchling>=1.27"]
 
 
-def test_readme_says_source_available_not_open_source():
+def test_readme_is_english_with_a_link_to_polish():
     readme = (ROOT / "README.md").read_text("utf-8")
-    assert "## Licencja / License" in readme
+    assert "**English** | [Polski](README.pl.md)" in readme.splitlines()[2]
+    assert "## License" in readme
     assert "PolyForm Shield 1.0.0" in readme
-    assert "source-available" in readme
+    assert "source-available, not open source" in readme
+
+
+def test_polish_readme_links_back_to_english():
+    readme = (ROOT / "README.pl.md").read_text("utf-8")
+    assert "[English](README.md) | **Polski**" in readme.splitlines()[2]
+    assert "## Licencja" in readme
+    assert "PolyForm Shield 1.0.0" in readme
+    assert "kod jawny (source-available)" in readme

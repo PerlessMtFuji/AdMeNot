@@ -1,31 +1,33 @@
 # AdMeNot
 
-Program na Windows, który po podłączeniu telefonu z Androidem (debugowanie USB) heurystycznie wykrywa aplikacje intruzywne (reklamy, spam powiadomień, nakładki, fałszywe launchery, administratorzy urządzenia), pozwala je wyciszyć, wyłączyć albo usunąć i cofnąć każdą zmianę.
+**English** | [Polski](README.pl.md)
 
-## Wymagania
+A Windows program that, once an Android phone is connected (USB debugging), heuristically detects intrusive apps (ads, notification spam, overlays, fake launchers, device administrators), lets you mute, disable or remove them, and undo every change.
 
-- Windows 10/11 x64, Python 3.13, Node.js 24 (tylko do budowania UI)
-- `adb.exe` jest dołączany razem ze scrcpy (`scripts\fetch_tools.py`); inny adb można wskazać w ustawieniach
-- Microsoft Edge WebView2 Runtime (wbudowany w Windows 11)
+## Requirements
 
-## Instalacja (środowisko deweloperskie)
+- Windows 10/11 x64, Python 3.13, Node.js 24 (only for building the UI)
+- `adb.exe` ships together with scrcpy (`scripts\fetch_tools.py`); a different adb can be set in the settings
+- Microsoft Edge WebView2 Runtime (built into Windows 11)
+
+## Installation (development environment)
 
     py -3.13 -m venv .venv
     .venv\Scripts\pip install -e ".[dev,gui,release]"
-    python scripts\build_phone_db.py            # baza telefonów i zdjęcia (Plan 3)
-    python scripts\fetch_tools.py               # scrcpy 4.1 z adb (podgląd ekranu, Plan 6b)
+    python scripts\build_phone_db.py            # phone database and photos
+    python scripts\fetch_tools.py               # scrcpy 4.1 with adb (screen preview)
     powershell -ExecutionPolicy Bypass -File scripts\build_ui.ps1
-    python scripts\build_icons.py               # tylko po zmianie assets\icon\*.svg (PNG, ICO, kopia dla UI)
+    python scripts\build_icons.py               # only after changing assets\icon\*.svg (PNG, ICO, copy for the UI)
 
-## Uruchomienie GUI
+## Running the GUI
 
     .venv\Scripts\admenot gui
 
-albo `.venv\Scripts\admenot-gui`. Okno wymaga zbudowanego UI (`src\admenot\app\web\`, poza gitem) — bez niego program podaje polecenie budowania.
+or `.venv\Scripts\admenot-gui`. The window needs the built UI (`src\admenot\app\web\`, not in git) — without it the program prints the build command.
 
-Motyw (System / Jasny / Ciemny), język i tryb domyślny zmienia się w Ustawieniach; „System” podąża za motywem Windows.
+Theme (System / Light / Dark), language and default mode are changed in Settings; "System" follows the Windows theme.
 
-Praca nad samym UI bez telefonu i bez Pythona (atrapa mostu odtwarza nagrane scenariusze):
+Working on the UI alone, without a phone or Python (a fake bridge replays recorded scenarios):
 
     cd ui
     npm run dev          # http://localhost:5173/?scenario=adware|clean|disconnect|unauthorized|many|empty
@@ -34,38 +36,36 @@ Praca nad samym UI bez telefonu i bez Pythona (atrapa mostu odtwarza nagrane sce
 
     admenot devices | device | scan [--apk] | capture | fix | undo | resume | history | cache | service | report | screenshot | selfcheck | gui
 
-- `service` — zapisuje dane serwisu (nazwa, adres, telefon, logo) do protokołu, np. `admenot service --name "…"`.
-- `report` — tworzy protokół serwisowy (PDF i HTML) dla zlecenia z dziennika, np. `admenot report --order ZS/…`.
-- `screenshot` — zrzut ekranu telefonu: `--order ZS/…` zapisuje go w zleceniu (trafia do protokołu), `--out plik.png` zapisuje sam plik.
-- `selfcheck` — sprawdza, czy program ma wszystkie pliki (dane, narzędzia, UI); `--device --reference plik` porównuje skan telefonu z wynikiem `scan --apk --all`.
+- `service` — saves the repair shop's details (name, address, phone, logo) for the service report, e.g. `admenot service --name "…"`.
+- `report` — creates the service report (PDF and HTML) for an order from the journal, e.g. `admenot report --order ZS/…`.
+- `screenshot` — phone screenshot: `--order ZS/…` stores it in the order (it goes into the report), `--out file.png` saves just the file.
+- `selfcheck` — checks that the program has all its files (data, tools, UI); `--device --reference file` compares a phone scan with the output of `scan --apk --all`.
 
-## Wydanie
+## Release
 
     .venv\Scripts\python scripts\build_release.py [--device]
 
-Daje `dist\release\AdMeNot-<wersja>-setup.exe` (instalacja per-user, bez uprawnień administratora). Numer wersji: tylko `src\admenot\__init__.py`. Pełna procedura i lista kontrolna: `docs/release.md`.
+Produces `dist\release\AdMeNot-<version>-setup.exe` (per-user install, no administrator rights). The version number lives only in `src\admenot\__init__.py`. Full procedure and checklist (in Polish): `docs/release.md`.
 
-## Testy
+## Tests
 
     .venv\Scripts\python -m pytest
     .venv\Scripts\python -m ruff check src tests
     cd ui; npm test; npm run check; npm run e2e
 
-Po zmianie mostu (`src/admenot/app/`) odśwież nagrania scenariuszy dla UI:
+After changing the bridge (`src/admenot/app/`), refresh the scenario recordings for the UI:
 
     .venv\Scripts\python scripts\record_bridge_fixtures.py
 
-## Dane użytkownika
+## User data
 
-`%LOCALAPPDATA%\AdMeNot\`: `settings.json`, `journal.db`, `backups\`, `logs\` (log sesji ADB i `app-*.log` z błędami okna), `phone_overrides.json`.
+`%LOCALAPPDATA%\AdMeNot\`: `settings.json`, `journal.db`, `backups\`, `logs\` (ADB session log and `app-*.log` with window errors), `phone_overrides.json`.
 
-## Znane ograniczenia
+## Known limitations
 
-- Porzucona analiza APK w tle (np. przez kliknięcie „Napraw” w jej trakcie) może jeszcze dokończyć do dwóch zaczętych, tylko-do-odczytu poleceń `adb pull` — nigdy nie dotykają dziennika, ale mogą pojawić się jako dodatkowe linie w konsoli ADB, już po starcie nowego zlecenia.
-- Okno GUI, gdy jest otwarte, serwuje zbudowany UI z własnego lokalnego serwera statycznego na `127.0.0.1` (efemeryczny port; wywołania `js_api` nie idą przez HTTP) — patrz punkt 9 doprecyzowań w planie GUI.
+- An abandoned background APK analysis (e.g. by clicking "Fix" while it runs) may still finish up to two already started, read-only `adb pull` commands — they never touch the journal, but may show up as extra lines in the ADB console after the new order has started.
+- While open, the GUI window serves the built UI from its own local static server on `127.0.0.1` (ephemeral port; `js_api` calls do not go over HTTP).
 
-## Licencja / License
-
-AdMeNot jest darmowy i udostępniony na licencji [PolyForm Shield 1.0.0](LICENSE). Możesz go używać, także zarobkowo — np. w serwisie przy naprawie telefonów klientów. Nie wolno sprzedawać programu ani na bazie tego kodu udostępniać produktu, który z nim konkuruje. To kod jawny (source-available), a nie open source w rozumieniu OSI. Licencje składników innych autorów są w `THIRD_PARTY_NOTICES.txt` w katalogu zainstalowanego programu.
+## License
 
 AdMeNot is free and licensed under [PolyForm Shield 1.0.0](LICENSE). You may use it, including commercially — for example in a repair shop working on customers' phones. You may not sell it or use this code to offer a product that competes with it. The code is source-available, not open source in the OSI sense. Third-party licenses are listed in `THIRD_PARTY_NOTICES.txt` in the installed program's folder.
