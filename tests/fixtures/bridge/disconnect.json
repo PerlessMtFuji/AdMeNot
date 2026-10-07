@@ -461,6 +461,18 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
+      "command": "dumpsys notification --package admenot.none",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Current Notification Manager state (filtered to 'admenot.none'):\n  Notification List:\n  Notification listeners:\n    Allowed notification listeners:\n      com.whatsapp/com.whatsapp.NotificationListener (user: 0 isPrimary: true)\n    Has user set:\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
       "command": "dumpsys usagestats",
       "status": "ok",
       "duration": 0.0,
@@ -1522,6 +1534,18 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
+      "command": "dumpsys notification --package admenot.none",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Current Notification Manager state (filtered to 'admenot.none'):\n  Notification List:\n  Notification listeners:\n    Allowed notification listeners:\n      com.whatsapp/com.whatsapp.NotificationListener (user: 0 isPrimary: true)\n    Has user set:\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
       "command": "getprop ro.build.version.sdk",
       "status": "ok",
       "duration": 0.0,
@@ -1562,18 +1586,6 @@
       "status": "ok",
       "duration": 0.0,
       "output": "null\n",
-      "tag": null
-     }
-    ],
-    [
-     "adb:command",
-     {
-      "time": "2026-09-26T14:30:00",
-      "serial": "R58T00TEST",
-      "command": "settings get secure enabled_notification_listeners",
-      "status": "ok",
-      "duration": 0.0,
-      "output": "com.whatsapp/com.whatsapp.NotificationListener\n",
       "tag": null
      }
     ]
@@ -1620,6 +1632,18 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
+      "command": "dumpsys notification --package admenot.none",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Current Notification Manager state (filtered to 'admenot.none'):\n  Notification List:\n  Notification listeners:\n    Allowed notification listeners:\n      com.whatsapp/com.whatsapp.NotificationListener (user: 0 isPrimary: true)\n    Has user set:\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
       "command": "getprop ro.build.version.sdk",
       "status": "ok",
       "duration": 0.0,
@@ -1660,18 +1684,6 @@
       "status": "ok",
       "duration": 0.0,
       "output": "null\n",
-      "tag": null
-     }
-    ],
-    [
-     "adb:command",
-     {
-      "time": "2026-09-26T14:30:00",
-      "serial": "R58T00TEST",
-      "command": "settings get secure enabled_notification_listeners",
-      "status": "ok",
-      "duration": 0.0,
-      "output": "com.whatsapp/com.whatsapp.NotificationListener\n",
       "tag": null
      }
     ],

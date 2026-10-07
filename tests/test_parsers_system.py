@@ -1,5 +1,6 @@
 from admenot.engine.parsers.common import parse_components
 from admenot.engine.parsers.system import (
+    parse_allowed_listeners,
     parse_device_admins,
     parse_resolved_component,
     parse_resolved_home,
@@ -79,3 +80,37 @@ def test_device_admins_of_other_users_are_ignored():
             "  Enabled Device Admins (User 10, provisioningState: 3):\n"
             "    com.work/.Admin:\n      uid=1010100\n")
     assert parse_device_admins(text) == {"com.a"}
+
+
+# OPPO CPH2271 (Android 12), `dumpsys notification --package admenot.none`, 2026-10-07 (skrócone).
+NOTIF_MANAGER_OPPO = """Current Notification Manager state (filtered to 'admenot.none'):
+  Notification List:
+
+  Notification listeners:
+    Allowed notification listeners:
+      com.google.android.projection.gearhead/com.google.android.gearhead.notifications.SharedNotificationListenerManager$ListenerService:com.oplus.notificationmanager/com.oplus.notificationmanager.NotificationChannelListenerService:com.ultimate.cleanerpro.ucp/com.clean.ultimate.ui.home.more.notify.notification.service.NotifyListenerService (user: 0 isPrimary: true)
+      com.work/.Listener (user: 10 isPrimary: true)
+    Has user set:
+      userId=0 value={com.intelli.clean/com.star.james.notify.NotifyListenerService, com.nope/com.nope.X}
+    All notification listeners (3) enabled for current profiles:
+      ComponentInfo{com.oplus.notificationmanager/com.oplus.notificationmanager.NotificationChannelListenerService}
+  Notification assistants:
+    Allowed notification assistants:
+      com.google.android.ext.services/android.ext.services.notification.Assistant (user: 0 isPrimary: true)
+"""
+
+
+def test_allowed_listeners_from_notification_manager_user_0_only():
+    assert parse_allowed_listeners(NOTIF_MANAGER_OPPO) == [
+        ("com.google.android.projection.gearhead/com.google.android.gearhead.notifications."
+         "SharedNotificationListenerManager$ListenerService"),
+        "com.oplus.notificationmanager/com.oplus.notificationmanager.NotificationChannelListenerService",
+        ("com.ultimate.cleanerpro.ucp/com.clean.ultimate.ui.home.more.notify.notification.service."
+         "NotifyListenerService"),
+    ]  # nie „Has user set” (tam są też odebrane) ani asystenci
+
+
+def test_allowed_listeners_empty_section_and_missing_section():
+    empty = "  Notification listeners:\n    Allowed notification listeners:\n    Has user set:\n"
+    assert parse_allowed_listeners(empty) == []
+    assert parse_allowed_listeners("Current Notification Manager state:\n  Notification List:\n") is None

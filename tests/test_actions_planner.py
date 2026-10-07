@@ -160,3 +160,9 @@ def test_overlay_step_only_when_app_can_draw_over_others():
     plan = _plan(AD, "silence", requested=())
     assert "SYSTEM_ALERT_WINDOW" not in [s.params.get("op") for s in plan.steps]
     assert [s.kind for s in plan.steps] == ["home", "secure_list", "force_stop"]
+
+
+def test_context_lists_listeners_approved_by_notification_manager():
+    phone = FakePhone([FakeApp(AD)], secure={LISTENERS: f"{GEARHEAD}:{AD_LISTENER}"})
+    phone.secure[LISTENERS] = GEARHEAD  # kopia bez AD, a NotificationManager nadal ją zatwierdza
+    assert read_phone_context(phone).secure_lists[LISTENERS] == f"{GEARHEAD}:{AD_LISTENER}"

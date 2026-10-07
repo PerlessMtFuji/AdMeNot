@@ -9,6 +9,8 @@ _COMPONENT_INFO = re.compile(r"ComponentInfo\{([\w.]+)/")
 _PACKAGE_NAME = re.compile(r"^[A-Za-z][\w]*(\.[\w]+)+$")
 _USER_INFO = re.compile(r"UserInfo\{(\d+):")
 _ADMINS_USER = re.compile(r"Enabled Device Admins \(User (\d+)")
+_LISTENERS_HEADER = "Allowed notification listeners:"
+_APPROVED_LINE = re.compile(r"^\s*(.*?)\s*\(user: (\d+) isPrimary: (true|false)\)\s*$")
 
 
 def parse_users(text: str) -> list[int]:
@@ -46,3 +48,24 @@ def parse_resolved_home(text: str) -> set[str]:
 def parse_resolved_component(text: str) -> str | None:
     """Domyślna aktywność z `resolve-activity`; „android/…ResolverActivity” oznacza brak domyślnej."""
     return next((c for c in parse_components(text) if not c.startswith("android/")), None)
+
+
+def parse_allowed_listeners(text: str) -> list[str] | None:
+    """`dumpsys notification`: słuchacze zatwierdzeni w NotificationManagerze dla profilu 0.
+
+    Od Androida 9 to oni mają dostęp, a `settings secure enabled_notification_listeners` jest
+    tylko kopią, która potrafi się rozjechać. None = sekcji nie ma (stary Android, inny format).
+    """
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip() != _LISTENERS_HEADER:
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        for nxt in lines[i + 1:]:
+            if nxt.strip() and len(nxt) - len(nxt.lstrip(" ")) <= indent:
+                break
+            m = _APPROVED_LINE.match(nxt)
+            if m and m[2] == "0" and m[3] == "true":
+                return [c for c in m[1].split(":") if "/" in c]
+        return []
+    return None

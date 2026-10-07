@@ -12,11 +12,15 @@ from admenot.engine.actions.backup import backup_apks, is_complete
 from admenot.engine.actions.errors import ActionError, classify, from_adb, looks_failed
 from admenot.engine.adb.transport import AdbError, AdbTransport
 from admenot.engine.collectors.packages import PM_DISABLED
-from admenot.engine.collectors.system import DEVICE_POLICY, RESOLVE_HOME
+from admenot.engine.collectors.system import DEVICE_POLICY, NOTIF_MANAGER, RESOLVE_HOME
 from admenot.engine.parsers.appops import parse_appops
 from admenot.engine.parsers.common import parse_package_list
 from admenot.engine.parsers.packages import parse_dumpsys_packages
-from admenot.engine.parsers.system import parse_device_admins, parse_resolved_component
+from admenot.engine.parsers.system import (
+    parse_allowed_listeners,
+    parse_device_admins,
+    parse_resolved_component,
+)
 
 State = dict[str, Any]
 NOTIF_LISTENERS_KEY = "enabled_notification_listeners"
@@ -55,6 +59,21 @@ def split_items(value: str) -> list[str]:
     if not value or value == "null":
         return []
     return [item for item in value.split(":") if item]
+
+
+def read_secure_list(adb: AdbTransport, key: str) -> str:
+    """Komponenty z listy w `settings secure`, rozdzielone „:”. Dostęp do powiadomień czytamy
+    z NotificationManagera — ustawienie jest tylko jego kopią; bez tej sekcji zostaje kopia."""
+    if key == NOTIF_LISTENERS_KEY:
+        try:
+            approved = parse_allowed_listeners(read(adb, NOTIF_MANAGER, 30))
+        except ActionError as exc:
+            if exc.uncertain:
+                raise
+            approved = None
+        if approved is not None:
+            return ":".join(approved)
+    return ":".join(split_items(read(adb, C.SETTINGS_GET.format(key=key))))
 
 
 def _flag(value: bool) -> str:
@@ -136,7 +155,7 @@ class _SecureList:
     """Lista komponentów w `settings secure` (ułatwienia dostępu, nasłuch powiadomień)."""
 
     def probe(self, adb: AdbTransport, step: Step) -> State:
-        return {"value": read(adb, C.SETTINGS_GET.format(key=step.params["key"])).strip()}
+        return {"value": read_secure_list(adb, step.params["key"])}
 
     def applied(self, step: Step, state: State) -> bool:
         items = set(split_items(state["value"]))
@@ -156,8 +175,6 @@ class _SecureList:
             # Od Androida 9 dostęp trzyma NotificationManager, a ustawienie jest tylko jego kopią:
             # `settings put` go nie odbiera i wpis wraca przy synchronizacji (OPPO CPH2271,
             # 2026-10-07). Stary Android nie zna polecenia — wtedy liczy się samo ustawienie.
-            # Kopię system odświeża z opóźnieniem (~0,25 s), więc `settings put` bywa wykonane
-            # i tutaj — zapisuje tę samą wartość, którą zaraz zapisze system.
             action = "disallow" if step.params["op"] == "remove" else "allow"
             for component in split_items(step.params["components"]):
                 run_checked(adb, C.NOTIF_LISTENER.format(action=action, component=component))
@@ -167,7 +184,7 @@ class _SecureList:
 
     def _put(self, adb: AdbTransport, step: Step) -> None:
         key = step.params["key"]
-        items = split_items(self.probe(adb, step)["value"])
+        items = split_items(read(adb, C.SETTINGS_GET.format(key=key)))
         wanted = split_items(step.params["components"])
         if step.params["op"] == "remove":
             new = [i for i in items if i not in wanted]

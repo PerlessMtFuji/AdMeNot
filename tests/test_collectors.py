@@ -29,6 +29,7 @@ from admenot.engine.collectors.system import (
     A11Y_SERVICES,
     DEVICE_POLICY,
     NOTIF_LISTENERS,
+    NOTIF_MANAGER,
     RESOLVE_HOME,
     ROLE_BROWSER,
     ROLE_HOME,
@@ -115,6 +116,18 @@ def test_system_collectors_with_home_fallback():
     assert all(s.ok for s in status.values())
     assert facts["com.b"].is_device_admin and facts["com.b"].is_home_holder
     assert facts["com.a"].accessibility_enabled and not facts["com.a"].notification_listener
+
+
+def test_listener_access_counts_from_setting_or_notification_manager():
+    adb = FakeAdb({
+        A11Y_SERVICES: "null\n",
+        NOTIF_LISTENERS: "com.b/.Listener\n",
+        NOTIF_MANAGER: ("  Notification listeners:\n    Allowed notification listeners:\n"
+                        "      com.a/.Listener (user: 0 isPrimary: true)\n"),
+    })
+    facts = _facts()
+    run_collectors(adb, facts, [SecureSettingsCollector()])
+    assert facts["com.a"].notification_listener and facts["com.b"].notification_listener
 
 
 class _Exploding:

@@ -4,6 +4,7 @@ from admenot.engine.adb.transport import AdbError, AdbTransport
 from admenot.engine.facts import AppFacts
 from admenot.engine.parsers.common import UnrecognizedOutput, split_components
 from admenot.engine.parsers.system import (
+    parse_allowed_listeners,
     parse_device_admins,
     parse_resolved_home,
     parse_role_holders,
@@ -17,6 +18,9 @@ RESOLVE_HOME = ("cmd package resolve-activity --brief -a android.intent.action.M
                 "-c android.intent.category.HOME")
 A11Y_SERVICES = "settings get secure enabled_accessibility_services"
 NOTIF_LISTENERS = "settings get secure enabled_notification_listeners"
+# Stan NotificationManagera bez listy powiadomień: filtr na nieistniejący pakiet wycina
+# powiadomienia (~100 linii zamiast ~12 tys.), sekcja „Allowed notification listeners” zostaje.
+NOTIF_MANAGER = "dumpsys notification --package admenot.none"
 
 
 class DevicePolicyCollector:
@@ -73,8 +77,18 @@ class SecureSettingsCollector:
     def collect(self, adb: AdbTransport, apps: list[AppFacts]) -> dict[str, set[str]]:
         return {
             "a11y": split_components(adb.shell(A11Y_SERVICES)),
-            "listeners": split_components(adb.shell(NOTIF_LISTENERS)),
+            # Suma obu źródeł: kopia w ustawieniach potrafi się rozjechać z NotificationManagerem
+            # (np. po `settings put`), a dostęp ma ten, kogo zatwierdza którekolwiek z nich.
+            "listeners": split_components(adb.shell(NOTIF_LISTENERS)) | self._approved(adb),
         }
+
+    @staticmethod
+    def _approved(adb: AdbTransport) -> set[str]:
+        try:
+            approved = parse_allowed_listeners(adb.shell(NOTIF_MANAGER, timeout=30))
+        except AdbError:
+            return set()  # nagranie sprzed tej zmiany albo telefon bez tej sekcji: zostaje kopia
+        return split_components(":".join(approved or []))
 
     def apply(self, facts: dict[str, AppFacts], data: dict[str, set[str]]) -> None:
         for f in facts.values():

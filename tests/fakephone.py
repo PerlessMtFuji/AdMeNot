@@ -20,7 +20,7 @@ from admenot.engine.adb.transport import AdbError
 from admenot.engine.collectors.components import HOME_QUERY
 from admenot.engine.collectors.packages import PM_DISABLED, PM_SYSTEM
 from admenot.engine.collectors.profiles import PM_USERS
-from admenot.engine.collectors.system import DEVICE_POLICY, RESOLVE_HOME
+from admenot.engine.collectors.system import DEVICE_POLICY, NOTIF_MANAGER, RESOLVE_HOME
 
 POST = "android.permission.POST_NOTIFICATIONS"
 LISTENERS = "enabled_notification_listeners"
@@ -183,6 +183,8 @@ class FakePhone:
             return "".join(f"{_HOME_HEADER}  {c}\n" for c in self._home_candidates())
         if command == DEVICE_POLICY:
             return self._device_policy()
+        if command == NOTIF_MANAGER:
+            return self._notification_manager()
         if command in (C.ADMIN_SETTINGS, C.SECURITY_SETTINGS):
             return self._open(command)
         if re.fullmatch(r"am force-stop \S+", command):
@@ -321,6 +323,14 @@ class FakePhone:
             self.listeners_allowed.remove(component)
         self.secure[LISTENERS] = ":".join(self.listeners_allowed)  # system odświeża kopię
         return ""
+
+    def _notification_manager(self) -> str:
+        head = "Current Notification Manager state (filtered to 'admenot.none'):\n  Notification List:\n"
+        if self.listeners_allowed is None:
+            return head  # stary Android: bez sekcji zatwierdzonych słuchaczy
+        return (head + "  Notification listeners:\n    Allowed notification listeners:\n"
+                f"      {':'.join(self.listeners_allowed)} (user: 0 isPrimary: true)\n"
+                "    Has user set:\n")
 
     def _device_policy(self) -> str:
         admins = "".join(f"      {a.package}/.AdminReceiver:\n        uid=10001\n"

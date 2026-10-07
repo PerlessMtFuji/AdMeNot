@@ -118,6 +118,19 @@ def test_listener_access_is_revoked_in_notification_manager_not_only_in_setting(
     assert not any(c.startswith("settings put") for c in phone.calls)
 
 
+def test_listener_state_is_read_from_notification_manager_not_the_setting():
+    # Kopia w ustawieniu rozjechana (np. stare `settings put`): aplikacja nadal ma dostęp.
+    phone = _phone(secure={LISTENERS: f"{GEARHEAD}:{AD_LISTENER}"})
+    phone.secure[LISTENERS] = GEARHEAD
+    step = _remove_listener()
+    before = S.probe(phone, step)
+    assert before == {"value": f"{GEARHEAD}:{AD_LISTENER}"}
+    assert not S.is_applied(step, before)
+    S.apply(phone, step)
+    assert phone.listeners_allowed == [GEARHEAD]
+    assert S.is_applied(step, S.probe(phone, step))
+
+
 def test_listener_access_undo_allows_it_again():
     phone = _phone(secure={LISTENERS: f"{GEARHEAD}:{AD_LISTENER}"})
     _apply_and_undo(phone, _remove_listener())
