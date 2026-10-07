@@ -26,8 +26,11 @@ from admenot.engine.apk.sdks import load_default_ad_sdks
 from admenot.engine.phones.build import DB_NAME, IMAGES_DIR
 from admenot.engine.rules.engine import load_default_ruleset
 from admenot.engine.tools import tools_dir
+from admenot.net import client
 
 STATUS = {"pl": ("OK", "BRAK"), "en": ("OK", "MISSING")}
+HEALTH = "/api/v1/health"
+SERVER = {"pl": "serwer", "en": "server"}
 
 
 @dataclass(frozen=True)
@@ -62,16 +65,16 @@ def androguard_resources() -> Path:
 
 def _androguard() -> None:
     _file(androguard_resources() / "public.xml")
-    public = importlib.import_module("androguard.core.resources.public")  # ta sama ścieżka co analiza manifestu
+    public = importlib.import_module("androguard.core.resources.public")  # ta sama sciezka co analiza manifestu
     if not public.SYSTEM_RESOURCES["attributes"]["forward"]:
-        raise ValueError("public.xml: brak atrybutów")
+        raise ValueError("public.xml: brak atrybutow")
 
 
 def _data_dir_writable() -> None:
     directory = paths.data_dir()
     directory.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryFile(dir=directory):
-        pass  # plik znika po zamknięciu
+        pass  # plik znika po zamknieciu
 
 
 CHECKS: tuple[tuple[str, Callable[[], object]], ...] = (
@@ -83,7 +86,7 @@ CHECKS: tuple[tuple[str, Callable[[], object]], ...] = (
     ("adb.exe", lambda: _file(tools_dir() / "adb.exe")),
     ("scrcpy.exe", lambda: _file(tools_dir() / "scrcpy.exe")),
     ("scrcpy-server", lambda: _file(tools_dir() / "scrcpy-server")),
-    ("SDL3.dll", lambda: _file(tools_dir() / "SDL3.dll")),  # DLL-e scrcpy zostają przy scrcpy.exe
+    ("SDL3.dll", lambda: _file(tools_dir() / "SDL3.dll")),  # DLL-e scrcpy zostaja przy scrcpy.exe
     ("phones.db", _phones_db),
     ("phones/", _phone_images),
     ("app/web/index.html", lambda: _file(app_main.WEB_DIR / "index.html")),
@@ -98,21 +101,42 @@ def run_checks() -> list[Check]:
     for name, check in CHECKS:
         try:
             check()
-        except Exception as exc:  # noqa: BLE001 — każdy błąd oznacza brak tego elementu
+        except Exception as exc:  # noqa: BLE001 - kazdy blad oznacza brak tego elementu
             results.append(Check(name, False, f"{type(exc).__name__}: {exc}"))
         else:
             results.append(Check(name, True))
     return results
 
 
-def cmd_selfcheck(lang: str) -> int:
+def server_check(lang: str) -> Check:
+    """`--online`: czy serwer odpowiada (spec backendu section 4.2) - jedyne polaczenie w tym kroku."""
+    try:
+        reply = client.get_json(HEALTH)
+    except client.BackendError as exc:
+        return Check(SERVER[lang], False, str(exc))
+    if reply.get("ok") is not True:
+        return Check(SERVER[lang], False, "ok != true")
+    return Check(SERVER[lang], True)
+
+
+def _print_checks(results: list[Check], lang: str) -> int:
     ok_word, missing_word = STATUS[lang]
-    results = run_checks()
     for r in results:
         word = ok_word if r.ok else missing_word
-        detail = "" if r.ok else f" — {r.detail}"
-        print(f"{word:<7} {r.name}{detail}")  # kolumna 7 znaków: „MISSING” mieści się bez obcinania
+        detail = "" if r.ok else f" -- {r.detail}"
+        print(f"{word:<7} {r.name}{detail}")  # kolumna 7 znakow: "MISSING" miesci sie bez obcinania
     return 0 if all(r.ok for r in results) else 1
+
+
+def cmd_selfcheck(lang: str, online: bool = False) -> int:
+    results = run_checks()
+    if online:
+        results.append(server_check(lang))
+    return _print_checks(results, lang)
+
+
+def cmd_online(lang: str) -> int:
+    return _print_checks([server_check(lang)], lang)
 
 
 DEVICE_MESSAGES = {
@@ -129,7 +153,7 @@ def _normalized(text: str) -> list[str]:
 
 
 def scan_diff(reference: str, actual: str) -> list[str]:
-    """Linie, którymi różnią się skany (czas pracy telefonu pominięty); [] = skany równe."""
+    """Linie, ktorymi roznia sie skany (czas pracy telefonu pominiety); [] = skany rowne."""
     diff = difflib.unified_diff(_normalized(reference), _normalized(actual), n=0, lineterm="")
     return [line for line in diff if line[:1] in "+-" and not line.startswith(("+++", "---"))]
 

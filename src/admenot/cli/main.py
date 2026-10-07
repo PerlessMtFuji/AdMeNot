@@ -452,6 +452,7 @@ def build_parser() -> argparse.ArgumentParser:
     shot.add_argument("--out", metavar="PNG")
     check = sub.add_parser("selfcheck")
     check.add_argument("--device", action="store_true")  # dodatkowo skan telefonu (Task 5)
+    check.add_argument("--online", action="store_true")  # dodatkowo: czy serwer odpowiada
     check.add_argument("--serial")
     check.add_argument("--reference", metavar="FILE")
     for p in (device, who, fix, history, undo, resume, cache, service, report, shot, check):
@@ -478,7 +479,7 @@ def _run(args: argparse.Namespace, host: AdbTransport) -> int:
             print(f"{e.serial}\t{e.state}\t{e.model or ''}")
         return 0
     if args.command == "selfcheck" and not args.device:
-        return selfcheck_cli.cmd_selfcheck(lang)  # bez telefonu
+        return selfcheck_cli.cmd_selfcheck(lang, online=args.online)  # bez telefonu
     if args.command == "cache":
         return cmd_cache(args, lang)
     if args.command == "service":
@@ -515,7 +516,10 @@ def _run(args: argparse.Namespace, host: AdbTransport) -> int:
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
             _print_report(report, lang, show_all=True)  # jak `scan --apk --all`
-        return selfcheck_cli.cmd_device(out.getvalue(), args.reference, lang)
+        code = selfcheck_cli.cmd_device(out.getvalue(), args.reference, lang)
+        if args.online:
+            code = max(code, selfcheck_cli.cmd_online(lang))
+        return code
     if args.command == "scan":
         report = _scan(adb, serial, lang, deep, apk=args.apk)
         missed = sorted(p for p in deep if not getattr(report.apk_reports.get(p), "deep", False))

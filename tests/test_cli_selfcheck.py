@@ -2,11 +2,13 @@ import sqlite3
 
 import pytest
 from conftest import make_synthetic_adb
+from httpstub import Stub, serve
 
 from admenot.app import main as app_main
 from admenot.cli import main as cli_main
 from admenot.cli import selfcheck_cli
 from admenot.cli.main import main
+from admenot.net import client
 
 TOOLS = ("adb.exe", "scrcpy.exe", "scrcpy-server", "SDL3.dll")
 
@@ -44,25 +46,25 @@ def test_missing_phones_db_is_reported(installed, capsys):
     (installed / "phones.db").unlink()
     assert selfcheck_cli.cmd_selfcheck("pl") == 1
     out = capsys.readouterr().out
-    assert "BRAK    phones.db — " in out
+    assert "BRAK    phones.db -- " in out
 
 
 def test_missing_adb_is_reported(installed, capsys):
     (installed / "tools" / "scrcpy" / "adb.exe").unlink()
     assert selfcheck_cli.cmd_selfcheck("en") == 1
-    assert "MISSING adb.exe — " in capsys.readouterr().out
+    assert "MISSING adb.exe -- " in capsys.readouterr().out
 
 
 def test_missing_scrcpy_dll_is_reported(installed, capsys):
     (installed / "tools" / "scrcpy" / "SDL3.dll").unlink()
     assert selfcheck_cli.cmd_selfcheck("pl") == 1
-    assert "BRAK    SDL3.dll — " in capsys.readouterr().out
+    assert "BRAK    SDL3.dll -- " in capsys.readouterr().out
 
 
 def test_missing_androguard_resources_are_reported(installed, monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(selfcheck_cli, "androguard_resources", lambda: tmp_path / "nowhere")
     assert selfcheck_cli.cmd_selfcheck("pl") == 1
-    assert "BRAK    androguard public.xml — " in capsys.readouterr().out
+    assert "BRAK    androguard public.xml -- " in capsys.readouterr().out
 
 
 def test_cli_command(installed, capsys):
@@ -100,3 +102,50 @@ def test_device_check_compares_the_scan_with_the_reference(tmp_path, monkeypatch
     assert main(args, host=make_synthetic_adb()) == 1
     out = capsys.readouterr().out
     assert "różni się od referencyjnego" in out and "+" in out and "com.clean.pro.boost" in out
+
+
+@pytest.fixture
+def health(monkeypatch):
+    stub = Stub(body=b'{"ok": true, "db": true}')
+    stop = serve(stub)
+    monkeypatch.setenv(client.ENV_URL, stub.url)
+    yield stub
+    stop()
+
+
+def test_offline_selfcheck_never_calls_the_server(installed, monkeypatch, capsys):
+    def boom(path):
+        raise AssertionError(f"selfcheck bez --online połączył się z {path}")
+
+    monkeypatch.setattr(client, "get_json", boom)
+    assert main(["selfcheck"]) == 0
+    assert "serwer" not in capsys.readouterr().out
+
+
+def test_online_selfcheck_reports_server_ok(installed, health, capsys):
+    assert main(["selfcheck", "--online"]) == 0
+    out = capsys.readouterr().out
+    assert "OK      serwer" in out
+    assert health.requests[0][1] == "/api/v1/health"
+
+
+def test_online_selfcheck_reports_http_error(installed, health, capsys):
+    health.status = 503
+    health.body = b'{"ok": false, "db": false}'
+    assert main(["selfcheck", "--online", "--lang", "en"]) == 1
+    assert "MISSING server -- http 503" in capsys.readouterr().out
+
+
+def test_online_selfcheck_reports_offline(installed, monkeypatch, capsys):
+    def offline(path):
+        raise client.BackendError("offline")
+
+    monkeypatch.setattr(client, "get_json", offline)
+    assert main(["selfcheck", "--online"]) == 1
+    assert "BRAK    serwer -- offline" in capsys.readouterr().out
+
+
+def test_online_selfcheck_requires_ok_true(installed, health, capsys):
+    health.body = b'{"status": "up"}'  # 200, ale to nie nasz health
+    assert main(["selfcheck", "--online"]) == 1
+    assert "BRAK    serwer -- ok != true" in capsys.readouterr().out
