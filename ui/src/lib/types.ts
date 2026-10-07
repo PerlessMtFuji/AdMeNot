@@ -96,6 +96,8 @@ export interface AppView {
   trusted: boolean;
   incomplete: boolean;
   is_system: boolean;
+  /** false: wyłączona na telefonie (`pm disable-user`) — przed tą naprawą albo wcześniej. */
+  enabled: boolean;
   from_play: boolean;
   installer: string | null;
   is_admin: boolean;

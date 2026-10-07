@@ -173,6 +173,14 @@ def test_app_view_passes_icon():
     assert view["icon"] == "data:image/png;base64,iVBORw0KGgo="
 
 
+def test_app_view_says_whether_the_app_is_disabled_on_the_phone():
+    from admenot.engine.scoring import AppResult
+
+    assert app_view(AppResult(AppFacts("com.x"), [], 0, "safe", False, False), "pl")["enabled"] is True
+    off = AppFacts("com.x", enabled=False)
+    assert app_view(AppResult(off, [], 0, "safe", False, False), "pl")["enabled"] is False
+
+
 def test_app_view_shows_confidence_gaps_and_scoped_safe_label(synthetic_adb):
     synthetic_adb.responses[DEVICE_POLICY] = AdbError("timeout", "slow")
     report = run_scan(synthetic_adb)

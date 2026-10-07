@@ -14,7 +14,7 @@ test('evidence: score meter, grouped reasons with muted points, raw data, no rul
 const flaggedApp = {
   package: 'com.clean.pro.boost', name: 'Cleaner Pro', score: 100, verdict: 'malicious',
   verdict_label: 'Szkodliwa', confidence: 'high', confidence_label: 'wysoka', gaps: [],
-  trusted: false, incomplete: false, is_system: false, from_play: false,
+  trusted: false, incomplete: false, is_system: false, enabled: true, from_play: false,
   installer: 'com.android.chrome', is_admin: true, default_level: 'remove', problems: [],
   apk_error: null, ad_sdks: null, symptoms: [], source: { label: 'Chrome', days: 3 },
   findings: [
@@ -61,7 +61,7 @@ test('raw data: one entry per rule, ad SDK list only once', () => {
   const base = {
     package: 'com.x', name: 'X', score: 40, verdict: 'suspicious', verdict_label: 'Podejrzana',
     confidence: 'medium', confidence_label: 'średnia', gaps: [], trusted: false,
-    incomplete: false, is_system: false, from_play: false, installer: null, is_admin: false, default_level: null,
+    incomplete: false, is_system: false, enabled: true, from_play: false, installer: null, is_admin: false, default_level: null,
     problems: [], apk_error: null, symptoms: [], source: { label: 'Chrome', days: 1 },
   };
   const sdk = { rule_id: 'DM-ADSDK-02', class: 'apk', category: 'ads', label: 'Wiele sieci reklamowych', weight: 20,
@@ -86,7 +86,7 @@ test('evidence: data gaps show an "Assessment limits" section and the confidence
   const app = {
     package: 'com.x', name: 'X', score: 40, verdict: 'suspicious', verdict_label: 'Podejrzana',
     confidence: 'low', confidence_label: 'niska — …', gaps: [{ key: 'apk', label: 'analiza pliku APK' }],
-    trusted: false, incomplete: true, is_system: false, from_play: false, installer: null, is_admin: false,
+    trusted: false, incomplete: true, is_system: false, enabled: true, from_play: false, installer: null, is_admin: false,
     default_level: null, problems: [], apk_error: null, ad_sdks: null, symptoms: [],
     source: { label: 'Chrome', days: 1 }, findings: [],
   };
@@ -102,7 +102,7 @@ test('evidence: incomplete without gaps and APK scope notes still show the limit
     package: 'com.x', name: 'X', score: 0, verdict: 'safe', verdict_label: 'Brak istotnych sygnałów (ocena niepełna)',
     confidence: 'low', confidence_label: 'niska', gaps: [], incomplete: true,
     scope: [{ key: 'obfuscated', label: 'Kod w dużej części zaciemniony' }],
-    trusted: false, is_system: false, from_play: false, installer: null, is_admin: false,
+    trusted: false, is_system: false, enabled: true, from_play: false, installer: null, is_admin: false,
     default_level: null, problems: [], apk_error: null, ad_sdks: [], symptoms: [],
     source: { label: 'Chrome', days: 1 }, findings: [],
   };
@@ -116,7 +116,7 @@ test('capability ladder: four columns, check / dash / question mark', async () =
   const app = {
     package: 'com.x', name: 'X', score: 10, verdict: 'review', verdict_label: 'Do sprawdzenia',
     confidence: 'low', confidence_label: 'niska', gaps: [], trusted: false, incomplete: false,
-    is_system: false, from_play: false, installer: null, is_admin: false, default_level: null,
+    is_system: false, enabled: true, from_play: false, installer: null, is_admin: false, default_level: null,
     problems: [], apk_error: null, ad_sdks: null, symptoms: [], source: { label: 'Chrome', days: 1 },
     findings: [],
     capabilities: [{ key: 'overlay', label: 'Okna nad innymi aplikacjami', levels: { declared: true, code: null, granted: false, observed: null } }],
@@ -133,7 +133,7 @@ test('capability ladder: four columns, check / dash / question mark', async () =
 test('deep analysis button for every app, also without findings; disabled without a phone', async () => {
   const app = {
     package: 'com.quiet.app', name: 'Quiet', score: 0, verdict: 'safe', verdict_label: 'Brak istotnych sygnałów',
-    confidence: 'high', confidence_label: 'wysoka', gaps: [], trusted: false, incomplete: false, is_system: false,
+    confidence: 'high', confidence_label: 'wysoka', gaps: [], trusted: false, incomplete: false, is_system: false, enabled: true,
     from_play: true, installer: 'com.android.vending', is_admin: false, default_level: null, problems: [],
     apk_error: null, ad_sdks: [], symptoms: [], source: { label: 'Sklep Play', days: 30 }, findings: [],
   };

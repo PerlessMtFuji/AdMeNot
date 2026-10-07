@@ -11,7 +11,7 @@ const evil: AppView = {
   package: 'com.evil', name: '<img src=x onerror="alert(1)"> & „Cleaner”', score: 90,
   verdict: 'malicious', verdict_label: 'Szkodliwa', confidence: 'high', confidence_label: 'wysoka',
   gaps: [], scope: [], trusted: false, incomplete: false,
-  is_system: false, from_play: false, installer: 'com.android.chrome', is_admin: true,
+  is_system: false, enabled: true, from_play: false, installer: 'com.android.chrome', is_admin: true,
   default_level: 'remove', problems: [],
   findings: [finding('DM-ADMIN-01', 'removal', 'Administrator urządzenia', 25), finding('DM-OVERLAY-01', 'ads', 'Okna nad innymi aplikacjami', 20), finding('DM-SIDE-01', 'origin', 'Spoza Sklepu Play', 8)],
   capabilities: [], apk_error: null, icon: null, ad_sdks: null,
@@ -79,4 +79,12 @@ test('app card without symptoms renders no tiles and no “Why?”', () => {
 test('app card: incomplete assessment is visible', () => {
   render(AppCard, { props: { app: { ...evil, incomplete: true }, level: null, onlevel: vi.fn(), ontoggle: vi.fn() } });
   expect(screen.getByText('Ocena niepełna')).toBeTruthy();
+});
+
+test('app card: an app disabled on the phone says so, an enabled one does not', async () => {
+  const props = { level: null, onlevel: vi.fn(), ontoggle: vi.fn() };
+  const { rerender } = render(AppCard, { props: { ...props, app: evil } });
+  expect(screen.queryByText('Wyłączona na telefonie')).toBeNull();
+  await rerender({ ...props, app: { ...evil, enabled: false } });
+  expect(screen.getByText('Wyłączona na telefonie')).toBeTruthy();
 });

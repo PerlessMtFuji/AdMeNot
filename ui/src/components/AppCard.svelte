@@ -36,6 +36,7 @@
     <div class="min-w-0 flex-1">
       <div class="flex min-w-0 items-center gap-2">
         <b class="truncate text-md" title={app.package}>{app.name}</b>
+        {#if !app.enabled}<Pill tone="neutral">{t('results.disabled')}</Pill>{/if}
         {#if app.incomplete}<Pill tone="neutral">{t('results.incomplete')}</Pill>{/if}
         {#if done}<Pill tone="ok">{t(`history.level_done.${done}`)}</Pill>
           {#if onundo}<Button variant="ghost" size="sm" disabled={busy} label={t('summary.undo_app', { name: app.name })}

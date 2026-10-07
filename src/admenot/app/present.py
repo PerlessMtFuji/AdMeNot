@@ -155,6 +155,7 @@ def app_view(r: AppResult, lang: str) -> dict[str, Any]:
         "gaps": [{"key": g, "label": gap_label(g, lang)} for g in sorted(facts.gaps)],
         "scope": [{"key": k, "label": scope_label(k, lang)} for k in scope_notes(facts)],
         "trusted": r.trusted, "incomplete": r.incomplete, "is_system": facts.is_system,
+        "enabled": facts.enabled,
         "from_play": facts.from_play, "installer": facts.installer,
         "is_admin": facts.is_device_admin, "default_level": default_level(r),
         "problems": list(dict.fromkeys(f["text"] for f in findings))[:MAX_PROBLEMS],
