@@ -3,12 +3,13 @@
 Pakiety Pythona: domknięcie zależności `admenot` i `pywebview` w środowisku builda (bez
 extras i bez pakietów, których tu nie ma, np. tylko dla macOS) plus PyInstaller (bootloader
 w exe). Do tego Python, scrcpy z adb, biblioteki WebView2 SDK z pywebview i biblioteki, które
-trafiają do zbudowanego UI.
+trafiają do zbudowanego UI, oraz listę urządzeń Google Play (`data/supported_devices.csv`).
 """
 
 from __future__ import annotations
 
 import ctypes
+import hashlib
 import json
 import re
 import sys
@@ -17,6 +18,9 @@ from importlib import metadata
 from pathlib import Path
 
 ROOTS = ("admenot", "pywebview")
+ROOT = Path(__file__).resolve().parents[1]
+GPLAY_CSV = ROOT / "data" / "supported_devices.csv"
+GPLAY_URL = "https://storage.googleapis.com/play_public/supported_devices.csv"
 # devDependencies, które vite wkleja do zbudowanego UI (czcionka, runtime Svelte, CSS Tailwinda)
 UI_BUNDLED = ("@fontsource-variable/manrope", "svelte", "tailwindcss")
 LICENSE_FILE = re.compile(r"(^|/)(LICEN[CS]E|COPYING|NOTICE)[^/]*$", re.IGNORECASE)
@@ -141,6 +145,15 @@ def _scrcpy(tools: Path) -> Component:
                      ((tools / "LICENSE.txt").read_text("utf-8", errors="replace"),))
 
 
+def _gplay(csv: Path) -> Component:
+    # plik nie ma własnej wersji ani daty — wersją jest skrót treści
+    return Component("Google Play supported devices (supported_devices.csv)",
+                     hashlib.sha256(csv.read_bytes()).hexdigest()[:12],
+                     "brak jawnej licencji, lista publikowana przez Google do pobrania / "
+                     "no explicit license, list published by Google for download",
+                     (f"Źródło / Source: {GPLAY_URL}",))
+
+
 def _file_version(path: Path) -> str:
     """Wersja pliku z zasobu VERSIONINFO (Windows); "?", gdy się nie da."""
     try:
@@ -181,5 +194,5 @@ def build(tools: Path, ui_dir: Path) -> tuple[str, list[str]]:
     components = [_python(), *python_components(python_closure()),
                   *python_components([metadata.distribution("pyinstaller")]),
                   _webview2_sdk(Path(metadata.distribution("pywebview").locate_file(WEBVIEW2_DLL))),
-                  _scrcpy(tools), *ui_components(ui_dir)]
+                  _scrcpy(tools), _gplay(GPLAY_CSV), *ui_components(ui_dir)]
     return render(components), missing_licenses(components)

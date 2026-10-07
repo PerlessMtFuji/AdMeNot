@@ -1,3 +1,4 @@
+import hashlib
 import importlib.util
 import json
 import sys
@@ -105,3 +106,22 @@ def test_webview2_sdk_component_carries_microsoft_bsd_text(tmp_path):
     assert component.version == "?"
     assert component.license == "BSD-3-Clause (Microsoft WebView2 SDK)"
     assert "Microsoft Corporation" in component.texts[0]
+
+
+def test_google_device_list_is_listed_with_source_and_hash_version(tmp_path):
+    m = _module()
+    csv = tmp_path / "supported_devices.csv"
+    csv.write_bytes(b"Retail Branding,Marketing Name,Device,Model\r\nOPPO,A16,OP4F7FL1,CPH2271\r\n")
+    component = m._gplay(csv)
+    assert component.name == "Google Play supported devices (supported_devices.csv)"
+    assert component.version == hashlib.sha256(csv.read_bytes()).hexdigest()[:12]
+    assert component.license
+    assert m.missing_licenses([component]) == []
+    assert m.GPLAY_URL in component.texts[0]
+    assert m.GPLAY_URL in m.render([component])
+
+
+def test_google_device_list_points_at_the_repo_copy():
+    m = _module()
+    assert m.GPLAY_CSV == ROOT / "data" / "supported_devices.csv"
+    assert m.GPLAY_CSV.is_file()
