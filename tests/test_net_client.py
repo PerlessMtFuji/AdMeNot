@@ -2,7 +2,7 @@ import json
 import socket
 
 import pytest
-from httpstub import Stub, serve
+from httpstub import Stub, serve, serve_garbage
 
 from admenot import __version__
 from admenot.net import client
@@ -99,3 +99,28 @@ def test_default_base_url(monkeypatch):
     monkeypatch.delenv(client.ENV_URL, raising=False)
     assert client.base_url() == client.BASE_URL
     assert client.BASE_URL == "https://admenot.<subdomena>.workers.dev"
+
+
+def test_garbage_non_http_reply_is_offline(monkeypatch):
+    url, stop = serve_garbage()
+    monkeypatch.setenv(client.ENV_URL, url)
+    try:
+        with pytest.raises(BackendError) as err:
+            client.get_json("/api/v1/health")
+        assert err.value.kind == "offline"
+    finally:
+        stop()
+
+
+def test_truncated_body_is_offline(stub):
+    stub.truncate_body = True
+    with pytest.raises(BackendError) as err:
+        client.get_json("/api/v1/health")
+    assert err.value.kind == "offline"
+
+
+def test_malformed_env_url_no_scheme_is_offline(monkeypatch):
+    monkeypatch.setenv(client.ENV_URL, "admenot.invalid")
+    with pytest.raises(BackendError) as err:
+        client.get_json("/api/v1/health")
+    assert err.value.kind == "offline"

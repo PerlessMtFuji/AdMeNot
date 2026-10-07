@@ -6,6 +6,7 @@ więc w paczce PyInstallera nie potrzeba `certifi`.
 
 from __future__ import annotations
 
+import http.client
 import json
 import os
 import urllib.error
@@ -42,15 +43,15 @@ def _request(path: str, data: bytes | None = None) -> dict[str, Any]:
     headers = {"User-Agent": user_agent(), "Accept": "application/json"}
     if data is not None:
         headers["Content-Type"] = "application/json"
-    request = urllib.request.Request(base_url() + path, data=data, headers=headers,
-                                     method="GET" if data is None else "POST")
     try:
+        request = urllib.request.Request(base_url() + path, data=data, headers=headers,
+                                         method="GET" if data is None else "POST")
         with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
             raw = response.read()
     except urllib.error.HTTPError as exc:  # przed OSError: HTTPError to też URLError
         exc.close()
         raise BackendError("http", exc.code) from None
-    except OSError:  # URLError, TimeoutError, błędy TLS, zerwane połączenie
+    except (OSError, http.client.HTTPException, ValueError):  # URLError, TimeoutError, błędy TLS, zerwane połączenie, BadStatusLine, IncompleteRead, InvalidURL
         raise BackendError("offline") from None
     try:
         value = json.loads(raw)

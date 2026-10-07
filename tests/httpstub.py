@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import socket
 import threading
 import time
 from dataclasses import dataclass, field
@@ -14,6 +15,7 @@ class Stub:
     body: bytes = b'{"ok": true}'
     content_type: str = "application/json"
     delay: float = 0.0  # opóźnienie przed wysłaniem treści (nagłówki idą od razu)
+    truncate_body: bool = False  # jeśli True, wysłanie mniej bajtów niż Content-Length mówi
     requests: list[tuple[str, str, dict[str, str], bytes]] = field(default_factory=list)
     url: str = ""
 
@@ -32,7 +34,10 @@ def serve(stub: Stub):
             self.end_headers()
             self.wfile.flush()
             time.sleep(stub.delay)
-            self.wfile.write(stub.body)
+            if stub.truncate_body:  # wysłanie tylko połowy bajtów, potem zamknięcie
+                self.wfile.write(stub.body[:len(stub.body) // 2])
+            else:
+                self.wfile.write(stub.body)
 
         do_GET = do_POST = _reply
 
@@ -49,3 +54,35 @@ def serve(stub: Stub):
         server.server_close()
 
     return stop
+
+
+def serve_garbage() -> tuple[str, callable]:
+    """Uruchamia surowy serwer wysyłający śmieci zamiast HTTP; zwraca (url, stop_fn)."""
+
+    def handler():
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server_socket.bind(("127.0.0.1", 0))
+        server_socket.listen(1)
+        port = server_socket.getsockname()[1]
+
+        def accept_connections():
+            while True:
+                try:
+                    client, _ = server_socket.accept()
+                    client.sendall(b"garbage\r\n\r\n")  # nie-HTTP odpowiedź
+                    client.close()
+                except OSError:
+                    break
+
+        thread = threading.Thread(target=accept_connections, daemon=True)
+        thread.start()
+        return server_socket, port
+
+    server_socket, port = handler()
+    url = f"http://127.0.0.1:{port}"
+
+    def stop() -> None:
+        server_socket.close()
+
+    return url, stop
