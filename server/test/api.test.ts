@@ -82,4 +82,11 @@ describe("strona", () => {
     expect(res.status).toBe(200);
     expect(await res.text()).toContain("AdMeNot");
   });
+
+  it.each(["/", "/pl/", "/privacy", "/pl/privacy"])("%s zwraca HTML", async (path) => {
+    const res = await env.ASSETS.fetch("https://assets.local" + path);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type") ?? "").toMatch(/^text\/html/);
+    await res.arrayBuffer();
+  });
 });

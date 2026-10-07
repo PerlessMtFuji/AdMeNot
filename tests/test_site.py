@@ -55,7 +55,7 @@ def test_no_external_resources(name):
     for tag in ("link", "script", "img"):
         for attrs in page.all(tag):
             ref = attrs.get("href") or attrs.get("src") or ""
-            assert ref.startswith("/"), f"{name}: <{tag}> {ref}"  # zasoby tylko z tego hosta
+            assert ref.startswith("/") and not ref.startswith("//"), f"{name}: <{tag}> {ref}"  # zasoby tylko z tego hosta
 
 
 @pytest.mark.parametrize("name", PAGES)
@@ -92,6 +92,16 @@ def test_privacy_names_the_controller(name):
     assert "Eryk Wlodarski" in text
     assert "e.wlodarski@protonmail.com" in text
     assert "selfcheck --online" in text
+
+
+@pytest.mark.parametrize(
+    ("name", "basis"),
+    (("privacy.html", "Art. 6(1)(f)"), ("pl/privacy.html", "art. 6 ust. 1 lit. f")),
+)
+def test_privacy_states_legal_basis_and_transfer(name, basis):
+    text, _ = load(name)
+    assert basis in text
+    assert "Data Privacy Framework" in text
 
 
 def test_polish_privacy_names_the_authority():

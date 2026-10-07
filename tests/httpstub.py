@@ -5,6 +5,7 @@ from __future__ import annotations
 import socket
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -34,10 +35,13 @@ def serve(stub: Stub):
             self.end_headers()
             self.wfile.flush()
             time.sleep(stub.delay)
-            if stub.truncate_body:  # wysłanie tylko połowy bajtów, potem zamknięcie
-                self.wfile.write(stub.body[:len(stub.body) // 2])
-            else:
-                self.wfile.write(stub.body)
+            try:
+                if stub.truncate_body:  # wysłanie tylko połowy bajtów, potem zamknięcie
+                    self.wfile.write(stub.body[:len(stub.body) // 2])
+                else:
+                    self.wfile.write(stub.body)
+            except OSError:  # klient mógł już zamknąć gniazdo po timeoucie — bez śladu w stderr
+                pass
 
         do_GET = do_POST = _reply
 
@@ -56,7 +60,7 @@ def serve(stub: Stub):
     return stop
 
 
-def serve_garbage() -> tuple[str, callable]:
+def serve_garbage() -> tuple[str, Callable[[], None]]:
     """Uruchamia surowy serwer wysyłający śmieci zamiast HTTP; zwraca (url, stop_fn)."""
 
     def handler():
