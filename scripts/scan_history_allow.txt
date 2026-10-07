@@ -8,3 +8,16 @@ DomKowalskich  # fikcyjna sieć Wi-Fi w testach skanera
 +999 123 456 789  # fikcyjny numer w testach skanera
 Testowy  # fikcyjny katalog użytkownika w testach skanera
 R58T00TEST  # numer seryjny w nagraniach mostu (tests/fixtures/bridge)
+499001200000004  # IMEI testowy w fiksturach i testach (tests/test_device_imei.py i in.)
+HT7A1B2C3  # fikcyjny numer seryjny w tests/fixtures/bridge/many.json
+S1  # numer seryjny-zaślepka w testach i planach („serial”: „S1”)
+R58  # prefiks Samsunga jako numer-zaślepka w testach (tests/test_app_present.py i in.)
+S/N  # etykieta pola w tłumaczeniach UI, nie wartość
+Nr seryjny  # etykieta pola w tekstach raportu, nie wartość
+Serial no.  # etykieta pola w tekstach raportu, nie wartość
+noreply@anthropic.com  # publiczny adres z linii Co-Authored-By w planach
++48 600 000 000  # numer-zaślepka w ustawieniach (tests/test_settings.py)
+serwis  # fikcyjny użytkownik Windows w ui/src/lib/fakeBridge.ts i planach
+O  # C:\Users\O'Brien\ — przykład ścieżki z apostrofem w planie wydania
+)(?P<v>[^  # fragment wyrażenia regularnego w samym skanerze i jego planie
+\  # fragment wyrażenia regularnego w samym skanerze i jego planie
