@@ -296,7 +296,7 @@ def history_view(journal: Journal, serial: str | None, serials: list[str],
             "interrupted": o.id in interrupted,
             "screenshots": journal.screenshot_count(o.id),
             "actions": [action_view(a, lang) for a in actions],
-            "apps": _order_apps(journal.scan(o.id), actions),
+            "apps": _order_apps(journal.scan(o.id) if actions else None, actions),
         })
     return {"serial": serial, "serials": serials, "devices": devices, "orders": orders}
 
