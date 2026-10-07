@@ -24,7 +24,7 @@ from admenot.app.jobs import Job, JobRunner, Stopped
 from admenot.app.present import (
     app_name,
     device_card,
-    device_name,
+    device_identity,
     estimate_view,
     history_view,
     plan_view,
@@ -620,8 +620,9 @@ class Api:
         ready = {e.serial for e in list_devices(self._host) if e.state == "device"}
         if order.device_serial not in ready:
             with self._journal() as journal:
-                name = device_name(journal, order.device_serial)
-            raise AppError("wrong_device", order.device_serial, serial=order.device_serial, device=name)
+                name, imei = device_identity(journal, order.device_serial)
+            raise AppError("wrong_device", order.device_serial, serial=order.device_serial,
+                           device=name, imei=imei)
         return order, self._session(order.device_serial)
 
     @_api

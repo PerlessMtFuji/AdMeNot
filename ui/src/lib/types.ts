@@ -282,6 +282,7 @@ export interface ApiErrorBody {
   serial?: string;
   /** Nazwa telefonu (wrong_device), jak na ekranie historii. */
   device?: string;
+  imei?: string | null;
   log?: string;
 }
 

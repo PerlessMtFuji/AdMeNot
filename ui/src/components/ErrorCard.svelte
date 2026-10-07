@@ -11,6 +11,13 @@
   const s = ctl.state;
   const known: readonly string[] = ERROR_KEYS;
   const key = $derived(s.error && known.includes(s.error.key) ? s.error.key : 'internal');
+  // Telefon jak na karcie urządzenia: nazwa, a obok IMEI (zapas: numer seryjny), żeby rozróżnić dwa takie same modele.
+  const device = $derived.by(() => {
+    const e = s.error;
+    const id = e?.imei ? `IMEI ${e.imei}` : e?.serial;
+    if (!e?.device) return id ?? '';
+    return id && id !== e.device ? `${e.device} (${id})` : e.device;
+  });
 </script>
 
 {#if fatal}
@@ -24,7 +31,7 @@
   <div role="alert" in:enter class="flex items-start gap-3 rounded-2xl border border-bad/30 bg-bad-soft px-4 py-3">
     <span class="mt-0.5 text-bad"><Icon name="triangle-alert" size={16} /></span>
     <div class="min-w-0 flex-1">
-      <b class="text-ink">{t(`error.${key}`, { device: s.error.device ?? s.error.serial ?? '' })}</b>
+      <b class="text-ink">{t(`error.${key}`, { device })}</b>
       {#if s.error.message && key !== 'wrong_device'}
         <div class="mono mt-1 text-xs break-words text-mut">{s.error.message}</div>
       {/if}

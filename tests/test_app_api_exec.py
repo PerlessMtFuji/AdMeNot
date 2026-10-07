@@ -164,7 +164,9 @@ def test_history_and_undo_with_another_phone_connected():
     assert history["serial"] == SERIAL and history["serials"] == [SERIAL]
     error = fresh.undo(number)["error"]
     assert error["key"] == "wrong_device" and error["serial"] == SERIAL
-    assert error["device"] == fresh.history()["devices"][0]["name"] != SERIAL  # nazwa jak w historii
+    device = fresh.history()["devices"][0]
+    assert error["device"] == device["name"] != SERIAL  # nazwa i IMEI jak w historii
+    assert error["imei"] == device["imei"]
     assert phone.apps["com.wlive.forecast"].enabled is False
     assert fresh.history("NOPE")["orders"] == []
 

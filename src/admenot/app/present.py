@@ -260,9 +260,10 @@ def _history_device(journal: Journal, serial: str, orders: list[Order]) -> dict[
             "imei": block.imei}
 
 
-def device_name(journal: Journal, serial: str) -> str:
-    """Nazwa telefonu z zapisanych zleceń, jak na ekranie historii (zapas: numer seryjny)."""
-    return _history_device(journal, serial, journal.orders_for(serial))["name"]
+def device_identity(journal: Journal, serial: str) -> tuple[str, str | None]:
+    """Nazwa i IMEI telefonu z zapisanych zleceń, jak na ekranie historii (zapas nazwy: numer seryjny)."""
+    device = _history_device(journal, serial, journal.orders_for(serial))
+    return device["name"], device["imei"]
 
 
 def history_view(journal: Journal, serial: str | None, serials: list[str],
