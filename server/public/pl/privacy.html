@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Polityka prywatności — AdMeNot</title>
+<link rel="icon" href="/favicon.ico">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/pl/"><img src="/icon.png" alt="" width="32" height="32"> AdMeNot</a>
+  <a class="lang" href="/privacy" hreflang="en" lang="en">English</a>
+</header>
+<main>
+  <section>
+    <h1>Polityka prywatności</h1>
+    <p class="note">Wersja z 7 października 2026</p>
+
+    <h2>Kto odpowiada za dane</h2>
+    <p>Administratorem danych jest Eryk Wlodarski. Kontakt: <a href="mailto:e.wlodarski@protonmail.com">e.wlodarski@protonmail.com</a>.</p>
+
+    <h2>Program AdMeNot</h2>
+    <p>Obecna wersja programu AdMeNot nie wysyła żadnych danych. Skany, raporty i dziennik działań zostają na Twoim komputerze.</p>
+    <p>Jedyny wyjątek to polecenie diagnostyczne <code>admenot selfcheck --online</code>, które uruchamiasz sam. Sprawdza, czy nasz serwer odpowiada, wywołując <code>/api/v1/health</code>. Zapytanie nie zawiera nic poza standardowym zapytaniem HTTP z nagłówkiem <code>User-Agent: AdMeNot/&lt;wersja&gt;</code>.</p>
+
+    <h2>Ta strona</h2>
+    <p>Strona nie używa ciasteczek, analityki ani zasobów z innych serwerów.</p>
+    <p>Stronę hostuje Cloudflare jako podmiot przetwarzający. Cloudflare widzi Twój adres IP przy połączeniu — tak działa internet. My adresów IP nie zapisujemy i ich nie otrzymujemy.</p>
+    <p>Instalator pobierasz z GitHuba, który ma własne <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">zasady prywatności</a>.</p>
+
+    <h2>Zasady dla każdej przyszłej funkcji</h2>
+    <ul>
+      <li>Nie zapisujemy adresów IP.</li>
+      <li>IMEI, numer seryjny, numery telefonów i listę aplikacji z telefonu klienta wysyłamy tylko po wyraźnej zgodzie przy konkretnym wysłaniu (na przykład raport błędu, który widzisz przed wysłaniem).</li>
+      <li>Statystyki użycia (telemetria) wyłącznie po wcześniejszej zgodzie.</li>
+      <li>Każda nowa funkcja wysyłająca dane najpierw dopisuje się do tej polityki.</li>
+    </ul>
+
+    <h2>Twoje prawa</h2>
+    <p>Na podstawie RODO możesz żądać dostępu do swoich danych, ich sprostowania lub usunięcia oraz wnieść sprzeciw wobec ich przetwarzania. Napisz na adres podany wyżej. Masz też prawo wnieść skargę do Prezesa Urzędu Ochrony Danych Osobowych (UODO).</p>
+  </section>
+</main>
+<footer>
+  <a href="/pl/">AdMeNot</a> ·
+  <a href="https://github.com/PerlessMtFuji/AdMeNot">Kod źródłowy</a>
+</footer>
+</body>
+</html>

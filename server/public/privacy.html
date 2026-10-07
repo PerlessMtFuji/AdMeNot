@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy policy — AdMeNot</title>
+<link rel="icon" href="/favicon.ico">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/"><img src="/icon.png" alt="" width="32" height="32"> AdMeNot</a>
+  <a class="lang" href="/pl/privacy" hreflang="pl" lang="pl">Polski</a>
+</header>
+<main>
+  <section>
+    <h1>Privacy policy</h1>
+    <p class="note">Version of 7 October 2026</p>
+
+    <h2>Who is responsible</h2>
+    <p>The data controller is Eryk Wlodarski. Contact: <a href="mailto:e.wlodarski@protonmail.com">e.wlodarski@protonmail.com</a>.</p>
+
+    <h2>The AdMeNot program</h2>
+    <p>The current version of AdMeNot sends no data anywhere. Scans, reports and the action journal stay on your computer.</p>
+    <p>The only exception is the diagnostic command <code>admenot selfcheck --online</code>, which you run yourself. It checks whether our server is reachable by calling <code>/api/v1/health</code>. The request carries nothing beyond a standard HTTP request with the header <code>User-Agent: AdMeNot/&lt;version&gt;</code>.</p>
+
+    <h2>This website</h2>
+    <p>The website uses no cookies, no analytics and no resources from other servers.</p>
+    <p>It is hosted by Cloudflare, which acts as our processor. Cloudflare sees your IP address when you connect, because that is how the internet works. We do not store IP addresses and do not receive them.</p>
+    <p>The installer is downloaded from GitHub, which has its own <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">privacy statement</a>.</p>
+
+    <h2>Rules for every future feature</h2>
+    <ul>
+      <li>We do not store IP addresses.</li>
+      <li>The IMEI, serial number, phone numbers and app list of a customer's phone are sent only with explicit consent at the moment of sending (for example, an error report you see before it is sent).</li>
+      <li>Usage statistics (telemetry) only after you opt in.</li>
+      <li>Every new feature that sends data is added to this policy first.</li>
+    </ul>
+
+    <h2>Your rights</h2>
+    <p>Under the GDPR you may ask for access to your data, its correction or deletion, and object to its processing. Write to the address above. You may also lodge a complaint with a supervisory authority — in Poland, the President of the Personal Data Protection Office (UODO).</p>
+  </section>
+</main>
+<footer>
+  <a href="/">AdMeNot</a> ·
+  <a href="https://github.com/PerlessMtFuji/AdMeNot">Source code</a>
+</footer>
+</body>
+</html>

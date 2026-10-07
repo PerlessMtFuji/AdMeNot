@@ -25,3 +25,4 @@ O  # C:\Users\O'Brien\ — przykład ścieżki z apostrofem w planie wydania
 Q7Z9TEST  # fikcyjny numer seryjny w testach skanera (nagranie JSON)
 DomNowakow  # fikcyjna sieć Wi-Fi w testach skanera (nagranie JSON)
 SiecNowakow  # fikcyjna sieć Wi-Fi w testach skanera (nagranie JSON)
+e.wlodarski@protonmail.com  # administrator danych w polityce prywatności (server/public) — publiczny celowo
