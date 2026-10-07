@@ -54,18 +54,24 @@ def parse_allowed_listeners(text: str) -> list[str] | None:
     """`dumpsys notification`: słuchacze zatwierdzeni w NotificationManagerze dla profilu 0.
 
     Od Androida 9 to oni mają dostęp, a `settings secure enabled_notification_listeners` jest
-    tylko kopią, która potrafi się rozjechać. None = sekcji nie ma (stary Android, inny format).
+    tylko kopią, która potrafi się rozjechać. None = sekcji nie ma (stary Android) albo jest w nieznanym
+    formacie — wtedy liczy się kopia, bo pusta lista uznałaby odebranie dostępu za już zrobione.
     """
     lines = text.splitlines()
     for i, line in enumerate(lines):
         if line.strip() != _LISTENERS_HEADER:
             continue
         indent = len(line) - len(line.lstrip(" "))
+        approved: list[str] = []
         for nxt in lines[i + 1:]:
-            if nxt.strip() and len(nxt) - len(nxt.lstrip(" ")) <= indent:
+            if not nxt.strip():
+                continue
+            if len(nxt) - len(nxt.lstrip(" ")) <= indent:
                 break
             m = _APPROVED_LINE.match(nxt)
-            if m and m[2] == "0" and m[3] == "true":
-                return [c for c in m[1].split(":") if "/" in c]
-        return []
+            if m is None:
+                return None
+            if m[2] == "0" and m[3] == "true":
+                approved = [c for c in m[1].split(":") if "/" in c]
+        return approved
     return None

@@ -77,18 +77,21 @@ class SecureSettingsCollector:
     def collect(self, adb: AdbTransport, apps: list[AppFacts]) -> dict[str, set[str]]:
         return {
             "a11y": split_components(adb.shell(A11Y_SERVICES)),
-            # Suma obu źródeł: kopia w ustawieniach potrafi się rozjechać z NotificationManagerem
-            # (np. po `settings put`), a dostęp ma ten, kogo zatwierdza którekolwiek z nich.
-            "listeners": split_components(adb.shell(NOTIF_LISTENERS)) | self._approved(adb),
+            "listeners": self._listeners(adb),
         }
 
     @staticmethod
-    def _approved(adb: AdbTransport) -> set[str]:
+    def _listeners(adb: AdbTransport) -> set[str]:
+        # Dostęp trzyma NotificationManager; kopia w ustawieniach potrafi się z nim rozjechać
+        # (np. po `settings put`). To samo źródło co krok naprawy (steps.read_secure_list),
+        # inaczej skan zgłaszałby dostęp, którego krok nie widzi i nie ma czego odebrać.
         try:
             approved = parse_allowed_listeners(adb.shell(NOTIF_MANAGER, timeout=30))
         except AdbError:
-            return set()  # nagranie sprzed tej zmiany albo telefon bez tej sekcji: zostaje kopia
-        return split_components(":".join(approved or []))
+            approved = None  # nagranie sprzed tej zmiany: zostaje kopia
+        if approved is not None:
+            return split_components(":".join(approved))
+        return split_components(adb.shell(NOTIF_LISTENERS))
 
     def apply(self, facts: dict[str, AppFacts], data: dict[str, set[str]]) -> None:
         for f in facts.values():

@@ -118,7 +118,8 @@ def test_system_collectors_with_home_fallback():
     assert facts["com.a"].accessibility_enabled and not facts["com.a"].notification_listener
 
 
-def test_listener_access_counts_from_setting_or_notification_manager():
+def test_listener_access_from_notification_manager_not_the_stale_setting():
+    # To samo źródło co krok naprawy: wpis tylko w kopii nie daje dostępu i nie ma czego odebrać.
     adb = FakeAdb({
         A11Y_SERVICES: "null\n",
         NOTIF_LISTENERS: "com.b/.Listener\n",
@@ -127,7 +128,19 @@ def test_listener_access_counts_from_setting_or_notification_manager():
     })
     facts = _facts()
     run_collectors(adb, facts, [SecureSettingsCollector()])
-    assert facts["com.a"].notification_listener and facts["com.b"].notification_listener
+    assert facts["com.a"].notification_listener and not facts["com.b"].notification_listener
+
+
+def test_listener_access_from_setting_when_notification_manager_unreadable():
+    adb = FakeAdb({
+        A11Y_SERVICES: "null\n",
+        NOTIF_LISTENERS: "com.b/.Listener\n",
+        NOTIF_MANAGER: ("  Notification listeners:\n    Allowed notification listeners:\n"
+                        "      com.a/.Listener [user 0, primary]\n"),
+    })
+    facts = _facts()
+    run_collectors(adb, facts, [SecureSettingsCollector()])
+    assert facts["com.b"].notification_listener and not facts["com.a"].notification_listener
 
 
 class _Exploding:

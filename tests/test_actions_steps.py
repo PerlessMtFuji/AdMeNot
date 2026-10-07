@@ -131,6 +131,18 @@ def test_listener_state_is_read_from_notification_manager_not_the_setting():
     assert S.is_applied(step, S.probe(phone, step))
 
 
+def test_listener_state_falls_back_to_setting_when_notification_manager_format_is_unknown():
+    # Nieznany format linii nie może dać pustej listy: krok uznałby dostęp za już odebrany.
+    phone = _phone(secure={LISTENERS: f"{GEARHEAD}:{AD_LISTENER}"})
+    phone._notification_manager = lambda: ("  Notification listeners:\n    Allowed notification listeners:\n"
+                                           f"      {GEARHEAD}:{AD_LISTENER} [user 0, primary]\n")
+    step = _remove_listener()
+    assert S.probe(phone, step) == {"value": f"{GEARHEAD}:{AD_LISTENER}"}
+    assert not S.is_applied(step, S.probe(phone, step))
+    S.apply(phone, step)
+    assert phone.listeners_allowed == [GEARHEAD]
+
+
 def test_listener_access_undo_allows_it_again():
     phone = _phone(secure={LISTENERS: f"{GEARHEAD}:{AD_LISTENER}"})
     _apply_and_undo(phone, _remove_listener())

@@ -114,3 +114,13 @@ def test_allowed_listeners_empty_section_and_missing_section():
     empty = "  Notification listeners:\n    Allowed notification listeners:\n    Has user set:\n"
     assert parse_allowed_listeners(empty) == []
     assert parse_allowed_listeners("Current Notification Manager state:\n  Notification List:\n") is None
+
+
+def test_allowed_listeners_unknown_line_format_is_unreadable_not_empty():
+    # Pusta lista uznałaby odebranie dostępu za zrobione; None każe czytać kopię z ustawień.
+    odd = ("  Notification listeners:\n    Allowed notification listeners:\n"
+           "      com.a/.Listener [user 0, primary]\n    Has user set:\n")
+    assert parse_allowed_listeners(odd) is None
+    only_work = ("    Allowed notification listeners:\n"
+                 "      com.work/.Listener (user: 10 isPrimary: true)\n")
+    assert parse_allowed_listeners(only_work) == []
