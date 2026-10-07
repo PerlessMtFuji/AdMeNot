@@ -16,8 +16,10 @@ Oba skany na całej historii (spec `2026-10-07-public-repo-design.md` §4):
     .venv\Scripts\python scripts\scan_history.py
 
 gitleaks: brak znalezisk albo każde opisane w `.gitleaks.toml`. Skaner: `brak trafień`;
-fałszywe alarmy trafiają do `scripts/scan_history_allow.txt` z uzasadnieniem. Nowe nagranie
-z telefonu przed commitem: najpierw skan, potem `git add`.
+fałszywe alarmy trafiają do `scripts/scan_history_allow.txt` z uzasadnieniem. Skaner widzi
+tylko to, co jest w commitach (nie drzewo robocze ani indeks), więc nowe nagranie z telefonu:
+commit lokalnie, skan, a push dopiero przy `brak trafień`. Trafienie w nowym nagraniu — popraw
+plik i przepisz lokalny commit (`git commit --amend`) przed pushem.
 
 ## Build
 
