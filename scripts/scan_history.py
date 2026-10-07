@@ -1,4 +1,4 @@
-"""Skan całej historii gita pod kątem danych osobowych z nagrań telefonów (spec 2026-10-07 §4.2).
+"""Skan całej historii gita pod kątem danych osobowych z nagrań telefonów.
 
 python scripts/scan_history.py [--repo .] [--allow scripts/scan_history_allow.txt]
 

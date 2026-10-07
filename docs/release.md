@@ -1,7 +1,5 @@
 # Wydanie AdMeNot
 
-Spec: `docs/superpowers/specs/2026-10-04-release-build-design.md`.
-
 ## Przygotowanie (raz)
 
     .venv\Scripts\pip install -e ".[dev,gui,release]"
@@ -10,7 +8,7 @@ Inno Setup 6 w `C:\Program Files (x86)\Inno Setup 6\` (albo `--iscc`). Node.js 2
 
 ## Przed wypchnięciem do publicznego repo
 
-Oba skany na całej historii (spec `2026-10-07-public-repo-design.md` §4):
+Oba skany na całej historii:
 
     gitleaks git -v --redact --report-path build\gitleaks.json .
     .venv\Scripts\python scripts\scan_history.py

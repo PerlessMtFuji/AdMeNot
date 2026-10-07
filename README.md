@@ -2,8 +2,6 @@
 
 Program na Windows, który po podłączeniu telefonu z Androidem (debugowanie USB) heurystycznie wykrywa aplikacje intruzywne (reklamy, spam powiadomień, nakładki, fałszywe launchery, administratorzy urządzenia), pozwala je wyciszyć, wyłączyć albo usunąć i cofnąć każdą zmianę.
 
-Specyfikacja: `docs/superpowers/specs/2026-09-26-demalware-design.md`. Plany: `docs/superpowers/plans/`.
-
 ## Wymagania
 
 - Windows 10/11 x64, Python 3.13, Node.js 24 (tylko do budowania UI)

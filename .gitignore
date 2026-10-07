@@ -1,4 +1,6 @@
 .superpowers/
+# specyfikacje, plany i notatki robocze — tylko lokalnie, nie w publicznym repo
+docs/superpowers/
 .venv/
 .idea/
 __pycache__/

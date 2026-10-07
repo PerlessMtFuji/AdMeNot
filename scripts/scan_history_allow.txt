@@ -1,11 +1,11 @@
-# Wartości, które scripts/scan_history.py ma pomijać (spec 2026-10-07 §4.2).
+# Wartości, które scripts/scan_history.py ma pomijać.
 # Jedna wartość na linię, po # — dlaczego jest bezpieczna. Wartość jest dozwolona w każdym pliku.
 490154203237518  # przykładowy IMEI w tests/test_scan_history_script.py
-ABC123XYZ  # numer seryjny w testach skanera i w specu 2026-10-07
-jan.kowalski@poczta.test  # fikcyjny adres w testach skanera
+ABC123XYZ  # numer seryjny w testach skanera
+jan.kowalski@poczta.test  # fikcyjny adres w testach skanera (domena .test zarezerwowana)
 jan.kowalski  # fikcyjne konto w testach skanera
 DomKowalskich  # fikcyjna sieć Wi-Fi w testach skanera
-+999 123 456 789  # fikcyjny numer w testach skanera
++999 123 456 789  # fikcyjny numer w testach skanera (+999 — kod nieprzydzielony)
 Testowy  # fikcyjny katalog użytkownika w testach skanera
 R58T00TEST  # numer seryjny w nagraniach mostu (tests/fixtures/bridge)
 499001200000004  # IMEI testowy w fiksturach i testach (tests/test_device_imei.py i in.)

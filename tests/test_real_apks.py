@@ -49,8 +49,8 @@ def test_current_parser_matches_stored_reports():
         analyzer.close()
 
 
-# Pełny przebieg (132 pakiety, ~25 s na aplikację) jest w docs/superpowers/measurements/2026-10-01-callgraph.md;
-# test bierze stały podzbiór, żeby dało się go uruchomić w kilka minut.
+# Pełny przebieg to 132 pakiety, ~25 s na aplikację; test bierze stały podzbiór, żeby dało się
+# go uruchomić w kilka minut.
 CALLGRAPH_SAMPLE = 10
 
 
