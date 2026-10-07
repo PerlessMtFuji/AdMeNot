@@ -1,0 +1,24 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "admenot",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./public/",
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    // Kod Workera tylko dla API — strona nie zużywa limitu wywołań (spec §2.1).
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "admenot",
+      // Prawdziwy identyfikator wpisuje Task 3 (`wrangler d1 create`); lokalnie wystarczy dowolny.
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // Bez Workers Logs: nie zapisujemy adresów IP (spec §2.2).
+  "observability": { "enabled": false }
+}

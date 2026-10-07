@@ -24,3 +24,6 @@ tests/fixtures/vivo-v2405a-android16-t2/
 # Zrzuty awarii narzędzi (msys bash, JVM)
 *.stackdump
 hs_err_pid*.log
+
+# Worker (server/): stan lokalny wranglera
+.wrangler/
