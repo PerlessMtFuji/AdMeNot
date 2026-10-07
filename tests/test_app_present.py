@@ -229,6 +229,23 @@ def test_history_devices_show_phone_name_model_and_photo(tmp_path):
     assert old["image"] == image_uri(SILHOUETTE)
 
 
+def test_history_orders_name_apps_and_show_icons_from_the_order_snapshot(tmp_path):
+    with Journal(tmp_path / "j.db") as journal:
+        order = journal.create_order("R58", "SM-A145R", None)
+        journal.save_scan(order.id, {"apps": [
+            {"package": "com.wlive.forecast", "label": "Weather Live", "icon": "data:image/png;base64,AA=="},
+            {"package": "com.other", "label": None, "icon": None}]})
+        step = {"kind": "enabled", "package": "com.wlive.forecast", "params": {"enabled": "0"}}
+        journal.add_action(order.id, "com.wlive.forecast", "disable", step, "pm disable-user")
+        journal.add_action(order.id, "com.gone", "disable", {**step, "package": "com.gone"}, "pm disable-user")
+        journal.create_order("OLD1", "Redmi_Note_8", None)  # zlecenie bez migawki
+        (o,) = history_view(journal, "R58", ["R58"], "pl")["orders"]
+        (old,) = history_view(journal, "OLD1", ["OLD1"], "pl")["orders"]
+    assert o["apps"] == {"com.wlive.forecast": {"name": "Weather Live", "icon": "data:image/png;base64,AA=="},
+                         "com.gone": {"name": None, "icon": None}}
+    assert old["apps"] == {}
+
+
 def test_app_view_lists_analysis_scope_for_a_quiet_app():
     from admenot.engine.scoring import AppResult
 

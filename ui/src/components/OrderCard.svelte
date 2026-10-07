@@ -1,24 +1,24 @@
 <script lang="ts">
   import { slide } from 'svelte/transition';
   import { t, tp } from '../lib/i18n/index.svelte';
-  import { groupHistory, type HistoryAppRow, initial, orderCounts } from '../lib/logic';
+  import { groupHistory, historyApp, type HistoryAppRow, initial, orderCounts } from '../lib/logic';
   import { DUR, ms } from '../lib/motion';
-  import type { HistoryOrder } from '../lib/types';
+  import type { AppView, HistoryOrder } from '../lib/types';
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
   import AppIcon from './AppIcon.svelte';
   import ReportButton from './ReportButton.svelte';
   import ScreenshotStrip from './ScreenshotStrip.svelte';
 
-  type Props = { order: HistoryOrder; names: Map<string, string>; icons?: Map<string, string | null>; disabled: boolean;
+  type Props = { order: HistoryOrder; scanned?: AppView[]; disabled: boolean;
     onrestore: (pkg: string) => void; onrestoreStep: (actionId: number) => void; onundoAll: () => void };
-  let { order, names, icons, disabled, onrestore, onrestoreStep, onundoAll }: Props = $props();
+  let { order, scanned = [], disabled, onrestore, onrestoreStep, onundoAll }: Props = $props();
   let open = $state<string[]>([]);
   let shotsOpen = $state(false);
   const rows = $derived(groupHistory(order.actions));
   const undone = $derived(order.status === 'undone');
   const canUndo = $derived(order.actions.some((a) => a.status === 'done' || a.status === 'pending'));
-  const nameOf = (pkg: string) => names.get(pkg) ?? pkg;
+  const nameOf = (pkg: string) => historyApp(order, pkg, scanned).name;
   const title = $derived.by(() => {
     if (order.interrupted) return t('history.interrupted_title', { names: rows.map((r) => nameOf(r.package)).join(', ') });
     const text = orderCounts(rows).map(([level, n]) => tp(`history.did.${level}`, n)).join(` ${t('history.and')} `);
@@ -61,13 +61,19 @@
     </div>
   {/if}
   {#each rows as r (r.package)}
+    {@const app = historyApp(order, r.package, scanned)}
     <div class="group border-t border-line/70">
       <div class="flex items-center gap-3 px-5 py-2.5 transition-colors duration-150 hover:bg-surface-2">
-        <AppIcon icon={icons?.get(r.package)} class="h-7 w-7">
-          <span class="grid h-7 w-7 flex-none place-items-center rounded-lg bg-neutral-soft text-xs font-extrabold text-mut shadow-[var(--shadow-well)]" aria-hidden="true">{initial(nameOf(r.package))}</span>
+        <AppIcon icon={app.icon} class="h-8 w-8">
+          <span class="grid h-8 w-8 flex-none place-items-center rounded-lg bg-neutral-soft text-xs font-extrabold text-mut shadow-[var(--shadow-well)]" aria-hidden="true">{initial(app.name)}</span>
         </AppIcon>
-        <b class="min-w-0 truncate">{nameOf(r.package)}</b>
-        <span class="truncate text-mut">{stateText(r)}</span>
+        <span class="flex min-w-0 flex-col">
+          <span class="flex min-w-0 items-baseline gap-3">
+            <b class="min-w-0 truncate">{app.name}</b>
+            <span class="truncate text-mut">{stateText(r)}</span>
+          </span>
+          {#if app.name !== r.package}<span class="mono truncate text-2xs text-soft">{r.package}</span>{/if}
+        </span>
         <span class="ml-auto flex flex-none items-center gap-3">
           <button type="button" class="text-sm font-semibold text-soft hover:text-ink" aria-expanded={open.includes(r.package)}
             onclick={() => toggle(r.package)}>{t('history.steps')}</button>
@@ -78,7 +84,7 @@
         </span>
       </div>
       {#if open.includes(r.package)}
-        <ul class="pr-5 pb-2.5 pl-[60px]" transition:slide={{ duration: ms(DUR.enter) }}>
+        <ul class="pr-5 pb-2.5 pl-[64px]" transition:slide={{ duration: ms(DUR.enter) }}>
           {#each r.actions as a (a.id)}
             <li class="flex gap-2 py-0.5 text-sm text-mut">
               <span class="min-w-0 flex-1">{a.step_label} — {a.status_label}{a.error ? `: ${a.error}` : ''}</span>

@@ -209,6 +209,8 @@ export interface HistoryOrder {
   model: string | null;
   interrupted: boolean;
   actions: HistoryAction[];
+  /** Nazwy i ikony z migawki zlecenia; brak przy zleceniach sprzed migawek. */
+  apps?: Record<string, { name: string | null; icon: string | null }>;
   screenshots: number;
 }
 

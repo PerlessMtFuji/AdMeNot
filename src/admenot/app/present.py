@@ -266,6 +266,15 @@ def device_identity(journal: Journal, serial: str) -> tuple[str, str | None]:
     return device["name"], device["imei"]
 
 
+def _order_apps(snap: dict[str, Any] | None, actions: list[Action]) -> dict[str, dict[str, Any]]:
+    # Nazwy i ikony z migawki tego zlecenia: historia nie zależy od bieżącego skanu ani telefonu.
+    if snap is None:
+        return {}
+    saved = {a["package"]: a for a in snap.get("apps", [])}
+    return {p: {"name": saved.get(p, {}).get("label"), "icon": saved.get(p, {}).get("icon")}
+            for p in dict.fromkeys(a.package for a in actions)}
+
+
 def history_view(journal: Journal, serial: str | None, serials: list[str],
                  lang: str) -> dict[str, Any]:
     devices = []
@@ -277,6 +286,7 @@ def history_view(journal: Journal, serial: str | None, serials: list[str],
     interrupted = {o.id for o in journal.interrupted_orders(serial)}
     orders = []
     for o in journal.orders_for(serial):
+        actions = journal.actions(o.id)
         orders.append({
             "id": o.id, "number": o.number,
             "created_at": o.created_at.isoformat(timespec="minutes"),
@@ -285,7 +295,8 @@ def history_view(journal: Journal, serial: str | None, serials: list[str],
             "client": o.client_name, "model": o.device_model,
             "interrupted": o.id in interrupted,
             "screenshots": journal.screenshot_count(o.id),
-            "actions": [action_view(a, lang) for a in journal.actions(o.id)],
+            "actions": [action_view(a, lang) for a in actions],
+            "apps": _order_apps(journal.scan(o.id), actions),
         })
     return {"serial": serial, "serials": serials, "devices": devices, "orders": orders}
 

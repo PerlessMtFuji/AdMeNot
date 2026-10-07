@@ -97,6 +97,19 @@ test('partially undone order: restored app has no restore, others keep it; clien
   expect(within(card).getByText(/<img src=x onerror=alert\(1\)>/)).toBeTruthy();
 });
 
+test('history: apps named and pictured from the order snapshot, package below the name, without a scan', async () => {
+  const { ctl, s } = await setupCtl('empty');
+  render(App, { props: { ctl } });
+  s.history = view({ interrupted: false, status: 'done', status_label: 'wykonane',
+    apps: { p: { name: 'Pogoda Live', icon: 'data:image/png;base64,AA==' } } });
+  s.screen = 'history';
+  await tick();
+  const card = screen.getByRole('article', { name: 'ZS/2026/0926/05' });
+  expect(within(card).getByText('Pogoda Live')).toBeTruthy();
+  expect(within(card).getByText('p').className).toContain('text-2xs');
+  expect(card.querySelector('img')?.getAttribute('src')).toBe('data:image/png;base64,AA==');
+});
+
 test('history: report button next to each order', async () => {
   const { s, ctl, bridge } = await setupCtl('report');
   render(App, { props: { ctl } });

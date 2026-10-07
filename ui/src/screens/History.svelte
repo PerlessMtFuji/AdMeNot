@@ -5,7 +5,7 @@
   import StepTimeline from '../components/StepTimeline.svelte';
   import type { Controller } from '../lib/controller';
   import { i18n, t } from '../lib/i18n/index.svelte';
-  import { dayKey, groupHistory, modelName } from '../lib/logic';
+  import { dayKey, groupHistory, historyApp, modelName } from '../lib/logic';
   import { enter, stagger } from '../lib/motion';
   import type { HistoryOrder } from '../lib/types';
   import Banner from '../ui/Banner.svelte';
@@ -17,8 +17,7 @@
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
   const h = $derived(s.history);
-  const names = $derived(new Map((s.scan?.apps ?? []).map((a) => [a.package, a.name])));
-  const icons = $derived(new Map((s.scan?.apps ?? []).map((a) => [a.package, a.icon])));
+  const scanned = $derived(s.scan?.apps ?? []);
   const interrupted = $derived(h?.orders.filter((o) => o.interrupted) ?? []);
   let other = $state('');
 
@@ -32,7 +31,7 @@
   function detail(o: HistoryOrder): string {
     const rows = groupHistory(o.actions);
     const row = rows.find((r) => r.state === 'pending') ?? rows[0];
-    return t('history.banner_detail', { name: names.get(row?.package ?? '') ?? row?.package ?? '',
+    return t('history.banner_detail', { name: row ? historyApp(o, row.package, scanned).name : '',
       done: o.actions.filter((a) => a.status === 'done').length, total: o.actions.length });
   }
 
@@ -88,7 +87,7 @@
               <span class="text-xs text-soft">{o.created_at.slice(11, 16)}</span>
             </div>
             <span class="absolute top-4 -left-[21px] h-3.5 w-3.5 rounded-full border-2 {dot(o)}" aria-hidden="true"></span>
-            <OrderCard order={o} {names} {icons} disabled={s.orderRunning}
+            <OrderCard order={o} {scanned} disabled={s.orderRunning}
               onrestore={(pkg) => ctl.undo(o.number, null, pkg)}
               onrestoreStep={(id) => ctl.undo(o.number, id)}
               onundoAll={() => ctl.undo(o.number)} />

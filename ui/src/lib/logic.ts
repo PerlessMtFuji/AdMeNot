@@ -1,5 +1,5 @@
 import { CATEGORY_ORDER } from './categories';
-import type { AppView, Category, DeviceEntry, Finding, HistoryAction, Level, Mode, OrderResult, PlanView, ScanView, StepEvent, Verdict } from './types';
+import type { AppView, Category, DeviceEntry, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanView, ScanView, StepEvent, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done';
 export type StageState = 'done' | 'now' | 'todo';
@@ -261,6 +261,13 @@ export function groupHistory(actions: HistoryAction[]): HistoryAppRow[] {
     r.canRestore = statuses.includes('done');
   }
   return rows;
+}
+
+/** Nazwa i ikona aplikacji w historii: z migawki zlecenia, potem z bieżącego skanu, na końcu pakiet. */
+export function historyApp(order: HistoryOrder, pkg: string, scanned: AppView[] = []): { name: string; icon: string | null } {
+  const saved = order.apps?.[pkg];
+  const now = scanned.find((a) => a.package === pkg);
+  return { name: saved?.name || now?.name || pkg, icon: saved?.icon ?? now?.icon ?? null };
 }
 
 export function orderCounts(rows: HistoryAppRow[]): [Level, number][] {
