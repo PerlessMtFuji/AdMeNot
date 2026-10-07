@@ -109,7 +109,7 @@ def run_checks() -> list[Check]:
 
 
 def server_check(lang: str) -> Check:
-    """`--online`: czy serwer odpowiada (spec backendu section 4.2) - jedyne polaczenie w tym kroku."""
+    "`--online`: czy serwer odpowiada (spec backendu §4.2) — jedyne połączenie w tym kroku."
     try:
         reply = client.get_json(HEALTH)
     except client.BackendError as exc:
@@ -123,8 +123,8 @@ def _print_checks(results: list[Check], lang: str) -> int:
     ok_word, missing_word = STATUS[lang]
     for r in results:
         word = ok_word if r.ok else missing_word
-        detail = "" if r.ok else f" -- {r.detail}"
-        print(f"{word:<7} {r.name}{detail}")  # kolumna 7 znakow: "MISSING" miesci sie bez obcinania
+        detail = "" if r.ok else f" — {r.detail}"
+        print(f"{word:<7} {r.name}{detail}")  # kolumna 7 znaków: „MISSING" mieści się bez obcinania
     return 0 if all(r.ok for r in results) else 1
 
 

@@ -46,25 +46,25 @@ def test_missing_phones_db_is_reported(installed, capsys):
     (installed / "phones.db").unlink()
     assert selfcheck_cli.cmd_selfcheck("pl") == 1
     out = capsys.readouterr().out
-    assert "BRAK    phones.db -- " in out
+    assert "BRAK    phones.db — " in out
 
 
 def test_missing_adb_is_reported(installed, capsys):
     (installed / "tools" / "scrcpy" / "adb.exe").unlink()
     assert selfcheck_cli.cmd_selfcheck("en") == 1
-    assert "MISSING adb.exe -- " in capsys.readouterr().out
+    assert "MISSING adb.exe — " in capsys.readouterr().out
 
 
 def test_missing_scrcpy_dll_is_reported(installed, capsys):
     (installed / "tools" / "scrcpy" / "SDL3.dll").unlink()
     assert selfcheck_cli.cmd_selfcheck("pl") == 1
-    assert "BRAK    SDL3.dll -- " in capsys.readouterr().out
+    assert "BRAK    SDL3.dll — " in capsys.readouterr().out
 
 
 def test_missing_androguard_resources_are_reported(installed, monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(selfcheck_cli, "androguard_resources", lambda: tmp_path / "nowhere")
     assert selfcheck_cli.cmd_selfcheck("pl") == 1
-    assert "BRAK    androguard public.xml -- " in capsys.readouterr().out
+    assert "BRAK    androguard public.xml — " in capsys.readouterr().out
 
 
 def test_cli_command(installed, capsys):
@@ -133,7 +133,7 @@ def test_online_selfcheck_reports_http_error(installed, health, capsys):
     health.status = 503
     health.body = b'{"ok": false, "db": false}'
     assert main(["selfcheck", "--online", "--lang", "en"]) == 1
-    assert "MISSING server -- http 503" in capsys.readouterr().out
+    assert "MISSING server — http 503" in capsys.readouterr().out
 
 
 def test_online_selfcheck_reports_offline(installed, monkeypatch, capsys):
@@ -142,10 +142,10 @@ def test_online_selfcheck_reports_offline(installed, monkeypatch, capsys):
 
     monkeypatch.setattr(client, "get_json", offline)
     assert main(["selfcheck", "--online"]) == 1
-    assert "BRAK    serwer -- offline" in capsys.readouterr().out
+    assert "BRAK    serwer — offline" in capsys.readouterr().out
 
 
 def test_online_selfcheck_requires_ok_true(installed, health, capsys):
     health.body = b'{"status": "up"}'  # 200, ale to nie nasz health
     assert main(["selfcheck", "--online"]) == 1
-    assert "BRAK    serwer -- ok != true" in capsys.readouterr().out
+    assert "BRAK    serwer — ok != true" in capsys.readouterr().out
