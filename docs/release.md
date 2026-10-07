@@ -8,6 +8,17 @@ Spec: `docs/superpowers/specs/2026-10-04-release-build-design.md`.
 
 Inno Setup 6 w `C:\Program Files (x86)\Inno Setup 6\` (albo `--iscc`). Node.js 24 do UI.
 
+## Przed wypchnięciem do publicznego repo
+
+Oba skany na całej historii (spec `2026-10-07-public-repo-design.md` §4):
+
+    gitleaks git -v --redact --report-path build\gitleaks.json .
+    .venv\Scripts\python scripts\scan_history.py
+
+gitleaks: brak znalezisk albo każde opisane w `.gitleaks.toml`. Skaner: `brak trafień`;
+fałszywe alarmy trafiają do `scripts/scan_history_allow.txt` z uzasadnieniem. Nowe nagranie
+z telefonu przed commitem: najpierw skan, potem `git add`.
+
 ## Build
 
 1. Podbij `__version__` w `src/admenot/__init__.py` i zatwierdź zmiany (build wymaga czystego drzewa).
