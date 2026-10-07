@@ -47,11 +47,13 @@ class Rule:
 RULES = (
     # 15 cyfr z poprawną sumą Luhna; nie część ułamka ani dłuższej liczby
     Rule("imei", re.compile(r"(?<![0-9.])(?P<v>[0-9]{15})(?![0-9])"), luhn_ok),
-    Rule("serial", re.compile(r"(?:\[ro(?:\.boot)?\.serialno\]: \[|\"serial\": \")(?P<v>[^\]\"]+)")),
+    # \\? — cudzysłowy escapowane, gdy wyjście polecenia leży w napisie JSON (nagrania mostu)
+    Rule("serial", re.compile(r"(?:\[ro(?:\.boot)?\.serialno\]: \[|\\?\"serial\\?\": \\?\")"
+                              r"(?P<v>[^\]\"\\]+)")),
     Rule("email", re.compile(r"(?P<v>[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})"),
          lambda value: not EXAMPLE_DOMAIN.search(value)),
     Rule("account", re.compile(r"(?:Account \{name=|account=)(?P<v>[^,}\s`]+)")),
-    Rule("wifi", re.compile(r"(?:SSID: \"|ssid=\"?)(?P<v>[^\",}\s`]+)", re.IGNORECASE)),
+    Rule("wifi", re.compile(r"(?:SSID: \\?\"|ssid=(?:\\?\")?)(?P<v>[^\\\",}\s`]+)", re.IGNORECASE)),
     Rule("phone", re.compile(r"(?<![0-9A-Za-z])(?P<v>\+[0-9][0-9 -]{7,17}[0-9])(?![0-9])"),
          lambda value: 9 <= sum(c.isdigit() for c in value) <= 15),
     Rule("user_path", re.compile(r"(?:[A-Za-z]:\\{1,2}Users\\{1,2}|/[a-z]/Users/)"

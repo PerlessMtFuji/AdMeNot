@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -63,6 +64,14 @@ def test_find_detects_each_rule():
     ])
     assert sorted(rule for rule, _ in m.find(text, frozenset())) == [
         "account", "email", "imei", "phone", "serial", "user_path", "wifi"]
+
+
+def test_find_sees_values_inside_json_strings():
+    # nagrania mostu trzymają wyjście poleceń jako napisy JSON, więc cudzysłowy są escapowane
+    m = _module()
+    text = json.dumps({"out": 'ssid="DomNowakow" SSID: "SiecNowakow" {"serial": "Q7Z9TEST"}'})
+    assert sorted(m.find(text, frozenset())) == [
+        ("serial", "Q7Z9TEST"), ("wifi", "DomNowakow"), ("wifi", "SiecNowakow")]
 
 
 def test_find_skips_fractions_and_invalid_imei():
