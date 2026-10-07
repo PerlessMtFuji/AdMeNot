@@ -14,8 +14,7 @@
     {
       "binding": "DB",
       "database_name": "admenot",
-      // Prawdziwy identyfikator wpisuje Task 3 (`wrangler d1 create`); lokalnie wystarczy dowolny.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "f360424a-d6fa-4483-b1e2-6441be5e6efc",
       "migrations_dir": "migrations"
     }
   ],

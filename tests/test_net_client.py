@@ -98,7 +98,7 @@ def test_env_url_trailing_slash(stub, monkeypatch):
 def test_default_base_url(monkeypatch):
     monkeypatch.delenv(client.ENV_URL, raising=False)
     assert client.base_url() == client.BASE_URL
-    assert client.BASE_URL == "https://admenot.<subdomena>.workers.dev"
+    assert client.BASE_URL == "https://admenot.e-wlodarski.workers.dev"
 
 
 def test_garbage_non_http_reply_is_offline(monkeypatch):

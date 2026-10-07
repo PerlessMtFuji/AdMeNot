@@ -19,6 +19,28 @@ tylko to, co jest w commitach (nie drzewo robocze ani indeks), więc nowe nagran
 commit lokalnie, skan, a push dopiero przy `brak trafień`. Trafienie w nowym nagraniu — popraw
 plik i przepisz lokalny commit (`git commit --amend`) przed pushem.
 
+## Backend (Cloudflare Worker `admenot`)
+
+Kod w `server/`: strona (`public/`), API (`src/index.ts`), migracje D1 (`migrations/`).
+Adres: `https://admenot.e-wlodarski.workers.dev` (ten sam co `BASE_URL` w `src/admenot/net/client.py`).
+
+Przed wdrożeniem: `npm test` i `npm run check` w `server/` oraz `pytest tests/test_site.py`.
+
+    cd server
+    npx wrangler login                                  # raz na komputer
+    npx wrangler d1 migrations apply admenot --remote   # zawsze PRZED deploy
+    npx wrangler deploy
+
+Kolejność ma znaczenie: nowy kod nigdy nie trafia na stary schemat. Sprawdzenie po wdrożeniu:
+`curl.exe -s <adres>/api/v1/health` → `{"ok":true,"db":true}` i `admenot selfcheck --online` → `OK      serwer`.
+Polityka obiecuje brak ciasteczek: `curl.exe -sI <adres>/ | findstr /i set-cookie` → puste.
+
+Przycisk pobierania na stronie: `data-released="false"` → `"true"` w `public/index.html`
+i `public/pl/index.html` przy pierwszym publicznym wydaniu, potem `deploy`.
+Przy przełączeniu na `"true"` najpierw popraw kontrast przycisku pobierania w trybie ciemnym
+(biały tekst na `#8b93fb` to ok. 2,9:1 — ciemniejsze tło akcentu albo ciemny tekst), w tym samym commicie.
+Zmiana treści polityki prywatności: obie wersje językowe i data wersji naraz.
+
 ## Build
 
 1. Podbij `__version__` w `src/admenot/__init__.py` i zatwierdź zmiany (build wymaga czystego drzewa).
