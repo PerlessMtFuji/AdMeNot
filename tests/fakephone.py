@@ -85,6 +85,7 @@ class FakePhone:
         static: dict[str, str | AdbError] | None = None,
         host: dict[str, str | AdbError] | None = None,
         sha256sum: bool = False,
+        listener_cmd: bool = True,
     ) -> None:
         self.serial: str | None = serial
         self.sdk = sdk
@@ -94,6 +95,12 @@ class FakePhone:
         self.static = dict(static or {})
         self.host = dict(host or {})
         self.sha256sum = sha256sum
+        # Android 9+: dostęp do powiadomień trzyma NotificationManager, a ustawienie jest jego
+        # kopią — `settings put` jej nie odbiera (OPPO CPH2271, 2026-10-07). Bez `listener_cmd`
+        # (stary Android) ustawienie jest jedynym źródłem, a `cmd notification` go nie zna.
+        self.listener_cmd = listener_cmd
+        self.listeners_allowed: list[str] | None = (
+            [c for c in self.secure.get(LISTENERS, "").split(":") if c] if listener_cmd else None)
         self.fail: dict[str, AdbError | str] = {}  # polecenie → wyjątek albo wyjście z kodem 0
         self.lose_response: set[str] = set()  # wykonuje się, ale odpowiedź ginie (odłączenie)
         self.disconnected = False
@@ -193,6 +200,8 @@ class FakePhone:
         if m := re.fullmatch(r"settings put secure (\S+) (.+)", command):
             self.secure[m[1]] = _sh_word(m[2])
             return ""
+        if m := re.fullmatch(r"cmd notification (allow|disallow)_listener (.+)", command):
+            return self._listener(m[1] == "allow", _sh_word(m[2]))
         if m := re.fullmatch(r"cmd package set-home-activity --user 0 (.+)", command):
             return self._set_home(_sh_word(m[1]))
         if m := re.fullmatch(r"pm disable-user --user 0 (\S+)", command):
@@ -300,6 +309,18 @@ class FakePhone:
         if not enabled:
             self._forget_home(package)
         return f"Package {package} new state: {'enabled' if enabled else 'disabled-user'}\n"
+
+    def _listener(self, allow: bool, component: str) -> str:
+        if self.listeners_allowed is None:
+            return f"Unknown command: {'allow' if allow else 'disallow'}_listener\n"
+        if "/" not in component:
+            return "Invalid listener - must be a ComponentName\n"
+        if allow and component not in self.listeners_allowed:
+            self.listeners_allowed.append(component)
+        if not allow and component in self.listeners_allowed:
+            self.listeners_allowed.remove(component)
+        self.secure[LISTENERS] = ":".join(self.listeners_allowed)  # system odświeża kopię
+        return ""
 
     def _device_policy(self) -> str:
         admins = "".join(f"      {a.package}/.AdminReceiver:\n        uid=10001\n"

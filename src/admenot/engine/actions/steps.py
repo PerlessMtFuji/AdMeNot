@@ -19,6 +19,7 @@ from admenot.engine.parsers.packages import parse_dumpsys_packages
 from admenot.engine.parsers.system import parse_device_admins, parse_resolved_component
 
 State = dict[str, Any]
+NOTIF_LISTENERS_KEY = "enabled_notification_listeners"
 
 
 @dataclass
@@ -143,10 +144,28 @@ class _SecureList:
         return not (items & wanted) if step.params["op"] == "remove" else wanted <= items
 
     def command(self, step: Step) -> str:
+        if step.params["key"] == NOTIF_LISTENERS_KEY:
+            action = "disallow" if step.params["op"] == "remove" else "allow"
+            return "; ".join(C.NOTIF_LISTENER.format(action=action, component=c)
+                             for c in split_items(step.params["components"]))
         sign = "-" if step.params["op"] == "remove" else "+"
         return f"settings put secure {step.params['key']} ({sign}{step.params['components']})"
 
     def apply(self, adb: AdbTransport, step: Step, cache: Path | None) -> None:
+        if step.params["key"] == NOTIF_LISTENERS_KEY:
+            # Od Androida 9 dostęp trzyma NotificationManager, a ustawienie jest tylko jego kopią:
+            # `settings put` go nie odbiera i wpis wraca przy synchronizacji (OPPO CPH2271,
+            # 2026-10-07). Stary Android nie zna polecenia — wtedy liczy się samo ustawienie.
+            # Kopię system odświeża z opóźnieniem (~0,25 s), więc `settings put` bywa wykonane
+            # i tutaj — zapisuje tę samą wartość, którą zaraz zapisze system.
+            action = "disallow" if step.params["op"] == "remove" else "allow"
+            for component in split_items(step.params["components"]):
+                run_checked(adb, C.NOTIF_LISTENER.format(action=action, component=component))
+            if self.applied(step, self.probe(adb, step)):
+                return
+        self._put(adb, step)
+
+    def _put(self, adb: AdbTransport, step: Step) -> None:
         key = step.params["key"]
         items = split_items(self.probe(adb, step)["value"])
         wanted = split_items(step.params["components"])

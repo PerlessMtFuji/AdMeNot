@@ -19,7 +19,8 @@ from admenot.engine.journal.db import Journal
 
 AD_LISTENER = "com.ad/com.ad.Listener"
 SAW = "android.permission.SYSTEM_ALERT_WINDOW"  # aplikacje w tych testach mogą rysować nad innymi
-WRITES = ("appops set", "pm ", "settings put", "am force-stop", "cmd package set-home")
+WRITES = ("appops set", "pm ", "settings put", "am force-stop", "cmd package set-home",
+          "cmd notification")
 
 
 def _phone():

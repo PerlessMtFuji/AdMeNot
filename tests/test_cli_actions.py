@@ -9,7 +9,8 @@ from admenot.engine.adb.fake import FakeAdb
 from admenot.engine.journal.db import Journal
 from admenot.engine.paths import journal_path
 
-WRITES = ("pm disable", "pm uninstall", "appops set", "pm revoke", "settings put", "am force-stop")
+WRITES = ("pm disable", "pm uninstall", "appops set", "pm revoke", "settings put", "am force-stop",
+          "cmd notification")
 
 
 @pytest.fixture(autouse=True)

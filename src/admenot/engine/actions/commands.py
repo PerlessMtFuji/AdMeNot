@@ -12,7 +12,8 @@ PM_REVOKE = "pm revoke {package} {permission}"
 DUMPSYS_PACKAGE = "dumpsys package {package}"
 SETTINGS_GET = "settings get secure {key}"
 SETTINGS_PUT = "settings put secure {key} '{value}'"
-DEFAULT_IME = SETTINGS_GET.format(key="default_input_method")
+NOTIF_LISTENER = "cmd notification {action}_listener '{component}'"  # allow | disallow
+DEFAULT_IME =SETTINGS_GET.format(key="default_input_method")
 SET_HOME = "cmd package set-home-activity --user 0 '{component}'"
 PM_DISABLE = "pm disable-user --user 0 {package}"
 PM_ENABLE = "pm enable --user 0 {package}"

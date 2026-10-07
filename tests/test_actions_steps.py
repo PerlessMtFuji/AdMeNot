@@ -1,5 +1,5 @@
 import pytest
-from fakephone import GEARHEAD, LISTENERS, POST, FakeApp, FakePhone
+from fakephone import A11Y, GEARHEAD, LISTENERS, POST, FakeApp, FakePhone
 
 from admenot.engine.actions import commands as C
 from admenot.engine.actions import steps as S
@@ -96,11 +96,42 @@ def test_secure_list_inverse_adds_back_only_components_that_were_present():
 
 
 def test_secure_list_refuses_value_with_quote():
-    phone = _phone(secure={LISTENERS: f"com.x/.A'B:{AD_LISTENER}"})
+    service = "com.ad/.A11y"
+    phone = _phone(secure={A11Y: f"com.x/.A'B:{service}"})
+    step = Step("secure_list", "com.ad", {"key": A11Y, "op": "remove", "components": service})
     with pytest.raises(ActionError) as exc:
-        S.apply(phone, _remove_listener())
+        S.apply(phone, step)
     assert exc.value.key == "failed"
-    assert phone.secure[LISTENERS] == f"com.x/.A'B:{AD_LISTENER}"
+    assert phone.secure[A11Y] == f"com.x/.A'B:{service}"
+
+
+
+def test_listener_access_is_revoked_in_notification_manager_not_only_in_setting():
+    # `settings put` zmienia tylko kopię: NotificationManager nadal ją zatwierdza i przy najbliższej
+    # synchronizacji wpis wraca (OPPO CPH2271, 2026-10-07).
+    phone = _phone(secure={LISTENERS: f"{GEARHEAD}:{AD_LISTENER}"})
+    step = _remove_listener()
+    S.apply(phone, step)
+    assert phone.listeners_allowed == [GEARHEAD]
+    assert phone.secure[LISTENERS] == GEARHEAD
+    assert f"cmd notification disallow_listener '{AD_LISTENER}'" in phone.calls
+    assert not any(c.startswith("settings put") for c in phone.calls)
+
+
+def test_listener_access_undo_allows_it_again():
+    phone = _phone(secure={LISTENERS: f"{GEARHEAD}:{AD_LISTENER}"})
+    _apply_and_undo(phone, _remove_listener())
+    assert set(phone.listeners_allowed) == {GEARHEAD, AD_LISTENER}
+    assert set(phone.secure[LISTENERS].split(":")) == {GEARHEAD, AD_LISTENER}
+
+
+def test_listener_access_falls_back_to_setting_without_cmd_notification():
+    phone = _phone(secure={LISTENERS: f"{GEARHEAD}:{AD_LISTENER}"}, listener_cmd=False)
+    step = _remove_listener()
+    before = _apply_and_undo(phone, step)
+    assert phone.secure[LISTENERS] == before["value"]
+    S.apply(phone, step)
+    assert phone.secure[LISTENERS] == GEARHEAD
 
 
 def test_home_switch_and_back():
@@ -144,7 +175,9 @@ def test_disconnect_is_uncertain():
 def test_command_for_describes_step():
     assert S.command_for(Step("enabled", "com.ad", {"enabled": "0"})) == (
         "pm disable-user --user 0 com.ad")
-    assert S.command_for(_remove_listener()) == f"settings put secure {LISTENERS} (-{AD_LISTENER})"
+    assert S.command_for(_remove_listener()) == f"cmd notification disallow_listener '{AD_LISTENER}'"
+    a11y = Step("secure_list", "com.ad", {"key": A11Y, "op": "remove", "components": "com.ad/.A"})
+    assert S.command_for(a11y) == f"settings put secure {A11Y} (-com.ad/.A)"
     with pytest.raises(ValueError):
         S.command_for(Step("teleport", "com.ad"))
 
