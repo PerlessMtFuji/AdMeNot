@@ -187,6 +187,7 @@ def build(args: argparse.Namespace, runner=subprocess.run) -> list[str]:
         device_line = "selfcheck --device: skan z paczki = skan deweloperski"
     notices, missing = third_party_notices.build(TOOLS, ROOT / "ui")
     (BUNDLE / "THIRD_PARTY_NOTICES.txt").write_text(notices, "utf-8")
+    shutil.copyfile(ROOT / "LICENSE", BUNDLE / "LICENSE.txt")
     warnings = [f"brak licencji w metadanych: {name}" for name in missing]
     if not WEBVIEW2_SETUP.is_file():
         download(WEBVIEW2_URL, WEBVIEW2_SETUP)

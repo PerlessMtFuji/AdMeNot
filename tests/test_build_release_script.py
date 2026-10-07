@@ -158,6 +158,7 @@ def test_build_runs_the_steps_in_order_and_writes_the_outputs(staged):
     assert f"/FAdMeNot-{v}-setup" in iscc
     assert not any(a.startswith("/S") for a in iscc)
     assert (m.BUNDLE / "THIRD_PARTY_NOTICES.txt").read_text("utf-8") == "NOTICES"
+    assert (m.BUNDLE / "LICENSE.txt").read_bytes() == (ROOT / "LICENSE").read_bytes()
     setup = next(m.RELEASE.glob("*-setup.exe"))
     assert setup.with_name(setup.name + ".sha256").is_file()
     notes = next(m.RELEASE.glob("*-release-notes.md")).read_text("utf-8")

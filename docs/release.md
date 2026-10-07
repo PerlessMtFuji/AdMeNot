@@ -29,7 +29,8 @@ sprawdzić, zapisz wprost jako niesprawdzony.
 2. Instalacja:
    - [ ] 2a. Na tym komputerze (obowiązkowo): brak okna UAC, skrót w menu Start i na pulpicie,
          program w `%LOCALAPPDATA%\Programs\AdMeNot`, okno `AdMeNot <wersja> beta` się otwiera,
-         `admenot-cli.exe selfcheck` → same `OK`.
+         `admenot-cli.exe selfcheck` → same `OK`,
+         w katalogu programu są `LICENSE.txt` i `THIRD_PARTY_NOTICES.txt`.
    - [ ] 2b. To samo na maszynie testowej (czysty Windows): przywróć punkt kontrolny, skopiuj
          instalator, zainstaluj i sprawdź jak w 2a. Można pominąć — wtedy zapisz to w „Uwagach”.
 
