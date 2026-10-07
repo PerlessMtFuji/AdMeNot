@@ -294,7 +294,7 @@
     "adb_error": "Błąd ADB.",
     "action_error": "Telefon odrzucił polecenie.",
     "busy": "Trwa inne zadanie — poczekaj na jego koniec.",
-    "wrong_device": "Podłącz telefon {serial}, którego dotyczy zlecenie.",
+    "wrong_device": "Podłącz telefon {device}, którego dotyczy zlecenie.",
     "no_scan": "Najpierw zeskanuj telefon.",
     "no_device": "Najpierw podłącz i zeskanuj telefon.",
     "unknown_order": "Nie znaleziono zlecenia.",

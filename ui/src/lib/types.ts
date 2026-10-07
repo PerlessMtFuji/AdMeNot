@@ -280,6 +280,8 @@ export interface ApiErrorBody {
   key: string;
   message: string;
   serial?: string;
+  /** Nazwa telefonu (wrong_device), jak na ekranie historii. */
+  device?: string;
   log?: string;
 }
 

@@ -294,7 +294,7 @@
     "adb_error": "ADB error.",
     "action_error": "The phone rejected the command.",
     "busy": "Another task is running — wait for it to finish.",
-    "wrong_device": "Connect phone {serial}, which this order is for.",
+    "wrong_device": "Connect the {device}, which this order is for.",
     "no_scan": "Scan the phone first.",
     "no_device": "Connect and scan a phone first.",
     "unknown_order": "Order not found.",

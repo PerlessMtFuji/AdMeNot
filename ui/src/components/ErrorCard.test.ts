@@ -6,9 +6,12 @@ import ErrorCard from './ErrorCard.svelte';
 
 test('error card: translated key, serial, log path, dismiss', async () => {
   const { s } = await renderWith(ErrorCard);
-  s.error = { key: 'wrong_device', message: 'R58T', serial: 'R58T' };
+  s.error = { key: 'wrong_device', message: 'R58T', serial: 'R58T', device: 'Samsung Galaxy A14' };
   await tick();
-  expect(screen.getByRole('alert').textContent).toContain('Podłącz telefon R58T');
+  expect(screen.getByRole('alert').textContent).toContain('Podłącz telefon Samsung Galaxy A14,');
+  s.error = { key: 'wrong_device', message: 'R58T', serial: 'R58T' }; // bez nazwy: numer seryjny
+  await tick();
+  expect(screen.getByRole('alert').textContent).toContain('Podłącz telefon R58T,');
   s.error = { key: 'something_new', message: 'x', log: 'C:\\logs\\app.log' };
   await tick();
   expect(screen.getByRole('alert').textContent).toContain('Nieoczekiwany błąd programu');
