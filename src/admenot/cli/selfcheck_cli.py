@@ -65,16 +65,16 @@ def androguard_resources() -> Path:
 
 def _androguard() -> None:
     _file(androguard_resources() / "public.xml")
-    public = importlib.import_module("androguard.core.resources.public")  # ta sama sciezka co analiza manifestu
+    public = importlib.import_module("androguard.core.resources.public")  # ta sama ścieżka co analiza manifestu
     if not public.SYSTEM_RESOURCES["attributes"]["forward"]:
-        raise ValueError("public.xml: brak atrybutow")
+        raise ValueError("public.xml: brak atrybutów")
 
 
 def _data_dir_writable() -> None:
     directory = paths.data_dir()
     directory.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryFile(dir=directory):
-        pass  # plik znika po zamknieciu
+        pass  # plik znika po zamknięciu
 
 
 CHECKS: tuple[tuple[str, Callable[[], object]], ...] = (
@@ -86,7 +86,7 @@ CHECKS: tuple[tuple[str, Callable[[], object]], ...] = (
     ("adb.exe", lambda: _file(tools_dir() / "adb.exe")),
     ("scrcpy.exe", lambda: _file(tools_dir() / "scrcpy.exe")),
     ("scrcpy-server", lambda: _file(tools_dir() / "scrcpy-server")),
-    ("SDL3.dll", lambda: _file(tools_dir() / "SDL3.dll")),  # DLL-e scrcpy zostaja przy scrcpy.exe
+    ("SDL3.dll", lambda: _file(tools_dir() / "SDL3.dll")),  # DLL-e scrcpy zostają przy scrcpy.exe
     ("phones.db", _phones_db),
     ("phones/", _phone_images),
     ("app/web/index.html", lambda: _file(app_main.WEB_DIR / "index.html")),
@@ -101,7 +101,7 @@ def run_checks() -> list[Check]:
     for name, check in CHECKS:
         try:
             check()
-        except Exception as exc:  # noqa: BLE001 - kazdy blad oznacza brak tego elementu
+        except Exception as exc:  # noqa: BLE001 — każdy błąd oznacza brak tego elementu
             results.append(Check(name, False, f"{type(exc).__name__}: {exc}"))
         else:
             results.append(Check(name, True))
@@ -153,7 +153,7 @@ def _normalized(text: str) -> list[str]:
 
 
 def scan_diff(reference: str, actual: str) -> list[str]:
-    """Linie, ktorymi roznia sie skany (czas pracy telefonu pominiety); [] = skany rowne."""
+    """Linie, którymi różnią się skany (czas pracy telefonu pominięty); [] = skany równe."""
     diff = difflib.unified_diff(_normalized(reference), _normalized(actual), n=0, lineterm="")
     return [line for line in diff if line[:1] in "+-" and not line.startswith(("+++", "---"))]
 
