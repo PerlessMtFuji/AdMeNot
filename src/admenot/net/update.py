@@ -14,12 +14,14 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from admenot import __version__
+from admenot.engine.paths import update_manifest_path
 from admenot.net import client
 from admenot.net.update_key import PUBLIC_KEYS
 
@@ -158,3 +160,44 @@ def state(manifest: Manifest | None, version: str = __version__) -> UpdateState:
 
 def download_page(lang: str) -> str:
     return client.base_url() + ("/pl/" if lang == "pl" else "/")
+
+
+def fetch() -> Manifest:
+    """Manifest z serwera; `client.BackendError` (także 404 przed pierwszym wydaniem) albo `ManifestError`."""
+    return verify(client.get_bytes(MANIFEST_PATH))
+
+
+def cached(path: Path | None = None) -> Manifest | None:
+    """Zapisany manifest, z ponownym sprawdzeniem podpisu — ręczna edycja pliku nic nie daje."""
+    try:
+        raw = (path or update_manifest_path()).read_bytes()
+    except OSError:
+        return None
+    try:
+        return verify(raw)
+    except ManifestError:
+        return None
+
+
+def _not_older(new: Manifest, old: Manifest) -> bool:
+    return new.published >= old.published and \
+        parse_version(new.min_supported) >= parse_version(old.min_supported)
+
+
+def store(manifest: Manifest, path: Path | None = None) -> bool:
+    """Zapis tylko nie starszego manifestu: stary, prawdziwie podpisany plik nie zniesie blokady."""
+    path = path or update_manifest_path()
+    old = cached(path)
+    if old is not None and not _not_older(manifest, old):
+        return False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_bytes(manifest.raw)
+    os.replace(tmp, path)
+    return True
+
+
+def retired(version: str = __version__, path: Path | None = None) -> Manifest | None:
+    """Manifest, który wycofuje tę wersję — tylko z pamięci, bez sieci (spec §5)."""
+    manifest = cached(path)
+    return manifest if state(manifest, version).retired else None

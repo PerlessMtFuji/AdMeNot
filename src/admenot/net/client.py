@@ -39,7 +39,7 @@ def user_agent() -> str:
     return f"AdMeNot/{__version__}"  # nic więcej: bez systemu, języka, identyfikatorów
 
 
-def _request(path: str, data: bytes | None = None) -> dict[str, Any]:
+def _fetch(path: str, data: bytes | None = None) -> bytes:
     headers = {"User-Agent": user_agent(), "Accept": "application/json"}
     if data is not None:
         headers["Content-Type"] = "application/json"
@@ -47,12 +47,16 @@ def _request(path: str, data: bytes | None = None) -> dict[str, Any]:
         request = urllib.request.Request(base_url() + path, data=data, headers=headers,
                                          method="GET" if data is None else "POST")
         with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
-            raw = response.read()
+            return response.read()
     except urllib.error.HTTPError as exc:  # przed OSError: HTTPError to też URLError
         exc.close()
         raise BackendError("http", exc.code) from None
     except (OSError, http.client.HTTPException, ValueError):  # URLError, TimeoutError, błędy TLS, zerwane połączenie, BadStatusLine, IncompleteRead, InvalidURL
         raise BackendError("offline") from None
+
+
+def _request(path: str, data: bytes | None = None) -> dict[str, Any]:
+    raw = _fetch(path, data)
     try:
         value = json.loads(raw)
     except ValueError:  # także UnicodeDecodeError — np. strona logowania do Wi-Fi
@@ -60,6 +64,11 @@ def _request(path: str, data: bytes | None = None) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise BackendError("invalid")
     return value
+
+
+def get_bytes(path: str) -> bytes:
+    """Surowa treść (manifest aktualizacji sprawdza sam podpis i format)."""
+    return _fetch(path)
 
 
 def get_json(path: str) -> dict[str, Any]:

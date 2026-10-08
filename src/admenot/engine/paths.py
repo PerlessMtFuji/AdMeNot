@@ -56,6 +56,16 @@ def phone_overrides_path() -> Path:
     return data_dir() / "phone_overrides.json"
 
 
+def update_manifest_path() -> Path:
+    """Ostatni poprawny manifest aktualizacji, z podpisem (spec aktualizacji §4.2)."""
+    return data_dir() / "update-manifest.json"
+
+
+def updates_dir() -> Path:
+    """Pobrane instalatory aktualizacji."""
+    return data_dir() / "updates"
+
+
 PACKAGE_ASSETS = Path(__file__).resolve().parents[1] / "assets"
 
 

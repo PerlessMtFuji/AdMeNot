@@ -124,3 +124,10 @@ def test_malformed_env_url_no_scheme_is_offline(monkeypatch):
     with pytest.raises(BackendError) as err:
         client.get_json("/api/v1/health")
     assert err.value.kind == "offline"
+
+
+def test_get_bytes_returns_the_raw_body(stub):
+    stub.body = b"<html>nie JSON</html>"
+    stub.content_type = "text/html"
+    assert client.get_bytes("/x") == b"<html>nie JSON</html>"
+    assert stub.requests[0][2]["User-Agent"] == f"AdMeNot/{__version__}"
