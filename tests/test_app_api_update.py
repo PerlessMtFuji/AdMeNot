@@ -192,3 +192,26 @@ def test_check_now_emits_the_new_state(signing_key):
     api, rec = api_with(update_fetch=lambda: update.verify(signed(signing_key)))
     api._updates.check_now()
     assert rec.of("update:state")[-1]["available"]["version"] == "9.9.9"
+
+
+def test_downgrade_is_not_announced_as_an_update():
+    save_settings({"last_run_version": "99.0.0"})
+    api, _ = api_with()
+    assert api.update_state()["updated_to"] is None
+    assert load_settings().last_run_version == __version__
+
+
+def test_install_progress_is_throttled_but_ends_with_the_total(signing_key, tmp_path):
+    cache(signing_key)
+    setup = tmp_path / "AdMeNot-9.9.9-setup.exe"
+
+    def download(manifest, progress, cancelled):
+        for done in range(10, 10_001, 10):
+            progress(done, 10_000)
+        setup.write_bytes(b"MZ")
+        return setup
+
+    api, rec, _ = frozen_api(download, lambda p: None)
+    api.install_update()
+    seen = rec.of("update:progress")
+    assert 1 < len(seen) <= 120 and seen[-1] == {"done": 10_000, "total": 10_000}

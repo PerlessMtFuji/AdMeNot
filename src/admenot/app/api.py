@@ -13,6 +13,7 @@ import functools
 import os
 import sys
 import threading
+import time
 import webbrowser
 from collections.abc import Callable
 from dataclasses import asdict, replace
@@ -255,7 +256,13 @@ class Api:
             self._settings = save_settings({"last_run_version": __version__})
         except SettingsTooNew:
             return None  # ustawień z nowszej wersji nie nadpisujemy
-        return __version__ if last else None  # pierwsze uruchomienie to nie aktualizacja
+        if not last:
+            return None  # pierwsze uruchomienie to nie aktualizacja
+        try:
+            newer = update.parse_version(last) < update.parse_version(__version__)
+        except update.ManifestError:
+            return None
+        return __version__ if newer else None  # ręczne cofnięcie wersji to nie aktualizacja
 
     def _update_view(self) -> dict[str, Any]:
         return update_view(self._updates.state(), self._lang,
@@ -768,7 +775,16 @@ class Api:
             self._open_url(page)  # wersja deweloperska: bez instalatora na drzewie źródeł
             return {"opened": True}
 
+        last = {"done": 0, "at": None}  # dławienie: ~1600 wywołań run_js na 100 MB to za dużo
+
         def progress(done: int, total: int | None) -> None:
+            now = time.monotonic()
+            final = total is not None and done >= total
+            step = max(total // 100, 1) if total else 1 << 20
+            if not (final or last["at"] is None or done - last["done"] >= step
+                    or now - last["at"] >= 0.25):
+                return
+            last["done"], last["at"] = done, now
             self._emit("update:progress", {"done": done, "total": total})
 
         def run(job: Job) -> None:
