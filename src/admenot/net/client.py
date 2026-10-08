@@ -6,6 +6,7 @@ więc w paczce PyInstallera nie potrzeba `certifi`.
 
 from __future__ import annotations
 
+import contextlib
 import http.client
 import json
 import os
@@ -127,5 +128,6 @@ def download(url: str, dest: Path, on_progress: Callable[[int, int | None], None
         if total is not None and done != total:
             raise BackendError("offline")  # serwer zerwał połączenie przed końcem pliku
     except BaseException:
-        dest.unlink(missing_ok=True)
+        with contextlib.suppress(OSError):  # sprzątanie nie może zasłonić pierwotnego błędu
+            dest.unlink(missing_ok=True)
         raise

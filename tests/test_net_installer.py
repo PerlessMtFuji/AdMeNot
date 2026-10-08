@@ -1,6 +1,7 @@
 import hashlib
 import subprocess
 from datetime import date
+from pathlib import Path
 
 import pytest
 from httpstub import Stub, serve
@@ -70,3 +71,26 @@ def test_cleanup_keeps_only_newer_installers(tmp_path):
 
 def test_cleanup_without_directory_is_quiet(tmp_path):
     installer.cleanup("0.9.2", tmp_path / "brak")
+
+
+@pytest.mark.parametrize("target", ["os.replace", "_sha256"])
+def test_failure_after_download_leaves_no_part(server, tmp_path, monkeypatch, target):
+    def boom(*args, **kw):
+        raise PermissionError("zablokowany")
+
+    if target == "os.replace":
+        monkeypatch.setattr(installer.os, "replace", boom)
+    else:
+        monkeypatch.setattr(installer, "_sha256", boom)
+    with pytest.raises(PermissionError):
+        installer.download(manifest(server.url + "/s.exe"), directory=tmp_path)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_cleanup_failure_does_not_mask_corrupt(server, tmp_path, monkeypatch):
+    def locked(self, missing_ok=False):
+        raise PermissionError("zablokowany")
+
+    monkeypatch.setattr(Path, "unlink", locked)
+    with pytest.raises(installer.Corrupt):
+        installer.download(manifest(server.url + "/s.exe", sha256="0" * 64), directory=tmp_path)

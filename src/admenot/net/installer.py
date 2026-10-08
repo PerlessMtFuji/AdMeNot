@@ -6,6 +6,7 @@ przekierowaniu. Plik ma końcówkę `.part`, dopóki nie przejdzie sprawdzenia.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import os
 import re
@@ -44,10 +45,14 @@ def download(manifest: Manifest, on_progress: Callable[[int, int | None], None] 
     final = setup_path(manifest.latest, directory)
     part = final.with_name(final.name + ".part")
     client.download(manifest.url, part, on_progress, cancelled)
-    if part.stat().st_size != manifest.size or _sha256(part) != manifest.sha256:
-        part.unlink(missing_ok=True)
-        raise Corrupt(manifest.latest)
-    os.replace(part, final)
+    try:
+        if part.stat().st_size != manifest.size or _sha256(part) != manifest.sha256:
+            raise Corrupt(manifest.latest)
+        os.replace(part, final)
+    except BaseException:
+        with contextlib.suppress(OSError):  # sprzątanie nie może zasłonić pierwotnego błędu
+            part.unlink(missing_ok=True)
+        raise
     return final
 
 

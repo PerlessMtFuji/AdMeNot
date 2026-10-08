@@ -1,5 +1,6 @@
 import json
 import socket
+from pathlib import Path
 
 import pytest
 from httpstub import Stub, serve, serve_garbage
@@ -175,3 +176,12 @@ def test_download_follows_redirects(stub, tmp_path):
     client.download(stub.url + "/latest", dest)
     assert dest.read_bytes() == b"plik"
     assert [r[1] for r in stub.requests] == ["/latest", "/real"]
+
+
+def test_download_unlink_failure_does_not_mask_cancelled(stub, tmp_path, monkeypatch):
+    def locked(self, missing_ok=False):
+        raise PermissionError("zablokowany")
+
+    monkeypatch.setattr(Path, "unlink", locked)
+    with pytest.raises(client.Cancelled):
+        client.download(stub.url + "/s", tmp_path / "setup.part", cancelled=lambda: True)
