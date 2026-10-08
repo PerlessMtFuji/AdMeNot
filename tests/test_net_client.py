@@ -185,3 +185,11 @@ def test_download_unlink_failure_does_not_mask_cancelled(stub, tmp_path, monkeyp
     monkeypatch.setattr(Path, "unlink", locked)
     with pytest.raises(client.Cancelled):
         client.download(stub.url + "/s", tmp_path / "setup.part", cancelled=lambda: True)
+
+
+def test_download_over_the_cap_is_aborted_and_removed(stub, tmp_path):
+    stub.body = b"x" * 300_000
+    dest = tmp_path / "setup.part"
+    with pytest.raises(client.TooLarge):
+        client.download(stub.url + "/s", dest, max_bytes=100_000)
+    assert not dest.exists()

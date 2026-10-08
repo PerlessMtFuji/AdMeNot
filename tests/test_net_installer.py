@@ -94,3 +94,9 @@ def test_cleanup_failure_does_not_mask_corrupt(server, tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "unlink", locked)
     with pytest.raises(installer.Corrupt):
         installer.download(manifest(server.url + "/s.exe", sha256="0" * 64), directory=tmp_path)
+
+
+def test_download_larger_than_declared_is_corrupt(server, tmp_path):
+    with pytest.raises(installer.Corrupt):
+        installer.download(manifest(server.url + "/s.exe", size=1000), directory=tmp_path)
+    assert list(tmp_path.iterdir()) == []
