@@ -5,4 +5,6 @@ klucz, zanim stary zostanie wycofany. Pusta krotka: każdy manifest jest odrzuca
 Klucz dopisuje `python scripts/publish_update.py keygen` (base64 surowych 32 bajtów).
 """
 
-PUBLIC_KEYS: tuple[str, ...] = ()
+PUBLIC_KEYS: tuple[str, ...] = (
+    "JTjcll63s6ipAtenxytZRP3UjjklR7D8EbiLq4xpNuU=",
+)
