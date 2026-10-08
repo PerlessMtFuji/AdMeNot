@@ -96,3 +96,12 @@ test('settings: APK cache limit, status, clear after repair and clear now', asyn
   await fireEvent.click(screen.getByRole('button', { name: 'Wyczyść teraz' }));
   expect(await screen.findByText(/Usunięto 3,4 GB/)).toBeTruthy();
 });
+
+test('automatic update checks can be turned off', async () => {
+  const { bridge } = await renderWith(Settings, 'empty');
+  const box = screen.getByRole('checkbox', { name: 'Sprawdzaj aktualizacje automatycznie' });
+  expect((box as HTMLInputElement).checked).toBe(true);
+  await fireEvent.click(box);
+  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ check_updates: false }] });
+  expect(screen.getByText(/nie dowie się o nowej ani o wycofanej wersji/)).toBeTruthy();
+});

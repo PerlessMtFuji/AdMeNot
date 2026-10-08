@@ -13,6 +13,7 @@
   import AppShell from './ui/AppShell.svelte';
   import Button from './ui/Button.svelte';
   import Dialog from './ui/Dialog.svelte';
+  import UpdateDialog from './components/UpdateDialog.svelte';
 
   let props: { ctl: Controller } = $props();
   const ctl = untrack(() => props.ctl); // kontroler nie zmienia się przez całe życie okna
@@ -62,3 +63,5 @@
     {/snippet}
   </Dialog>
 {/if}
+
+<UpdateDialog />

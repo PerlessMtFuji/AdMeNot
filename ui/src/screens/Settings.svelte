@@ -149,6 +149,16 @@
       <span class="text-xs text-mut">{t('settings.mirror_auto_hint')}</span>
     </div></Card>
 
+    <Card><div class="flex flex-col gap-3 p-6">
+      <span class="lbl">{t('settings.updates_title')}</span>
+      <label class="flex items-center gap-3">
+        <input type="checkbox" checked={s.settings.check_updates}
+          onchange={(e) => ctl.saveSettings({ check_updates: e.currentTarget.checked })} />
+        <span>{t('settings.check_updates')}</span>
+      </label>
+      <span class="text-xs text-mut">{t('settings.check_updates_hint')}</span>
+    </div></Card>
+
     <Card><div class="flex flex-col gap-4 p-6">
       <span class="lbl">{t('settings.cache_title')}</span>
       <div class="flex flex-col gap-1">
