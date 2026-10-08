@@ -15,14 +15,15 @@
 <main>
   <section>
     <h1>Polityka prywatności</h1>
-    <p class="note">Wersja z 7 października 2026</p>
+    <p class="note">Wersja z 8 października 2026</p>
 
     <h2>Kto odpowiada za dane</h2>
     <p>Administratorem danych jest Eryk Wlodarski. Kontakt: <a href="mailto:e.wlodarski@protonmail.com">e.wlodarski@protonmail.com</a>.</p>
 
     <h2>Program AdMeNot</h2>
-    <p>Obecna wersja programu AdMeNot nie wysyła żadnych danych. Skany, raporty i dziennik działań zostają na Twoim komputerze.</p>
-    <p>Jedyny wyjątek to polecenie diagnostyczne <code>admenot selfcheck --online</code>, które uruchamiasz sam. Sprawdza, czy nasz serwer odpowiada, wywołując <code>/api/v1/health</code>. Zapytanie nie zawiera nic poza standardowym zapytaniem HTTP z nagłówkiem <code>User-Agent: AdMeNot/&lt;wersja&gt;</code>.</p>
+    <p>Skany, raporty i dziennik działań zostają na Twoim komputerze. Program nigdzie ich nie wysyła.</p>
+    <p>Gdy włączone jest „Sprawdzaj aktualizacje automatycznie” (domyślnie tak, w Ustawienia → Aktualizacje), program pobiera z tej strony mały plik z informacją o wersjach 10 sekund po starcie, a potem co 6 godzin. Zapytanie nie zawiera nic poza standardowym zapytaniem HTTP z nagłówkiem <code>User-Agent: AdMeNot/&lt;wersja&gt;</code> i niczego z niego nie zapisujemy. Gdy zdecydujesz się zainstalować aktualizację, instalator pobierany jest z GitHuba. Po wyłączeniu ustawienia program nie łączy się w tym celu — i nie dowie się o nowej ani o wycofanej wersji.</p>
+    <p>Polecenie diagnostyczne <code>admenot selfcheck --online</code>, które uruchamiasz sam, wysyła to samo zapytanie o wersje i wywołuje <code>/api/v1/health</code>, żeby sprawdzić, czy nasz serwer odpowiada.</p>
 
     <h2>Ta strona</h2>
     <p>Strona nie używa ciasteczek, analityki ani zasobów z innych serwerów.</p>

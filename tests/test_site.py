@@ -107,3 +107,20 @@ def test_privacy_states_legal_basis_and_transfer(name, basis):
 def test_polish_privacy_names_the_authority():
     text, _ = load("pl/privacy.html")
     assert "Prezesa Urzędu Ochrony Danych Osobowych" in text
+
+
+def test_update_manifest_has_a_short_cache():
+    lines = (PUBLIC / "_headers").read_text("utf-8").splitlines()
+    start = lines.index("/updates/*")
+    assert lines[start + 1].strip() == "Cache-Control: public, max-age=300"
+
+
+@pytest.mark.parametrize(("name", "words"), (
+    ("privacy.html", ("Check for updates automatically", "every 6 hours", "User-Agent")),
+    ("pl/privacy.html", ("Sprawdzaj aktualizacje automatycznie", "co 6 godzin", "User-Agent")),
+))
+def test_privacy_describes_update_checks(name, words):
+    text, _ = load(name)
+    for word in words:
+        assert word in text
+    assert "sends no data anywhere" not in text and "nie wysyła żadnych danych" not in text
