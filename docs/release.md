@@ -41,6 +41,33 @@ Przy przełączeniu na `"true"` najpierw popraw kontrast przycisku pobierania w 
 (biały tekst na `#8b93fb` to ok. 2,9:1 — ciemniejsze tło akcentu albo ciemny tekst), w tym samym commicie.
 Zmiana treści polityki prywatności: obie wersje językowe i data wersji naraz.
 
+## Klucz podpisu manifestu aktualizacji
+
+- Tworzenie (raz): `.venv\Scripts\python scripts\publish_update.py keygen` — pyta o hasło dwa razy,
+  zapisuje `%USERPROFILE%\.admenot\update-signing-key.pem` (inna ścieżka: `ADMENOT_SIGNING_KEY`)
+  i wypisuje klucz publiczny do dopisania w `src/admenot/net/update_key.py`.
+- **Kopia zapasowa obowiązkowa:** plik PEM i hasło osobno (np. menedżer haseł + nośnik offline).
+  Bez klucza zainstalowane kopie nie dostaną już żadnej aktualizacji — betowców trzeba by prosić
+  o ręczną instalację.
+- Rotacja: dopisz nowy klucz publiczny do `PUBLIC_KEYS` (stary zostaje), wydaj wersję, a stary
+  usuń dopiero w kolejnej. Wyciek klucza: wersja z samym nowym kluczem + prośba o ręczną aktualizację.
+
+## Aktualizacje
+
+Po wgraniu instalatora do GitHub Release `v<wersja>`:
+
+1. Notatki: `notes-pl.txt`, `notes-en.txt` (krótko, dla serwisanta).
+2. `.venv\Scripts\python scripts\publish_update.py release <wersja> --notes-pl notes-pl.txt --notes-en notes-en.txt`
+   (opcjonalnie `--min <wersja> --reason-pl … --reason-en …`). Skrypt sprawdza, że SHA-256 pliku
+   na GitHubie = lokalny `dist\release\…sha256`.
+3. `git add server/public/updates/v1/manifest.json`, commit, `wrangler deploy` (z `server/`).
+4. `admenot selfcheck --online` → `OK      aktualizacje — aktualna (<wersja>)` z nowej wersji
+   i `dostępna <wersja>` z poprzedniej.
+
+Wycofanie wersji (bez nowego release'u):
+`publish_update.py retire --min <pierwsza dobra wersja> --reason-pl "…" --reason-en "…"`, commit,
+`wrangler deploy`. Cache: do 5 minut (`server/public/_headers`).
+
 ## Build
 
 1. Podbij `__version__` w `src/admenot/__init__.py` i zatwierdź zmiany (build wymaga czystego drzewa).
@@ -83,3 +110,6 @@ sprawdzić, zapisz wprost jako niesprawdzony.
        (samo `/VERYSILENT` pokazuje prośbę o zamknięcie i czeka).
 7. [ ] adb z Android SDK (jeśli jest) działa dalej po instalacji i deinstalacji.
 8. [ ] Wynik VirusTotal w notatkach (albo „nie sprawdzono” z powodem).
+9. [ ] Aktualizacja z programu (przed pierwszym publicznym wydaniem i po zmianach w F): próba
+       z §10.2 specu aktualizacji — `docs/superpowers/specs/2026-10-08-updates-design.md`
+       (lokalnie) albo kroki niżej. Kopia `%LOCALAPPDATA%\AdMeNot` przed próbą.
