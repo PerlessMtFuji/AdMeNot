@@ -171,8 +171,20 @@ end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   AppDir: String;
+  Waited: Integer;
 begin
   AppDir := ExpandConstant('{app}');
+  { aktualizacja z programu: AdMeNot uruchamia instalator, a dopiero potem się zamyka — czekamy
+    cicho do 30 s, zanim pokażemy okno zamknięcia (inaczej Anuluj zostawia użytkownika bez programu) }
+  if IsUpdate then
+  begin
+    Waited := 0;
+    while AppRunning(AppDir) and (Waited < 30000) do
+    begin
+      Sleep(500);
+      Waited := Waited + 500;
+    end;
+  end;
   if not CloseAppGate(AppDir) then
   begin
     Result := CustomMessage('InstallCancelled');

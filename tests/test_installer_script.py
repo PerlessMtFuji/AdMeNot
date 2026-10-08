@@ -21,3 +21,10 @@ def test_update_install_restarts_the_program():
     assert len(restart) == 1 and "nowait" in restart[0] and "postinstall" not in restart[0]
     assert any("postinstall skipifsilent" in line for line in lines)  # ręczna instalacja bez zmian
     assert "function IsUpdate: Boolean;" in text and "'/UPDATE=1'" in text
+
+
+def test_update_waits_for_the_program_before_the_close_gate():
+    text = ISS.read_bytes().decode("utf-8-sig")
+    body = text.split("function PrepareToInstall", 1)[1].split("procedure CurStepChanged", 1)[0]
+    assert "if IsUpdate then" in body and "Sleep(500)" in body
+    assert body.index("Sleep(500)") < body.index("CloseAppGate(AppDir)")  # najpierw cichy sondaż
