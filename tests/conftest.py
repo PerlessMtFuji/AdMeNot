@@ -4,6 +4,7 @@ zaufany komunikator (com.whatsapp) i systemowy launcher (com.sec.android.app.lau
 from datetime import datetime, timedelta
 
 import pytest
+from updatehelpers import trust
 
 from admenot.engine.adb.fake import FakeAdb
 from admenot.engine.collectors.behavior import ALARM, APPOPS_GET, NOTIFICATIONS, USAGESTATS
@@ -186,3 +187,9 @@ def make_synthetic_adb(devices_output: str = SYNTHETIC_DEVICES) -> FakeAdb:
 @pytest.fixture
 def synthetic_adb() -> FakeAdb:
     return make_synthetic_adb()
+
+
+@pytest.fixture
+def signing_key(monkeypatch):
+    """Klucz Ed25519 zaufany przez `admenot.net.update` na czas testu."""
+    return trust(monkeypatch)
