@@ -27,3 +27,6 @@ hs_err_pid*.log
 
 # Worker (server/): stan lokalny wranglera
 .wrangler/
+
+# Klucz prywatny podpisu manifestu aktualizacji — nigdy w repo (spec aktualizacji §2.3)
+*signing-key*.pem
