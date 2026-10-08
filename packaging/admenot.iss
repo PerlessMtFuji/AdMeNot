@@ -74,10 +74,22 @@ Name: "{autodesktop}\AdMeNot"; Filename: "{app}\AdMeNot.exe"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\AdMeNot.exe"; Description: "{cm:LaunchProgram,AdMeNot}"; Flags: nowait postinstall skipifsilent
+; Aktualizacja z programu (/SILENT /UPDATE=1): uruchom AdMeNot ponownie (spec aktualizacji §6.4)
+Filename: "{app}\AdMeNot.exe"; Flags: nowait; Check: IsUpdate
 
 [Code]
 const
   WebView2Key = 'Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
+
+function IsUpdate: Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 1 to ParamCount do
+    if CompareText(ParamStr(I), '/UPDATE=1') = 0 then
+      Result := True;
+end;
 
 function PowerShell(Command: String): Integer;
 var
