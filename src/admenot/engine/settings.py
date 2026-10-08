@@ -26,7 +26,8 @@ MODES = ("simple", "expert")
 THEMES = ("system", "light", "dark")
 SELECT_LEVELS = ("silence", "disable", "remove")  # poziomy akcji (actions/planner.LEVELS)
 KEYS = ("lang", "mode", "adb_path", "backups_dir", "theme", "mirror_auto",
-        "apk_cache_limit_gb", "apk_cache_clear_after_repair", "select_level")
+        "apk_cache_limit_gb", "apk_cache_clear_after_repair", "select_level",
+        "check_updates", "dismissed_update", "last_run_version")
 LOGO_TYPES = {
     ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
     ".webp": "image/webp", ".svg": "image/svg+xml",
@@ -62,6 +63,9 @@ class Settings:
     apk_cache_limit_gb: int = 10  # górna granica; działa tyle, ile mieści dysk (apk/cache.py)
     apk_cache_clear_after_repair: bool = False
     select_level: str = "silence"  # akcja po zaznaczeniu aplikacji, dla której silnik nic nie proponuje
+    check_updates: bool = True  # wyłączone = zero zapytań o aktualizacje (spec aktualizacji §4.3)
+    dismissed_update: str | None = None  # wersja ukryta krzyżykiem na banerze
+    last_run_version: str | None = None  # komunikat „Zaktualizowano” po zmianie wersji
 
 
 @dataclass(frozen=True)
@@ -126,7 +130,7 @@ def _save(path: Path, update: Callable[[dict[str, Any]], None]) -> None:
 
 
 def _valid(key: str, value: Any) -> bool:
-    if key in ("mirror_auto", "apk_cache_clear_after_repair"):
+    if key in ("mirror_auto", "apk_cache_clear_after_repair", "check_updates"):
         return isinstance(value, bool)
     if key == "apk_cache_limit_gb":
         # bool to podklasa int — True nie może znaczyć „1 GB"

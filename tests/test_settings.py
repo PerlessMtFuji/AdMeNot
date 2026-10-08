@@ -231,3 +231,14 @@ def test_a_broken_schema_value_counts_as_version_0():
     assert S.load_settings().mode == "expert"
     S.save_settings({"lang": "pl"})
     assert json.loads(path.read_text("utf-8"))["schema"] == len(S.MIGRATIONS)
+
+
+def test_update_settings_defaults_and_validation(tmp_path):
+    path = tmp_path / "s.json"
+    s = S.load_settings(path)
+    assert (s.check_updates, s.dismissed_update, s.last_run_version) == (True, None, None)
+    s = S.save_settings({"check_updates": False, "dismissed_update": "0.9.3",
+                         "last_run_version": "0.9.2"}, path)
+    assert (s.check_updates, s.dismissed_update, s.last_run_version) == (False, "0.9.3", "0.9.2")
+    with pytest.raises(ValueError):
+        S.save_settings({"check_updates": "nie"}, path)
