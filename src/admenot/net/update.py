@@ -131,7 +131,7 @@ def verify(raw: bytes, keys: Sequence[str] | None = None) -> Manifest:
     """Sprawdza podpis i treść; każde naruszenie → `ManifestError`."""
     try:
         outer = json.loads(raw)
-    except ValueError:
+    except (ValueError, RecursionError):
         raise ManifestError("to nie JSON") from None
     if not isinstance(outer, dict) or not isinstance(outer.get("payload"), str) \
             or not isinstance(outer.get("sig"), str):
@@ -145,7 +145,7 @@ def verify(raw: bytes, keys: Sequence[str] | None = None) -> Manifest:
         raise ManifestError("zły podpis")
     try:
         data = json.loads(payload)
-    except ValueError:
+    except (ValueError, RecursionError):
         raise ManifestError("payload: to nie JSON") from None
     return _parse(data, bytes(raw))
 

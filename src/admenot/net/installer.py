@@ -44,7 +44,10 @@ def download(manifest: Manifest, on_progress: Callable[[int, int | None], None] 
              directory: Path | None = None) -> Path:
     final = setup_path(manifest.latest, directory)
     part = final.with_name(final.name + ".part")
-    client.download(manifest.url, part, on_progress, cancelled)
+    try:
+        client.download(manifest.url, part, on_progress, cancelled, max_bytes=manifest.size)
+    except client.TooLarge:
+        raise Corrupt(manifest.latest) from None
     try:
         if part.stat().st_size != manifest.size or _sha256(part) != manifest.sha256:
             raise Corrupt(manifest.latest)

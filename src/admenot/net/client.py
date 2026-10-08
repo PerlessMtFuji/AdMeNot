@@ -40,6 +40,10 @@ class Cancelled(Exception):
     """Pobieranie przerwane przez `cancelled()`."""
 
 
+class TooLarge(Exception):
+    """Serwer wysłał więcej bajtów, niż pozwala `max_bytes` (np. przekierowanie na cudzy plik)."""
+
+
 def base_url() -> str:
     return (os.environ.get(ENV_URL) or BASE_URL).rstrip("/")
 
@@ -100,11 +104,12 @@ def _open_download(url: str) -> http.client.HTTPResponse:
 
 
 def download(url: str, dest: Path, on_progress: Callable[[int, int | None], None] | None = None,
-             cancelled: Callable[[], bool] = lambda: False) -> None:
+             cancelled: Callable[[], bool] = lambda: False, max_bytes: int | None = None) -> None:
     """Pobiera pełny adres `url` (nie ścieżkę API) do `dest`, kawałkami.
 
     Sieć → `BackendError`, anulowanie → `Cancelled`, błąd dysku → `OSError` (bez przepakowania,
-    żeby brak miejsca nie udawał braku sieci). Przy każdym błędzie `dest` jest usuwany.
+    żeby brak miejsca nie udawał braku sieci), więcej niż `max_bytes` → `TooLarge`.
+    Przy każdym błędzie `dest` jest usuwany.
     """
     dest.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -121,8 +126,10 @@ def download(url: str, dest: Path, on_progress: Callable[[int, int | None], None
                     break
                 if cancelled():
                     raise Cancelled
-                out.write(chunk)
                 done += len(chunk)
+                if max_bytes is not None and done > max_bytes:
+                    raise TooLarge(f"więcej niż {max_bytes} B")  # zanim dysk się zapełni
+                out.write(chunk)
                 if on_progress is not None:
                     on_progress(done, total)
         if total is not None and done != total:

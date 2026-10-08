@@ -110,3 +110,13 @@ def test_download_page_follows_the_language(monkeypatch):
     monkeypatch.delenv(client.ENV_URL, raising=False)
     assert update.download_page("pl") == client.BASE_URL + "/pl/"
     assert update.download_page("en") == client.BASE_URL + "/"
+
+
+def test_deeply_nested_json_is_a_manifest_error(signing_key):
+    with pytest.raises(ManifestError):
+        update.verify(b"[" * 200_000)
+    deep = "[" * 200_000
+    sig = base64.b64encode(signing_key.sign(deep.encode())).decode("ascii")
+    outer = json.dumps({"payload": deep, "sig": sig}).encode()
+    with pytest.raises(ManifestError):
+        update.verify(outer, (public_b64(signing_key),))
