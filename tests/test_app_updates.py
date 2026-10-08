@@ -109,10 +109,12 @@ def test_view_dismissed_and_updated(signing_key):
 @pytest.mark.parametrize("broken", ["fetch", "enabled"])
 def test_loop_survives_an_unexpected_error(signing_key, broken):
     calls = []
+    first = threading.Event()
     second = threading.Event()
 
     def boom():
         calls.append(1)
+        first.set()
         if len(calls) == 1:
             raise RuntimeError("pełny dysk")
 
@@ -130,9 +132,7 @@ def test_loop_survives_an_unexpected_error(signing_key, broken):
     svc, _ = service(fetch, enabled=enabled, first_delay=0.0, interval=3600)
     svc.start()
     try:
-        deadline = threading.Event()
-        while not calls and not deadline.wait(0.01):
-            pass
+        assert first.wait(5)
         assert not second.is_set()
         svc.poke()
         assert second.wait(5)
