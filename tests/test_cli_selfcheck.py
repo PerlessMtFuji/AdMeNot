@@ -107,6 +107,7 @@ def test_device_check_compares_the_scan_with_the_reference(tmp_path, monkeypatch
 @pytest.fixture
 def health(monkeypatch):
     stub = Stub(body=b'{"ok": true, "db": true}')
+    stub.routes["/updates/v1/manifest.json"] = (404, b'{"error": "not_found"}')
     stop = serve(stub)
     monkeypatch.setenv(client.ENV_URL, stub.url)
     yield stub
@@ -118,14 +119,17 @@ def test_offline_selfcheck_never_calls_the_server(installed, monkeypatch, capsys
         raise AssertionError(f"selfcheck bez --online połączył się z {path}")
 
     monkeypatch.setattr(client, "get_json", boom)
+    monkeypatch.setattr(client, "get_bytes", boom)
     assert main(["selfcheck"]) == 0
-    assert "serwer" not in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "serwer" not in out and "aktualizacje" not in out
 
 
 def test_online_selfcheck_reports_server_ok(installed, health, capsys):
     assert main(["selfcheck", "--online"]) == 0
     out = capsys.readouterr().out
     assert "OK      serwer" in out
+    assert "OK      aktualizacje — brak manifestu" in out
     assert health.requests[0][1] == "/api/v1/health"
 
 
@@ -141,6 +145,7 @@ def test_online_selfcheck_reports_offline(installed, monkeypatch, capsys):
         raise client.BackendError("offline")
 
     monkeypatch.setattr(client, "get_json", offline)
+    monkeypatch.setattr(client, "get_bytes", offline)
     assert main(["selfcheck", "--online"]) == 1
     assert "BRAK    serwer — offline" in capsys.readouterr().out
 

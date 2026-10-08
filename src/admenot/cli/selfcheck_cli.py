@@ -18,6 +18,7 @@ from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 
+from admenot import __version__
 from admenot.app import main as app_main
 from admenot.engine import paths
 from admenot.engine.allowlist.trust import load_default_trust_list, load_protected_list
@@ -26,11 +27,18 @@ from admenot.engine.apk.sdks import load_default_ad_sdks
 from admenot.engine.phones.build import DB_NAME, IMAGES_DIR
 from admenot.engine.rules.engine import load_default_ruleset
 from admenot.engine.tools import tools_dir
-from admenot.net import client
+from admenot.net import client, update
 
-STATUS = {"pl": ("OK", "BRAK"), "en": ("OK", "MISSING")}
+STATUS = {"pl": ("OK", "BRAK", "UWAGA"), "en": ("OK", "MISSING", "WARNING")}
 HEALTH = "/api/v1/health"
 SERVER = {"pl": "serwer", "en": "server"}
+UPDATES = {"pl": "aktualizacje", "en": "updates"}
+UPDATE_TEXT = {
+    "pl": {"current": "aktualna ({version})", "available": "dostępna {version}",
+           "retired": "wycofana (min {version})", "none": "brak manifestu"},
+    "en": {"current": "up to date ({version})", "available": "available {version}",
+           "retired": "withdrawn (min {version})", "none": "no manifest"},
+}
 
 
 @dataclass(frozen=True)
@@ -38,6 +46,7 @@ class Check:
     name: str
     ok: bool
     detail: str = ""
+    warn: bool = False  # działa, ale wymaga uwagi (np. wycofana wersja) — kod wyjścia 1
 
 
 def _file(path: Path) -> None:
@@ -119,24 +128,43 @@ def server_check(lang: str) -> Check:
     return Check(SERVER[lang], True)
 
 
+def update_check(lang: str) -> Check:
+    """`--online`: manifest aktualizacji z serwera (spec aktualizacji §9); niczego nie zapisuje."""
+    name, text = UPDATES[lang], UPDATE_TEXT[lang]
+    try:
+        manifest = update.fetch()
+    except client.BackendError as exc:
+        if exc.status == 404:  # przed pierwszym publicznym wydaniem
+            return Check(name, True, text["none"])
+        return Check(name, False, str(exc))
+    except update.ManifestError as exc:
+        return Check(name, False, str(exc))
+    st = update.state(manifest)
+    if st.retired:
+        return Check(name, True, text["retired"].format(version=manifest.min_supported), warn=True)
+    if st.available:
+        return Check(name, True, text["available"].format(version=manifest.latest))
+    return Check(name, True, text["current"].format(version=__version__))
+
+
 def _print_checks(results: list[Check], lang: str) -> int:
-    ok_word, missing_word = STATUS[lang]
+    ok_word, missing_word, warn_word = STATUS[lang]
     for r in results:
-        word = ok_word if r.ok else missing_word
-        detail = "" if r.ok else f" — {r.detail}"
-        print(f"{word:<7} {r.name}{detail}")  # kolumna 7 znaków: „MISSING” mieści się bez obcinania
-    return 0 if all(r.ok for r in results) else 1
+        word = warn_word if r.warn else ok_word if r.ok else missing_word
+        detail = f" — {r.detail}" if r.detail else ""
+        print(f"{word:<7} {r.name}{detail}")  # kolumna 7 znaków: „MISSING” i „WARNING” mieszczą się bez obcinania
+    return 0 if all(r.ok and not r.warn for r in results) else 1
 
 
 def cmd_selfcheck(lang: str, online: bool = False) -> int:
     results = run_checks()
     if online:
-        results.append(server_check(lang))
+        results += [server_check(lang), update_check(lang)]
     return _print_checks(results, lang)
 
 
 def cmd_online(lang: str) -> int:
-    return _print_checks([server_check(lang)], lang)
+    return _print_checks([server_check(lang), update_check(lang)], lang)
 
 
 DEVICE_MESSAGES = {

@@ -40,9 +40,12 @@ from admenot.engine.paths import incident_path
 from admenot.engine.session import ScanReport, report_to_dict, run_scan
 from admenot.engine.settings import SettingsTooNew, load_settings
 from admenot.engine.texts import VERDICT_LABELS, gap_label
+from admenot.net import update
 
 MESSAGES = {
     "pl": {
+        "retired": "Ta wersja AdMeNot jest wycofana{reason} — zmiany na telefonie są zablokowane "
+                   "(cofanie działa). Zainstaluj nową wersję: {page}",
         "no_device": "Nie wykryto telefonu. Podłącz telefon kablem USB i włącz debugowanie USB.",
         "unknown_serial": "Nie znaleziono telefonu o numerze {serial}.",
         "bad_package": "Niepoprawna nazwa pakietu: {package}",
@@ -97,6 +100,8 @@ MESSAGES = {
         "watch_saved": "Zapisano nagranie: {path}. Następny skan tego telefonu uwzględni je przez 24 h.",
     },
     "en": {
+        "retired": "This version of AdMeNot is withdrawn{reason} — changes to phones are blocked "
+                   "(undo still works). Install the new version: {page}",
         "no_device": "No phone detected. Connect the phone via USB and enable USB debugging.",
         "unknown_serial": "No phone with serial {serial}.",
         "bad_package": "Invalid package name: {package}",
@@ -470,6 +475,12 @@ def _scan(adb: AdbTransport, serial: str, lang: str, deep: frozenset[str] = froz
 
 def _run(args: argparse.Namespace, host: AdbTransport) -> int:
     lang = args.lang
+    if args.command in ("fix", "resume"):  # wycofana wersja: bez nowych zmian (spec aktualizacji §5)
+        blocked = update.retired()
+        if blocked is not None:
+            reason = blocked.reason_for(lang)
+            raise CliError(3, _msg(lang, "retired", reason=f": {reason}" if reason else "",
+                                   page=update.download_page(lang)))
     if args.command == "gui":
         from admenot.app import main as app_main  # pywebview tylko dla GUI
 
