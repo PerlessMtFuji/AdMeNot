@@ -128,11 +128,14 @@ sprawdzić, zapisz wprost jako niesprawdzony.
          uruchamiasz program) i uruchom zainstalowane 0.9.90. Po ok. 10 s baner „Dostępna wersja 0.9.91”;
          Zainstaluj → pobieranie → instalator z paskiem → program wraca jako `AdMeNot 0.9.91 beta`
          z komunikatem „Zaktualizowano do 0.9.91”; dziennik i ustawienia zostały;
-         `%LOCALAPPDATA%\AdMeNot\updates` jest pusty.
+         `%LOCALAPPDATA%\AdMeNot\updates` jest pusty najpóźniej po kolejnym uruchomieniu.
    - [ ] 9e. Wycofanie: zainstaluj ręcznie 0.9.90, `publish_update.py retire --min 0.9.91 --reason-pl "Test" --reason-en "Test"`
-         (z `ADMENOT_API_URL`), skopiuj manifest jak w 9c, uruchom program ponownie: czerwony baner,
+         (z `ADMENOT_API_URL`) — `retire` czyta manifest z repo, więc najpierw skopiuj testowy manifest z
+         `$env:TEMP\admenot-update-test\updates\v1\` z powrotem do `server\public\updates\v1\`; po `retire` skopiuj wynik
+         do katalogu testowego i znów usuń `server\public\updates`. Uruchom program ponownie: czerwony baner,
          „Napraw” na telefonie otwiera okno instalacji zamiast zlecenia, cofanie starego zlecenia
          z Historii działa. Telefon tylko z listy modyfikowalnych (nigdy moto g54 ani Vivo).
    - [ ] 9f. Sprzątanie: usuń zmienną `ADMENOT_API_URL` (`[Environment]::SetEnvironmentVariable("ADMENOT_API_URL", $null, "User")`),
-         `git checkout -- src/admenot/__init__.py src/admenot/net/update_key.py server/public/updates`,
-         usuń klucz testowy, przywróć `%LOCALAPPDATA%\AdMeNot` z kopii i zainstaluj właściwą wersję.
+         `git checkout -- src/admenot/__init__.py src/admenot/net/update_key.py` i osobno
+         `Remove-Item -Recurse -ErrorAction SilentlyContinue server\public\updates` (katalog jest nieśledzony),
+         usuń klucz testowy (wyciek klucza prywatnego do repo wykrywa przebieg gitleaks, spec §2.3 / §11.5), przywróć `%LOCALAPPDATA%\AdMeNot` z kopii i zainstaluj właściwą wersję.
