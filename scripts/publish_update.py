@@ -120,6 +120,13 @@ def release(version: str, notes: dict[str, str], *, key: Ed25519PrivateKey, toda
         raise PublishError(f"SHA-256 pliku pod {url} ({digest}) ≠ lokalny build ({expected})")
     old = _old_payload(out)
     minimum = min_supported or (old["min_supported"] if old else version)
+    if old:
+        # zainstalowane programy nigdy nie cofają manifestu (store), więc obniżka zablokowałaby je na stałe
+        if update.parse_version(minimum) < update.parse_version(old["min_supported"]):
+            raise PublishError(f"min_supported {minimum} < obecne {old['min_supported']} "
+                               "— release nie obniża minimum")
+        if update.parse_version(version) < update.parse_version(old["latest"]):
+            raise PublishError(f"wersja {version} < obecna {old['latest']} — release nie cofa wersji")
     payload: dict[str, Any] = {
         "format": update.FORMAT, "latest": version, "published": today.isoformat(),
         "min_supported": minimum, "url": url, "sha256": digest, "size": size, "notes": notes,

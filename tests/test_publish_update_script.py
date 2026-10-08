@@ -130,3 +130,22 @@ def test_signed_file_is_pretty_and_utf8(pub, key):
     raw = pub.sign({"notes": {"pl": "Zażółć"}}, key)
     outer = json.loads(raw)
     assert set(outer) == {"payload", "sig"} and "Zażółć" in raw.decode("utf-8")
+
+
+def test_release_refuses_to_lower_the_minimum_or_the_version(pub, key, dist, tmp_path):
+    out = tmp_path / "manifest.json"
+    keys = (public_b64(key),)
+    (dist / "AdMeNot-9.9.8-setup.exe.sha256").write_text(f"{SHA} *x\n", "utf-8")
+
+    def go(version, **kw):
+        return pub.release(version, NOTES, key=key, today=DAY, fetch=lambda url: (SHA, 1),
+                           dist=dist, out=out, keys=keys, **kw)
+
+    go("9.9.9", min_supported="9.5.0")
+    before = out.read_bytes()
+    with pytest.raises(pub.PublishError, match="min"):
+        go("9.9.9", min_supported="9.0.0")
+    with pytest.raises(pub.PublishError, match="9.9.9"):
+        go("9.9.8")
+    assert out.read_bytes() == before
+    go("9.9.9")  # ta sama wersja (np. nowe notatki) jest dozwolona
