@@ -18,6 +18,18 @@ export interface Settings {
   apk_cache_limit_gb: number;
   apk_cache_clear_after_repair: boolean;
   select_level: Level;
+  check_updates: boolean;
+  dismissed_update: string | null;
+  last_run_version: string | null;
+}
+
+export interface UpdateView {
+  available: { version: string; notes: string; size: number } | null;
+  dismissed: boolean;
+  retired: { min_supported: string; reason: string | null } | null;
+  updated_to: string | null;
+  updated_notes: string | null;
+  installable: boolean;
 }
 
 export interface CacheUsage {
@@ -286,6 +298,10 @@ export interface ApiErrorBody {
   device?: string;
   imei?: string | null;
   log?: string;
+  /** Strona pobierania (update_launch_failed). */
+  page?: string;
+  /** Najstarsza wspierana wersja (retired). */
+  min_supported?: string;
 }
 
 export interface ApiError {
@@ -335,6 +351,9 @@ export interface Api {
   service(): R<ServiceInfo>;
   save_service(changes: Partial<ServiceInfo>): R<ServiceInfo>;
   pick_logo(): R<{ path: string | null }>;
+  update_state(): R<UpdateView>;
+  dismiss_update(version: string): R<UpdateView>;
+  install_update(): R<{ job_id: string } | { opened: boolean }>;
   quit(): R<{ ok: boolean }>;
 }
 
@@ -363,6 +382,8 @@ export interface EventMap {
   'job:error': JobError;
   'job:end': { job_id: string; kind: string };
   'app:close_requested': { kind: string };
+  'update:state': UpdateView;
+  'update:progress': { done: number; total: number | null };
   'mirror:state': MirrorView;
   'mirror:warning': { serial: string; code: 'control_blocked' | 'stay_awake_blocked' };
   'incident:state': { recording: boolean; seconds: number };

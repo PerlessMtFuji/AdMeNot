@@ -42,6 +42,8 @@ export class Controller {
     this.subscribe();
     const settings = await this.call(this.api.get_settings());
     if (settings) this.applySettings(settings);
+    const update = await this.call(this.api.update_state());
+    if (update) this.state.update = update;
     // Przed listą urządzeń: onDevices() decyduje o auto-podglądzie na podstawie s.mirror.available.
     const mirror = await this.call(this.api.mirror_status());
     if (mirror) this.state.mirror = { ...this.state.mirror, available: mirror.available, serial: mirror.serial, state: mirror.state };
@@ -174,6 +176,11 @@ export class Controller {
     });
     on('adb:command', (d) => { s.console = [...s.console.slice(-(CONSOLE_LIMIT - 1)), d]; });
     on('job:error', (d) => {
+      if (d.kind === 'update') { // błędy aktualizacji pokazuje okno instalacji, nie karta błędu
+        s.updateError = d;
+        s.updateProgress = null;
+        return;
+      }
       s.error = d;
       // Każdy błąd zadania musi zostawić ekran, z którego da się wyjść (ponowny skan,
       // dokończenie albo cofnięcie zlecenia), niezależnie od klucza błędu.
@@ -196,8 +203,11 @@ export class Controller {
     });
     on('job:end', (d) => {
       this.ended.add(d.job_id);
+      if (d.kind === 'update') s.updateProgress = null;
       if (s.job?.id === d.job_id) s.job = null;
     });
+    on('update:state', (d) => { s.update = d; });
+    on('update:progress', (d) => { s.updateProgress = d; });
     on('app:close_requested', () => { s.closeRequested = true; });
     on('mirror:state', (d) => {
       const active = s.mirror.state === 'starting' || s.mirror.state === 'running';
@@ -357,6 +367,7 @@ export class Controller {
     s.error = null;
     const r = await this.call(this.api.execute({ ...s.selection }, [...s.unlocked]));
     if (r) this.setJob(r.job_id, 'exec');
+    else this.retiredToDialog();
   }
 
   async stop(): Promise<void> {
@@ -379,6 +390,7 @@ export class Controller {
     // zlecenie znika z „przerwanych” dopiero z `exec:order`: nieudane wznowienie zostawia je
     const r = await this.call(this.api.resume(order));
     if (r) this.setJob(r.job_id, 'resume');
+    else this.retiredToDialog();
   }
 
   async undo(order: string, actionId: number | null = null, pkg: string | null = null): Promise<void> {
@@ -390,6 +402,59 @@ export class Controller {
     const r = await this.call(this.api.undo(order, actionId, pkg));
     if (r) this.setJob(r.job_id, 'undo');
     else s.undoing = s.undoTarget = null;
+  }
+
+  // --- aktualizacje ------------------------------------------------------------------------------
+
+  /** Błąd `retired` przy zmianach na telefonie otwiera okno instalacji (jeśli jest co instalować). */
+  private retiredToDialog(): void {
+    const s = this.state;
+    if (s.error?.key !== 'retired' || !s.update?.available) return;
+    s.error = null;
+    this.openUpdate();
+  }
+
+  openUpdate(): void {
+    this.state.updateError = null;
+    this.state.updateDialog = true;
+  }
+
+  closeUpdate(): void {
+    if (this.state.job?.kind === 'update') return; // najpierw Anuluj pobieranie
+    this.state.updateDialog = false;
+  }
+
+  async installUpdate(): Promise<void> {
+    const s = this.state;
+    s.updateError = null;
+    const r = await this.call(this.api.install_update());
+    if (!r) {
+      s.updateError = s.error; // busy / update_none — w oknie, nie na karcie błędu
+      s.error = null;
+      return;
+    }
+    if ('job_id' in r) {
+      s.updateProgress = { done: 0, total: null };
+      this.setJob(r.job_id, 'update');
+    } else {
+      s.updateDialog = false; // wersja deweloperska: otwarto stronę pobierania
+    }
+  }
+
+  async cancelUpdate(): Promise<void> {
+    const job = this.state.job;
+    if (job?.kind === 'update') await this.call(this.api.stop(job.id));
+  }
+
+  async dismissUpdate(): Promise<void> {
+    const version = this.state.update?.available?.version;
+    if (!version) return;
+    const r = await this.call(this.api.dismiss_update(version));
+    if (r) this.state.update = r;
+  }
+
+  dismissUpdated(): void {
+    this.state.updatedSeen = true;
   }
 
   // --- historia, ustawienia, konsola -------------------------------------------------------------

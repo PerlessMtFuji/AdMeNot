@@ -1,6 +1,6 @@
 // Atrapa mostu: odtwarza scenariusze nagrane z prawdziwego Api (scripts/record_bridge_fixtures.py).
 import type { Bridge } from './bridge';
-import type { Api, EventMap, EventName, ScanView, ServiceInfo, Settings, ShotView } from './types';
+import type { Api, EventMap, EventName, ScanView, ServiceInfo, Settings, ShotView, UpdateView } from './types';
 
 interface RecordedCall {
   method: string;
@@ -45,16 +45,19 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
   const target = new EventTarget();
   const calls: FakeBridge['calls'] = [];
   let settings: Settings = { lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system', mirror_auto: false,
-    apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false, select_level: 'silence' };
+    apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false, select_level: 'silence',
+    check_updates: true, dismissed_update: null, last_run_version: null };
   let service: ServiceInfo = { name: null, address: null, phone: null, logo: null };
   let lastScan: ScanView | null = null;
   let mirror: { serial: string | null; state: string } = { serial: null, state: 'stopped' };
+  let update: UpdateView = { available: null, dismissed: false, retired: null, updated_to: null, updated_notes: null, installable: true };
   const shots: ShotView[] = [];
   const SHOT_IMAGE = 'data:image/svg+xml,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="200"><rect width="90" height="200" rx="8" fill="#1f2937"/>'
     + '<rect x="8" y="40" width="74" height="90" rx="6" fill="#f59e0b"/></svg>');
 
   const dispatch = (event: string, detail: unknown) => {
+    if (event === 'update:state') update = structuredClone(detail as UpdateView);
     if (event === 'scan:done' || event === 'apk:done') lastScan = (detail as { scan: ScanView }).scan;
     target.dispatchEvent(new CustomEvent(event, { detail: structuredClone(detail) }));
   };
@@ -164,6 +167,17 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
       case 'answer':
       case 'quit':
         return { ok: true };
+      case 'update_state':
+        return { ...update };
+      case 'dismiss_update':
+        update = { ...update, dismissed: true };
+        return { ...update };
+      case 'install_update':
+        return update.installable ? { job_id: 'job-update' } : { opened: true };
+      case 'execute':
+      case 'resume':
+        if (update.retired) return { error: { key: 'retired', message: update.retired.reason ?? '', min_supported: update.retired.min_supported } };
+        return { error: { key: 'internal', message: `fake bridge: ${method}` } };
       default:
         return { error: { key: 'internal', message: `fake bridge: ${method}` } };
     }

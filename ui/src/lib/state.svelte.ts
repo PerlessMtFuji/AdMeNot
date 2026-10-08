@@ -1,7 +1,7 @@
 import { actedLevels, type ActedLog, type OpenGroups, type Phase } from './logic';
 import type {
   ApiErrorBody, ApkEstimate, ApkQuestion, Category, ConsoleEntry, DeviceEntry, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
-  PlanView, Question, ReportResult, ScanView, Settings, ShotsView, ShotView, StepEvent, UndoDone, Verdict, WhoView,
+  PlanView, Question, ReportResult, ScanView, Settings, ShotsView, ShotView, StepEvent, UndoDone, UpdateView, Verdict, WhoView,
 } from './types';
 
 export type Screen = 'main' | 'history' | 'settings';
@@ -11,7 +11,8 @@ export class AppState {
   phase = $state<Phase>('connect');
   screen = $state<Screen>('main');
   settings = $state<Settings>({ lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system', mirror_auto: false,
-    apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false, select_level: 'silence' });
+    apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false, select_level: 'silence',
+    check_updates: true, dismissed_update: null, last_run_version: null });
   devices = $state<DeviceEntry[]>([]);
   devicesError = $state<string | null>(null);
   knownSerials = $state<string[]>([]);
@@ -79,6 +80,12 @@ export class AppState {
   consoleWarned = $state(false);
   error = $state<ApiErrorBody | null>(null);
   closeRequested = $state(false);
+  update = $state<UpdateView | null>(null);
+  updateDialog = $state(false);
+  updateProgress = $state<{ done: number; total: number | null } | null>(null);
+  updateError = $state<ApiErrorBody | null>(null);
+  /** „Zaktualizowano do …” zamknięte w tej sesji. */
+  updatedSeen = $state(false);
   fatal = $state<string | null>(null);
 
   get orderRunning(): boolean {

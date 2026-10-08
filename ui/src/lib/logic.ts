@@ -1,5 +1,5 @@
 import { CATEGORY_ORDER } from './categories';
-import type { AppView, Category, DeviceEntry, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanView, ScanView, StepEvent, Verdict } from './types';
+import type { AppView, Category, DeviceEntry, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanView, ScanView, StepEvent, UpdateView, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done';
 export type StageState = 'done' | 'now' | 'todo';
@@ -391,4 +391,13 @@ export function notices(input: { scan: ScanView | null; sdk: number | undefined;
     if (input.selectLevel === 'silence') out.push({ key: 'select_level_disable', tone: 'info', params: {} });
   }
   return out;
+}
+
+/** Który baner aktualizacji pokazać; wycofanie ma pierwszeństwo i nie da się go zamknąć (spec aktualizacji §7). */
+export function updateBanner(u: UpdateView | null, updatedSeen: boolean): 'retired' | 'available' | 'updated' | null {
+  if (!u) return null;
+  if (u.retired) return 'retired';
+  if (u.available && !u.dismissed) return 'available';
+  if (u.updated_to && !updatedSeen) return 'updated';
+  return null;
 }

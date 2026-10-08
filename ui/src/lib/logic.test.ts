@@ -33,8 +33,9 @@ import {
   groupOpen,
   topReasons,
   notices,
+  updateBanner,
 } from './logic';
-import type { AppView, Category, StepEvent, Finding, ScanView } from './types';
+import type { AppView, Category, StepEvent, Finding, ScanView, UpdateView } from './types';
 
 function app(pkg: string, verdict: AppView['verdict'], extra: Partial<AppView> = {}): AppView {
   const level = verdict === 'malicious' ? 'remove' : verdict === 'suspicious' ? 'disable' : null;
@@ -352,4 +353,16 @@ describe('notices', () => {
     const n = notices({ ...base, sdk: 31, selectLevel: 'disable', scan: scan({ profiles: { others: [], known: false } }) });
     expect(n.map((x) => x.key)).toEqual(['profiles_unknown', 'notifications_manual']);
   });
+});
+
+test('update banner priority', () => {
+  const none: UpdateView = { available: null, dismissed: false, retired: null, updated_to: null, updated_notes: null, installable: true };
+  const available = { ...none, available: { version: '9.9.9', notes: 'n', size: 1 } };
+  expect(updateBanner(null, false)).toBeNull();
+  expect(updateBanner(none, false)).toBeNull();
+  expect(updateBanner(available, false)).toBe('available');
+  expect(updateBanner({ ...available, dismissed: true }, false)).toBeNull();
+  expect(updateBanner({ ...available, dismissed: true, retired: { min_supported: '9.0.0', reason: null } }, false)).toBe('retired');
+  expect(updateBanner({ ...none, updated_to: '0.9.3' }, false)).toBe('updated');
+  expect(updateBanner({ ...none, updated_to: '0.9.3' }, true)).toBeNull();
 });

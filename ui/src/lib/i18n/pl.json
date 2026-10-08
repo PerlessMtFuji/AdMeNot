@@ -273,6 +273,32 @@
     "warn_ok": "Rozumiem", "empty": "Brak poleceń w tej sesji.", "disabled": "Konsola działa przy zeskanowanym telefonie, gdy nie trwa zlecenie.",
     "resize": "Zmień wysokość konsoli"
   },
+  "update": {
+    "available": "Dostępna wersja {version}",
+    "notes": "Co nowego",
+    "install": "Zainstaluj",
+    "dismiss": "Nie przypominaj o tej wersji",
+    "busy": "Dostępne po zakończeniu bieżącego zadania",
+    "retired_title": "Ta wersja jest wycofana",
+    "retired_reason": "{reason}. ",
+    "retired_text": "Zmiany na telefonach są zablokowane do czasu aktualizacji.",
+    "updated": "Zaktualizowano do {version}",
+    "dialog_title": "AdMeNot {version}",
+    "confirm": "AdMeNot zamknie się, zainstaluje {version} i uruchomi ponownie. Dziennik, ustawienia i kopie zostają.",
+    "dev": "Wersja deweloperska — otworzę stronę pobierania.",
+    "downloading": "Pobieranie aktualizacji",
+    "progress": "Pobrano {done} z {total} MB",
+    "progress_unknown": "Pobrano {done} MB",
+    "retry": "Spróbuj ponownie",
+    "error": {
+      "update_download": "Nie udało się pobrać aktualizacji. Sprawdź połączenie i spróbuj ponownie.",
+      "update_corrupt": "Pobrany plik jest uszkodzony lub podmieniony — spróbuj ponownie.",
+      "update_launch_failed": "Nie udało się uruchomić instalatora. Pobierz go ze strony: {page}",
+      "busy": "Dostępne po zakończeniu bieżącego zadania.",
+      "update_none": "Brak nowszej wersji.",
+      "internal": "Nieoczekiwany błąd aktualizacji."
+    }
+  },
   "close": { "title": "Trwa zlecenie", "message": "Przerwać po bieżącym kroku i zamknąć program? Zlecenie da się później dokończyć albo cofnąć.", "confirm": "Przerwij i zamknij" },
   "report": {
     "button": "Protokół PDF",
@@ -285,6 +311,7 @@
     "pdf_locked": "Plik {pdf} jest otwarty w innym programie — zamknij go i spróbuj ponownie. Otwarto protokół HTML: {html}"
   },
   "error": {
+    "retired": "Ta wersja AdMeNot jest wycofana — zmiany na telefonach są zablokowane do czasu aktualizacji.",
     "fatal": "Wystąpił nieoczekiwany błąd interfejsu.", "restart": "Wróć do początku", "log": "Szczegóły w logu: {path}",
     "adb_missing": "Nie znaleziono programu adb. Wskaż adb.exe w ustawieniach.",
     "unauthorized": "Telefon nie jest autoryzowany — potwierdź okno na telefonie.",

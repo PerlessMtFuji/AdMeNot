@@ -273,6 +273,32 @@
     "warn_ok": "I understand", "empty": "No commands in this session.", "disabled": "The console works with a scanned phone while no order is running.",
     "resize": "Resize the console"
   },
+  "update": {
+    "available": "Version {version} is available",
+    "notes": "What's new",
+    "install": "Install",
+    "dismiss": "Don't remind me about this version",
+    "busy": "Available when the current task ends",
+    "retired_title": "This version is withdrawn",
+    "retired_reason": "{reason}. ",
+    "retired_text": "Changes to phones are blocked until you update.",
+    "updated": "Updated to {version}",
+    "dialog_title": "AdMeNot {version}",
+    "confirm": "AdMeNot will close, install {version} and start again. The journal, settings and backups stay.",
+    "dev": "Development version — the download page will open.",
+    "downloading": "Downloading the update",
+    "progress": "Downloaded {done} of {total} MB",
+    "progress_unknown": "Downloaded {done} MB",
+    "retry": "Try again",
+    "error": {
+      "update_download": "Could not download the update. Check the connection and try again.",
+      "update_corrupt": "The downloaded file is damaged or was replaced — try again.",
+      "update_launch_failed": "Could not start the installer. Download it from: {page}",
+      "busy": "Available when the current task ends.",
+      "update_none": "No newer version.",
+      "internal": "Unexpected update error."
+    }
+  },
   "close": { "title": "An order is running", "message": "Pause after the current step and close the program? The order can be finished or undone later.", "confirm": "Pause and close" },
   "report": {
     "button": "Report PDF",
@@ -285,6 +311,7 @@
     "pdf_locked": "File {pdf} is open in another program — close it and try again. Opened the HTML report: {html}"
   },
   "error": {
+    "retired": "This version of AdMeNot is withdrawn — changes to phones are blocked until you update.",
     "fatal": "An unexpected interface error occurred.", "restart": "Back to start", "log": "Details in the log: {path}",
     "adb_missing": "The adb program was not found. Point to adb.exe in the settings.",
     "unauthorized": "The phone is not authorized — confirm the prompt on the phone.",
