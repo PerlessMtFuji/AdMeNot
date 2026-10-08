@@ -6,6 +6,7 @@ trafia do logu. Wyłączone ustawienie = zero zapytań; zapisany manifest dział
 
 from __future__ import annotations
 
+import contextlib
 import threading
 from collections.abc import Callable
 from typing import Any
@@ -74,10 +75,11 @@ class UpdateService:
             self._wake.clear()
             if self._stopped.is_set():
                 return
-            if self._enabled():
-                try:
+            try:
+                if self._enabled():
                     self.check_now()
-                except Exception as exc:  # noqa: BLE001 — wątek tła nie może zginąć (np. pełny dysk)
+            except Exception as exc:  # noqa: BLE001 — wątek tła nie może zginąć (np. pełny dysk)
+                with contextlib.suppress(Exception):  # sam log też może paść
                     log_exception(exc)
             delay = self._interval
 

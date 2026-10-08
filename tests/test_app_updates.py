@@ -104,3 +104,37 @@ def test_view_dismissed_and_updated(signing_key):
     empty = update_view(update.state(None, "0.9.2"), "pl", dismissed="9.9.9", updated_to=None,
                         installable=True)
     assert empty["available"] is None and empty["dismissed"] is False
+
+
+@pytest.mark.parametrize("broken", ["fetch", "enabled"])
+def test_loop_survives_an_unexpected_error(signing_key, broken):
+    calls = []
+    second = threading.Event()
+
+    def boom():
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("pełny dysk")
+
+    def fetch():
+        if broken == "fetch":
+            boom()
+        second.set()
+        return update.verify(signed(signing_key))
+
+    def enabled():
+        if broken == "enabled":
+            boom()
+        return True
+
+    svc, _ = service(fetch, enabled=enabled, first_delay=0.0, interval=3600)
+    svc.start()
+    try:
+        deadline = threading.Event()
+        while not calls and not deadline.wait(0.01):
+            pass
+        assert not second.is_set()
+        svc.poke()
+        assert second.wait(5)
+    finally:
+        svc.stop()
