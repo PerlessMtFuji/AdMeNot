@@ -65,10 +65,13 @@ def test_window_is_created_with_the_api(monkeypatch, tmp_path):
             created["start"] = kw
 
     monkeypatch.setitem(sys.modules, "webview", FakeWebview)
+    started = []
+    monkeypatch.setattr(app_main.Api, "_start_updates", lambda self: started.append(self))
     assert app_main.run_gui() == 0
     assert created["title"] == app_main.window_title() and created["url"] == str(web / "index.html")
     assert created["min_size"] == (1024, 700) and created["start"]["http_server"] is True
     assert created["closing"].__self__ is created["js_api"]
+    assert started == [created["js_api"]]  # wątek aktualizacji startuje tylko z prawdziwego okna
 
 
 def test_cli_gui_command(monkeypatch):

@@ -11,13 +11,16 @@ from __future__ import annotations
 
 import functools
 import os
+import sys
 import threading
+import webbrowser
 from collections.abc import Callable
 from dataclasses import asdict, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from admenot import __version__
 from admenot.app.errors import AppError, error_payload, log_exception, report_error
 from admenot.app.events import Emitter
 from admenot.app.jobs import Job, JobRunner, Stopped
@@ -32,6 +35,7 @@ from admenot.app.present import (
     scan_view,
     step_view,
 )
+from admenot.app.updates import UpdateService, update_view
 from admenot.app.watcher import DeviceWatcher
 from admenot.engine.actions.executor import ExecOptions, run_order
 from admenot.engine.actions.executor import resume as resume_steps
@@ -61,6 +65,7 @@ from admenot.engine.session import ScanReport, analyze_apks, run_scan
 from admenot.engine.settings import (
     LogoError,
     ServiceInfo,
+    SettingsTooNew,
     check_logo,
     effective_lang,
     load_service,
@@ -80,6 +85,7 @@ from admenot.engine.workflow import (
     targeted_actions,
     undo_order,
 )
+from admenot.net import client, installer, update
 
 HostFactory = Callable[[str | None], AdbTransport]
 ApkFactory = Callable[..., ApkProvider]
@@ -133,6 +139,11 @@ class Api:
         now: Callable[[], datetime] = datetime.now,
         open_file: Callable[[Path], None] = _startfile,
         mirror_factory: Callable[..., Mirror] = Mirror,
+        update_fetch: Callable[[], update.Manifest] = update.fetch,
+        update_download: Callable[..., Path] = installer.download,
+        launch_setup: Callable[[Path], object] = installer.launch,
+        open_url: Callable[[str], object] = webbrowser.open,
+        frozen: bool | None = None,
     ) -> None:
         self._emitter = emitter
         self._host_factory = host_factory
@@ -173,6 +184,13 @@ class Api:
             lambda view: self._emit("mirror:warning", view),
             self._mirror_line,
             adb=lambda: resolve_adb(self._settings.adb_path).path)
+        self._frozen = getattr(sys, "frozen", False) if frozen is None else frozen
+        self._update_download = update_download
+        self._launch_setup = launch_setup
+        self._open_url = open_url
+        self._updated_to = self._note_version()
+        self._updates = UpdateService(lambda: self._emit("update:state", self._update_view()),
+                                      lambda: self._settings.check_updates, fetch=update_fetch)
 
     # --- pomocnicze (nie są wystawiane do JS) -----------------------------------------------
 
@@ -228,6 +246,34 @@ class Api:
         with self._journal() as journal:
             return [o.number for o in journal.interrupted_orders(serial)]
 
+    def _note_version(self) -> str | None:
+        """Wersja, do której program właśnie się zaktualizował — komunikat raz (spec §6.5)."""
+        last = self._settings.last_run_version
+        if last == __version__:
+            return None
+        try:
+            self._settings = save_settings({"last_run_version": __version__})
+        except SettingsTooNew:
+            return None  # ustawień z nowszej wersji nie nadpisujemy
+        return __version__ if last else None  # pierwsze uruchomienie to nie aktualizacja
+
+    def _update_view(self) -> dict[str, Any]:
+        return update_view(self._updates.state(), self._lang,
+                           dismissed=self._settings.dismissed_update,
+                           updated_to=self._updated_to, installable=self._frozen)
+
+    def _require_current(self) -> None:
+        """Wycofana wersja nie nakłada nowych zmian na telefon (spec aktualizacji §5)."""
+        st = self._updates.state()
+        if st.retired and st.manifest is not None:
+            raise AppError("retired", st.manifest.reason_for(self._lang) or "",
+                           min_supported=st.manifest.min_supported)
+
+    def _start_updates(self) -> None:
+        """Tylko z `run_gui`: sprzątanie starych instalatorów i wątek sprawdzania."""
+        installer.cleanup()
+        self._updates.start()
+
     def _device_list(self) -> dict[str, Any]:
         try:
             entries = list_devices(self._host)
@@ -275,6 +321,8 @@ class Api:
             self._lang = effective_lang(self._settings)
         if "adb_path" in changes:
             self._host = self._host_factory(self._settings.adb_path)
+        if changes.get("check_updates") is True:
+            self._updates.poke()
         return self.get_settings()
 
     @_api
@@ -591,6 +639,7 @@ class Api:
 
     @_api
     def execute(self, requests: dict[str, str], unlocked: list[str] | None = None) -> dict[str, Any]:
+        self._require_current()
         self._require_scan()
         self._abandon_apk()
         adb, report, match, client = self._adb, self._report, self._match, self._client
@@ -627,6 +676,7 @@ class Api:
 
     @_api
     def resume(self, number: str) -> dict[str, Any]:
+        self._require_current()
         order, adb = self._order_adb(number)
         with self._journal() as journal:
             if not any(a.status == "pending" for a in journal.actions(order.id)):
@@ -693,6 +743,50 @@ class Api:
     @_api
     def answer(self, job_id: str, value: str) -> dict[str, Any]:
         return {"ok": self._jobs.answer(job_id, value)}
+
+    # --- aktualizacje ---------------------------------------------------------------------------
+
+    @_api
+    def update_state(self) -> dict[str, Any]:
+        return self._update_view()
+
+    @_api
+    def dismiss_update(self, version: str) -> dict[str, Any]:
+        if not isinstance(version, str) or not version.strip():
+            raise AppError("bad_request", "version")
+        self._settings = save_settings({"dismissed_update": version})
+        return self._update_view()
+
+    @_api
+    def install_update(self) -> dict[str, Any]:
+        st = self._updates.state()
+        if not st.available or st.manifest is None:
+            raise AppError("update_none")
+        manifest = st.manifest
+        page = update.download_page(self._lang)
+        if not self._frozen:
+            self._open_url(page)  # wersja deweloperska: bez instalatora na drzewie źródeł
+            return {"opened": True}
+
+        def progress(done: int, total: int | None) -> None:
+            self._emit("update:progress", {"done": done, "total": total})
+
+        def run(job: Job) -> None:
+            try:
+                setup = self._update_download(manifest, progress, job.should_stop)
+            except client.Cancelled:
+                raise Stopped from None
+            except installer.Corrupt:
+                raise AppError("update_corrupt") from None
+            except (client.BackendError, OSError) as exc:  # sieć albo dysk
+                raise AppError("update_download", str(exc)) from None
+            try:
+                self._launch_setup(setup)
+            except OSError as exc:
+                raise AppError("update_launch_failed", str(exc), page=page) from None
+            self.quit()  # instalator czeka na zamknięcie AdMeNot.exe (CloseApplications=force)
+
+        return {"job_id": self._jobs.start("update", run)}
 
     # --- historia ------------------------------------------------------------------------------
 
@@ -804,6 +898,7 @@ class Api:
         self._pick_file_fn = pick_file
 
     def _shutdown(self) -> None:
+        self._updates.stop()
         self._mirror.stop()
         self._watcher.stop()
         self._abandon_apk()

@@ -88,6 +88,7 @@ def run_gui() -> int:
         return chosen[0] if chosen else None
 
     api._attach(pick_folder=pick_folder, close=window.destroy, pick_file=pick_file)
+    api._start_updates()
     window.events.closing += api._on_closing
     try:
         webview.start(gui="edgechromium", http_server=True)
