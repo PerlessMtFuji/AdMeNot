@@ -131,3 +131,47 @@ def test_get_bytes_returns_the_raw_body(stub):
     stub.content_type = "text/html"
     assert client.get_bytes("/x") == b"<html>nie JSON</html>"
     assert stub.requests[0][2]["User-Agent"] == f"AdMeNot/{__version__}"
+
+
+def test_download_writes_the_file_and_reports_progress(stub, tmp_path):
+    stub.body = bytes(range(256)) * 1000
+    seen = []
+    dest = tmp_path / "d" / "setup.exe.part"
+    client.download(stub.url + "/setup.exe", dest, lambda done, total: seen.append((done, total)))
+    assert dest.read_bytes() == stub.body
+    assert seen[-1] == (len(stub.body), len(stub.body)) and len(seen) >= 4
+    assert stub.requests[0][2]["User-Agent"] == f"AdMeNot/{__version__}"
+
+
+def test_download_cancel_removes_the_file(stub, tmp_path):
+    stub.body = b"x" * 300_000
+    dest = tmp_path / "setup.part"
+    with pytest.raises(client.Cancelled):
+        client.download(stub.url + "/s", dest, cancelled=lambda: True)
+    assert not dest.exists()
+
+
+def test_download_http_error_removes_the_file(stub, tmp_path):
+    stub.status = 404
+    dest = tmp_path / "setup.part"
+    with pytest.raises(BackendError) as err:
+        client.download(stub.url + "/s", dest)
+    assert (err.value.kind, err.value.status) == ("http", 404) and not dest.exists()
+
+
+def test_download_truncated_is_offline(stub, tmp_path):
+    stub.body = b"x" * 100_000
+    stub.truncate_body = True
+    dest = tmp_path / "setup.part"
+    with pytest.raises(BackendError) as err:
+        client.download(stub.url + "/s", dest)
+    assert err.value.kind == "offline" and not dest.exists()
+
+
+def test_download_follows_redirects(stub, tmp_path):
+    stub.body = b"plik"
+    stub.redirects["/latest"] = "/real"
+    dest = tmp_path / "setup.part"
+    client.download(stub.url + "/latest", dest)
+    assert dest.read_bytes() == b"plik"
+    assert [r[1] for r in stub.requests] == ["/latest", "/real"]

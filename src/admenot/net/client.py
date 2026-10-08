@@ -11,6 +11,8 @@ import json
 import os
 import urllib.error
 import urllib.request
+from collections.abc import Callable
+from pathlib import Path
 from typing import Any, Literal
 
 from admenot import __version__
@@ -18,6 +20,8 @@ from admenot import __version__
 BASE_URL = "https://admenot.e-wlodarski.workers.dev"
 ENV_URL = "ADMENOT_API_URL"  # nadpisuje BASE_URL: testy, `wrangler dev`
 TIMEOUT = 5.0  # sekundy; bez ponowień
+DOWNLOAD_TIMEOUT = 30.0  # sekundy na operację gniazda przy pobieraniu instalatora
+CHUNK = 64 * 1024
 
 Kind = Literal["offline", "http", "invalid"]
 
@@ -29,6 +33,10 @@ class BackendError(Exception):
         super().__init__(kind if status is None else f"{kind} {status}")
         self.kind = kind
         self.status = status
+
+
+class Cancelled(Exception):
+    """Pobieranie przerwane przez `cancelled()`."""
 
 
 def base_url() -> str:
@@ -77,3 +85,47 @@ def get_json(path: str) -> dict[str, Any]:
 
 def post_json(path: str, body: dict[str, Any]) -> dict[str, Any]:
     return _request(path, json.dumps(body).encode("utf-8"))
+
+
+def _open_download(url: str) -> http.client.HTTPResponse:
+    request = urllib.request.Request(url, headers={"User-Agent": user_agent()})
+    try:
+        return urllib.request.urlopen(request, timeout=DOWNLOAD_TIMEOUT)
+    except urllib.error.HTTPError as exc:
+        exc.close()
+        raise BackendError("http", exc.code) from None
+    except (OSError, http.client.HTTPException, ValueError):
+        raise BackendError("offline") from None
+
+
+def download(url: str, dest: Path, on_progress: Callable[[int, int | None], None] | None = None,
+             cancelled: Callable[[], bool] = lambda: False) -> None:
+    """Pobiera pełny adres `url` (nie ścieżkę API) do `dest`, kawałkami.
+
+    Sieć → `BackendError`, anulowanie → `Cancelled`, błąd dysku → `OSError` (bez przepakowania,
+    żeby brak miejsca nie udawał braku sieci). Przy każdym błędzie `dest` jest usuwany.
+    """
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with _open_download(url) as response, dest.open("wb") as out:
+            length = response.headers.get("Content-Length")
+            total = int(length) if length and length.isdigit() else None
+            done = 0
+            while True:
+                try:
+                    chunk = response.read(CHUNK)
+                except (OSError, http.client.HTTPException, ValueError):
+                    raise BackendError("offline") from None
+                if not chunk:
+                    break
+                if cancelled():
+                    raise Cancelled
+                out.write(chunk)
+                done += len(chunk)
+                if on_progress is not None:
+                    on_progress(done, total)
+        if total is not None and done != total:
+            raise BackendError("offline")  # serwer zerwał połączenie przed końcem pliku
+    except BaseException:
+        dest.unlink(missing_ok=True)
+        raise

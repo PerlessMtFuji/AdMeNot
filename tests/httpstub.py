@@ -17,6 +17,8 @@ class Stub:
     content_type: str = "application/json"
     delay: float = 0.0  # opóźnienie przed wysłaniem treści (nagłówki idą od razu)
     truncate_body: bool = False  # jeśli True, wysłanie mniej bajtów niż Content-Length mówi
+    redirects: dict[str, str] = field(default_factory=dict)  # ścieżka → Location (302)
+    routes: dict[str, tuple[int, bytes]] = field(default_factory=dict)  # ścieżka → (status, treść)
     requests: list[tuple[str, str, dict[str, str], bytes]] = field(default_factory=list)
     url: str = ""
 
@@ -29,17 +31,24 @@ def serve(stub: Stub):
             length = int(self.headers.get("Content-Length") or 0)
             data = self.rfile.read(length) if length else b""
             stub.requests.append((self.command, self.path, dict(self.headers), data))
-            self.send_response(stub.status)
+            if self.path in stub.redirects:
+                self.send_response(302)
+                self.send_header("Location", stub.redirects[self.path])
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            status, body = stub.routes.get(self.path, (stub.status, stub.body))
+            self.send_response(status)
             self.send_header("Content-Type", stub.content_type)
-            self.send_header("Content-Length", str(len(stub.body)))
+            self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.flush()
             time.sleep(stub.delay)
             try:
                 if stub.truncate_body:  # wysłanie tylko połowy bajtów, potem zamknięcie
-                    self.wfile.write(stub.body[:len(stub.body) // 2])
+                    self.wfile.write(body[:len(body) // 2])
                 else:
-                    self.wfile.write(stub.body)
+                    self.wfile.write(body)
             except OSError:  # klient mógł już zamknąć gniazdo po timeoucie — bez śladu w stderr
                 pass
 
