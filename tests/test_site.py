@@ -116,8 +116,8 @@ def test_update_manifest_has_a_short_cache():
 
 
 @pytest.mark.parametrize(("name", "words"), (
-    ("privacy.html", ("Check for updates automatically", "every 6 hours", "User-Agent")),
-    ("pl/privacy.html", ("Sprawdzaj aktualizacje automatycznie", "co 6 godzin", "User-Agent")),
+    ("privacy.html", ("Check for updates automatically", "10 seconds", "every 6 hours", "User-Agent")),
+    ("pl/privacy.html", ("Sprawdzaj aktualizacje automatycznie", "10 sekund", "co 6 godzin", "User-Agent")),
 ))
 def test_privacy_describes_update_checks(name, words):
     text, _ = load(name)

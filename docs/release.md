@@ -110,6 +110,29 @@ sprawdzić, zapisz wprost jako niesprawdzony.
        (samo `/VERYSILENT` pokazuje prośbę o zamknięcie i czeka).
 7. [ ] adb z Android SDK (jeśli jest) działa dalej po instalacji i deinstalacji.
 8. [ ] Wynik VirusTotal w notatkach (albo „nie sprawdzono” z powodem).
-9. [ ] Aktualizacja z programu (przed pierwszym publicznym wydaniem i po zmianach w F): próba
-       z §10.2 specu aktualizacji — `docs/superpowers/specs/2026-10-08-updates-design.md`
-       (lokalnie) albo kroki niżej. Kopia `%LOCALAPPDATA%\AdMeNot` przed próbą.
+9. [ ] Aktualizacja z programu (przed pierwszym publicznym wydaniem i po zmianach w aktualizacjach).
+       Kopia `%LOCALAPPDATA%\AdMeNot` przed próbą (`Copy-Item -Recurse $env:LOCALAPPDATA\AdMeNot $env:TEMP\AdMeNot-backup`).
+   - [ ] 9a. Klucz testowy: `$env:ADMENOT_SIGNING_KEY = "$env:TEMP\admenot-test-key.pem"`,
+         `.venv\Scripts\python scripts\publish_update.py keygen`; wypisany klucz publiczny wpisz
+         **tymczasowo** jako jedyny w `PUBLIC_KEYS` w `src/admenot/net/update_key.py` (bez commitu).
+   - [ ] 9b. Dwa buildy z `--allow-dirty` (bez commitu): `__version__ = "0.9.90"`, build, instalacja
+         `dist\release\AdMeNot-0.9.90-setup.exe`; potem `__version__ = "0.9.91"` i ten sam build.
+   - [ ] 9c. Serwer lokalny: skopiuj `AdMeNot-0.9.91-setup.exe` do `$env:TEMP\admenot-update-test`,
+         w osobnym oknie `.venv\Scripts\python -m http.server 8787 --bind 127.0.0.1 --directory $env:TEMP\admenot-update-test`.
+         W oknie z kluczem testowym: `$env:ADMENOT_API_URL = "http://127.0.0.1:8787"` (lokalny adres
+         działa tylko z tą zmienną) i
+         `publish_update.py release 0.9.91 --notes-pl n-pl.txt --notes-en n-en.txt --download-base http://127.0.0.1:8787/`.
+         Skopiuj `server\public\updates\v1\manifest.json` do `$env:TEMP\admenot-update-test\updates\v1\`
+         i usuń z repo (`Remove-Item -Recurse server\public\updates`) — manifest testowy nie trafia do commitu.
+   - [ ] 9d. Ustaw `ADMENOT_API_URL` na `http://127.0.0.1:8787` (użytkownika albo w PowerShellu, z którego
+         uruchamiasz program) i uruchom zainstalowane 0.9.90. Po ok. 10 s baner „Dostępna wersja 0.9.91”;
+         Zainstaluj → pobieranie → instalator z paskiem → program wraca jako `AdMeNot 0.9.91 beta`
+         z komunikatem „Zaktualizowano do 0.9.91”; dziennik i ustawienia zostały;
+         `%LOCALAPPDATA%\AdMeNot\updates` jest pusty.
+   - [ ] 9e. Wycofanie: zainstaluj ręcznie 0.9.90, `publish_update.py retire --min 0.9.91 --reason-pl "Test" --reason-en "Test"`
+         (z `ADMENOT_API_URL`), skopiuj manifest jak w 9c, uruchom program ponownie: czerwony baner,
+         „Napraw” na telefonie otwiera okno instalacji zamiast zlecenia, cofanie starego zlecenia
+         z Historii działa. Telefon tylko z listy modyfikowalnych (nigdy moto g54 ani Vivo).
+   - [ ] 9f. Sprzątanie: usuń zmienną `ADMENOT_API_URL` (`[Environment]::SetEnvironmentVariable("ADMENOT_API_URL", $null, "User")`),
+         `git checkout -- src/admenot/__init__.py src/admenot/net/update_key.py server/public/updates`,
+         usuń klucz testowy, przywróć `%LOCALAPPDATA%\AdMeNot` z kopii i zainstaluj właściwą wersję.
