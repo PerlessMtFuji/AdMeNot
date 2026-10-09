@@ -87,3 +87,25 @@ def test_wrangler_failure_is_reported(capsys):
 
     assert m.main(["list"], run=failing) == 1
     assert "Not logged in" in capsys.readouterr().err
+
+
+def test_show_and_list_strip_terminal_control_characters(capsys):
+    m = _module()
+    evil = {**BODY, "comment": "a\x1b]0;evil\x07b\x9bc\x00d", "log_tail": "l1\nl2\tx"}
+    run = FakeRun([{"id": "R-7K3Q9M", "created": "2026-10-09 14:03:15", "body": json.dumps(evil), "seen": 0}], [])
+    assert m.main(["show", "R-7K3Q9M"], run=run) == 0
+    out = capsys.readouterr().out
+    assert "\x1b" not in out and "\x07" not in out and "\x9b" not in out and "\x00" not in out
+    assert "a]0;evilbcd" in out and "l1\nl2\tx" in out
+    run = FakeRun([{"id": "R-7K3Q9M", "created": "2026-10-09 14:03:15", "app": "0.9.3\x1b[2J",
+                    "kind": "exit", "error_type": "E\x1b]0;x\x07", "error_where": None, "count": 1, "seen": 0}])
+    assert m.main(["list"], run=run) == 0
+    out = capsys.readouterr().out
+    assert "\x1b" not in out and "\x07" not in out and "0.9.3[2J" in out
+
+
+def test_id_with_trailing_newline_is_refused(capsys):
+    m = _module()
+    run = FakeRun()
+    assert m.main(["show", "R-7K3Q9M\n"], run=run) == 2
+    assert run.calls == []

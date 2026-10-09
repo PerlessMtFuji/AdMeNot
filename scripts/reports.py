@@ -19,7 +19,9 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 SERVER = ROOT / "server"
 WRANGLER = SERVER / "node_modules" / "wrangler" / "bin" / "wrangler.js"
-ID_RE = re.compile(r"^R-[0-9A-HJKMNP-TV-Z]{6}$")
+ID_RE = re.compile(r"R-[0-9A-HJKMNP-TV-Z]{6}")
+# znaki sterujące poza \n i \t (ESC, BEL, C1…) — treść raportu nie może sterować terminalem
+_CONTROL = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
 
 Run = Callable[..., Any]
 
@@ -42,8 +44,12 @@ def run_sql(sql: str, local: bool = False, run: Run = subprocess.run) -> list[di
         raise ReportsError(f"nieczytelna odpowiedź wranglera: {exc}") from None
 
 
+def _safe(value: Any) -> str:
+    return _CONTROL.sub("", str(value))
+
+
 def _check(report_id: str) -> str:
-    if not ID_RE.match(report_id):
+    if not ID_RE.fullmatch(report_id):
         raise ValueError(report_id)
     return report_id
 
@@ -57,14 +63,14 @@ def cmd_list(new: bool, limit: int, local: bool, run: Run) -> int:
         print("Brak raportów.")
     for r in rows:
         mark = " " if r["seen"] else "*"
-        print(f"{mark} {r['id']}  {r['created']}  {r['app']:<8} {r['kind']:<6} x{r['count'] or 1:<3} "
-              f"{r['error_type']}  {r['error_where'] or ''}")
+        print(_safe(f"{mark} {r['id']}  {r['created']}  {r['app']:<8} {r['kind']:<6} "
+                    f"x{r['count'] or 1:<3} {r['error_type']}  {r['error_where'] or ''}"))
     return 0
 
 
 def _section(title: str, text: str | None) -> None:
     if text:
-        print(f"\n## {title}\n{text}")
+        print(f"\n## {title}\n{_safe(text)}")
 
 
 def cmd_show(report_id: str, local: bool, run: Run) -> int:
@@ -75,12 +81,12 @@ def cmd_show(report_id: str, local: bool, run: Run) -> int:
     body = json.loads(rows[0]["body"])
     ctx, err = body.get("context") or {}, body.get("error") or {}
     device = ctx.get("device") or {}
-    print(f"{report_id}  {rows[0]['created']} UTC  {body.get('kind')}  x{body.get('count')}")
-    print(f"AdMeNot {body.get('app')}  {body.get('os')}  język {body.get('lang')}  (u użytkownika: {body.get('created')})")
-    print(f"Kontekst: call={ctx.get('call')} job={ctx.get('job')} screen={ctx.get('screen')}")
+    print(_safe(f"{report_id}  {rows[0]['created']} UTC  {body.get('kind')}  x{body.get('count')}"))
+    print(_safe(f"AdMeNot {body.get('app')}  {body.get('os')}  język {body.get('lang')}  (u użytkownika: {body.get('created')})"))
+    print(_safe(f"Kontekst: call={ctx.get('call')} job={ctx.get('job')} screen={ctx.get('screen')}"))
     if device:
-        print(f"Telefon: {device.get('manufacturer')} {device.get('model')}, Android {device.get('android')}")
-    print(f"Błąd: {err.get('type')}: {err.get('message')}  [{err.get('where') or '-'}]")
+        print(_safe(f"Telefon: {device.get('manufacturer')} {device.get('model')}, Android {device.get('android')}"))
+    print(_safe(f"Błąd: {err.get('type')}: {err.get('message')}  [{err.get('where') or '-'}]"))
     _section("Opis od użytkownika", body.get("comment"))
     _section("Traceback", err.get("trace"))
     _section("Log programu", body.get("log_tail"))
@@ -99,6 +105,8 @@ def cmd_delete(report_id: str, local: bool, run: Run) -> int:
 
 
 def main(argv: Sequence[str] | None = None, run: Run = subprocess.run) -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")  # konsola bez UTF-8 nie wywróci wydruku raportu
     parser = argparse.ArgumentParser(description="Raporty błędów AdMeNot (D1)")
     sub = parser.add_subparsers(dest="command", required=True)
     lst = sub.add_parser("list")
