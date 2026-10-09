@@ -32,8 +32,9 @@ test('offline: the report is queued and the dialog only offers closing', async (
   bridge.failNextCrashSend('crash_offline');
   await fireEvent.click(screen.getByRole('button', { name: 'Wyślij raport' }));
   await fireEvent.click(await screen.findByRole('button', { name: 'Wyślij' }));
-  expect(await screen.findByRole('status')).toHaveProperty('textContent',
-    'Brak połączenia z serwerem. Raport zostanie wysłany automatycznie, gdy połączenie wróci — możesz zamknąć to okno.');
+  const notice = await screen.findByRole('status');
+  expect(within(notice).getByText('Brak połączenia z serwerem')).toBeTruthy();
+  expect(within(notice).getByText('Raport zostanie wysłany automatycznie, gdy połączenie wróci. Możesz zamknąć to okno.')).toBeTruthy();
   const dialog = within(screen.getByRole('dialog'));
   expect(dialog.queryByRole('button', { name: 'Wyślij' })).toBeNull();
   await fireEvent.click(dialog.getByRole('button', { name: 'Zamknij' }));

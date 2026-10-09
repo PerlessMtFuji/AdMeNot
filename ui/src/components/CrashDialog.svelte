@@ -2,6 +2,7 @@
   import { getContext, onDestroy } from 'svelte';
   import type { Controller } from '../lib/controller';
   import { CRASH_ERROR_KEYS, t } from '../lib/i18n/index.svelte';
+  import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
   import Dialog from '../ui/Dialog.svelte';
 
@@ -57,9 +58,10 @@
       </details>
       <p class="mt-3 text-xs text-mut">{t('crash.contact')}</p>
       {#if queued}
-        <p role="status" class="mt-3">{t('crash.error.crash_offline')}</p>
+        <div class="mt-3"><Banner tone="warn" icon="info" title={t('crash.queued_title')}>{t('crash.queued')}</Banner></div>
       {:else if s.crashError}
-        <p role="alert" class="mt-3 text-bad">{t(`crash.error.${errorKey}`, { message: s.crashError.message })}</p>
+        <div class="mt-3"><Banner tone="bad" icon="triangle-alert" title={t('crash.failed_title')}>
+          {t(`crash.error.${errorKey}`, { message: s.crashError.message })}</Banner></div>
       {/if}
     {/if}
     {#snippet actions()}
