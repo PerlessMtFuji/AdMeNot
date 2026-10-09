@@ -74,7 +74,7 @@ Wycofanie wersji (bez nowego release'u):
 - Przegląd: `.venv\Scripts\python scripts\reports.py list --new`, szczegóły `show R-XXXXXX` (oznacza jako przejrzany).
 - Usunięcie na prośbę (RODO): `reports.py delete R-XXXXXX`. Wszystkie raporty znikają same po 90 dniach.
 - Próba lokalna: w `server/` `npx wrangler d1 migrations apply admenot --local` i `npx wrangler dev` (port 8787);
-  program z `ADMENOT_API_URL=http://127.0.0.1:8787`; `reports.py --local list`.
+  program z `ADMENOT_API_URL=http://127.0.0.1:8787`; `reports.py list --local`.
 
 ## Build
 
