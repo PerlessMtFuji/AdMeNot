@@ -15,7 +15,7 @@
 <main>
   <section>
     <h1>Polityka prywatności</h1>
-    <p class="note">Wersja z 8 października 2026</p>
+    <p class="note">Wersja z 9 października 2026</p>
 
     <h2>Kto odpowiada za dane</h2>
     <p>Administratorem danych jest Eryk Wlodarski. Kontakt: <a href="mailto:e.wlodarski@protonmail.com">e.wlodarski@protonmail.com</a>.</p>
@@ -25,13 +25,19 @@
     <p>Gdy włączone jest „Sprawdzaj aktualizacje automatycznie” (domyślnie tak, w Ustawienia → Aktualizacje), program pobiera z tej strony mały plik z informacją o wersjach 10 sekund po starcie, a potem co 6 godzin. Zapytanie nie zawiera nic poza standardowym zapytaniem HTTP z nagłówkiem <code>User-Agent: AdMeNot/&lt;wersja&gt;</code> i niczego z niego nie zapisujemy. Gdy zdecydujesz się zainstalować aktualizację, instalator pobierany jest z GitHuba. Po wyłączeniu ustawienia program nie łączy się w tym celu — i nie dowie się o nowej ani o wycofanej wersji.</p>
     <p>Polecenie diagnostyczne <code>admenot selfcheck --online</code>, które uruchamiasz sam, wysyła to samo zapytanie o wersje i wywołuje <code>/api/v1/health</code>, żeby sprawdzić, czy nasz serwer odpowiada.</p>
 
+    <h2>Raporty błędów</h2>
+    <p>Gdy w programie wystąpi nieoczekiwany błąd albo program ostatnio zamknął się nieoczekiwanie, AdMeNot proponuje wysłanie raportu o błędzie. Raport wysyła się tylko po kliknięciu „Wyślij”, a przed wysłaniem widać całą jego treść.</p>
+    <p>Raport zawiera zawsze: wersję AdMeNot i Windows, język programu, opis błędu z miejscem w kodzie programu, co program wtedy robił, producenta, model i wersję Androida podłączonego telefonu, liczbę wystąpień błędu i Twój opcjonalny opis. Tylko po zaznaczeniu pola zawiera też ostatnie 50 poleceń ADB, w których mogą być nazwy aplikacji zainstalowanych na telefonie klienta.</p>
+    <p>Raport nigdy nie zawiera numeru IMEI, numeru seryjnego telefonu, numerów telefonów, adresów e-mail ani nazwy Twojego konta Windows — program usuwa je, zanim zapisze raport na komputerze. Adresów IP nie zapisujemy.</p>
+    <p>Raporty służą wyłącznie do naprawiania błędów programu. Usuwamy je automatycznie po 90 dniach. Aby usunąć raport wcześniej, napisz na adres podany wyżej i podaj numer raportu (np. R-7K3Q9M).</p>
+
     <h2>Ta strona</h2>
     <p>Strona nie używa ciasteczek, analityki ani zasobów z innych serwerów.</p>
     <p>Stronę hostuje Cloudflare jako podmiot przetwarzający. Cloudflare widzi Twój adres IP przy połączeniu — tak działa internet. My adresów IP nie zapisujemy ani nie logujemy, a nasz kod ich nie odczytuje.</p>
     <p>Instalator pobierasz z GitHuba, który ma własne <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">zasady prywatności</a>.</p>
 
     <h2>Podstawa prawna i przekazywanie danych</h2>
-    <p>Dane przetwarzamy, aby udostępniać stronę i serwer oraz dbać o ich bezpieczeństwo. Podstawą prawną jest nasz prawnie uzasadniony interes, art. 6 ust. 1 lit. f RODO.</p>
+    <p>Dane przetwarzamy, aby udostępniać stronę i serwer oraz dbać o ich bezpieczeństwo oraz w celu naprawy zgłoszonych błędów programu. Podstawą prawną jest nasz prawnie uzasadniony interes, art. 6 ust. 1 lit. f RODO.</p>
     <p>Cloudflare, Inc. ma siedzibę w Stanach Zjednoczonych, więc dane mogą być przetwarzane poza EOG. Przekazanie odbywa się na podstawie programu EU–US Data Privacy Framework, w którym uczestniczy Cloudflare.</p>
     <p>Nie przechowujemy danych z odwiedzin. Cloudflare jako nasz podmiot przetwarzający przechowuje dane techniczne przez okres wskazany w swoich warunkach świadczenia usług.</p>
 

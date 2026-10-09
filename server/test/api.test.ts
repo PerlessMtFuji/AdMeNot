@@ -89,4 +89,12 @@ describe("strona", () => {
     expect(res.headers.get("Content-Type") ?? "").toMatch(/^text\/html/);
     await res.arrayBuffer();
   });
+
+  it.each([["/privacy", "Error reports", "90 days"], ["/pl/privacy", "Raporty błędów", "90 dni"]])(
+    "%s opisuje raporty błędów", async (path, heading, keep) => {
+      const html = await (await env.ASSETS.fetch("https://assets.local" + path)).text();
+      expect(html).toContain(`<h2>${heading}</h2>`);
+      expect(html).toContain(keep);
+      expect(html).toMatch(/IMEI/);
+    });
 });
