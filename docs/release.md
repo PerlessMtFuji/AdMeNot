@@ -154,7 +154,9 @@ sprawdzić, zapisz wprost jako niesprawdzony.
          usuń klucz testowy (wyciek klucza prywatnego do repo wykrywa przebieg gitleaks, spec §2.3 / §11.5), przywróć `%LOCALAPPDATA%\AdMeNot` z kopii i zainstaluj właściwą wersję.
 10. [ ] Raport błędu z buildu: `ADMENOT_CRASH_TEST=error` → „Wyślij raport” na karcie błędu, numer, raport widać
         w `reports.py list --local`; `ADMENOT_CRASH_TEST=fatal` → po ponownym starcie baner, wysyłka z ADB,
-        `show` bez numeru seryjnego i nazwy konta. Bez `wrangler dev`: komunikat offline, raport czeka.
+        `show` bez numeru seryjnego i nazwy konta. Bez `wrangler dev`: komunikat o automatycznej wysyłce,
+        okno można zamknąć; po zamknięciu programu, starcie `wrangler dev` i ponownym uruchomieniu raport
+        wysyła się sam w ok. 30 s (`reports.py list --local`).
    - [ ] 10a. Po wdrożeniu raportów na produkcję (migracja `--remote` i `wrangler deploy`): jeden raport
          próbny na produkcję — `ADMENOT_CRASH_TEST=error` **bez** `ADMENOT_API_URL`, „Wyślij raport”, numer;
          `.venv\Scripts\python scripts\reports.py list --new` pokazuje ten numer; potem

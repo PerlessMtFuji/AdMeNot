@@ -438,9 +438,12 @@ def _set_queued(path: Path, data: dict[str, Any], queued: dict[str, Any] | None)
         _session.queue_wake.set()
 
 
-def send_queued(post: Post | None = None, now: Now | None = None) -> bool:
+def send_queued(post: Post | None = None, now: Now | None = None,
+                stop: threading.Event | None = None) -> bool:
     """Wysyła raporty z kolejki; True, gdy coś dalej czeka na połączenie. Nigdy nie rzuca."""
     for path in _files():
+        if stop is not None and stop.is_set():
+            return False  # koniec sesji — reszta poczeka do następnego startu
         data = _read(path)
         queued = data.get("queued") if data else None
         if not queued or data["sent"]:  # type: ignore[index]
@@ -451,9 +454,24 @@ def send_queued(post: Post | None = None, now: Now | None = None) -> bool:
         except client.BackendError as exc:
             if _unreachable(exc):
                 return True  # serwer dalej nieosiągalny — reszta też poczeka
+            _rejected_in_background(path, exc)
         except Exception as failure:  # noqa: BLE001 — np. raport usunięty w międzyczasie
             _log_failure(failure)
     return False
+
+
+def _rejected_in_background(path: Path, exc: client.BackendError) -> None:
+    """Serwer odrzucił raport z kolejki: ślad w logu, a raport po awarii wraca do banera."""
+    _log_failure(exc)
+    with _send_lock:  # jak `discard`: nie zapisujemy raportu usuniętego w międzyczasie
+        data = _read(path)
+        if data is None or data["kind"] not in ("exit", "thread") or data["sent"]:
+            return
+        data["announced"] = False
+        try:
+            _write(path, data)
+        except Exception as failure:  # noqa: BLE001
+            _log_failure(failure)
 
 
 QUEUE_FIRST = 30.0  # pierwsza próba po starcie programu (s)
@@ -471,7 +489,7 @@ def _queue_loop(wake: threading.Event, stop: threading.Event) -> None:
         if woken:  # nowy raport w kolejce (właśnie zawiodła wysyłka) — próba po przerwie
             delay, step = QUEUE_RETRY[0], 1
             continue
-        if send_queued():
+        if send_queued(stop=stop):
             delay = QUEUE_RETRY[min(step, len(QUEUE_RETRY) - 1)]
             step += 1
         else:
@@ -499,7 +517,9 @@ def stop_queue() -> None:
 
 
 def discard(crash_id: str) -> None:
-    _path(crash_id).unlink(missing_ok=True)
+    # Pod blokadą wysyłki: trwająca wysyłka w tle nie zapisze z powrotem usuniętego raportu.
+    with _send_lock:
+        _path(crash_id).unlink(missing_ok=True)
 
 
 def claim_session() -> bool:
@@ -611,7 +631,8 @@ def _crashed_session(saved: Any) -> Iterator[None]:
 _FAULT_HEADER = re.compile(r"^(?:Windows fatal exception:|Fatal Python error:)", re.MULTILINE)
 # Kody HRESULT (0x8…) to wyjątki COM/RPC pierwszej szansy, które WinForms/WebView2 rzuca i sam
 # obsługuje (np. 0x8001010d przy każdym starcie okna); faulthandler zapisuje je mimo to.
-_HANDLED_FAULT = re.compile(r"^Windows fatal exception: code 0x8[0-9a-fA-F]{7}\s*$")
+# 0x800000xx to ostrzeżenia NTSTATUS (np. 0x80000003 breakpoint) — prawdziwe awarie, zostają.
+_HANDLED_FAULT = re.compile(r"^Windows fatal exception: code 0x8(?!00000)[0-9a-fA-F]{7}\s*$")
 
 
 def _real_faults(fault: str) -> str:

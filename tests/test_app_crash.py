@@ -300,6 +300,40 @@ def test_rejected_report_leaves_the_queue():
     assert "queued" not in load(crash_id) and load(crash_id)["sent"] is None
 
 
+def test_report_deleted_during_background_send_stays_deleted():
+    crash_id = crash.capture(boom(), now=lambda: NOW)
+    with pytest.raises(client.BackendError):
+        crash.send(crash_id, False, None, post=offline)
+    deleter = []
+
+    def accepted_while_user_deletes(path, body):
+        t = threading.Thread(target=lambda: deleter.append(crash.discard(crash_id)))
+        t.start()
+        t.join(0.2)  # usuwanie czeka na koniec wysyłki
+        return {"id": "R-7K3Q9M"}
+
+    assert crash.send_queued(post=accepted_while_user_deletes) is False
+    for _ in range(100):
+        if deleter:
+            break
+        time.sleep(0.01)
+    assert not (crashes_dir() / f"{crash_id}.json").exists()
+    assert crash.send_queued(post=offline) is False
+
+
+def test_background_rejection_returns_crash_report_to_banner():
+    thread = crash.capture(type_="RuntimeError", message="x", kind="thread", now=lambda: NOW)
+    crash.startup_reports()
+    with pytest.raises(client.BackendError):
+        crash.send(thread, False, None, post=offline)
+
+    def rejected(path, body):
+        raise client.BackendError("http", 400)
+
+    crash.send_queued(post=rejected)
+    assert crash.startup_reports() == [thread]
+
+
 def test_queued_crash_report_is_not_offered_again_in_banner():
     thread = crash.capture(type_="RuntimeError", message="x", kind="thread", now=lambda: NOW)
     assert crash.startup_reports() == [thread]

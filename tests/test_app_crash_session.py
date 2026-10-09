@@ -75,6 +75,13 @@ def test_real_fault_after_com_exception_is_reported_without_it():
     assert "0x8001010d" not in data["error"]["trace"] and "line 1342 in run" in data["error"]["trace"]
 
 
+def test_fatal_ntstatus_warning_codes_are_kept():
+    marker(COM_BLOCK + "Windows fatal exception: code 0x80000003\n\n"
+           "Thread 0x1 (most recent call first):\n")
+    crash.recover(now=lambda: datetime(2026, 10, 9, 15, 0, 0))
+    assert reports()[0]["error"]["message"] == "Windows fatal exception: code 0x80000003"
+
+
 def test_marker_with_log_entries_after_start():
     marker()
     log = logs_dir() / "app-2026-10-09.log"
