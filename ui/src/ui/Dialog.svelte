@@ -39,10 +39,11 @@
 <div class="fixed inset-0 z-50 grid place-items-center bg-[rgb(15_23_42/.45)] backdrop-blur-[6px]"
   transition:fade={{ duration: ms(DUR.micro) }}>
   <div bind:this={box} role="dialog" aria-modal="true" aria-labelledby={id} tabindex="-1" onkeydown={keydown}
-    class="w-[min(500px,92vw)] rounded-[20px] card p-6"
+    class="flex max-h-[90vh] w-[min(500px,92vw)] flex-col rounded-[20px] card p-6"
     transition:scale={{ start: 0.96, duration: ms(DUR.dialog) }}>
-    <h2 {id} class="text-lg font-bold">{title}</h2>
-    <div class="mt-2 text-mut">{@render children()}</div>
-    <div class="mt-6 flex justify-end gap-2">{@render actions()}</div>
+    <!-- treść przewija się w oknie, tytuł i przyciski zostają widoczne -->
+    <h2 {id} class="shrink-0 text-lg font-bold">{title}</h2>
+    <div class="mt-2 min-h-0 overflow-auto text-mut">{@render children()}</div>
+    <div class="mt-6 flex shrink-0 justify-end gap-2">{@render actions()}</div>
   </div>
 </div>

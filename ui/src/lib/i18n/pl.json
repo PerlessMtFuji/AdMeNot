@@ -292,6 +292,7 @@
     "sending": "Wysyłanie…",
     "sent": "Wysłano. Numer raportu: {id}",
     "copy": "Kopiuj",
+    "copied": "Skopiowano",
     "banner": "Program ostatnio zakończył się błędem. Wysłać raport?",
     "banner_send": "Wyślij…",
     "banner_dismiss": "Odrzuć",

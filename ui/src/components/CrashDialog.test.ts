@@ -66,3 +66,40 @@ test('ADB box is disabled without ADB lines', async () => {
   await tick();
   expect((screen.getByRole('checkbox', { name: /Dołącz/ }) as HTMLInputElement).disabled).toBe(true);
 });
+
+async function sentDialog() {
+  await withError();
+  await fireEvent.click(screen.getByRole('button', { name: 'Wyślij raport' }));
+  await fireEvent.click(await screen.findByRole('button', { name: 'Wyślij' }));
+  await screen.findByText('Wysłano. Numer raportu: R-7K3Q9M');
+}
+
+test('copy shows feedback', async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+  try {
+    await sentDialog();
+    await fireEvent.click(screen.getByRole('button', { name: 'Kopiuj' }));
+    expect(await screen.findByText('Skopiowano')).toBeTruthy();
+    expect(writeText).toHaveBeenCalledWith('R-7K3Q9M');
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+test('copy rejected by the clipboard does not leak a rejection', async () => {
+  const rejections: unknown[] = [];
+  const onRejection = (reason: unknown) => rejections.push(reason);
+  process.on('unhandledRejection', onRejection);
+  vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText: () => Promise.reject(new Error('denied')) } });
+  try {
+    await sentDialog();
+    await fireEvent.click(screen.getByRole('button', { name: 'Kopiuj' }));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(rejections).toEqual([]);
+    expect(screen.getByText('Wysłano. Numer raportu: R-7K3Q9M')).toBeTruthy();
+  } finally {
+    process.off('unhandledRejection', onRejection);
+    vi.unstubAllGlobals();
+  }
+});

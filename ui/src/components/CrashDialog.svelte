@@ -12,6 +12,12 @@
   const error = $derived((s.crashPreview?.error ?? {}) as { type?: string });
   const created = $derived(String(s.crashPreview?.created ?? '').replace('T', ' '));
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let copied = $state(false);
+
+  // Odmowa schowka nie może trafić do `unhandledrejection` (main.ts przełączyłby UI w „fatal”).
+  function copy(): void {
+    navigator.clipboard?.writeText(s.crashSent ?? '').then(() => { copied = true; }).catch(() => {});
+  }
 
   // Podgląd = treść wysyłki; odświeżany po zmianie pola ADB lub opisu (spec raportów §5.2).
   function refresh(): void {
@@ -27,7 +33,8 @@
   <Dialog title={t('crash.title')} oncancel={() => ctl.closeCrash()}>
     {#if s.crashSent}
       <p class="flex items-center gap-2">{t('crash.sent', { id: s.crashSent })}
-        <Button size="sm" variant="ghost" onclick={() => navigator.clipboard?.writeText(s.crashSent ?? '')}>{t('crash.copy')}</Button></p>
+        <Button size="sm" variant="ghost" onclick={copy}>{t('crash.copy')}</Button>
+        {#if copied}<span role="status" class="text-xs text-mut">{t('crash.copied')}</span>{/if}</p>
       <p class="mt-2 text-xs text-mut">{t('crash.contact')}</p>
     {:else}
       <p>{t('crash.intro')}</p>
@@ -44,7 +51,7 @@
       </label>
       <details class="mt-3">
         <summary class="cursor-pointer text-sm">{t('crash.show')}</summary>
-        <pre class="mono mt-2 max-h-[30vh] overflow-auto rounded-lg bg-surface-2 p-2.5 text-xs whitespace-pre-wrap">{s.crashPreview ? JSON.stringify(s.crashPreview, null, 2) : ''}</pre>
+        <pre class="mono mt-2 max-h-[30vh] overflow-auto rounded-lg bg-surface-2 p-2.5 text-xs whitespace-pre-wrap break-all">{s.crashPreview ? JSON.stringify(s.crashPreview, null, 2) : ''}</pre>
       </details>
       <p class="mt-3 text-xs text-mut">{t('crash.contact')}</p>
       {#if s.crashError}

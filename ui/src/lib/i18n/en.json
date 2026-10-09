@@ -292,6 +292,7 @@
     "sending": "Sending…",
     "sent": "Sent. Report number: {id}",
     "copy": "Copy",
+    "copied": "Copied",
     "banner": "The program closed with an error last time. Send a report?",
     "banner_send": "Send…",
     "banner_dismiss": "Dismiss",
