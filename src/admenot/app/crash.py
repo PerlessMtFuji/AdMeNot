@@ -64,6 +64,7 @@ class _Session:
 
 
 _session = _Session()
+_send_lock = threading.Lock()  # wywołania API z JS idą z wątków roboczych — jedna wysyłka naraz
 
 
 def reset_session() -> None:
@@ -157,9 +158,13 @@ def _load(crash_id: str) -> dict[str, Any]:
 
 def _write(path: Path, data: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), "utf-8")
-    os.replace(tmp, path)
+    tmp = path.with_name(f"{path.stem}.{secrets.token_hex(4)}.tmp")
+    try:
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), "utf-8")
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def capture(exc: BaseException | None = None, *, kind: str = "error",
@@ -223,7 +228,8 @@ def _capture(exc: BaseException | None, kind: str, context: dict[str, Any], type
 
 def _files() -> list[Path]:
     try:
-        return sorted(crashes_dir().glob("*.json"))  # nazwa zaczyna się od czasu → kolejność
+        # tylko pliki o kształcie identyfikatora (nie running.json); nazwa zaczyna się od czasu → kolejność
+        return sorted(p for p in crashes_dir().glob("*.json") if ID_RE.match(p.stem))
     except OSError:
         return []
 
@@ -231,6 +237,11 @@ def _files() -> list[Path]:
 def prune(now: Now | None = None) -> None:
     """Usuwa pliki uszkodzone, starsze niż KEEP_DAYS i nadmiarowe ponad MAX_FILES (najstarsze)."""
     limit = (now or datetime.now)() - timedelta(days=KEEP_DAYS)
+    try:
+        for leftover in crashes_dir().glob("*.tmp"):  # resztki nieudanych zapisów
+            leftover.unlink(missing_ok=True)
+    except OSError:
+        pass
     kept: list[Path] = []
     for path in _files():
         data = _read(path)
@@ -289,17 +300,18 @@ def preview(crash_id: str, include_adb: bool, comment: str | None) -> dict[str, 
 
 def send(crash_id: str, include_adb: bool, comment: str | None, post: Post | None = None,
          now: Now | None = None) -> str:
-    path = _path(crash_id)
-    data = _load(crash_id)
-    if data["sent"]:
-        return data["sent"]["id"]
-    result = (post or client.post_json)(ENDPOINT, _body(data, include_adb, comment))
-    sent_id = result.get("id")
-    if not isinstance(sent_id, str) or not SENT_RE.match(sent_id):
-        raise client.BackendError("invalid")
-    data["sent"] = {"id": sent_id, "at": (now or datetime.now)().isoformat(timespec="seconds")}
-    _write(path, data)
-    return sent_id
+    with _send_lock:
+        path = _path(crash_id)
+        data = _load(crash_id)
+        if data["sent"]:
+            return data["sent"]["id"]
+        result = (post or client.post_json)(ENDPOINT, _body(data, include_adb, comment))
+        sent_id = result.get("id")
+        if not isinstance(sent_id, str) or not SENT_RE.match(sent_id):
+            raise client.BackendError("invalid")
+        data["sent"] = {"id": sent_id, "at": (now or datetime.now)().isoformat(timespec="seconds")}
+        _write(path, data)
+        return sent_id
 
 
 def discard(crash_id: str) -> None:

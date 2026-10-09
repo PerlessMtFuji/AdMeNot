@@ -1,4 +1,6 @@
 import json
+import threading
+import time
 from datetime import datetime, timedelta
 
 import pytest
@@ -178,3 +180,38 @@ def test_startup_reports_once_and_only_unsent_exit_or_thread():
     assert crash.startup_reports() == [thread]
     assert crash.startup_reports() == []
     assert err in {r["id"] for r in crash.list_reports()}
+
+
+def test_running_marker_survives_capture_and_prune():
+    crashes_dir().mkdir(parents=True)
+    marker = crashes_dir() / "running.json"
+    marker.write_text(json.dumps({"app": "0.9.3", "started": "2026-10-09T14:00:00"}), "utf-8")
+    crash.capture(boom(), now=lambda: NOW)
+    crash.prune(now=lambda: NOW)
+    assert marker.exists()
+
+
+def test_prune_removes_leftover_tmp_files():
+    crashes_dir().mkdir(parents=True)
+    (crashes_dir() / "20261009-140312-abcd.1234.tmp").write_text("x", "utf-8")
+    crash.prune(now=lambda: NOW)
+    assert list(crashes_dir().glob("*.tmp")) == []
+
+
+def test_concurrent_sends_post_once():
+    crash_id = crash.capture(boom(), now=lambda: NOW)
+    calls = []
+
+    def slow(path, body):
+        calls.append(1)
+        time.sleep(0.2)
+        return {"id": "R-7K3Q9M"}
+
+    results = []
+    threads = [threading.Thread(target=lambda: results.append(crash.send(crash_id, False, None, post=slow)))
+               for _ in range(2)]
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
+    assert len(calls) == 1 and results == ["R-7K3Q9M", "R-7K3Q9M"]
