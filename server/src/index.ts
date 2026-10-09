@@ -45,26 +45,86 @@ function validReport(b: unknown): b is Record<string, unknown> & { error: Record
   return true;
 }
 
+const DEVICE_KEYS = ["manufacturer", "model", "android"];
+const CONTEXT_KEYS = ["call", "job", "screen"];
+
+// Zapisujemy tylko znane pola: nieznane klucze nie obchodzą limitów (device: dokładnie 3 pola).
+function normalize(b: Record<string, unknown> & { error: Record<string, unknown> }): Record<string, unknown> | null {
+  const ctx = b.context as Record<string, unknown>;
+  const context: Record<string, unknown> = {};
+  for (const key of CONTEXT_KEYS) {
+    if (!text(ctx[key], LIMITS.short)) return null;
+    context[key] = ctx[key] ?? null;
+  }
+  let device: Record<string, unknown> | null = null;
+  if (ctx.device !== null && ctx.device !== undefined) {
+    const d = ctx.device;
+    if (!isObject(d) || Object.keys(d).some((k) => !DEVICE_KEYS.includes(k))) return null;
+    device = {};
+    for (const key of DEVICE_KEYS) {
+      if (!text(d[key], LIMITS.short)) return null;
+      device[key] = d[key] ?? null;
+    }
+  }
+  context.device = device;
+  const e = b.error;
+  return {
+    format: b.format, kind: b.kind, app: b.app, os: b.os, lang: b.lang, count: b.count, created: b.created,
+    context,
+    error: { type: e.type, message: e.message ?? null, where: e.where ?? null, trace: e.trace ?? null },
+    log_tail: b.log_tail ?? null, adb_tail: b.adb_tail ?? null, comment: b.comment ?? null,
+  };
+}
+
+// Czyta treść strumieniowo i przerywa po przekroczeniu limitu; null = za duża.
+async function readLimited(request: Request): Promise<string | null> {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_BODY) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) {
+    all.set(c, offset);
+    offset += c.byteLength;
+  }
+  return new TextDecoder().decode(all);
+}
+
 function reportId(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(6));
   return "R-" + Array.from(bytes, (b) => ID_ALPHABET[b % 32]).join(""); // 256 % 32 == 0: bez skrzywienia
 }
 
 async function createReport(request: Request, env: Env): Promise<Response> {
-  if (!(request.headers.get("Content-Type") ?? "").startsWith("application/json")) return json({ error: "invalid" }, 400);
-  const declared = Number(request.headers.get("Content-Length") ?? "0");
-  if (declared > MAX_BODY) return json({ error: "too_large" }, 413);
-  const raw = await request.text();
-  if (new TextEncoder().encode(raw).length > MAX_BODY) return json({ error: "too_large" }, 413);
+  if (!(request.headers.get("Content-Type") ?? "").toLowerCase().startsWith("application/json")) return json({ error: "invalid" }, 400);
+  // Limiter przed czytaniem treści, żeby także odpowiedzi 413 były limitowane.
   const { success } = await env.REPORTS_LIMITER.limit({ key: request.headers.get("CF-Connecting-IP") ?? "unknown" });
   if (!success) return json({ error: "rate_limited" }, 429);
-  let body: unknown;
+  const declared = Number(request.headers.get("Content-Length") ?? "0");
+  if (declared > MAX_BODY) return json({ error: "too_large" }, 413);
+  const raw = await readLimited(request);
+  if (raw === null) return json({ error: "too_large" }, 413);
+  let parsed: unknown;
   try {
-    body = JSON.parse(raw);
+    parsed = JSON.parse(raw);
   } catch {
     return json({ error: "invalid" }, 400);
   }
-  if (!validReport(body)) return json({ error: "invalid" }, 400);
+  if (!validReport(parsed)) return json({ error: "invalid" }, 400);
+  const clean = normalize(parsed);
+  if (!clean) return json({ error: "invalid" }, 400);
+  const stored = JSON.stringify(clean);
   try {
     const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM reports WHERE created >= datetime('now', '-1 day')")
       .first<{ n: number }>();
@@ -72,12 +132,14 @@ async function createReport(request: Request, env: Env): Promise<Response> {
     const insert = (id: string) => env.DB.prepare(
       "INSERT INTO reports (id, created, kind, app, os, lang, error_type, error_where, body) "
       + "VALUES (?, datetime('now'), ?, ?, ?, ?, ?, ?, ?)",
-    ).bind(id, body.kind, body.app, body.os, body.lang, body.error.type, body.error.where ?? null, raw).run();
+    ).bind(id, parsed.kind, parsed.app, parsed.os, parsed.lang, parsed.error.type, parsed.error.where ?? null, stored).run();
     let id = reportId();
     try {
       await insert(id);
-    } catch {
-      id = reportId(); // kolizja klucza (1 na ~10^9) — jedna ponowna próba
+    } catch (err) {
+      // Ponawiamy tylko przy kolizji klucza (1 na ~10^9); inny błąd D1 idzie do 503.
+      if (!String((err as Error)?.message ?? err).includes("UNIQUE constraint failed")) throw err;
+      id = reportId();
       await insert(id);
     }
     return json({ id }, 201);

@@ -74,6 +74,45 @@ describe("POST /api/v1/reports", () => {
     expect(await res.json()).toEqual({ error: "too_large" });
   });
 
+  it("413 dla strumienia bez Content-Length", async () => {
+    const chunk = new Uint8Array(16 * 1024).fill(120);
+    let sent = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (sent >= 10) return controller.close();
+        sent++;
+        controller.enqueue(chunk);
+      },
+    });
+    const res = await exports.default.fetch(new Request(BASE + "/api/v1/reports", {
+      method: "POST", headers: { "Content-Type": "application/json", "CF-Connecting-IP": crypto.randomUUID() },
+      body: stream, duplex: "half",
+    } as RequestInit));
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({ error: "too_large" });
+  });
+
+  it("nie zapisuje nieznanych kluczy", async () => {
+    const res = await post(report({ x: "y".repeat(30_000), context: { call: "c", job: null, screen: null, device: null, extra: "z" } }));
+    expect(res.status).toBe(201);
+    const { id } = await res.json<{ id: string }>();
+    const row = await env.DB.prepare("SELECT body FROM reports WHERE id = ?").bind(id).first<{ body: string }>();
+    const stored = JSON.parse(row!.body);
+    expect(stored).not.toHaveProperty("x");
+    expect(stored.context).toEqual({ call: "c", job: null, screen: null, device: null });
+  });
+
+  it("400 dla device z dodatkowym kluczem", async () => {
+    const res = await post(report({ context: { call: null, job: null, screen: null,
+      device: { manufacturer: "A", model: "B", android: "14", serial: "123" } } }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid" });
+  });
+
+  it("Content-Type bez rozróżniania wielkości liter", async () => {
+    expect((await post(report(), { "Content-Type": "Application/JSON; charset=utf-8" })).status).toBe(201);
+  });
+
   it("400 bez Content-Type JSON", async () => {
     const res = await post(report(), { "Content-Type": "text/plain" });
     expect(res.status).toBe(400);
