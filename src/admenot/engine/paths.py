@@ -36,6 +36,11 @@ def reports_dir() -> Path:
     return data_dir() / "reports"
 
 
+def crashes_dir() -> Path:
+    """Raporty błędów czekające na wysłanie (spec raportów błędów §3.2)."""
+    return data_dir() / "crashes"
+
+
 def incident_path(serial: str) -> Path:
     """Ostatnie nagranie incydentu (`who --watch`) telefonu o tym numerze."""
     safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in serial)
