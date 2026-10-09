@@ -153,5 +153,13 @@ sprawdzić, zapisz wprost jako niesprawdzony.
          `Remove-Item -Recurse -ErrorAction SilentlyContinue server\public\updates` (katalog jest nieśledzony),
          usuń klucz testowy (wyciek klucza prywatnego do repo wykrywa przebieg gitleaks, spec §2.3 / §11.5), przywróć `%LOCALAPPDATA%\AdMeNot` z kopii i zainstaluj właściwą wersję.
 10. [ ] Raport błędu z buildu: `ADMENOT_CRASH_TEST=error` → „Wyślij raport” na karcie błędu, numer, raport widać
-        w `reports.py --local list`; `ADMENOT_CRASH_TEST=fatal` → po ponownym starcie baner, wysyłka z ADB,
+        w `reports.py list --local`; `ADMENOT_CRASH_TEST=fatal` → po ponownym starcie baner, wysyłka z ADB,
         `show` bez numeru seryjnego i nazwy konta. Bez `wrangler dev`: komunikat offline, raport czeka.
+   - [ ] 10a. Po wdrożeniu raportów na produkcję (migracja `--remote` i `wrangler deploy`): jeden raport
+         próbny na produkcję — `ADMENOT_CRASH_TEST=error` **bez** `ADMENOT_API_URL`, „Wyślij raport”, numer;
+         `.venv\Scripts\python scripts\reports.py list --new` pokazuje ten numer; potem
+         `.venv\Scripts\python scripts\reports.py delete <numer>`.
+   - [ ] 10b. Czysta sesja: zwykła praca (skan, okno wyboru pliku, podgląd ekranu); przed zamknięciem
+         zajrzyj do `%LOCALAPPDATA%\AdMeNot\crashes\fault.txt` — musi być pusty (faulthandler na Windows
+         zapisuje też wyjątki SEH/COM pierwszej szansy; jeśli coś jest, zanotuj treść do filtra). Zamknij
+         program i uruchom ponownie → brak banera o błędzie.

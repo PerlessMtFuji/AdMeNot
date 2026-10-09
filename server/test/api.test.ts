@@ -90,11 +90,13 @@ describe("strona", () => {
     await res.arrayBuffer();
   });
 
-  it.each([["/privacy", "Error reports", "90 days"], ["/pl/privacy", "Raporty błędów", "90 dni"]])(
-    "%s opisuje raporty błędów", async (path, heading, keep) => {
+  it.each([["/privacy", "Error reports", "90 days", "“Send”"],
+    ["/pl/privacy", "Raporty błędów", "90 dni", "„Wyślij”"]])(
+    "%s opisuje raporty błędów", async (path, heading, keep, button) => {
       const html = await (await env.ASSETS.fetch("https://assets.local" + path)).text();
       expect(html).toContain(`<h2>${heading}</h2>`);
       expect(html).toContain(keep);
-      expect(html).toMatch(/IMEI/);
+      expect(html).toContain("R-7K3Q9M");
+      expect(html).toContain(button);
     });
 });
