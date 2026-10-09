@@ -75,7 +75,7 @@ class JobRunner:
             pass
         except Exception as exc:  # noqa: BLE001 — każdy błąd zadania trafia do UI
             self._emitter.emit("job:error", {"job_id": job.id, "kind": job.kind,
-                                              **report_error(exc)})
+                                              **report_error(exc, {"job": job.kind})})
         finally:
             with self._lock:
                 if self._current is job:

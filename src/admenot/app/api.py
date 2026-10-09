@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from admenot import __version__
+from admenot.app import crash
 from admenot.app.errors import AppError, error_payload, log_exception, report_error
 from admenot.app.events import Emitter
 from admenot.app.jobs import Job, JobRunner, Stopped
@@ -87,6 +88,7 @@ from admenot.engine.workflow import (
     undo_order,
 )
 from admenot.net import client, installer, update
+from admenot.net.client import BackendError
 
 HostFactory = Callable[[str | None], AdbTransport]
 ApkFactory = Callable[..., ApkProvider]
@@ -121,7 +123,7 @@ def _api(method: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]
         try:
             return method(self, *args, **kwargs)
         except Exception as exc:  # noqa: BLE001 — do JS nigdy nie leci wyjątek
-            return {"error": report_error(exc)}
+            return {"error": report_error(exc, {"call": method.__name__})}
 
     return wrapper
 
@@ -286,6 +288,7 @@ class Api:
             entries = list_devices(self._host)
         except AdbError as exc:
             return {"devices": [], "error": error_payload(exc)["key"]}
+        crash.note_serials(e.serial for e in entries)
         ready = {e.serial for e in entries if e.state == "device"}
         for serial in set(self._identities) - ready:
             self._identities.pop(serial, None)  # odłączony: przy następnym podłączeniu czytamy od nowa
@@ -359,11 +362,14 @@ class Api:
         def run(job: Job) -> None:
             self._emit("scan:stage", {"stage": "identify"})
             device = read_device_info(adb)
+            crash.note_device(device.serial, device.manufacturer, device.model, device.android_release)
             match = self._provider.match(device)
             self._identities[device.serial] = (device_card(device, match)["name"], device.imei)
             self._adb, self._serial, self._client = adb, device.serial, name
             self._report, self._match = None, match
             self._emit("scan:device", {"device": device_card(device, match)})
+            if os.environ.get(crash.CRASH_TEST) == "error":  # próba ręczna (spec raportów §10.2)
+                raise RuntimeError(crash.CRASH_TEST)
             incidents = load_incident(incident_path(device.serial), self._now())
             report = run_scan(adb, device=device, incidents=incidents,
                               on_stage=lambda stage: self._emit("scan:stage", {"stage": stage}))
@@ -474,7 +480,7 @@ class Api:
                         for a in attribute(timeline)]
                 self._emit("incident:done", {"marks": len(timeline.marks), "hits": hits})
             except Exception as exc:  # noqa: BLE001 — błąd nagrania trafia do UI
-                self._emit("incident:done", {"marks": 0, "hits": [], "error": report_error(exc)})
+                self._emit("incident:done", {"marks": 0, "hits": [], "error": report_error(exc, {"job": "incident"})})
             finally:
                 with self._incident_lock:
                     self._incident_active = False
@@ -803,6 +809,57 @@ class Api:
             self.quit()  # instalator czeka na zamknięcie AdMeNot.exe (CloseApplications=force)
 
         return {"job_id": self._jobs.start("update", run)}
+
+    # --- raporty błędów (spec raportów błędów §5.1) -----------------------------------------
+
+    @staticmethod
+    def _crash_errors(fn: Callable[[], dict[str, Any]]) -> dict[str, Any]:
+        try:
+            return fn()
+        except crash.UnknownCrash:
+            raise AppError("unknown_crash") from None
+        except BackendError as exc:
+            if exc.kind == "offline" or exc.status in (429, 503):
+                raise AppError("crash_offline", str(exc)) from None
+            raise AppError("crash_rejected", str(exc)) from None
+
+    @staticmethod
+    def _crash_comment(comment: Any) -> str | None:
+        if comment is not None and not isinstance(comment, str):
+            raise AppError("bad_request", "comment")
+        return comment
+
+    @_api
+    def capture_ui_error(self, message: str, stack: str | None = None,
+                         screen: str | None = None) -> dict[str, Any]:
+        if not isinstance(message, str):
+            raise AppError("bad_request", "message")
+        crash_id = crash.capture(kind="ui", type_="UIError", message=message,
+                                 trace=stack if isinstance(stack, str) else None,
+                                 where=message[:120],
+                                 context={"screen": screen if isinstance(screen, str) else None})
+        return {"crash": crash_id}
+
+    @_api
+    def crash_reports(self) -> dict[str, Any]:
+        return {"reports": crash.list_reports(), "startup": crash.startup_reports()}
+
+    @_api
+    def crash_preview(self, crash_id: str, include_adb: bool = False,
+                      comment: str | None = None) -> dict[str, Any]:
+        text = self._crash_comment(comment)
+        return self._crash_errors(lambda: crash.preview(crash_id, bool(include_adb), text))
+
+    @_api
+    def send_crash(self, crash_id: str, include_adb: bool = False,
+                   comment: str | None = None) -> dict[str, Any]:
+        text = self._crash_comment(comment)
+        return self._crash_errors(
+            lambda: {"sent_id": crash.send(crash_id, bool(include_adb), text)})
+
+    @_api
+    def discard_crash(self, crash_id: str) -> dict[str, Any]:
+        return self._crash_errors(lambda: crash.discard(crash_id) or {})
 
     # --- historia ------------------------------------------------------------------------------
 

@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from admenot.app import crash
 from admenot.engine.actions.errors import ActionError
 from admenot.engine.adb.transport import AdbError
 from admenot.engine.journal.db import JournalTooNew
@@ -49,8 +50,11 @@ def log_exception(exc: BaseException) -> Path:
     return path
 
 
-def report_error(exc: BaseException) -> dict[str, Any]:
+def report_error(exc: BaseException, context: dict[str, Any] | None = None) -> dict[str, Any]:
     payload = error_payload(exc)
     if payload["key"] == "internal":
         payload["log"] = str(log_exception(exc))
+        crash_id = crash.capture(exc, context=context)
+        if crash_id:
+            payload["crash"] = crash_id
     return payload
