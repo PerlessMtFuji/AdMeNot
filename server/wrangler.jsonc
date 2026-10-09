@@ -18,6 +18,12 @@
       "migrations_dir": "migrations"
     }
   ],
+  // Limiter raportów: klucz trzymany tylko w pamięci limitera (spec backendu §2.2, raportów §6.2).
+  "ratelimits": [
+    { "name": "REPORTS_LIMITER", "namespace_id": "1001", "simple": { "limit": 5, "period": 60 } }
+  ],
+  // Codzienne usuwanie raportów starszych niż 90 dni (spec raportów §6.3).
+  "triggers": { "crons": ["17 3 * * *"] },
   // Bez Workers Logs: nie zapisujemy adresów IP (spec §2.2).
   "observability": { "enabled": false }
 }
