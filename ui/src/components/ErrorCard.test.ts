@@ -30,3 +30,18 @@ test('fatal error offers a restart', async () => {
   expect(screen.getByRole('alert').textContent).toContain('TypeError: boom');
   expect(screen.getByRole('button', { name: 'Wróć do początku' })).toBeTruthy();
 });
+
+test('internal error without a report has no send button', async () => {
+  const { s } = await renderWith(ErrorCard, 'empty');
+  s.error = { key: 'internal', message: 'x' };
+  await tick();
+  expect(screen.queryByRole('button', { name: 'Wyślij raport' })).toBeNull();
+});
+
+test('fatal screen offers the report when one was captured', async () => {
+  const { s } = await renderWith(ErrorCard, 'empty', { fatal: true });
+  s.fatal = 'TypeError';
+  s.fatalCrash = '20261009-140312-ui00';
+  await tick();
+  expect(screen.getByRole('button', { name: 'Wyślij raport' })).toBeTruthy();
+});

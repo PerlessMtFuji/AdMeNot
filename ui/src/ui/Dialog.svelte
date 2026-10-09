@@ -7,7 +7,7 @@
   let { title, children, actions, oncancel }: Props = $props();
   let box: HTMLDivElement;
   const id = `dialog-${Math.random().toString(36).slice(2, 9)}`;
-  const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
   $effect(() => {
     const previous = document.activeElement as HTMLElement | null;

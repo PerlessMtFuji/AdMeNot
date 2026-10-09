@@ -25,7 +25,10 @@
     <span class="grid h-12 w-12 place-items-center rounded-full bg-bad-soft text-bad"><Icon name="triangle-alert" size={22} /></span>
     <b class="text-lg">{t('error.fatal')}</b>
     <pre class="mono w-full rounded-lg bg-surface-2 p-2.5 text-left text-xs whitespace-pre-wrap text-mut">{s.fatal}</pre>
-    <Button variant="primary" onclick={() => location.reload()}>{t('error.restart')}</Button>
+    <div class="flex gap-2">
+      {#if s.fatalCrash}<Button onclick={() => ctl.openCrash(s.fatalCrash!)}>{t('crash.send')}</Button>{/if}
+      <Button variant="primary" onclick={() => location.reload()}>{t('error.restart')}</Button>
+    </div>
   </div>
 {:else if s.error}
   <div role="alert" in:enter class="flex items-start gap-3 rounded-2xl border border-bad/30 bg-bad-soft px-4 py-3">
@@ -39,6 +42,9 @@
     </div>
     {#if key === 'adb_missing'}
       <Button size="sm" onclick={() => { ctl.dismissError(); ctl.openSettings(); }}>{t('connect.open_settings')}</Button>
+    {/if}
+    {#if s.error.crash}
+      <Button size="sm" onclick={() => ctl.openCrash(s.error!.crash!)}>{t('crash.send')}</Button>
     {/if}
     <Button size="sm" variant="ghost" onclick={() => ctl.dismissError()}>{t('common.close')}</Button>
   </div>

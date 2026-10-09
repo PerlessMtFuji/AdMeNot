@@ -1,5 +1,6 @@
 <script lang="ts">
   import { setContext, untrack } from 'svelte';
+  import CrashDialog from './components/CrashDialog.svelte';
   import ErrorCard from './components/ErrorCard.svelte';
   import type { Controller } from './lib/controller';
   import { t } from './lib/i18n/index.svelte';
@@ -65,3 +66,4 @@
 {/if}
 
 <UpdateDialog />
+<CrashDialog />
