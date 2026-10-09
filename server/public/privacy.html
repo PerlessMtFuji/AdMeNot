@@ -21,7 +21,7 @@
     <p>The data controller is Eryk Wlodarski. Contact: <a href="mailto:e.wlodarski@protonmail.com">e.wlodarski@protonmail.com</a>.</p>
 
     <h2>The AdMeNot program</h2>
-    <p>Scans, reports and the action journal stay on your computer. The program sends none of them anywhere.</p>
+    <p>Scans, reports and the action journal stay on your computer. The program sends none of them anywhere. The only exception are error reports, described below, which are sent only when you click “Send”.</p>
     <p>When “Check for updates automatically” is on (the default, in Settings → Updates), the program downloads a small file with version information from this website 10 seconds after it starts and then every 6 hours. The request carries nothing beyond a standard HTTP request with the header <code>User-Agent: AdMeNot/&lt;version&gt;</code>, and we store nothing from it. When you choose to install an update, the installer is downloaded from GitHub. With the setting off, the program makes no such connection — and will not learn about a new or withdrawn version.</p>
     <p>The diagnostic command <code>admenot selfcheck --online</code>, which you run yourself, makes the same version request and calls <code>/api/v1/health</code> to check whether our server is reachable.</p>
 
@@ -37,7 +37,7 @@
     <p>The installer is downloaded from GitHub, which has its own <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">privacy statement</a>.</p>
 
     <h2>Legal basis and transfers</h2>
-    <p>We process this data to deliver the website and the server and to keep them secure, and to fix errors reported from the program. The legal basis is our legitimate interest, Art. 6(1)(f) GDPR.</p>
+    <p>We process this data to deliver the website and the server, keep them secure and fix errors reported from the program. The legal basis is our legitimate interest, Art. 6(1)(f) GDPR.</p>
     <p>Cloudflare, Inc. is based in the United States, so data may be processed outside the EEA. The transfer is based on the EU–US Data Privacy Framework, in which Cloudflare participates.</p>
     <p>We keep no data from visits. Cloudflare keeps technical data for the period set in its terms of service as our processor.</p>
 
