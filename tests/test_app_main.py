@@ -146,3 +146,78 @@ def test_androguard_imports_without_a_console():
             "from admenot.app.main import ensure_std_streams; ensure_std_streams()\n"
             "import androguard.core.apk\n")
     assert subprocess.run([sys.executable, "-c", code], check=False).returncode == 0
+
+
+def _fake_webview(monkeypatch, tmp_path, start):
+    web = tmp_path / "web"
+    web.mkdir()
+    (web / "index.html").write_text("<!doctype html>", "utf-8")
+    monkeypatch.setattr(app_main, "WEB_DIR", web)
+
+    class Closing:
+        def __iadd__(self, handler):
+            return self
+
+    class Window:
+        def __init__(self):
+            self.events = type("Events", (), {"closing": Closing()})()
+
+        def destroy(self):
+            pass
+
+    class FakeWebview:
+        class FileDialog:
+            FOLDER = "folder"
+
+        @staticmethod
+        def create_window(title, **kw):
+            return Window()
+
+        @staticmethod
+        def start(**kw):
+            start()
+
+    monkeypatch.setitem(sys.modules, "webview", FakeWebview)
+    monkeypatch.setattr(app_main.Api, "_start_updates", lambda self: None)
+
+
+def _record_session(monkeypatch):
+    seen = []
+    monkeypatch.setattr(app_main.crash, "recover", lambda now=None: seen.append("recover"))
+    monkeypatch.setattr(app_main.crash, "start_session", lambda now=None: seen.append("start"))
+    monkeypatch.setattr(app_main.crash, "install_hooks", lambda: seen.append("hooks"))
+    monkeypatch.setattr(app_main.crash, "end_session", lambda: seen.append("end"))
+    return seen
+
+
+def test_gui_session_order_on_clean_exit(monkeypatch, tmp_path):
+    seen = _record_session(monkeypatch)
+    _fake_webview(monkeypatch, tmp_path, start=lambda: seen.append("window"))
+    assert app_main.run_gui() == 0
+    assert seen == ["recover", "start", "hooks", "window", "end"]
+
+
+def test_gui_session_ends_even_when_webview_fails(monkeypatch, tmp_path):
+    seen = _record_session(monkeypatch)
+
+    def broken():
+        raise RuntimeError("WebView2 not found")
+
+    _fake_webview(monkeypatch, tmp_path, start=broken)
+    assert app_main.run_gui() == 3
+    assert seen[-1] == "end"
+
+
+def test_real_session_leaves_no_marker(monkeypatch, tmp_path):
+    from admenot.engine.paths import crashes_dir
+
+    _fake_webview(monkeypatch, tmp_path, start=lambda: None)
+    assert app_main.run_gui() == 0
+    assert not (crashes_dir() / "running.json").exists()
+
+
+def test_missing_ui_creates_no_session(monkeypatch, tmp_path):
+    seen = _record_session(monkeypatch)
+    monkeypatch.setattr(app_main, "WEB_DIR", tmp_path / "missing")
+    assert app_main.run_gui() == 2
+    assert seen == []

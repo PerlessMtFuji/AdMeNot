@@ -5,13 +5,16 @@ Uruchomienie: `admenot gui` albo `admenot-gui`. UI buduje `scripts/build_ui.ps1`
 
 from __future__ import annotations
 
+import faulthandler
 import multiprocessing
 import os
 import sys
+import threading
 from pathlib import Path
 from typing import Any
 
 from admenot import __version__
+from admenot.app import crash
 from admenot.app.api import Api
 from admenot.app.events import WindowEmitter
 from admenot.engine.settings import effective_lang, load_settings
@@ -70,32 +73,40 @@ def run_gui() -> int:
     except ImportError:
         _fail(text["no_webview"])
         return 4
-    holder: dict[str, Any] = {}
-    api = Api(WindowEmitter(lambda: holder.get("window")))
-    # http_server=True: moduły ES z file:// są w Chromium blokowane
-    window = webview.create_window(window_title(), url=str(index), js_api=api,
-                                   background_color="#eef2f6", **WINDOW)
-    holder["window"] = window
-
-    def pick_folder() -> str | None:
-        chosen = window.create_file_dialog(webview.FileDialog.FOLDER)
-        return chosen[0] if chosen else None
-
-    def pick_file() -> str | None:
-        chosen = window.create_file_dialog(
-            webview.FileDialog.OPEN,
-            file_types=("Logo (*.png;*.jpg;*.jpeg;*.webp;*.svg)",))
-        return chosen[0] if chosen else None
-
-    api._attach(pick_folder=pick_folder, close=window.destroy, pick_file=pick_file)
-    api._start_updates()
-    window.events.closing += api._on_closing
+    crash.recover()
+    crash.start_session()
+    crash.install_hooks()
+    if os.environ.get(crash.CRASH_TEST) == "fatal":  # próba ręczna (spec raportów §10.2)
+        threading.Timer(5.0, faulthandler._sigsegv).start()
     try:
-        webview.start(gui="edgechromium", http_server=True)
-    except Exception as exc:  # noqa: BLE001 — np. brak WebView2 na Windows 10
-        _fail(text["no_webview2"].format(error=exc))
-        return 3
-    return 0
+        holder: dict[str, Any] = {}
+        api = Api(WindowEmitter(lambda: holder.get("window")))
+        # http_server=True: moduły ES z file:// są w Chromium blokowane
+        window = webview.create_window(window_title(), url=str(index), js_api=api,
+                                       background_color="#eef2f6", **WINDOW)
+        holder["window"] = window
+
+        def pick_folder() -> str | None:
+            chosen = window.create_file_dialog(webview.FileDialog.FOLDER)
+            return chosen[0] if chosen else None
+
+        def pick_file() -> str | None:
+            chosen = window.create_file_dialog(
+                webview.FileDialog.OPEN,
+                file_types=("Logo (*.png;*.jpg;*.jpeg;*.webp;*.svg)",))
+            return chosen[0] if chosen else None
+
+        api._attach(pick_folder=pick_folder, close=window.destroy, pick_file=pick_file)
+        api._start_updates()
+        window.events.closing += api._on_closing
+        try:
+            webview.start(gui="edgechromium", http_server=True)
+        except Exception as exc:  # noqa: BLE001 — np. brak WebView2 na Windows 10
+            _fail(text["no_webview2"].format(error=exc))
+            return 3
+        return 0
+    finally:
+        crash.end_session()
 
 
 def ensure_std_streams() -> None:

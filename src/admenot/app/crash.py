@@ -7,12 +7,14 @@ Moduł nie importuje `admenot.app.errors` na poziomie modułu (errors importuje 
 
 from __future__ import annotations
 
+import faulthandler
 import json
 import os
 import platform
 import re
 import secrets
 import string
+import sys
 import threading
 import traceback
 from collections.abc import Callable, Iterable
@@ -40,6 +42,8 @@ WHERE_LIMIT = 300
 ADB_LINES = 50
 ADB_READ = 64 * 1024  # z końca logu sesji czytamy tylko tyle bajtów
 COMMENT_LIMIT = 1000
+MARKER = "running.json"
+FAULT = "fault.txt"
 ID_RE = re.compile(r"^\d{8}-\d{6}-[a-z0-9]{4}$")
 SENT_RE = re.compile(r"^R-[0-9A-HJKMNP-TV-Z]{6}$")
 _ALPHABET = string.ascii_lowercase + string.digits
@@ -316,3 +320,106 @@ def send(crash_id: str, include_adb: bool, comment: str | None, post: Post | Non
 
 def discard(crash_id: str) -> None:
     _path(crash_id).unlink(missing_ok=True)
+
+
+def start_session(now: Now | None = None) -> None:
+    """Tylko z `run_gui`: znacznik „program działa” i zrzut stosu przy awarii (spec §3.1 pkt 4)."""
+    try:
+        directory = crashes_dir()
+        directory.mkdir(parents=True, exist_ok=True)
+        started = (now or datetime.now)()
+        _session.started = started
+        (directory / MARKER).write_text(
+            json.dumps({"app": __version__, "started": started.isoformat(timespec="seconds")}),
+            "utf-8")
+        _session.handler_was_enabled = faulthandler.is_enabled()
+        _session.fault = (directory / FAULT).open("w", encoding="utf-8")
+        faulthandler.enable(_session.fault, all_threads=True)
+    except Exception as failure:  # noqa: BLE001
+        _log_failure(failure)
+
+
+def end_session() -> None:
+    try:
+        if _session.fault is not None:
+            faulthandler.disable()
+            _session.fault.close()
+            _session.fault = None
+            if _session.handler_was_enabled and sys.__stderr__ is not None:
+                faulthandler.enable(sys.__stderr__)  # np. pytest miał własny
+        for name in (MARKER, FAULT):
+            (crashes_dir() / name).unlink(missing_ok=True)
+    except Exception as failure:  # noqa: BLE001
+        _log_failure(failure)
+
+
+def _log_since(started: datetime) -> str:
+    """Wpisy `app-*.log` (format `log_exception`) z czasem ≥ `started`, z dnia startu i dziś."""
+    days = {started.date(), datetime.now().date()}
+    entries: list[str] = []
+    for day in sorted(days):
+        try:
+            text = (logs_dir() / f"app-{day:%Y-%m-%d}.log").read_text("utf-8", errors="replace")
+        except OSError:
+            continue
+        for chunk in text.split("--- ")[1:]:
+            head, _, _rest = chunk.partition("\n")
+            try:
+                stamp = datetime.fromisoformat(head.strip())
+            except ValueError:
+                continue
+            if stamp >= started:
+                entries.append("--- " + chunk)
+    return "".join(entries).strip()
+
+
+def recover(now: Now | None = None) -> str | None:
+    """Przy starcie, przed `start_session`: raport `exit`, jeśli poprzednia sesja padła ze śladem."""
+    try:
+        directory = crashes_dir()
+        marker = directory / MARKER
+        crash_id = None
+        if marker.is_file():
+            try:
+                started = datetime.fromisoformat(json.loads(marker.read_text("utf-8"))["started"])
+            except (OSError, ValueError, KeyError, TypeError):
+                started = None
+            fault = ""
+            if started is not None:
+                try:
+                    fault = (directory / FAULT).read_text("utf-8", errors="replace").strip()
+                except OSError:
+                    fault = ""
+                log = _log_since(started)
+                if fault or log:
+                    first = fault.splitlines()[0] if fault else "AdMeNot zakończył się nieoczekiwanie"
+                    crash_id = capture(kind="exit", type_="fatal" if fault else "exit",
+                                       message=first, trace=fault or None, log_tail=log or None,
+                                       now=now)
+            marker.unlink(missing_ok=True)
+            (directory / FAULT).unlink(missing_ok=True)
+        prune(now=now)
+        return crash_id
+    except Exception as failure:  # noqa: BLE001
+        _log_failure(failure)
+        return None
+
+
+def install_hooks() -> None:
+    """Nieobsłużony wyjątek w wątku albo w głównym wątku → raport `thread` (bez komunikatu w UI)."""
+    previous_sys = sys.excepthook
+    previous_thread = threading.excepthook
+
+    def on_sys(exc_type, exc, tb):  # type: ignore[no-untyped-def]
+        if exc is not None and not issubclass(exc_type, (SystemExit, KeyboardInterrupt)):
+            capture(exc, kind="thread", context={"call": "main"})
+        previous_sys(exc_type, exc, tb)
+
+    def on_thread(args: threading.ExceptHookArgs) -> None:
+        if args.exc_value is not None and args.exc_type is not SystemExit:
+            name = args.thread.name if args.thread is not None else "?"
+            capture(args.exc_value, kind="thread", context={"call": f"thread:{name}"})
+        previous_thread(args)
+
+    sys.excepthook = on_sys
+    threading.excepthook = on_thread
