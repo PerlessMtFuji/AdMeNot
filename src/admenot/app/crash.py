@@ -525,6 +525,22 @@ def _crashed_session(saved: Any) -> Iterator[None]:
             _session.serials, _session.device = before  # nowa sesja nie dziedziczy telefonu
 
 
+_FAULT_HEADER = re.compile(r"^(?:Windows fatal exception:|Fatal Python error:)", re.MULTILINE)
+# Kody HRESULT (0x8…) to wyjątki COM/RPC pierwszej szansy, które WinForms/WebView2 rzuca i sam
+# obsługuje (np. 0x8001010d przy każdym starcie okna); faulthandler zapisuje je mimo to.
+_HANDLED_FAULT = re.compile(r"^Windows fatal exception: code 0x8[0-9a-fA-F]{7}\s*$")
+
+
+def _real_faults(fault: str) -> str:
+    """Zrzut `fault.txt` bez bloków po obsłużonych wyjątkach COM — zostaje sama awaria."""
+    starts = [m.start() for m in _FAULT_HEADER.finditer(fault)]
+    if not starts:
+        return fault
+    blocks = [fault[a:b] for a, b in zip(starts, [*starts[1:], len(fault)], strict=True)]
+    kept = [b for b in blocks if not _HANDLED_FAULT.match(b.splitlines()[0])]
+    return (fault[:starts[0]] + "".join(kept)).strip()
+
+
 def recover(now: Now | None = None) -> str | None:
     """Przy starcie, przed `start_session`: raport `exit`, jeśli poprzednia sesja padła ze śladem."""
     try:
@@ -541,7 +557,8 @@ def recover(now: Now | None = None) -> str | None:
             fault = ""
             if started is not None:
                 try:
-                    fault = (directory / FAULT).read_text("utf-8", errors="replace").strip()
+                    fault = _real_faults(
+                        (directory / FAULT).read_text("utf-8", errors="replace").strip())
                 except OSError:
                     fault = ""
                 log = _log_since(started)

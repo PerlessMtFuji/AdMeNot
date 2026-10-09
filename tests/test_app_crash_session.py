@@ -54,6 +54,27 @@ def test_marker_with_fault_dump_becomes_exit_report():
     assert not (crashes_dir() / "running.json").exists()
 
 
+COM_BLOCK = ("Windows fatal exception: code 0x8001010d\n\n"
+             "Current thread 0x0001c188 (most recent call first):\n"
+             '  File "webview\\platforms\\winforms.py", line 808 in create\n\n')
+
+
+def test_handled_com_exception_alone_is_not_a_crash():
+    marker(COM_BLOCK)
+    assert crash.recover() is None
+    assert reports() == [] and not (crashes_dir() / "running.json").exists()
+
+
+def test_real_fault_after_com_exception_is_reported_without_it():
+    marker(COM_BLOCK + "Windows fatal exception: access violation\n\n"
+           "Thread 0x1 (most recent call first):\n"
+           '  File "threading.py", line 1342 in run\n')
+    crash.recover(now=lambda: datetime(2026, 10, 9, 15, 0, 0))
+    data = reports()[0]
+    assert data["error"]["message"] == "Windows fatal exception: access violation"
+    assert "0x8001010d" not in data["error"]["trace"] and "line 1342 in run" in data["error"]["trace"]
+
+
 def test_marker_with_log_entries_after_start():
     marker()
     log = logs_dir() / "app-2026-10-09.log"

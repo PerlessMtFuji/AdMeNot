@@ -160,6 +160,7 @@ sprawdzić, zapisz wprost jako niesprawdzony.
          `.venv\Scripts\python scripts\reports.py list --new` pokazuje ten numer; potem
          `.venv\Scripts\python scripts\reports.py delete <numer>`.
    - [ ] 10b. Czysta sesja: zwykła praca (skan, okno wyboru pliku, podgląd ekranu); przed zamknięciem
-         zajrzyj do `%LOCALAPPDATA%\AdMeNot\crashes\fault.txt` — musi być pusty (faulthandler na Windows
-         zapisuje też wyjątki SEH/COM pierwszej szansy; jeśli coś jest, zanotuj treść do filtra). Zamknij
-         program i uruchom ponownie → brak banera o błędzie.
+         zajrzyj do `%LOCALAPPDATA%\AdMeNot\crashes\fault.txt` — wolno w nim być tylko blokom
+         `Windows fatal exception: code 0x8…` (obsłużone wyjątki COM, np. `0x8001010d` przy starcie okna;
+         `recover` je pomija). Inny nagłówek zanotuj do filtra. Zakończ proces bez czystego zamknięcia
+         (`Stop-Process -Name AdMeNot`) i uruchom ponownie → brak banera o błędzie.

@@ -78,7 +78,9 @@ def run_gui() -> int:
         crash.start_session()
     crash.install_hooks()
     if os.environ.get(crash.CRASH_TEST) == "fatal":  # próba ręczna (spec raportów §10.2)
-        timer = threading.Timer(5.0, faulthandler._sigsegv)
+        # _read_null daje prawdziwe naruszenie dostępu; _sigsegv na Windows to tylko sygnał C,
+        # którego faulthandler nie zapisuje (proces kończy się kodem 3 bez zrzutu).
+        timer = threading.Timer(5.0, faulthandler._read_null)
         timer.daemon = True
         timer.start()
     try:
