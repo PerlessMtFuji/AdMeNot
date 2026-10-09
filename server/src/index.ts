@@ -18,7 +18,7 @@ async function health(env: Env): Promise<Response> {
 
 // Raporty błędów (spec raportów błędów §6): tylko zapis; odczyt wyłącznie przez wranglera autora.
 const MAX_BODY = 64 * 1024;
-const DAILY_CAP = 500;
+const DAILY_CAP = 100; // najgorszy przypadek ~100 × 45 KB × 90 dni ≈ 400 MB (D1 free: 500 MB)
 const KINDS = new Set(["error", "ui", "thread", "exit"]);
 const ID_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 const LIMITS = { short: 64, type: 200, where: 300, message: 1000, trace: 16384, log: 8192, adbLine: 300, adbLines: 50, comment: 1000, context: 2048 };

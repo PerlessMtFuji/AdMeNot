@@ -130,7 +130,8 @@ describe("POST /api/v1/reports", () => {
   it("503 po przekroczeniu sufitu dziennego", async () => {
     const stmt = env.DB.prepare(
       "INSERT INTO reports (id, created, kind, app, os, lang, error_type, body) VALUES (?, datetime('now'), 'error', 'a', 'o', 'pl', 'E', '{}')");
-    await env.DB.batch(Array.from({ length: 500 }, (_, i) => stmt.bind(`T-${i}`)));
+    await env.DB.batch(Array.from({ length: 99 }, (_, i) => stmt.bind(`T-${i}`)));
+    expect((await post(report())).status).toBe(201); // setny raport doby jeszcze wchodzi
     const res = await post(report());
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ error: "busy" });
