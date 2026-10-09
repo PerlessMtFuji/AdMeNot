@@ -100,7 +100,7 @@ def _other_process_claims(tmp_path):
             "sys.stdout.write(str(crash.claim_session()))")
     env = {**__import__("os").environ, "LOCALAPPDATA": str(tmp_path / "data")}
     out = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True,
-                         check=True)
+                         check=True, timeout=60)
     return out.stdout.strip()
 
 
@@ -126,3 +126,43 @@ def test_traceback_containing_dashes_is_not_split():
     log.write_text("--- 2026-10-09T14:05:00\nTraceback\nValueError: a --- b\n\n", "utf-8")
     crash.recover(now=lambda: datetime(2026, 10, 9, 15, 0, 0))
     assert "ValueError: a --- b" in reports()[0]["log_tail"]
+
+
+def test_crashed_session_serials_and_device_reach_exit_report():
+    assert crash.claim_session()
+    crash.start_session(now=lambda: STARTED)
+    crash.note_serials(["R58T00TEST"])
+    crash.note_device("R58T00TEST", "OPPO", "CPH2483", "14")
+    saved = json.loads((crashes_dir() / "running.json").read_text("utf-8"))
+    assert saved["serials"] == ["R58T00TEST"] and saved["device"]["model"] == "CPH2483"
+    assert saved["started"] == STARTED.isoformat()
+    # symulacja awarii: proces znika bez end_session, nowy proces startuje z czystą sesją
+    crash.reset_session()
+    (crashes_dir() / "fault.txt").write_text(
+        "Windows fatal exception: access violation (R58T00TEST)\n  File \"x.py\", line 3 in f\n", "utf-8")
+    log = logs_dir() / "app-2026-10-09.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    log.write_text("--- 2026-10-09T14:05:00\nAdbError: device R58T00TEST offline\n\n", "utf-8")
+    crash.recover(now=lambda: datetime(2026, 10, 9, 15, 0, 0))
+    data = reports()[0]
+    assert "R58T00TEST" not in json.dumps(data)
+    assert "<serial>" in data["error"]["message"] and "<serial>" in data["log_tail"]
+    assert data["context"]["device"] == {"manufacturer": "OPPO", "model": "CPH2483", "android": "14"}
+    # nowa sesja nie dziedziczy telefonu ani numerów po awarii
+    later = crash.capture(type_="Other", message="R58T00TEST", now=lambda: datetime(2026, 10, 9, 15, 1, 0))
+    other = json.loads((crashes_dir() / f"{later}.json").read_text("utf-8"))
+    assert other["context"]["device"] is None and other["error"]["message"] == "R58T00TEST"
+
+
+def test_note_serials_without_session_does_not_write_marker():
+    crash.note_serials(["R58T00TEST"])
+    assert not (crashes_dir() / "running.json").exists()
+
+
+def test_bad_serials_in_marker_are_ignored():
+    crashes_dir().mkdir(parents=True, exist_ok=True)
+    (crashes_dir() / "running.json").write_text(json.dumps(
+        {"app": "0.9.3", "started": STARTED.isoformat(), "serials": "R58T00TEST", "device": [1]}), "utf-8")
+    (crashes_dir() / "fault.txt").write_text("fatal", "utf-8")
+    assert crash.recover(now=lambda: datetime(2026, 10, 9, 15, 0, 0))
+    assert reports()[0]["context"]["device"] is None

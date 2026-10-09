@@ -53,3 +53,9 @@ def test_adb_line_redacts_command_and_truncates():
 
 def test_adb_line_bad_format():
     assert adb_line("garbage", []) is None
+
+
+def test_other_profile_and_short_name_paths():
+    assert r(r"C:\Users\JANKOW~1\AppData\Local\Temp\x") == r"%USERPROFILE%\AppData\Local\Temp\x"
+    assert r('d:/users/Ola/Desktop/a.apk "x"') == '%USERPROFILE%/Desktop/a.apk "x"'
+    assert r(r'File "C:\Users\Jan Kowalski\x.py"') == r'File "%USERPROFILE%\x.py"'

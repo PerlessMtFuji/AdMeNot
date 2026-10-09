@@ -1,4 +1,5 @@
 import json
+import os
 import threading
 import time
 from datetime import datetime, timedelta
@@ -193,7 +194,10 @@ def test_running_marker_survives_capture_and_prune():
 
 def test_prune_removes_leftover_tmp_files():
     crashes_dir().mkdir(parents=True)
-    (crashes_dir() / "20261009-140312-abcd.1234.tmp").write_text("x", "utf-8")
+    leftover = crashes_dir() / "20261009-140312-abcd.1234.tmp"
+    leftover.write_text("x", "utf-8")
+    old = time.time() - 120  # starsze niż 60 s — świeże mogą być zapisem w toku
+    os.utime(leftover, (old, old))
     crash.prune(now=lambda: NOW)
     assert list(crashes_dir().glob("*.tmp")) == []
 
@@ -215,3 +219,113 @@ def test_concurrent_sends_post_once():
     for th in threads:
         th.join()
     assert len(calls) == 1 and results == ["R-7K3Q9M", "R-7K3Q9M"]
+
+
+def _encoded(body):
+    return len(json.dumps(body).encode("utf-8"))  # dokładnie jak client.post_json
+
+
+def test_body_with_cjk_fits_server_limit_and_keeps_trace_end():
+    trace = "漢" * 16000 + "END-OF-TRACE"
+    crash_id = crash.capture(type_="X", message="字" * 1000, trace=trace, log_tail="語" * 8192,
+                             now=lambda: NOW)
+    body = crash.preview(crash_id, include_adb=False, comment="評" * 1000)["body"]
+    assert _encoded(body) <= 60000
+    assert body["error"]["trace"].endswith("END-OF-TRACE")
+    assert load(crash_id)["error"]["trace"].startswith("漢")  # plik bez zmian
+    posted = []
+    crash.send(crash_id, False, "評" * 1000,
+               post=lambda p, b: posted.append(b) or {"id": "R-7K3Q9M"}, now=lambda: NOW)
+    assert posted == [body]
+
+
+def test_body_small_report_is_untouched():
+    crash_id = crash.capture(type_="X", message="m", trace="t" * 100, log_tail="l" * 100, now=lambda: NOW)
+    body = crash.preview(crash_id, False, None)["body"]
+    assert body["error"]["trace"] == "t" * 100 and body["log_tail"] == "l" * 100
+
+
+def test_adb_tail_redacts_serial_from_its_own_row_without_session():
+    log = logs_dir() / "2026-10-09.log"
+    log.parent.mkdir(parents=True)
+    log.write_text("2026-10-09T14:00:00\tR58T00TEST\tok\t0.1s\thost:-s R58T00TEST get-state\n"
+                   "2026-10-09T14:00:01\tNone\tok\t0.1s\thost:devices None\n", "utf-8")
+    data = load(crash.capture(boom(), now=lambda: NOW))
+    assert all("R58T00TEST" not in line for line in data["adb_tail"])
+    assert "<serial>" in data["adb_tail"][0]
+    assert data["adb_tail"][1].endswith("host:devices None")  # „None” to nie numer seryjny
+
+
+def test_offline_send_reoffers_startup_report_next_time():
+    thread = crash.capture(type_="RuntimeError", message="x", kind="thread", now=lambda: NOW)
+    assert crash.startup_reports() == [thread]
+
+    def offline(path, body):
+        raise client.BackendError("offline")
+
+    with pytest.raises(client.BackendError):
+        crash.send(thread, False, None, post=offline)
+    assert crash.startup_reports() == [thread]
+
+
+@pytest.mark.parametrize("status", [429, 503])
+def test_busy_server_reoffers_startup_report(status):
+    thread = crash.capture(type_="RuntimeError", message="x", kind="exit", now=lambda: NOW)
+    crash.startup_reports()
+
+    def busy(path, body):
+        raise client.BackendError("http", status)
+
+    with pytest.raises(client.BackendError):
+        crash.send(thread, False, None, post=busy)
+    assert crash.startup_reports() == [thread]
+
+
+def test_rejected_send_does_not_reoffer_and_error_kind_never_announced():
+    thread = crash.capture(type_="RuntimeError", message="x", kind="thread", now=lambda: NOW)
+    err = crash.capture(boom(), now=lambda: NOW)
+    crash.startup_reports()
+
+    def rejected(path, body):
+        raise client.BackendError("http", 400)
+
+    def offline(path, body):
+        raise client.BackendError("offline")
+
+    with pytest.raises(client.BackendError):
+        crash.send(thread, False, None, post=rejected)
+    with pytest.raises(client.BackendError):
+        crash.send(err, False, None, post=offline)
+    assert crash.startup_reports() == []
+    assert load(err)["announced"] is False
+
+
+def test_file_with_bad_shape_is_skipped_and_pruned():
+    good = crash.capture(boom(), now=lambda: NOW)
+    data = load(good)
+    del data["created"]
+    (crashes_dir() / "20261009-140000-badd.json").write_text(json.dumps(data), "utf-8")
+    for key, value in (("count", 0), ("error", {"type": 5}), ("sent", {"id": 7}), ("context", None)):
+        broken = {**load(good), key: value}
+        (crashes_dir() / f"20261009-13000{len(key) % 10}-{key[:4]:x<4}.json").write_text(
+            json.dumps(broken), "utf-8")
+    assert [r["id"] for r in crash.list_reports()] == [good]
+    crash.prune(now=lambda: NOW)
+    assert [p.stem for p in crashes_dir().glob("*.json")] == [good]
+
+
+def test_context_and_device_fields_capped_at_64():
+    crash.note_device("S1234", "M" * 100, "X" * 100, "1" * 100)
+    crash_id = crash.capture(boom(), context={"call": "thread:" + "n" * 100, "job": "j" * 100,
+                                              "screen": "s" * 100}, now=lambda: NOW)
+    ctx = crash.preview(crash_id, False, None)["body"]["context"]
+    assert all(len(ctx[k]) == 64 for k in ("call", "job", "screen"))
+    assert all(len(v) == 64 for v in ctx["device"].values())
+
+
+def test_prune_keeps_fresh_tmp_files(tmp_path):
+    crashes_dir().mkdir(parents=True)
+    fresh = crashes_dir() / "20261009-140312-abcd.5678.tmp"
+    fresh.write_text("x", "utf-8")
+    crash.prune(now=lambda: NOW)
+    assert fresh.exists()  # zapis w toku w innym wątku

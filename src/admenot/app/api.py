@@ -848,14 +848,14 @@ class Api:
     def crash_preview(self, crash_id: str, include_adb: bool = False,
                       comment: str | None = None) -> dict[str, Any]:
         text = self._crash_comment(comment)
-        return self._crash_errors(lambda: crash.preview(crash_id, bool(include_adb), text))
+        return self._crash_errors(lambda: crash.preview(crash_id, include_adb is True, text))
 
     @_api
     def send_crash(self, crash_id: str, include_adb: bool = False,
                    comment: str | None = None) -> dict[str, Any]:
         text = self._crash_comment(comment)
         return self._crash_errors(
-            lambda: {"sent_id": crash.send(crash_id, bool(include_adb), text)})
+            lambda: {"sent_id": crash.send(crash_id, include_adb is True, text)})
 
     @_api
     def discard_crash(self, crash_id: str) -> dict[str, Any]:

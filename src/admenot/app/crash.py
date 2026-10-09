@@ -16,8 +16,10 @@ import secrets
 import string
 import sys
 import threading
+import time
 import traceback
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Iterator
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -42,6 +44,9 @@ WHERE_LIMIT = 300
 ADB_LINES = 50
 ADB_READ = 64 * 1024  # z końca logu sesji czytamy tylko tyle bajtów
 COMMENT_LIMIT = 1000
+FIELD_LIMIT = 64  # context.call/job/screen i pola telefonu — serwer odrzuca dłuższe
+BODY_LIMIT = 60000  # bajty JSON-a wysyłki (serwer: 65536) — zapas na nagłówki i zaokrąglenia
+TMP_AGE = 60  # sekundy: młodszy *.tmp może być zapisem w toku w innym wątku
 MARKER = "running.json"
 FAULT = "fault.txt"
 LOCK = "session.lock"
@@ -81,7 +86,10 @@ def reset_session() -> None:
 
 def note_serials(serials: Iterable[str]) -> None:
     with _session.lock:
+        before = len(_session.serials)
         _session.serials.update(s for s in serials if s)
+        if len(_session.serials) != before:
+            _save_marker()
 
 
 def note_device(serial: str, manufacturer: str, model: str, android: str) -> None:
@@ -89,6 +97,25 @@ def note_device(serial: str, manufacturer: str, model: str, android: str) -> Non
         if serial:
             _session.serials.add(serial)
         _session.device = {"manufacturer": manufacturer, "model": model, "android": android}
+        _save_marker()
+
+
+def _marker_data(started: datetime) -> dict[str, Any]:
+    return {"app": __version__, "started": started.isoformat(timespec="seconds"),
+            "serials": sorted(_session.serials), "device": _session.device}
+
+
+def _save_marker() -> None:
+    """Numery i telefon trafiają też do znacznika — raport `exit` po awarii wytnie je z logów.
+
+    Tylko w objętej, rozpoczętej sesji; wołane pod `_session.lock`; nigdy nie rzuca.
+    """
+    if not _session.claimed or _session.started is None:
+        return
+    try:
+        _write_json(crashes_dir() / MARKER, json.dumps(_marker_data(_session.started)))
+    except Exception as failure:  # noqa: BLE001
+        _log_failure(failure)
 
 
 def _log_failure(exc: BaseException) -> None:
@@ -132,7 +159,12 @@ def _adb_tail(now: datetime, serials: set[str]) -> list[str] | None:
             raw = fh.read().decode("utf-8", errors="replace")
     except OSError:
         return None
-    lines = [adb_line(line, serials) for line in raw.splitlines()[-ADB_LINES - 1:]]
+    rows = raw.splitlines()[-ADB_LINES - 1:]
+    # numer z kolumny 2 też wycinamy z polecenia (np. `host:-s <numer>`), nawet bez numerów sesji;
+    # „None” to wpis bez telefonu (transport bez numeru), nie numer seryjny
+    found = {parts[1] for parts in (row.split("\t") for row in rows)
+             if len(parts) >= 5 and parts[1] and parts[1] != "None"}
+    lines = [adb_line(line, serials | found) for line in rows]
     kept = [line for line in lines if line]
     return kept[-ADB_LINES:] or None
 
@@ -153,6 +185,13 @@ def _read(path: Path) -> dict[str, Any] | None:
         return None
     if not isinstance(data, dict) or data.get("format") != FORMAT or data.get("kind") not in KINDS:
         return None
+    count, error, sent = data.get("count"), data.get("error"), data.get("sent")
+    if not isinstance(data.get("created"), str) \
+            or not isinstance(count, int) or isinstance(count, bool) or count < 1 \
+            or not isinstance(error, dict) or not isinstance(error.get("type"), str) \
+            or not (sent is None or (isinstance(sent, dict) and isinstance(sent.get("id"), str))) \
+            or not isinstance(data.get("context"), dict):
+        return None  # zły kształt — pomijany w liście, usuwany przy porządkach
     return data
 
 
@@ -164,14 +203,23 @@ def _load(crash_id: str) -> dict[str, Any]:
 
 
 def _write(path: Path, data: dict[str, Any]) -> None:
+    _write_json(path, json.dumps(data, ensure_ascii=False, indent=1))
+
+
+def _write_json(path: Path, text: str) -> None:
+    """Zapis atomowy: plik tymczasowy obok i `os.replace`."""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f"{path.stem}.{secrets.token_hex(4)}.tmp")
     try:
-        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=1), "utf-8")
+        tmp.write_text(text, "utf-8")
         os.replace(tmp, path)
     except BaseException:
         tmp.unlink(missing_ok=True)
         raise
+
+
+def _short(value: Any) -> Any:
+    return value[:FIELD_LIMIT] if isinstance(value, str) else value
 
 
 def capture(exc: BaseException | None = None, *, kind: str = "error",
@@ -200,7 +248,7 @@ def _capture(exc: BaseException | None, kind: str, context: dict[str, Any], type
     type_ = (type_ or "Error")[:TYPE_LIMIT]
     with _session.lock:
         serials = set(_session.serials)
-        device = dict(_session.device) if _session.device else None
+        device = {k: _short(v) for k, v in _session.device.items()} if _session.device else None
         known = _session.seen.get((type_, where))
     if known is not None:
         path = crashes_dir() / f"{known}.json"
@@ -217,8 +265,8 @@ def _capture(exc: BaseException | None, kind: str, context: dict[str, Any], type
     data = {
         "format": FORMAT, "kind": kind, "created": stamp.isoformat(timespec="seconds"), "count": 1,
         "app": __version__, "os": f"{platform.system()} {platform.version()}", "lang": _lang(),
-        "context": {"call": context.get("call"), "job": context.get("job"),
-                    "screen": context.get("screen"), "device": device},
+        "context": {"call": _short(context.get("call")), "job": _short(context.get("job")),
+                    "screen": _short(context.get("screen")), "device": device},
         "error": {"type": type_, "message": (redact(message or "", serials))[:MESSAGE_LIMIT],
                   "where": redact(where, serials)[:WHERE_LIMIT] if where else None,
                   "trace": clean(trace, TRACE_LIMIT)},
@@ -246,7 +294,8 @@ def prune(now: Now | None = None) -> None:
     limit = (now or datetime.now)() - timedelta(days=KEEP_DAYS)
     try:
         for leftover in crashes_dir().glob("*.tmp"):  # resztki nieudanych zapisów
-            leftover.unlink(missing_ok=True)
+            if time.time() - leftover.stat().st_mtime > TMP_AGE:
+                leftover.unlink(missing_ok=True)
     except OSError:
         pass
     kept: list[Path] = []
@@ -290,14 +339,45 @@ def startup_reports() -> list[str]:
     return ids
 
 
+def _encoded_size(body: dict[str, Any]) -> int:
+    return len(json.dumps(body).encode("utf-8"))  # tak samo jak `client.post_json`
+
+
+def _cut_front(text: str | None, excess: int) -> str | None:
+    """Usuwa z początku tyle znaków, ile trzeba, by JSON skurczył się o `excess` bajtów."""
+    if not text or excess <= 0:
+        return text
+    removed = cut = 0
+    while cut < len(text) and removed < excess:
+        removed += len(json.dumps(text[cut])) - 2  # znak spoza ASCII to `\uXXXX` (6 bajtów)
+        cut += 1
+    return text[cut:] or None
+
+
 def _body(data: dict[str, Any], include_adb: bool, comment: str | None) -> dict[str, Any]:
     with _session.lock:
         serials = set(_session.serials)
     text = redact((comment or "").strip(), serials)[:COMMENT_LIMIT]
-    return {"format": FORMAT, "kind": data["kind"], "app": data["app"], "os": data["os"],
+    body = {"format": FORMAT, "kind": data["kind"], "app": data["app"], "os": data["os"],
             "lang": data["lang"], "count": data["count"], "created": data["created"],
-            "context": data["context"], "error": data["error"], "log_tail": data["log_tail"],
-            "adb_tail": data["adb_tail"] if include_adb else None, "comment": text or None}
+            "context": data["context"], "error": dict(data["error"]), "log_tail": data["log_tail"],
+            "adb_tail": list(data["adb_tail"]) if include_adb and data["adb_tail"] else None,
+            "comment": text or None}
+    # limity są w znakach, a JSON koduje znaki spoza ASCII jako `\uXXXX` — przycinamy początek
+    # (koniec zostaje): najpierw log programu, potem traceback, na końcu wiersze ADB
+    excess = _encoded_size(body) - BODY_LIMIT
+    if excess > 0:
+        body["log_tail"] = _cut_front(body["log_tail"], excess)
+        excess = _encoded_size(body) - BODY_LIMIT
+    if excess > 0:
+        body["error"]["trace"] = _cut_front(body["error"]["trace"], excess)
+        excess = _encoded_size(body) - BODY_LIMIT
+    while excess > 0 and body["adb_tail"]:
+        body["adb_tail"].pop(0)
+        excess = _encoded_size(body) - BODY_LIMIT
+    if body["adb_tail"] == []:
+        body["adb_tail"] = None
+    return body
 
 
 def preview(crash_id: str, include_adb: bool, comment: str | None) -> dict[str, Any]:
@@ -312,13 +392,29 @@ def send(crash_id: str, include_adb: bool, comment: str | None, post: Post | Non
         data = _load(crash_id)
         if data["sent"]:
             return data["sent"]["id"]
-        result = (post or client.post_json)(ENDPOINT, _body(data, include_adb, comment))
+        try:
+            result = (post or client.post_json)(ENDPOINT, _body(data, include_adb, comment))
+        except client.BackendError as exc:
+            if exc.kind == "offline" or exc.status in (429, 503):
+                _reoffer(path, data)
+            raise
         sent_id = result.get("id")
         if not isinstance(sent_id, str) or not SENT_RE.match(sent_id):
             raise client.BackendError("invalid")
         data["sent"] = {"id": sent_id, "at": (now or datetime.now)().isoformat(timespec="seconds")}
         _write(path, data)
         return sent_id
+
+
+def _reoffer(path: Path, data: dict[str, Any]) -> None:
+    """Raport po awarii, którego nie dało się teraz wysłać, wraca w banerze przy następnym starcie."""
+    if data["kind"] not in ("exit", "thread") or not data.get("announced"):
+        return
+    try:
+        data["announced"] = False
+        _write(path, data)
+    except Exception as failure:  # noqa: BLE001 — nie zasłaniamy pierwotnego błędu
+        _log_failure(failure)
 
 
 def discard(crash_id: str) -> None:
@@ -360,10 +456,9 @@ def start_session(now: Now | None = None) -> None:
         directory = crashes_dir()
         directory.mkdir(parents=True, exist_ok=True)
         started = (now or datetime.now)()
-        _session.started = started
-        (directory / MARKER).write_text(
-            json.dumps({"app": __version__, "started": started.isoformat(timespec="seconds")}),
-            "utf-8")
+        with _session.lock:
+            _session.started = started
+            (directory / MARKER).write_text(json.dumps(_marker_data(started)), "utf-8")
         _session.handler_was_enabled = faulthandler.is_enabled()
         _session.fault = (directory / FAULT).open("w", encoding="utf-8")
         faulthandler.enable(_session.fault, all_threads=True)
@@ -411,6 +506,25 @@ def _log_since(started: datetime) -> str:
     return "".join(entries).strip()
 
 
+@contextmanager
+def _crashed_session(saved: Any) -> Iterator[None]:
+    """Na czas jednego raportu `exit`: numery i telefon z padniętej sesji (ze znacznika)."""
+    serials = saved.get("serials") if isinstance(saved, dict) else None
+    device = saved.get("device") if isinstance(saved, dict) else None
+    keys = ("manufacturer", "model", "android")
+    with _session.lock:
+        before = (_session.serials, _session.device)
+        _session.serials = {s for s in serials if isinstance(s, str) and s} \
+            if isinstance(serials, list) else set()
+        _session.device = {k: device[k] for k in keys} if isinstance(device, dict) \
+            and all(isinstance(device.get(k), str) for k in keys) else None
+    try:
+        yield
+    finally:
+        with _session.lock:
+            _session.serials, _session.device = before  # nowa sesja nie dziedziczy telefonu
+
+
 def recover(now: Now | None = None) -> str | None:
     """Przy starcie, przed `start_session`: raport `exit`, jeśli poprzednia sesja padła ze śladem."""
     try:
@@ -418,8 +532,10 @@ def recover(now: Now | None = None) -> str | None:
         marker = directory / MARKER
         crash_id = None
         if marker.is_file():
+            saved: Any = None
             try:
-                started = datetime.fromisoformat(json.loads(marker.read_text("utf-8"))["started"])
+                saved = json.loads(marker.read_text("utf-8"))
+                started = datetime.fromisoformat(saved["started"])
             except (OSError, ValueError, KeyError, TypeError):
                 started = None
             fault = ""
@@ -431,9 +547,10 @@ def recover(now: Now | None = None) -> str | None:
                 log = _log_since(started)
                 if fault or log:
                     first = fault.splitlines()[0] if fault else "AdMeNot zakończył się nieoczekiwanie"
-                    crash_id = capture(kind="exit", type_="fatal" if fault else "exit",
-                                       message=first, trace=fault or None, log_tail=log or None,
-                                       now=now)
+                    with _crashed_session(saved):
+                        crash_id = capture(kind="exit", type_="fatal" if fault else "exit",
+                                           message=first, trace=fault or None,
+                                           log_tail=log or None, now=now)
             marker.unlink(missing_ok=True)
             (directory / FAULT).unlink(missing_ok=True)
         prune(now=now)

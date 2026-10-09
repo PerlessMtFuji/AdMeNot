@@ -18,6 +18,7 @@ _IMEI = re.compile(r"(?<!\d)\d{14,17}(?!\d)")
 _PHONE = re.compile(r"(?<![\w.])\+?\d[\d \-]{7,14}\d(?![\w.])")
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}")
 _EMAIL = re.compile(r"[^\s@<>\"'(),;]+@[^\s@<>\"'(),;]+\.\w+")
+_ANY_PROFILE = re.compile(r"[A-Za-z]:[\\/]Users[\\/][^\\/\s\"']+", re.IGNORECASE)
 
 
 def _phone(match: re.Match[str]) -> str:
@@ -34,6 +35,7 @@ def redact(text: str, serials: Iterable[str] = (), home: str | None = None,
     if home:
         for variant in sorted({home, home.replace("\\", "/")}, key=len, reverse=True):
             text = re.sub(re.escape(variant), "%USERPROFILE%", text, flags=re.IGNORECASE)
+    text = _ANY_PROFILE.sub("%USERPROFILE%", text)  # krótkie nazwy 8.3 (JANKOW~1) i cudze profile
     for serial in sorted({s for s in serials if len(s) >= _MIN_SERIAL}, key=len, reverse=True):
         text = text.replace(serial, "<serial>")
     text = _IMEI.sub("<imei>", text)
