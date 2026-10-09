@@ -44,6 +44,7 @@ ADB_READ = 64 * 1024  # z końca logu sesji czytamy tylko tyle bajtów
 COMMENT_LIMIT = 1000
 MARKER = "running.json"
 FAULT = "fault.txt"
+LOCK = "session.lock"
 ID_RE = re.compile(r"^\d{8}-\d{6}-[a-z0-9]{4}$")
 SENT_RE = re.compile(r"^R-[0-9A-HJKMNP-TV-Z]{6}$")
 _ALPHABET = string.ascii_lowercase + string.digits
@@ -65,6 +66,8 @@ class _Session:
         self.started: datetime | None = None
         self.fault: Any = None  # plik faulthandlera (Task 3)
         self.handler_was_enabled = False
+        self.lock_file: Any = None  # uchwyt blokady sesji (jedna instancja GUI naraz)
+        self.claimed = False
 
 
 _session = _Session()
@@ -322,6 +325,35 @@ def discard(crash_id: str) -> None:
     _path(crash_id).unlink(missing_ok=True)
 
 
+def claim_session() -> bool:
+    """Blokada na czas życia procesu: tylko pierwsza instancja GUI zarządza znacznikiem i zrzutem."""
+    try:
+        if _session.claimed:
+            return True
+        directory = crashes_dir()
+        directory.mkdir(parents=True, exist_ok=True)
+        handle = (directory / LOCK).open("a+b")
+        try:
+            if sys.platform == "win32":
+                import msvcrt
+
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            handle.close()
+            return False
+        _session.lock_file = handle
+        _session.claimed = True
+        return True
+    except Exception as failure:  # noqa: BLE001
+        _log_failure(failure)
+        return False
+
+
 def start_session(now: Now | None = None) -> None:
     """Tylko z `run_gui`: znacznik „program działa” i zrzut stosu przy awarii (spec §3.1 pkt 4)."""
     try:
@@ -341,6 +373,8 @@ def start_session(now: Now | None = None) -> None:
 
 def end_session() -> None:
     try:
+        if not _session.claimed:
+            return  # cudza sesja — nie ruszamy jej znacznika ani zrzutu
         if _session.fault is not None:
             faulthandler.disable()
             _session.fault.close()
@@ -349,6 +383,10 @@ def end_session() -> None:
                 faulthandler.enable(sys.__stderr__)  # np. pytest miał własny
         for name in (MARKER, FAULT):
             (crashes_dir() / name).unlink(missing_ok=True)
+        if _session.lock_file is not None:
+            _session.lock_file.close()  # zamknięcie uchwytu zwalnia blokadę
+            _session.lock_file = None
+        _session.claimed = False
     except Exception as failure:  # noqa: BLE001
         _log_failure(failure)
 
@@ -362,7 +400,7 @@ def _log_since(started: datetime) -> str:
             text = (logs_dir() / f"app-{day:%Y-%m-%d}.log").read_text("utf-8", errors="replace")
         except OSError:
             continue
-        for chunk in text.split("--- ")[1:]:
+        for chunk in re.split(r"(?m)^--- ", text)[1:]:
             head, _, _rest = chunk.partition("\n")
             try:
                 stamp = datetime.fromisoformat(head.strip())

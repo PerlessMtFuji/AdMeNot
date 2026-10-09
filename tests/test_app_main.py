@@ -183,6 +183,7 @@ def _fake_webview(monkeypatch, tmp_path, start):
 
 def _record_session(monkeypatch):
     seen = []
+    monkeypatch.setattr(app_main.crash, "claim_session", lambda: seen.append("claim") or True)
     monkeypatch.setattr(app_main.crash, "recover", lambda now=None: seen.append("recover"))
     monkeypatch.setattr(app_main.crash, "start_session", lambda now=None: seen.append("start"))
     monkeypatch.setattr(app_main.crash, "install_hooks", lambda: seen.append("hooks"))
@@ -194,7 +195,7 @@ def test_gui_session_order_on_clean_exit(monkeypatch, tmp_path):
     seen = _record_session(monkeypatch)
     _fake_webview(monkeypatch, tmp_path, start=lambda: seen.append("window"))
     assert app_main.run_gui() == 0
-    assert seen == ["recover", "start", "hooks", "window", "end"]
+    assert seen == ["claim", "recover", "start", "hooks", "window", "end"]
 
 
 def test_gui_session_ends_even_when_webview_fails(monkeypatch, tmp_path):
@@ -209,8 +210,12 @@ def test_gui_session_ends_even_when_webview_fails(monkeypatch, tmp_path):
 
 
 def test_real_session_leaves_no_marker(monkeypatch, tmp_path):
+    import threading
+
     from admenot.engine.paths import crashes_dir
 
+    monkeypatch.setattr(sys, "excepthook", sys.excepthook)  # install_hooks nie może wyciec
+    monkeypatch.setattr(threading, "excepthook", threading.excepthook)
     _fake_webview(monkeypatch, tmp_path, start=lambda: None)
     assert app_main.run_gui() == 0
     assert not (crashes_dir() / "running.json").exists()
@@ -221,3 +226,11 @@ def test_missing_ui_creates_no_session(monkeypatch, tmp_path):
     monkeypatch.setattr(app_main, "WEB_DIR", tmp_path / "missing")
     assert app_main.run_gui() == 2
     assert seen == []
+
+
+def test_second_instance_skips_recover_and_start_but_installs_hooks(monkeypatch, tmp_path):
+    seen = _record_session(monkeypatch)
+    monkeypatch.setattr(app_main.crash, "claim_session", lambda: seen.append("claim") or False)
+    _fake_webview(monkeypatch, tmp_path, start=lambda: seen.append("window"))
+    assert app_main.run_gui() == 0
+    assert seen == ["claim", "hooks", "window", "end"]

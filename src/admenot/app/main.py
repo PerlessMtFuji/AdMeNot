@@ -73,11 +73,14 @@ def run_gui() -> int:
     except ImportError:
         _fail(text["no_webview"])
         return 4
-    crash.recover()
-    crash.start_session()
+    if crash.claim_session():  # druga instancja nie rusza cudzego znacznika
+        crash.recover()
+        crash.start_session()
     crash.install_hooks()
     if os.environ.get(crash.CRASH_TEST) == "fatal":  # próba ręczna (spec raportów §10.2)
-        threading.Timer(5.0, faulthandler._sigsegv).start()
+        timer = threading.Timer(5.0, faulthandler._sigsegv)
+        timer.daemon = True
+        timer.start()
     try:
         holder: dict[str, Any] = {}
         api = Api(WindowEmitter(lambda: holder.get("window")))

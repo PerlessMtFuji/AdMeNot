@@ -1,4 +1,5 @@
 import json
+import subprocess
 import sys
 import threading
 from datetime import datetime
@@ -33,6 +34,7 @@ def reports():
 
 
 def test_clean_session_leaves_nothing():
+    assert crash.claim_session()  # start_session wołane tylko po objęciu sesji
     crash.start_session(now=lambda: STARTED)
     assert (crashes_dir() / "running.json").is_file()
     crash.end_session()
@@ -91,3 +93,36 @@ def test_thread_hook_writes_thread_report(monkeypatch):
     data = reports()[0]
     assert data["kind"] == "thread" and data["context"]["call"] == "thread:admenot-test"
     assert previous  # poprzedni hak dalej wołany
+
+
+def _other_process_claims(tmp_path):
+    code = ("import sys; from admenot.app import crash; "
+            "sys.stdout.write(str(crash.claim_session()))")
+    env = {**__import__("os").environ, "LOCALAPPDATA": str(tmp_path / "data")}
+    out = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True,
+                         check=True)
+    return out.stdout.strip()
+
+
+def test_claim_is_exclusive_across_processes(tmp_path):
+    assert crash.claim_session() is True
+    assert _other_process_claims(tmp_path) == "False"
+    crash.end_session()
+    assert _other_process_claims(tmp_path) == "True"
+    assert crash.claim_session() is True
+
+
+def test_end_session_without_claim_keeps_foreign_marker():
+    marker("coś")
+    crash.end_session()
+    assert (crashes_dir() / "running.json").is_file()
+    assert (crashes_dir() / "fault.txt").is_file()
+
+
+def test_traceback_containing_dashes_is_not_split():
+    marker()
+    log = logs_dir() / "app-2026-10-09.log"
+    log.parent.mkdir(parents=True)
+    log.write_text("--- 2026-10-09T14:05:00\nTraceback\nValueError: a --- b\n\n", "utf-8")
+    crash.recover(now=lambda: datetime(2026, 10, 9, 15, 0, 0))
+    assert "ValueError: a --- b" in reports()[0]["log_tail"]
