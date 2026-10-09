@@ -73,6 +73,9 @@ class _Session:
         self.handler_was_enabled = False
         self.lock_file: Any = None  # uchwyt blokady sesji (jedna instancja GUI naraz)
         self.claimed = False
+        self.queue_wake = threading.Event()  # nowy raport w kolejce albo koniec sesji
+        self.queue_stop = threading.Event()
+        self.queue_thread: threading.Thread | None = None
 
 
 _session = _Session()
@@ -81,6 +84,7 @@ _send_lock = threading.Lock()  # wywołania API z JS idą z wątków roboczych �
 
 def reset_session() -> None:
     global _session
+    stop_queue()
     _session = _Session()
 
 
@@ -190,6 +194,7 @@ def _read(path: Path) -> dict[str, Any] | None:
             or not isinstance(count, int) or isinstance(count, bool) or count < 1 \
             or not isinstance(error, dict) or not isinstance(error.get("type"), str) \
             or not (sent is None or (isinstance(sent, dict) and isinstance(sent.get("id"), str))) \
+            or not isinstance(data.get("queued", {}), dict) \
             or not isinstance(data.get("context"), dict):
         return None  # zły kształt — pomijany w liście, usuwany przy porządkach
     return data
@@ -392,29 +397,105 @@ def send(crash_id: str, include_adb: bool, comment: str | None, post: Post | Non
         data = _load(crash_id)
         if data["sent"]:
             return data["sent"]["id"]
+        body = _body(data, include_adb, comment)
         try:
-            result = (post or client.post_json)(ENDPOINT, _body(data, include_adb, comment))
+            result = (post or client.post_json)(ENDPOINT, body)
         except client.BackendError as exc:
-            if exc.kind == "offline" or exc.status in (429, 503):
-                _reoffer(path, data)
+            # Brak połączenia: zgoda już jest (klik „Wyślij”), więc raport czeka w kolejce
+            # z wyborami użytkownika; odrzucony przez serwer wypada z kolejki.
+            queued = {"include_adb": include_adb, "comment": body["comment"]} \
+                if _unreachable(exc) else None
+            _set_queued(path, data, queued)
             raise
         sent_id = result.get("id")
         if not isinstance(sent_id, str) or not SENT_RE.match(sent_id):
+            _set_queued(path, data, None)
             raise client.BackendError("invalid")
         data["sent"] = {"id": sent_id, "at": (now or datetime.now)().isoformat(timespec="seconds")}
+        data.pop("queued", None)
         _write(path, data)
         return sent_id
 
 
-def _reoffer(path: Path, data: dict[str, Any]) -> None:
-    """Raport po awarii, którego nie dało się teraz wysłać, wraca w banerze przy następnym starcie."""
-    if data["kind"] not in ("exit", "thread") or not data.get("announced"):
+def _unreachable(exc: client.BackendError) -> bool:
+    return exc.kind == "offline" or exc.status in (429, 503)
+
+
+def _set_queued(path: Path, data: dict[str, Any], queued: dict[str, Any] | None) -> None:
+    if data.get("queued") == queued:
         return
     try:
-        data["announced"] = False
+        if queued is None:
+            data.pop("queued", None)
+        else:
+            data["queued"] = queued
+            data["announced"] = True  # zgoda jest — baner po awarii już niepotrzebny
         _write(path, data)
     except Exception as failure:  # noqa: BLE001 — nie zasłaniamy pierwotnego błędu
         _log_failure(failure)
+        return
+    if queued is not None:
+        _session.queue_wake.set()
+
+
+def send_queued(post: Post | None = None, now: Now | None = None) -> bool:
+    """Wysyła raporty z kolejki; True, gdy coś dalej czeka na połączenie. Nigdy nie rzuca."""
+    for path in _files():
+        data = _read(path)
+        queued = data.get("queued") if data else None
+        if not queued or data["sent"]:  # type: ignore[index]
+            continue
+        try:
+            send(path.stem, queued.get("include_adb") is True, queued.get("comment"),
+                 post=post, now=now)
+        except client.BackendError as exc:
+            if _unreachable(exc):
+                return True  # serwer dalej nieosiągalny — reszta też poczeka
+        except Exception as failure:  # noqa: BLE001 — np. raport usunięty w międzyczasie
+            _log_failure(failure)
+    return False
+
+
+QUEUE_FIRST = 30.0  # pierwsza próba po starcie programu (s)
+QUEUE_RETRY = (300.0, 900.0, 1800.0, 3600.0)  # kolejne próby, gdy dalej nie ma połączenia
+
+
+def _queue_loop(wake: threading.Event, stop: threading.Event) -> None:
+    delay: float | None = QUEUE_FIRST
+    step = 0
+    while True:
+        woken = wake.wait(delay)
+        wake.clear()
+        if stop.is_set():
+            return
+        if woken:  # nowy raport w kolejce (właśnie zawiodła wysyłka) — próba po przerwie
+            delay, step = QUEUE_RETRY[0], 1
+            continue
+        if send_queued():
+            delay = QUEUE_RETRY[min(step, len(QUEUE_RETRY) - 1)]
+            step += 1
+        else:
+            delay, step = None, 0  # pusto — czekamy na nowy raport
+
+
+def start_queue() -> None:
+    """Wątek wysyłający zakolejkowane raporty (z `start_session`, tylko w sesji GUI)."""
+    session = _session
+    if session.queue_thread is not None:
+        return
+    session.queue_thread = threading.Thread(
+        target=_queue_loop, args=(session.queue_wake, session.queue_stop), daemon=True,
+        name="admenot-crash-queue")
+    session.queue_thread.start()
+
+
+def stop_queue() -> None:
+    session = _session
+    session.queue_stop.set()
+    session.queue_wake.set()
+    if session.queue_thread is not None:
+        session.queue_thread.join(timeout=2)
+        session.queue_thread = None
 
 
 def discard(crash_id: str) -> None:
@@ -462,6 +543,7 @@ def start_session(now: Now | None = None) -> None:
         _session.handler_was_enabled = faulthandler.is_enabled()
         _session.fault = (directory / FAULT).open("w", encoding="utf-8")
         faulthandler.enable(_session.fault, all_threads=True)
+        start_queue()
     except Exception as failure:  # noqa: BLE001
         _log_failure(failure)
 
@@ -470,6 +552,7 @@ def end_session() -> None:
     try:
         if not _session.claimed:
             return  # cudza sesja — nie ruszamy jej znacznika ani zrzutu
+        stop_queue()
         if _session.fault is not None:
             faulthandler.disable()
             _session.fault.close()

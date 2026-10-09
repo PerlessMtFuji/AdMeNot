@@ -297,7 +297,7 @@
     "banner_send": "Wyślij…",
     "banner_dismiss": "Odrzuć",
     "error": {
-      "crash_offline": "Nie udało się połączyć z serwerem. Raport czeka — spróbuj później.",
+      "crash_offline": "Brak połączenia z serwerem. Raport zostanie wysłany automatycznie, gdy połączenie wróci — możesz zamknąć to okno.",
       "crash_rejected": "Serwer odrzucił raport ({message}).",
       "unknown_crash": "Tego raportu już nie ma.",
       "internal": "Nieoczekiwany błąd przy wysyłaniu raportu."

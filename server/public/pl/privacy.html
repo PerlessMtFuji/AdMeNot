@@ -26,7 +26,7 @@
     <p>Polecenie diagnostyczne <code>admenot selfcheck --online</code>, które uruchamiasz sam, wysyła to samo zapytanie o wersje i wywołuje <code>/api/v1/health</code>, żeby sprawdzić, czy nasz serwer odpowiada.</p>
 
     <h2>Raporty błędów</h2>
-    <p>Gdy w programie wystąpi nieoczekiwany błąd albo program ostatnio zamknął się nieoczekiwanie, AdMeNot proponuje wysłanie raportu o błędzie. Raport wysyła się tylko po kliknięciu „Wyślij”, a przed wysłaniem widać całą jego treść.</p>
+    <p>Gdy w programie wystąpi nieoczekiwany błąd albo program ostatnio zamknął się nieoczekiwanie, AdMeNot proponuje wysłanie raportu o błędzie. Raport wysyła się tylko po kliknięciu „Wyślij”, a przed wysłaniem widać całą jego treść. Jeśli w tej chwili nie ma połączenia z serwerem, program wyśle raport sam, gdy połączenie wróci.</p>
     <p>Raport zawiera zawsze: wersję AdMeNot i Windows, język programu, opis błędu z miejscem w kodzie programu, co program wtedy robił, producenta, model i wersję Androida podłączonego telefonu, liczbę wystąpień błędu i Twój opcjonalny opis. Tylko po zaznaczeniu pola zawiera też ostatnie 50 poleceń ADB, w których mogą być nazwy aplikacji zainstalowanych na telefonie klienta.</p>
     <p>Raport nigdy nie zawiera numeru IMEI, numeru seryjnego telefonu, numerów telefonów, adresów e-mail ani nazwy Twojego konta Windows — program usuwa je, zanim zapisze raport na komputerze. Adresów IP nie zapisujemy.</p>
     <p>Raporty służą wyłącznie do naprawiania błędów programu. Usuwamy je automatycznie po 90 dniach. Aby usunąć raport wcześniej, napisz na adres podany wyżej i podaj numer raportu (np. R-7K3Q9M).</p>

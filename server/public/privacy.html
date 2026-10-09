@@ -26,7 +26,7 @@
     <p>The diagnostic command <code>admenot selfcheck --online</code>, which you run yourself, makes the same version request and calls <code>/api/v1/health</code> to check whether our server is reachable.</p>
 
     <h2>Error reports</h2>
-    <p>When the program hits an unexpected error, or closed unexpectedly the last time, it offers to send an error report. A report is sent only when you click “Send”, and you can see its full content before sending.</p>
+    <p>When the program hits an unexpected error, or closed unexpectedly the last time, it offers to send an error report. A report is sent only when you click “Send”, and you can see its full content before sending. If there is no connection to the server at that moment, the program sends the report by itself once the connection is back.</p>
     <p>A report always contains: the AdMeNot and Windows versions, the program language, a description of the error with its place in the program code, what the program was doing, the manufacturer, model and Android version of the connected phone, how many times the error occurred, and your optional description. Only if you tick the box does it also contain the last 50 ADB commands, which may include names of apps installed on the customer's phone.</p>
     <p>A report never contains the phone's IMEI, serial number, phone numbers, e-mail addresses or your Windows account name — the program removes them before the report is saved on your computer. We do not store IP addresses.</p>
     <p>We use reports only to fix errors in the program. Reports are deleted automatically after 90 days. To have one deleted earlier, write to the address above with the report number (for example R-7K3Q9M).</p>

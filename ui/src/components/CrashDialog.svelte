@@ -8,6 +8,8 @@
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
   const known: readonly string[] = CRASH_ERROR_KEYS;
+  // Brak połączenia: raport czeka w kolejce i wyśle się sam (spec raportów §5.2, kolejka w tle).
+  const queued = $derived(s.crashError?.key === 'crash_offline');
   const errorKey = $derived(s.crashError && known.includes(s.crashError.key) ? s.crashError.key : 'internal');
   const error = $derived((s.crashPreview?.error ?? {}) as { type?: string });
   const created = $derived(String(s.crashPreview?.created ?? '').replace('T', ' '));
@@ -54,12 +56,17 @@
         <pre class="mono mt-2 max-h-[30vh] overflow-auto rounded-lg bg-surface-2 p-2.5 text-xs whitespace-pre-wrap break-all">{s.crashPreview ? JSON.stringify(s.crashPreview, null, 2) : ''}</pre>
       </details>
       <p class="mt-3 text-xs text-mut">{t('crash.contact')}</p>
-      {#if s.crashError}
+      {#if queued}
+        <p role="status" class="mt-3">{t('crash.error.crash_offline')}</p>
+      {:else if s.crashError}
         <p role="alert" class="mt-3 text-bad">{t(`crash.error.${errorKey}`, { message: s.crashError.message })}</p>
       {/if}
     {/if}
     {#snippet actions()}
       {#if s.crashSent}
+        <Button variant="primary" onclick={() => ctl.closeCrash()}>{t('common.close')}</Button>
+      {:else if queued}
+        <Button variant="ghost" size="sm" onclick={() => ctl.discardCrash()}>{t('crash.discard')}</Button>
         <Button variant="primary" onclick={() => ctl.closeCrash()}>{t('common.close')}</Button>
       {:else}
         <Button variant="ghost" size="sm" disabled={s.crashSending} onclick={() => ctl.discardCrash()}>{t('crash.discard')}</Button>

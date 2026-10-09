@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { expect, test, vi } from 'vitest';
 import App from '../App.svelte';
@@ -27,12 +27,17 @@ test('error card opens the dialog with a preview and sends', async () => {
   expect(bridge.calls.find((c) => c.method === 'send_crash')?.args).toEqual(['20261009-140312-abcd', true, '']);
 });
 
-test('offline message keeps the report', async () => {
-  const { bridge } = await withError();
+test('offline: the report is queued and the dialog only offers closing', async () => {
+  const { bridge, s } = await withError();
   bridge.failNextCrashSend('crash_offline');
   await fireEvent.click(screen.getByRole('button', { name: 'Wyślij raport' }));
   await fireEvent.click(await screen.findByRole('button', { name: 'Wyślij' }));
-  expect(await screen.findByText('Nie udało się połączyć z serwerem. Raport czeka — spróbuj później.')).toBeTruthy();
+  expect(await screen.findByRole('status')).toHaveProperty('textContent',
+    'Brak połączenia z serwerem. Raport zostanie wysłany automatycznie, gdy połączenie wróci — możesz zamknąć to okno.');
+  const dialog = within(screen.getByRole('dialog'));
+  expect(dialog.queryByRole('button', { name: 'Wyślij' })).toBeNull();
+  await fireEvent.click(dialog.getByRole('button', { name: 'Zamknij' }));
+  expect(s.crashDialog).toBeNull();
 });
 
 test('startup banner after a crash, not over the update banner', async () => {

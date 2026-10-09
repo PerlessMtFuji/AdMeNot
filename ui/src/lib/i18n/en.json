@@ -297,7 +297,7 @@
     "banner_send": "Send…",
     "banner_dismiss": "Dismiss",
     "error": {
-      "crash_offline": "Could not reach the server. The report is kept — try again later.",
+      "crash_offline": "No connection to the server. The report will be sent automatically once the connection is back — you can close this window.",
       "crash_rejected": "The server rejected the report ({message}).",
       "unknown_crash": "This report no longer exists.",
       "internal": "Unexpected error while sending the report."

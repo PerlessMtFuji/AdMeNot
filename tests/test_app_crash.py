@@ -256,48 +256,83 @@ def test_adb_tail_redacts_serial_from_its_own_row_without_session():
     assert data["adb_tail"][1].endswith("host:devices None")  # „None” to nie numer seryjny
 
 
-def test_offline_send_reoffers_startup_report_next_time():
-    thread = crash.capture(type_="RuntimeError", message="x", kind="thread", now=lambda: NOW)
-    assert crash.startup_reports() == [thread]
-
-    def offline(path, body):
-        raise client.BackendError("offline")
-
-    with pytest.raises(client.BackendError):
-        crash.send(thread, False, None, post=offline)
-    assert crash.startup_reports() == [thread]
+def offline(path, body):
+    raise client.BackendError("offline")
 
 
-@pytest.mark.parametrize("status", [429, 503])
-def test_busy_server_reoffers_startup_report(status):
-    thread = crash.capture(type_="RuntimeError", message="x", kind="exit", now=lambda: NOW)
-    crash.startup_reports()
+@pytest.mark.parametrize("error", [client.BackendError("offline"), client.BackendError("http", 429),
+                                   client.BackendError("http", 503)])
+def test_unreachable_server_queues_report_with_users_choices(error):
+    crash_id = crash.capture(boom(), now=lambda: NOW)
 
-    def busy(path, body):
-        raise client.BackendError("http", status)
+    def fail(path, body):
+        raise error
 
     with pytest.raises(client.BackendError):
-        crash.send(thread, False, None, post=busy)
-    assert crash.startup_reports() == [thread]
+        crash.send(crash_id, True, "  skan, jan@example.com ", post=fail)
+    assert load(crash_id)["queued"] == {"include_adb": True, "comment": "skan, <email>"}
+    assert load(crash_id)["sent"] is None
 
 
-def test_rejected_send_does_not_reoffer_and_error_kind_never_announced():
-    thread = crash.capture(type_="RuntimeError", message="x", kind="thread", now=lambda: NOW)
-    err = crash.capture(boom(), now=lambda: NOW)
-    crash.startup_reports()
+def test_queued_report_is_sent_in_background_with_saved_choices():
+    crash_id = crash.capture(boom(), now=lambda: NOW)
+    with pytest.raises(client.BackendError):
+        crash.send(crash_id, True, "opis", post=offline)
+    assert crash.send_queued(post=offline) is True  # dalej brak sieci — czeka
+    posted = []
+    assert crash.send_queued(post=lambda p, b: posted.append(b) or {"id": "R-7K3Q9M"},
+                             now=lambda: NOW) is False
+    assert len(posted) == 1 and posted[0]["comment"] == "opis"
+    data = load(crash_id)
+    assert data["sent"]["id"] == "R-7K3Q9M" and "queued" not in data
+    assert crash.send_queued(post=offline) is False  # nic już nie czeka
+
+
+def test_rejected_report_leaves_the_queue():
+    crash_id = crash.capture(boom(), now=lambda: NOW)
+    with pytest.raises(client.BackendError):
+        crash.send(crash_id, False, None, post=offline)
 
     def rejected(path, body):
         raise client.BackendError("http", 400)
 
-    def offline(path, body):
-        raise client.BackendError("offline")
+    assert crash.send_queued(post=rejected) is False
+    assert "queued" not in load(crash_id) and load(crash_id)["sent"] is None
 
+
+def test_queued_crash_report_is_not_offered_again_in_banner():
+    thread = crash.capture(type_="RuntimeError", message="x", kind="thread", now=lambda: NOW)
+    assert crash.startup_reports() == [thread]
     with pytest.raises(client.BackendError):
-        crash.send(thread, False, None, post=rejected)
-    with pytest.raises(client.BackendError):
-        crash.send(err, False, None, post=offline)
+        crash.send(thread, False, None, post=offline)
     assert crash.startup_reports() == []
-    assert load(err)["announced"] is False
+    assert [r["id"] for r in crash.list_reports()] == [thread]
+
+
+def test_background_queue_retries_until_sent(monkeypatch):
+    crash_id = crash.capture(boom(), now=lambda: NOW)
+    with pytest.raises(client.BackendError):
+        crash.send(crash_id, False, None, post=offline)
+    answers = iter([client.BackendError("offline"), {"id": "R-7K3Q9M"}])
+
+    def post(path, body):
+        answer = next(answers)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    monkeypatch.setattr(client, "post_json", post)
+    monkeypatch.setattr(crash, "QUEUE_FIRST", 0.01)
+    monkeypatch.setattr(crash, "QUEUE_RETRY", (0.01,))
+    crash.start_queue()
+    try:
+        for _ in range(300):
+            if load(crash_id)["sent"]:
+                break
+            time.sleep(0.01)
+    finally:
+        crash.stop_queue()
+    assert load(crash_id)["sent"]["id"] == "R-7K3Q9M"
 
 
 def test_file_with_bad_shape_is_skipped_and_pruned():
