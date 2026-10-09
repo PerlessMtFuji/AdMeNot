@@ -666,11 +666,13 @@ def recover(now: Now | None = None) -> str | None:
                 except OSError:
                     fault = ""
                 log = _log_since(started)
-                if fault or log:
-                    first = fault.splitlines()[0] if fault else "AdMeNot zakończył się nieoczekiwanie"
+                # Tylko prawdziwa awaria w zrzucie. Same wpisy w logu mają już własne raporty
+                # (karta błędu, haki wątków) albo celowo ich nie mają (błędy tła) — bez awarii
+                # to zwykłe wyłączenie komputera, nie baner. Log dołączamy do raportu z awarią.
+                if fault:
                     with _crashed_session(saved):
-                        crash_id = capture(kind="exit", type_="fatal" if fault else "exit",
-                                           message=first, trace=fault or None,
+                        crash_id = capture(kind="exit", type_="fatal",
+                                           message=fault.splitlines()[0], trace=fault,
                                            log_tail=log or None, now=now)
             marker.unlink(missing_ok=True)
             (directory / FAULT).unlink(missing_ok=True)

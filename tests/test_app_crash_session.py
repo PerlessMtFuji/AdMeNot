@@ -82,16 +82,29 @@ def test_fatal_ntstatus_warning_codes_are_kept():
     assert reports()[0]["error"]["message"] == "Windows fatal exception: code 0x80000003"
 
 
-def test_marker_with_log_entries_after_start():
-    marker()
+def write_app_log():
     log = logs_dir() / "app-2026-10-09.log"
     log.parent.mkdir(parents=True)
     log.write_text("--- 2026-10-09T13:59:00\nOld: before\n\n"
                    "--- 2026-10-09T14:05:00\nTraceback...\nValueError: after\n\n", "utf-8")
+
+
+def test_fault_report_carries_log_entries_after_start():
+    marker("Windows fatal exception: access violation\n")
+    write_app_log()
     crash.recover(now=lambda: datetime(2026, 10, 9, 15, 0, 0))
     data = reports()[0]
-    assert data["error"]["type"] == "exit"
+    assert data["error"]["type"] == "fatal"
     assert "ValueError: after" in data["log_tail"] and "Old: before" not in data["log_tail"]
+
+
+def test_log_entries_alone_are_not_a_crash():
+    # Błędy z logu mają już własne raporty (karta błędu, haki wątków) albo celowo ich nie mają
+    # (błędy tła); bez awarii w fault.txt to zwykłe wyłączenie komputera, nie baner.
+    marker(COM_BLOCK)
+    write_app_log()
+    assert crash.recover() is None
+    assert reports() == [] and not (crashes_dir() / "running.json").exists()
 
 
 def test_bare_marker_is_removed_silently():
@@ -148,7 +161,7 @@ def test_end_session_without_claim_keeps_foreign_marker():
 
 
 def test_traceback_containing_dashes_is_not_split():
-    marker()
+    marker("Windows fatal exception: access violation\n")
     log = logs_dir() / "app-2026-10-09.log"
     log.parent.mkdir(parents=True)
     log.write_text("--- 2026-10-09T14:05:00\nTraceback\nValueError: a --- b\n\n", "utf-8")
