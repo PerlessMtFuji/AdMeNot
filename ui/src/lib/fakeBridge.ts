@@ -1,6 +1,6 @@
 // Atrapa mostu: odtwarza scenariusze nagrane z prawdziwego Api (scripts/record_bridge_fixtures.py).
 import type { Bridge } from './bridge';
-import type { Api, EventMap, EventName, ScanView, ServiceInfo, Settings, ShotView, UpdateView } from './types';
+import type { Api, CrashSummary, EventMap, EventName, ScanView, ServiceInfo, Settings, ShotView, UpdateView } from './types';
 
 interface RecordedCall {
   method: string;
@@ -28,6 +28,8 @@ export function scenarioNames(): string[] {
 }
 
 export type FakeBridge = Bridge & {
+  setCrashes(reports: CrashSummary[], startup: string[]): void;
+  failNextCrashSend(key: string): void;
   calls: { method: string; args: unknown[] }[];
   emit<K extends EventName>(name: K, detail: EventMap[K]): void;
 };
@@ -52,6 +54,9 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
   let mirror: { serial: string | null; state: string } = { serial: null, state: 'stopped' };
   let update: UpdateView = { available: null, dismissed: false, retired: null, updated_to: null, updated_notes: null, installable: true };
   const shots: ShotView[] = [];
+  let crashes: CrashSummary[] = [];
+  let crashStartup: string[] = [];
+  let failSend: string | null = null;
   const SHOT_IMAGE = 'data:image/svg+xml,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="200"><rect width="90" height="200" rx="8" fill="#1f2937"/>'
     + '<rect x="8" y="40" width="74" height="90" rx="6" fill="#f59e0b"/></svg>');
@@ -174,6 +179,20 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
         return { ...update };
       case 'install_update':
         return update.installable ? { job_id: 'job-update' } : { opened: true };
+      case 'capture_ui_error':
+        return { crash: '20261009-140312-ui00' };
+      case 'crash_reports':
+        return { reports: [...crashes], startup: [...crashStartup] };
+      case 'crash_preview':
+        return { body: { format: 1, kind: 'error', error: { type: 'KeyError', message: "'x'" },
+          adb_tail: args[1] ? ['14:00:00\tok\t0.1s\tshell:pm list packages'] : null,
+          comment: String(args[2] ?? '') || null }, has_adb: true };
+      case 'send_crash':
+        if (failSend) { const key = failSend; failSend = null; return { error: { key, message: '' } }; }
+        return { sent_id: 'R-7K3Q9M' };
+      case 'discard_crash':
+        crashes = crashes.filter((c) => c.id !== args[0]);
+        return {};
       case 'execute':
       case 'resume':
         if (update.retired) return { error: { key: 'retired', message: update.retired.reason ?? '', min_supported: update.retired.min_supported } };
@@ -205,5 +224,7 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
       return () => target.removeEventListener(event, listener);
     },
     emit: (event, detail) => dispatch(event, detail),
+    setCrashes: (reports, startup) => { crashes = [...reports]; crashStartup = [...startup]; },
+    failNextCrashSend: (key) => { failSend = key; },
   };
 }

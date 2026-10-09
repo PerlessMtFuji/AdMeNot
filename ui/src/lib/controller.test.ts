@@ -449,3 +449,64 @@ describe('repair screen view state', () => {
     expect(s.detailsOpen).toBe(true); // szczegóły techniczne: do zamknięcia programu
   });
 });
+
+describe('error reports', () => {
+  test('init loads startup reports', async () => {
+    const { ctl, s, bridge } = setup('empty');
+    bridge.setCrashes([{ id: '20261009-140312-abcd', kind: 'exit', created: '2026-10-09T14:03:12', type: 'fatal', sent_id: null }],
+      ['20261009-140312-abcd']);
+    await ctl.init();
+    expect(s.crashStartup).toEqual(['20261009-140312-abcd']);
+  });
+
+  test('open previews, toggling ADB and sending shows the number', async () => {
+    const { ctl, s, bridge } = setup('empty');
+    await ctl.init();
+    ctl.openCrash('20261009-140312-abcd');
+    await vi.waitFor(() => expect(s.crashPreview).not.toBeNull());
+    expect(s.crashHasAdb).toBe(true);
+    s.crashAdb = true;
+    s.crashComment = 'skan';
+    await ctl.previewCrash();
+    expect(bridge.calls.at(-1)).toEqual({ method: 'crash_preview', args: ['20261009-140312-abcd', true, 'skan'] });
+    const first = ctl.sendCrash();
+    const second = ctl.sendCrash(); // podwójny klik
+    await Promise.all([first, second]);
+    expect(bridge.calls.filter((c) => c.method === 'send_crash')).toHaveLength(1);
+    expect(s.crashSent).toBe('R-7K3Q9M');
+    expect(s.error).toBeNull();
+  });
+
+  test('offline error stays in the dialog', async () => {
+    const { ctl, s, bridge } = setup('empty');
+    await ctl.init();
+    bridge.failNextCrashSend('crash_offline');
+    ctl.openCrash('20261009-140312-abcd');
+    await ctl.sendCrash();
+    expect(s.crashError?.key).toBe('crash_offline');
+    expect(s.crashSent).toBeNull();
+    expect(s.error).toBeNull();
+  });
+
+  test('close and discard forget the startup banner', async () => {
+    const { ctl, s, bridge } = setup('empty');
+    bridge.setCrashes([], ['a', 'b']);
+    await ctl.init();
+    ctl.openCrash('a');
+    ctl.closeCrash();
+    expect(s.crashDialog).toBeNull();
+    expect(s.crashStartup).toEqual(['b']);
+    await ctl.discardCrash('b');
+    expect(bridge.calls.at(-1)).toEqual({ method: 'discard_crash', args: ['b'] });
+    expect(s.crashStartup).toEqual([]);
+  });
+
+  test('UI error is captured once', async () => {
+    const { ctl, s, bridge } = setup('empty');
+    await ctl.init();
+    await ctl.captureUiError('TypeError: x', 'at f');
+    await ctl.captureUiError('TypeError: y', 'at g');
+    expect(bridge.calls.filter((c) => c.method === 'capture_ui_error')).toHaveLength(1);
+    expect(s.fatalCrash).toBe('20261009-140312-ui00');
+  });
+});

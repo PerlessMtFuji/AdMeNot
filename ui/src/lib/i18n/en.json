@@ -276,6 +276,32 @@
     "warn_ok": "I understand", "empty": "No commands in this session.", "disabled": "The console works with a scanned phone while no order is running.",
     "resize": "Resize the console"
   },
+  "crash": {
+    "send": "Send report",
+    "title": "Send an error report",
+    "intro": "The report goes to the author of the program and helps fix this error.",
+    "summary": "{type} · {created}",
+    "includes": "Contains: program and Windows versions, the error description, the phone model.",
+    "comment": "What were you doing when the error happened? (optional)",
+    "adb": "Include the last ADB commands (may contain names of apps on the customer's phone)",
+    "show": "Show what will be sent",
+    "contact": "Want a reply? Write to e.wlodarski@protonmail.com and give the report number.",
+    "submit": "Send",
+    "later": "Don't send",
+    "discard": "Delete report",
+    "sending": "Sending…",
+    "sent": "Sent. Report number: {id}",
+    "copy": "Copy",
+    "banner": "The program closed with an error last time. Send a report?",
+    "banner_send": "Send…",
+    "banner_dismiss": "Dismiss",
+    "error": {
+      "crash_offline": "Could not reach the server. The report is kept — try again later.",
+      "crash_rejected": "The server rejected the report ({message}).",
+      "unknown_crash": "This report no longer exists.",
+      "internal": "Unexpected error while sending the report."
+    }
+  },
   "update": {
     "available": "Version {version} is available",
     "notes": "What's new",
@@ -339,6 +365,7 @@
     "mirror_missing": "Bundled scrcpy is missing — run scripts\\fetch_tools.py.",
     "mirror_failed": "Could not start the screen view.",
     "unknown_screenshot": "No such screenshot.",
+    "unknown_crash": "This report no longer exists.",
     "shot_limit": "You can choose at most 8 screenshots for the report.",
     "data_too_new": "The program data comes from a newer version of AdMeNot — update the program."
   }

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { USB_GROUPS, USB_STEPS } from '../usb';
 import en from './en.json';
-import { ERROR_KEYS, i18n, LEVEL_KEYS, PLURAL_KEYS, SCAN_STAGES, t, tp, UPDATE_ERROR_KEYS } from './index.svelte';
+import { CRASH_ERROR_KEYS, ERROR_KEYS, i18n, LEVEL_KEYS, PLURAL_KEYS, SCAN_STAGES, t, tp, UPDATE_ERROR_KEYS } from './index.svelte';
 import pl from './pl.json';
 
 function flat(obj: Record<string, unknown>, prefix = ''): string[] {
@@ -36,6 +36,7 @@ describe('dictionaries', () => {
     const wanted = [
       ...ERROR_KEYS.map((k) => `error.${k}`),
       ...UPDATE_ERROR_KEYS.map((k) => `update.error.${k}`),
+      ...CRASH_ERROR_KEYS.map((k) => `crash.error.${k}`),
       ...SCAN_STAGES.map((k) => `scan.stage.${k}`),
       ...LEVEL_KEYS.map((k) => `level.${k}`),
       ...USB_GROUPS.map((g) => `usb.group.${g}`),

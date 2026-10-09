@@ -13,6 +13,7 @@ export class Controller {
   private ended = new Set<string>();
   private knownLoaded = false;
   private autoMirrored = new Set<string>();
+  private uiErrorSent = false;
 
   constructor(readonly state: AppState, readonly bridge: Bridge) {}
 
@@ -44,6 +45,7 @@ export class Controller {
     if (settings) this.applySettings(settings);
     const update = await this.call(this.api.update_state());
     if (update) this.state.update = update;
+    await this.loadCrashes();
     // Przed listą urządzeń: onDevices() decyduje o auto-podglądzie na podstawie s.mirror.available.
     const mirror = await this.call(this.api.mirror_status());
     if (mirror) this.state.mirror = { ...this.state.mirror, available: mirror.available, serial: mirror.serial, state: mirror.state };
@@ -455,6 +457,91 @@ export class Controller {
 
   dismissUpdated(): void {
     this.state.updatedSeen = true;
+  }
+
+  // --- raporty błędów (spec raportów błędów §5) -------------------------------------------
+  // Błędy okna raportu zostają w oknie (crashError), nie trafiają na kartę błędu.
+
+  async loadCrashes(): Promise<void> {
+    const r = await this.call(this.api.crash_reports());
+    if (r) this.state.crashStartup = r.startup;
+  }
+
+  private screenName(): string {
+    const s = this.state;
+    return s.screen !== 'main' ? s.screen : s.phase;
+  }
+
+  async captureUiError(message: string, stack: string | null): Promise<void> {
+    if (this.state.fatalCrash || this.uiErrorSent) return; // kaskada błędów: jeden raport
+    this.uiErrorSent = true;
+    try {
+      const r = await this.api.capture_ui_error(message, stack, this.screenName());
+      if (!isApiError(r) && r.crash) this.state.fatalCrash = r.crash;
+    } catch {
+      // most nie działa — zostaje sam ekran błędu
+    }
+  }
+
+  openCrash(id: string): void {
+    const s = this.state;
+    Object.assign(s, { crashDialog: id, crashAdb: false, crashComment: '', crashPreview: null,
+      crashHasAdb: false, crashSending: false, crashSent: null, crashError: null });
+    void this.previewCrash();
+  }
+
+  async previewCrash(): Promise<void> {
+    const s = this.state;
+    const id = s.crashDialog;
+    if (!id) return;
+    try {
+      const r = await this.api.crash_preview(id, s.crashAdb, s.crashComment);
+      if (s.crashDialog !== id) return;
+      if (isApiError(r)) { s.crashError = r.error; return; }
+      s.crashPreview = r.body;
+      s.crashHasAdb = r.has_adb;
+    } catch (e) {
+      s.crashError = { key: 'internal', message: String(e) };
+    }
+  }
+
+  async sendCrash(): Promise<void> {
+    const s = this.state;
+    const id = s.crashDialog;
+    if (!id || s.crashSending || s.crashSent) return;
+    s.crashSending = true;
+    s.crashError = null;
+    try {
+      const r = await this.api.send_crash(id, s.crashAdb, s.crashComment);
+      if (isApiError(r)) s.crashError = r.error;
+      else { s.crashSent = r.sent_id; this.forgetCrash(id); }
+    } catch (e) {
+      s.crashError = { key: 'internal', message: String(e) };
+    } finally {
+      s.crashSending = false;
+    }
+  }
+
+  closeCrash(): void {
+    const s = this.state;
+    if (s.crashSending) return;
+    if (s.crashDialog) this.forgetCrash(s.crashDialog);
+    s.crashDialog = null;
+  }
+
+  async discardCrash(id?: string): Promise<void> {
+    const s = this.state;
+    const target = id ?? s.crashDialog;
+    if (!target) return;
+    await this.call(this.api.discard_crash(target));
+    this.forgetCrash(target);
+    if (s.crashDialog === target) s.crashDialog = null;
+    if (s.error?.crash === target) s.error = { ...s.error, crash: undefined };
+    if (s.fatalCrash === target) s.fatalCrash = null;
+  }
+
+  private forgetCrash(id: string): void {
+    this.state.crashStartup = this.state.crashStartup.filter((x) => x !== id);
   }
 
   // --- historia, ustawienia, konsola -------------------------------------------------------------

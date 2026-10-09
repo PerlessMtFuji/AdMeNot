@@ -87,6 +87,16 @@ export class AppState {
   /** „Zaktualizowano do …” zamknięte w tej sesji. */
   updatedSeen = $state(false);
   fatal = $state<string | null>(null);
+  crashStartup = $state<string[]>([]);
+  crashDialog = $state<string | null>(null);
+  crashAdb = $state(false);
+  crashComment = $state('');
+  crashPreview = $state<Record<string, unknown> | null>(null);
+  crashHasAdb = $state(false);
+  crashSending = $state(false);
+  crashSent = $state<string | null>(null);
+  crashError = $state<ApiErrorBody | null>(null);
+  fatalCrash = $state<string | null>(null);
 
   get orderRunning(): boolean {
     return this.job !== null && ORDER_KINDS.includes(this.job.kind);

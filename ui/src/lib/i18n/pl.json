@@ -276,6 +276,32 @@
     "warn_ok": "Rozumiem", "empty": "Brak poleceń w tej sesji.", "disabled": "Konsola działa przy zeskanowanym telefonie, gdy nie trwa zlecenie.",
     "resize": "Zmień wysokość konsoli"
   },
+  "crash": {
+    "send": "Wyślij raport",
+    "title": "Wyślij raport o błędzie",
+    "intro": "Raport trafi do autora programu i pomoże naprawić ten błąd.",
+    "summary": "{type} · {created}",
+    "includes": "Zawiera: wersję programu i Windows, opis błędu, model telefonu.",
+    "comment": "Co robiłeś, gdy wystąpił błąd? (opcjonalnie)",
+    "adb": "Dołącz ostatnie polecenia ADB (mogą zawierać nazwy aplikacji z telefonu klienta)",
+    "show": "Pokaż, co zostanie wysłane",
+    "contact": "Chcesz odpowiedzi? Napisz na e.wlodarski@protonmail.com i podaj numer raportu.",
+    "submit": "Wyślij",
+    "later": "Nie wysyłaj",
+    "discard": "Usuń raport",
+    "sending": "Wysyłanie…",
+    "sent": "Wysłano. Numer raportu: {id}",
+    "copy": "Kopiuj",
+    "banner": "Program ostatnio zakończył się błędem. Wysłać raport?",
+    "banner_send": "Wyślij…",
+    "banner_dismiss": "Odrzuć",
+    "error": {
+      "crash_offline": "Nie udało się połączyć z serwerem. Raport czeka — spróbuj później.",
+      "crash_rejected": "Serwer odrzucił raport ({message}).",
+      "unknown_crash": "Tego raportu już nie ma.",
+      "internal": "Nieoczekiwany błąd przy wysyłaniu raportu."
+    }
+  },
   "update": {
     "available": "Dostępna wersja {version}",
     "notes": "Co nowego",
@@ -339,6 +365,7 @@
     "mirror_missing": "Brak dołączonego scrcpy — uruchom scripts\\fetch_tools.py.",
     "mirror_failed": "Nie udało się uruchomić podglądu ekranu.",
     "unknown_screenshot": "Nie ma takiego zrzutu ekranu.",
+    "unknown_crash": "Tego raportu już nie ma.",
     "shot_limit": "Do protokołu można wybrać najwyżej 8 zrzutów.",
     "data_too_new": "Dane programu pochodzą z nowszej wersji AdMeNot — zaktualizuj program."
   }

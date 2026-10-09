@@ -293,6 +293,8 @@ export type AdbSource = 'settings' | 'bundled' | 'path' | 'missing';
 export interface ApiErrorBody {
   key: string;
   message: string;
+  /** Lokalny raport błędu do wysłania (internal). */
+  crash?: string;
   serial?: string;
   /** Nazwa telefonu (wrong_device), jak na ekranie historii. */
   device?: string;
@@ -311,6 +313,9 @@ export interface ApiError {
 export type JobError = ApiErrorBody & { job_id: string; kind: string };
 
 type R<T> = Promise<T | ApiError>;
+
+export interface CrashSummary { id: string; kind: 'error' | 'ui' | 'thread' | 'exit'; created: string; type: string; sent_id: string | null }
+export interface CrashPreview { body: Record<string, unknown>; has_adb: boolean }
 
 export interface WhoEntry { package: string; name: string }
 export interface IncidentHit { mark: number; package: string; name: string; kind: 'overlay' | 'new_notification' | 'foreground'; over: string | null; over_name: string | null }
@@ -354,6 +359,11 @@ export interface Api {
   update_state(): R<UpdateView>;
   dismiss_update(version: string): R<UpdateView>;
   install_update(): R<{ job_id: string } | { opened: boolean }>;
+  capture_ui_error(message: string, stack: string | null, screen: string | null): R<{ crash: string | null }>;
+  crash_reports(): R<{ reports: CrashSummary[]; startup: string[] }>;
+  crash_preview(id: string, include_adb: boolean, comment: string): R<CrashPreview>;
+  send_crash(id: string, include_adb: boolean, comment: string): R<{ sent_id: string }>;
+  discard_crash(id: string): R<Record<string, never>>;
   quit(): R<{ ok: boolean }>;
 }
 
