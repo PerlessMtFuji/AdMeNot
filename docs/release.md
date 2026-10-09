@@ -68,6 +68,14 @@ Wycofanie wersji (bez nowego release'u):
 `publish_update.py retire --min <pierwsza dobra wersja> --reason-pl "…" --reason-en "…"`, commit,
 `wrangler deploy`. Cache: do 5 minut (`server/public/_headers`).
 
+## Raporty błędów
+
+- Wdrożenie zmian w raportach: najpierw `npx wrangler d1 migrations apply admenot --remote`, potem `npx wrangler deploy` (z `server/`).
+- Przegląd: `.venv\Scripts\python scripts\reports.py list --new`, szczegóły `show R-XXXXXX` (oznacza jako przejrzany).
+- Usunięcie na prośbę (RODO): `reports.py delete R-XXXXXX`. Wszystkie raporty znikają same po 90 dniach.
+- Próba lokalna: w `server/` `npx wrangler d1 migrations apply admenot --local` i `npx wrangler dev` (port 8787);
+  program z `ADMENOT_API_URL=http://127.0.0.1:8787`; `reports.py --local list`.
+
 ## Build
 
 1. Podbij `__version__` w `src/admenot/__init__.py` i zatwierdź zmiany (build wymaga czystego drzewa).
@@ -144,3 +152,6 @@ sprawdzić, zapisz wprost jako niesprawdzony.
          `git checkout -- src/admenot/__init__.py src/admenot/net/update_key.py` i osobno
          `Remove-Item -Recurse -ErrorAction SilentlyContinue server\public\updates` (katalog jest nieśledzony),
          usuń klucz testowy (wyciek klucza prywatnego do repo wykrywa przebieg gitleaks, spec §2.3 / §11.5), przywróć `%LOCALAPPDATA%\AdMeNot` z kopii i zainstaluj właściwą wersję.
+10. [ ] Raport błędu z buildu: `ADMENOT_CRASH_TEST=error` → „Wyślij raport” na karcie błędu, numer, raport widać
+        w `reports.py --local list`; `ADMENOT_CRASH_TEST=fatal` → po ponownym starcie baner, wysyłka z ADB,
+        `show` bez numeru seryjnego i nazwy konta. Bez `wrangler dev`: komunikat offline, raport czeka.
