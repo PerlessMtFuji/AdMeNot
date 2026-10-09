@@ -26,3 +26,8 @@ Q7Z9TEST  # fikcyjny numer seryjny w testach skanera (nagranie JSON)
 DomNowakow  # fikcyjna sieć Wi-Fi w testach skanera (nagranie JSON)
 SiecNowakow  # fikcyjna sieć Wi-Fi w testach skanera (nagranie JSON)
 e.wlodarski@protonmail.com  # administrator danych w polityce prywatności (server/public) — publiczny celowo
+356938035643809  # przykładowy IMEI w testach wycinania (tests/test_app_redact.py)
++48 601 234 567  # fikcyjny numer w testach wycinania (tests/test_app_redact.py)
+601-234-567  # ten sam fikcyjny numer w innym zapisie (tests/test_app_redact.py)
+Jan  # C:\Users\Jan Kowalski\ — fikcyjny profil w testach wycinania (tests/test_app_redact.py)
+JANKOW~1  # krótka nazwa 8.3 fikcyjnego profilu w testach wycinania (tests/test_app_redact.py)
