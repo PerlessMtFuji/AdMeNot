@@ -52,13 +52,13 @@ def user_agent() -> str:
     return f"AdMeNot/{__version__}"  # nic więcej: bez systemu, języka, identyfikatorów
 
 
-def _fetch(path: str, data: bytes | None = None) -> bytes:
+def _fetch(path: str, data: bytes | None = None, method: str | None = None) -> bytes:
     headers = {"User-Agent": user_agent(), "Accept": "application/json"}
     if data is not None:
         headers["Content-Type"] = "application/json"
     try:
         request = urllib.request.Request(base_url() + path, data=data, headers=headers,
-                                         method="GET" if data is None else "POST")
+                                         method=method or ("GET" if data is None else "POST"))
         with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
             return response.read()
     except urllib.error.HTTPError as exc:  # przed OSError: HTTPError to też URLError
@@ -68,8 +68,8 @@ def _fetch(path: str, data: bytes | None = None) -> bytes:
         raise BackendError("offline") from None
 
 
-def _request(path: str, data: bytes | None = None) -> dict[str, Any]:
-    raw = _fetch(path, data)
+def _request(path: str, data: bytes | None = None, method: str | None = None) -> dict[str, Any]:
+    raw = _fetch(path, data, method)
     try:
         value = json.loads(raw)
     except ValueError:  # także UnicodeDecodeError — np. strona logowania do Wi-Fi
@@ -90,6 +90,10 @@ def get_json(path: str) -> dict[str, Any]:
 
 def post_json(path: str, body: dict[str, Any]) -> dict[str, Any]:
     return _request(path, json.dumps(body).encode("utf-8"))
+
+
+def delete(path: str) -> dict[str, Any]:
+    return _request(path, method="DELETE")
 
 
 def _open_download(url: str) -> http.client.HTTPResponse:

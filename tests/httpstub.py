@@ -52,7 +52,7 @@ def serve(stub: Stub):
             except OSError:  # klient mógł już zamknąć gniazdo po timeoucie — bez śladu w stderr
                 pass
 
-        do_GET = do_POST = _reply
+        do_GET = do_POST = do_DELETE = _reply
 
         def log_message(self, *args) -> None:  # cisza w wyjściu pytest
             pass

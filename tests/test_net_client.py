@@ -193,3 +193,10 @@ def test_download_over_the_cap_is_aborted_and_removed(stub, tmp_path):
     with pytest.raises(client.TooLarge):
         client.download(stub.url + "/s", dest, max_bytes=100_000)
     assert not dest.exists()
+
+
+def test_delete_sends_delete_method(stub):
+    stub.body = b'{"deleted": 3}'
+    assert client.delete("/api/v1/telemetry/x") == {"deleted": 3}
+    method, path, _, body = stub.requests[0]
+    assert (method, path, body) == ("DELETE", "/api/v1/telemetry/x", b"")
