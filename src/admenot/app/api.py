@@ -421,6 +421,7 @@ class Api:
             self._open_order.pop(serial.strip(), None)
         adb = self._session(serial.strip())
         name = (client or "").strip() or None
+        crash.note_names([name])
 
         def run(job: Job) -> None:
             self._emit("scan:stage", {"stage": "identify"})

@@ -1,3 +1,5 @@
+import pytest
+
 from admenot.app.redact import adb_line, redact
 
 HOME = r"C:\Users\Jan Kowalski"
@@ -59,3 +61,31 @@ def test_other_profile_and_short_name_paths():
     assert r(r"C:\Users\JANKOW~1\AppData\Local\Temp\x") == r"%USERPROFILE%\AppData\Local\Temp\x"
     assert r('d:/users/Ola/Desktop/a.apk "x"') == '%USERPROFILE%/Desktop/a.apk "x"'
     assert r(r'File "C:\Users\Jan Kowalski\x.py"') == r'File "%USERPROFILE%\x.py"'
+
+
+# --- audyt 2026-10-11, PRIV-02 -------------------------------------------------------------------
+
+@pytest.mark.parametrize("text", ["Phone (123) 456-7890", "tel. 123.456.7890", "+48 (22) 600-00-00"])
+def test_phone_numbers_with_brackets_and_dots(text):
+    assert "<phone>" in redact(text, home="", user="")
+
+
+def test_version_numbers_are_not_phones():
+    assert redact("Windows 10.0.26100.4652", home="", user="") == "Windows 10.0.26100.4652"
+
+
+def test_android_account_names_and_known_client_names():
+    out = redact("Account {name=anna.kowalska, type=example}; client Anna Kowalska, kowalska",
+                 home="", user="", names=["Anna  Kowalska"])
+    assert "anna" not in out.lower() and "kowalska" not in out.lower()
+    assert "Account {name=<account>, type=example}" in out
+
+
+def test_other_profile_with_a_space_is_removed_whole():
+    out = redact("C:/Users/Anna Kowalska/Documents/test.txt", home=r"C:\Users\Operator", user="")
+    assert out == "%USERPROFILE%/Documents/test.txt"
+
+
+def test_unc_paths():
+    assert redact(r"open \\fileserver\klienci\Kowalski\a.txt", home="", user="") == (
+        r"open <unc>\Kowalski\a.txt")

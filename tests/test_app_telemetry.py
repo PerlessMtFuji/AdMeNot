@@ -332,3 +332,87 @@ def test_withdrawal_is_not_held_by_the_send_gap(monkeypatch):
     wake.set()
     thread.join(timeout=2)
     assert sent
+
+
+# --- audyt 2026-10-11 ---------------------------------------------------------------------------
+
+def test_settings_save_does_not_restore_withdrawn_consent(monkeypatch):
+    """PRIV-01: zapis motywu, który przeczytał plik ze zgodą, nie nadpisuje jej cofnięcia."""
+    from admenot.engine import settings as settings_module
+
+    consent()
+    original = settings_module._load
+    started = threading.Event()
+    withdraw = threading.Thread(target=lambda: (started.set(), telemetry.set_consent(False, False, NOW)))
+    calls = {"n": 0}
+
+    def slow_load(path):
+        data = original(path)
+        calls["n"] += 1
+        if calls["n"] == 1:  # zapis motywu ma w ręku dane ze zgodą — teraz cofnięcie zgody
+            withdraw.start()
+            started.wait()
+            withdraw.join(timeout=0.3)
+            assert withdraw.is_alive()  # czeka na transakcję ustawień, zamiast ją przepleść
+        return data
+
+    monkeypatch.setattr(settings_module, "_load", slow_load)
+    save_settings({"theme": "dark"})
+    withdraw.join(timeout=5)
+    s = load_settings()
+    assert (s.telemetry, s.telemetry_id, s.theme) == (False, None, "dark")
+
+
+def test_withdrawal_keeps_the_id_when_the_delete_request_cannot_be_saved(monkeypatch):
+    """PRIV-03: ID znika z ustawień dopiero, gdy żądanie usunięcia jest trwale zapisane."""
+    s = consent()
+
+    def full(ids):
+        raise OSError(28, "synthetic full disk")
+
+    write_deletes = telemetry._write_deletes
+    monkeypatch.setattr(telemetry, "_write_deletes", full)
+    with pytest.raises(OSError):
+        telemetry.set_consent(False, False, NOW)
+    assert load_settings().telemetry_id == s.telemetry_id
+    monkeypatch.setattr(telemetry, "_write_deletes", write_deletes)  # LOCALAPPDATA zostaje w tmp
+    telemetry.set_consent(False, False, NOW)
+    assert json.loads(telemetry_delete_path().read_text("utf-8"))["installs"] == [s.telemetry_id]
+
+
+def test_large_queue_is_split_to_fit_the_server_limit():
+    """BUG-11: 12 skanów po 200 pakietów po pracy offline — nic nie ginie przez HTTP 413."""
+    consent(packages=True)
+    names = [f"com.example.synthetic.package.number{i:04d}" for i in range(200)]
+    for _ in range(12):
+        telemetry.record("scan", lambda p: {"apps": 200, "packages": names}, now=lambda: NOW)
+    queued = len(lines())
+    limit = 256 * 1024
+    sizes, server = [], Server()
+
+    def post(path, payload):
+        size = len(json.dumps(payload).encode("utf-8"))
+        sizes.append(size)
+        if size > limit:
+            raise BackendError("http", 413)
+        return server.post(path, payload)
+
+    telemetry.send_pending(post=post, delete=server.delete)
+    assert sum(len(b) for b in server.batches) == queued == 12
+    assert max(sizes) <= limit and not telemetry_path().exists()
+
+
+def test_413_splits_the_batch_instead_of_dropping_it():
+    consent()
+    for _ in range(4):
+        telemetry.record("scan", lambda p: body(p), now=lambda: NOW)
+    server, seen = Server(), []
+
+    def post(path, payload):
+        seen.append(len(payload["events"]))
+        if len(payload["events"]) > 1:
+            raise BackendError("http", 413)
+        return server.post(path, payload)
+
+    telemetry.send_pending(post=post, delete=server.delete)
+    assert seen[:3] == [4, 2, 1] and sum(len(b) for b in server.batches) == 4

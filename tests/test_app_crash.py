@@ -398,3 +398,10 @@ def test_prune_keeps_fresh_tmp_files(tmp_path):
     fresh.write_text("x", "utf-8")
     crash.prune(now=lambda: NOW)
     assert fresh.exists()  # zapis w toku w innym wątku
+
+
+def test_client_names_of_the_session_are_cut_from_reports():
+    """Audyt 2026-10-11, PRIV-02: nazwisko klienta z pola w programie nie trafia do raportu."""
+    crash.note_names(["Anna Kowalska", None, "  "])
+    data = load(crash.capture(boom("order for Anna Kowalska; account kowalska"), now=lambda: NOW))
+    assert "kowalska" not in json.dumps(data).lower() and "<name>" in data["error"]["message"]

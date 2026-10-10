@@ -34,7 +34,8 @@ def lock_name(serial: str) -> str:
     return hashlib.sha256(serial.encode("utf-8")).hexdigest()[:24] + ".lock"
 
 
-def _try_lock(fd: int) -> bool:
+def try_lock(fd: int) -> bool:
+    """Nieblokująca wyłączna blokada pierwszego bajtu pliku (Windows: per uchwyt)."""
     if sys.platform == "win32":
         import msvcrt
 
@@ -52,7 +53,7 @@ def _try_lock(fd: int) -> bool:
     return True
 
 
-def _unlock(fd: int) -> None:
+def unlock(fd: int) -> None:
     if sys.platform == "win32":
         import msvcrt
 
@@ -74,12 +75,12 @@ def device_lock(journal_path: Path | str, serial: str) -> Iterator[None]:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
     try:
-        if not _try_lock(fd):
+        if not try_lock(fd):
             raise DeviceBusy(serial)
         try:
             yield
         finally:
-            _unlock(fd)
+            unlock(fd)
     finally:
         os.close(fd)
 
@@ -92,9 +93,9 @@ def operation_active(journal_path: Path | str) -> bool:
         except OSError:
             continue
         try:
-            if not _try_lock(fd):
+            if not try_lock(fd):
                 return True
-            _unlock(fd)
+            unlock(fd)
         finally:
             os.close(fd)
     return False

@@ -74,8 +74,12 @@ describe('controller with the adware scenario', () => {
     expect(s.selection['com.clean.pro.boost']).toBeUndefined(); // usuniętej nie ma już czego zmieniać
     ctl.setLevel('com.wlive.forecast', 'remove');
     expect(s.selection['com.wlive.forecast']).toBe('remove'); // wyłączoną można jeszcze usunąć
+    s.client = 'Anna Kowalska';
+    s.unlocked = ['com.android.systemui'];
     ctl.newScan();
     expect(s.acted).toEqual({});
+    expect(s.client).toBe(''); // PRIV-04: następny telefon to inny klient
+    expect(s.unlocked).toEqual([]);
   });
 
   test('undo one app from the results after back to repair', async () => {

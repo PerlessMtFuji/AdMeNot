@@ -281,6 +281,9 @@ export class Controller {
       plan: null, selection: {}, actedLog: {}, undoTarget: null, steps: [], disconnectedOrder: null, reports: {},
       categoryFilter: [], sourceFilter: null, lastShot: null, lastShotSerial: null, shotCount: 0,
       openGroups: {}, diagnostics: false, who: null,
+      // Nowa sprawa: nazwisko poprzedniego klienta nie może trafić do protokołu następnego telefonu
+      // (audyt 2026-10-11, PRIV-04), a odblokowane pakiety chronione — do jego planu (QA-01).
+      client: '', unlocked: [],
     });
   }
 

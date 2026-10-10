@@ -18,13 +18,24 @@ from typing import Any
 
 from admenot.app.telemetry_events import common, hour, start_body
 from admenot.engine.paths import telemetry_delete_path, telemetry_path
-from admenot.engine.settings import Settings, effective_lang, load_settings, save_internal
+from admenot.engine.settings import (
+    Settings,
+    check_writable,
+    effective_lang,
+    load_settings,
+    save_internal,
+    settings_transaction,
+    write_atomic,
+)
 from admenot.net import client
 
 ENDPOINT = "/api/v1/telemetry"
 FORMAT = 1
 BATCH = 100
 MAX_BYTES = 1024 * 1024
+# Worker przyjmuje do 256 KB treści (server/src/telemetry.ts); paczkę liczymy w bajtach UTF-8
+# tak, jak wysyła ją `client.post_json`, z zapasem (audyt 2026-10-11, BUG-11).
+MAX_REQUEST = 192 * 1024
 KEEP = timedelta(days=30)
 FIRST = 30.0  # s po starcie
 PERIOD = 6 * 3600.0
@@ -78,10 +89,7 @@ def _write_events(events: list[dict[str, Any]]) -> None:
     if not events:
         path.unlink(missing_ok=True)
         return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text("".join(json.dumps(e, ensure_ascii=False) + "\n" for e in events), "utf-8")
-    tmp.replace(path)
+    write_atomic(path, "".join(json.dumps(e, ensure_ascii=False) + "\n" for e in events))
 
 
 def _trim(events: list[dict[str, Any]], now: datetime) -> list[dict[str, Any]]:
@@ -110,10 +118,7 @@ def _write_deletes(ids: list[str]) -> None:
     if not ids:
         path.unlink(missing_ok=True)
         return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(json.dumps({"installs": ids}), "utf-8")
-    tmp.replace(path)
+    write_atomic(path, json.dumps({"installs": ids}))
 
 
 def delete_pending() -> bool:
@@ -131,18 +136,24 @@ def set_consent(telemetry: bool, packages: bool, now: datetime) -> Settings:
     """Spec §4.2: włączenie tworzy ID (raz), wyłączenie kasuje kolejkę i planuje usunięcie z serwera."""
     packages = packages and telemetry
     # Odczyt i zapis pod jedną blokadą: równoległe wywołania z mostu nie tworzą dwóch ID,
-    # a `record` nie dopisze zdarzenia starego ID po skasowaniu kolejki.
-    with _lock:
+    # a `record` nie dopisze zdarzenia starego ID po skasowaniu kolejki. Transakcja ustawień
+    # wyklucza też zapis innego klucza ze starą zgodą z innego wątku lub procesu (PRIV-01).
+    with _lock, settings_transaction():
+        check_writable()  # SettingsTooNew przed czymkolwiek: nic nie ruszamy
         current = load_settings()
         changes: dict[str, Any] = {"telemetry": telemetry, "telemetry_packages": packages,
                                    "telemetry_at": _stamp(now),
                                    "telemetry_id": (current.telemetry_id or str(uuid.uuid4()))
                                    if telemetry else None}
-        settings = save_internal(changes)  # najpierw ustawienia: SettingsTooNew nic nie rusza
+        if not telemetry and current.telemetry_id:
+            # Najpierw trwały zapis żądania usunięcia, dopiero potem zapomnienie ID: błąd zapisu
+            # nie może zgubić identyfikatora danych na serwerze (PRIV-03).
+            pending = _read_deletes()
+            if current.telemetry_id not in pending:
+                _write_deletes([*pending, current.telemetry_id])
+        settings = save_internal(changes)
         if not telemetry:
             _write_events([])
-            if current.telemetry_id:
-                _write_deletes([*_read_deletes(), current.telemetry_id])
         elif not packages and current.telemetry_packages:
             _write_events([{**e, "packages": None} if "packages" in e else e
                            for e in _read_events()])
@@ -154,7 +165,8 @@ def set_consent(telemetry: bool, packages: bool, now: datetime) -> Settings:
 
 def record(type_: str, build: Callable[[bool], dict[str, Any]], now: Now | None = None) -> None:
     try:
-        with _lock:  # zgoda sprawdzona i zdarzenie zapisane bez cofnięcia zgody pomiędzy
+        # Zgoda sprawdzona i zdarzenie zapisane bez cofnięcia zgody pomiędzy (także z innego procesu).
+        with _lock, settings_transaction():
             settings = load_settings()
             if not settings.telemetry or not settings.telemetry_id:
                 return
@@ -209,6 +221,23 @@ def _send_deletes(delete: Delete, on_deleted: Callable[[], None] | None = None) 
     return bool(ids)
 
 
+def _request_bytes(events: list[dict[str, Any]]) -> int:
+    return len(json.dumps({"format": FORMAT, "events": events}).encode("utf-8"))
+
+
+def _batch(events: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    """Najdłuższy początek kolejki (≤ `limit` zdarzeń), który mieści się w MAX_REQUEST."""
+    batch: list[dict[str, Any]] = []
+    size = _request_bytes([])
+    for event in events[:limit]:
+        grown = size + len(json.dumps(event).encode("utf-8")) + 2  # przecinek i spacja
+        if batch and grown > MAX_REQUEST:
+            break
+        batch.append(event)
+        size = grown
+    return batch
+
+
 def _remove(sent: list[dict[str, Any]]) -> None:
     with _lock:
         rest = _read_events()
@@ -224,6 +253,7 @@ def send_pending(post: Post | None = None, delete: Delete | None = None,
     """Wysyła usunięcia i kolejkę; True, jeśli poszło choć jedno zapytanie (dla limitu w `_loop`)."""
     post = post or client.post_json
     went = False
+    limit = BATCH
     try:
         went = _send_deletes(delete or client.delete, on_deleted)
         while stop is None or not stop.is_set():
@@ -235,7 +265,7 @@ def send_pending(post: Post | None = None, delete: Delete | None = None,
                 mine = [e for e in events if e["install"] == settings.telemetry_id]
                 if len(mine) != len(events):  # pozostałość po cofniętej zgodzie — nie wychodzi
                     _write_events(_trim(mine, (now or _utc_now)()))
-            batch = mine[:BATCH]
+            batch = _batch(mine, limit)
             if not batch:
                 return went
             went = True
@@ -244,8 +274,12 @@ def send_pending(post: Post | None = None, delete: Delete | None = None,
             except client.BackendError as exc:
                 if _waiting(exc):
                     return went
-                _log(exc)  # 400: zła paczka nie może blokować kolejki na zawsze
+                if exc.status == 413 and len(batch) > 1:
+                    limit = max(1, len(batch) // 2)  # za duża paczka: dzielimy, nic nie kasujemy
+                    continue
+                _log(exc)  # 400 albo pojedyncze zbyt duże zdarzenie nie blokuje kolejki na zawsze
             _remove(batch)
+            limit = BATCH
     except Exception as exc:  # noqa: BLE001
         _log(exc)
     return went

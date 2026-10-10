@@ -52,7 +52,11 @@ def user_agent() -> str:
     return f"AdMeNot/{__version__}"  # nic więcej: bez systemu, języka, identyfikatorów
 
 
-def _fetch(path: str, data: bytes | None = None, method: str | None = None) -> bytes:
+MAX_RESPONSE = 1024 * 1024  # odpowiedzi API i manifest są małe (audyt 2026-10-11, PERF-03)
+
+
+def _fetch(path: str, data: bytes | None = None, method: str | None = None,
+           max_bytes: int = MAX_RESPONSE) -> bytes:
     headers = {"User-Agent": user_agent(), "Accept": "application/json"}
     if data is not None:
         headers["Content-Type"] = "application/json"
@@ -60,12 +64,18 @@ def _fetch(path: str, data: bytes | None = None, method: str | None = None) -> b
         request = urllib.request.Request(base_url() + path, data=data, headers=headers,
                                          method=method or ("GET" if data is None else "POST"))
         with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
-            return response.read()
+            body = response.read(max_bytes + 1)  # limit przed alokacją całej odpowiedzi
+            length = response.headers.get("Content-Length", "")
+            if len(body) <= max_bytes and length.isdigit() and int(length) != len(body):
+                raise BackendError("offline")  # serwer zerwał połączenie przed końcem treści
     except urllib.error.HTTPError as exc:  # przed OSError: HTTPError to też URLError
         exc.close()
         raise BackendError("http", exc.code) from None
     except (OSError, http.client.HTTPException, ValueError):  # URLError, TimeoutError, błędy TLS, zerwane połączenie, BadStatusLine, IncompleteRead, InvalidURL
         raise BackendError("offline") from None
+    if len(body) > max_bytes:
+        raise BackendError("invalid")
+    return body
 
 
 def _request(path: str, data: bytes | None = None, method: str | None = None) -> dict[str, Any]:
