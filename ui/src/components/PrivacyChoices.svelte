@@ -1,26 +1,34 @@
 <script lang="ts">
-  import { getContext, onMount } from 'svelte';
+  import { getContext, onMount, tick } from 'svelte';
   import type { Controller } from '../lib/controller';
   import { t } from '../lib/i18n/index.svelte';
   import type { TelemetrySample } from '../lib/types';
 
   let { telemetry, packages, onchange }: {
-    telemetry: boolean; packages: boolean; onchange: (telemetry: boolean, packages: boolean) => void;
+    telemetry: boolean; packages: boolean; onchange: (telemetry: boolean, packages: boolean) => void | Promise<void>;
   } = $props();
   const ctl = getContext<Controller>('ctl');
   let sample = $state<TelemetrySample | null>(null);
   const WHAT = ['common', 'start', 'scan', 'repair', 'undo', 'packages', 'never'];
   onMount(async () => { sample = await ctl.telemetrySample(); });
+
+  // `checked` jest jednokierunkowe: gdy zapis się nie uda, właściwość się nie zmienia i pole
+  // zostałoby kliknięte — po zapisie ustawiamy je na to, co naprawdę obowiązuje.
+  async function change(input: HTMLInputElement, tel: boolean, pkg: boolean, shown: () => boolean): Promise<void> {
+    await onchange(tel, pkg);
+    await tick();
+    input.checked = shown();
+  }
 </script>
 
 <div class="flex flex-col gap-3">
   <label class="flex items-start gap-3">
-    <input type="checkbox" checked={telemetry} onchange={(e) => onchange(e.currentTarget.checked, packages && e.currentTarget.checked)} />
+    <input type="checkbox" checked={telemetry} onchange={(e) => change(e.currentTarget, e.currentTarget.checked, packages && e.currentTarget.checked, () => telemetry)} />
     <span><span class="font-semibold">{t('privacy.telemetry')}</span><br /><span class="text-xs text-mut">{t('privacy.telemetry_hint')}</span></span>
   </label>
   <label class="ml-7 flex items-start gap-3" class:opacity-50={!telemetry}>
     <input type="checkbox" checked={packages && telemetry} disabled={!telemetry}
-      onchange={(e) => onchange(telemetry, e.currentTarget.checked)} />
+      onchange={(e) => change(e.currentTarget, telemetry, e.currentTarget.checked, () => packages && telemetry)} />
     <span><span class="font-semibold">{t('privacy.packages')}</span><br /><span class="text-xs text-mut">{t('privacy.packages_hint')}</span></span>
   </label>
   <details class="text-sm">

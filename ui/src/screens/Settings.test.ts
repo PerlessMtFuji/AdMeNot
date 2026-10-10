@@ -121,3 +121,12 @@ test('„Pokaż ostrzeżenie” otwiera treść ostrzeżenia', async () => {
   await fireEvent.click(screen.getByRole('button', { name: 'Pokaż ostrzeżenie' }));
   await screen.findByText('AdMeNot jest w wersji beta i może zawierać błędy.');
 });
+
+test('prywatność: nieudany zapis zgody nie zostawia zaznaczonego pola', async () => {
+  const { bridge } = await renderWith(Settings, 'empty');
+  bridge.failNext('set_telemetry', 'internal');
+  const box = screen.getByLabelText(/Wysyłaj anonimowe statystyki użycia/) as HTMLInputElement;
+  await fireEvent.click(box);
+  await vi.waitFor(() => expect(bridge.calls.some((c) => c.method === 'set_telemetry')).toBe(true));
+  await vi.waitFor(() => expect(box.checked).toBe(false));
+});
