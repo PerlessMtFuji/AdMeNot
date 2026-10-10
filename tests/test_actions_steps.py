@@ -101,7 +101,7 @@ def test_secure_list_refuses_value_with_quote():
     step = Step("secure_list", "com.ad", {"key": A11Y, "op": "remove", "components": service})
     with pytest.raises(ActionError) as exc:
         S.apply(phone, step)
-    assert exc.value.key == "failed"
+    assert exc.value.key == "unrecognized"
     assert phone.secure[A11Y] == f"com.x/.A'B:{service}"
 
 
@@ -253,3 +253,24 @@ def test_known_empty_answers_stay_valid_states():
         "mode": "default"}
     gone = Step("installed", "com.gone", {"installed": "0", "backup_dir": ""})
     assert S.probe(phone, gone) == {"installed": False}
+
+
+@pytest.mark.parametrize("bad", ["com.ad/.L'; echo audit_probe; #", "com.ad/.L$(id)", "com.ad/.L`id`",
+                                 "com.ad/.L\necho x", "com.ad/.Ł"])
+def test_listener_component_from_the_phone_is_validated_and_quoted(bad):
+    """Audyt 2026-10-11, SEC-01: niezaufany komponent nie dokleja polecenia w powłoce telefonu."""
+    phone = _phone()
+    step = _remove_listener(bad)
+    with pytest.raises(ActionError) as exc:
+        S.apply(phone, step)
+    assert exc.value.key == "unrecognized"
+    assert not [c for c in phone.calls if c.startswith("cmd notification")]
+    # Pokazane (i zapisane w dzienniku) polecenie to jedno słowo-argument, nie doklejona komenda.
+    import shlex
+
+    assert shlex.split(S.command_for(step)) == ["cmd", "notification", "disallow_listener", bad]
+
+
+def test_valid_component_with_dollar_still_works():
+    phone = _phone(secure={LISTENERS: "com.ad/.Outer$Listener"})
+    _apply_and_undo(phone, _remove_listener("com.ad/.Outer$Listener"))

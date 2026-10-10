@@ -148,7 +148,7 @@
     "deep": "Głęboka analiza", "deep_hint": "Szuka w kodzie aplikacji możliwych ścieżek do wrażliwych wywołań. Trwa do kilku minut.", "limits": "Ograniczenia oceny", "incomplete_data": "Mało danych o zachowaniu aplikacji", "confidence": "Pewność wniosku"
   },
   "actions": { "console": "Konsola ADB", "fix": "Napraw zaznaczone ({count})", "rescan": "Skanuj ponownie" },
-  "plan": { "title": "Plan naprawy", "confirm_title": "Co zrobię na telefonie", "blocked": "Pominięta", "unlock": "Odblokuj", "undo_hint": "Zmiany cofniesz w Historii. Usunięcie aplikacji kasuje jej dane — cofnięcie przywróci samą aplikację.", "run": "Wykonaj ({count})", "nothing": "Nic do wykonania — wszystkie aplikacje są zablokowane." },
+  "plan": { "title": "Plan naprawy", "confirm_title": "Co zrobię na telefonie", "blocked": "Pominięta", "unlock": "Odblokuj", "unlock_prompt": "To aplikacja systemowa — zmiana może zepsuć funkcje telefonu. Aby ją odblokować, przepisz nazwę pakietu: {package}", "unlock_label": "Nazwa pakietu do odblokowania", "undo_hint": "Zmiany cofniesz w Historii. Usunięcie aplikacji kasuje jej dane — cofnięcie przywróci samą aplikację.", "run": "Wykonaj ({count})", "nothing": "Nic do wykonania — wszystkie aplikacje są zablokowane." },
   "exec": {
     "title": "Naprawiam telefon…", "step": "krok {done} z {total}", "panel": "Zlecenie",
     "done_title": "Telefon naprawiony", "done_warn": "Naprawa zakończona z uwagami",

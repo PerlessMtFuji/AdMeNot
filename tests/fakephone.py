@@ -198,7 +198,7 @@ class FakePhone:
             return self._appops_get(m[1], m[2])
         if m := re.fullmatch(r"appops set (\S+) (\w+) (\w+)", command):
             return self._appops_set(m[1], m[2], m[3])
-        if m := re.fullmatch(r"pm (grant|revoke) (\S+) (\S+)", command):
+        if m := re.fullmatch(r"pm (grant|revoke) --user 0 (\S+) (\S+)", command):
             return self._permission(m[1], m[2], m[3])
         if (m := re.fullmatch(r"dumpsys package (\S+)", command)) and m[1] != "packages":
             return self._dumpsys_package(m[1])

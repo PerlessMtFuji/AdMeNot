@@ -148,7 +148,7 @@
     "deep": "Deep analysis", "deep_hint": "Looks in the app code for possible paths to sensitive calls. Takes up to a few minutes.", "limits": "Assessment limits", "incomplete_data": "Little data about the app's behavior", "confidence": "Confidence"
   },
   "actions": { "console": "ADB console", "fix": "Fix selected ({count})", "rescan": "Scan again" },
-  "plan": { "title": "Repair plan", "confirm_title": "What I will do on the phone", "blocked": "Skipped", "unlock": "Unlock", "undo_hint": "You can undo changes in History. Removing an app deletes its data — undo restores the app itself.", "run": "Run ({count})", "nothing": "Nothing to run — all apps are blocked." },
+  "plan": { "title": "Repair plan", "confirm_title": "What I will do on the phone", "blocked": "Skipped", "unlock": "Unlock", "unlock_prompt": "This is a system app — changing it can break phone features. To unlock it, type the package name: {package}", "unlock_label": "Package name to unlock", "undo_hint": "You can undo changes in History. Removing an app deletes its data — undo restores the app itself.", "run": "Run ({count})", "nothing": "Nothing to run — all apps are blocked." },
   "exec": {
     "title": "Fixing the phone…", "step": "step {done} of {total}", "panel": "Order",
     "done_title": "Phone fixed", "done_warn": "Repair finished with remarks",

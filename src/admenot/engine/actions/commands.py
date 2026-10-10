@@ -1,14 +1,22 @@
 """Polecenia ADB akcji (spec §7). Jedno miejsce, z którego korzystają kroki i FakePhone w testach.
 
 Wartości, które mogą zawierać `$` (nazwy komponentów), są w pojedynczym cudzysłowie —
-bez niego powłoka telefonu potraktuje `$ListenerService` jako zmienną i ją wytnie.
+bez niego powłoka telefonu potraktuje `$ListenerService` jako zmienną i ją wytnie. Wstawiamy je
+przez `quoted()`: apostrof w środku nie zamknie cudzysłowu (audyt 2026-10-11, SEC-01).
 """
+
+
+def quoted(value: str) -> str:
+    """Treść do wstawienia między '…' w poleceniu powłoki POSIX (apostrof → '"'"')."""
+    return value.replace("'", "'\"'\"'")
+
 
 FORCE_STOP = "am force-stop {package}"
 APPOPS_GET_OP = "appops get {package} {op}"
 APPOPS_SET = "appops set {package} {op} {mode}"
-PM_GRANT = "pm grant {package} {permission}"
-PM_REVOKE = "pm revoke {package} {permission}"
+# Jawny profil 0 (skanowany), jak przy disable/uninstall (audyt 2026-10-11, BUG-08).
+PM_GRANT = "pm grant --user 0 {package} {permission}"
+PM_REVOKE = "pm revoke --user 0 {package} {permission}"
 DUMPSYS_PACKAGE = "dumpsys package {package}"
 SETTINGS_GET = "settings get secure {key}"
 SETTINGS_PUT = "settings put secure {key} '{value}'"

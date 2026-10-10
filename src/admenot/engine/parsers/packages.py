@@ -10,6 +10,7 @@ _LIB_OVERLAYS = re.compile(r"^\S+ overlay paths:$")
 _PERM_SECTIONS = {"requested permissions:", "install permissions:", "runtime permissions:"}
 _GRANTED = re.compile(r"^([\w.]+): granted=(true|false)")
 _PERM_NAME = re.compile(r"^([\w.]+)")
+_USER = re.compile(r"^User (\d+):")
 _TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
@@ -68,6 +69,7 @@ def parse_dumpsys_packages(text: str) -> dict[str, PkgDump]:
     current: PkgDump | None = None
     section: str | None = None
     section_indent = 0
+    user: int | None = None  # sekcja „User N:” — uprawnienia wykonawcze są per profil
 
     for raw in text.splitlines():
         if raw.startswith("Packages:"):
@@ -82,7 +84,7 @@ def parse_dumpsys_packages(text: str) -> dict[str, PkgDump]:
         header = _PKG_HEADER.match(raw)
         if header:
             current = dumps.setdefault(header.group(1), PkgDump(header.group(1)))
-            section = None
+            section, user = None, None
             continue
         if current is None:
             continue
@@ -90,6 +92,8 @@ def parse_dumpsys_packages(text: str) -> dict[str, PkgDump]:
         line = raw.strip()
         if section and _indent(raw) <= section_indent:
             section = None
+        if m := _USER.match(line):
+            user, section = int(m.group(1)), None
         if line in _PERM_SECTIONS:
             section, section_indent = line[:-1], _indent(raw)
             continue
@@ -101,7 +105,9 @@ def parse_dumpsys_packages(text: str) -> dict[str, PkgDump]:
             if m := _GRANTED.match(line):
                 # Android 12 nie wypisuje „requested permissions:” — wymienione tu też są żądane.
                 current.requested.add(m.group(1))
-                if m.group(2) == "true":
+                # Skanujemy profil 0: zgoda z profilu służbowego/klona (User 10) nie jest jego
+                # stanem — inaczej cofnięcie przyznałoby uprawnienie, którego nie było (BUG-08).
+                if m.group(2) == "true" and user in (None, 0):
                     current.granted.add(m.group(1))
         elif m := re.search(r"\bversionCode=(\d+)", line):
             current.version_code = int(m.group(1))

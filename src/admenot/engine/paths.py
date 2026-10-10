@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
+import re
 from pathlib import Path
 
 
@@ -22,6 +24,16 @@ def backups_dir() -> Path:
 
     custom = load_settings().backups_dir
     return Path(custom) if custom else data_dir() / "backups"
+
+
+def device_dir_name(serial: str) -> str:
+    """Nazwa katalogu telefonu: czytelny początek numeru + skrót całego numeru.
+
+    Numer seryjny pochodzi z ADB i trafiał wprost do ścieżki kopii: „C:/Inny”, „..” albo
+    „192.0.2.1:5555” zmieniały katalog lub psuły kopię (audyt 2026-10-11, SEC-02).
+    """
+    readable = re.sub(r"[^A-Za-z0-9_-]", "_", serial)[:32].strip("_") or "device"
+    return f"{readable}-{hashlib.sha256(serial.encode('utf-8')).hexdigest()[:12]}"
 
 
 def settings_path() -> Path:
