@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import App from './App.svelte';
 import { setupCtl } from './test-utils';
 
@@ -37,4 +37,14 @@ test('pokazuje ekran powitalny przed akceptacją, potem ekran podłączenia', as
   await waitFor(() => expect(screen.queryByRole('heading', { name: 'Witaj w AdMeNot' })).toBeNull());
   expect(screen.getByRole('list', { name: 'Etapy' })).toBeTruthy();
   expect(bridge.calls.some((c) => c.method === 'accept_welcome')).toBe(true);
+});
+
+test('rail: „Wesprzyj projekt” nad Historią otwiera stronę wsparcia', async () => {
+  const { ctl, bridge } = await setupCtl('empty');
+  render(App, { props: { ctl } });
+  const rail = within(screen.getByRole('navigation'));
+  const support = rail.getByRole('button', { name: 'Wesprzyj projekt' });
+  expect(support.nextElementSibling).toBe(rail.getByRole('button', { name: 'Historia' }));
+  await fireEvent.click(support);
+  await vi.waitFor(() => expect(bridge.calls.at(-1)).toEqual({ method: 'open_donate', args: [] }));
 });

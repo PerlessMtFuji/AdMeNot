@@ -45,6 +45,9 @@
     </button>
   {/if}
   <div class="mt-auto flex flex-col gap-0.5">
+    <button class="{NAV} mb-1.5 bg-accent-soft/60 !text-accent hover:!bg-accent-soft" onclick={() => ctl.openDonate()}>
+      <Icon name="heart" />{t('donate.support')}
+    </button>
     {#if expert && s.screen === 'main' && s.scan}
       <button class="{NAV} {s.consoleOpen ? CURRENT : ''}" aria-pressed={s.consoleOpen}
         onclick={() => (s.consoleOpen = !s.consoleOpen)}><Icon name="terminal" />{t('actions.console')}</button>

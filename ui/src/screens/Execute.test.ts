@@ -157,7 +157,8 @@ describe('plan and execution', () => {
     bridge.emit('exec:done', doneWith(true));
     await tick();
     expect(screen.getByText(SUPPORT)).toBeTruthy();
-    await fireEvent.click(screen.getByRole('button', { name: 'Wesprzyj projekt' }));
+    const banner = screen.getByText(SUPPORT).closest('[role="status"]') as HTMLElement;
+    await fireEvent.click(within(banner).getByRole('button', { name: 'Wesprzyj projekt' }));
     await vi.waitFor(() => expect(bridge.calls.some((c) => c.method === 'open_donate')).toBe(true));
     expect(screen.queryByText(SUPPORT)).toBeNull();
   });
