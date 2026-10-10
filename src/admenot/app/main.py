@@ -83,6 +83,7 @@ def run_gui() -> int:
         timer = threading.Timer(5.0, faulthandler._read_null)
         timer.daemon = True
         timer.start()
+    api: Api | None = None
     try:
         holder: dict[str, Any] = {}
         api = Api(WindowEmitter(lambda: holder.get("window")))
@@ -103,6 +104,7 @@ def run_gui() -> int:
 
         api._attach(pick_folder=pick_folder, close=window.destroy, pick_file=pick_file)
         api._start_updates()
+        api._start_telemetry()
         window.events.closing += api._on_closing
         try:
             webview.start(gui="edgechromium", http_server=True)
@@ -111,6 +113,8 @@ def run_gui() -> int:
             return 3
         return 0
     finally:
+        if api is not None:
+            api._stop_telemetry()
         crash.end_session()
 
 

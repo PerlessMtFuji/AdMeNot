@@ -11,18 +11,19 @@ from __future__ import annotations
 
 import functools
 import os
+import secrets
 import sys
 import threading
 import time
 import webbrowser
 from collections.abc import Callable
 from dataclasses import asdict, replace
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from admenot import __version__
-from admenot.app import crash
+from admenot.app import crash, telemetry
 from admenot.app.errors import AppError, error_payload, log_exception, report_error
 from admenot.app.events import Emitter
 from admenot.app.jobs import Job, JobRunner, Stopped
@@ -37,8 +38,10 @@ from admenot.app.present import (
     scan_view,
     step_view,
 )
+from admenot.app.telemetry_events import repair_event, sample, scan_event, undo_event
 from admenot.app.updates import UpdateService, update_view
 from admenot.app.watcher import DeviceWatcher
+from admenot.engine import welcome
 from admenot.engine.actions.executor import ExecOptions, run_order
 from admenot.engine.actions.executor import resume as resume_steps
 from admenot.engine.adb.devices import list_devices
@@ -79,6 +82,7 @@ from admenot.engine.texts import error_text, order_status_label, screenshot_capt
 from admenot.engine.tools import resolve_adb
 from admenot.engine.workflow import (
     OrderInterrupted,
+    OrderResult,
     Runner,
     clear_cache_after_repair,
     execute_order,
@@ -164,6 +168,7 @@ class Api:
         self._adb: SessionLogAdb | None = None
         self._serial: str | None = None
         self._client: str | None = None
+        self._scan_session: str | None = None  # łączy skan z naprawą w statystykach
         self._report: ScanReport | None = None
         self._match: PhoneMatch | None = None
         self._pick_folder_fn: Callable[[], str | None] | None = None
@@ -196,6 +201,9 @@ class Api:
                                       lambda: self._settings.check_updates, fetch=update_fetch)
 
     # --- pomocnicze (nie są wystawiane do JS) -----------------------------------------------
+
+    def _utc(self) -> datetime:
+        return datetime.now(UTC)
 
     def _emit(self, name: str, detail: Any = None) -> None:
         self._emitter.emit(name, detail)
@@ -278,6 +286,14 @@ class Api:
             raise AppError("retired", st.manifest.reason_for(self._lang) or "",
                            min_supported=st.manifest.min_supported)
 
+    def _start_telemetry(self) -> None:
+        """Tylko z `run_gui`: wątek wysyłki i zdarzenie „start” (raz na dobę)."""
+        telemetry.start()
+        telemetry.note_start(self._settings.mode, self._utc())
+
+    def _stop_telemetry(self) -> None:
+        telemetry.stop()
+
     def _start_updates(self) -> None:
         """Tylko z `run_gui`: sprzątanie starych instalatorów i wątek sprawdzania."""
         installer.cleanup()
@@ -314,7 +330,34 @@ class Api:
 
     @_api
     def get_settings(self) -> dict[str, Any]:
-        return {**asdict(self._settings), "lang": self._lang}
+        return {**asdict(self._settings), "lang": self._lang,
+                "welcome_current": welcome.WELCOME_VERSION,
+                "telemetry_delete_pending": telemetry.delete_pending()}
+
+    @_api
+    def accept_welcome(self, telemetry_on: bool, packages: bool) -> dict[str, Any]:
+        if not isinstance(telemetry_on, bool) or not isinstance(packages, bool):
+            raise AppError("bad_request", "consent")
+        # Najpierw zgody: SettingsTooNew przerywa przed zapisem akceptacji ostrzeżenia.
+        telemetry.set_consent(telemetry_on, packages, self._utc())
+        self._settings = welcome.accept_risk(self._utc())
+        return self.get_settings()
+
+    @_api
+    def set_telemetry(self, telemetry_on: bool, packages: bool) -> dict[str, Any]:
+        if not isinstance(telemetry_on, bool) or not isinstance(packages, bool):
+            raise AppError("bad_request", "consent")
+        self._settings = telemetry.set_consent(telemetry_on, packages, self._utc())
+        return self.get_settings()
+
+    @_api
+    def telemetry_sample(self) -> dict[str, Any]:
+        return sample()
+
+    @_api
+    def open_privacy(self) -> dict[str, Any]:
+        self._open_url(f"{client.base_url()}/{'pl/' if self._lang == 'pl' else ''}privacy")
+        return {"ok": True}
 
     @_api
     def save_settings(self, changes: dict[str, Any]) -> dict[str, Any]:
@@ -367,6 +410,9 @@ class Api:
             self._identities[device.serial] = (device_card(device, match)["name"], device.imei)
             self._adb, self._serial, self._client = adb, device.serial, name
             self._report, self._match = None, match
+            session = secrets.token_hex(4)
+            self._scan_session = session
+            started = time.monotonic()
             self._emit("scan:device", {"device": device_card(device, match)})
             if os.environ.get(crash.CRASH_TEST) == "error":  # próba ręczna (spec raportów §10.2)
                 raise RuntimeError(crash.CRASH_TEST)
@@ -378,6 +424,8 @@ class Api:
             self._emit("scan:done", {"scan": scan_view(report, self._lang),
                                      "interrupted": self._interrupted(device.serial),
                                      "client": name})
+            telemetry.record("scan", lambda p: scan_event(report, session,
+                                                          int(time.monotonic() - started), p))
             if self._apk_factory is not None:
                 job.kind = "apk"
                 self._run_apk(job, adb, report)
@@ -389,6 +437,8 @@ class Api:
 
     def _run_apk(self, job: Job, adb: AdbTransport, report: ScanReport,
                  deep: frozenset[str] = frozenset()) -> None:
+        started = time.monotonic()
+
         def decide(est: Estimate, use: CacheUsage) -> str:
             # Zatrzymanie zadania w trakcie pytania (None) = pominięcie; `job.check` niżej kończy.
             return job.ask("apk:question", {"kind": "no_space", **estimate_view(est, use)}) or "skip"
@@ -411,6 +461,11 @@ class Api:
             return
         self._report = updated
         self._emit("apk:done", {"scan": scan_view(updated, self._lang)})
+        if not deep:  # głęboka analiza jednej aplikacji to nie nowa ocena telefonu
+            session = self._scan_session or ""
+            telemetry.record("scan", lambda p: scan_event(updated, session,
+                                                          int(time.monotonic() - started), p,
+                                                          apk_stage=True))
 
     @_api
     def deep_analyze(self, package: str) -> dict[str, Any]:
@@ -631,17 +686,20 @@ class Api:
                            on_admin_timeout=on_admin_timeout, should_stop=job.should_stop)
 
     def _run_order(self, job: Job, adb: AdbTransport, journal: Journal, order: Order,
-                   manufacturer: str, names: dict[str, str], runner: Runner) -> None:
+                   manufacturer: str, names: dict[str, str],
+                   runner: Runner) -> tuple[OrderResult | None, str | None]:
+        """(wynik, przerwanie): przerwanie = None | "stopped" | "disconnected" (telemetria)."""
         try:
             result = execute_order(adb, journal, order, self._options(job, manufacturer, names),
                                    runner)
         except OrderInterrupted as exc:
             self._emit("exec:disconnected", {"order": exc.order.number})
-            return
+            return None, "disconnected"
         if result.stopped:
             self._emit("exec:stopped", {"order": order.number})
         clear_cache_after_repair(result, self._settings, default_cache_dir())
         self._emit("exec:done", result_view(result, names, self._lang, manufacturer))
+        return result, "stopped" if result.stopped else None
 
     @_api
     def preview_plan(self, requests: dict[str, str],
@@ -668,7 +726,12 @@ class Api:
                 self._bind_order(journal, plan.device.serial, order.id)
                 self._emit("exec:order", {"order": order.number,
                                           "plan": plan_view(plan, self._lang)})
-                self._run_order(job, adb, journal, order, plan.ctx.manufacturer, names, run_order)
+                result, interrupted = self._run_order(job, adb, journal, order,
+                                                      plan.ctx.manufacturer, names, run_order)
+            verdicts = {r.facts.package: r.verdict for r in report.results}
+            session = self._scan_session or ""
+            telemetry.record("repair", lambda p: repair_event(plan.device, session, plan.plans,
+                                                              verdicts, result, interrupted, p))
 
         return {"job_id": self._jobs.start("exec", run)}
 
@@ -719,7 +782,8 @@ class Api:
         names = self._names()
 
         def run(job: Job) -> None:
-            manufacturer = read_device_info(adb).manufacturer
+            device = read_device_info(adb)
+            manufacturer = device.manufacturer
             with self._journal() as journal:
                 try:
                     result = undo_order(adb, journal, order, package=package, action_id=action_id,
@@ -734,6 +798,11 @@ class Api:
                 "errors": [error_text(key, self._lang, manufacturer) for _, key in result.errors],
                 "admin_not_restored": result.admin_not_restored,
             })
+            apps = sorted({a.package for a in targeted})
+            failed = sorted({a.package for a, _ in result.errors})
+            # Wiek liczony w `build`: ewentualny wyjątek łapie `record`, nie zadanie cofania.
+            telemetry.record("undo", lambda p: undo_event(
+                device, apps, failed, (self._now() - order.created_at).days, p))
 
         return {"job_id": self._jobs.start("undo", run)}
 
