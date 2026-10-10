@@ -379,7 +379,7 @@
       "internal": "Unexpected update error."
     }
   },
-  "close": { "title": "An order is running", "message": "Pause after the current step and close the program? The order can be finished or undone later.", "confirm": "Pause and close" },
+  "close": { "title": "An order is running", "message": "Pause after the current step and close the program? The order can be finished or undone later.", "confirm": "Pause and close", "after_step": "Finishing the current step on the phone — the program will close by itself." },
   "report": {
     "button": "Report PDF",
     "busy": "Creating the report…",

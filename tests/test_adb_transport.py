@@ -2,6 +2,7 @@ import subprocess
 
 import pytest
 
+from admenot.engine.adb import transport
 from admenot.engine.adb.fake import FakeAdb
 from admenot.engine.adb.transport import AdbError, RealAdb, classify_error
 
@@ -19,7 +20,7 @@ def test_real_adb_builds_command_with_serial(monkeypatch):
         seen["timeout"] = kw["timeout"]
         return _Proc(stdout=b"ok\r\n")
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(transport, "_run_capped", fake_run)
     adb = RealAdb(serial="R58T", adb_path="adb.exe")
     assert adb.shell("getprop", timeout=5) == "ok\n"
     assert seen["cmd"] == ["adb.exe", "-s", "R58T", "shell", "getprop"]
@@ -27,7 +28,7 @@ def test_real_adb_builds_command_with_serial(monkeypatch):
 
 
 def test_real_adb_decodes_invalid_utf8(monkeypatch):
-    monkeypatch.setattr(subprocess, "run", lambda cmd, **kw: _Proc(stdout=b"a\xffb\r\n"))
+    monkeypatch.setattr(transport, "_run_capped", lambda cmd, **kw: _Proc(stdout=b"a\xffb\r\n"))
     assert RealAdb(adb_path="adb.exe").shell("x") == "a�b\n"
 
 
@@ -35,7 +36,7 @@ def test_real_adb_timeout(monkeypatch):
     def boom(cmd, **kw):
         raise subprocess.TimeoutExpired(cmd, kw["timeout"])
 
-    monkeypatch.setattr(subprocess, "run", boom)
+    monkeypatch.setattr(transport, "_run_capped", boom)
     with pytest.raises(AdbError) as exc:
         RealAdb(adb_path="adb.exe").shell("dumpsys x", timeout=1)
     assert exc.value.kind == "timeout"
@@ -75,7 +76,7 @@ def test_classify_error(text, kind):
 
 def test_nonzero_exit_raises_classified(monkeypatch):
     monkeypatch.setattr(
-        subprocess, "run", lambda cmd, **kw: _Proc(returncode=1, stderr=b"error: device offline")
+        transport, "_run_capped", lambda cmd, **kw: _Proc(returncode=1, stderr=b"error: device offline")
     )
     with pytest.raises(AdbError) as exc:
         RealAdb(adb_path="adb.exe").shell("x")
@@ -152,7 +153,7 @@ def test_real_adb_does_not_share_the_console_stdin(monkeypatch):
         seen.update(kw)
         return _Proc(stdout=b"ok\n")
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(transport, "_run_capped", fake_run)
     RealAdb(serial="R58T", adb_path="adb.exe").shell("getprop")
     assert seen.get("stdin") is subprocess.DEVNULL
 
@@ -164,7 +165,7 @@ def test_run_bytes_returns_raw_stdout(monkeypatch):
         seen["cmd"] = cmd
         return _Proc(stdout=b"\x89PNG\r\n\x1a\n\x00\xff")
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(transport, "_run_capped", fake_run)
     adb = RealAdb(serial="R58T", adb_path="adb.exe")
     assert adb.run_bytes(["exec-out", "screencap", "-p"]) == b"\x89PNG\r\n\x1a\n\x00\xff"
     assert seen["cmd"] == ["adb.exe", "-s", "R58T", "exec-out", "screencap", "-p"]
@@ -172,7 +173,7 @@ def test_run_bytes_returns_raw_stdout(monkeypatch):
 
 def test_run_bytes_classifies_errors(monkeypatch):
     monkeypatch.setattr(
-        subprocess, "run", lambda cmd, **kw: _Proc(returncode=1, stderr=b"error: device offline"))
+        transport, "_run_capped", lambda cmd, **kw: _Proc(returncode=1, stderr=b"error: device offline"))
     with pytest.raises(AdbError) as exc:
         RealAdb(adb_path="adb.exe").run_bytes(["exec-out", "screencap", "-p"])
     assert exc.value.kind == "offline"
@@ -188,3 +189,24 @@ def test_fake_adb_run_bytes():
         fake.run_bytes(["exec-out", "bad"])
     with pytest.raises(AdbError):
         fake.run_bytes(["exec-out", "other"])
+
+
+def test_run_capped_stops_a_process_that_writes_too_much():
+    """Audyt 2026-10-11, PERF-03: limit działa przed zgromadzeniem całego wyjścia w pamięci."""
+    import sys
+
+    flood = [sys.executable, "-c", "import sys\nwhile True: sys.stdout.buffer.write(b'x' * 65536)"]
+    with pytest.raises(transport.OutputTooLarge):
+        transport._run_capped(flood, stdin=subprocess.DEVNULL, timeout=20, creationflags=0,
+                              limit=1024 * 1024)
+
+
+def test_run_capped_returns_output_code_and_honours_timeout():
+    import sys
+
+    ok = transport._run_capped([sys.executable, "-c", "import sys; print('hi'); sys.exit(3)"],
+                               stdin=subprocess.DEVNULL, timeout=20, creationflags=0)
+    assert (ok.returncode, ok.stdout.strip()) == (3, b"hi")
+    with pytest.raises(subprocess.TimeoutExpired):
+        transport._run_capped([sys.executable, "-c", "import time; time.sleep(30)"],
+                              stdin=subprocess.DEVNULL, timeout=0.3, creationflags=0)

@@ -217,6 +217,18 @@ describe('controller edge cases', () => {
     }
   });
 
+  test('APK events of an abandoned job do not touch the current scan (BUG-10)', async () => {
+    const { ctl, s, bridge } = setup('empty');
+    await ctl.init();
+    s.job = { id: 'job-2', kind: 'scan' };
+    s.apk = { done: 0, total: 0, running: true, changed: [] };
+    bridge.emit('apk:progress', { done: 5, total: 9, package: 'old', job_id: 'job-1' });
+    bridge.emit('apk:stopped', { job_id: 'job-1' });
+    expect(s.apk).toEqual({ done: 0, total: 0, running: true, changed: [] });
+    bridge.emit('apk:progress', { done: 1, total: 3, package: 'new', job_id: 'job-2' });
+    expect(s.apk.done).toBe(1);
+  });
+
   test('events: question, admin wait, job errors, console cap, close request', async () => {
     const { ctl, s, bridge } = setup('empty');
     await ctl.init();

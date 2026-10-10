@@ -356,3 +356,29 @@ def test_alarm_failure_is_not_a_gap_of_system_apps():
     assert not status["alarm"].ok
     assert "alarm" in facts["com.a"].gaps and "alarm" in facts["com.b"].gaps
     assert "alarm" not in facts["com.sys"].gaps
+
+
+def test_appops_queue_stops_at_the_scan_deadline():
+    """Audyt 2026-10-11, PERF-02: po terminie etapu nie idą nowe `appops get`."""
+    from admenot.engine.facts import AppFacts
+
+    class SlowAdb:
+        def __init__(self):
+            self.calls = []
+
+        def shell(self, command, timeout=20.0):
+            self.calls.append(command)
+            time.sleep(0.02)
+            return "No operations.\n"
+
+    adb = SlowAdb()
+    facts = {f"com.app{i}": AppFacts(f"com.app{i}") for i in range(300)}
+    status = run_collectors(adb, facts, [AppOpsCollector(workers=2)], timeout=0.2)
+    # Na granicy terminu wynik bywa „timeout” albo dane częściowe — w obu razach aplikacje po
+    # terminie mają lukę, a nie czekają w kolejce wywołań.
+    assert status["appops"].ok is False or len(status["appops"].partial) > 200
+    assert facts["com.app299"].gaps == {"appops"}
+    time.sleep(0.3)
+    settled = len(adb.calls)
+    time.sleep(0.3)
+    assert len(adb.calls) == settled < 60

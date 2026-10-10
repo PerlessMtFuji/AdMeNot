@@ -110,10 +110,15 @@ export class Controller {
       s.apkQuestion = null;
       s.phase = 'results';
     });
-    on('apk:estimate', (d) => { s.apkEstimate = d; });
-    on('apk:question', (d) => { s.apkQuestion = d; });
-    on('apk:progress', (d) => { s.apk = { ...s.apk, done: d.done, total: d.total, running: true }; });
+    // Zdarzenia porzuconej analizy APK (poprzedni skan) nie mogą zmienić nowego (BUG-10).
+    const stale = (d: { job_id?: string }): boolean => !!d.job_id && !!s.job && d.job_id !== s.job.id;
+    on('apk:estimate', (d) => { if (!stale(d)) s.apkEstimate = d; });
+    on('apk:question', (d) => { if (!stale(d)) s.apkQuestion = d; });
+    on('apk:progress', (d) => {
+      if (!stale(d)) s.apk = { ...s.apk, done: d.done, total: d.total, running: true };
+    });
     on('apk:done', (d) => {
+      if (stale(d)) return;
       const changed = changedVerdicts(s.scan?.apps ?? [], d.scan.apps);
       s.selection = mergeSelection(s.selection, d.scan.apps, s.touched);
       s.scan = d.scan;
@@ -125,7 +130,11 @@ export class Controller {
       s.incident = { recording: false, marks: d.marks, result: d };
       if (d.error) s.error = d.error;
     });
-    on('apk:stopped', () => { s.apkQuestion = null; s.apk = { ...s.apk, running: false }; });
+    on('apk:stopped', (d) => {
+      if (stale(d)) return;
+      s.apkQuestion = null;
+      s.apk = { ...s.apk, running: false };
+    });
     on('exec:order', (d) => {
       s.order = d.order;
       s.execPlan = d.plan;
@@ -743,7 +752,8 @@ export class Controller {
 
   async quit(): Promise<void> {
     this.state.closeRequested = false;
-    await this.call(this.api.quit());
+    const r = await this.call(this.api.quit());
+    if (r?.closing_after_step) this.state.closingAfterStep = true;  // okno zamknie się samo
   }
 
   dismissError(): void {

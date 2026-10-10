@@ -13,6 +13,7 @@ from typing import Any
 from admenot.engine.apk.callgraph import CodePath
 from admenot.engine.apk.components import component_from_json
 from admenot.engine.apk.dex import read_apk_types
+from admenot.engine.apk.limits import ApkRejected, preflight
 from admenot.engine.apk.manifest import ManifestInfo, icon_uri, read_manifest
 from admenot.engine.apk.sdks import AdSdkList, load_default_ad_sdks
 from admenot.engine.facts import AppFacts
@@ -132,6 +133,12 @@ def analyze_apk(
         return report
     base = next((p for p in paths if p.name == "base.apk"), paths[0])
     errors: list[str] = []
+    try:
+        for p in paths:  # tylko katalog ZIP: bomba nie trafi do parsera (PERF-01)
+            preflight(p)
+    except ApkRejected as exc:
+        report.error = f"rejected: {exc}"
+        return report
 
     for p in paths:
         try:

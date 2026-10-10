@@ -166,3 +166,23 @@ def test_data_from_a_newer_version_has_its_own_error_key():
     payload = error_payload(SettingsTooNew(2, 1))
     assert payload["key"] == "data_too_new" and "nowszej wersji" in payload["message"]
     assert error_payload(JournalTooNew(3, 1))["key"] == "data_too_new"
+
+
+def test_quit_during_a_long_step_closes_after_it_instead_of_cutting_it(monkeypatch):
+    """Audyt 2026-10-11, EDGE-01: instalacja z kopii trwa dłużej niż QUIT_WAIT."""
+    from admenot.app import api as api_module
+
+    monkeypatch.setattr(api_module, "QUIT_WAIT", 0.05)
+    _phone, api, _rec = _scanned(sync=False, admin_timeout=0)
+    closed = []
+    api._attach(pick_folder=lambda: None, close=lambda: closed.append(True))
+    release = threading.Event()
+    api._jobs.start("exec", lambda job: release.wait(5))
+    assert api.quit() == {"ok": True, "closing_after_step": True}
+    assert closed == []  # krok trwa — okno jeszcze otwarte
+    release.set()
+    for _ in range(100):
+        if closed:
+            break
+        threading.Event().wait(0.02)
+    assert closed == [True]

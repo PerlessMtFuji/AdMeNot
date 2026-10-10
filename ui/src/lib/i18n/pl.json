@@ -379,7 +379,7 @@
       "internal": "Nieoczekiwany błąd aktualizacji."
     }
   },
-  "close": { "title": "Trwa zlecenie", "message": "Przerwać po bieżącym kroku i zamknąć program? Zlecenie da się później dokończyć albo cofnąć.", "confirm": "Przerwij i zamknij" },
+  "close": { "title": "Trwa zlecenie", "message": "Przerwać po bieżącym kroku i zamknąć program? Zlecenie da się później dokończyć albo cofnąć.", "confirm": "Przerwij i zamknij", "after_step": "Kończę bieżący krok na telefonie — program zamknie się sam." },
   "report": {
     "button": "Protokół PDF",
     "busy": "Tworzę protokół…",

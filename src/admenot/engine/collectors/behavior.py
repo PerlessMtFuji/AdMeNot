@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -25,6 +26,7 @@ class AppOpsData:
 
 class AppOpsCollector:
     name = "appops"
+    uses_deadline = True  # `run_collectors` podaje termin (time.monotonic) całego etapu
 
     SAW = "android.permission.SYSTEM_ALERT_WINDOW"
 
@@ -35,10 +37,13 @@ class AppOpsCollector:
         # Systemowe tylko z uprawnieniem do okien nad innymi: pełna lista to setki wywołań.
         return not facts.is_system or self.SAW in facts.requested_permissions
 
-    def collect(self, adb: AdbTransport, apps: list[AppFacts]) -> AppOpsData:
+    def collect(self, adb: AdbTransport, apps: list[AppFacts],
+                deadline: float | None = None) -> AppOpsData:
         targets = [a.package for a in apps if self.covers(a)]
 
         def one(package: str) -> tuple[str, dict[str, AppOpState] | None]:
+            if deadline is not None and time.monotonic() >= deadline:
+                return package, None  # po terminie: brak danych, bez kolejnego wywołania adb
             try:
                 text = adb.shell(APPOPS_GET.format(package=package))
                 ops = parse_appops(text)

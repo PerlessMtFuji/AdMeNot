@@ -465,6 +465,11 @@ def send_queued(post: Post | None = None, now: Now | None = None,
             if _unreachable(exc):
                 return True  # serwer dalej nieosiągalny — reszta też poczeka
             _rejected_in_background(path, exc)
+        except PermissionError as failure:
+            # Windows: plik czyta akurat ktoś inny (antywirus, podgląd) i `os.replace` odmawia —
+            # to chwilowe, raport czeka na kolejną próbę zamiast do następnej awarii.
+            _log_failure(failure)
+            return True
         except Exception as failure:  # noqa: BLE001 — np. raport usunięty w międzyczasie
             _log_failure(failure)
     return False

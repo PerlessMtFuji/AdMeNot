@@ -32,6 +32,14 @@ def icon_uri(data: bytes) -> str | None:
     return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
 
 
+def _entry_size(apk, path: str) -> int | None:  # apk: androguard.core.apk.APK
+    """Rozmiar wpisu po rozpakowaniu z katalogu ZIP, bez czytania treści (None = nie wiadomo)."""
+    try:
+        return apk.zip.getinfo(path).file_size
+    except Exception:  # noqa: BLE001 — brak wpisu albo inny obiekt: zdecyduje odczyt
+        return None
+
+
 def _read_icon(apk) -> str | None:  # apk: androguard.core.apk.APK (import leniwy)
     seen: set[str] = set()
     for dpi in _ICON_DPIS:
@@ -40,6 +48,8 @@ def _read_icon(apk) -> str | None:  # apk: androguard.core.apk.APK (import leniw
             continue
         seen.add(path)
         try:
+            if (_entry_size(apk, path) or 0) > ICON_MAX_BYTES:
+                continue  # nie czytamy całego wpisu, który i tak odrzucimy (PERF-01)
             uri = icon_uri(apk.get_file(path))
         except Exception:  # noqa: BLE001, S112 — brak pliku w archiwum: szukamy dalej
             continue
