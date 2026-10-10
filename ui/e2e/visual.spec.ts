@@ -16,6 +16,12 @@ for (const theme of ['light', 'dark'] as const) {
   test.describe(`screens (PL, 1280×800, ${theme})`, () => {
     test.use({ colorScheme: theme });
 
+    test('ekran powitalny', async ({ page }) => {
+      await page.goto('/?scenario=empty&welcome=1');
+      await expect(page.getByRole('heading', { name: 'Witaj w AdMeNot' })).toBeVisible();
+      await expect(page).toHaveScreenshot(`welcome-${theme}.png`);
+    });
+
     test('connect: waiting, permission, connected', async ({ page }) => {
       await page.goto('/?scenario=empty');
       await expect(page.getByRole('heading', { name: 'Podłącz telefon' })).toBeVisible();

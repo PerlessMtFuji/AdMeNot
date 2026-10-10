@@ -141,3 +141,15 @@ test('screen view and screenshots: start, stop, screenshot lands in the order st
   await box.uncheck();
   await expect(page.getByText('w protokole: 0/8')).toBeVisible();
 });
+
+test('pierwsze uruchomienie: ostrzeżenie i zgody', async ({ page }) => {
+  await page.goto('/?scenario=adware&welcome=1');
+  await expect(page.getByRole('heading', { name: 'Witaj w AdMeNot' })).toBeVisible();
+  const start = page.getByRole('button', { name: 'Zaczynamy' });
+  await expect(start).toBeDisabled();
+  await page.getByLabel('Rozumiem i akceptuję').check();
+  await page.getByLabel(/Wysyłaj anonimowe statystyki użycia/).check();
+  await start.click();
+  await expect(page.getByRole('heading', { name: 'Witaj w AdMeNot' })).toBeHidden();
+  await expect(page.getByRole('heading', { name: 'Połączono' })).toBeVisible();
+});

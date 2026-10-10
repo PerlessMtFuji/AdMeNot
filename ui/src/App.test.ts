@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { expect, test } from 'vitest';
 import App from './App.svelte';
@@ -25,4 +25,16 @@ test('shell: brand, five stages in the rail, history and settings toggle', async
   expect(screen.getByRole('button', { name: 'Nowe zlecenie' })).toBeTruthy();
   await fireEvent.click(screen.getByRole('button', { name: 'Nowe zlecenie' }));
   expect(s.screen).toBe('main');
+});
+
+test('pokazuje ekran powitalny przed akceptacją, potem ekran podłączenia', async () => {
+  const { ctl, bridge } = await setupCtl('empty', { welcome: true });
+  render(App, { props: { ctl } });
+  await screen.findByRole('heading', { name: 'Witaj w AdMeNot' });
+  expect(screen.queryByRole('list', { name: 'Etapy' })).toBeNull();
+  await fireEvent.click(screen.getByLabelText('Rozumiem i akceptuję'));
+  await fireEvent.click(screen.getByRole('button', { name: 'Zaczynamy' }));
+  await waitFor(() => expect(screen.queryByRole('heading', { name: 'Witaj w AdMeNot' })).toBeNull());
+  expect(screen.getByRole('list', { name: 'Etapy' })).toBeTruthy();
+  expect(bridge.calls.some((c) => c.method === 'accept_welcome')).toBe(true);
 });

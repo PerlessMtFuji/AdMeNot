@@ -4,6 +4,7 @@
   import ErrorCard from './components/ErrorCard.svelte';
   import type { Controller } from './lib/controller';
   import { t } from './lib/i18n/index.svelte';
+  import { needsWelcome } from './lib/logic';
   import { screenIn } from './lib/motion';
   import Connect from './screens/Connect.svelte';
   import Execute from './screens/Execute.svelte';
@@ -11,6 +12,7 @@
   import Results from './screens/Results.svelte';
   import Scan from './screens/Scan.svelte';
   import Settings from './screens/Settings.svelte';
+  import Welcome from './screens/Welcome.svelte';
   import AppShell from './ui/AppShell.svelte';
   import Button from './ui/Button.svelte';
   import Dialog from './ui/Dialog.svelte';
@@ -20,6 +22,8 @@
   const ctl = untrack(() => props.ctl); // kontroler nie zmienia się przez całe życie okna
   setContext('ctl', ctl);
   const s = ctl.state;
+  // Ostrzeżenie przy pierwszym starcie (spec kroku H §3.1): zamiast zwykłego widoku, bez panelu kroków.
+  const welcome = $derived(s.settingsLoaded && needsWelcome(s.settings));
 
   const ORDER = ['connect', 'scanning', 'results', 'executing', 'history', 'settings', 'fatal'];
   const view = $derived(s.fatal ? 'fatal' : s.screen !== 'main' ? s.screen
@@ -33,6 +37,9 @@
   });
 </script>
 
+{#if welcome}
+  <Welcome />
+{:else}
 <AppShell>
   {#key view}
     <div class="flex min-h-0 min-w-0 flex-1" in:screenIn={{ dir }}>
@@ -54,6 +61,7 @@
     </div>
   {/key}
 </AppShell>
+{/if}
 
 {#if s.closeRequested}
   <Dialog title={t('close.title')} oncancel={() => (s.closeRequested = false)}>
@@ -65,5 +73,7 @@
   </Dialog>
 {/if}
 
-<UpdateDialog />
-<CrashDialog />
+{#if !welcome}  <!-- aktualizacje i raporty awarii czekają na zamknięcie ekranu powitalnego -->
+  <UpdateDialog />
+  <CrashDialog />
+{/if}

@@ -32,6 +32,7 @@ export function scenarioNames(): string[] {
 export type FakeBridge = Bridge & {
   setCrashes(reports: CrashSummary[], startup: string[]): void;
   failNextCrashSend(key: string): void;
+  failNext(method: string, key: string): void;  // następne wywołanie `method` zwraca błąd `key`
   calls: { method: string; args: unknown[] }[];
   emit<K extends EventName>(name: K, detail: EventMap[K]): void;
 };
@@ -61,6 +62,7 @@ export function createFakeBridge(name: string, options: { delay?: number; welcom
   let crashes: CrashSummary[] = [];
   let crashStartup: string[] = [];
   let failSend: string | null = null;
+  const failures = new Map<string, string>();
   const SHOT_IMAGE = 'data:image/svg+xml,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="200"><rect width="90" height="200" rx="8" fill="#1f2937"/>'
     + '<rect x="8" y="40" width="74" height="90" rx="6" fill="#f59e0b"/></svg>');
@@ -222,6 +224,11 @@ export function createFakeBridge(name: string, options: { delay?: number; welcom
 
   const invoke = (method: string, args: unknown[]): unknown => {
     calls.push({ method, args });
+    const failure = failures.get(method);
+    if (failure) {
+      failures.delete(method);
+      return { error: { key: failure, message: '' } };
+    }
     const queue = queues.get(method);
     if (!queue || queue.length === 0) return fallback(method, args);
     const call = queue.length > 1 ? queue.shift()! : queue[0];
@@ -244,5 +251,6 @@ export function createFakeBridge(name: string, options: { delay?: number; welcom
     emit: (event, detail) => dispatch(event, detail),
     setCrashes: (reports, startup) => { crashes = [...reports]; crashStartup = [...startup]; },
     failNextCrashSend: (key) => { failSend = key; },
+    failNext: (method, key) => { failures.set(method, key); },
   };
 }
