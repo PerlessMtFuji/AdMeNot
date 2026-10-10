@@ -1,11 +1,15 @@
 <script lang="ts">
   import { getContext, onMount } from 'svelte';
+  import PrivacyChoices from '../components/PrivacyChoices.svelte';
+  import RiskWarning from '../components/RiskWarning.svelte';
   import type { Controller } from '../lib/controller';
   import { i18n, t } from '../lib/i18n/index.svelte';
   import { formatGb, LEVEL_TONE } from '../lib/logic';
   import type { CacheUsage, Lang, Level, Mode, Theme } from '../lib/types';
+  import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
   import Card from '../ui/Card.svelte';
+  import Dialog from '../ui/Dialog.svelte';
   import Icon from '../ui/Icon.svelte';
   import Segmented from '../ui/Segmented.svelte';
 
@@ -15,6 +19,12 @@
   let backups = $state(s.settings.backups_dir ?? '');
   let check = $state<{ ok: boolean; text: string } | null>(null);
   let saved = $state(false);
+  let warning = $state(false);
+  let idCopied = $state(false);
+  // Odmowa schowka nie może trafić do `unhandledrejection` (main.ts przełączyłby UI w „fatal”).
+  function copyId(): void {
+    navigator.clipboard?.writeText(s.settings.telemetry_id ?? '').then(() => { idCopied = true; }).catch(() => {});
+  }
   const themes = $derived([
     { value: 'system' as Theme, label: t('settings.theme_system') },
     { value: 'light' as Theme, label: t('settings.theme_light') },
@@ -158,6 +168,31 @@
       </label>
       <span class="text-xs text-mut">{t('settings.check_updates_hint')}</span>
     </div></Card>
+
+    <Card><div class="flex flex-col gap-4 p-6">
+      <span class="lbl">{t('privacy.title')}</span>
+      <PrivacyChoices telemetry={s.settings.telemetry} packages={s.settings.telemetry_packages}
+        onchange={(tel, pkg) => ctl.setTelemetry(tel, pkg)} />
+      {#if s.settings.telemetry_id}
+        <div class="flex flex-wrap items-center gap-2 text-sm">
+          <span>{t('privacy.id')}:</span><code class="mono">{s.settings.telemetry_id}</code>
+          <Button size="sm" variant="ghost" onclick={copyId}>{t('privacy.copy')}</Button>
+          {#if idCopied}<span role="status" class="text-xs text-mut">{t('privacy.copied')}</span>{/if}
+        </div>
+        <span class="text-xs text-mut">{t('privacy.id_hint')}</span>
+      {/if}
+      {#if s.settings.telemetry_delete_pending}
+        <Banner tone="info" icon="info">{t('privacy.delete_pending')}</Banner>
+      {/if}
+      <div><Button size="sm" variant="ghost" onclick={() => (warning = true)}>{t('privacy.show_warning')}</Button></div>
+    </div></Card>
+
+    {#if warning}
+      <Dialog title={t('welcome.risk_title')} oncancel={() => (warning = false)}>
+        <RiskWarning />
+        {#snippet actions()}<Button onclick={() => (warning = false)}>{t('common.close')}</Button>{/snippet}
+      </Dialog>
+    {/if}
 
     <Card><div class="flex flex-col gap-4 p-6">
       <span class="lbl">{t('settings.cache_title')}</span>

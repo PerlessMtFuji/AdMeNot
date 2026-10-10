@@ -105,3 +105,19 @@ test('automatic update checks can be turned off', async () => {
   expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ check_updates: false }] });
   expect(screen.getByText(/nie dowie się o nowej ani o wycofanej wersji/)).toBeTruthy();
 });
+
+test('prywatność: zgoda pokazuje ID, wyłączenie pokazuje oczekujące usunięcie', async () => {
+  const { bridge } = await renderWith(Settings, 'empty');
+  await fireEvent.click(screen.getByLabelText(/Wysyłaj anonimowe statystyki użycia/));
+  await screen.findByText('3f2a9c1e-5b7d-4e8f-9a0b-1c2d3e4f5a6b');
+  await fireEvent.click(screen.getByLabelText(/Wysyłaj anonimowe statystyki użycia/));
+  await screen.findByText('Usuwanie danych z serwera czeka na połączenie z internetem.');
+  expect(screen.queryByText('3f2a9c1e-5b7d-4e8f-9a0b-1c2d3e4f5a6b')).toBeNull();
+  expect(bridge.calls.filter((c) => c.method === 'set_telemetry').map((c) => c.args)).toEqual([[true, false], [false, false]]);
+});
+
+test('„Pokaż ostrzeżenie” otwiera treść ostrzeżenia', async () => {
+  await renderWith(Settings, 'empty');
+  await fireEvent.click(screen.getByRole('button', { name: 'Pokaż ostrzeżenie' }));
+  await screen.findByText('AdMeNot jest w wersji beta i może zawierać błędy.');
+});
