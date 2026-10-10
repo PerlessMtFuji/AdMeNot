@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import locale
 import os
+import re
 import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -28,6 +29,12 @@ SELECT_LEVELS = ("silence", "disable", "remove")  # poziomy akcji (actions/plann
 KEYS = ("lang", "mode", "adb_path", "backups_dir", "theme", "mirror_auto",
         "apk_cache_limit_gb", "apk_cache_clear_after_repair", "select_level",
         "check_updates", "dismissed_update", "last_run_version")
+# Klucze zmieniane tylko przez dedykowane funkcje (ostrzeżenie, zgody telemetrii), nigdy z ekranu
+# ustawień: UI nie może podstawić własnego ID instalacji ani „zaakceptować” ostrzeżenia bokiem.
+INTERNAL_KEYS = ("welcome_version", "welcome_at", "telemetry", "telemetry_packages",
+                 "telemetry_id", "telemetry_at", "telemetry_start_day")
+UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 LOGO_TYPES = {
     ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
     ".webp": "image/webp", ".svg": "image/svg+xml",
@@ -66,6 +73,13 @@ class Settings:
     check_updates: bool = True  # wyłączone = zero zapytań o aktualizacje (spec aktualizacji §4.3)
     dismissed_update: str | None = None  # wersja ukryta krzyżykiem na banerze
     last_run_version: str | None = None  # komunikat „Zaktualizowano” po zmianie wersji
+    welcome_version: int | None = None  # zaakceptowana wersja ostrzeżenia (welcome.WELCOME_VERSION)
+    welcome_at: str | None = None
+    telemetry: bool = False  # zgoda na statystyki (spec kroku H §4)
+    telemetry_packages: bool = False  # osobna zgoda na nazwy pakietów
+    telemetry_id: str | None = None  # UUIDv4 instalacji; istnieje tylko przy telemetry=True
+    telemetry_at: str | None = None
+    telemetry_start_day: str | None = None  # dzień (UTC) ostatniego zdarzenia „start”
 
 
 @dataclass(frozen=True)
@@ -130,6 +144,14 @@ def _save(path: Path, update: Callable[[dict[str, Any]], None]) -> None:
 
 
 def _valid(key: str, value: Any) -> bool:
+    if key in ("telemetry", "telemetry_packages"):
+        return isinstance(value, bool)
+    if key == "welcome_version":
+        return value is None or (isinstance(value, int) and not isinstance(value, bool) and value >= 1)
+    if key == "telemetry_id":
+        return value is None or (isinstance(value, str) and UUID_RE.match(value) is not None)
+    if key == "telemetry_start_day":
+        return value is None or (isinstance(value, str) and DAY_RE.match(value) is not None)
     if key in ("mirror_auto", "apk_cache_clear_after_repair", "check_updates"):
         return isinstance(value, bool)
     if key == "apk_cache_limit_gb":
@@ -148,13 +170,24 @@ def _valid(key: str, value: Any) -> bool:
 
 def load_settings(path: Path | None = None) -> Settings:
     data = _load(path or settings_path())
-    return Settings(**{k: data[k] for k in KEYS if k in data and _valid(k, data[k])})
+    return Settings(**{k: data[k] for k in KEYS + INTERNAL_KEYS if k in data and _valid(k, data[k])})
 
 
 def save_settings(changes: dict[str, Any], path: Path | None = None) -> Settings:
     path = path or settings_path()
     unknown = sorted(set(changes) - set(KEYS))
     bad = sorted(k for k, v in changes.items() if k in KEYS and not _valid(k, v))
+    if unknown or bad:
+        raise ValueError(f"unknown={unknown} bad={bad}")
+    _save(path, lambda data: data.update(changes))
+    return load_settings(path)
+
+
+def save_internal(changes: dict[str, Any], path: Path | None = None) -> Settings:
+    """Zapis kluczy wewnętrznych (`INTERNAL_KEYS`) — tylko z `welcome` i `app.telemetry`."""
+    path = path or settings_path()
+    unknown = sorted(set(changes) - set(INTERNAL_KEYS))
+    bad = sorted(k for k, v in changes.items() if k in INTERNAL_KEYS and not _valid(k, v))
     if unknown or bad:
         raise ValueError(f"unknown={unknown} bad={bad}")
     _save(path, lambda data: data.update(changes))

@@ -41,6 +41,16 @@ def crashes_dir() -> Path:
     return data_dir() / "crashes"
 
 
+def telemetry_path() -> Path:
+    """Zdarzenia statystyk czekające na wysłanie (spec kroku H §6)."""
+    return data_dir() / "telemetry.jsonl"
+
+
+def telemetry_delete_path() -> Path:
+    """ID instalacji, których dane trzeba usunąć z serwera po cofnięciu zgody (spec kroku H §6.4)."""
+    return data_dir() / "telemetry_delete.json"
+
+
 def incident_path(serial: str) -> Path:
     """Ostatnie nagranie incydentu (`who --watch`) telefonu o tym numerze."""
     safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in serial)
