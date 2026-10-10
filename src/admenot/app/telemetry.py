@@ -29,6 +29,7 @@ KEEP = timedelta(days=30)
 FIRST = 30.0  # s po starcie
 PERIOD = 6 * 3600.0
 MIN_GAP = 600.0  # po `record` najwyżej raz na 10 min
+RETRY = 600.0  # zaległa kolejka albo usunięcie z serwera: kolejna próba po 10 min, nie po 6 h
 
 Post = Callable[[str, dict[str, Any]], dict[str, Any]]
 Delete = Callable[[str], dict[str, Any]]
@@ -38,6 +39,7 @@ _lock = threading.Lock()  # plik kolejki i lista do usunięcia
 _wake = threading.Event()
 _stop = threading.Event()
 _thread: threading.Thread | None = None
+_on_deleted: Callable[[], None] | None = None  # UI chowa baner „usuwanie czeka”
 
 
 def _utc_now() -> datetime:
@@ -185,7 +187,7 @@ def _waiting(exc: client.BackendError) -> bool:
     return exc.kind != "http" or exc.status in (429,) or (exc.status or 0) >= 500
 
 
-def _send_deletes(delete: Delete) -> None:
+def _send_deletes(delete: Delete, on_deleted: Callable[[], None] | None = None) -> None:
     with _lock:
         ids = _read_deletes()
     done = []
@@ -199,7 +201,10 @@ def _send_deletes(delete: Delete) -> None:
         done.append(install)
     if done:
         with _lock:
-            _write_deletes([i for i in _read_deletes() if i not in done])
+            rest = [i for i in _read_deletes() if i not in done]
+            _write_deletes(rest)
+        if not rest and on_deleted is not None:
+            on_deleted()
 
 
 def _remove(sent: list[dict[str, Any]]) -> None:
@@ -212,10 +217,11 @@ def _remove(sent: list[dict[str, Any]]) -> None:
 
 
 def send_pending(post: Post | None = None, delete: Delete | None = None,
-                 stop: threading.Event | None = None, now: Now | None = None) -> None:
+                 stop: threading.Event | None = None, now: Now | None = None,
+                 on_deleted: Callable[[], None] | None = None) -> None:
     post = post or client.post_json
     try:
-        _send_deletes(delete or client.delete)
+        _send_deletes(delete or client.delete, on_deleted)
         while stop is None or not stop.is_set():
             settings = load_settings()
             with _lock:
@@ -252,15 +258,25 @@ def _loop(wake: threading.Event, stop: threading.Event,
             delay = MIN_GAP - (clock() - last)
             continue
         last = clock()
-        send_pending(stop=stop)
-        delay = PERIOD
+        send_pending(stop=stop, on_deleted=_on_deleted)
+        delay = _next_delay()
 
 
-def start() -> None:
+def _next_delay() -> float:
+    """Coś czeka na sieć (zdarzenia albo usunięcie po cofnięciu zgody) → RETRY, inaczej PERIOD."""
+    try:
+        waiting = delete_pending() or telemetry_path().exists()
+    except OSError:
+        waiting = False
+    return RETRY if waiting else PERIOD
+
+
+def start(on_deleted: Callable[[], None] | None = None) -> None:
     """Wątek wysyłki (z `run_gui`); CLI nigdy niczego nie wysyła."""
-    global _thread
+    global _thread, _on_deleted
     if _thread is not None:
         return
+    _on_deleted = on_deleted
     _stop.clear()
     _thread = threading.Thread(target=_loop, args=(_wake, _stop), daemon=True,
                                name="admenot-telemetry")

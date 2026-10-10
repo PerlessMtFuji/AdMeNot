@@ -251,3 +251,26 @@ def test_withdrawal_during_record_leaves_no_queue(monkeypatch):
     recording.join(timeout=5)
     withdrawing.join(timeout=5)
     assert not telemetry_path().exists()
+
+
+def test_pending_work_is_retried_sooner():
+    assert telemetry._next_delay() == telemetry.PERIOD
+    consent()
+    telemetry.record("scan", body, now=lambda: NOW)  # kolejka czeka (np. brak sieci)
+    assert telemetry._next_delay() == telemetry.RETRY
+    telemetry.set_consent(False, False, NOW)  # kolejka skasowana, czeka usunięcie z serwera
+    assert telemetry._next_delay() == telemetry.RETRY < telemetry.PERIOD
+
+
+def test_finished_deletion_is_announced():
+    consent()
+    telemetry.set_consent(False, False, NOW)
+    done = []
+    offline = Server(fail=BackendError("offline"))
+    telemetry.send_pending(post=offline.post, delete=offline.delete, now=lambda: NOW,
+                           on_deleted=lambda: done.append(1))
+    assert done == []
+    server = Server()
+    telemetry.send_pending(post=server.post, delete=server.delete, now=lambda: NOW,
+                           on_deleted=lambda: done.append(1))
+    assert done == [1]

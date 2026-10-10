@@ -121,3 +121,14 @@ def test_consent_records_start_for_today():
     api.accept_welcome(True, False)
     api.set_telemetry(True, True)  # przełączenie w tym samym dniu nie dubluje zdarzenia
     assert [e["type"] for e in events()] == ["start"]
+
+
+def test_finished_deletion_reaches_the_ui(monkeypatch):
+    from admenot.app import telemetry
+
+    api, rec = make_api(make_cli_phone())
+    started = {}
+    monkeypatch.setattr(telemetry, "start", lambda on_deleted=None: started.update(cb=on_deleted))
+    api._start_telemetry()
+    started["cb"]()  # wątek wysyłki: lista ID do usunięcia właśnie opustoszała
+    assert rec.wait_for("telemetry:deleted") == {}

@@ -532,4 +532,14 @@ describe('first run and telemetry consent', () => {
     expect(ctl.state.settings.telemetry_packages).toBe(false);
     expect(ctl.state.settings.telemetry_delete_pending).toBe(true);
   });
+
+  test('zakończone usunięcie danych z serwera chowa baner', async () => {
+    const { bridge, ctl } = setup('adware');
+    await ctl.init();
+    await ctl.setTelemetry(true, false);
+    await ctl.setTelemetry(false, false);
+    expect(ctl.state.settings.telemetry_delete_pending).toBe(true);
+    bridge.emit('telemetry:deleted', {});
+    expect(ctl.state.settings.telemetry_delete_pending).toBe(false);
+  });
 });

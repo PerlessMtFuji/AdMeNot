@@ -408,6 +408,7 @@ export interface EventMap {
   'job:end': { job_id: string; kind: string };
   'app:close_requested': { kind: string };
   'update:state': UpdateView;
+  'telemetry:deleted': Record<string, never>;
   'update:progress': { done: number; total: number | null };
   'mirror:state': MirrorView;
   'mirror:warning': { serial: string; code: 'control_blocked' | 'stay_awake_blocked' };

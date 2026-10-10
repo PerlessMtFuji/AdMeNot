@@ -210,6 +210,8 @@ export class Controller {
       if (s.job?.id === d.job_id) s.job = null;
     });
     on('update:state', (d) => { s.update = d; });
+    // Wątek telemetrii usunął dane z serwera po cofnięciu zgody — baner „czeka na połączenie” znika.
+    on('telemetry:deleted', () => { s.settings = { ...s.settings, telemetry_delete_pending: false }; });
     on('update:progress', (d) => { s.updateProgress = d; });
     on('app:close_requested', () => { s.closeRequested = true; });
     on('mirror:state', (d) => {

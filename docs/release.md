@@ -178,7 +178,7 @@ sprawdzić, zapisz wprost jako niesprawdzony.
     - [ ] 11b. Z `wrangler dev` (`ADMENOT_API_URL=http://127.0.0.1:8787`, migracje `--local`): skan, naprawa, cofnięcie;
           po ok. 30 s `scripts\telemetry.py verdicts --local` pokazuje skan, naprawę i cofnięcie, `packages --local` jest pusty.
     - [ ] 11c. Bez `wrangler dev`: skan → `telemetry.jsonl` rośnie; po starcie `wrangler dev` i ponownym uruchomieniu programu plik znika.
-    - [ ] 11d. Ustawienia → wyłącz statystyki: baner o oczekującym usunięciu (bez serwera); po starcie serwera i ponownym uruchomieniu programu (ok. 30 s) baner znika;
+    - [ ] 11d. Ustawienia → wyłącz statystyki: baner o oczekującym usunięciu (bez serwera); po starcie serwera baner znika sam w ciągu 10 min (od razu po ponownym uruchomieniu programu, ok. 30 s);
           `telemetry.py active --local` nie pokazuje już tej instalacji.
     - [ ] 11e. CLI: `admenot scan` na czystym profilu kończy się ostrzeżeniem i kodem 2; `--accept-risk` przechodzi.
     - [ ] 11f. Po wdrożeniu na produkcję: włącz statystyki bez `ADMENOT_API_URL`, jeden skan; `telemetry.py phones --days 1`

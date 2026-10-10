@@ -288,7 +288,7 @@ class Api:
 
     def _start_telemetry(self) -> None:
         """Tylko z `run_gui`: wątek wysyłki i zdarzenie „start” (raz na dobę)."""
-        telemetry.start()
+        telemetry.start(on_deleted=lambda: self._emit("telemetry:deleted", {}))
         telemetry.note_start(self._settings.mode, self._utc())
 
     def _stop_telemetry(self) -> None:
