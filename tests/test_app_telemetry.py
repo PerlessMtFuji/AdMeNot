@@ -307,3 +307,28 @@ def test_send_pending_reports_whether_anything_went_out():
     consent()
     telemetry.record("scan", body, now=lambda: NOW)
     assert telemetry.send_pending(post=server.post, delete=server.delete, now=lambda: NOW) is True
+
+
+def test_withdrawal_is_not_held_by_the_send_gap(monkeypatch):
+    # Usunięcie danych po cofnięciu zgody idzie od razu, nie po 10-minutowej przerwie po wysyłce.
+    calls, first, second = [], threading.Event(), threading.Event()
+
+    def fake_send(**kw):
+        calls.append(1)
+        (first if len(calls) == 1 else second).set()
+        return True  # coś wysłano: zaczyna się przerwa MIN_GAP
+
+    monkeypatch.setattr(telemetry, "send_pending", fake_send)
+    stop, wake = threading.Event(), threading.Event()
+    thread = threading.Thread(target=telemetry._loop, args=(wake, stop), daemon=True)
+    thread.start()
+    wake.set()
+    assert first.wait(timeout=2)
+    consent()
+    telemetry.set_consent(False, False, NOW)  # ID czeka na usunięcie z serwera
+    wake.set()
+    sent = second.wait(timeout=2)
+    stop.set()
+    wake.set()
+    thread.join(timeout=2)
+    assert sent

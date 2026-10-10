@@ -260,7 +260,8 @@ def _loop(wake: threading.Event, stop: threading.Event,
         wake.clear()
         if stop.is_set():
             return
-        if last is not None and clock() - last < MIN_GAP:
+        # Przerwa dotyczy statystyk; usunięcie danych po cofnięciu zgody idzie od razu.
+        if last is not None and clock() - last < MIN_GAP and not delete_pending():
             delay = MIN_GAP - (clock() - last)
             continue
         # Limit 10 min liczy się od próby, która coś wysłała: pusta (np. tuż po zgodzie, zanim
