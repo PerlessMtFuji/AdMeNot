@@ -21,7 +21,7 @@
     <p>The data controller is Eryk Wlodarski. Contact: <a href="mailto:e.wlodarski@protonmail.com">e.wlodarski@protonmail.com</a>.</p>
 
     <h2>The AdMeNot program</h2>
-    <p>Scans, reports and the action journal stay on your computer. The program sends none of them anywhere. The only exception is error reports, described below, which are sent only when you click “Send”.</p>
+    <p>Scans, reports and the action journal stay on your computer. The program sends none of them anywhere. The exceptions are error reports, which are sent only when you click “Send”, and usage statistics, sent only if you turn them on — both described below.</p>
     <p>When “Check for updates automatically” is on (the default, in Settings → Updates), the program downloads a small file with version information from this website 10 seconds after it starts and then every 6 hours. The request carries nothing beyond a standard HTTP request with the header <code>User-Agent: AdMeNot/&lt;version&gt;</code>, and we store nothing from it. When you choose to install an update, the installer is downloaded from GitHub. With the setting off, the program makes no such connection — and will not learn about a new or withdrawn version.</p>
     <p>The diagnostic command <code>admenot selfcheck --online</code>, which you run yourself, makes the same version request and calls <code>/api/v1/health</code> to check whether our server is reachable.</p>
 
@@ -30,6 +30,19 @@
     <p>A report always contains: the AdMeNot and Windows versions, the program language, a description of the error with its place in the program code, what the program was doing, the manufacturer, model and Android version of the connected phone, how many times the error occurred, and your optional description. Only if you tick the box does it also contain the last 50 ADB commands, which may include names of apps installed on the customer's phone.</p>
     <p>A report never contains the phone's IMEI, serial number, phone numbers, e-mail addresses or your Windows account name — the program removes them before the report is saved on your computer. We do not store IP addresses.</p>
     <p>We use reports only to fix errors in the program. Reports are deleted automatically after 90 days. To have one deleted earlier, write to the address above with the report number (for example R-7K3Q9M).</p>
+
+    <h2>Usage statistics (optional)</h2>
+    <p>Off by default. If you turn them on — on the first-start screen or later in Settings — the program sends anonymous usage statistics. The legal basis is your consent, Art. 6(1)(a) GDPR; you can withdraw it at any time.</p>
+    <ul>
+      <li>Always: a random installation ID created when you consent, program and Windows version, language, the hour of the event.</li>
+      <li>Program start (at most once a day): simple or expert mode.</li>
+      <li>After a scan: phone manufacturer, model and Android version, number of apps per rating, scan time, APK analysis result.</li>
+      <li>After a repair: how many apps were silenced, disabled and removed, how many the program had flagged, how many failed, error codes.</li>
+      <li>After an undo: how many apps were restored and how many days after the repair.</li>
+      <li>Only with a separate second consent: package names of apps the program flagged or you selected, with the rating and your decision.</li>
+    </ul>
+    <p>Never sent: serial number, IMEI, customer name, order number, shop details, screenshots, or names of apps rated safe that nobody touched.</p>
+    <p>The data is pseudonymous: it is linked to the installation ID, not to you or the customer. We keep it for 13 months. Turning statistics off in Settings deletes all data with your installation ID from the server (the program retries until it succeeds). You can also ask us by email to delete it — include the installation ID shown in Settings.</p>
 
     <h2>This website</h2>
     <p>The website uses no cookies, no analytics and no resources from other servers.</p>
@@ -44,7 +57,7 @@
     <h2>Rules for every future feature</h2>
     <ul>
       <li>We do not store IP addresses.</li>
-      <li>The IMEI, serial number, phone numbers and app list of a customer's phone are sent only with explicit consent at the moment of sending (for example, an error report you see before it is sent).</li>
+      <li>The IMEI, serial number, phone numbers and app list of a customer's phone are sent only with explicit consent at the moment of sending (for example, an error report you see before it is sent). The one exception: package names in usage statistics, only with a separate consent in the program that you can withdraw at any time.</li>
       <li>Usage statistics (telemetry) only after you opt in.</li>
       <li>Every new feature that sends data is added to this policy first.</li>
     </ul>

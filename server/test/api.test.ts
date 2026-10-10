@@ -90,6 +90,15 @@ describe("strona", () => {
     await res.arrayBuffer();
   });
 
+  it.each([["/privacy", "Usage statistics (optional)", "13 months", "installation ID"],
+    ["/pl/privacy", "Statystyki użycia (opcjonalne)", "13 miesięcy", "identyfikator instalacji"]])(
+    "%s opisuje statystyki", async (path, heading, keep, id) => {
+      const html = await (await env.ASSETS.fetch("https://assets.local" + path)).text();
+      expect(html).toContain(`<h2>${heading}</h2>`);
+      expect(html).toContain(keep);
+      expect(html).toContain(id);
+    });
+
   it.each([["/privacy", "Error reports", "90 days", "“Send”"],
     ["/pl/privacy", "Raporty błędów", "90 dni", "„Wyślij”"]])(
     "%s opisuje raporty błędów", async (path, heading, keep, button) => {

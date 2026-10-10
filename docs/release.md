@@ -76,6 +76,13 @@ Wycofanie wersji (bez nowego release'u):
 - Próba lokalna: w `server/` `npx wrangler d1 migrations apply admenot --local` i `npx wrangler dev` (port 8787);
   program z `ADMENOT_API_URL=http://127.0.0.1:8787`; `reports.py list --local`.
 
+## Telemetria (statystyki użycia)
+
+- Wdrożenie: z `server/` najpierw `npx wrangler d1 migrations apply admenot --remote`, potem `npx wrangler deploy`.
+- Odczyt: `.venv\Scripts\python scripts\telemetry.py active | phones | verdicts | packages [--left]` (`--days N`, `--local`).
+- Usunięcie na prośbę (RODO): `scripts\telemetry.py delete <identyfikator instalacji>`. Zdarzenia znikają same po 13 miesiącach.
+- Limit: 200 KB treści na dobę (`TELEMETRY_DAILY_BYTES` w `server/src/telemetry.ts`); po jego przekroczeniu program ponawia następnego dnia.
+
 ## Build
 
 1. Podbij `__version__` w `src/admenot/__init__.py` i zatwierdź zmiany (build wymaga czystego drzewa).
@@ -166,3 +173,14 @@ sprawdzić, zapisz wprost jako niesprawdzony.
          `Windows fatal exception: code 0x8…` (obsłużone wyjątki COM, np. `0x8001010d` przy starcie okna;
          `recover` je pomija). Inny nagłówek zanotuj do filtra. Zakończ proces bez czystego zamknięcia
          (`Stop-Process -Name AdMeNot`) i uruchom ponownie → brak banera o błędzie.
+11. [ ] Pierwsze uruchomienie i statystyki z buildu (czysty profil: zmień nazwę `%LOCALAPPDATA%\AdMeNot` na czas próby):
+    - [ ] 11a. Start → ekran powitalny; „Zaczynamy” nieaktywny bez pola; zaznacz pole i statystyki (bez pakietów).
+    - [ ] 11b. Z `wrangler dev` (`ADMENOT_API_URL=http://127.0.0.1:8787`, migracje `--local`): skan, naprawa, cofnięcie;
+          po ok. 30 s `scripts\telemetry.py verdicts --local` pokazuje skan, naprawę i cofnięcie, `packages --local` jest pusty.
+    - [ ] 11c. Bez `wrangler dev`: skan → `telemetry.jsonl` rośnie; po starcie `wrangler dev` i ponownym uruchomieniu programu plik znika.
+    - [ ] 11d. Ustawienia → wyłącz statystyki: baner o oczekującym usunięciu (bez serwera); po starcie serwera i ponownym uruchomieniu programu (ok. 30 s) baner znika;
+          `telemetry.py active --local` nie pokazuje już tej instalacji.
+    - [ ] 11e. CLI: `admenot scan` na czystym profilu kończy się ostrzeżeniem i kodem 2; `--accept-risk` przechodzi.
+    - [ ] 11f. Po wdrożeniu na produkcję: włącz statystyki bez `ADMENOT_API_URL`, jeden skan; `telemetry.py phones --days 1`
+          pokazuje telefon; potem `telemetry.py delete <ID z Ustawień>`.
+    - [ ] 11g. Przywróć prawdziwy profil `%LOCALAPPDATA%\AdMeNot`.
