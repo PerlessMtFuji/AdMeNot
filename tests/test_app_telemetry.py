@@ -274,3 +274,36 @@ def test_finished_deletion_is_announced():
     telemetry.send_pending(post=server.post, delete=server.delete, now=lambda: NOW,
                            on_deleted=lambda: done.append(1))
     assert done == [1]
+
+
+def test_empty_attempt_does_not_delay_the_next_send(monkeypatch):
+    # „Zaczynamy” budzi wątek, zanim powstanie pierwsze zdarzenie: pusta próba nie może
+    # wstrzymać wysyłki skanu na 10 minut.
+    calls = []
+    first, second = threading.Event(), threading.Event()
+
+    def fake_send(**kw):
+        calls.append(1)
+        (first if len(calls) == 1 else second).set()
+        return len(calls) > 1  # pierwsza próba: kolejka pusta, nic nie wysłano
+
+    monkeypatch.setattr(telemetry, "send_pending", fake_send)
+    stop, wake = threading.Event(), threading.Event()
+    thread = threading.Thread(target=telemetry._loop, args=(wake, stop), daemon=True)
+    thread.start()
+    wake.set()
+    assert first.wait(timeout=2)
+    wake.set()  # `record` po zgodzie
+    sent = second.wait(timeout=2)
+    stop.set()
+    wake.set()
+    thread.join(timeout=2)
+    assert sent
+
+
+def test_send_pending_reports_whether_anything_went_out():
+    server = Server()
+    assert telemetry.send_pending(post=server.post, delete=server.delete, now=lambda: NOW) is False
+    consent()
+    telemetry.record("scan", body, now=lambda: NOW)
+    assert telemetry.send_pending(post=server.post, delete=server.delete, now=lambda: NOW) is True

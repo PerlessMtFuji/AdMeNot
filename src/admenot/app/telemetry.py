@@ -187,7 +187,8 @@ def _waiting(exc: client.BackendError) -> bool:
     return exc.kind != "http" or exc.status in (429,) or (exc.status or 0) >= 500
 
 
-def _send_deletes(delete: Delete, on_deleted: Callable[[], None] | None = None) -> None:
+def _send_deletes(delete: Delete, on_deleted: Callable[[], None] | None = None) -> bool:
+    """True, jeśli poszło choć jedno zapytanie."""
     with _lock:
         ids = _read_deletes()
     done = []
@@ -205,6 +206,7 @@ def _send_deletes(delete: Delete, on_deleted: Callable[[], None] | None = None) 
             _write_deletes(rest)
         if not rest and on_deleted is not None:
             on_deleted()
+    return bool(ids)
 
 
 def _remove(sent: list[dict[str, Any]]) -> None:
@@ -218,31 +220,35 @@ def _remove(sent: list[dict[str, Any]]) -> None:
 
 def send_pending(post: Post | None = None, delete: Delete | None = None,
                  stop: threading.Event | None = None, now: Now | None = None,
-                 on_deleted: Callable[[], None] | None = None) -> None:
+                 on_deleted: Callable[[], None] | None = None) -> bool:
+    """Wysyła usunięcia i kolejkę; True, jeśli poszło choć jedno zapytanie (dla limitu w `_loop`)."""
     post = post or client.post_json
+    went = False
     try:
-        _send_deletes(delete or client.delete, on_deleted)
+        went = _send_deletes(delete or client.delete, on_deleted)
         while stop is None or not stop.is_set():
             settings = load_settings()
             with _lock:
                 events = _read_events()
                 if not settings.telemetry or not settings.telemetry_id:
-                    return
+                    return went
                 mine = [e for e in events if e["install"] == settings.telemetry_id]
                 if len(mine) != len(events):  # pozostałość po cofniętej zgodzie — nie wychodzi
                     _write_events(_trim(mine, (now or _utc_now)()))
             batch = mine[:BATCH]
             if not batch:
-                return
+                return went
+            went = True
             try:
                 post(ENDPOINT, {"format": FORMAT, "events": batch})
             except client.BackendError as exc:
                 if _waiting(exc):
-                    return
+                    return went
                 _log(exc)  # 400: zła paczka nie może blokować kolejki na zawsze
             _remove(batch)
     except Exception as exc:  # noqa: BLE001
         _log(exc)
+    return went
 
 
 def _loop(wake: threading.Event, stop: threading.Event,
@@ -257,8 +263,10 @@ def _loop(wake: threading.Event, stop: threading.Event,
         if last is not None and clock() - last < MIN_GAP:
             delay = MIN_GAP - (clock() - last)
             continue
-        last = clock()
-        send_pending(stop=stop, on_deleted=_on_deleted)
+        # Limit 10 min liczy się od próby, która coś wysłała: pusta (np. tuż po zgodzie, zanim
+        # powstało pierwsze zdarzenie) nie wstrzymuje wysyłki skanu.
+        if send_pending(stop=stop, on_deleted=_on_deleted):
+            last = clock()
         delay = _next_delay()
 
 
