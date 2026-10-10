@@ -341,6 +341,7 @@ class Api:
         # Najpierw zgody: SettingsTooNew przerywa przed zapisem akceptacji ostrzeżenia.
         telemetry.set_consent(telemetry_on, packages, self._utc())
         self._settings = welcome.accept_risk(self._utc())
+        self._note_start()
         return self.get_settings()
 
     @_api
@@ -348,7 +349,13 @@ class Api:
         if not isinstance(telemetry_on, bool) or not isinstance(packages, bool):
             raise AppError("bad_request", "consent")
         self._settings = telemetry.set_consent(telemetry_on, packages, self._utc())
+        self._note_start()
         return self.get_settings()
+
+    def _note_start(self) -> None:
+        """„start” także w dniu udzielenia zgody (przy starcie okna zgody jeszcze nie było)."""
+        telemetry.note_start(self._settings.mode, self._utc())
+        self._settings = load_settings()  # telemetry_start_day
 
     @_api
     def telemetry_sample(self) -> dict[str, Any]:

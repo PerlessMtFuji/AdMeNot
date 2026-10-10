@@ -79,8 +79,8 @@ def test_scan_repair_undo_events_with_consent():
     rec.wait_for("undo:done")
     assert api._jobs.wait(5)
     types = [e["type"] for e in events()]
-    assert types == ["scan", "scan", "repair", "undo"]  # skan + ponowna ocena po APK
-    scan, apk_scan, repair, undo = events()
+    assert types == ["start", "scan", "scan", "repair", "undo"]  # zgoda, skan + ponowna ocena po APK
+    _, scan, apk_scan, repair, undo = events()
     assert apk_scan["apk_stage"] is True and scan["session"] == repair["session"]
     assert repair["levels"]["disable"] == 1 and repair["packages"] is None
     assert undo["apps"] == 1 and undo["failed"] == 0
@@ -113,3 +113,11 @@ def test_sample_and_privacy_link():
     assert {e["type"] for e in sample["basic"]} == {"start", "scan", "repair", "undo"}
     api.open_privacy()
     assert opened == ["https://admenot.e-wlodarski.workers.dev/pl/privacy"]
+
+
+def test_consent_records_start_for_today():
+    # Zgoda dana na ekranie powitalnym: „start” z tego dnia, a nie dopiero przy następnym uruchomieniu.
+    api, _ = make_api(make_cli_phone())
+    api.accept_welcome(True, False)
+    api.set_telemetry(True, True)  # przełączenie w tym samym dniu nie dubluje zdarzenia
+    assert [e["type"] for e in events()] == ["start"]
