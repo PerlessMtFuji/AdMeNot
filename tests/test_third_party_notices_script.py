@@ -116,7 +116,8 @@ def test_google_device_list_is_listed_with_source_and_hash_version(tmp_path):
     assert component.name == "Google Play supported devices (supported_devices.csv)"
     assert component.version == hashlib.sha256(csv.read_bytes()).hexdigest()[:12]
     assert component.license
-    assert m.missing_licenses([component]) == []
+    # „brak jawnej licencji” to nie podstawa redystrybucji: wymaga decyzji autora (REL-04)
+    assert m.missing_licenses([component]) == [component.name]
     assert m.GPLAY_URL in component.texts[0]
     assert m.GPLAY_URL in m.render([component])
 
@@ -125,3 +126,20 @@ def test_google_device_list_points_at_the_repo_copy():
     m = _module()
     assert m.GPLAY_CSV == ROOT / "data" / "supported_devices.csv"
     assert m.GPLAY_CSV.is_file()
+
+
+def test_phone_assets_need_documented_provenance(tmp_path):
+    """Audyt 2026-10-11, REL-04: zdjęcia i baza telefonów to też składnik z licencją i źródłem."""
+    m = _module()
+    assets = tmp_path / "assets"
+    (assets / "phones").mkdir(parents=True)
+    (assets / "phones.db").write_bytes(b"db")
+    (assets / "phones" / "a.webp").write_bytes(b"x")
+    undocumented = m._phone_assets(assets, tmp_path / "missing.json")
+    assert undocumented.version.endswith("1 images")
+    assert m.missing_licenses([undocumented]) == [undocumented.name]
+    provenance = tmp_path / "p.json"
+    provenance.write_text(json.dumps({"phone_assets": {"source": "Szklodo", "license": "own work",
+                                                       "basis": "author"}}), "utf-8")
+    documented = m._phone_assets(assets, provenance)
+    assert m.missing_licenses([documented]) == [] and "Szklodo" in documented.texts[0]

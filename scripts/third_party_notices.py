@@ -21,6 +21,11 @@ ROOTS = ("admenot", "pywebview")
 ROOT = Path(__file__).resolve().parents[1]
 GPLAY_CSV = ROOT / "data" / "supported_devices.csv"
 GPLAY_URL = "https://storage.googleapis.com/play_public/supported_devices.csv"
+PHONE_ASSETS = ROOT / "src" / "admenot" / "assets"
+PROVENANCE = ROOT / "packaging" / "assets-provenance.json"
+# Licencja opisana tak, że nie daje podstawy redystrybucji — wymaga jawnego rozstrzygnięcia
+# autora (packaging/license-decisions.txt), jak brak licencji (audyt 2026-10-11, REL-04).
+UNRESOLVED = re.compile(r"brak jawnej licencji|no explicit license|nieznana|unknown", re.IGNORECASE)
 # devDependencies, które vite wkleja do zbudowanego UI (czcionka, runtime Svelte, CSS Tailwinda)
 UI_BUNDLED = ("@fontsource-variable/manrope", "svelte", "tailwindcss")
 LICENSE_FILE = re.compile(r"(^|/)(LICEN[CS]E|COPYING|NOTICE)[^/]*$", re.IGNORECASE)
@@ -154,6 +159,23 @@ def _gplay(csv: Path) -> Component:
                      (f"Źródło / Source: {GPLAY_URL}",))
 
 
+def _phone_assets(assets: Path, provenance: Path = PROVENANCE) -> Component:
+    """Baza telefonów i zdjęcia z katalogu autora: wersja = skrót bazy i liczba zdjęć, a licencja
+    i podstawa redystrybucji z packaging/assets-provenance.json (bez niej: nierozstrzygnięta)."""
+    db = assets / "phones.db"
+    images = sorted((assets / "phones").glob("*")) if (assets / "phones").is_dir() else []
+    digest = hashlib.sha256(db.read_bytes()).hexdigest()[:12] if db.is_file() else "brak"
+    try:
+        info = json.loads(provenance.read_text("utf-8"))["phone_assets"]
+    except (OSError, ValueError, KeyError, TypeError):
+        info = {}
+    source = info.get("source") or "nieopisane / undocumented"
+    basis = info.get("basis") or "brak udokumentowanej podstawy / no documented basis"
+    return Component("Phone database and photos (phones.db, phones/*)",
+                     f"{digest}, {len(images)} images", info.get("license"),
+                     (f"Źródło / Source: {source}", f"Podstawa / Basis: {basis}"))
+
+
 def _file_version(path: Path) -> str:
     """Wersja pliku z zasobu VERSIONINFO (Windows); "?", gdy się nie da."""
     try:
@@ -187,12 +209,13 @@ def render(components: list[Component]) -> str:
 
 
 def missing_licenses(components: list[Component]) -> list[str]:
-    return [c.name for c in components if not c.license]
+    return [c.name for c in components if not c.license or UNRESOLVED.search(c.license)]
 
 
 def build(tools: Path, ui_dir: Path) -> tuple[str, list[str]]:
     components = [_python(), *python_components(python_closure()),
                   *python_components([metadata.distribution("pyinstaller")]),
                   _webview2_sdk(Path(metadata.distribution("pywebview").locate_file(WEBVIEW2_DLL))),
-                  _scrcpy(tools), _gplay(GPLAY_CSV), *ui_components(ui_dir)]
+                  _scrcpy(tools), _gplay(GPLAY_CSV), _phone_assets(PHONE_ASSETS),
+                  *ui_components(ui_dir)]
     return render(components), missing_licenses(components)

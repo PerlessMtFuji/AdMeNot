@@ -1,16 +1,16 @@
 """Progi trafności na oznaczonych nagraniach (labels.yaml + targets.yaml)."""
 
-from pathlib import Path
 
 import pytest
 import yaml
+from corpus import fixture_dirs
 
 from admenot.engine.adb.fake import FakeAdb
 from admenot.engine.apk.providers import StoredApkProvider
 from admenot.engine.evaluation import evaluate, format_evaluation, load_labels, with_install_age
 from admenot.engine.session import run_scan
 
-FIXTURES = sorted(p.parent for p in (Path(__file__).parent / "fixtures").glob("*/targets.yaml"))
+FIXTURES = fixture_dirs("targets.yaml")  # prywatne nagrania tylko jawnie (QA-02)
 
 
 @pytest.mark.parametrize("fixture_dir", FIXTURES, ids=[p.name for p in FIXTURES])

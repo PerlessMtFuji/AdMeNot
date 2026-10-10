@@ -1,0 +1,8 @@
+{
+  "_comment": "Pochodzenie zasobów dołączanych do paczki (audyt 2026-10-11, REL-04). Uzupełnia autor: źródło, licencja i podstawa redystrybucji. Puste pola = składnik nierozstrzygnięty w THIRD_PARTY_NOTICES.",
+  "phone_assets": {
+    "source": null,
+    "license": null,
+    "basis": null
+  }
+}

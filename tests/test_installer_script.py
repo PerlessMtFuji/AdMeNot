@@ -28,3 +28,13 @@ def test_update_waits_for_the_program_before_the_close_gate():
     body = text.split("function PrepareToInstall", 1)[1].split("procedure CurStepChanged", 1)[0]
     assert "if IsUpdate then" in body and "Sleep(500)" in body
     assert body.index("Sleep(500)") < body.index("CloseAppGate(AppDir)")  # najpierw cichy sondaż
+
+
+def test_cli_is_gated_like_the_window_and_never_force_killed():
+    """Audyt 2026-10-11, REL-05: admenot-cli może właśnie zmieniać telefon."""
+    text = ISS.read_bytes().decode("utf-8-sig")
+    stop = text.split("procedure StopBundleProcesses", 1)[1].split("end;", 1)[0]
+    running = text.split("function AppRunning", 1)[1].split("end;", 1)[0]
+    assert "admenot-cli" not in stop and "Stop-Process -Force" in stop
+    assert "admenot-cli.exe" in running and "AdMeNot.exe" in running
+    assert "\x07" not in text
