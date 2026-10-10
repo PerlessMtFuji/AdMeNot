@@ -175,6 +175,44 @@
     "text": "Interrupted order {order}", "resume": "Finish", "undo": "Undo",
     "disconnected": "The phone was disconnected during order {order}. Reconnect and scan it, then finish or undo the order."
   },
+  "welcome": {
+    "title": "Welcome to AdMeNot",
+    "lead": "Before you start, read what you are agreeing to.",
+    "risk_title": "Important",
+    "risk1": "AdMeNot is a beta and may contain bugs.",
+    "risk2": "The program disables and removes apps on the customer's phone. Every change is your decision, and you answer for it to the customer.",
+    "risk3": "You can undo most changes in History; removing an app without an APK copy cannot always be undone.",
+    "risk4": "Back up the customer's important data before a repair.",
+    "risk5": "The program is provided “as is”, without any warranty (PolyForm Shield 1.0.0 license).",
+    "accept": "I understand and accept",
+    "start": "Get started",
+    "later": "You can change your choices at any time in Settings."
+  },
+  "privacy": {
+    "title": "Privacy",
+    "telemetry": "Send anonymous usage statistics",
+    "telemetry_hint": "They show which phones reach repair shops and whether detection gets it right. No serial numbers, IMEI or customer data.",
+    "packages": "Include package names of flagged and removed apps",
+    "packages_hint": "This helps improve detection the most. The name of a rare app may, however, say something about the customer.",
+    "what_toggle": "What we send",
+    "what": {
+      "common": "Always: a random installation ID, program and Windows version, language, hour of the event.",
+      "start": "Program start (at most once a day): simple or expert mode.",
+      "scan": "After a scan: phone manufacturer, model and Android version, number of apps per rating, scan time, APK analysis result.",
+      "repair": "After a repair: how many apps were silenced, disabled and removed, how many the program flagged, how many failed and the error codes.",
+      "undo": "After an undo: how many apps were restored and how many days after the repair.",
+      "packages": "With the second consent: package names of apps the program flagged or you selected, with the rating and your decision.",
+      "never": "Never: serial number, IMEI, customer name, order number, shop details, screenshots, names of apps rated safe and left untouched."
+    },
+    "raw": "Example in the sent format",
+    "policy": "Privacy policy",
+    "id": "Installation ID",
+    "copy": "Copy",
+    "copied": "Copied",
+    "id_hint": "Include it in an email if you want your data deleted. Turning statistics off deletes the data from the server.",
+    "delete_pending": "Deleting data from the server is waiting for an internet connection.",
+    "show_warning": "Show warning"
+  },
   "history": {
     "title": "Order history", "phone": "Phone", "empty": "No orders for this phone.", "none": "No saved orders.",
     "restore": "Restore", "undo_all": "Undo the whole order", "resume": "Finish",

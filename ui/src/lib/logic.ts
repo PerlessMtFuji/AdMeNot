@@ -1,5 +1,5 @@
 import { CATEGORY_ORDER } from './categories';
-import type { AppView, Category, DeviceEntry, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanView, ScanView, StepEvent, UpdateView, Verdict } from './types';
+import type { AppView, Category, DeviceEntry, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanView, ScanView, Settings, StepEvent, UpdateView, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done';
 export type StageState = 'done' | 'now' | 'todo';
@@ -400,4 +400,9 @@ export function updateBanner(u: UpdateView | null, updatedSeen: boolean): 'retir
   if (u.available && !u.dismissed) return 'available';
   if (u.updated_to && !updatedSeen) return 'updated';
   return null;
+}
+
+/** Ekran powitalny: ostrzeżenie jeszcze niezaakceptowane albo w starszej wersji (spec kroku H §3.1). */
+export function needsWelcome(s: Settings): boolean {
+  return s.welcome_version === null || s.welcome_version < s.welcome_current;
 }

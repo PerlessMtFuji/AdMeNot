@@ -175,6 +175,44 @@
     "text": "Przerwane zlecenie {order}", "resume": "Dokończ", "undo": "Cofnij",
     "disconnected": "Telefon odłączony w trakcie zlecenia {order}. Podłącz go ponownie i zeskanuj, a potem dokończ albo cofnij zlecenie."
   },
+  "welcome": {
+    "title": "Witaj w AdMeNot",
+    "lead": "Zanim zaczniesz, przeczytaj, na co się zgadzasz.",
+    "risk_title": "Ważne",
+    "risk1": "AdMeNot jest w wersji beta i może zawierać błędy.",
+    "risk2": "Program wyłącza i usuwa aplikacje na telefonie klienta. Decyzja o każdej zmianie należy do Ciebie — to Ty odpowiadasz za nią przed klientem.",
+    "risk3": "Większość zmian cofniesz w Historii; usunięcia aplikacji bez kopii APK nie zawsze.",
+    "risk4": "Przed naprawą zrób kopię ważnych danych klienta.",
+    "risk5": "Program jest udostępniany „tak jak jest”, bez żadnej gwarancji (licencja PolyForm Shield 1.0.0).",
+    "accept": "Rozumiem i akceptuję",
+    "start": "Zaczynamy",
+    "later": "Zgody zmienisz w każdej chwili w Ustawieniach."
+  },
+  "privacy": {
+    "title": "Prywatność",
+    "telemetry": "Wysyłaj anonimowe statystyki użycia",
+    "telemetry_hint": "Pomagają zrozumieć, jakie telefony trafiają do serwisów i czy wykrywanie trafia. Bez numerów seryjnych, IMEI i danych klienta.",
+    "packages": "Dołącz nazwy pakietów oznaczonych i usuwanych aplikacji",
+    "packages_hint": "To najbardziej pomaga ulepszać wykrywanie. Nazwa rzadkiej aplikacji może jednak coś mówić o kliencie.",
+    "what_toggle": "Co wysyłamy",
+    "what": {
+      "common": "Zawsze: losowy identyfikator instalacji, wersja programu i Windows, język, godzina zdarzenia.",
+      "start": "Uruchomienie programu (najwyżej raz dziennie): tryb prosty lub ekspercki.",
+      "scan": "Po skanie: producent, model i wersja Androida telefonu, liczba aplikacji w każdej ocenie, czas skanu, wynik analizy APK.",
+      "repair": "Po naprawie: ile aplikacji wyciszono, wyłączono i usunięto, ile z nich oznaczył program, ile się nie udało i kody błędów.",
+      "undo": "Po cofnięciu: ile aplikacji cofnięto i ile dni minęło od naprawy.",
+      "packages": "Z drugą zgodą: nazwy pakietów oznaczonych przez program i zaznaczonych przez Ciebie, z oceną i Twoją decyzją.",
+      "never": "Nigdy: numer seryjny, IMEI, nazwa klienta, numer zlecenia, dane serwisu, zrzuty ekranu, nazwy aplikacji uznanych za bezpieczne i nieruszanych."
+    },
+    "raw": "Przykład w formacie wysyłki",
+    "policy": "Polityka prywatności",
+    "id": "Identyfikator instalacji",
+    "copy": "Skopiuj",
+    "copied": "Skopiowano",
+    "id_hint": "Podaj go w mailu, jeśli chcesz usunięcia danych. Wyłączenie statystyk usuwa dane z serwera.",
+    "delete_pending": "Usuwanie danych z serwera czeka na połączenie z internetem.",
+    "show_warning": "Pokaż ostrzeżenie"
+  },
   "history": {
     "title": "Historia zleceń", "phone": "Telefon", "empty": "Brak zleceń dla tego telefonu.", "none": "Brak zapisanych zleceń.",
     "restore": "Przywróć", "undo_all": "Cofnij całe zlecenie", "resume": "Dokończ",

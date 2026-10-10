@@ -4,7 +4,7 @@ import { actedAfter, changedVerdicts, defaultSelection, mergeSelection, notifica
 import type { AppState } from './state.svelte';
 import { applyTheme } from './theme';
 import type {
-  ApiError, AppView, CacheUsage, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, Theme, Verdict,
+  ApiError, AppView, CacheUsage, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, TelemetrySample, Theme, Verdict,
 } from './types';
 
 const CONSOLE_LIMIT = 500;
@@ -67,6 +67,7 @@ export class Controller {
     i18n.lang = settings.lang;
     if (typeof document !== 'undefined') document.documentElement.lang = settings.lang;
     if (typeof document !== 'undefined') applyTheme(settings.theme ?? 'system');
+    this.state.settingsLoaded = true;
   }
 
   private onDevices(d: DevicesPayload): void {
@@ -576,6 +577,24 @@ export class Controller {
       if (this.state.screen === 'history') await this.refreshHistory();
     }
     return r;
+  }
+
+  async acceptWelcome(telemetry: boolean, packages: boolean): Promise<void> {
+    const r = await this.call(this.api.accept_welcome(telemetry, packages));
+    if (r) this.applySettings(r);
+  }
+
+  async setTelemetry(telemetry: boolean, packages: boolean): Promise<void> {
+    const r = await this.call(this.api.set_telemetry(telemetry, packages && telemetry));
+    if (r) this.applySettings(r);
+  }
+
+  telemetrySample(): Promise<TelemetrySample | null> {
+    return this.call(this.api.telemetry_sample());
+  }
+
+  async openPrivacy(): Promise<void> {
+    await this.call(this.api.open_privacy());
   }
 
   setMode(mode: Mode): Promise<Settings | null> {

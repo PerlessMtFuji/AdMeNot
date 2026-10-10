@@ -38,8 +38,8 @@ export async function connectBridge(): Promise<Bridge> {
   // W buildzie produkcyjnym stała jest pusta i import atrapy znika z paczki.
   if (import.meta.env.VITE_FAKE_BRIDGE === '1' && !(window as PywebviewWindow).pywebview) {
     const { createFakeBridge } = await import('./fakeBridge');
-    const scenario = new URLSearchParams(location.search).get('scenario') ?? 'adware';
-    return createFakeBridge(scenario);
+    const params = new URLSearchParams(location.search);
+    return createFakeBridge(params.get('scenario') ?? 'adware', { welcome: params.get('welcome') === '1' });
   }
   return { api: await waitForPywebview(), on: windowEvents() };
 }

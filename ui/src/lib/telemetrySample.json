@@ -1,0 +1,203 @@
+{
+  "basic": [
+    {
+      "install": "00000000-0000-4000-8000-000000000000",
+      "type": "start",
+      "t": "2026-10-10T14:00:00Z",
+      "app": "0.9.2",
+      "os": "Windows 10.0.26100",
+      "lang": "pl",
+      "mode": "simple"
+    },
+    {
+      "install": "00000000-0000-4000-8000-000000000000",
+      "type": "scan",
+      "t": "2026-10-10T14:00:00Z",
+      "app": "0.9.2",
+      "os": "Windows 10.0.26100",
+      "lang": "pl",
+      "device": {
+        "manufacturer": "OPPO",
+        "model": "CPH2483",
+        "android": "14"
+      },
+      "session": "ab12cd34",
+      "apps": 187,
+      "verdicts": {
+        "malicious": 1,
+        "suspicious": 0,
+        "review": 1
+      },
+      "low_behavior_data": false,
+      "apk": {
+        "requested": 2,
+        "analyzed": 2,
+        "failed": 0
+      },
+      "seconds": 41,
+      "apk_stage": false,
+      "packages": null
+    },
+    {
+      "install": "00000000-0000-4000-8000-000000000000",
+      "type": "repair",
+      "t": "2026-10-10T14:00:00Z",
+      "app": "0.9.2",
+      "os": "Windows 10.0.26100",
+      "lang": "pl",
+      "device": {
+        "manufacturer": "OPPO",
+        "model": "CPH2483",
+        "android": "14"
+      },
+      "session": "ab12cd34",
+      "levels": {
+        "silence": 0,
+        "disable": 1,
+        "remove": 1
+      },
+      "sources": {
+        "flagged": 2,
+        "manual": 0
+      },
+      "failed": 0,
+      "errors": [],
+      "interrupted": null,
+      "packages": null
+    },
+    {
+      "install": "00000000-0000-4000-8000-000000000000",
+      "type": "undo",
+      "t": "2026-10-10T14:00:00Z",
+      "app": "0.9.2",
+      "os": "Windows 10.0.26100",
+      "lang": "pl",
+      "device": {
+        "manufacturer": "OPPO",
+        "model": "CPH2483",
+        "android": "14"
+      },
+      "apps": 1,
+      "failed": 0,
+      "age_days": 2,
+      "packages": null
+    }
+  ],
+  "packages": [
+    {
+      "install": "00000000-0000-4000-8000-000000000000",
+      "type": "start",
+      "t": "2026-10-10T14:00:00Z",
+      "app": "0.9.2",
+      "os": "Windows 10.0.26100",
+      "lang": "pl",
+      "mode": "simple"
+    },
+    {
+      "install": "00000000-0000-4000-8000-000000000000",
+      "type": "scan",
+      "t": "2026-10-10T14:00:00Z",
+      "app": "0.9.2",
+      "os": "Windows 10.0.26100",
+      "lang": "pl",
+      "device": {
+        "manufacturer": "OPPO",
+        "model": "CPH2483",
+        "android": "14"
+      },
+      "session": "ab12cd34",
+      "apps": 187,
+      "verdicts": {
+        "malicious": 1,
+        "suspicious": 0,
+        "review": 1
+      },
+      "low_behavior_data": false,
+      "apk": {
+        "requested": 2,
+        "analyzed": 2,
+        "failed": 0
+      },
+      "seconds": 41,
+      "apk_stage": false,
+      "packages": [
+        {
+          "package": "com.clean.pro.boost",
+          "verdict": "malicious",
+          "score": 82,
+          "confidence": "high",
+          "system": false
+        },
+        {
+          "package": "com.wlive.forecast",
+          "verdict": "review",
+          "score": 31,
+          "confidence": "medium",
+          "system": false
+        }
+      ]
+    },
+    {
+      "install": "00000000-0000-4000-8000-000000000000",
+      "type": "repair",
+      "t": "2026-10-10T14:00:00Z",
+      "app": "0.9.2",
+      "os": "Windows 10.0.26100",
+      "lang": "pl",
+      "device": {
+        "manufacturer": "OPPO",
+        "model": "CPH2483",
+        "android": "14"
+      },
+      "session": "ab12cd34",
+      "levels": {
+        "silence": 0,
+        "disable": 1,
+        "remove": 1
+      },
+      "sources": {
+        "flagged": 2,
+        "manual": 0
+      },
+      "failed": 0,
+      "errors": [],
+      "interrupted": null,
+      "packages": [
+        {
+          "package": "com.clean.pro.boost",
+          "source": "flagged",
+          "level": "remove",
+          "ok": true
+        },
+        {
+          "package": "com.wlive.forecast",
+          "source": "flagged",
+          "level": "disable",
+          "ok": true
+        }
+      ]
+    },
+    {
+      "install": "00000000-0000-4000-8000-000000000000",
+      "type": "undo",
+      "t": "2026-10-10T14:00:00Z",
+      "app": "0.9.2",
+      "os": "Windows 10.0.26100",
+      "lang": "pl",
+      "device": {
+        "manufacturer": "OPPO",
+        "model": "CPH2483",
+        "android": "14"
+      },
+      "apps": 1,
+      "failed": 0,
+      "age_days": 2,
+      "packages": [
+        {
+          "package": "com.wlive.forecast",
+          "ok": true
+        }
+      ]
+    }
+  ]
+}

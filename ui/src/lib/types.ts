@@ -21,6 +21,17 @@ export interface Settings {
   check_updates: boolean;
   dismissed_update: string | null;
   last_run_version: string | null;
+  welcome_version: number | null;
+  welcome_current: number;
+  telemetry: boolean;
+  telemetry_packages: boolean;
+  telemetry_id: string | null;
+  telemetry_delete_pending: boolean;
+}
+
+export interface TelemetrySample {
+  basic: Record<string, unknown>[];
+  packages: Record<string, unknown>[];
 }
 
 export interface UpdateView {
@@ -325,6 +336,10 @@ export interface WhoView { resumed: WhoEntry | null; overlays: WhoEntry[] | null
 export interface Api {
   get_settings(): R<Settings>;
   save_settings(changes: Partial<Settings>): R<Settings>;
+  accept_welcome(telemetry: boolean, packages: boolean): R<Settings>;
+  set_telemetry(telemetry: boolean, packages: boolean): R<Settings>;
+  telemetry_sample(): R<TelemetrySample>;
+  open_privacy(): R<{ ok: boolean }>;
   apk_cache(): R<CacheUsage>;
   clear_apk_cache(): R<{ freed_bytes: number }>;
   list_devices(): R<DevicesPayload>;

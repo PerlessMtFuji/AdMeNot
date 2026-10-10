@@ -1,6 +1,8 @@
 // Atrapa mostu: odtwarza scenariusze nagrane z prawdziwego Api (scripts/record_bridge_fixtures.py).
 import type { Bridge } from './bridge';
-import type { Api, CrashSummary, EventMap, EventName, ScanView, ServiceInfo, Settings, ShotView, UpdateView } from './types';
+import type { Api, CrashSummary, EventMap, EventName, ScanView, ServiceInfo, Settings, ShotView, TelemetrySample, UpdateView } from './types';
+// Wynik `telemetry_events.sample()` z Pythona (Task 7 planu kroku H) — ten sam kształt co prawdziwe zdarzenia.
+import SAMPLE from './telemetrySample.json';
 
 interface RecordedCall {
   method: string;
@@ -36,7 +38,7 @@ export type FakeBridge = Bridge & {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function createFakeBridge(name: string, options: { delay?: number } = {}): FakeBridge {
+export function createFakeBridge(name: string, options: { delay?: number; welcome?: boolean } = {}): FakeBridge {
   const data = scenarios[name];
   if (!data) throw new Error(`unknown scenario: ${name}`);
   const delay = options.delay ?? 15;
@@ -48,7 +50,9 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
   const calls: FakeBridge['calls'] = [];
   let settings: Settings = { lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system', mirror_auto: false,
     apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false, select_level: 'silence',
-    check_updates: true, dismissed_update: null, last_run_version: null };
+    check_updates: true, dismissed_update: null, last_run_version: null,
+    welcome_version: options.welcome ? null : 1, welcome_current: 1, telemetry: false, telemetry_packages: false,
+    telemetry_id: null, telemetry_delete_pending: false };
   let service: ServiceInfo = { name: null, address: null, phone: null, logo: null };
   let lastScan: ScanView | null = null;
   let mirror: { serial: string | null; state: string } = { serial: null, state: 'stopped' };
@@ -90,6 +94,20 @@ export function createFakeBridge(name: string, options: { delay?: number } = {})
         settings = { ...settings, ...changes };
         return { ...settings };
       }
+      case 'accept_welcome':
+        settings = { ...settings, welcome_version: settings.welcome_current };
+        return fallback('set_telemetry', args);
+      case 'set_telemetry': {
+        const [on, packages] = args as [boolean, boolean];
+        settings = { ...settings, telemetry: on, telemetry_packages: on && packages,
+          telemetry_id: on ? settings.telemetry_id ?? '3f2a9c1e-5b7d-4e8f-9a0b-1c2d3e4f5a6b' : null,
+          telemetry_delete_pending: !on && settings.telemetry_id !== null ? true : settings.telemetry_delete_pending };
+        return { ...settings };
+      }
+      case 'telemetry_sample':
+        return SAMPLE as TelemetrySample;
+      case 'open_privacy':
+        return { ok: true };
       case 'apk_cache': {
         const GB = 1024 ** 3;
         const limit = settings.apk_cache_limit_gb * GB;

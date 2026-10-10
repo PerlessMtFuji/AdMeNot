@@ -3,7 +3,7 @@ import { setupCtl } from '../test-utils';
 import { Controller } from './controller';
 import { createFakeBridge } from './fakeBridge';
 import { i18n } from './i18n/index.svelte';
-import { actedAfter, actedLevels, withoutUndone } from './logic';
+import { actedAfter, actedLevels, needsWelcome, withoutUndone } from './logic';
 import { AppState } from './state.svelte';
 
 function setup(scenario: string) {
@@ -508,5 +508,28 @@ describe('error reports', () => {
     await ctl.captureUiError('TypeError: y', 'at g');
     expect(bridge.calls.filter((c) => c.method === 'capture_ui_error')).toHaveLength(1);
     expect(s.fatalCrash).toBe('20261009-140312-ui00');
+  });
+});
+
+describe('first run and telemetry consent', () => {
+  test('akceptacja ostrzeżenia zapisuje zgody i zamyka ekran powitalny', async () => {
+    const bridge = createFakeBridge('adware', { delay: 0, welcome: true });
+    const ctl = new Controller(new AppState(), bridge);
+    await ctl.init();
+    expect(ctl.state.settingsLoaded).toBe(true);
+    expect(needsWelcome(ctl.state.settings)).toBe(true);
+    await ctl.acceptWelcome(true, false);
+    expect(needsWelcome(ctl.state.settings)).toBe(false);
+    expect(ctl.state.settings.telemetry).toBe(true);
+    expect(bridge.calls.at(-1)).toEqual({ method: 'accept_welcome', args: [true, false] });
+  });
+
+  test('wyłączenie statystyk wyłącza też pakiety', async () => {
+    const { ctl } = setup('adware');
+    await ctl.init();
+    await ctl.setTelemetry(true, true);
+    await ctl.setTelemetry(false, true);
+    expect(ctl.state.settings.telemetry_packages).toBe(false);
+    expect(ctl.state.settings.telemetry_delete_pending).toBe(true);
   });
 });

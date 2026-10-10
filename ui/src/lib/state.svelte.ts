@@ -12,7 +12,10 @@ export class AppState {
   screen = $state<Screen>('main');
   settings = $state<Settings>({ lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system', mirror_auto: false,
     apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false, select_level: 'silence',
-    check_updates: true, dismissed_update: null, last_run_version: null });
+    check_updates: true, dismissed_update: null, last_run_version: null,
+    welcome_version: 1, welcome_current: 1, telemetry: false, telemetry_packages: false, telemetry_id: null,
+    telemetry_delete_pending: false });
+  settingsLoaded = $state(false);  // ekran powitalny dopiero po odczycie ustawień
   devices = $state<DeviceEntry[]>([]);
   devicesError = $state<string | null>(null);
   knownSerials = $state<string[]>([]);

@@ -34,8 +34,9 @@ import {
   topReasons,
   notices,
   updateBanner,
+  needsWelcome,
 } from './logic';
-import type { AppView, Category, StepEvent, Finding, ScanView, UpdateView } from './types';
+import type { AppView, Category, StepEvent, Finding, ScanView, Settings, UpdateView } from './types';
 
 function app(pkg: string, verdict: AppView['verdict'], extra: Partial<AppView> = {}): AppView {
   const level = verdict === 'malicious' ? 'remove' : verdict === 'suspicious' ? 'disable' : null;
@@ -365,4 +366,13 @@ test('update banner priority', () => {
   expect(updateBanner({ ...available, dismissed: true, retired: { min_supported: '9.0.0', reason: null } }, false)).toBe('retired');
   expect(updateBanner({ ...none, updated_to: '0.9.3' }, false)).toBe('updated');
   expect(updateBanner({ ...none, updated_to: '0.9.3' }, true)).toBeNull();
+});
+
+describe('needsWelcome', () => {
+  const base = { welcome_version: 1, welcome_current: 1 } as Settings;
+  test('pokazuje ekran przed akceptacją i po podniesieniu wersji', () => {
+    expect(needsWelcome({ ...base, welcome_version: null })).toBe(true);
+    expect(needsWelcome({ ...base, welcome_current: 2 })).toBe(true);
+    expect(needsWelcome(base)).toBe(false);
+  });
 });
