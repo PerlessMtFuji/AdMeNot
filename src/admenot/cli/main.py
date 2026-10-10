@@ -8,11 +8,12 @@ import contextlib
 import io
 import json
 import multiprocessing
+import os
 import sys
 import threading
 import time
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 
 from admenot import __version__
 from admenot.cli import screenshot_cli, selfcheck_cli
@@ -26,6 +27,7 @@ from admenot.cli.actions_cli import (
 )
 from admenot.cli.device_cli import cmd_device
 from admenot.cli.report_cli import cmd_report, cmd_service
+from admenot.engine import welcome
 from admenot.engine.actions.errors import ActionError
 from admenot.engine.adb.devices import list_devices
 from admenot.engine.adb.transport import AdbError, AdbTransport, RealAdb
@@ -44,6 +46,7 @@ from admenot.net import update
 
 MESSAGES = {
     "pl": {
+        "accept_risk": "Uruchom polecenie ponownie z --accept-risk, jeśli rozumiesz i akceptujesz.",
         "retired": "Ta wersja AdMeNot jest wycofana{reason} — zmiany na telefonie są zablokowane "
                    "(cofanie działa). Zainstaluj nową wersję: {page}",
         "no_device": "Nie wykryto telefonu. Podłącz telefon kablem USB i włącz debugowanie USB.",
@@ -100,6 +103,7 @@ MESSAGES = {
         "watch_saved": "Zapisano nagranie: {path}. Następny skan tego telefonu uwzględni je przez 24 h.",
     },
     "en": {
+        "accept_risk": "Run the command again with --accept-risk if you understand and accept this.",
         "retired": "This version of AdMeNot is withdrawn{reason} — changes to phones are blocked "
                    "(undo still works). Install the new version: {page}",
         "no_device": "No phone detected. Connect the phone via USB and enable USB debugging.",
@@ -460,6 +464,8 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("--online", action="store_true")  # dodatkowo: czy serwer odpowiada
     check.add_argument("--serial")
     check.add_argument("--reference", metavar="FILE")
+    for p in (scan, capture, fix, undo):  # polecenia, które zmieniają albo czytają telefon (krok H §9)
+        p.add_argument("--accept-risk", action="store_true")
     for p in (device, who, fix, history, undo, resume, cache, service, report, shot, check):
         p.add_argument("--lang", choices=["pl", "en"], default=argparse.SUPPRESS)
     return parser
@@ -475,6 +481,12 @@ def _scan(adb: AdbTransport, serial: str, lang: str, deep: frozenset[str] = froz
 
 def _run(args: argparse.Namespace, host: AdbTransport) -> int:
     lang = args.lang
+    if args.command in ("scan", "fix", "undo", "capture") and welcome.welcome_needed(load_settings()):
+        if getattr(args, "accept_risk", False) or os.environ.get("ADMENOT_ACCEPT_RISK") == "1":
+            welcome.accept_risk(datetime.now(UTC))
+        else:
+            lines = "\n".join(f"• {line}" for line in welcome.RISK_LINES[lang])
+            raise CliError(2, f"{lines}\n{_msg(lang, 'accept_risk')}")
     if args.command in ("fix", "resume"):  # wycofana wersja: bez nowych zmian (spec aktualizacji §5)
         blocked = update.retired()
         if blocked is not None:

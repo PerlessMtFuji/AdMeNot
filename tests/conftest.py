@@ -193,3 +193,9 @@ def synthetic_adb() -> FakeAdb:
 def signing_key(monkeypatch):
     """Klucz Ed25519 zaufany przez `admenot.net.update` na czas testu."""
     return trust(monkeypatch)
+
+
+@pytest.fixture(autouse=True)
+def _accept_risk(monkeypatch):
+    """Istniejące testy CLI nie przechodzą przez ostrzeżenie z pierwszego uruchomienia (krok H §9)."""
+    monkeypatch.setenv("ADMENOT_ACCEPT_RISK", "1")
