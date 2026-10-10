@@ -1,11 +1,9 @@
 // Worker AdMeNot: statyczna strona z public/ (bez kodu) + API pod /api/v1/ (spec backendu §2).
 // Nie logujemy zapytań ani nagłówków — adresów IP nie zapisujemy nigdzie (§2.2).
+import { json, readLimited } from "./http";
+import { createEvents, deleteEvents, pruneEvents } from "./telemetry";
 
-const JSON_HEADERS = { "Content-Type": "application/json", "Cache-Control": "no-store" };
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
-}
+const TELEMETRY_ITEM = /^\/api\/v1\/telemetry\/([^/]+)$/;
 
 async function health(env: Env): Promise<Response> {
   try {
@@ -76,31 +74,6 @@ function normalize(b: Record<string, unknown> & { error: Record<string, unknown>
   };
 }
 
-// Czyta treść strumieniowo i przerywa po przekroczeniu limitu; null = za duża.
-async function readLimited(request: Request): Promise<string | null> {
-  if (!request.body) return "";
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > MAX_BODY) {
-      await reader.cancel();
-      return null;
-    }
-    chunks.push(value);
-  }
-  const all = new Uint8Array(total);
-  let offset = 0;
-  for (const c of chunks) {
-    all.set(c, offset);
-    offset += c.byteLength;
-  }
-  return new TextDecoder().decode(all);
-}
-
 function reportId(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(6));
   return "R-" + Array.from(bytes, (b) => ID_ALPHABET[b % 32]).join(""); // 256 % 32 == 0: bez skrzywienia
@@ -113,7 +86,7 @@ async function createReport(request: Request, env: Env): Promise<Response> {
   if (!success) return json({ error: "rate_limited" }, 429);
   const declared = Number(request.headers.get("Content-Length") ?? "0");
   if (declared > MAX_BODY) return json({ error: "too_large" }, 413);
-  const raw = await readLimited(request);
+  const raw = await readLimited(request, MAX_BODY);
   if (raw === null) return json({ error: "too_large" }, 413);
   let parsed: unknown;
   try {
@@ -157,9 +130,17 @@ export default {
     if (request.method === "POST" && pathname === "/api/v1/reports") {
       return createReport(request, env);
     }
+    if (request.method === "POST" && pathname === "/api/v1/telemetry") {
+      return createEvents(request, env);
+    }
+    const item = TELEMETRY_ITEM.exec(pathname);
+    if (request.method === "DELETE" && item) {
+      return deleteEvents(item[1], env);
+    }
     return json({ error: "not_found" }, 404);
   },
   async scheduled(_controller, env, _ctx): Promise<void> {
     await env.DB.prepare("DELETE FROM reports WHERE created < datetime('now', '-90 days')").run();
+    await pruneEvents(env);
   },
 } satisfies ExportedHandler<Env>;
