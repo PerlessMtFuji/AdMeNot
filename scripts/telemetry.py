@@ -21,6 +21,14 @@ def _since(days: int) -> str:
     return f"created >= datetime('now', '-{int(days)} days')"
 
 
+def _final(alias: str) -> str:
+    """Skan `alias` to ocena końcowa sesji: po analizie APK, a bez niej — skan podstawowy."""
+    return (f"(json_extract({alias}.body, '$.apk_stage') = 1 OR NOT EXISTS ("
+            f"SELECT 1 FROM events a WHERE a.type = 'scan' AND a.install = {alias}.install "
+            f"AND json_extract(a.body, '$.session') = json_extract({alias}.body, '$.session') "
+            "AND json_extract(a.body, '$.apk_stage') = 1))")
+
+
 QUERIES = {
     "active": lambda d: (
         "SELECT date(created) AS day, COUNT(DISTINCT install) AS installs, "
@@ -41,9 +49,9 @@ QUERIES = {
         "SUM(json_extract(body, '$.levels.disable')) AS disable, "
         "SUM(json_extract(body, '$.levels.remove')) AS remove, "
         "SUM(json_extract(body, '$.sources.manual')) AS manual, "
-        "SUM(json_extract(body, '$.apps')) AS apps FROM events "
-        f"WHERE type IN ('scan', 'repair', 'undo') AND json_extract(body, '$.apk_stage') IS NOT 1 "
-        f"AND {_since(d)} GROUP BY type"),
+        "SUM(json_extract(body, '$.apps')) AS apps FROM events e "
+        f"WHERE (e.type IN ('repair', 'undo') OR (e.type = 'scan' AND {_final('e')})) "
+        f"AND e.{_since(d)} GROUP BY type"),
     "packages": lambda d: (
         "SELECT json_extract(p.value, '$.package') AS package, json_extract(p.value, '$.level') AS level, "
         "json_extract(p.value, '$.source') AS source, COUNT(*) AS times, COUNT(DISTINCT e.install) AS installs "
@@ -52,7 +60,7 @@ QUERIES = {
     "left": lambda d: (
         "SELECT json_extract(p.value, '$.package') AS package, json_extract(p.value, '$.verdict') AS verdict, "
         "COUNT(*) AS times FROM events s, json_each(s.body, '$.packages') p "
-        f"WHERE s.type = 'scan' AND s.{_since(d)} AND NOT EXISTS ("
+        f"WHERE s.type = 'scan' AND {_final('s')} AND s.{_since(d)} AND NOT EXISTS ("
         "SELECT 1 FROM events r, json_each(r.body, '$.packages') q WHERE r.type = 'repair' "
         "AND r.install = s.install AND json_extract(r.body, '$.session') = json_extract(s.body, '$.session') "
         "AND json_extract(q.value, '$.package') = json_extract(p.value, '$.package')) "
