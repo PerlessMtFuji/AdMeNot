@@ -22,6 +22,7 @@ from admenot.engine.device.info import read_device_info
 from admenot.engine.facts import AppFacts
 from admenot.engine.incident import load_incident
 from admenot.engine.journal.db import Journal, Order
+from admenot.engine.oplock import DeviceBusy
 from admenot.engine.paths import incident_path, journal_path, logs_dir
 from admenot.engine.phones.provider import PhoneImageProvider
 from admenot.engine.session import ScanReport, run_scan
@@ -209,6 +210,9 @@ def _execute_and_report(adb: AdbTransport, journal: Journal, order: Order, optio
     except OrderInterrupted:
         print(_m(lang, "disconnected", number=order.number), file=sys.stderr)
         return 3
+    except DeviceBusy:
+        print(error_text("device_busy", lang, manufacturer), file=sys.stderr)
+        return 4
     code = 0
     print()
     for app in result.apps:
@@ -314,6 +318,9 @@ def cmd_undo(args: argparse.Namespace, host: AdbTransport, lang: str,
         except OrderInterrupted:
             print(_m(lang, "disconnected", number=order.number), file=sys.stderr)
             return 3
+        except DeviceBusy:
+            print(error_text("device_busy", lang, manufacturer), file=sys.stderr)
+            return 4
         if result.admin_not_restored:
             print(_m(lang, "admin_not_restored"))
         status = TEXTS[lang]["order_status"][result.order.status]

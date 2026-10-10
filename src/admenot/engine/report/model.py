@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from admenot.engine import paths
-from admenot.engine.journal.db import MAX_REPORT_SCREENSHOTS, Action, Journal, Order
+from admenot.engine.journal.db import MAX_REPORT_SCREENSHOTS, Action, Journal, Order, unresolved
 from admenot.engine.phones.build import IMAGES_DIR
 from admenot.engine.phones.provider import SILHOUETTE
 
@@ -96,7 +96,9 @@ def _outcome(actions: list[Action], still_active: bool) -> str:
     if "pending" in statuses:
         return "interrupted"
     if "undone" in statuses:  # cofnięcie wygrywa z (nieaktualną) weryfikacją
-        return "partially_undone" if "done" in statuses else "undone"
+        # „failed” z zapisanym krokiem odwrotnym mógł zmienić telefon, a nie został cofnięty
+        # (audyt 2026-10-11, BUG-09) — to cofnięcie częściowe, nie pełne.
+        return "partially_undone" if unresolved(actions) else "undone"
     if "failed" in statuses:
         return "failed"
     return "still_active" if still_active else "done"

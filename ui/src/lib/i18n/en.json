@@ -418,6 +418,7 @@
     "unknown_screenshot": "No such screenshot.",
     "unknown_crash": "This report no longer exists.",
     "shot_limit": "You can choose at most 8 screenshots for the report.",
+    "device_busy": "Another AdMeNot window or the CLI is running an order on this phone. Wait until it finishes.",
     "data_too_new": "The program data comes from a newer version of AdMeNot — update the program."
   }
 }

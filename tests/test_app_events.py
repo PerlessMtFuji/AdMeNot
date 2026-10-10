@@ -82,3 +82,23 @@ def test_internal_errors_are_logged(data_dir):
     assert "RuntimeError: boom" in text and "Traceback" in text
     assert "log" not in report_error(AppError("busy"))
     assert log_exception(ValueError("v")).name.startswith("app-")
+
+
+def test_report_error_survives_a_full_disk(monkeypatch):
+    """Audyt 2026-10-11, EDGE-02: błąd zapisu logu nie zastępuje pierwotnej przyczyny."""
+    from admenot.app import errors
+
+    def full(exc):
+        raise OSError(28, "synthetic full disk")
+
+    monkeypatch.setattr(errors, "log_exception", full)
+    monkeypatch.setattr(errors.crash, "capture", lambda exc, context=None: full(exc))
+    payload = report_error(RuntimeError("boom"))
+    assert payload["key"] == "internal" and "boom" in payload["message"]
+    assert payload["log_failed"] is True and "crash" not in payload
+
+
+def test_device_busy_has_its_own_key():
+    from admenot.engine.oplock import DeviceBusy
+
+    assert error_payload(DeviceBusy("R58"))["key"] == "device_busy"

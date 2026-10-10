@@ -2060,10 +2060,58 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
+      "command": "cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n  com.sec.android.app.launcher/com.android.launcher3.uioverrides.QuickstepLauncher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\ncom.sec.android.app.launcher/com.android.launcher3.uioverrides.QuickstepLauncher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
       "command": "dumpsys device_policy",
       "status": "ok",
       "duration": 0.0,
       "output": "Current Device Policy Manager state:\n  User 0:\n    Enabled Device Admins (User 0, provisioningState: 0):\n      com.clean.pro.boost/.AdminReceiver:\n        uid=10001\n    mPasswordOwner=-1\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys notification --package admenot.none",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Current Notification Manager state (filtered to 'admenot.none'):\n  Notification List:\n  Notification listeners:\n    Allowed notification listeners:\n      com.whatsapp/com.whatsapp.NotificationListener (user: 0 isPrimary: true)\n    Has user set:\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "getprop ro.build.version.sdk",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "34\n",
       "tag": null
      }
     ],
@@ -2096,10 +2144,70 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
+      "command": "pm list packages -s --user 0",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "package:com.sec.android.app.launcher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm path com.clean.pro.boost",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "package:/data/app/~~fake==/com.clean.pro.boost-1/base.apk\npackage:/data/app/~~fake==/com.clean.pro.boost-1/split_config.arm64_v8a.apk\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
       "command": "pm uninstall --user 0 com.clean.pro.boost",
       "status": "error:command_failed",
       "duration": 0.0,
       "output": "Failure [DELETE_FAILED_DEVICE_POLICY_MANAGER]",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "settings get secure default_input_method",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "null\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "settings get secure enabled_accessibility_services",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "null\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "sha256sum '/data/app/~~fake==/com.clean.pro.boost-1/base.apk' '/data/app/~~fake==/com.clean.pro.boost-1/split_config.arm64_v8a.apk'",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for \"sha256sum '/data/app/~~fake==/com.clean.pro.boost-1/base.apk' '/data/app/~~fake==/com.clean.pro.boost-1/split_config.arm64_v8a.apk'\"",
       "tag": null
      }
     ],
@@ -2135,6 +2243,54 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
+      "command": "cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n  com.sec.android.app.launcher/com.android.launcher3.uioverrides.QuickstepLauncher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\ncom.sec.android.app.launcher/com.android.launcher3.uioverrides.QuickstepLauncher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys notification --package admenot.none",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Current Notification Manager state (filtered to 'admenot.none'):\n  Notification List:\n  Notification listeners:\n    Allowed notification listeners:\n      com.whatsapp/com.whatsapp.NotificationListener (user: 0 isPrimary: true)\n    Has user set:\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "getprop ro.build.version.sdk",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "34\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
       "command": "pm list packages --user 0 com.clean.pro.boost",
       "status": "ok",
       "duration": 0.0,
@@ -2159,10 +2315,70 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
+      "command": "pm list packages -s --user 0",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "package:com.sec.android.app.launcher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm path com.clean.pro.boost",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "package:/data/app/~~fake==/com.clean.pro.boost-1/base.apk\npackage:/data/app/~~fake==/com.clean.pro.boost-1/split_config.arm64_v8a.apk\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
       "command": "pm uninstall --user 0 com.clean.pro.boost",
       "status": "ok",
       "duration": 0.0,
       "output": "Success\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "settings get secure default_input_method",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "null\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "settings get secure enabled_accessibility_services",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "null\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "sha256sum '/data/app/~~fake==/com.clean.pro.boost-1/base.apk' '/data/app/~~fake==/com.clean.pro.boost-1/split_config.arm64_v8a.apk'",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for \"sha256sum '/data/app/~~fake==/com.clean.pro.boost-1/base.apk' '/data/app/~~fake==/com.clean.pro.boost-1/split_config.arm64_v8a.apk'\"",
       "tag": null
      }
     ],
@@ -2335,6 +2551,54 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
+      "command": "cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n  com.sec.android.app.launcher/com.android.launcher3.uioverrides.QuickstepLauncher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\ncom.sec.android.app.launcher/com.android.launcher3.uioverrides.QuickstepLauncher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys notification --package admenot.none",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Current Notification Manager state (filtered to 'admenot.none'):\n  Notification List:\n  Notification listeners:\n    Allowed notification listeners:\n      com.whatsapp/com.whatsapp.NotificationListener (user: 0 isPrimary: true)\n    Has user set:\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "getprop ro.build.version.sdk",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "34\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
       "command": "pm disable-user --user 0 com.wlive.forecast",
       "status": "ok",
       "duration": 0.0,
@@ -2351,6 +2615,42 @@
       "status": "ok",
       "duration": 0.0,
       "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm list packages -s --user 0",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "package:com.sec.android.app.launcher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "settings get secure default_input_method",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "null\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "settings get secure enabled_accessibility_services",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "null\n",
       "tag": null
      }
     ],
@@ -2792,6 +3092,18 @@
      }
     ],
     [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm list packages -d --user 0",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
      "undo:step",
      {
       "action_id": 10,
@@ -2847,6 +3159,18 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
+      "command": "appops get com.wlive.forecast USE_FULL_SCREEN_INTENT",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "No operations.\nDefault mode: allow\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
       "command": "appops set com.wlive.forecast USE_FULL_SCREEN_INTENT default",
       "status": "ok",
       "duration": 0.0,
@@ -2890,6 +3214,18 @@
       "status": "running",
       "error": null,
       "restore_bytes": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys package com.wlive.forecast",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Domain verification status:\nFailure printing domain verification information\nPackages:\n  Package [com.wlive.forecast] (f00d):\n    versionCode=31 minSdk=26 targetSdk=34\n    User 0: ceDataInode=1 installed=true enabled=0\n      runtime permissions:\n        android.permission.POST_NOTIFICATIONS: granted=true\n",
+      "tag": null
      }
     ],
     [
@@ -2979,6 +3315,30 @@
      }
     ],
     [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm list packages --user 0 com.clean.pro.boost",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "package:com.clean.pro.boost\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm list packages -d --user 0",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
      "undo:step",
      {
       "action_id": 6,
@@ -3047,6 +3407,18 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
+      "command": "appops get com.clean.pro.boost USE_FULL_SCREEN_INTENT",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "No operations.\nDefault mode: allow\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
       "command": "appops set com.clean.pro.boost USE_FULL_SCREEN_INTENT default",
       "status": "ok",
       "duration": 0.0,
@@ -3097,6 +3469,18 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
+      "command": "appops get com.clean.pro.boost SYSTEM_ALERT_WINDOW",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "SYSTEM_ALERT_WINDOW: allow\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
       "command": "appops set com.clean.pro.boost SYSTEM_ALERT_WINDOW allow",
       "status": "ok",
       "duration": 0.0,
@@ -3140,6 +3524,18 @@
       "status": "running",
       "error": null,
       "restore_bytes": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys package com.clean.pro.boost",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Domain verification status:\nFailure printing domain verification information\nPackages:\n  Package [com.clean.pro.boost] (f00d):\n    versionCode=7 minSdk=26 targetSdk=34\n    User 0: ceDataInode=1 installed=true enabled=0\n      runtime permissions:\n        android.permission.POST_NOTIFICATIONS: granted=true\n",
+      "tag": null
      }
     ],
     [

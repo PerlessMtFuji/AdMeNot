@@ -8,16 +8,21 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable, Iterable
+from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from admenot.engine.actions import steps as S
+from admenot.engine.actions.backup import read_manifest
+from admenot.engine.actions.context import read_phone_context
 from admenot.engine.actions.errors import ActionError
 from admenot.engine.actions.planner import AppPlan
 from admenot.engine.actions.steps import Step
 from admenot.engine.adb.transport import AdbTransport
-from admenot.engine.journal.db import Action, Journal, Order
+from admenot.engine.apk.fetch import installed_hashes
+from admenot.engine.journal.db import Action, Journal, Order, unresolved
+from admenot.engine.oplock import device_lock
 
 Event = dict[str, Any]
 BLOCKING_KINDS = frozenset({"backup"})  # bez kopii APK nie odinstalowujemy
@@ -90,6 +95,31 @@ def _emit(options: ExecOptions, type_: str, row: Action, status: str,
                       "step": row.step, "status": status, "error": error, **extra})
 
 
+def is_destructive(step: Step) -> bool:
+    return ((step.kind == "enabled" and step.params.get("enabled") == "0")
+            or (step.kind == "installed" and step.params.get("installed") == "0"))
+
+
+def _precheck(adb: AdbTransport, step: Step) -> None:
+    """Warunki planu sprawdzane tuż przed wyłączeniem/usunięciem, także po wznowieniu (audyt
+    2026-10-11, BUG-04, BUG-07): klient mógł zmienić klawiaturę, przełączenie ekranu głównego
+    mogło się nie udać, aplikacja mogła się zaktualizować od zrobienia kopii."""
+    ctx = read_phone_context(adb)
+    if ctx.unknown:
+        raise ActionError("context_unknown", ", ".join(sorted(ctx.unknown)))
+    if step.package == ctx.ime_package:
+        raise ActionError("active_ime")
+    if step.package == ctx.home_package:
+        raise ActionError("home_active")
+    if step.kind == "installed":
+        manifest = read_manifest(Path(step.params["backup_dir"]))
+        if manifest is None or manifest.get("package") != step.package:
+            raise ActionError("no_backup", step.params["backup_dir"])
+        hashes = installed_hashes(adb, step.package)
+        if hashes is not None and hashes != manifest["files"]:
+            raise ActionError("backup_stale")
+
+
 def _execute(adb: AdbTransport, journal: Journal, row: Action, options: ExecOptions) -> None:
     step = Step.from_dict(row.step)
     state = S.probe(adb, step)
@@ -97,8 +127,11 @@ def _execute(adb: AdbTransport, journal: Journal, row: Action, options: ExecOpti
         if row.prev_state is None:
             journal.record_prev_state(row.id, state, None)  # nic nie zmieniamy — nic do cofnięcia
         return  # przerwane zlecenie: krok zdążył się wykonać, odwrotność jest już zapisana
+    if is_destructive(step):
+        _precheck(adb, step)
     if row.prev_state is None:
         inverse = S.inverse(step, state)
+        # Porównaj-i-ustaw: zapisany już stan (np. przez inny proces) wygrywa z naszą migawką.
         journal.record_prev_state(row.id, state, inverse.to_dict() if inverse else None)
     if step.kind == "admin":
         # Zaległy krok z przerwanego zlecenia: nikt już nie czeka na telefonie — tylko sprawdzamy stan.
@@ -162,11 +195,22 @@ def _finish(journal: Journal, order_id: int) -> None:
         journal.set_order_status(order_id, "failed" if "failed" in statuses else "done")
 
 
+def _locked(journal: Journal, order_id: int) -> AbstractContextManager[None]:
+    """Blokada telefonu zlecenia, wspólna dla procesów (BUG-06): DeviceBusy, gdy zajęty.
+    Kroki czytamy z dziennika dopiero pod blokadą — nie ze starej migawki."""
+    return device_lock(journal.path, journal.order(order_id).device_serial)
+
+
 def run_order(adb: AdbTransport, journal: Journal, order_id: int,
               options: ExecOptions | None = None) -> list[AppOutcome]:
     """Wykonuje kroki „pending” po kolei. `should_stop` przerywa przed kolejnym krokiem:
     reszta zostaje „pending”, a zlecenie — przerwane, do dokończenia (`resume`) albo cofnięcia."""
-    options = options or ExecOptions()
+    with _locked(journal, order_id):
+        return _run_order(adb, journal, order_id, options or ExecOptions())
+
+
+def _run_order(adb: AdbTransport, journal: Journal, order_id: int,
+               options: ExecOptions) -> list[AppOutcome]:
     outcomes: dict[str, AppOutcome] = {}
     blocked: set[str] = set()
     for row in journal.actions(order_id):
@@ -229,8 +273,23 @@ def undo(
     action_id: int | None = None,
     options: ExecOptions | None = None,
 ) -> list[tuple[Action, str]]:
-    """Cofa kroki w odwrotnej kolejności: jeden krok, jedną aplikację albo całe zlecenie."""
-    options = options or ExecOptions()
+    """Cofa kroki w odwrotnej kolejności: jeden krok, jedną aplikację albo całe zlecenie.
+
+    `should_stop` przerywa przed kolejną odwrotnością (EDGE-01); krok jest „undone” dopiero, gdy
+    ponowny odczyt potwierdzi stan sprzed naprawy (BUG-05)."""
+    with _locked(journal, order_id):
+        return _undo(adb, journal, order_id, package, action_id, options or ExecOptions())
+
+
+def _confirmed(adb: AdbTransport, inverse: Step, options: ExecOptions) -> bool:
+    if S.is_applied(inverse, S.probe(adb, inverse)):
+        return True
+    options.sleep(options.poll_interval)  # część telefonów zmienia stan z opóźnieniem
+    return S.is_applied(inverse, S.probe(adb, inverse))
+
+
+def _undo(adb: AdbTransport, journal: Journal, order_id: int, package: str | None,
+          action_id: int | None, options: ExecOptions) -> list[tuple[Action, str]]:
     everything = journal.actions(order_id)
     rows = [a for a in everything
             if (package is None or a.package == package) and (action_id is None or a.id == action_id)]
@@ -246,6 +305,9 @@ def undo(
             continue
         if row.status == "failed" and (row.prev_state is None or row.inverse is None):
             continue  # krok nie zdążył niczego zmienić albo nie ma czego odwracać
+        if options.should_stop():
+            options.on_event({"type": "stopped"})
+            break
         # Krok „failed” z zapisanym stanem mógł się wykonać (np. adb: „error: closed”):
         # odwrotność jest idempotentna, więc bez zmiany na telefonie nic nie zostanie wysłane.
         if row.prev_state is None:  # przerwane zlecenie: krok nie zdążył się zacząć
@@ -268,6 +330,8 @@ def undo(
                 if not S.is_applied(inverse, S.probe(adb, inverse)):
                     _emit(options, "undo", row, "running", **_restore_size(inverse))
                     S.apply(adb, inverse, options.apk_cache_dir)
+                    if not _confirmed(adb, inverse, options):
+                        raise ActionError("not_restored")
                 if inverse.kind == "installed":
                     installed[row.package] = inverse.params["installed"] == "1"
         except ActionError as exc:
@@ -278,9 +342,8 @@ def undo(
             continue
         journal.set_action_status(row.id, "undone")
         _emit(options, "undo", row, "undone")
-    remaining = {a.status for a in journal.actions(order_id)}
     journal.set_order_status(
-        order_id, "partially_undone" if remaining & {"done", "pending"} else "undone")
+        order_id, "partially_undone" if unresolved(journal.actions(order_id)) else "undone")
     return errors
 
 

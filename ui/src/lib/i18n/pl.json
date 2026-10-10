@@ -418,6 +418,7 @@
     "unknown_screenshot": "Nie ma takiego zrzutu ekranu.",
     "unknown_crash": "Tego raportu już nie ma.",
     "shot_limit": "Do protokołu można wybrać najwyżej 8 zrzutów.",
+    "device_busy": "Inne okno AdMeNot albo CLI wykonuje teraz zlecenie na tym telefonie. Poczekaj, aż skończy.",
     "data_too_new": "Dane programu pochodzą z nowszej wersji AdMeNot — zaktualizuj program."
   }
 }

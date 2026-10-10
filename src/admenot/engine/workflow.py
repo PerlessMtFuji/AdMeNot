@@ -108,7 +108,8 @@ def plan_order(
     protected = load_protected_list()
     root = backups_dir() / device.serial
     free = frozenset(unlocked)
-    results = [plan_app(package, level, facts.get(package), ctx, protected, root, free)
+    destroyed = frozenset(p for p, level in requests.items() if level in ("disable", "remove"))
+    results = [plan_app(package, level, facts.get(package), ctx, protected, root, free, destroyed)
                for package, level in requests.items()]
     return OrderPlan(device, ctx, facts, results)
 
