@@ -127,15 +127,15 @@ def _stamp(now: datetime) -> str:
 
 def set_consent(telemetry: bool, packages: bool, now: datetime) -> Settings:
     """Spec §4.2: włączenie tworzy ID (raz), wyłączenie kasuje kolejkę i planuje usunięcie z serwera."""
-    current = load_settings()
     packages = packages and telemetry
-    changes: dict[str, Any] = {"telemetry": telemetry, "telemetry_packages": packages,
-                               "telemetry_at": _stamp(now)}
-    if telemetry:
-        changes["telemetry_id"] = current.telemetry_id or str(uuid.uuid4())
-    else:
-        changes["telemetry_id"] = None
+    # Odczyt i zapis pod jedną blokadą: równoległe wywołania z mostu nie tworzą dwóch ID,
+    # a `record` nie dopisze zdarzenia starego ID po skasowaniu kolejki.
     with _lock:
+        current = load_settings()
+        changes: dict[str, Any] = {"telemetry": telemetry, "telemetry_packages": packages,
+                                   "telemetry_at": _stamp(now),
+                                   "telemetry_id": (current.telemetry_id or str(uuid.uuid4()))
+                                   if telemetry else None}
         settings = save_internal(changes)  # najpierw ustawienia: SettingsTooNew nic nie rusza
         if not telemetry:
             _write_events([])
@@ -152,13 +152,13 @@ def set_consent(telemetry: bool, packages: bool, now: datetime) -> Settings:
 
 def record(type_: str, build: Callable[[bool], dict[str, Any]], now: Now | None = None) -> None:
     try:
-        settings = load_settings()
-        if not settings.telemetry or not settings.telemetry_id:
-            return
-        when = (now or _utc_now)()
-        event = {**common(settings.telemetry_id, type_, when, effective_lang(settings)),
-                 **build(settings.telemetry_packages)}
-        with _lock:
+        with _lock:  # zgoda sprawdzona i zdarzenie zapisane bez cofnięcia zgody pomiędzy
+            settings = load_settings()
+            if not settings.telemetry or not settings.telemetry_id:
+                return
+            when = (now or _utc_now)()
+            event = {**common(settings.telemetry_id, type_, when, effective_lang(settings)),
+                     **build(settings.telemetry_packages)}
             _write_events(_trim([*_read_events(), event], when))
         _wake.set()
     except Exception as exc:  # noqa: BLE001 — statystyki nigdy nie psują pracy

@@ -1,3 +1,4 @@
+import contextlib
 import json
 import threading
 from datetime import UTC, datetime, timedelta
@@ -207,3 +208,46 @@ def test_loop_stops_promptly():
     wake.set()
     thread.join(timeout=2)
     assert not thread.is_alive()
+
+
+def test_concurrent_enabling_keeps_one_id(monkeypatch):
+    # pywebview woła metody w osobnych wątkach: dwa szybkie włączenia nie mogą dać dwóch ID.
+    real = telemetry.load_settings
+    both = threading.Barrier(2)
+
+    def slow_load():
+        settings = real()
+        with contextlib.suppress(threading.BrokenBarrierError):
+            both.wait(timeout=0.5)  # bez blokady oba wątki czytają ustawienia bez ID
+        return settings
+
+    monkeypatch.setattr(telemetry, "load_settings", slow_load)
+    ids = []
+    threads = [threading.Thread(target=lambda: ids.append(consent().telemetry_id)) for _ in range(2)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=5)
+    assert len(ids) == 2 and ids[0] == ids[1] == load_settings().telemetry_id
+
+
+def test_withdrawal_during_record_leaves_no_queue(monkeypatch):
+    consent()
+    loaded, withdrawn = threading.Event(), threading.Event()
+    real = telemetry.common
+
+    def slow_common(*args):
+        loaded.set()
+        withdrawn.wait(timeout=0.5)  # cofnięcie zgody między odczytem zgody a zapisem
+        return real(*args)
+
+    monkeypatch.setattr(telemetry, "common", slow_common)
+    recording = threading.Thread(target=lambda: telemetry.record("scan", body, now=lambda: NOW))
+    recording.start()
+    assert loaded.wait(timeout=5)
+    withdrawing = threading.Thread(target=lambda: (telemetry.set_consent(False, False, NOW),
+                                                   withdrawn.set()))
+    withdrawing.start()
+    recording.join(timeout=5)
+    withdrawing.join(timeout=5)
+    assert not telemetry_path().exists()
