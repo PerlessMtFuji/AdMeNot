@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from admenot.engine import donate
+from admenot.engine.journal.db import Order
 from admenot.engine.paths import settings_path
 from admenot.engine.settings import load_settings, save_internal
 from admenot.engine.workflow import AppStatus, OrderResult
@@ -16,9 +17,10 @@ def env(monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
 
 
-def _result(*statuses, stopped=False):
+def _result(*statuses, stopped=False, order_status="done"):
     apps = [AppStatus(f"pkg{i}", status) for i, status in enumerate(statuses)]
-    return OrderResult(order=None, apps=apps, stopped=stopped)
+    order = Order(1, "ZS/2026/1010/01", "SERIAL", None, None, DAY, order_status)
+    return OrderResult(order=order, apps=apps, stopped=stopped)
 
 
 @pytest.mark.parametrize(("statuses", "stopped", "expected"), [
@@ -30,6 +32,11 @@ def _result(*statuses, stopped=False):
 ])
 def test_succeeded(statuses, stopped, expected):
     assert donate.succeeded(_result(*statuses, stopped=stopped)) is expected
+
+
+def test_resume_after_a_failed_app_is_not_a_success():
+    # `resume` zwraca tylko aplikacje z dokończonej części; o całości mówi status zlecenia
+    assert donate.succeeded(_result("ok", order_status="failed")) is False
 
 
 def test_first_reminder_after_the_first_successful_order():

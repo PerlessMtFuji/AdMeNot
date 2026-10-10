@@ -21,7 +21,9 @@ MIN_DAYS = 14
 
 
 def succeeded(result: OrderResult) -> bool:
-    return not result.stopped and bool(result.apps) and all(a.status == "ok" for a in result.apps)
+    # Po `resume` `apps` to tylko dokończona część; o całym zleceniu mówi jego status w dzienniku.
+    return (not result.stopped and result.order.status == "done" and bool(result.apps)
+            and all(a.status == "ok" for a in result.apps))
 
 
 def _shown(settings: Settings, today: date) -> date | None:
