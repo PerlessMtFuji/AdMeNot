@@ -177,7 +177,75 @@ def test_backup_copies_exactly_the_fetched_files(tmp_path, monkeypatch):
         (cached / name).write_bytes(name.encode())
     monkeypatch.setattr(B, "fetch_apks", lambda adb, package, cache_dir: FetchedApks(
         [cached / name for name in SPLITS], verified=True))
+    monkeypatch.setattr(B, "installed_hashes", lambda adb, package: None)
     target = tmp_path / "backups" / "S" / "com.spam" / "7"
     paths = B.backup_apks(None, "com.spam", 7, target, tmp_path / "apk-cache")
     assert sorted(p.name for p in paths) == sorted(SPLITS)
     assert B.is_complete(target)
+
+
+def _complete_backup(tmp_path):
+    with Journal(tmp_path / "journal-extra.db") as journal:
+        _remove(_phone(sha256sum=True), journal, tmp_path)
+    return tmp_path.joinpath(*BACKUP)
+
+
+@pytest.mark.parametrize("damage", ["marker_only", "missing_split", "zero_bytes", "changed_byte",
+                                    "stray_apk", "legacy_marker"])
+def test_damaged_backup_is_not_complete(tmp_path, damage):
+    """Audyt 2026-10-11, BUG-02: znacznik i dowolny APK nie wystarczają do uznania kopii."""
+    from admenot.engine.actions import backup as B
+
+    backup = _complete_backup(tmp_path)
+    assert B.is_complete(backup, "com.spam") and not B.is_complete(backup, "com.other")
+    split = backup / SPLITS[1]
+    if damage == "marker_only":
+        for apk in backup.glob("*.apk"):
+            apk.unlink()
+        (backup / "base.apk").write_bytes(b"")
+    elif damage == "missing_split":
+        split.unlink()
+    elif damage == "zero_bytes":
+        split.write_bytes(b"")
+    elif damage == "changed_byte":
+        data = bytearray(split.read_bytes())
+        data[0] ^= 1
+        split.write_bytes(bytes(data))
+    elif damage == "stray_apk":
+        (backup / "other.apk").write_bytes(b"x")
+    else:
+        (backup / ".complete").write_text("", encoding="utf-8")
+    assert not B.is_complete(backup)
+
+
+def test_damaged_backup_is_refreshed_before_uninstall(journal, tmp_path):
+    phone = _phone(sha256sum=True)
+    order, _ = _remove(phone, journal, tmp_path)
+    undo(phone, journal, order.id)
+    backup = tmp_path.joinpath(*BACKUP)
+    (backup / SPLITS[1]).unlink()  # zginął split po pierwszej kopii; znacznik został
+    phone.calls.clear()
+    _, (outcome,) = _remove(phone, journal, tmp_path)
+    from admenot.engine.actions.backup import is_complete
+
+    assert outcome.ok and is_complete(backup, "com.spam")
+    assert sorted(p.name for p in backup.glob("*.apk")) == sorted(SPLITS)
+
+
+def test_backup_of_an_updated_app_with_the_same_version_is_refetched(journal, tmp_path):
+    phone = _phone(sha256sum=True)
+    order, _ = _remove(phone, journal, tmp_path)
+    undo(phone, journal, order.id)
+    phone.apps["com.spam"].build = b"rebuilt"  # te same nazwy i versionCode, inne bajty
+    phone.calls.clear()
+    _remove(phone, journal, tmp_path)
+    assert [c for c in phone.calls if c.startswith("host:pull")]
+
+
+def test_undo_refuses_a_damaged_backup(journal, tmp_path):
+    phone = _phone()
+    order, _ = _remove(phone, journal, tmp_path)
+    (tmp_path.joinpath(*BACKUP) / SPLITS[1]).write_bytes(b"")
+    errors = undo(phone, journal, order.id)
+    assert (errors[0][0].step["kind"], errors[0][1]) == ("installed", "no_backup")
+    assert not [c for c in phone.calls if c.startswith("host:install")]

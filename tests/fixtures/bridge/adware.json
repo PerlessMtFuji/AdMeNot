@@ -533,7 +533,7 @@
          "from_play": false,
          "installer": "com.android.chrome",
          "is_admin": true,
-         "default_level": "remove",
+         "default_level": "disable",
          "problems": [
           "Jest aktywnym administratorem urządzenia — przed wyłączeniem lub usunięciem trzeba odebrać te uprawnienia.",
           "W ciągu ostatniej doby korzystała z wyświetlania okien nad innymi aplikacjami.",
@@ -1029,7 +1029,7 @@
          "from_play": false,
          "installer": "com.android.chrome",
          "is_admin": true,
-         "default_level": "remove",
+         "default_level": "disable",
          "problems": [
           "Jest aktywnym administratorem urządzenia — przed wyłączeniem lub usunięciem trzeba odebrać te uprawnienia.",
           "W ciągu ostatniej doby korzystała z wyświetlania okien nad innymi aplikacjami.",
@@ -1490,7 +1490,9 @@
        "kopia APK na komputerze",
        "odinstalowanie (użytkownik 0)"
       ],
-      "warnings": []
+      "warnings": [
+       "usunięcie kasuje dane aplikacji (konta, ustawienia, pliki) — cofnięcie przywróci samą aplikację, bez danych"
+      ]
      },
      {
       "package": "com.wlive.forecast",
@@ -1717,7 +1719,9 @@
           "kopia APK na komputerze",
           "odinstalowanie (użytkownik 0)"
          ],
-         "warnings": []
+         "warnings": [
+          "usunięcie kasuje dane aplikacji (konta, ustawienia, pliki) — cofnięcie przywróci samą aplikację, bez danych"
+         ]
         },
         {
          "package": "com.wlive.forecast",
@@ -1974,6 +1978,30 @@
       "status": "ok",
       "duration": 0.0,
       "output": "package:/data/app/~~fake==/com.clean.pro.boost-1/base.apk\npackage:/data/app/~~fake==/com.clean.pro.boost-1/split_config.arm64_v8a.apk\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm path com.clean.pro.boost",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "package:/data/app/~~fake==/com.clean.pro.boost-1/base.apk\npackage:/data/app/~~fake==/com.clean.pro.boost-1/split_config.arm64_v8a.apk\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "sha256sum '/data/app/~~fake==/com.clean.pro.boost-1/base.apk' '/data/app/~~fake==/com.clean.pro.boost-1/split_config.arm64_v8a.apk'",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for \"sha256sum '/data/app/~~fake==/com.clean.pro.boost-1/base.apk' '/data/app/~~fake==/com.clean.pro.boost-1/split_config.arm64_v8a.apk'\"",
       "tag": null
      }
     ],

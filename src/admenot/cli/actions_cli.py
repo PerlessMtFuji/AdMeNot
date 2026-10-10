@@ -192,7 +192,7 @@ def _print_plan(results: list[AppPlan | Blocked], facts: dict[str, AppFacts], de
     for r in results:
         name = _name(r.package, facts)
         if isinstance(r, Blocked):
-            print(f"  ✗ {name}: {texts['reasons'][r.reason].format(package=r.package)}")
+            print(f"  ✗ {name}: {texts['reasons'][r.reason].format(package=r.package, detail=r.detail)}")
             continue
         print(f"  {texts['levels'][r.level]}  {name}")
         for step in r.steps:

@@ -148,11 +148,11 @@
     "deep": "Deep analysis", "deep_hint": "Looks in the app code for possible paths to sensitive calls. Takes up to a few minutes.", "limits": "Assessment limits", "incomplete_data": "Little data about the app's behavior", "confidence": "Confidence"
   },
   "actions": { "console": "ADB console", "fix": "Fix selected ({count})", "rescan": "Scan again" },
-  "plan": { "title": "Repair plan", "confirm_title": "What I will do on the phone", "blocked": "Skipped", "unlock": "Unlock", "undo_hint": "Every change can be undone in History.", "run": "Run ({count})", "nothing": "Nothing to run — all apps are blocked." },
+  "plan": { "title": "Repair plan", "confirm_title": "What I will do on the phone", "blocked": "Skipped", "unlock": "Unlock", "undo_hint": "You can undo changes in History. Removing an app deletes its data — undo restores the app itself.", "run": "Run ({count})", "nothing": "Nothing to run — all apps are blocked." },
   "exec": {
     "title": "Fixing the phone…", "step": "step {done} of {total}", "panel": "Order",
     "done_title": "Phone fixed", "done_warn": "Repair finished with remarks",
-    "done_sub": "{apps} · {steps} · every change can be undone in History",
+    "done_sub": "{apps} · {steps} · undo in History",
     "stopped_title": "Order paused",
     "stop_hint": "Pausing finishes the current step. You can finish or undo the order later.",
     "state": { "queued": "waiting", "running": "in progress", "ok": "done", "still_active": "still active", "failed": "failed", "stopped": "paused" },
@@ -181,7 +181,7 @@
     "risk_title": "Important",
     "risk1": "AdMeNot is a beta and may contain bugs.",
     "risk2": "The program disables and removes apps on the customer's phone. Every change is your decision, and you answer for it to the customer.",
-    "risk3": "You can undo most changes in History; removing an app without an APK copy cannot always be undone.",
+    "risk3": "You can undo most changes in History. Removing an app deletes its data — undo restores at most the app itself from the APK copy.",
     "risk4": "Back up the customer's important data before a repair.",
     "risk5": "The program is provided “as is”, without any warranty (PolyForm Shield 1.0.0 license).",
     "accept": "I understand and accept",

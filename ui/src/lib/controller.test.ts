@@ -27,7 +27,7 @@ describe('controller with the adware scenario', () => {
     expect(s.apk.running).toBe(false);
     expect(s.apk.total).toBeGreaterThan(0);
     expect(s.device?.serial).toBe('R58T00TEST');
-    expect(s.selection['com.clean.pro.boost']).toBe('remove');
+    expect(s.selection['com.clean.pro.boost']).toBe('disable');
     expect(s.job).toBeNull();
   });
 
@@ -143,7 +143,7 @@ describe('controller with the adware scenario', () => {
     ctl.toggle(app);
     expect(s.selection['com.clean.pro.boost']).toBeUndefined();
     ctl.toggle(app);
-    expect(s.selection['com.clean.pro.boost']).toBe('remove');
+    expect(s.selection['com.clean.pro.boost']).toBe('disable');
     expect(s.touched).toContain('com.clean.pro.boost');
   });
 
@@ -163,7 +163,7 @@ describe('controller with the adware scenario', () => {
     expect(s.selection['com.sec.android.app.launcher']).toBe('disable'); // producenta nie usuwamy domyślnie
     ctl.toggle(app('com.clean.pro.boost'));
     ctl.toggle(app('com.clean.pro.boost'));
-    expect(s.selection['com.clean.pro.boost']).toBe('remove'); // propozycja silnika ma pierwszeństwo
+    expect(s.selection['com.clean.pro.boost']).toBe('disable'); // propozycja silnika ma pierwszeństwo
   });
 
   test('on Android 12 and older the silence default from settings becomes disable', async () => {

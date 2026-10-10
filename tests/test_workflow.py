@@ -41,7 +41,7 @@ def test_recommended_requests_and_blocked_protected_launcher():
     phone = make_cli_phone()
     report = run_scan(phone)
     requests = recommended_requests(report)
-    assert requests["com.clean.pro.boost"] == "remove" and "com.whatsapp" not in requests
+    assert requests["com.clean.pro.boost"] == "disable" and "com.whatsapp" not in requests
     plan = plan_order(phone, report, {"com.sec.android.app.launcher": "disable",
                                       "com.wlive.forecast": "disable"})
     blocked = [r for r in plan.results if isinstance(r, Blocked)]

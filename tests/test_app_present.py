@@ -50,7 +50,7 @@ def test_scan_view_pl_and_en(synthetic_adb):
     apps = {a["package"]: a for a in view["apps"]}
     boost = apps["com.clean.pro.boost"]
     assert boost["verdict"] == "malicious" and boost["verdict_label"] == "Szkodliwa"
-    assert boost["default_level"] == "remove" and boost["is_admin"] is True
+    assert boost["default_level"] == "disable" and boost["is_admin"] is True
     assert boost["confidence"] == "high"
     assert 1 <= len(boost["problems"]) <= 3 and len(set(boost["problems"])) == len(boost["problems"])
     assert boost["findings"][0]["weight"] >= boost["findings"][-1]["weight"]

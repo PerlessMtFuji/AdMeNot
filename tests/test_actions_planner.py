@@ -81,6 +81,7 @@ def test_disable_and_remove_extend_silence():
     assert (uninstall.kind, uninstall.params) == (
         "installed", {"installed": "0", "backup_dir": expected})
     assert [s.kind for s in remove.steps[:-2]] == [s.kind for s in _plan("com.other", "silence").steps]
+    assert remove.warnings == ["app_data_lost"] and disable.warnings == []
 
 
 def test_remove_without_version_code_uses_unknown_dir():
@@ -121,7 +122,8 @@ def _r(verdict, confidence="medium", is_system=False):
 
 
 def test_default_level_depends_on_verdict_and_confidence():
-    assert default_level(_r("malicious", "high")) == "remove"
+    # Usunięcie kasuje dane aplikacji, a undo ich nie odtworzy: domyślnie tylko odwracalne poziomy.
+    assert default_level(_r("malicious", "high")) == "disable"
     assert default_level(_r("suspicious", "medium")) == "disable"
     assert default_level(_r("suspicious", "low")) == "silence"
     assert default_level(_r("review")) is None and default_level(_r("safe")) is None
@@ -166,3 +168,55 @@ def test_context_lists_listeners_approved_by_notification_manager():
     phone = FakePhone([FakeApp(AD)], secure={LISTENERS: f"{GEARHEAD}:{AD_LISTENER}"})
     phone.secure[LISTENERS] = GEARHEAD  # kopia bez AD, a NotificationManager nadal ją zatwierdza
     assert read_phone_context(phone).secure_lists[LISTENERS] == f"{GEARHEAD}:{AD_LISTENER}"
+
+
+# --- audyt 2026-10-11, BUG-03: nierozpoznany odczyt to „nie wiadomo”, nie „brak” -------------
+
+def _context_phone():
+    return FakePhone([FakeApp("com.spam", home_activity=".Keyboard"),
+                      FakeApp("com.android.launcher", system=True, home_activity=".Launcher")],
+                     home=LAUNCHER)
+
+
+def test_recognized_phone_context_has_no_unknown_reads():
+    phone = _context_phone()
+    ctx = read_phone_context(phone)
+    assert ctx.unknown == frozenset() and ctx.ime_package is None  # „null” = brak klawiatury
+
+
+def test_no_home_candidates_is_a_recognized_empty_answer():
+    phone = FakePhone([FakeApp("com.spam"), FakeApp("com.android.x", system=True)])
+    assert read_phone_context(phone).unknown == frozenset()
+
+
+def _with_answer(command, answer):
+    phone = _context_phone()
+    phone.fail[command] = answer
+    return read_phone_context(phone)
+
+
+def test_each_unrecognized_context_read_blocks_disable_and_remove():
+    from admenot.engine.actions import commands as C
+    from admenot.engine.collectors.components import HOME_QUERY
+    from admenot.engine.collectors.packages import PM_SYSTEM
+    from admenot.engine.collectors.system import RESOLVE_HOME
+
+    reads = {C.DEFAULT_IME: "ime", RESOLVE_HOME: "home", HOME_QUERY: "launchers",
+             PM_SYSTEM: "system_packages"}
+    for command, name in reads.items():
+        for answer in ("", "unsupported format\n", "com.spam/"):
+            ctx = _with_answer(command, answer)
+            assert ctx.unknown == {name}, (command, answer)
+            for level in ("disable", "remove"):
+                assert _plan("com.spam", level, ctx=ctx) == Blocked(
+                    "com.spam", level, "context_unknown", name), (command, answer)
+            assert isinstance(_plan("com.spam", "silence", ctx=ctx), AppPlan)
+
+
+def test_unrecognized_ime_does_not_let_the_active_keyboard_be_disabled():
+    """Scenariusz z audytu: aktywna klawiatura com.spam, odczyt IME „unsupported format”."""
+    from admenot.engine.actions import commands as C
+
+    ctx = _with_answer(C.DEFAULT_IME, "unsupported format\n")
+    assert ctx.ime_package is None
+    assert isinstance(_plan("com.spam", "disable", ctx=ctx), Blocked)

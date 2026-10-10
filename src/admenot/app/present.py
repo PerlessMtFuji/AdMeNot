@@ -199,7 +199,7 @@ def plan_view(plan: OrderPlan, lang: str) -> dict[str, Any]:
                 "level": r.level, "level_label": level_label(r.level, lang)}
         if isinstance(r, Blocked):
             apps.append({**base, "blocked": True, "reason": r.reason,
-                         "reason_text": reason_text(r.reason, lang, r.package),
+                         "reason_text": reason_text(r.reason, lang, r.package, r.detail),
                          "steps": [], "warnings": []})
         else:
             apps.append({**base, "blocked": False, "reason": None, "reason_text": None,

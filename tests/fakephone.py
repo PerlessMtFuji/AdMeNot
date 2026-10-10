@@ -46,6 +46,10 @@ class FakeApp:
     admin: bool = False
     home_activity: str | None = None  # np. ".Launcher": aplikacja jest kandydatem HOME
     keeps_apk: bool = False  # po `pm uninstall --user 0` APK zostaje (aplikacje systemowe)
+    build: bytes = b""  # dopisywane do bajtów APK: przebudowana aplikacja z tym samym versionCode
+
+    def apk(self, name: str) -> bytes:
+        return apk_bytes(self.package, name) + self.build
 
 
 def apk_bytes(package: str, name: str) -> bytes:
@@ -180,7 +184,8 @@ class FakePhone:
         if command == RESOLVE_HOME:
             return _HOME_HEADER + (self.home or "android/com.android.internal.app.ResolverActivity") + "\n"
         if command == HOME_QUERY:
-            return "".join(f"{_HOME_HEADER}  {c}\n" for c in self._home_candidates())
+            found = "".join(f"{_HOME_HEADER}  {c}\n" for c in self._home_candidates())
+            return found or "No activities found\n"
         if command == DEVICE_POLICY:
             return self._device_policy()
         if command == NOTIF_MANAGER:
@@ -229,7 +234,7 @@ class FakePhone:
                 prefix = APK_DIR.format(package=app.package) + "/"
                 name = remote[len(prefix):]
                 if remote.startswith(prefix) and name in app.apks:
-                    digest = hashlib.sha256(apk_bytes(app.package, name)).hexdigest()
+                    digest = hashlib.sha256(app.apk(name)).hexdigest()
                     lines.append(f"{digest}  {remote}\n")
         return "".join(lines)
 
@@ -369,7 +374,7 @@ class FakePhone:
             prefix = APK_DIR.format(package=app.package) + "/"
             name = remote[len(prefix):]
             if remote.startswith(prefix) and name in app.apks:
-                local.write_bytes(apk_bytes(app.package, name))
+                local.write_bytes(app.apk(name))
                 return f"{remote}: 1 file pulled\n"
         raise AdbError("command_failed", f"remote object '{remote}' does not exist")
 

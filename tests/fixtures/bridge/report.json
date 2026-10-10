@@ -533,7 +533,7 @@
          "from_play": false,
          "installer": "com.android.chrome",
          "is_admin": true,
-         "default_level": "remove",
+         "default_level": "disable",
          "problems": [
           "Jest aktywnym administratorem urządzenia — przed wyłączeniem lub usunięciem trzeba odebrać te uprawnienia.",
           "W ciągu ostatniej doby korzystała z wyświetlania okien nad innymi aplikacjami.",
@@ -1029,7 +1029,7 @@
          "from_play": false,
          "installer": "com.android.chrome",
          "is_admin": true,
-         "default_level": "remove",
+         "default_level": "disable",
          "problems": [
           "Jest aktywnym administratorem urządzenia — przed wyłączeniem lub usunięciem trzeba odebrać te uprawnienia.",
           "W ciągu ostatniej doby korzystała z wyświetlania okien nad innymi aplikacjami.",

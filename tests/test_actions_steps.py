@@ -226,3 +226,30 @@ def test_security_hint_depends_on_manufacturer():
     assert hint_key("security", "Xiaomi") == "security_miui"
     assert hint_key("security", "samsung") == "security"
     assert hint_key("device_admin", "OPPO") == "device_admin"
+
+
+@pytest.mark.parametrize(("step", "command"), [
+    (Step("appop", "com.ad", {"op": "SYSTEM_ALERT_WINDOW", "mode": "deny"}),
+     "appops get com.ad SYSTEM_ALERT_WINDOW"),
+    (Step("enabled", "com.ad", {"enabled": "0"}), "pm list packages -d --user 0"),
+    (Step("installed", "com.ad", {"installed": "0", "backup_dir": ""}),
+     "pm list packages --user 0 com.ad"),
+    (Step("permission", "com.ad", {"permission": POST, "granted": "0"}), "dumpsys package com.ad"),
+])
+def test_unrecognized_probe_is_an_error_not_a_state(step, command):
+    """Audyt 2026-10-11, BUG-03: nierozpoznany odczyt nie może trafić do dziennika jako stan
+    sprzed zmiany (np. „enabled”/„default”), bo cofnięcie przywróciłoby fałszywy stan."""
+    phone = _phone()
+    phone.fail[command] = "unsupported format\n"
+    with pytest.raises(ActionError) as caught:
+        S.probe(phone, step)
+    assert caught.value.key == "unrecognized"
+
+
+def test_known_empty_answers_stay_valid_states():
+    phone = _phone()
+    assert S.probe(phone, Step("enabled", "com.ad", {"enabled": "0"})) == {"enabled": True}
+    assert S.probe(phone, Step("appop", "com.ad", {"op": "SYSTEM_ALERT_WINDOW", "mode": "deny"})) == {
+        "mode": "default"}
+    gone = Step("installed", "com.gone", {"installed": "0", "backup_dir": ""})
+    assert S.probe(phone, gone) == {"installed": False}

@@ -54,6 +54,21 @@ def run_checked(adb: AdbTransport, command: str, timeout: float = 20.0) -> str:
     return out
 
 
+def unrecognized(command: str, output: str) -> ActionError:
+    """Odpowiedź w nieznanym formacie: „nie wiadomo”, a nie stan, który da się zapisać do cofnięcia
+    (audyt 2026-10-11, BUG-03)."""
+    return ActionError("unrecognized", f"{command}: {output.strip()[:200]}")
+
+
+def package_list(adb: AdbTransport, command: str) -> set[str]:
+    """`pm list packages …`: pusta odpowiedź to pusta lista, nierozpoznana — błąd."""
+    out = run_checked(adb, command)
+    packages = parse_package_list(out)
+    if not packages and out.strip():
+        raise unrecognized(command, out)
+    return packages
+
+
 def split_items(value: str) -> list[str]:
     value = value.strip()
     if not value or value == "null":
@@ -119,8 +134,14 @@ class _ForceStop(_Simple):
 class _AppOp(_Simple):
     def probe(self, adb: AdbTransport, step: Step) -> State:
         op = step.params["op"]
-        ops = parse_appops(run_checked(adb, C.APPOPS_GET_OP.format(package=step.package, op=op)))
-        return {"mode": ops[op].mode if op in ops else "default"}  # „No operations.” = default
+        command = C.APPOPS_GET_OP.format(package=step.package, op=op)
+        out = run_checked(adb, command)
+        ops = parse_appops(out)
+        if op in ops:
+            return {"mode": ops[op].mode}
+        if "No operations" in out:
+            return {"mode": "default"}
+        raise unrecognized(command, out)
 
     def applied(self, step: Step, state: State) -> bool:
         return state["mode"] == step.params["mode"]
@@ -135,9 +156,12 @@ class _AppOp(_Simple):
 class _Permission(_Simple):
     def probe(self, adb: AdbTransport, step: Step) -> State:
         # Bez run_checked: dumpsys package wypisuje „Failure printing domain verification…” zawsze.
-        dumps = parse_dumpsys_packages(read(adb, C.DUMPSYS_PACKAGE.format(package=step.package), 30))
-        dump = dumps.get(step.package)
-        return {"granted": bool(dump and step.params["permission"] in dump.granted)}
+        command = C.DUMPSYS_PACKAGE.format(package=step.package)
+        out = read(adb, command, 30)
+        dump = parse_dumpsys_packages(out).get(step.package)
+        if dump is None:
+            raise unrecognized(command, out)
+        return {"granted": step.params["permission"] in dump.granted}
 
     def applied(self, step: Step, state: State) -> bool:
         return _flag(state["granted"]) == step.params["granted"]
@@ -227,8 +251,7 @@ class _Home(_Simple):
 
 class _Enabled(_Simple):
     def probe(self, adb: AdbTransport, step: Step) -> State:
-        disabled = parse_package_list(run_checked(adb, PM_DISABLED))
-        return {"enabled": step.package not in disabled}
+        return {"enabled": step.package not in package_list(adb, PM_DISABLED)}
 
     def applied(self, step: Step, state: State) -> bool:
         return _flag(state["enabled"]) == step.params["enabled"]
@@ -245,11 +268,12 @@ class _Backup:
     """Kopia APK na komputerze. Nie zmienia telefonu, więc nie ma kroku odwrotnego."""
 
     def probe(self, adb: AdbTransport, step: Step) -> State:
-        return {"complete": is_complete(Path(step.params["dir"]))}
+        return {"complete": is_complete(Path(step.params["dir"]), step.package)}
 
     def applied(self, step: Step, state: State) -> bool:
-        # Bez versionCode nie wiadomo, czy kopia jest z tej wersji — pobieramy zawsze.
-        return state["complete"] and bool(step.params.get("version_code"))
+        # Zawsze `apply`: dopiero on porównuje kopię ze skrótami plików zainstalowanych teraz
+        # na telefonie (aktualizacja tej samej wersji, uszkodzona kopia) i ewentualnie ją odnawia.
+        return False
 
     def command(self, step: Step) -> str:
         return f"backup {step.package} -> {step.params['dir']}"
@@ -269,8 +293,8 @@ class _Backup:
         return None
 
 
-def _install_from_backup(adb: AdbTransport, directory: Path) -> None:
-    if not is_complete(directory):
+def _install_from_backup(adb: AdbTransport, package: str, directory: Path) -> None:
+    if not is_complete(directory, package):
         raise ActionError("no_backup", str(directory))
     apks = [str(p) for p in sorted(directory.glob("*.apk"))]
     args = ["install", apks[0]] if len(apks) == 1 else ["install-multiple", *apks]
@@ -284,11 +308,11 @@ def _install_from_backup(adb: AdbTransport, directory: Path) -> None:
 
 class _Installed:
     def probe(self, adb: AdbTransport, step: Step) -> State:
-        listed = parse_package_list(run_checked(adb, C.PM_INSTALLED.format(package=step.package)))
+        listed = package_list(adb, C.PM_INSTALLED.format(package=step.package))
         installed = step.package in listed  # filtr pm to podciąg — liczy się dokładna nazwa
         state: State = {"installed": installed}
         if installed:  # ponowna instalacja włącza aplikację — zapamiętujemy, czy była wyłączona
-            state["enabled"] = step.package not in parse_package_list(run_checked(adb, PM_DISABLED))
+            state["enabled"] = step.package not in package_list(adb, PM_DISABLED)
         return state
 
     def applied(self, step: Step, state: State) -> bool:
@@ -320,7 +344,7 @@ class _Installed:
         except ActionError as exc:
             if exc.uncertain:
                 raise
-        _install_from_backup(adb, Path(step.params["backup_dir"]))  # APK zniknął razem z aplikacją
+        _install_from_backup(adb, step.package, Path(step.params["backup_dir"]))  # APK zniknął razem z aplikacją
 
     def inverse(self, step: Step, state: State) -> Step | None:
         params = {"installed": _flag(state["installed"]), "backup_dir": step.params["backup_dir"]}
