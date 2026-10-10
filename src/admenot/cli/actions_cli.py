@@ -8,6 +8,7 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
+from admenot.engine import donate
 from admenot.engine.actions.context import read_phone_context
 from admenot.engine.actions.executor import ExecOptions, resume, run_order
 from admenot.engine.actions.planner import LEVELS, AppPlan, Blocked
@@ -222,6 +223,8 @@ def _execute_and_report(adb: AdbTransport, journal: Journal, order: Order, optio
             code = 5
         else:
             print(_m(lang, "ok", name=name))
+    if donate.succeeded(result):
+        donate.count_success()  # licznik obejmuje pracę w CLI; przypomnienie pokazuje tylko GUI
     freed = clear_cache_after_repair(result, load_settings(), options.apk_cache_dir
                                      or default_cache_dir())
     if freed is not None:

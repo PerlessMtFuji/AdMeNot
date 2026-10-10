@@ -8,6 +8,7 @@ from admenot.cli.main import main
 from admenot.engine.adb.fake import FakeAdb
 from admenot.engine.journal.db import Journal
 from admenot.engine.paths import journal_path
+from admenot.engine.settings import load_settings
 
 WRITES = ("pm disable", "pm uninstall", "appops set", "pm revoke", "settings put", "am force-stop",
           "cmd notification")
@@ -193,3 +194,12 @@ def test_fix_uses_the_incident_recording_like_scan(monkeypatch, tmp_path):
     monkeypatch.setattr(actions_cli, "run_scan", spy)
     assert main(["fix", "--app", "com.wlive.forecast=disable", "--yes"], host=phone) == 0
     assert seen["incidents"] == {"com.wlive.forecast": (1, "com.game")}
+
+
+def test_cli_counts_without_using_up_the_first_reminder(capsys):
+    phone = make_cli_phone()
+    assert main(["fix", "--app", "com.wlive.forecast=disable", "--yes"], host=phone) == 0
+    out = capsys.readouterr().out.lower()
+    s = load_settings()
+    assert (s.donate_count, s.donate_shown_at) == (1, None)
+    assert "wsparc" not in out and "suppi" not in out

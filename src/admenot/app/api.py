@@ -41,7 +41,7 @@ from admenot.app.present import (
 from admenot.app.telemetry_events import repair_event, sample, scan_event, undo_event
 from admenot.app.updates import UpdateService, update_view
 from admenot.app.watcher import DeviceWatcher
-from admenot.engine import welcome
+from admenot.engine import donate, welcome
 from admenot.engine.actions.executor import ExecOptions, run_order
 from admenot.engine.actions.executor import resume as resume_steps
 from admenot.engine.adb.devices import list_devices
@@ -332,7 +332,8 @@ class Api:
     def get_settings(self) -> dict[str, Any]:
         return {**asdict(self._settings), "lang": self._lang,
                 "welcome_current": welcome.WELCOME_VERSION,
-                "telemetry_delete_pending": telemetry.delete_pending()}
+                "telemetry_delete_pending": telemetry.delete_pending(),
+                "donate_reminders": not self._settings.donate_off}
 
     @_api
     def accept_welcome(self, telemetry_on: bool, packages: bool) -> dict[str, Any]:
@@ -365,6 +366,18 @@ class Api:
     def open_privacy(self) -> dict[str, Any]:
         self._open_url(f"{client.base_url()}/{'pl/' if self._lang == 'pl' else ''}privacy")
         return {"ok": True}
+
+    @_api
+    def open_donate(self) -> dict[str, Any]:
+        self._open_url(f"{client.base_url()}/{'pl/' if self._lang == 'pl' else ''}donate")
+        return {"ok": True}
+
+    @_api
+    def set_donate_reminders(self, on: bool) -> dict[str, Any]:
+        if not isinstance(on, bool):
+            raise AppError("bad_request", "donate")
+        self._settings = donate.set_reminders(on)
+        return self.get_settings()
 
     @_api
     def save_settings(self, changes: dict[str, Any]) -> dict[str, Any]:
@@ -705,7 +718,12 @@ class Api:
         if result.stopped:
             self._emit("exec:stopped", {"order": order.number})
         clear_cache_after_repair(result, self._settings, default_cache_dir())
-        self._emit("exec:done", result_view(result, names, self._lang, manufacturer))
+        reminder = False
+        if donate.succeeded(result):  # także zlecenie dokończone przez resume
+            reminder = donate.note_success(self._now())
+            self._settings = load_settings()
+        self._emit("exec:done", {**result_view(result, names, self._lang, manufacturer),
+                                 "donate_reminder": reminder})
         return result, "stopped" if result.stopped else None
 
     @_api
