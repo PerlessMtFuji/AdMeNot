@@ -1,8 +1,10 @@
+import json
 from datetime import UTC, datetime
 
 import pytest
 
 from admenot.engine import welcome
+from admenot.engine.paths import settings_path
 from admenot.engine.settings import (
     INTERNAL_KEYS,
     SettingsTooNew,
@@ -85,3 +87,20 @@ def test_older_accepted_version_shows_welcome_again(monkeypatch):
 
 def test_risk_lines_in_both_languages():
     assert len(welcome.RISK_LINES["pl"]) == len(welcome.RISK_LINES["en"]) >= 5
+
+
+def test_donate_keys_default_and_validate():
+    s = load_settings()
+    assert (s.donate_count, s.donate_shown_at, s.donate_off) == (0, None, False)
+    settings_path().parent.mkdir(parents=True, exist_ok=True)
+    settings_path().write_text(json.dumps({"donate_count": -1, "donate_shown_at": "jutro",
+                                           "donate_off": "tak"}), "utf-8")
+    s = load_settings()
+    assert (s.donate_count, s.donate_shown_at, s.donate_off) == (0, None, False)
+    save_internal({"donate_count": 3, "donate_shown_at": "2026-10-10", "donate_off": True})
+    s = load_settings()
+    assert (s.donate_count, s.donate_shown_at, s.donate_off) == (3, "2026-10-10", True)
+    for bad in ({"donate_count": True}, {"donate_count": 1.5}, {"donate_shown_at": "10.10.2026"},
+                {"donate_off": 1}):
+        with pytest.raises(ValueError):
+            save_internal(bad)

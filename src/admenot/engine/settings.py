@@ -32,7 +32,8 @@ KEYS = ("lang", "mode", "adb_path", "backups_dir", "theme", "mirror_auto",
 # Klucze zmieniane tylko przez dedykowane funkcje (ostrzeżenie, zgody telemetrii), nigdy z ekranu
 # ustawień: UI nie może podstawić własnego ID instalacji ani „zaakceptować” ostrzeżenia bokiem.
 INTERNAL_KEYS = ("welcome_version", "welcome_at", "telemetry", "telemetry_packages",
-                 "telemetry_id", "telemetry_at", "telemetry_start_day")
+                 "telemetry_id", "telemetry_at", "telemetry_start_day",
+                 "donate_count", "donate_shown_at", "donate_off")
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 LOGO_TYPES = {
@@ -80,6 +81,9 @@ class Settings:
     telemetry_id: str | None = None  # UUIDv4 instalacji; istnieje tylko przy telemetry=True
     telemetry_at: str | None = None
     telemetry_start_day: str | None = None  # dzień (UTC) ostatniego zdarzenia „start”
+    donate_count: int = 0  # udane zlecenia od ostatniego przypomnienia o wsparciu (spec kroku J §4)
+    donate_shown_at: str | None = None  # dzień (lokalny) ostatniego przypomnienia
+    donate_off: bool = False  # „Już wspieram, nie pokazuj więcej”
 
 
 @dataclass(frozen=True)
@@ -144,14 +148,18 @@ def _save(path: Path, update: Callable[[dict[str, Any]], None]) -> None:
 
 
 def _valid(key: str, value: Any) -> bool:
+    if key == "donate_count":
+        return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+    if key == "donate_off":
+        return isinstance(value, bool)
+    if key in ("telemetry_start_day", "donate_shown_at"):
+        return value is None or (isinstance(value, str) and DAY_RE.match(value) is not None)
     if key in ("telemetry", "telemetry_packages"):
         return isinstance(value, bool)
     if key == "welcome_version":
         return value is None or (isinstance(value, int) and not isinstance(value, bool) and value >= 1)
     if key == "telemetry_id":
         return value is None or (isinstance(value, str) and UUID_RE.match(value) is not None)
-    if key == "telemetry_start_day":
-        return value is None or (isinstance(value, str) and DAY_RE.match(value) is not None)
     if key in ("mirror_auto", "apk_cache_clear_after_repair", "check_updates"):
         return isinstance(value, bool)
     if key == "apk_cache_limit_gb":
@@ -184,7 +192,7 @@ def save_settings(changes: dict[str, Any], path: Path | None = None) -> Settings
 
 
 def save_internal(changes: dict[str, Any], path: Path | None = None) -> Settings:
-    """Zapis kluczy wewnętrznych (`INTERNAL_KEYS`) — tylko z `welcome` i `app.telemetry`."""
+    """Zapis kluczy wewnętrznych (`INTERNAL_KEYS`) — tylko z `welcome`, `app.telemetry` i `donate`."""
     path = path or settings_path()
     unknown = sorted(set(changes) - set(INTERNAL_KEYS))
     bad = sorted(k for k, v in changes.items() if k in INTERNAL_KEYS and not _valid(k, v))
