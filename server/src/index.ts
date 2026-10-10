@@ -99,22 +99,25 @@ async function createReport(request: Request, env: Env): Promise<Response> {
   if (!clean) return json({ error: "invalid" }, 400);
   const stored = JSON.stringify(clean);
   try {
-    const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM reports WHERE created >= datetime('now', '-1 day')")
-      .first<{ n: number }>();
-    if ((recent?.n ?? 0) >= DAILY_CAP) return json({ error: "busy" }, 503);
+    // Sufit doby sprawdzany w tym samym poleceniu co zapis: równoległe raporty nie przekroczą
+    // go razem (audyt 2026-10-11, BUG-12).
     const insert = (id: string) => env.DB.prepare(
       "INSERT INTO reports (id, created, kind, app, os, lang, error_type, error_where, body) "
-      + "VALUES (?, datetime('now'), ?, ?, ?, ?, ?, ?, ?)",
-    ).bind(id, parsed.kind, parsed.app, parsed.os, parsed.lang, parsed.error.type, parsed.error.where ?? null, stored).run();
+      + "SELECT ?, datetime('now'), ?, ?, ?, ?, ?, ?, ? "
+      + "WHERE (SELECT COUNT(*) FROM reports WHERE created >= datetime('now', '-1 day')) < ?",
+    ).bind(id, parsed.kind, parsed.app, parsed.os, parsed.lang, parsed.error.type, parsed.error.where ?? null, stored,
+      DAILY_CAP).run();
     let id = reportId();
+    let res;
     try {
-      await insert(id);
+      res = await insert(id);
     } catch (err) {
       // Ponawiamy tylko przy kolizji klucza (1 na ~10^9); inny błąd D1 idzie do 503.
       if (!String((err as Error)?.message ?? err).includes("UNIQUE constraint failed")) throw err;
       id = reportId();
-      await insert(id);
+      res = await insert(id);
     }
+    if ((res.meta.changes ?? 0) === 0) return json({ error: "busy" }, 503);
     return json({ id }, 201);
   } catch {
     return json({ error: "busy" }, 503);
@@ -135,7 +138,7 @@ export default {
     }
     const item = TELEMETRY_ITEM.exec(pathname);
     if (request.method === "DELETE" && item) {
-      return deleteEvents(item[1], env);
+      return deleteEvents(request, item[1], env);
     }
     return json({ error: "not_found" }, 404);
   },
