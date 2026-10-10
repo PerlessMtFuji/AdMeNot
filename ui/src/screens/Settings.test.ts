@@ -130,3 +130,18 @@ test('prywatność: nieudany zapis zgody nie zostawia zaznaczonego pola', async 
   await vi.waitFor(() => expect(bridge.calls.some((c) => c.method === 'set_telemetry')).toBe(true));
   await vi.waitFor(() => expect(box.checked).toBe(false));
 });
+
+test('wsparcie: przycisk otwiera stronę, przełącznik zapisuje i wraca po błędzie', async () => {
+  const { bridge, s } = await renderWith(Settings, 'empty');
+  await fireEvent.click(screen.getByRole('button', { name: 'Wesprzyj projekt' }));
+  await vi.waitFor(() => expect(bridge.calls.at(-1)).toEqual({ method: 'open_donate', args: [] }));
+  const box = screen.getByLabelText('Przypominaj o wsparciu') as HTMLInputElement;
+  expect(box.checked).toBe(true);
+  await fireEvent.click(box);
+  await vi.waitFor(() => expect(s.settings.donate_reminders).toBe(false));
+  expect(box.checked).toBe(false);
+  bridge.failNext('set_donate_reminders', 'internal');
+  await fireEvent.click(box);
+  await vi.waitFor(() => expect(bridge.calls.at(-1)?.method).toBe('set_donate_reminders'));
+  await vi.waitFor(() => expect(box.checked).toBe(false));
+});

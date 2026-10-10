@@ -131,6 +131,7 @@ export class Controller {
       s.execPlan = d.plan;
       s.steps = [];
       s.result = null;
+      s.donateBanner = false;
       s.stopped = false;
       s.stopping = false;
       s.verifying = false;
@@ -148,6 +149,7 @@ export class Controller {
     on('exec:stopped', () => { s.stopped = true; });
     on('exec:done', (d) => {
       s.result = d;
+      s.donateBanner = d.donate_reminder === true;
       s.actedLog = actedAfter(s.actedLog, s.execPlan, d);
       s.verifying = false;
       s.admin = null;
@@ -597,6 +599,19 @@ export class Controller {
 
   async openPrivacy(): Promise<void> {
     await this.call(this.api.open_privacy());
+  }
+
+  async openDonate(): Promise<void> {
+    await this.call(this.api.open_donate());
+  }
+
+  async setDonateReminders(on: boolean): Promise<void> {
+    const r = await this.call(this.api.set_donate_reminders(on));
+    if (r) this.applySettings(r);
+  }
+
+  closeDonate(): void {
+    this.state.donateBanner = false;
   }
 
   setMode(mode: Mode): Promise<Settings | null> {

@@ -147,6 +147,49 @@ describe('plan and execution', () => {
     expect(screen.getByRole('button', { name: /Wstrzymuję/ })).toBeTruthy();
   });
 
+  const doneWith = (reminder: boolean | undefined) => ({ order: 'ZS/2026/0926/07', status: 'done',
+    status_label: 'wykonane', stopped: false, donate_reminder: reminder,
+    apps: [{ package: 'a', name: 'Pierwsza', outcome: 'ok' as const, errors: [], kinds: [] }] });
+  const SUPPORT = /AdMeNot jest darmowy i rozwija go jedna osoba/;
+
+  test('baner wsparcia: „Wesprzyj projekt” otwiera stronę i chowa baner', async () => {
+    const { bridge } = await app('empty');
+    bridge.emit('exec:done', doneWith(true));
+    await tick();
+    expect(screen.getByText(SUPPORT)).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Wesprzyj projekt' }));
+    await vi.waitFor(() => expect(bridge.calls.some((c) => c.method === 'open_donate')).toBe(true));
+    expect(screen.queryByText(SUPPORT)).toBeNull();
+  });
+
+  test('baner wsparcia: „Już wspieram” wyłącza przypomnienia, krzyżyk tylko zamyka', async () => {
+    const { bridge, s } = await app('empty');
+    bridge.emit('exec:done', doneWith(true));
+    await tick();
+    await fireEvent.click(screen.getByRole('button', { name: 'Zamknij przypomnienie' }));
+    expect(screen.queryByText(SUPPORT)).toBeNull();
+    expect(bridge.calls.some((c) => c.method === 'set_donate_reminders' || c.method === 'open_donate')).toBe(false);
+    bridge.emit('exec:done', doneWith(true));
+    await tick();
+    await fireEvent.click(screen.getByRole('button', { name: 'Już wspieram, nie pokazuj więcej' }));
+    await vi.waitFor(() => expect(bridge.calls.at(-1)).toEqual({ method: 'set_donate_reminders', args: [false] }));
+    await vi.waitFor(() => expect(s.settings.donate_reminders).toBe(false));
+    expect(screen.queryByText(SUPPORT)).toBeNull();
+  });
+
+  test('baner wsparcia: brak bez flagi, znika przy nowym zleceniu', async () => {
+    const { bridge } = await app('empty');
+    bridge.emit('exec:done', doneWith(undefined));  // starsze nagrania scenariuszy nie mają pola
+    await tick();
+    expect(screen.queryByText(SUPPORT)).toBeNull();
+    bridge.emit('exec:done', doneWith(true));
+    await tick();
+    expect(screen.getByText(SUPPORT)).toBeTruthy();
+    bridge.emit('exec:order', { order: 'ZS/2026/0926/08', plan: null });
+    await tick();
+    expect(screen.queryByText(SUPPORT)).toBeNull();
+  });
+
   test('after a pause the apps never started stay listed in the result', async () => {
     const { s, bridge } = await app('empty');
     const plan = (pkg: string, name: string) => ({ package: pkg, name, level: 'disable' as const,

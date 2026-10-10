@@ -53,7 +53,7 @@ export function createFakeBridge(name: string, options: { delay?: number; welcom
     apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false, select_level: 'silence',
     check_updates: true, dismissed_update: null, last_run_version: null,
     welcome_version: options.welcome ? null : 1, welcome_current: 1, telemetry: false, telemetry_packages: false,
-    telemetry_id: null, telemetry_delete_pending: false };
+    telemetry_id: null, telemetry_delete_pending: false, donate_reminders: true };
   let service: ServiceInfo = { name: null, address: null, phone: null, logo: null };
   let lastScan: ScanView | null = null;
   let mirror: { serial: string | null; state: string } = { serial: null, state: 'stopped' };
@@ -109,7 +109,11 @@ export function createFakeBridge(name: string, options: { delay?: number; welcom
       case 'telemetry_sample':
         return SAMPLE as TelemetrySample;
       case 'open_privacy':
+      case 'open_donate':
         return { ok: true };
+      case 'set_donate_reminders':
+        settings = { ...settings, donate_reminders: args[0] as boolean };
+        return { ...settings };
       case 'apk_cache': {
         const GB = 1024 ** 3;
         const limit = settings.apk_cache_limit_gb * GB;

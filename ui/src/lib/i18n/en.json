@@ -213,6 +213,15 @@
     "delete_pending": "Deleting data from the server is waiting for an internet connection.",
     "show_warning": "Show warning"
   },
+  "donate": {
+    "title": "Support the project",
+    "support": "Support the project",
+    "already": "I already support it, don't show again",
+    "close": "Close the reminder",
+    "banner": "AdMeNot is free and made by one person. If it saves you time in your shop, you can buy me a coffee — it's voluntary and unlocks nothing.",
+    "settings_text": "AdMeNot is free. Voluntary support helps develop it and unlocks nothing.",
+    "reminders": "Remind me about support"
+  },
   "history": {
     "title": "Order history", "phone": "Phone", "empty": "No orders for this phone.", "none": "No saved orders.",
     "restore": "Restore", "undo_all": "Undo the whole order", "resume": "Finish",

@@ -213,6 +213,15 @@
     "delete_pending": "Usuwanie danych z serwera czeka na połączenie z internetem.",
     "show_warning": "Pokaż ostrzeżenie"
   },
+  "donate": {
+    "title": "Wesprzyj projekt",
+    "support": "Wesprzyj projekt",
+    "already": "Już wspieram, nie pokazuj więcej",
+    "close": "Zamknij przypomnienie",
+    "banner": "AdMeNot jest darmowy i rozwija go jedna osoba. Jeśli program oszczędza Ci czas w serwisie, możesz postawić kawę — to dobrowolne i niczego nie odblokowuje.",
+    "settings_text": "AdMeNot jest darmowy. Dobrowolne wsparcie pomaga go rozwijać i niczego nie odblokowuje.",
+    "reminders": "Przypominaj o wsparciu"
+  },
   "history": {
     "title": "Historia zleceń", "phone": "Telefon", "empty": "Brak zleceń dla tego telefonu.", "none": "Brak zapisanych zleceń.",
     "restore": "Przywróć", "undo_all": "Cofnij całe zlecenie", "resume": "Dokończ",

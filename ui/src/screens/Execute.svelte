@@ -4,6 +4,7 @@
   import AdminPrompt from '../components/AdminPrompt.svelte';
   import AppIcon from '../components/AppIcon.svelte';
   import DeviceCard from '../components/DeviceCard.svelte';
+  import DonateBanner from '../components/DonateBanner.svelte';
   import MirrorControls from '../components/MirrorControls.svelte';
   import ReportButton from '../components/ReportButton.svelte';
   import ScreenshotStrip from '../components/ScreenshotStrip.svelte';
@@ -97,6 +98,7 @@
 
     <AdminPrompt />
     {#if s.verifying}<Banner tone="info" icon="info" title={t('exec.verifying')} />{/if}
+    <DonateBanner />
 
     {#each groups as g (g.package)}
       {@const res = results.get(g.package)}

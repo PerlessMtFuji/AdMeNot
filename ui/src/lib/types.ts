@@ -27,6 +27,7 @@ export interface Settings {
   telemetry_packages: boolean;
   telemetry_id: string | null;
   telemetry_delete_pending: boolean;
+  donate_reminders: boolean;
 }
 
 export interface TelemetrySample {
@@ -200,6 +201,7 @@ export interface OrderResult {
   status_label: string;
   stopped: boolean;
   apps: { package: string; name: string; outcome: Outcome; errors: string[]; kinds: string[] }[];
+  donate_reminder?: boolean; // brak w starszych nagraniach scenariuszy
 }
 
 export interface UndoDone {
@@ -340,6 +342,8 @@ export interface Api {
   set_telemetry(telemetry: boolean, packages: boolean): R<Settings>;
   telemetry_sample(): R<TelemetrySample>;
   open_privacy(): R<{ ok: boolean }>;
+  open_donate(): R<{ ok: boolean }>;
+  set_donate_reminders(on: boolean): R<Settings>;
   apk_cache(): R<CacheUsage>;
   clear_apk_cache(): R<{ freed_bytes: number }>;
   list_devices(): R<DevicesPayload>;

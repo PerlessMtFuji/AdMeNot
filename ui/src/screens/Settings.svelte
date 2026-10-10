@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getContext, onMount } from 'svelte';
+  import { getContext, onMount, tick } from 'svelte';
   import PrivacyChoices from '../components/PrivacyChoices.svelte';
   import RiskWarning from '../components/RiskWarning.svelte';
   import type { Controller } from '../lib/controller';
@@ -100,6 +100,13 @@
     const r = await ctl.saveSettings({ adb_path: adbPath.trim() || null, backups_dir: backups.trim() || null });
     saved = r !== null;
   }
+
+  // `checked` jest jednokierunkowe: po nieudanym zapisie pole wraca do zapisanego stanu.
+  async function donateReminders(input: HTMLInputElement): Promise<void> {
+    await ctl.setDonateReminders(input.checked);
+    await tick();
+    input.checked = s.settings.donate_reminders;
+  }
 </script>
 
 <main class="min-w-0 flex-1 scroll-fade overflow-auto px-7 py-7">
@@ -193,6 +200,17 @@
         {#snippet actions()}<Button onclick={() => (warning = false)}>{t('common.close')}</Button>{/snippet}
       </Dialog>
     {/if}
+
+    <Card><div class="flex flex-col gap-3 p-6">
+      <span class="lbl">{t('donate.title')}</span>
+      <span class="text-sm text-mut">{t('donate.settings_text')}</span>
+      <label class="flex items-center gap-3">
+        <input type="checkbox" checked={s.settings.donate_reminders}
+          onchange={(e) => donateReminders(e.currentTarget)} />
+        <span>{t('donate.reminders')}</span>
+      </label>
+      <div><Button size="sm" onclick={() => ctl.openDonate()}><Icon name="heart" />{t('donate.support')}</Button></div>
+    </div></Card>
 
     <Card><div class="flex flex-col gap-4 p-6">
       <span class="lbl">{t('settings.cache_title')}</span>

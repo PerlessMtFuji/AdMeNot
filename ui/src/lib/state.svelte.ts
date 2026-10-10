@@ -14,7 +14,7 @@ export class AppState {
     apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false, select_level: 'silence',
     check_updates: true, dismissed_update: null, last_run_version: null,
     welcome_version: 1, welcome_current: 1, telemetry: false, telemetry_packages: false, telemetry_id: null,
-    telemetry_delete_pending: false });
+    telemetry_delete_pending: false, donate_reminders: true });
   settingsLoaded = $state(false);  // ekran powitalny dopiero po odczycie ustawień
   devices = $state<DeviceEntry[]>([]);
   devicesError = $state<string | null>(null);
@@ -56,6 +56,7 @@ export class AppState {
   stopping = $state(false);
   stopped = $state(false);
   result = $state<OrderResult | null>(null);
+  donateBanner = $state(false); // przypomnienie o wsparciu na ekranie wyniku (spec kroku J §6.1)
   /** Co już zrobiono na tym telefonie od skanu, zlecenie po zleceniu (powrót do naprawy, cofanie aplikacji). */
   actedLog = $state<ActedLog>({});
   /** Trwające cofanie (undo:done zdejmuje cofnięte z actedLog); action_id → null, bo cofa tylko krok. */
