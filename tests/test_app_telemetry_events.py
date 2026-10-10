@@ -107,3 +107,18 @@ def test_sample_scan_matches_scan_event_keys(synthetic_adb):
     shown = next(e for e in ev.sample()["packages"] if e["type"] == "scan")
     assert set(real) <= set(shown) and set(shown) - set(real) == {"install", "type", "t", "app", "os", "lang"}
     assert set(real["packages"][0]) == set(shown["packages"][0])
+
+
+def test_values_fit_server_limits(synthetic_adb):
+    # Serwer odrzuca całą paczkę za jedno złe pole — program wysyła tylko to, co serwer przyjmie.
+    from dataclasses import replace
+
+    report = run_scan(synthetic_adb)
+    odd = replace(report.device, manufacturer="", model="M" * 100, android_release="  ")
+    assert ev.device_of(odd) == {"manufacturer": "?", "model": "M" * 64, "android": "?"}
+    assert ev.scan_event(replace(report, device=odd), "s", 10**6, packages=False)["seconds"] == 86_400
+    long_error = AppStatus("a.b", "failed", errors=["x" * 100, ""])
+    result = OrderResult(order=None, stopped=False, apps=[long_error])
+    e = ev.repair_event(odd, "s", [AppPlan("a.b", "disable", [])], {}, result, None, packages=False)
+    assert e["errors"] == ["x" * 64]
+    assert len(ev.common("id", "start", datetime(2026, 10, 10, tzinfo=UTC), "pl")["os"]) <= 64

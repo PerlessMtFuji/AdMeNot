@@ -24,6 +24,20 @@ FLAGGED = ("malicious", "suspicious", "review")
 LEVELS = ("silence", "disable", "remove")
 SAMPLE_INSTALL = "00000000-0000-4000-8000-000000000000"
 _PKG = re.compile(r"^[A-Za-z0-9_.]{1,255}$")
+# Limity serwera (server/src/telemetry.ts): jedno złe pole odrzuca całą paczkę, więc przycinamy tu.
+SHORT = 64
+MAX_COUNT = 100_000
+MAX_SECONDS = 86_400
+MAX_SCORE = 1000
+
+
+def _short(value: str | None) -> str:
+    """Niepusty napis ≤ 64 znaki; pusty (np. telefon bez `ro.build.version.release`) → „?”."""
+    return (value or "").strip()[:SHORT] or "?"
+
+
+def _count(value: int, top: int = MAX_COUNT) -> int:
+    return min(max(0, int(value)), top)
 
 
 def hour(now: datetime) -> str:
@@ -32,12 +46,12 @@ def hour(now: datetime) -> str:
 
 def common(install: str, type_: str, now: datetime, lang: str) -> dict[str, Any]:
     return {"install": install, "type": type_, "t": hour(now), "app": __version__,
-            "os": f"{platform.system()} {platform.version()}", "lang": lang}
+            "os": _short(f"{platform.system()} {platform.version()}"), "lang": lang}
 
 
 def device_of(device: DeviceInfo) -> dict[str, str]:
-    return {"manufacturer": device.manufacturer, "model": device.model,
-            "android": device.android_release}
+    return {"manufacturer": _short(device.manufacturer), "model": _short(device.model),
+            "android": _short(device.android_release)}
 
 
 def _listed(items: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -53,13 +67,13 @@ def scan_event(report: ScanReport, session: str, seconds: int, packages: bool,
     flagged = [r for r in report.results if r.verdict != "safe"]  # wyniki są już po wyniku malejąco
     apk = report.apk
     return {
-        "device": device_of(report.device), "session": session, "apps": len(report.results),
+        "device": device_of(report.device), "session": session, "apps": _count(len(report.results)),
         "verdicts": {v: sum(1 for r in flagged if r.verdict == v) for v in FLAGGED},
         "low_behavior_data": report.low_behavior_data,
         "apk": None if apk is None else {"requested": apk.requested, "analyzed": apk.analyzed,
                                          "failed": len(apk.failed)},
-        "seconds": max(0, int(seconds)), "apk_stage": apk_stage,
-        "packages": _listed({"package": r.facts.package, "verdict": r.verdict, "score": r.score,
+        "seconds": _count(seconds, MAX_SECONDS), "apk_stage": apk_stage,
+        "packages": _listed({"package": r.facts.package, "verdict": r.verdict, "score": _count(r.score, MAX_SCORE),
                              "confidence": r.confidence, "system": r.facts.is_system}
                             for r in flagged) if packages else None,
     }
@@ -78,7 +92,7 @@ def repair_event(device: DeviceInfo, session: str, plans: list[AppPlan], verdict
         return None if status is None else status.status == "ok"
 
     failed = [a for a in statuses.values() if a.status != "ok"]
-    errors = sorted({key for a in failed for key in a.errors})[:MAX_ERRORS]
+    errors = sorted({key[:SHORT] for a in failed for key in a.errors if key})[:MAX_ERRORS]
     return {
         "device": device_of(device), "session": session,
         "levels": {lvl: sum(1 for p in plans if p.level == lvl) for lvl in LEVELS},
@@ -95,7 +109,7 @@ def undo_event(device: DeviceInfo, apps: list[str], failed: list[str], age_days:
     bad = set(failed)
     return {
         "device": device_of(device), "apps": len(apps), "failed": len(bad),
-        "age_days": max(0, int(age_days)),
+        "age_days": _count(age_days),
         "packages": _listed({"package": p, "ok": p not in bad} for p in apps) if packages else None,
     }
 
