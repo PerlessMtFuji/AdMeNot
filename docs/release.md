@@ -184,3 +184,4 @@ sprawdzić, zapisz wprost jako niesprawdzony.
     - [ ] 11f. Po wdrożeniu na produkcję: włącz statystyki bez `ADMENOT_API_URL`, jeden skan; `telemetry.py phones --days 1`
           pokazuje telefon; potem `telemetry.py delete <ID z Ustawień>`.
     - [ ] 11g. Przywróć prawdziwy profil `%LOCALAPPDATA%\AdMeNot`.
+12. [ ] Wsparcie: w `server/public/donate.html` i `server/public/pl/donate.html` zamiast `https://suppi.pl/` jest adres profilu na suppi.pl; strony wdrożone (`npx wrangler deploy` z `server/`); w programie Ustawienia → „Wesprzyj projekt” otwiera stronę, a jej przycisk prowadzi do profilu. **Przed** publikacją instalatora.

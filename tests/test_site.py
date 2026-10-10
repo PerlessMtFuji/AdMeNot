@@ -8,8 +8,10 @@ from pathlib import Path
 import pytest
 
 PUBLIC = Path(__file__).resolve().parents[1] / "server" / "public"
-PAGES = ("index.html", "privacy.html", "pl/index.html", "pl/privacy.html", "404.html")
+PAGES = ("index.html", "privacy.html", "donate.html", "pl/index.html", "pl/privacy.html",
+         "pl/donate.html", "404.html")
 DOWNLOAD = "https://github.com/PerlessMtFuji/AdMeNot/releases/latest"
+SUPPI = "https://suppi.pl/"
 
 
 class Page(HTMLParser):
@@ -124,3 +126,19 @@ def test_privacy_describes_update_checks(name, words):
     for word in words:
         assert word in text
     assert "sends no data anywhere" not in text and "nie wysyła żadnych danych" not in text
+
+
+def test_donate_pages_link_each_other_and_suppi():
+    _, en = load("donate.html")
+    _, pl = load("pl/donate.html")
+    en_links = [a.get("href") or "" for a in en.all("a")]
+    pl_links = [a.get("href") or "" for a in pl.all("a")]
+    assert "/pl/donate" in en_links and "/donate" in pl_links
+    assert any(h.startswith(SUPPI) for h in en_links) and any(h.startswith(SUPPI) for h in pl_links)
+
+
+def test_home_pages_link_the_donate_page():
+    _, en = load("index.html")
+    _, pl = load("pl/index.html")
+    assert "/donate" in [a.get("href") for a in en.all("a")]
+    assert "/pl/donate" in [a.get("href") for a in pl.all("a")]

@@ -66,6 +66,10 @@ Po zmianie mostu (`src/admenot/app/`) odśwież nagrania scenariuszy dla UI:
 - Porzucona analiza APK w tle (np. przez kliknięcie „Napraw” w jej trakcie) może jeszcze dokończyć do dwóch zaczętych, tylko-do-odczytu poleceń `adb pull` — nigdy nie dotykają dziennika, ale mogą pojawić się jako dodatkowe linie w konsoli ADB, już po starcie nowego zlecenia.
 - Okno GUI, gdy jest otwarte, serwuje zbudowany UI z własnego lokalnego serwera statycznego na `127.0.0.1` (efemeryczny port; wywołania `js_api` nie idą przez HTTP).
 
+## Wsparcie
+
+AdMeNot jest darmowy. Jeśli oszczędza Ci czas, możesz go dobrowolnie wesprzeć: <https://admenot.e-wlodarski.workers.dev/pl/donate>. Wsparcie niczego nie odblokowuje.
+
 ## Licencja
 
 AdMeNot jest darmowy i udostępniony na licencji [PolyForm Shield 1.0.0](LICENSE). Możesz go używać, także zarobkowo — np. w serwisie przy naprawie telefonów klientów. Nie wolno sprzedawać programu ani na bazie tego kodu udostępniać produktu, który z nim konkuruje. To kod jawny (source-available), a nie open source w rozumieniu OSI. Licencje składników innych autorów są w `THIRD_PARTY_NOTICES.txt` w katalogu zainstalowanego programu.

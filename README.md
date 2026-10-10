@@ -66,6 +66,10 @@ After changing the bridge (`src/admenot/app/`), refresh the scenario recordings 
 - An abandoned background APK analysis (e.g. by clicking "Fix" while it runs) may still finish up to two already started, read-only `adb pull` commands — they never touch the journal, but may show up as extra lines in the ADB console after the new order has started.
 - While open, the GUI window serves the built UI from its own local static server on `127.0.0.1` (ephemeral port; `js_api` calls do not go over HTTP).
 
+## Support
+
+AdMeNot is free. If it saves you time, you can support it voluntarily: <https://admenot.e-wlodarski.workers.dev/donate>. Support unlocks nothing.
+
 ## License
 
 AdMeNot is free and licensed under [PolyForm Shield 1.0.0](LICENSE). You may use it, including commercially — for example in a repair shop working on customers' phones. You may not sell it or use this code to offer a product that competes with it. The code is source-available, not open source in the OSI sense. Third-party licenses are listed in `THIRD_PARTY_NOTICES.txt` in the installed program's folder.
