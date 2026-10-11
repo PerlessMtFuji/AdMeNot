@@ -30,7 +30,8 @@ def read_lock(path: Path = LOCK) -> dict[str, str]:
     pins: dict[str, str] = {}
     for line in path.read_text("utf-8").splitlines():
         line = line.strip()
-        if not line or line.startswith("#"):
+        # linie --hash=… to kontynuacja przypięcia z pip-compile/uv (--generate-hashes)
+        if not line or line.startswith(("#", "--hash=")):
             continue
         m = _PIN.match(line)
         if m is None:

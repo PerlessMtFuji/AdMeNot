@@ -278,6 +278,22 @@ def test_release_env_reports_every_difference():
     assert env.read_lock()  # zamrożona lista w repo jest poprawna
 
 
+def test_release_lock_pins_hashes(tmp_path):
+    """Format z --generate-hashes: kontynuacje --hash=… nie są przypięciami, a każde przypięcie
+    w repo ma skrót (pip install --require-hashes)."""
+    spec = importlib.util.spec_from_file_location("release_env", ROOT / "scripts" / "release_env.py")
+    env = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(env)
+    lock = tmp_path / "lock"
+    lock.write_text("# x\nAlpha_Pkg==1.0 \\\n    --hash=sha256:aa \\\n    --hash=sha256:bb\n"
+                    "beta==2.0 \\\n    --hash=sha256:cc\n", "utf-8")
+    assert env.read_lock(lock) == {"alpha-pkg": "1.0", "beta": "2.0"}
+    lines = [s.strip() for s in env.LOCK.read_text("utf-8").splitlines()]
+    pins = [i for i, s in enumerate(lines) if "==" in s and not s.startswith("#")]
+    assert pins and all(lines[i].endswith("\\") and lines[i + 1].startswith("--hash=sha256:")
+                        for i in pins)
+
+
 def test_unresolved_licenses_block_a_release_until_decided(staged, monkeypatch):
     m, _, runner, _, tmp_path = staged
     monkeypatch.setattr(m.third_party_notices, "build", lambda tools, ui: ("N", ["Google list"]))

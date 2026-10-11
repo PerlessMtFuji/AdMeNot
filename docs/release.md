@@ -2,14 +2,14 @@
 
 ## Przygotowanie (raz)
 
-    .venv\Scripts\pip install -e ".[dev,gui,release]"
-    .venv\Scripts\pip install -r packaging\requirements-release.lock
+    .venv\Scripts\pip install --require-hashes -r packaging\requirements-release.lock
+    .venv\Scripts\pip install --no-deps -e .
 
 Build sprawdza, że środowisko jest dokładnie takie jak w `packaging/requirements-release.lock`
-(`scripts/release_env.py`); inna wersja albo pakiet spoza listy zatrzymuje wydanie. Zmiana
-zależności = świadoma aktualizacja locka (`pip freeze --exclude-editable`) w osobnym commicie
-i przegląd CVE nowych wersji na zatwierdzonym stanowisku. Lock przypina wersje, jeszcze nie skróty
-plików — do dopisania (`pip-compile --generate-hashes`) przed pierwszym publicznym wydaniem.
+(`scripts/release_env.py`); inna wersja albo pakiet spoza listy zatrzymuje wydanie. Lock przypina
+wersje i skróty SHA-256 plików (pip odrzuci podmieniony plik). Zmiana zależności = świadoma
+aktualizacja locka (polecenie w jego nagłówku: `pip freeze`, potem `uv pip compile --generate-hashes`)
+w osobnym commicie i przegląd CVE nowych wersji na zatwierdzonym stanowisku.
 
 Inno Setup 6 w `C:\Program Files (x86)\Inno Setup 6\` (albo `--iscc`). Node.js 24 do UI.
 
