@@ -7,8 +7,8 @@ export function json(body: unknown, status = 200, headers: Record<string, string
 }
 
 // Czyta treść strumieniowo i przerywa po przekroczeniu limitu; null = za duża.
-export async function readLimited(request: Request, max: number): Promise<string | null> {
-  if (!request.body) return "";
+export async function readLimitedBytes(request: Request, max: number): Promise<Uint8Array | null> {
+  if (!request.body) return new Uint8Array(0);
   const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -28,5 +28,10 @@ export async function readLimited(request: Request, max: number): Promise<string
     all.set(c, offset);
     offset += c.byteLength;
   }
-  return new TextDecoder().decode(all);
+  return all;
+}
+
+export async function readLimited(request: Request, max: number): Promise<string | null> {
+  const bytes = await readLimitedBytes(request, max);
+  return bytes === null ? null : new TextDecoder().decode(bytes);
 }

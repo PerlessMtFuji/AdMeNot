@@ -23,7 +23,10 @@
     { "name": "REPORTS_LIMITER", "namespace_id": "1001", "simple": { "limit": 5, "period": 60 } },
     // Statystyki: limiter przed czytaniem treści i przed D1 — program wysyła najwyżej kilka
     // zapytań na 10 minut, więc 60/min na adres zatrzymuje tylko zalew (audyt 2026-10-11, SEC-03).
-    { "name": "TELEMETRY_LIMITER", "namespace_id": "1002", "simple": { "limit": 60, "period": 60 } }
+    { "name": "TELEMETRY_LIMITER", "namespace_id": "1002", "simple": { "limit": 60, "period": 60 } },
+    // Plany dla klienta: zapis kilka razy na zlecenie, odczyt kilka razy na skan (spec plan-qr §4.2).
+    { "name": "SHARES_LIMITER", "namespace_id": "1003", "simple": { "limit": 20, "period": 60 } },
+    { "name": "SHARES_READ_LIMITER", "namespace_id": "1004", "simple": { "limit": 60, "period": 60 } }
   ],
   // Dobowy limit na adres: liczniki pod kluczem HMAC(klucz doby losowany przez obiekt, adres); klucz
   // i liczniki kasuje alarm o północy UTC (spec §2.2).

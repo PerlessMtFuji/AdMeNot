@@ -70,9 +70,9 @@ describe("schemat D1", () => {
     }
   });
 
-  it("schema_info ma wersję 3", async () => {
+  it("schema_info ma wersję 4", async () => {
     const row = await env.DB.prepare("SELECT version FROM schema_info").first<{ version: number }>();
-    expect(row?.version).toBe(3);
+    expect(row?.version).toBe(4);
   });
 });
 

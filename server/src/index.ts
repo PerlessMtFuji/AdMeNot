@@ -2,13 +2,16 @@
 // Nie logujemy zapytań ani nagłówków — adresów IP nie zapisujemy nigdzie (§2.2).
 import { json, readLimited } from "./http";
 import { takeQuota, untilMidnight } from "./quota";
+import { createShare, getShare, pruneShares } from "./shares";
 import { createEvents, deleteEvents, pruneEvents } from "./telemetry";
 
 export { Quota } from "./quota";
+export { SHARE_MAX_BODY, SHARES_IP_DAILY, SHARES_LIVE_CAP } from "./shares";
 // Raporty błędów na adres i dobę (przegląd 2026-10-11): sufit 100/dobę jest wspólny dla wszystkich.
 export const REPORTS_IP_DAILY = 20;
 
 const TELEMETRY_ITEM = /^\/api\/v1\/telemetry\/([^/]+)$/;
+const SHARE_ITEM = /^\/api\/v1\/shares\/([^/]+)$/;
 
 async function health(env: Env): Promise<Response> {
   try {
@@ -144,6 +147,13 @@ export default {
     if (request.method === "POST" && pathname === "/api/v1/telemetry") {
       return createEvents(request, env);
     }
+    if (request.method === "POST" && pathname === "/api/v1/shares") {
+      return createShare(request, env);
+    }
+    const share = SHARE_ITEM.exec(pathname);
+    if (request.method === "GET" && share) {
+      return getShare(request, share[1], env);
+    }
     const item = TELEMETRY_ITEM.exec(pathname);
     if (request.method === "DELETE" && item) {
       return deleteEvents(request, item[1], env);
@@ -153,5 +163,6 @@ export default {
   async scheduled(_controller, env, _ctx): Promise<void> {
     await env.DB.prepare("DELETE FROM reports WHERE created < datetime('now', '-90 days')").run();
     await pruneEvents(env);
+    await pruneShares(env);
   },
 } satisfies ExportedHandler<Env>;
