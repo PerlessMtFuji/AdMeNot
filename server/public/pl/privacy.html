@@ -31,6 +31,8 @@
     <p>Zanim program zapisze raport na komputerze, usuwa z niego numer IMEI i numer seryjny telefonu, numery telefonów, adresy e-mail, nazwy kont Androida, nazwiska klientów wpisane w programie i nazwę Twojego konta Windows. To filtrowanie działa na wzorcach i nie wyłapie każdej danej osobowej, dlatego przed wysłaniem sprawdź podgląd. Adresów IP nie zapisujemy.</p>
     <p>Raporty służą wyłącznie do naprawiania błędów programu. Usuwamy je automatycznie po 90 dniach. Aby usunąć raport wcześniej, napisz na adres podany wyżej i podaj numer raportu (np. R-7K3Q9M).</p>
 
+    <h2>Plan naprawy dla klienta</h2>
+    <p>Gdy serwisant kliknie „Pokaż klientowi”, AdMeNot przygotowuje listę zmian: nazwy i ikony aplikacji oraz to, co się z nimi stanie. Program szyfruje ją na komputerze i wysyła na nasz serwer (<code>/api/v1/shares</code>) wyłącznie w zaszyfrowanej postaci. Klucz jest tylko w kodzie QR, w części adresu, której przeglądarka nie wysyła na serwer, więc nie możemy odczytać listy. Zaszyfrowany plan usuwamy po 60 minutach. Adresów IP nie zapisujemy. Bez połączenia z serwerem lista (bez ikon) trafia w całości do kodu QR i nie jest nigdzie wysyłana.</p>
     <h2>Statystyki użycia (opcjonalne)</h2>
     <p>Domyślnie wyłączone. Jeśli je włączysz — na ekranie powitalnym albo później w Ustawieniach — program wysyła anonimowe statystyki użycia. Podstawą prawną jest Twoja zgoda, art. 6 ust. 1 lit. a RODO; możesz ją wycofać w każdej chwili.</p>
     <ul>
