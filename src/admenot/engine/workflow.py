@@ -121,7 +121,8 @@ def plan_order(
 
 
 def start(journal: Journal, plan: OrderPlan, client: str | None,
-          report: ScanReport | None = None, match: PhoneMatch | None = None) -> Order:
+          report: ScanReport | None = None, match: PhoneMatch | None = None,
+          consent: dict[str, str] | None = None) -> Order:
     order = start_order(journal, plan.device.serial, plan.device.model, plan.plans, client,
                         identity_of(plan.device))
     if report is not None and match is not None:
@@ -131,6 +132,8 @@ def start(journal: Journal, plan: OrderPlan, client: str | None,
         snapshot = scan_snapshot(report, match, chosen)
         if plan.unlocked:  # decyzja operatora zostaje w zleceniu (audyt 2026-10-11, QA-01)
             snapshot["unlocked"] = sorted(plan.unlocked)
+        if consent:  # klient zobaczył ten plan przed wykonaniem (spec plan-qr §5.4)
+            snapshot["consent"] = dict(consent)
         journal.save_scan(order.id, snapshot)
     return order
 
