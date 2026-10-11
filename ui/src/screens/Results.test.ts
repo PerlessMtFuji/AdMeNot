@@ -40,13 +40,13 @@ describe('Results', () => {
     expect(within(card).getByText(boost.symptoms[0].text)).toBeTruthy();
     const panel = screen.getByRole('complementary', { name: 'Plan naprawy' });
     const count = Object.keys(s.selection).length;
-    expect(within(panel).getByRole('button', { name: `Napraw zaznaczone (${count})` })).toBeTruthy();
+    expect(within(panel).getByRole('button', { name: `Podsumowanie (${count})` })).toBeTruthy();
     expect(within(panel).getByText(boost.name)).toBeTruthy();
     await fireEvent.click(within(card).getByRole('button', { name: 'Wyłącz' }));
     expect(s.selection[boost.package]).toBe('disable');
     await fireEvent.click(within(card).getByRole('checkbox', { name: boost.name }));
     expect(s.selection[boost.package]).toBeUndefined();
-    expect(within(panel).getByRole('button', { name: `Napraw zaznaczone (${count - 1})` })).toBeTruthy();
+    expect(within(panel).getByRole('button', { name: `Podsumowanie (${count - 1})` })).toBeTruthy();
     expect(within(panel).getByText('R58T00TEST')).toBeTruthy();
     await fireEvent.click(within(panel).getByRole('button', { name: new RegExp(tp('results.safe', s.scan!.counts.safe)) }));
     const safe = screen.getByRole('region', { name: 'Bez uwag' });
@@ -107,7 +107,7 @@ describe('Results', () => {
     await tick();
     const panel = screen.getByRole('complementary', { name: 'Plan naprawy' });
     expect(within(panel).getByText('Zaznacz aplikacje, które chcesz naprawić.')).toBeTruthy();
-    const fix = within(panel).getByRole('button', { name: 'Napraw zaznaczone (0)' }) as HTMLButtonElement;
+    const fix = within(panel).getByRole('button', { name: 'Podsumowanie (0)' }) as HTMLButtonElement;
     expect(fix.disabled).toBe(true);
   });
 
@@ -115,7 +115,7 @@ describe('Results', () => {
     const { s } = await scanned('clean');
     expect(screen.getByRole('heading', { name: 'Nie wykryto oznak zagrożenia' })).toBeTruthy();
     expect(screen.getByText(`W zakresie wykonanego skanu · sprawdzone aplikacje: ${s.scan!.counts.total}`)).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Napraw zaznaczone (0)' }) as HTMLButtonElement)
+    expect((screen.getByRole('button', { name: 'Podsumowanie (0)' }) as HTMLButtonElement)
       .disabled).toBe(true);
   });
 

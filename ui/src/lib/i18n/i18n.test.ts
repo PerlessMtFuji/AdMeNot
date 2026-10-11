@@ -56,9 +56,9 @@ describe('dictionaries', () => {
 
   test('t() switches language and fills parameters', () => {
     i18n.lang = 'pl';
-    expect(t('actions.fix', { count: 2 })).toBe('Napraw zaznaczone (2)');
+    expect(t('actions.fix', { count: 2 })).toBe('Podsumowanie (2)');
     i18n.lang = 'en';
-    expect(t('actions.fix', { count: 2 })).toBe('Fix selected (2)');
+    expect(t('actions.fix', { count: 2 })).toBe('Summary (2)');
     expect(t('no.such.key')).toBe('no.such.key');
     i18n.lang = 'pl';
   });

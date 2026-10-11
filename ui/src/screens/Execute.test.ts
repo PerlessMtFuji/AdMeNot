@@ -21,7 +21,7 @@ async function scanned(scenario = 'adware') {
 describe('plan and execution', () => {
   test('report button opens the PDF, then shows the PDF error', async () => {
     const { s, bridge } = await scanned('report');
-    await fireEvent.click(screen.getByRole('button', { name: /Napraw zaznaczone/ }));
+    await fireEvent.click(screen.getByRole('button', { name: /Podsumowanie/ }));
     await fireEvent.click(await screen.findByRole('button', { name: /^Wykonaj/ }));
     await vi.waitFor(() => expect(s.phase).toBe('done'));
     await tick();
@@ -39,7 +39,7 @@ describe('plan and execution', () => {
 
   test('preview, run, results, new scan', async () => {
     const { s } = await scanned();
-    await fireEvent.click(screen.getByRole('button', { name: /Napraw zaznaczone/ }));
+    await fireEvent.click(screen.getByRole('button', { name: /Podsumowanie/ }));
     const confirm = await screen.findByRole('region', { name: 'Plan naprawy' });
     expect(confirm.textContent).toContain('wyłączenie aplikacji');
     expect(screen.getByRole('main').hasAttribute('inert')).toBe(true);
@@ -54,7 +54,7 @@ describe('plan and execution', () => {
 
   test('back to repair: same results, done apps marked, a removed app cannot be picked again', async () => {
     const { s } = await scanned();
-    await fireEvent.click(screen.getByRole('button', { name: /Napraw zaznaczone/ }));
+    await fireEvent.click(screen.getByRole('button', { name: /Podsumowanie/ }));
     await fireEvent.click(await screen.findByRole('button', { name: /^Wykonaj/ }));
     await vi.waitFor(() => expect(s.phase).toBe('done'));
     await tick();
@@ -69,7 +69,7 @@ describe('plan and execution', () => {
 
   test('back to repair, then undo one app right from its card', async () => {
     const { s } = await scanned();
-    await fireEvent.click(screen.getByRole('button', { name: /Napraw zaznaczone/ }));
+    await fireEvent.click(screen.getByRole('button', { name: /Podsumowanie/ }));
     await fireEvent.click(await screen.findByRole('button', { name: /^Wykonaj/ }));
     await vi.waitFor(() => expect(s.phase).toBe('done'));
     await tick();
@@ -88,7 +88,7 @@ describe('plan and execution', () => {
 
   test('undo from the result goes to history', async () => {
     const { s } = await scanned();
-    await fireEvent.click(screen.getByRole('button', { name: /Napraw zaznaczone/ }));
+    await fireEvent.click(screen.getByRole('button', { name: /Podsumowanie/ }));
     await fireEvent.click(await screen.findByRole('button', { name: /^Wykonaj/ }));
     await vi.waitFor(() => expect(s.phase).toBe('done'));
     await tick();
@@ -123,13 +123,33 @@ describe('plan and execution', () => {
       ['com.sec.android.app.launcher']] });
   });
 
+  test('the summary groups apps by action with shared steps listed once', async () => {
+    const { s } = await scanned();
+    const app = (name: string, level: 'silence' | 'remove', steps: string[]) => ({ package: `p.${name}`, name, level,
+      level_label: '', blocked: false, reason: null, reason_text: null, steps, warnings: [] });
+    s.plan = { runnable: 3, code: 'K7F3', apps: [
+      app('Zegar', 'silence', ['blokada okien nad innymi aplikacjami']),
+      app('Cleaner', 'remove', ['zatrzymanie aplikacji', 'odinstalowanie (użytkownik 0)']),
+      app('Bateria', 'silence', ['blokada okien nad innymi aplikacjami', 'odebranie zgody na powiadomienia']),
+    ] };
+    await tick();
+    const region = screen.getByRole('region', { name: 'Plan naprawy' });
+    expect(within(region).getAllByRole('heading', { level: 3 }).map((h) => h.textContent?.trim()))
+      .toEqual(['Do usunięcia (1)', 'Do wyciszenia (2)']);
+    expect(within(region).getAllByText('blokada okien nad innymi aplikacjami')).toHaveLength(1);
+    const silence = within(region).getByRole('list', { name: 'Do wyciszenia (2)' });
+    expect([...silence.children].map((li) => li.querySelector('b')?.textContent))
+      .toEqual(['Bateria', 'Zegar']);
+    expect(within(silence).getByText('odebranie zgody na powiadomienia')).toBeTruthy();
+  });
+
   test('back from the confirmation returns to the plan panel', async () => {
     const { s } = await scanned();
-    await fireEvent.click(screen.getByRole('button', { name: /Napraw zaznaczone/ }));
+    await fireEvent.click(screen.getByRole('button', { name: /Podsumowanie/ }));
     await screen.findByRole('region', { name: 'Plan naprawy' });
     await fireEvent.click(screen.getByRole('button', { name: 'Wróć' }));
     expect(s.plan).toBeNull();
-    expect(screen.getByRole('button', { name: /Napraw zaznaczone/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Podsumowanie/ })).toBeTruthy();
     expect(screen.getByRole('main').hasAttribute('inert')).toBe(false);
   });
 

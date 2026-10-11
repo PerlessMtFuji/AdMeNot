@@ -1,5 +1,5 @@
 import { CATEGORY_ORDER } from './categories';
-import type { AppView, Category, DeviceEntry, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanView, ScanView, Settings, StepEvent, UpdateView, Verdict } from './types';
+import type { AppView, Category, DeviceEntry, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanView, ScanView, Settings, StepEvent, UpdateView, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done';
 export type StageState = 'done' | 'now' | 'todo';
@@ -191,6 +191,31 @@ export const LEVEL_TONE: Record<Level, 'accent' | 'warn' | 'bad'> = { silence: '
 export const VERDICT_TONE: Record<Verdict, 'bad' | 'warn' | 'neutral' | 'ok'> = {
   malicious: 'bad', suspicious: 'warn', review: 'neutral', safe: 'ok',
 };
+
+export type PlanGroupKey = Level | 'blocked';
+export interface PlanGroup {
+  key: PlanGroupKey;
+  steps: string[]; // wspólne dla wszystkich aplikacji grupy: pokazane raz pod nagłówkiem
+  warnings: string[];
+  apps: { app: PlanApp; steps: string[]; warnings: string[] }[]; // tylko to, czego nie ma w części wspólnej
+}
+
+const PLAN_GROUPS: PlanGroupKey[] = ['remove', 'disable', 'silence', 'blocked']; // od najmocniejszej zmiany
+
+const shared = (lists: string[][]) => lists[0].filter((x) => lists.every((l) => l.includes(x)));
+
+/** Podsumowanie przed naprawą pogrupowane wg akcji, jak strona planu dla klienta. */
+export function planGroups(apps: PlanApp[], lang: string): PlanGroup[] {
+  const order = new Intl.Collator(lang);
+  return PLAN_GROUPS.flatMap((key) => {
+    const list = apps.filter((a) => (a.blocked ? 'blocked' : a.level) === key).sort((a, b) => order.compare(a.name, b.name));
+    if (list.length === 0) return [];
+    const steps = list.length > 1 ? shared(list.map((a) => a.steps)) : list[0].steps;
+    const warnings = list.length > 1 ? shared(list.map((a) => a.warnings)) : list[0].warnings;
+    return [{ key, steps, warnings, apps: list.map((app) => ({ app,
+      steps: app.steps.filter((x) => !steps.includes(x)), warnings: app.warnings.filter((x) => !warnings.includes(x)) })) }];
+  });
+}
 
 export function planEntries(apps: AppView[], selection: Record<string, Level>):
   { package: string; name: string; level: Level }[] {

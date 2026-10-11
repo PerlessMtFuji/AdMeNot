@@ -12,7 +12,7 @@ async function scan(page: Page, scenario: string) {
 test('adware: scan, confirm the plan, fix with the admin step, undo from history', async ({ page }) => {
   await scan(page, 'adware');
   await expect(page.getByRole('heading', { name: /wymaga(ją)? uwagi/ })).toBeVisible();
-  await page.getByRole('button', { name: /Napraw zaznaczone/ }).click();
+  await page.getByRole('button', { name: /Podsumowanie/ }).click();
   await expect(page.getByRole('region', { name: 'Plan naprawy' })).toBeVisible();
   await page.getByRole('button', { name: /^Wykonaj/ }).click();
   await expect(page.getByRole('heading', { name: 'Telefon naprawiony' })).toBeVisible({ timeout: 15_000 });
@@ -26,12 +26,12 @@ test('adware: scan, confirm the plan, fix with the admin step, undo from history
 test('clean phone has nothing to fix', async ({ page }) => {
   await scan(page, 'clean');
   await expect(page.getByRole('heading', { name: 'Nie wykryto oznak zagrożenia' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Napraw zaznaczone (0)' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Podsumowanie (0)' })).toBeDisabled();
 });
 
 test('disconnect during the order, then finish it', async ({ page }) => {
   await scan(page, 'disconnect');
-  await page.getByRole('button', { name: /Napraw zaznaczone/ }).click();
+  await page.getByRole('button', { name: /Podsumowanie/ }).click();
   await page.getByRole('button', { name: /^Wykonaj/ }).click();
   await expect(page.getByText(/Telefon odłączony w trakcie zlecenia/)).toBeVisible({ timeout: 15_000 });
   await page.getByRole('button', { name: 'Dokończ' }).first().click();
@@ -40,7 +40,7 @@ test('disconnect during the order, then finish it', async ({ page }) => {
 
 test('report scenario: PDF error falls back to HTML, service details saved', async ({ page }) => {
   await scan(page, 'report');
-  await page.getByRole('button', { name: /Napraw zaznaczone/ }).click();
+  await page.getByRole('button', { name: /Podsumowanie/ }).click();
   await page.getByRole('button', { name: /^Wykonaj/ }).click();
   await expect(page.getByRole('heading', { name: 'Telefon naprawiony' })).toBeVisible({ timeout: 15_000 });
   const report = page.getByRole('button', { name: 'Protokół PDF' });
@@ -66,7 +66,7 @@ test('expert mode and English', async ({ page }) => {
   await page.getByRole('button', { name: 'Ustawienia' }).click();
   await page.getByRole('button', { name: 'English' }).click();
   await page.getByRole('button', { name: 'Back to the order' }).click();
-  await expect(page.getByRole('button', { name: /^Fix \(/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Summary \(/ })).toBeVisible();
   await expect(page.getByRole('columnheader', { name: 'App' })).toBeVisible();
 });
 
@@ -112,7 +112,7 @@ test('find the ad source opens in the side panel and comes back to the plan', as
 
 test('repair cards keep their full height when the order is longer than the window', async ({ page }) => {
   await scan(page, 'adware');
-  await page.getByRole('button', { name: /Napraw zaznaczone/ }).click();
+  await page.getByRole('button', { name: /Podsumowanie/ }).click();
   await page.getByRole('button', { name: /^Wykonaj/ }).click();
   await expect(page.getByRole('heading', { name: 'Telefon naprawiony' })).toBeVisible({ timeout: 15_000 });
   await page.setViewportSize({ width: 1280, height: 300 });
@@ -132,7 +132,7 @@ test('screen view and screenshots: start, stop, screenshot lands in the order st
   await expect(panel.getByText('1 zrzut do protokołu')).toBeVisible();
   await panel.getByRole('button', { name: 'Zamknij podgląd' }).click();
   await expect(panel.getByRole('button', { name: 'Podgląd ekranu' })).toBeVisible();
-  await page.getByRole('button', { name: /Napraw zaznaczone/ }).click();
+  await page.getByRole('button', { name: /Podsumowanie/ }).click();
   await page.getByRole('button', { name: /^Wykonaj/ }).click();
   await expect(page.getByRole('heading', { name: 'Telefon naprawiony' })).toBeVisible({ timeout: 15_000 });
   const box = page.getByRole('checkbox', { name: 'w protokole' });
@@ -155,7 +155,7 @@ test('pierwsze uruchomienie: ostrzeżenie i zgody', async ({ page }) => {
 });
 test('show the plan to the client: QR, code and consent go with the order', async ({ page }) => {
   await scan(page, 'adware');
-  await page.getByRole('button', { name: /Napraw zaznaczone/ }).click();
+  await page.getByRole('button', { name: /Podsumowanie/ }).click();
   await page.getByRole('button', { name: 'Pokaż klientowi' }).click();
   await expect(page.getByRole('img', { name: /Kod QR/ })).toBeVisible();
   // Atrapa udostępnia ten sam plan co podgląd: kod kontrolny z nagrania tests/fixtures/bridge/adware.json.

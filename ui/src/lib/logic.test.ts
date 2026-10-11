@@ -21,6 +21,7 @@ import {
   mergeSelection,
   modelName,
   planEntries,
+  planGroups,
   scanChecklist,
   signalChips,
   sourceKey,
@@ -36,7 +37,7 @@ import {
   updateBanner,
   needsWelcome,
 } from './logic';
-import type { AppView, Category, StepEvent, Finding, ScanView, Settings, UpdateView } from './types';
+import type { AppView, Category, Level, PlanApp, StepEvent, Finding, ScanView, Settings, UpdateView } from './types';
 
 function app(pkg: string, verdict: AppView['verdict'], extra: Partial<AppView> = {}): AppView {
   const level = verdict === 'malicious' ? 'remove' : verdict === 'suspicious' ? 'disable' : null;
@@ -374,5 +375,30 @@ describe('needsWelcome', () => {
     expect(needsWelcome({ ...base, welcome_version: null })).toBe(true);
     expect(needsWelcome({ ...base, welcome_current: 2 })).toBe(true);
     expect(needsWelcome(base)).toBe(false);
+  });
+});
+
+describe('plan groups', () => {
+  const app = (name: string, level: Level, steps: string[], extra: Partial<PlanApp> = {}): PlanApp => ({
+    package: `p.${name}`, name, level, level_label: '', blocked: false, reason: null, reason_text: null,
+    steps, warnings: [], ...extra });
+
+  test('groups by action, strongest first, skipped last, names sorted by the UI language', () => {
+    const groups = planGroups([
+      app('Żaba', 'silence', ['a']), app('Ala', 'remove', ['x']), app('Ćma', 'silence', ['a']),
+      app('Cebula', 'silence', ['a']), app('System', 'remove', [], { blocked: true }), app('Bęben', 'disable', ['d']),
+    ], 'pl');
+    expect(groups.map((g) => g.key)).toEqual(['remove', 'disable', 'silence', 'blocked']);
+    expect(groups.map((g) => g.apps.map((a) => a.app.name))).toEqual([['Ala'], ['Bęben'], ['Cebula', 'Ćma', 'Żaba'], ['System']]);
+  });
+
+  test('steps and warnings shared by the whole group are listed once, the rest stays with the app', () => {
+    const [g] = planGroups([
+      app('B', 'remove', ['zgoda', 'okna', 'stop', 'odinstalowanie'], { warnings: ['dane'] }),
+      app('A', 'remove', ['zgoda', 'stop', 'odinstalowanie'], { warnings: ['dane', 'konto'] }),
+    ], 'pl');
+    expect(g.steps).toEqual(['zgoda', 'stop', 'odinstalowanie']);
+    expect(g.warnings).toEqual(['dane']);
+    expect(g.apps.map((a) => [a.app.name, a.steps, a.warnings])).toEqual([['A', [], ['konto']], ['B', ['okna'], []]]);
   });
 });
