@@ -115,7 +115,7 @@ test('history: report button next to each order', async () => {
   render(App, { props: { ctl } });
   await ctl.startScan();
   await vi.waitFor(() => expect(s.job).toBeNull());
-  await fireEvent.click(screen.getByRole('button', { name: /Napraw zaznaczone/ }));
+  await fireEvent.click(screen.getByRole('button', { name: /Podsumowanie/ }));
   await fireEvent.click(await screen.findByRole('button', { name: /^Wykonaj/ }));
   await vi.waitFor(() => expect(s.phase).toBe('done'));
   await fireEvent.click(screen.getByRole('button', { name: 'Historia' }));

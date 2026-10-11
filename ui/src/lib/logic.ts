@@ -1,5 +1,5 @@
 import { CATEGORY_ORDER } from './categories';
-import type { AppView, Category, DeviceEntry, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanView, ScanView, Settings, StepEvent, UpdateView, Verdict } from './types';
+import type { AppView, Category, DeviceEntry, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanView, ScanView, Settings, StepEvent, UpdateView, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done';
 export type StageState = 'done' | 'now' | 'todo';
@@ -191,6 +191,41 @@ export const LEVEL_TONE: Record<Level, 'accent' | 'warn' | 'bad'> = { silence: '
 export const VERDICT_TONE: Record<Verdict, 'bad' | 'warn' | 'neutral' | 'ok'> = {
   malicious: 'bad', suspicious: 'warn', review: 'neutral', safe: 'ok',
 };
+
+export type PlanGroupKey = Level | 'blocked';
+/** Krok albo ostrzeżenie w grupie; only: nazwy aplikacji, których dotyczy (pusta = wszystkich w grupie). */
+export interface PlanGroupLine { text: string; only: string[] }
+export interface PlanGroup { key: PlanGroupKey; apps: PlanApp[]; steps: PlanGroupLine[]; warnings: PlanGroupLine[] }
+
+const PLAN_GROUPS: PlanGroupKey[] = ['remove', 'disable', 'silence', 'blocked']; // od najmocniejszej zmiany
+
+/** Jedna lista dla grupy w kolejności wykonania: krok, którego część aplikacji nie ma, zostaje między
+ *  sąsiadami z ich listy (planista układa kroki zawsze w tej samej kolejności). */
+function mergeLines(apps: PlanApp[], pick: (a: PlanApp) => string[]): PlanGroupLine[] {
+  const order: string[] = [];
+  for (const a of apps) {
+    let at = -1;
+    for (const text of pick(a)) {
+      const found = order.indexOf(text);
+      if (found >= 0) at = found;
+      else order.splice(++at, 0, text);
+    }
+  }
+  return order.map((text) => {
+    const having = apps.filter((a) => pick(a).includes(text));
+    return { text, only: having.length === apps.length ? [] : having.map((a) => a.name) };
+  });
+}
+
+/** Podsumowanie przed naprawą pogrupowane wg akcji, jak strona planu dla klienta. */
+export function planGroups(apps: PlanApp[], lang: string): PlanGroup[] {
+  const order = new Intl.Collator(lang);
+  return PLAN_GROUPS.flatMap((key) => {
+    const list = apps.filter((a) => (a.blocked ? 'blocked' : a.level) === key).sort((a, b) => order.compare(a.name, b.name));
+    return list.length === 0 ? []
+      : [{ key, apps: list, steps: mergeLines(list, (a) => a.steps), warnings: mergeLines(list, (a) => a.warnings) }];
+  });
+}
 
 export function planEntries(apps: AppView[], selection: Record<string, Level>):
   { package: string; name: string; level: Level }[] {

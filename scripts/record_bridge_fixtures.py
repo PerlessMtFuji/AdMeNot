@@ -161,7 +161,7 @@ def _report(r: Recorder, phone: Any) -> None:
     r.call("list_devices")
     r.call("history", None)  # UI przy starcie pyta o znane telefony (Controller.loadKnownSerials)
     r.call("start_scan", SERIAL, CLIENT)
-    r.call("preview_plan", {"com.wlive.forecast": "disable"}, [])  # „Napraw zaznaczone”
+    r.call("preview_plan", {"com.wlive.forecast": "disable"}, [])  # „Podsumowanie”
     r.call("execute", {"com.wlive.forecast": "disable"}, [])
     number = r.events("exec:order")[0]["order"]
     with mock.patch("admenot.engine.report.files.html_to_pdf", _fake_pdf):

@@ -21,6 +21,7 @@ import {
   mergeSelection,
   modelName,
   planEntries,
+  planGroups,
   scanChecklist,
   signalChips,
   sourceKey,
@@ -36,7 +37,7 @@ import {
   updateBanner,
   needsWelcome,
 } from './logic';
-import type { AppView, Category, StepEvent, Finding, ScanView, Settings, UpdateView } from './types';
+import type { AppView, Category, Level, PlanApp, StepEvent, Finding, ScanView, Settings, UpdateView } from './types';
 
 function app(pkg: string, verdict: AppView['verdict'], extra: Partial<AppView> = {}): AppView {
   const level = verdict === 'malicious' ? 'remove' : verdict === 'suspicious' ? 'disable' : null;
@@ -374,5 +375,41 @@ describe('needsWelcome', () => {
     expect(needsWelcome({ ...base, welcome_version: null })).toBe(true);
     expect(needsWelcome({ ...base, welcome_current: 2 })).toBe(true);
     expect(needsWelcome(base)).toBe(false);
+  });
+});
+
+describe('plan groups', () => {
+  const app = (name: string, level: Level, steps: string[], extra: Partial<PlanApp> = {}): PlanApp => ({
+    package: `p.${name}`, name, level, level_label: '', blocked: false, reason: null, reason_text: null,
+    steps, warnings: [], ...extra });
+
+  test('groups by action, strongest first, skipped last, names sorted by the UI language', () => {
+    const groups = planGroups([
+      app('Żaba', 'silence', ['a']), app('Ala', 'remove', ['x']), app('Ćma', 'silence', ['a']),
+      app('Cebula', 'silence', ['a']), app('System', 'remove', [], { blocked: true }), app('Bęben', 'disable', ['d']),
+    ], 'pl');
+    expect(groups.map((g) => g.key)).toEqual(['remove', 'disable', 'silence', 'blocked']);
+    expect(groups.map((g) => g.apps.map((a) => a.name))).toEqual([['Ala'], ['Bęben'], ['Cebula', 'Ćma', 'Żaba'], ['System']]);
+  });
+
+  test('one step list per group in execution order, steps not for every app name their apps', () => {
+    const [g] = planGroups([
+      app('Ultimate', 'disable', ['powiadomienia', 'zatrzymanie', 'wyłączenie'], { warnings: ['konto'] }),
+      app('IntelliClean', 'disable', ['zatrzymanie', 'wyłączenie'], { warnings: [] }),
+    ], 'pl');
+    expect(g.apps.map((a) => a.name)).toEqual(['IntelliClean', 'Ultimate']);
+    expect(g.steps).toEqual([
+      { text: 'powiadomienia', only: ['Ultimate'] }, { text: 'zatrzymanie', only: [] }, { text: 'wyłączenie', only: [] },
+    ]);
+    expect(g.warnings).toEqual([{ text: 'konto', only: ['Ultimate'] }]);
+  });
+
+  test('a step only some apps have keeps its place between the shared ones', () => {
+    const [g] = planGroups([
+      app('A', 'remove', ['zgoda', 'stop', 'odinstalowanie']),
+      app('B', 'remove', ['zgoda', 'okna', 'stop', 'odinstalowanie']),
+    ], 'pl');
+    expect(g.steps.map((x) => x.text)).toEqual(['zgoda', 'okna', 'stop', 'odinstalowanie']);
+    expect(g.steps[1].only).toEqual(['B']);
   });
 });

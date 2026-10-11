@@ -61,7 +61,7 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(page).toHaveScreenshot(`results-console-${theme}.png`);
       await page.getByRole('button', { name: 'Konsola ADB' }).click();
       await page.getByRole('button', { name: 'Prosty' }).click();
-      await page.getByRole('button', { name: /Napraw zaznaczone/ }).click();
+      await page.getByRole('button', { name: /Podsumowanie/ }).click();
       await expect(page.getByRole('region', { name: 'Plan naprawy' })).toBeVisible();
       await expect(page).toHaveScreenshot(`plan-confirm-${theme}.png`);
     });
@@ -80,7 +80,7 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(page).toHaveScreenshot(`execute-admin-${theme}.png`,
         { mask: [page.getByText(/Czekam jeszcze/), page.locator('svg circle + circle')] });
       await scan(page);
-      await page.getByRole('button', { name: /Napraw zaznaczone/ }).click();
+      await page.getByRole('button', { name: /Podsumowanie/ }).click();
       await page.getByRole('button', { name: /^Wykonaj/ }).click();
       await expect(page.getByRole('heading', { name: 'Telefon naprawiony' })).toBeVisible({ timeout: 15_000 });
       await expect(page).toHaveScreenshot(`execute-done-${theme}.png`);
@@ -88,7 +88,7 @@ for (const theme of ['light', 'dark'] as const) {
 
     test('history and settings', async ({ page }) => {
       await scan(page);
-      await page.getByRole('button', { name: /Napraw zaznaczone/ }).click();
+      await page.getByRole('button', { name: /Podsumowanie/ }).click();
       await page.getByRole('button', { name: /^Wykonaj/ }).click();
       await expect(page.getByRole('heading', { name: 'Telefon naprawiony' })).toBeVisible({ timeout: 15_000 });
       await page.getByRole('button', { name: 'Historia' }).click();
