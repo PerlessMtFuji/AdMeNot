@@ -10,6 +10,7 @@ import contextlib
 import http.client
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -56,10 +57,10 @@ MAX_RESPONSE = 1024 * 1024  # odpowiedzi API i manifest są małe (audyt 2026-10
 
 
 def _fetch(path: str, data: bytes | None = None, method: str | None = None,
-           max_bytes: int = MAX_RESPONSE) -> bytes:
+           max_bytes: int = MAX_RESPONSE, content_type: str = "application/json") -> bytes:
     headers = {"User-Agent": user_agent(), "Accept": "application/json"}
     if data is not None:
-        headers["Content-Type"] = "application/json"
+        headers["Content-Type"] = content_type
     try:
         request = urllib.request.Request(base_url() + path, data=data, headers=headers,
                                          method=method or ("GET" if data is None else "POST"))
@@ -78,8 +79,9 @@ def _fetch(path: str, data: bytes | None = None, method: str | None = None,
     return body
 
 
-def _request(path: str, data: bytes | None = None, method: str | None = None) -> dict[str, Any]:
-    raw = _fetch(path, data, method)
+def _request(path: str, data: bytes | None = None, method: str | None = None,
+             content_type: str = "application/json") -> dict[str, Any]:
+    raw = _fetch(path, data, method, content_type=content_type)
     try:
         value = json.loads(raw)
     except ValueError:  # także UnicodeDecodeError — np. strona logowania do Wi-Fi
@@ -104,6 +106,18 @@ def post_json(path: str, body: dict[str, Any]) -> dict[str, Any]:
 
 def delete(path: str) -> dict[str, Any]:
     return _request(path, method="DELETE")
+
+
+_SHARE_ID = re.compile(r"[A-Za-z0-9_-]{22}")
+
+
+def create_share(blob: bytes) -> tuple[str, str]:
+    """Zaszyfrowany plan dla klienta (spec 2026-10-11-plan-qr §4.2): serwer widzi tylko bajty."""
+    value = _request("/api/v1/shares", blob, content_type="application/octet-stream")
+    share_id, expires = value.get("id"), value.get("expires")
+    if not isinstance(share_id, str) or not _SHARE_ID.fullmatch(share_id) or not isinstance(expires, str):
+        raise BackendError("invalid")
+    return share_id, expires
 
 
 def _open_download(url: str) -> http.client.HTTPResponse:

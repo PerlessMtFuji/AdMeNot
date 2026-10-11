@@ -209,3 +209,31 @@ def test_oversized_response_is_refused_before_reading_it_all(stub):
         client._fetch("/api/v1/health", max_bytes=1000)
     assert err.value.kind == "invalid"
     assert client._fetch("/api/v1/health", max_bytes=len(stub.body)) == stub.body
+
+
+SHARE_OK = b'{"id": "AbCdEfGhIjKlMnOpQrStUv", "expires": "2026-10-11T13:32:00Z"}'
+
+
+def test_create_share_posts_raw_bytes(stub):
+    stub.status, stub.body = 201, SHARE_OK
+    assert client.create_share(b"\x01blob") == ("AbCdEfGhIjKlMnOpQrStUv", "2026-10-11T13:32:00Z")
+    method, path, headers, data = stub.requests[0]
+    assert (method, path) == ("POST", "/api/v1/shares")
+    assert headers["Content-Type"] == "application/octet-stream"
+    assert data == b"\x01blob"
+
+
+@pytest.mark.parametrize("body", [b'{"id": "../etc", "expires": "x"}', b'{"id": "AbCdEfGhIjKlMnOpQrStUv"}',
+                                  b'[]'])
+def test_create_share_rejects_odd_answers(stub, body):
+    stub.status, stub.body = 201, body
+    with pytest.raises(BackendError) as err:
+        client.create_share(b"\x01")
+    assert err.value.kind == "invalid"
+
+
+def test_create_share_offline(monkeypatch):
+    monkeypatch.setenv(client.ENV_URL, "http://127.0.0.1:1")
+    with pytest.raises(BackendError) as err:
+        client.create_share(b"\x01")
+    assert err.value.kind == "offline"
