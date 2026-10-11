@@ -139,6 +139,9 @@ def render_html(protocol: Protocol, service: ServiceInfo, generated_at: datetime
         recommendations=[t["recommendations"][r.key].format(**r.params)
                          for r in protocol.recommendations],
         generated=t["generated"].format(date=generated_at.strftime(t["datetime_format"])),
+        consent=(t["consent"].format(code=protocol.consent.code,
+                                     time=protocol.consent.shown_at.strftime("%H:%M"))
+                 if protocol.consent else None),
         shots=[{"image": image, "time": s.taken_at.strftime(t["datetime_format"]),
                 "caption": screenshot_caption(s.context, lang)}
                for s in protocol.screenshots if (image := data_uri(s.image))],

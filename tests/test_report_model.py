@@ -4,7 +4,7 @@ import pytest
 
 from admenot.engine.journal.db import Journal
 from admenot.engine.phones.provider import SILHOUETTE
-from admenot.engine.report.model import AppRow, Recommendation, ScanScope, build_protocol
+from admenot.engine.report.model import AppRow, Consent, Recommendation, ScanScope, build_protocol
 
 NOW = datetime(2026, 9, 26, 14, 5)
 BOOST, FORECAST, GAME = "com.clean.pro.boost", "com.wlive.forecast", "com.game"
@@ -280,3 +280,16 @@ def test_failed_step_with_unrestored_inverse_is_partially_undone(journal, photo)
     journal.set_action_status(aid, "failed", "timeout")
     outcomes = {r.package: r.outcome for r in build_protocol(journal, order.id, "pl").rows}
     assert outcomes["com.x"] == "partially_undone"
+
+
+def test_consent_is_read_from_the_snapshot(journal, photo):
+    order = make_order(journal, {**snapshot(photo), "consent": {
+        "code": "K7F3", "shown_at": "2026-10-11T14:32:05", "confirmed_at": "2026-10-11T14:35:00"}})
+    p = build_protocol(journal, order.id, "pl")
+    assert p.consent == Consent("K7F3", datetime(2026, 10, 11, 14, 32, 5), datetime(2026, 10, 11, 14, 35))
+
+
+@pytest.mark.parametrize("bad", [None, "x", {"code": 1}, {"code": "K7F3", "shown_at": "wczoraj"}])
+def test_broken_consent_is_ignored(journal, photo, bad):
+    order = make_order(journal, {**snapshot(photo), "consent": bad})
+    assert build_protocol(journal, order.id, "pl").consent is None

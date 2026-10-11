@@ -77,6 +77,13 @@ class ProtocolShot:
 
 
 @dataclass(frozen=True)
+class Consent:
+    code: str
+    shown_at: datetime
+    confirmed_at: datetime
+
+
+@dataclass(frozen=True)
 class Protocol:
     number: str
     created_at: datetime
@@ -89,6 +96,7 @@ class Protocol:
     lang: str
     scope: ScanScope | None = None
     screenshots: list[ProtocolShot] = field(default_factory=list)
+    consent: Consent | None = None
 
 
 def _outcome(actions: list[Action], still_active: bool) -> str:
@@ -111,6 +119,18 @@ def _row(package: str, app: dict[str, Any] | None, lang: str, level: str | None,
     return AppRow(package, app.get("label"), app.get("verdict"),
                   list(problems.get(lang) or problems.get("pl") or []), level, outcome,
                   bool(app.get("incomplete")), list(app.get("gaps") or []), app.get("icon"))
+
+
+def _consent(snap: dict[str, Any] | None) -> Consent | None:
+    """Zgoda z migawki (spec plan-qr §5.4); uszkodzony wpis = brak linijki, nie błąd protokołu."""
+    raw = (snap or {}).get("consent")
+    if not isinstance(raw, dict) or not isinstance(raw.get("code"), str):
+        return None
+    try:
+        return Consent(raw["code"], datetime.fromisoformat(raw["shown_at"]),
+                       datetime.fromisoformat(raw["confirmed_at"]))
+    except (KeyError, TypeError, ValueError):
+        return None
 
 
 def _scope(snap: dict[str, Any], incomplete_apps: int) -> ScanScope:
@@ -240,4 +260,4 @@ def build_protocol(journal: Journal, order_id: int, lang: str) -> Protocol:
             clean = snap["app_count"] - in_rows - incomplete_apps
     return Protocol(order.number, order.created_at, order.client_name, device, rows, clean,
                     _recommendations(rows, device, order.created_at, scope), snap is not None,
-                    lang, scope, _screenshots(journal, order_id))
+                    lang, scope, _screenshots(journal, order_id), consent=_consent(snap))
