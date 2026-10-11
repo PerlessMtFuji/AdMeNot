@@ -36,6 +36,7 @@ def main() -> None:
         "payload": PAYLOAD,
         "local_fragment": local.split("#", 1)[1],
         "local_payload": share.decode_local(local),
+        "local_limit": share.LOCAL_LIMIT,  # UI sprawdza, że kod tej długości da się zeskanować
     }
     OUT.write_text(json.dumps(vector, ensure_ascii=False, indent=2) + "\n", "utf-8")
     print(f"zapisano {OUT}")
