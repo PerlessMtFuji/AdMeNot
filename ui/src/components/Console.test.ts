@@ -4,7 +4,8 @@ import { expect, test, vi } from 'vitest';
 import App from '../App.svelte';
 import { setupCtl } from '../test-utils';
 
-test('console shows session commands and runs shell commands after a warning', async () => {
+// Renderuje całe App i skanuje: ok. 2,5 s przy 12 wątkach vitest, pod pełnym obciążeniem przekraczało domyślne 5 s.
+test('console shows session commands and runs shell commands after a warning', { timeout: 15_000 }, async () => {
   const { ctl, s, bridge } = await setupCtl('adware');
   render(App, { props: { ctl } });
   await ctl.startScan();
