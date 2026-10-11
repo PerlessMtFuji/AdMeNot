@@ -41,7 +41,7 @@ from admenot.app.present import (
 from admenot.app.telemetry_events import repair_event, sample, scan_event, undo_event
 from admenot.app.updates import UpdateService, update_view
 from admenot.app.watcher import DeviceWatcher
-from admenot.engine import donate, welcome
+from admenot.engine import donate, retention, welcome
 from admenot.engine.actions.executor import ExecOptions, run_order
 from admenot.engine.actions.executor import resume as resume_steps
 from admenot.engine.adb.devices import list_devices
@@ -62,6 +62,7 @@ from admenot.engine.journal.db import (
     ScreenshotLimit,
 )
 from admenot.engine.mirror import Mirror, MirrorUnavailable
+from admenot.engine.oplock import device_lock
 from admenot.engine.paths import incident_path, journal_path, logs_dir, screenshot_files
 from admenot.engine.phones.provider import PhoneImageProvider, PhoneMatch
 from admenot.engine.report.files import UnknownOrder, write_report
@@ -191,6 +192,7 @@ class Api:
         self._pending: dict[str, list[int]] = {}  # telefon → zrzuty czekające na zlecenie
         self._shots_lock = threading.Lock()  # chroni _open_order/_pending; nigdy pod adb/screencap
         self._clean_screenshots()
+        self._purge_old_data()
         self._mirror = mirror_factory(
             lambda view: self._emit("mirror:state", view),
             lambda view: self._emit("mirror:warning", view),
@@ -228,6 +230,17 @@ class Api:
         try:
             with self._journal() as journal:
                 delete_shots(journal, journal.orphan_screenshots())
+        except Exception as exc:  # noqa: BLE001 — sprzątanie nie może zablokować startu okna
+            log_exception(exc)
+
+    def _purge_old_data(self) -> None:
+        """Retencja przy starcie okna: zlecenia starsze niż okres z ustawień i stare logi."""
+        try:
+            now = self._now()
+            if self._settings.retention_days:
+                with self._journal() as journal:
+                    retention.purge(journal, now, self._settings.retention_days)
+            retention.prune_logs(logs_dir(), now)
         except Exception as exc:  # noqa: BLE001 — sprzątanie nie może zablokować startu okna
             log_exception(exc)
 
@@ -982,6 +995,25 @@ class Api:
             serials = journal.recent_serials()
             chosen = serial or self._serial or (serials[0] if serials else None)
             return history_view(journal, chosen, serials, self._lang)
+
+    @_api
+    def delete_order(self, number: str) -> dict[str, Any]:
+        """Zlecenie razem z jego zrzutami, protokołem i kopiami APK (RODO, przegląd 2026-10-11)."""
+        if not isinstance(number, str) or not number.strip():
+            raise AppError("bad_request", "order")
+        job = self._jobs.current()
+        if job is not None:
+            raise AppError("busy", job.kind)
+        number = number.strip()
+        with self._journal() as journal:
+            order = journal.order_by_number(number)
+            if order is None:
+                raise AppError("unknown_order", number)
+            with device_lock(journal.path, order.device_serial):
+                retention.delete_order(journal, order)
+        with self._shots_lock:
+            self._open_order = {s: o for s, o in self._open_order.items() if o != order.id}
+        return {"deleted": number}
 
     # --- protokół i dane serwisu (Plan 6, spec §9.3) ----------------------------------------
 

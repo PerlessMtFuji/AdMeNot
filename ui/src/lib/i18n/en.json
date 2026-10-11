@@ -225,6 +225,7 @@
   "history": {
     "title": "Order history", "phone": "Phone", "empty": "No orders for this phone.", "none": "No saved orders.",
     "restore": "Restore", "undo_all": "Undo the whole order", "resume": "Finish",
+    "delete": "Delete order", "delete_title": "Delete order {number}?", "delete_text": "Its steps, screenshots, report and APK copies will be removed. Changes on the phone can no longer be undone in AdMeNot.", "delete_confirm": "Delete",
     "admin_note": "Undo does not restore device admin rights.", "undo_errors": "Not everything could be undone:",
     "banner": "The order from {when} was not finished",
     "banner_detail": "{name} — {done} of {total} steps done.",
@@ -283,6 +284,7 @@
     "updates_title": "Updates",
     "check_updates": "Check for updates automatically",
     "check_updates_hint": "Off: the program never contacts the server and will not learn about a new or withdrawn version.",
+    "retention_title": "Keeping customer data", "retention": "Delete orders older than", "retention_forever": "never", "retention_days": "{days} days", "retention_hint": "60 days by default. Orders (with the customer name, IMEI, screenshots and APK copies) are deleted when the program starts. Orders with steps left to finish are kept. Deleted orders can no longer be undone. Technical logs are kept for 90 days.",
     "adb_source": { "settings": "from settings", "bundled": "bundled", "path": "from PATH", "missing": "missing" },
     "service_title": "Service details",
     "service_hint": "Shown in the report header.",

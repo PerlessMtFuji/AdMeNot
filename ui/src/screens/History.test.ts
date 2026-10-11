@@ -133,3 +133,15 @@ test('history: phone list shows the phone name first, the model below and the ph
   expect(lines.slice(0, 2)).toEqual([d.name, d.model]);
   expect(within(row).getByRole('img', { name: d.name }).getAttribute('src')).toBe(d.image);
 });
+
+test('history: deleting an order asks first, then calls the bridge', async () => {
+  const { s, bridge } = await openHistory();
+  const order = s.history!.orders[0];
+  const card = screen.getByRole('article', { name: order.number });
+  await fireEvent.click(within(card).getByRole('button', { name: 'Usuń zlecenie' }));
+  const dialog = screen.getByRole('dialog', { name: `Usunąć zlecenie ${order.number}?` });
+  expect(bridge.calls.some((c) => c.method === 'delete_order')).toBe(false);
+  await fireEvent.click(within(dialog).getByRole('button', { name: 'Usuń' }));
+  await vi.waitFor(() =>
+    expect(bridge.calls.some((c) => c.method === 'delete_order' && c.args[0] === order.number)).toBe(true));
+});

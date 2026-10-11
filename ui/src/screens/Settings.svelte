@@ -176,6 +176,19 @@
       <span class="text-xs text-mut">{t('settings.check_updates_hint')}</span>
     </div></Card>
 
+    <Card><div class="flex flex-col gap-3 p-6">
+      <span class="lbl">{t('settings.retention_title')}</span>
+      <label class="flex flex-wrap items-center gap-3">
+        <span>{t('settings.retention')}</span>
+        <select class="field rounded-[10px] px-2.5 py-1.5 text-sm" value={String(s.settings.retention_days ?? '')}
+          onchange={(e) => ctl.saveSettings({ retention_days: e.currentTarget.value ? Number(e.currentTarget.value) : null })}>
+          <option value="">{t('settings.retention_forever')}</option>
+          {#each [30, 60, 90, 180, 365] as d (d)}<option value={String(d)}>{t('settings.retention_days', { days: d })}</option>{/each}
+        </select>
+      </label>
+      <span class="text-xs text-mut">{t('settings.retention_hint')}</span>
+    </div></Card>
+
     <Card><div class="flex flex-col gap-4 p-6">
       <span class="lbl">{t('privacy.title')}</span>
       <PrivacyChoices telemetry={s.settings.telemetry} packages={s.settings.telemetry_packages}

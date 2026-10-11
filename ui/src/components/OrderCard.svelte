@@ -5,14 +5,17 @@
   import { DUR, ms } from '../lib/motion';
   import type { AppView, HistoryOrder } from '../lib/types';
   import Button from '../ui/Button.svelte';
+  import Dialog from '../ui/Dialog.svelte';
   import Icon from '../ui/Icon.svelte';
   import AppIcon from './AppIcon.svelte';
   import ReportButton from './ReportButton.svelte';
   import ScreenshotStrip from './ScreenshotStrip.svelte';
 
   type Props = { order: HistoryOrder; scanned?: AppView[]; disabled: boolean;
-    onrestore: (pkg: string) => void; onrestoreStep: (actionId: number) => void; onundoAll: () => void };
-  let { order, scanned = [], disabled, onrestore, onrestoreStep, onundoAll }: Props = $props();
+    onrestore: (pkg: string) => void; onrestoreStep: (actionId: number) => void; onundoAll: () => void;
+    ondelete: () => void };
+  let { order, scanned = [], disabled, onrestore, onrestoreStep, onundoAll, ondelete }: Props = $props();
+  let confirming = $state(false);
   let open = $state<string[]>([]);
   let shotsOpen = $state(false);
   const rows = $derived(groupHistory(order.actions));
@@ -53,6 +56,7 @@
       {#if canUndo && !order.interrupted}
         <Button variant="ghost" size="sm" {disabled} onclick={onundoAll}><Icon name="undo-2" />{t('history.undo_all')}</Button>
       {/if}
+      <Button variant="ghost" size="sm" {disabled} onclick={() => (confirming = true)}><Icon name="trash-2" />{t('history.delete')}</Button>
     </div>
   </div>
   {#if shotsOpen}
@@ -98,3 +102,12 @@
     </div>
   {/each}
 </article>
+{#if confirming}
+  <Dialog title={t('history.delete_title', { number: order.number })} oncancel={() => (confirming = false)}>
+    {t('history.delete_text')}
+    {#snippet actions()}
+      <Button onclick={() => (confirming = false)}>{t('common.cancel')}</Button>
+      <Button variant="danger" onclick={() => { confirming = false; ondelete(); }}>{t('history.delete_confirm')}</Button>
+    {/snippet}
+  </Dialog>
+{/if}

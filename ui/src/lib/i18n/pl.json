@@ -225,6 +225,7 @@
   "history": {
     "title": "Historia zleceń", "phone": "Telefon", "empty": "Brak zleceń dla tego telefonu.", "none": "Brak zapisanych zleceń.",
     "restore": "Przywróć", "undo_all": "Cofnij całe zlecenie", "resume": "Dokończ",
+    "delete": "Usuń zlecenie", "delete_title": "Usunąć zlecenie {number}?", "delete_text": "Znikną kroki, zrzuty ekranu, protokół i kopie APK tego zlecenia. Zmian na telefonie nie będzie już można cofnąć w AdMeNot.", "delete_confirm": "Usuń",
     "admin_note": "Cofnięcie nie przywraca uprawnień administratora urządzenia.", "undo_errors": "Nie wszystko udało się cofnąć:",
     "banner": "Zlecenie z {when} nie zostało dokończone",
     "banner_detail": "{name} — wykonano {done} z {total} kroków.",
@@ -283,6 +284,7 @@
     "updates_title": "Aktualizacje",
     "check_updates": "Sprawdzaj aktualizacje automatycznie",
     "check_updates_hint": "Wyłączone: program nie łączy się z serwerem i nie dowie się o nowej ani o wycofanej wersji.",
+    "retention_title": "Przechowywanie danych klientów", "retention": "Usuwaj zlecenia starsze niż", "retention_forever": "nie usuwaj", "retention_days": "{days} dni", "retention_hint": "Domyślnie 60 dni. Zlecenia (z nazwiskiem klienta, IMEI, zrzutami i kopiami APK) usuwamy przy uruchomieniu programu. Zlecenia z krokami do dokończenia zostają. Po usunięciu zmian nie da się cofnąć. Logi techniczne trzymamy 90 dni.",
     "adb_source": { "settings": "z ustawień", "bundled": "dołączony", "path": "z PATH", "missing": "brak" },
     "service_title": "Dane serwisu",
     "service_hint": "Pojawiają się w nagłówku protokołu.",

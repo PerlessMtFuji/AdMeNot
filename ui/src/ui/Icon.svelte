@@ -29,6 +29,7 @@
   import Smartphone from '@lucide/svelte/icons/smartphone';
   import Terminal from '@lucide/svelte/icons/terminal';
   import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
+  import Trash2 from '@lucide/svelte/icons/trash-2';
   import Undo2 from '@lucide/svelte/icons/undo-2';
   import VenetianMask from '@lucide/svelte/icons/venetian-mask';
   import X from '@lucide/svelte/icons/x';
@@ -37,7 +38,7 @@
   export const ICONS = {
     megaphone: Megaphone, 'bell-ring': BellRing, lock: Lock, 'lock-open': LockOpen, eye: Eye,
     'venetian-mask': VenetianMask, clock: Clock, download: Download, zap: Zap, check: Check, x: X,
-    'triangle-alert': TriangleAlert, info: Info, 'undo-2': Undo2, 'rotate-ccw': RotateCcw, 'arrow-left': ArrowLeft,
+    'triangle-alert': TriangleAlert, info: Info, 'undo-2': Undo2, 'trash-2': Trash2, 'rotate-ccw': RotateCcw, 'arrow-left': ArrowLeft,
     'chevron-down': ChevronDown, 'chevron-right': ChevronRight, search: Search, terminal: Terminal,
     history: HistoryIcon, settings: SettingsIcon, plus: Plus, pause: Pause, smartphone: Smartphone,
     'shield-x': ShieldX, 'shield-alert': ShieldAlert, 'shield-user': ShieldUser, 'scan-search': ScanSearch,

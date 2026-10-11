@@ -15,6 +15,15 @@ function setup(scenario: string) {
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe('controller with the adware scenario', () => {
+  test('deleting an order calls the bridge and refreshes the history', async () => {
+    const { bridge, ctl } = setup('adware');
+    await ctl.init();
+    const before = bridge.calls.filter((c) => c.method === 'history').length;
+    await ctl.deleteOrder('ZS/2026/0926/01');
+    expect(bridge.calls.some((c) => c.method === 'delete_order' && c.args[0] === 'ZS/2026/0926/01')).toBe(true);
+    expect(bridge.calls.filter((c) => c.method === 'history').length).toBe(before + 1);
+  });
+
   test('init picks the only ready phone, scan fills results and defaults', async () => {
     const { ctl, s } = setup('adware');
     await ctl.init();
