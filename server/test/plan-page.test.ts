@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import vector from "../../tests/fixtures/share_vector.json";
-import { TEXTS, decodeLocal, decryptShare, effect, parseFragment } from "../public/plan.js";
+import { TEXTS, canInflate, decodeLocal, decryptShare, effect, initial, parseFragment } from "../public/plan.js";
 
 const bytes = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 
@@ -39,6 +39,20 @@ describe("plan.js", () => {
     expect(effect({ n: "a", l: "remove" }, true, t)).toBe(
       "Zostanie usunięta razem ze swoimi danymi. Samą aplikację da się przywrócić.");
     expect(effect({ n: "a", l: "remove", b: 1 }, true, t)).toBe("Nie zostanie zmieniona.");
+  });
+
+  it("inicjał to cały pierwszy znak graficzny, także flaga i emoji złożone", () => {
+    expect(initial("🇵🇱 Polska")).toBe("🇵🇱");
+    expect(initial("👨‍👩‍👧 Rodzina")).toBe("👨‍👩‍👧");
+    expect(initial("  ćma")).toBe("Ć");
+    expect(initial("   ")).toBe("?");
+  });
+
+  it("rozpoznaje przeglądarkę bez rozpakowywania deflate-raw (Safari < 16.4, Chrome < 103)", () => {
+    expect(canInflate(globalThis)).toBe(true);
+    expect(canInflate({})).toBe(false);
+    class Old { constructor(format: string) { if (format !== "gzip") throw new TypeError(format); } }
+    expect(canInflate({ DecompressionStream: Old })).toBe(false);
   });
 
   it("oba języki mają te same klucze", () => {

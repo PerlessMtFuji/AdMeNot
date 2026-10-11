@@ -11,3 +11,5 @@ export function decodeLocal(data: string): Promise<PlanPayload>;
 export function decryptShare(blob: Uint8Array, key: string): Promise<PlanPayload>;
 export function effect(app: { n: string; l: string; b?: number }, notif: boolean, t: PlanTexts): string;
 export function render(root: Element, payload: PlanPayload, mode: "server" | "local"): void;
+export function canInflate(g: object): boolean;
+export function initial(name: string): string;

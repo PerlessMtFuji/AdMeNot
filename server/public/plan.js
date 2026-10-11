@@ -20,6 +20,7 @@ export const TEXTS = {
     unreadable: "Nie da się odczytać planu.",
     offline: "Brak połączenia.",
     busy: "Serwer jest chwilowo zajęty. Spróbuj za chwilę.",
+    old_browser: "Ta przeglądarka jest za stara, żeby pokazać plan. Zaktualizuj ją albo otwórz kod w innej przeglądarce.",
   },
   en: {
     title: "Repair plan",
@@ -36,6 +37,7 @@ export const TEXTS = {
     unreadable: "The plan cannot be read.",
     offline: "No connection.",
     busy: "The server is busy. Try again in a moment.",
+    old_browser: "This browser is too old to show the plan. Update it or open the code in another browser.",
   },
 };
 
@@ -45,6 +47,25 @@ function fromB64url(text) {
   const out = new Uint8Array(raw.length);
   for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
   return out;
+}
+
+/** deflate-raw w DecompressionStream: Safari 16.4+, Chrome 103+. Starsze rzucają przy tworzeniu strumienia. */
+export function canInflate(g) {
+  try {
+    return typeof g.DecompressionStream === "function" && Boolean(new g.DecompressionStream("deflate-raw"));
+  } catch {
+    return false;
+  }
+}
+
+/** Pierwszy znak graficzny (flaga, emoji złożone), nie pierwszy punkt kodowy. */
+export function initial(name) {
+  const text = String(name).trim();
+  if (!text) return "?";
+  const first = typeof Intl !== "undefined" && Intl.Segmenter
+    ? new Intl.Segmenter().segment(text)[Symbol.iterator]().next().value.segment
+    : [...text][0];
+  return first.toUpperCase();
 }
 
 async function inflate(bytes) {
@@ -114,10 +135,12 @@ export function render(root, p, mode) {
       img.src = a.i;
       li.append(img);
     } else {
-      li.append(el("span", "icon initial", ([...a.n.trim()][0] ?? "?").toUpperCase()));
+      li.append(el("span", "icon initial", initial(a.n)));
     }
     const body = el("div");
-    body.append(el("b", null, a.n), el("p", null, effect(a, p.notif === 1, t)));
+    const name = el("b", null, a.n);
+    name.dir = "auto"; // nazwy po arabsku czy hebrajsku nie mieszają kierunku z tekstem strony
+    body.append(name, el("p", null, effect(a, p.notif === 1, t)));
     li.append(body);
     list.append(li);
   }
@@ -133,6 +156,7 @@ function fail(root, key) {
 async function main(root) {
   const f = parseFragment(location.hash);
   if (!f) return fail(root, "unreadable");
+  if (!canInflate(globalThis)) return fail(root, "old_browser");
   try {
     if (f.mode === "local") return render(root, await decodeLocal(f.data), "local");
     let res;
