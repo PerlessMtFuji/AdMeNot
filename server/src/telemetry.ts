@@ -1,10 +1,13 @@
 // Statystyki użycia (spec kroku H §7): zapis znanych pól, limit bajtów na dobę, usuwanie na żądanie.
 import { json, readLimited } from "./http";
+import { takeQuota, untilMidnight } from "./quota";
 
 export const TELEMETRY_MAX_BODY = 256 * 1024;
 export const TELEMETRY_DAILY_BYTES = 200 * 1024; // ~80 MB / 13 mies. obok raportów w 500 MB D1 free
 // Jedna instalacja (albo ktoś podszywający się pod nią) nie zajmie całego budżetu doby (SEC-03).
 export const TELEMETRY_INSTALL_DAILY_BYTES = 100 * 1024;
+// Na adres: losowe ID instalacji nie wyczerpią wspólnego budżetu doby.
+export const TELEMETRY_IP_DAILY_BYTES = 40 * 1024;
 const MAX_EVENTS = 100;
 const MAX_PACKAGES = 200;
 const MAX_ERRORS = 20;
@@ -155,11 +158,13 @@ export async function createEvents(request: Request, env: Env): Promise<Response
   }
   const rows = events.map((e) => ({ install: e.install, t: e.t, type: e.type, app: e.app, body: JSON.stringify(e) }));
   const size = rows.reduce((n, r) => n + bytes(r.body), 0);
+  const later = { "Retry-After": String(untilMidnight()) };
+  if (!(await takeQuota(request, env, "telemetry", size, TELEMETRY_IP_DAILY_BYTES))) return json({ error: "budget" }, 429, later);
   try {
     const res = await env.DB.prepare(INSERT_WITHIN_BUDGET)
       .bind(JSON.stringify(rows), size, TELEMETRY_DAILY_BYTES, events[0].install, TELEMETRY_INSTALL_DAILY_BYTES)
       .run();
-    if ((res.meta.changes ?? 0) === 0) return json({ error: "busy" }, 429);
+    if ((res.meta.changes ?? 0) === 0) return json({ error: "busy" }, 429, later);
     return json({ ok: true, stored: events.length });
   } catch {
     return json({ error: "busy" }, 503);

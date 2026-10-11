@@ -1,7 +1,12 @@
 // Worker AdMeNot: statyczna strona z public/ (bez kodu) + API pod /api/v1/ (spec backendu §2).
 // Nie logujemy zapytań ani nagłówków — adresów IP nie zapisujemy nigdzie (§2.2).
 import { json, readLimited } from "./http";
+import { takeQuota, untilMidnight } from "./quota";
 import { createEvents, deleteEvents, pruneEvents } from "./telemetry";
+
+export { Quota } from "./quota";
+// Raporty błędów na adres i dobę (przegląd 2026-10-11): sufit 100/dobę jest wspólny dla wszystkich.
+export const REPORTS_IP_DAILY = 20;
 
 const TELEMETRY_ITEM = /^\/api\/v1\/telemetry\/([^/]+)$/;
 
@@ -97,6 +102,9 @@ async function createReport(request: Request, env: Env): Promise<Response> {
   if (!validReport(parsed)) return json({ error: "invalid" }, 400);
   const clean = normalize(parsed);
   if (!clean) return json({ error: "invalid" }, 400);
+  if (!(await takeQuota(request, env, "reports", 1, REPORTS_IP_DAILY))) {
+    return json({ error: "budget" }, 429, { "Retry-After": String(untilMidnight()) });
+  }
   const stored = JSON.stringify(clean);
   try {
     // Sufit doby sprawdzany w tym samym poleceniu co zapis: równoległe raporty nie przekroczą
