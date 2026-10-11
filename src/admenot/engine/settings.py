@@ -31,9 +31,11 @@ LANGS = ("pl", "en")
 MODES = ("simple", "expert")
 THEMES = ("system", "light", "dark")
 SELECT_LEVELS = ("silence", "disable", "remove")  # poziomy akcji (actions/planner.LEVELS)
+RETENTION_DAYS = (30, 60, 90, 180, 365)  # okres przechowywania zleceń do wyboru; None = nie usuwaj
+DEFAULT_RETENTION_DAYS = 60  # RODO: domyślnie ograniczone przechowywanie danych klientów
 KEYS = ("lang", "mode", "adb_path", "backups_dir", "theme", "mirror_auto",
         "apk_cache_limit_gb", "apk_cache_clear_after_repair", "select_level",
-        "check_updates", "dismissed_update", "last_run_version")
+        "check_updates", "dismissed_update", "last_run_version", "retention_days")
 # Klucze zmieniane tylko przez dedykowane funkcje (ostrzeżenie, zgody telemetrii), nigdy z ekranu
 # ustawień: UI nie może podstawić własnego ID instalacji ani „zaakceptować” ostrzeżenia bokiem.
 INTERNAL_KEYS = ("welcome_version", "welcome_at", "telemetry", "telemetry_packages",
@@ -79,6 +81,7 @@ class Settings:
     check_updates: bool = True  # wyłączone = zero zapytań o aktualizacje (spec aktualizacji §4.3)
     dismissed_update: str | None = None  # wersja ukryta krzyżykiem na banerze
     last_run_version: str | None = None  # komunikat „Zaktualizowano” po zmianie wersji
+    retention_days: int | None = DEFAULT_RETENTION_DAYS  # starsze zlecenia usuwa engine.retention przy starcie okna
     welcome_version: int | None = None  # zaakceptowana wersja ostrzeżenia (welcome.WELCOME_VERSION)
     welcome_at: str | None = None
     telemetry: bool = False  # zgoda na statystyki (spec kroku H §4)
@@ -233,6 +236,8 @@ def _valid(key: str, value: Any) -> bool:
         return value in THEMES
     if key == "select_level":
         return value in SELECT_LEVELS
+    if key == "retention_days":
+        return value is None or (type(value) is int and value in RETENTION_DAYS)
     return value is None or (isinstance(value, str) and value.strip() != "")
 
 

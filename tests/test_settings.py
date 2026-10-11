@@ -10,7 +10,9 @@ from admenot.engine.settings import (
     ServiceInfo,
     check_logo,
     load_service,
+    load_settings,
     save_service,
+    save_settings,
 )
 
 
@@ -242,3 +244,22 @@ def test_update_settings_defaults_and_validation(tmp_path):
     assert (s.check_updates, s.dismissed_update, s.last_run_version) == (False, "0.9.3", "0.9.2")
     with pytest.raises(ValueError):
         S.save_settings({"check_updates": "nie"}, path)
+
+
+def test_retention_defaults_to_60_days_and_never_is_remembered(tmp_path):
+    path = tmp_path / "settings.json"
+    assert load_settings(path).retention_days == 60  # brak klucza (nowa instalacja i aktualizacja)
+    assert save_settings({"retention_days": None}, path).retention_days is None
+    assert load_settings(path).retention_days is None  # „nie usuwaj” nie wraca do 60
+
+
+@pytest.mark.parametrize("value", [None, 30, 60, 90, 180, 365])
+def test_retention_days_accepts_the_offered_choices(tmp_path, value):
+    path = tmp_path / "settings.json"
+    assert save_settings({"retention_days": value}, path).retention_days == value
+
+
+@pytest.mark.parametrize("value", [0, 7, True, "90", 90.0])
+def test_retention_days_rejects_other_values(tmp_path, value):
+    with pytest.raises(ValueError):
+        save_settings({"retention_days": value}, tmp_path / "settings.json")
