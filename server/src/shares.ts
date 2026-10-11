@@ -71,11 +71,17 @@ export async function createShare(request: Request, env: Env): Promise<Response>
 export async function getShare(request: Request, id: string, env: Env): Promise<Response> {
   if (!(await env.SHARES_READ_LIMITER.limit({ key: ip(request) })).success) return json({ error: "rate_limited" }, 429);
   if (!ID.test(id)) return json({ error: "not_found" }, 404);
+  // Blob czyta tylko strona /plan przez fetch. Otwarcie adresu wprost (pobranie pliku z domeny
+  // projektu) dostaje 404, żeby trasa nie służyła za hosting plików (przegląd 2026-10-11).
+  if (request.headers.get("Sec-Fetch-Dest") === "document") return json({ error: "not_found" }, 404);
   const row = await env.DB.prepare("SELECT body FROM shares WHERE id = ? AND expires > datetime('now')")
     .bind(id).first<{ body: string }>();
   if (!row) return json({ error: "not_found" }, 404);
   return new Response(fromBase64(row.body), {
-    headers: { "Content-Type": "application/octet-stream", "Cache-Control": "no-store" },
+    headers: {
+      "Content-Type": "application/octet-stream", "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff", "Content-Disposition": "attachment",
+    },
   });
 }
 

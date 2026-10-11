@@ -108,6 +108,21 @@ describe("GET /api/v1/shares/:id", () => {
     }
   });
 
+  it("nie podaje bloba jako pliku do otwarcia w przeglądarce", async () => {
+    const { id } = await (await post(blob())).json<{ id: string }>();
+    const res = await get(id);
+    expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(res.headers.get("Content-Disposition")).toBe("attachment");
+    const nav = await exports.default.fetch(new Request(`${BASE}/api/v1/shares/${id}`, {
+      headers: { "CF-Connecting-IP": crypto.randomUUID(), "Sec-Fetch-Dest": "document" },
+    }));
+    expect(nav.status).toBe(404); // wejście z paska adresu: strona /plan pobiera blob przez fetch
+    const page = await exports.default.fetch(new Request(`${BASE}/api/v1/shares/${id}`, {
+      headers: { "CF-Connecting-IP": crypto.randomUUID(), "Sec-Fetch-Dest": "empty", "Sec-Fetch-Mode": "cors" },
+    }));
+    expect(page.status).toBe(200);
+  });
+
   it("429 z limitera odczytu", async () => {
     const res = await get("A".repeat(22), open({ SHARES_READ_LIMITER: { limit: async () => ({ success: false }) } }));
     expect(res.status).toBe(429);
