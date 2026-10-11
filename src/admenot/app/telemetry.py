@@ -51,6 +51,9 @@ _wake = threading.Event()
 _stop = threading.Event()
 _thread: threading.Thread | None = None
 _on_deleted: Callable[[], None] | None = None  # UI chowa baner „usuwanie czeka”
+# Serwer odmówił z powodu limitu (429): następna próba po PERIOD, nie po RETRY — tysiąc instalacji
+# ponawiających co 10 minut tylko przedłużałoby blokadę (przegląd 2026-10-11).
+_throttled = threading.Event()
 
 
 def _utc_now() -> datetime:
@@ -273,6 +276,8 @@ def send_pending(post: Post | None = None, delete: Delete | None = None,
                 post(ENDPOINT, {"format": FORMAT, "events": batch})
             except client.BackendError as exc:
                 if _waiting(exc):
+                    if exc.status == 429:
+                        _throttled.set()
                     return went
                 if exc.status == 413 and len(batch) > 1:
                     limit = max(1, len(batch) // 2)  # za duża paczka: dzielimy, nic nie kasujemy
@@ -307,6 +312,9 @@ def _loop(wake: threading.Event, stop: threading.Event,
 
 def _next_delay() -> float:
     """Coś czeka na sieć (zdarzenia albo usunięcie po cofnięciu zgody) → RETRY, inaczej PERIOD."""
+    if _throttled.is_set():
+        _throttled.clear()
+        return PERIOD
     try:
         waiting = delete_pending() or telemetry_path().exists()
     except OSError:

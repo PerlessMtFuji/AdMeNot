@@ -575,6 +575,13 @@ export class Controller {
     if (r) this.state.history = r;
   }
 
+  async deleteOrder(order: string): Promise<void> {
+    const r = await this.call(this.api.delete_order(order));
+    if (!r) return;
+    this.state.interrupted = this.state.interrupted.filter((o) => o !== order);
+    await this.refreshHistory();
+  }
+
   openSettings(): void {
     this.state.screen = 'settings';
   }

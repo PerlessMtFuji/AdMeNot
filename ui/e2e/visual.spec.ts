@@ -15,6 +15,10 @@ async function inject(page: Page, fn: (env: any) => void) {
 for (const theme of ['light', 'dark'] as const) {
   test.describe(`screens (PL, 1280×800, ${theme})`, () => {
     test.use({ colorScheme: theme });
+    // Zegar w makiecie telefonu i daty pokazują czas systemowy; bez tego zrzut zmienia się co minutę.
+    test.beforeEach(async ({ page }) => {
+      await page.clock.setFixedTime(new Date('2026-10-11T09:41:00'));
+    });
 
     test('ekran powitalny', async ({ page }) => {
       await page.goto('/?scenario=empty&welcome=1');
@@ -111,5 +115,17 @@ test.describe('motion', () => {
       (els) => els.map((el) => getComputedStyle(el).animationName));
     expect(names.length).toBeGreaterThan(0);
     expect(names.every((n) => n === 'none')).toBe(true);
+  });
+});
+
+test.describe('minimum window (PL, 1008×661, light)', () => {
+  test.use({ viewport: { width: 1008, height: 661 }, colorScheme: 'light' });
+  test.beforeEach(async ({ page }) => { await page.clock.setFixedTime(new Date('2026-10-11T09:41:00')); });
+
+  test('results simple and expert', async ({ page }) => {
+    await scan(page);
+    await expect(page).toHaveScreenshot('min-results-simple.png');
+    await page.getByRole('button', { name: 'Ekspert' }).click();
+    await expect(page).toHaveScreenshot('min-results-expert.png');
   });
 });

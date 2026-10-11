@@ -18,6 +18,7 @@ export interface Settings {
   apk_cache_limit_gb: number;
   apk_cache_clear_after_repair: boolean;
   select_level: Level;
+  retention_days: number | null;
   check_updates: boolean;
   dismissed_update: string | null;
   last_run_version: string | null;
@@ -360,6 +361,7 @@ export interface Api {
   stop(jobId: string): R<{ ok: boolean }>;
   answer(jobId: string, value: string): R<{ ok: boolean }>;
   history(serial: string | null): R<HistoryView>;
+  delete_order(order: string): R<{ deleted: string }>;
   adb_shell(command: string): R<{ ok: boolean; output: string }>;
   who_is_showing(): R<WhoView>;
   check_adb(path: string | null): R<{ ok: boolean; version: string | null; message: string; source: AdbSource; path: string | null }>;

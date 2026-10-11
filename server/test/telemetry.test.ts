@@ -1,6 +1,7 @@
 import { env, exports } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
 import worker from "../src/index";
+import { TELEMETRY_IP_DAILY_BYTES } from "../src/telemetry";
 
 const BASE = "https://admenot.test";
 const ID = "3f2a9c1e-5b7d-4e8f-9a0b-1c2d3e4f5a6b";
@@ -25,7 +26,7 @@ const start = () => common("start", { mode: "simple" });
 
 async function post(events: unknown[], raw?: string): Promise<Response> {
   return exports.default.fetch(new Request(BASE + "/api/v1/telemetry", {
-    method: "POST", headers: { "Content-Type": "application/json" },
+    method: "POST", headers: { "Content-Type": "application/json", "CF-Connecting-IP": crypto.randomUUID() },
     body: raw ?? JSON.stringify({ format: 1, events }),
   }));
 }
@@ -38,6 +39,30 @@ beforeEach(async () => {
 });
 
 describe("POST /api/v1/telemetry", () => {
+  it("one address cannot exceed its daily share, whatever install IDs it claims", async () => {
+    const ip = "198.51.100.7";
+    const big = () => ({ ...scan({ packages: Array.from({ length: 200 }, (_, i) => ({
+      package: `com.example.app${i}`, verdict: "review", score: 25, confidence: "low", system: false })) }),
+      install: crypto.randomUUID() });
+    const send = (from: string) => exports.default.fetch(new Request(BASE + "/api/v1/telemetry", {
+      method: "POST", headers: { "Content-Type": "application/json", "CF-Connecting-IP": from },
+      body: JSON.stringify({ format: 1, events: [big()] }),
+    }));
+    let res = await send(ip);
+    let sent = 1;
+    while (res.status === 200 && sent < 10) {
+      res = await send(ip);
+      sent += 1;
+    }
+    expect(sent).toBeGreaterThan(1);
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: "budget" });
+    expect(Number(res.headers.get("Retry-After"))).toBeGreaterThan(0);
+    const stored = (await rows()).reduce((n, r) => n + new TextEncoder().encode(r.body).byteLength, 0);
+    expect(stored).toBeLessThanOrEqual(TELEMETRY_IP_DAILY_BYTES);
+    expect((await send("198.51.100.8")).status).toBe(200);
+  });
+
   it("zapisuje wszystkie typy zdarzeń", async () => {
     const res = await post([start(), scan(), repair(), undo()]);
     expect(res.status).toBe(200);

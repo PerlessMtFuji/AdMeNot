@@ -6,7 +6,11 @@ import re
 from dataclasses import dataclass, field
 
 from admenot.engine.actions import commands as C
-from admenot.engine.actions.steps import NOTIF_LISTENERS_KEY, read, read_secure_list
+from admenot.engine.actions.steps import (
+    SECURE_LIST_KEYS,
+    read,
+    read_secure_list,
+)
 from admenot.engine.adb.transport import AdbTransport
 from admenot.engine.collectors.components import HOME_QUERY
 from admenot.engine.collectors.packages import PM_SYSTEM
@@ -19,7 +23,6 @@ from admenot.engine.parsers.common import (
 )
 from admenot.engine.parsers.system import parse_resolved_component
 
-SECURE_LIST_KEYS = ("enabled_accessibility_services", NOTIF_LISTENERS_KEY)
 # FallbackHome to ekran startowy Ustawień, a nie launcher, na który można przełączyć.
 _NOT_LAUNCHERS = frozenset({"com.android.settings"})
 _IME = re.compile(r"^([A-Za-z][\w.]*)/[\w.$]+$")

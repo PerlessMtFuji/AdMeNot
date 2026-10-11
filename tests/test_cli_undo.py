@@ -127,3 +127,16 @@ def test_cache_status_survives_unreadable_disk(capsys, tmp_path, monkeypatch):
     assert main(["cache"], host=FakeAdb()) == 0
     out = capsys.readouterr().out
     assert "2 MB" in out and "nie udało się odczytać" in out and "room" not in out
+
+
+@pytest.mark.parametrize("command", ["undo", "resume"])
+def test_cli_refuses_another_phone_with_the_same_serial(capsys, command):
+    phone = make_cli_phone()
+    phone.secure["android_id"] = "1111222233334444"
+    order = _fix(phone, "com.wlive.forecast=disable")
+    capsys.readouterr()
+    phone.secure["android_id"] = "9999888877776666"  # inny egzemplarz z tym samym numerem seryjnym
+    assert main([command, "--order", order.number, "--yes"] if command == "resume"
+                else [command, "--order", order.number], host=phone) == 6
+    assert "To nie jest telefon ze zlecenia" in capsys.readouterr().err
+    assert phone.apps["com.wlive.forecast"].enabled is False

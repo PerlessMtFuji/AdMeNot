@@ -9,6 +9,7 @@ from admenot.engine.apk.analyze import ApkReport
 from admenot.engine.collectors.profiles import PM_USERS
 from admenot.engine.collectors.system import DEVICE_POLICY
 from admenot.engine.foreground import ACTIVITIES, WINDOWS
+from admenot.engine.paths import incident_path
 
 
 def test_devices_lists_entries(capsys):
@@ -316,7 +317,7 @@ def test_who_watch_records_an_incident_that_the_next_scan_uses(capsys, monkeypat
     out = capsys.readouterr().out
     assert seen == {"duration": 30.0, "interval": 1.5, "poll": False}
     assert "com.clean.pro.boost" in out and "com.game" in out
-    assert (tmp_path / "AdMeNot" / "incidents" / f"{SERIAL}.json").exists()
+    assert incident_path(SERIAL).exists()
 
     assert main(["scan", "--json"], host=make_synthetic_adb()) == 0
     results = {r["package"]: r for r in json.loads(capsys.readouterr().out)["results"]}

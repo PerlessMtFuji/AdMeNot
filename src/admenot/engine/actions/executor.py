@@ -70,9 +70,10 @@ def start_order(
     model: str | None,
     plans: Iterable[AppPlan],
     client_name: str | None = None,
+    identity: dict[str, Any] | None = None,
 ) -> Order:
     """Zakłada zlecenie i zapisuje wszystkie kroki jako „pending”, zanim coś trafi na telefon."""
-    order = journal.create_order(serial, model, client_name)
+    order = journal.create_order(serial, model, client_name, identity)
     for plan in plans:
         for step in plan.steps:
             journal.add_action(order.id, plan.package, plan.level, step.to_dict(),

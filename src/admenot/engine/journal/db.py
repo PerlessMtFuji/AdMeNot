@@ -57,8 +57,21 @@ CREATE TABLE IF NOT EXISTS screenshots (
 CREATE INDEX IF NOT EXISTS screenshots_by_order ON screenshots(order_id);
 """
 
+_V2_IDENTITY = """
+ALTER TABLE orders ADD COLUMN device_identity TEXT;
+"""
+
+_V3_ORDER_SEQ = """
+CREATE TABLE IF NOT EXISTS order_seq (
+    prefix TEXT PRIMARY KEY,
+    last INTEGER NOT NULL
+);
+"""
+
 # v1 to schemat sprzed wersjonowania — `IF NOT EXISTS` przyjmuje też bazy z user_version = 0.
-MIGRATIONS: tuple[str, ...] = (_SCHEMA_V1,)
+# v2: tożsamość telefonu w zleceniu (android_id, IMEI, model) — przegląd 2026-10-11.
+# v3: licznik numerów zleceń dnia — numer usuniętego zlecenia nie wraca (protokół mógł trafić do klienta).
+MIGRATIONS: tuple[str, ...] = (_SCHEMA_V1, _V2_IDENTITY, _V3_ORDER_SEQ)
 
 ORDER_STATUSES = frozenset({"running", "done", "failed", "undone", "partially_undone"})
 ACTION_STATUSES = frozenset({"pending", "done", "failed", "undone"})
@@ -89,6 +102,7 @@ class Order:
     client_name: str | None
     created_at: datetime
     status: str
+    device_identity: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -153,7 +167,8 @@ def _migrate(db: sqlite3.Connection, path: Path | str, migrations: Sequence[str]
 
 def _order(row: sqlite3.Row) -> Order:
     return Order(row["id"], row["number"], row["device_serial"], row["device_model"],
-                 row["client_name"], datetime.fromisoformat(row["created_at"]), row["status"])
+                 row["client_name"], datetime.fromisoformat(row["created_at"]), row["status"],
+                 _load(row["device_identity"]))
 
 
 def _action(row: sqlite3.Row) -> Action:
@@ -175,6 +190,8 @@ class Journal:
         self._path = str(path)
         self._db = sqlite3.connect(str(path))
         self._db.row_factory = sqlite3.Row
+        # Usunięte wiersze (nazwiska, IMEI) nadpisywane zerami, nie zostają w wolnych stronach pliku.
+        self._db.execute("PRAGMA secure_delete = ON")
         try:
             _migrate(self._db, path, migrations)
         except BaseException:
@@ -196,17 +213,26 @@ class Journal:
 
     # --- zlecenia -----------------------------------------------------------------------------
 
-    def create_order(self, serial: str, model: str | None, client_name: str | None = None) -> Order:
+    def create_order(self, serial: str, model: str | None, client_name: str | None = None,
+                     identity: dict[str, Any] | None = None) -> Order:
         now = self._now()
         prefix = f"ZS/{now:%Y}/{now:%m%d}/"
         with self._db:
-            (count,) = self._db.execute(
-                "SELECT COUNT(*) FROM orders WHERE number LIKE ?", (prefix + "%",)).fetchone()
+            # Licznik dnia, nie COUNT ani MAX z tabeli: po usunięciu zlecenia (także ostatniego)
+            # jego numer nie wraca. MAX z tabeli — dla zleceń sprzed licznika (v3).
+            (last,) = self._db.execute(
+                "SELECT MAX(COALESCE((SELECT last FROM order_seq WHERE prefix = ?1), 0),"
+                " COALESCE((SELECT MAX(CAST(substr(number, ?2) AS INTEGER)) FROM orders"
+                " WHERE number LIKE ?1 || '%'), 0))",
+                (prefix, len(prefix) + 1)).fetchone()
+            self._db.execute(
+                "INSERT INTO order_seq (prefix, last) VALUES (?, ?)"
+                " ON CONFLICT(prefix) DO UPDATE SET last = excluded.last", (prefix, last + 1))
             cur = self._db.execute(
-                "INSERT INTO orders (number, device_serial, device_model, client_name, created_at, status)"
-                " VALUES (?, ?, ?, ?, ?, 'running')",
-                (f"{prefix}{count + 1:02d}", serial, model, client_name or None,
-                 now.isoformat(timespec="seconds")))
+                "INSERT INTO orders (number, device_serial, device_model, client_name, created_at, status,"
+                " device_identity) VALUES (?, ?, ?, ?, ?, 'running', ?)",
+                (f"{prefix}{last + 1:02d}", serial, model, client_name or None,
+                 now.isoformat(timespec="seconds"), _dump(identity)))
         return self.order(cur.lastrowid)
 
     def order(self, order_id: int) -> Order:
@@ -241,6 +267,26 @@ class Journal:
             raise ValueError(f"invalid order status: {status!r}")
         with self._db:
             self._db.execute("UPDATE orders SET status = ? WHERE id = ?", (status, order_id))
+
+    def orders_before(self, cutoff: datetime) -> list[Order]:
+        rows = self._db.execute("SELECT * FROM orders WHERE created_at < ? ORDER BY id",
+                                (cutoff.isoformat(timespec="seconds"),))
+        return [_order(r) for r in rows]
+
+    def delete_order(self, order_id: int) -> None:
+        """Wiersze zlecenia; pliki (zrzuty, protokół, kopie APK) usuwa `engine.retention`."""
+        with self._db:
+            for table, column in (("actions", "order_id"), ("order_scans", "order_id"),
+                                  ("screenshots", "order_id"), ("orders", "id")):
+                self._db.execute(f"DELETE FROM {table} WHERE {column} = ?", (order_id,))  # stałe nazwy
+
+    def backup_dirs(self, exclude: int | None = None) -> set[str]:
+        """Katalogi kopii APK, do których odwołują się kroki zleceń (poza `exclude`)."""
+        found: set[str] = set()
+        for (text,) in self._db.execute("SELECT step FROM actions WHERE order_id IS NOT ?", (exclude,)):
+            params = json.loads(text).get("params") or {}
+            found.update(params[key] for key in ("dir", "backup_dir") if params.get(key))
+        return found
 
     # --- akcje --------------------------------------------------------------------------------
 

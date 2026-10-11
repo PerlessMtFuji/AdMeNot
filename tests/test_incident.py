@@ -2,6 +2,7 @@ from admenot.engine.adb.fake import FakeAdb
 from admenot.engine.collectors.behavior import NOTIFICATIONS
 from admenot.engine.foreground import ACTIVITIES, WINDOWS
 from admenot.engine.incident import Sample, Timeline, attribute, incident_facts, record
+from admenot.engine.paths import incident_path
 
 
 def _s(t, resumed="com.android.launcher", overlays=(), notif=None):
@@ -119,3 +120,11 @@ def test_record_keeps_a_mark_from_the_last_interval_and_survives_ctrl_c():
     now[0] = 0.0
     tl = record(adb, 10.0, 1.0, clock=lambda: now[0], sleep=interrupted, poll_mark=lambda: True)
     assert len(tl.samples) == 2 and tl.marks == [0.0, 1.0]  # Ctrl+C kończy nagranie, nie gubi go
+
+
+def test_incident_files_do_not_collide_and_stay_in_their_folder(monkeypatch, tmp_path):
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    wifi, other, up = incident_path("10.0.0.5:5555"), incident_path("10.0.0.5_5555"), incident_path("..")
+    assert wifi != other
+    folder = tmp_path / "AdMeNot" / "incidents"
+    assert {wifi.parent, other.parent, up.parent} == {folder}

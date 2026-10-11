@@ -4,13 +4,15 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 
-from admenot.engine.adb.transport import AdbTransport
+from admenot.engine.adb.transport import AdbError, AdbTransport
 from admenot.engine.device.imei import read_imei
 
 GETPROP = "getprop"
 UPTIME = "cat /proc/uptime"
 LOCAL_NOW = 'date "+%Y-%m-%d %H:%M:%S"'
 TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+ANDROID_ID = "settings get --user 0 secure android_id"
+_ANDROID_ID = re.compile(r"^[0-9a-fA-F]{8,64}$")
 
 _PROP = re.compile(r"^\[([^\]]+)\]: \[(.*)\]$")
 
@@ -29,6 +31,9 @@ class DeviceInfo:
     uptime_s: float
     local_now: datetime
     imei: str | None = None  # None: Android nie pozwala odczytać — zostaje numer seryjny
+    # Settings.Secure.ANDROID_ID powłoki: stały dla telefonu i użytkownika, zmienia się po
+    # przywróceniu ustawień fabrycznych. Odróżnia dwa telefony z tym samym numerem seryjnym.
+    android_id: str | None = None
 
 
 def parse_getprop(text: str) -> dict[str, str]:
@@ -38,6 +43,14 @@ def parse_getprop(text: str) -> dict[str, str]:
         if m:
             props[m.group(1)] = m.group(2)
     return props
+
+
+def read_android_id(adb: AdbTransport) -> str | None:
+    try:
+        value = adb.shell(ANDROID_ID).strip()
+    except AdbError:
+        return None
+    return value if _ANDROID_ID.match(value) else None
 
 
 def read_device_info(adb: AdbTransport) -> DeviceInfo:
@@ -64,4 +77,5 @@ def read_device_info(adb: AdbTransport) -> DeviceInfo:
         uptime_s=uptime_s,
         local_now=local_now,
         imei=read_imei(adb),
+        android_id=read_android_id(adb),
     )

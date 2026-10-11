@@ -18,7 +18,8 @@ from admenot.engine.apk.analyze import clean_label
 from admenot.engine.apk.cache import GB, cache_size, clear_cache, usage
 from admenot.engine.apk.fetch import default_cache_dir
 from admenot.engine.apk.providers import ApkProvider, ProgressFn
-from admenot.engine.device.info import read_device_info
+from admenot.engine.device.identity import same_device
+from admenot.engine.device.info import DeviceInfo, read_device_info
 from admenot.engine.facts import AppFacts
 from admenot.engine.incident import load_incident
 from admenot.engine.journal.db import Journal, Order
@@ -65,6 +66,8 @@ MSG: dict[str, dict[str, str]] = {
         "unknown_order": "Nie znaleziono zlecenia {number}.",
         "no_target": "Nie ma takiej aplikacji ani kroku w zleceniu {number}.",
         "nothing_to_resume": "Zlecenie {number} nie ma kroków do dokończenia.",
+        "device_mismatch": "To nie jest telefon ze zlecenia {number} — inny telefon z tym samym numerem "
+                           "seryjnym albo telefon po przywróceniu ustawień fabrycznych. Nic nie zmieniono.",
         "undone": "Zlecenie {number}: {status}.",
         "admin_not_restored": "Uwaga: cofnięcie nie przywraca uprawnień administratora urządzenia.",
         "cache": "Pamięć podręczna APK: {mb:.0f} MB w {path}. Limit {limit:.0f} GB, teraz zmieści się "
@@ -98,6 +101,8 @@ MSG: dict[str, dict[str, str]] = {
         "unknown_order": "Order {number} not found.",
         "no_target": "No such app or step in order {number}.",
         "nothing_to_resume": "Order {number} has no steps left to finish.",
+        "device_mismatch": "This is not the phone from order {number} — another phone with the same "
+                           "serial number, or the phone after a factory reset. Nothing was changed.",
         "undone": "Order {number}: {status}.",
         "admin_not_restored": "Note: undo does not restore device admin rights.",
         "cache": "APK cache: {mb:.0f} MB in {path}. Limit {limit:.0f} GB, room now for "
@@ -300,6 +305,15 @@ def _order_or_none(journal: Journal, number: str, lang: str) -> Order | None:
     return order
 
 
+def _same_phone(order: Order, adb: AdbTransport, lang: str) -> DeviceInfo | None:
+    """Telefon zlecenia albo None (komunikat już wypisany): ten sam numer seryjny, inny telefon."""
+    device = read_device_info(adb)
+    if same_device(order.device_identity, device) is False:
+        print(_m(lang, "device_mismatch", number=order.number), file=sys.stderr)
+        return None
+    return device
+
+
 def cmd_undo(args: argparse.Namespace, host: AdbTransport, lang: str,
              pick: Callable[[AdbTransport, str | None, str], str]) -> int:
     with Journal(journal_path()) as journal:
@@ -311,7 +325,10 @@ def cmd_undo(args: argparse.Namespace, host: AdbTransport, lang: str,
             print(_m(lang, "no_target", number=order.number), file=sys.stderr)
             return 2
         adb = with_session_log(host.with_serial(pick(host, order.device_serial, lang)))
-        manufacturer = read_device_info(adb).manufacturer
+        device = _same_phone(order, adb, lang)
+        if device is None:
+            return 6
+        manufacturer = device.manufacturer
         try:
             result = undo_order(adb, journal, order, package=args.app, action_id=args.action,
                                 options=ExecOptions(on_event=_printer(lang, manufacturer)))
@@ -334,11 +351,14 @@ def cmd_resume(args: argparse.Namespace, host: AdbTransport, lang: str,
         order = _order_or_none(journal, args.order, lang)
         if order is None:
             return 2
+        adb = with_session_log(host.with_serial(pick(host, order.device_serial, lang)))
+        device = _same_phone(order, adb, lang)
+        if device is None:
+            return 6
         if not any(a.status == "pending" for a in journal.actions(order.id)):
             print(_m(lang, "nothing_to_resume", number=order.number))
             return 0
-        adb = with_session_log(host.with_serial(pick(host, order.device_serial, lang)))
-        manufacturer = read_device_info(adb).manufacturer
+        manufacturer = device.manufacturer
         options = _options(args, lang, manufacturer, None)
         return _execute_and_report(adb, journal, order, options, lang, manufacturer, {}, resume)
 

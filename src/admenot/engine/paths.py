@@ -64,9 +64,10 @@ def telemetry_delete_path() -> Path:
 
 
 def incident_path(serial: str) -> Path:
-    """Ostatnie nagranie incydentu (`who --watch`) telefonu o tym numerze."""
-    safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in serial)
-    return data_dir() / "incidents" / f"{safe}.json"
+    """Ostatnie nagranie incydentu (`who --watch`) telefonu o tym numerze. Nazwa jak katalog kopii
+    (SEC-02): „10.0.0.5:5555” i „10.0.0.5_5555” to różne pliki. Nagrania z poprzedniej wersji
+    (najwyżej 24 h) przestają być widoczne — to akceptowalne."""
+    return data_dir() / "incidents" / f"{device_dir_name(serial)}.json"
 
 
 def screenshots_dir() -> Path:

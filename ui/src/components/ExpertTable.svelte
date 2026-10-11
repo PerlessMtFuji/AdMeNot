@@ -67,7 +67,7 @@
 </div>
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
-<div role="group" aria-label={t('expert.table')} tabindex="0" onkeydown={keydown} bind:this={table} class="flex flex-col gap-4 outline-none">
+<div role="group" aria-label={t('expert.table')} tabindex="0" onkeydown={keydown} bind:this={table} class="@container flex flex-col gap-4 outline-none">
   {#each shown as g (g.verdict)}
     <VerdictSection verdict={g.verdict} count={g.apps.length} open={isOpen(g.verdict)}
       collapsible={!searching && g.apps.length > 0 && !DANGER.includes(g.verdict)}
@@ -75,7 +75,7 @@
       <div class="flex-none overflow-hidden rounded-2xl card">
         <table class="w-full table-fixed border-collapse">
           <colgroup>
-            <col class="w-10" /><col /><col class="w-[180px]" /><col class="w-[100px]" /><col class="w-[96px]" /><col class="w-[120px]" />
+            <col class="w-10" /><col /><col class="w-[180px]" /><col class="w-[100px] @max-[660px]:hidden" /><col class="w-[96px] @max-[660px]:hidden" /><col class="w-[120px]" />
           </colgroup>
           {#if g.verdict === firstWithRows}
             <thead>
@@ -83,8 +83,8 @@
                 <th class="border-b border-line px-3 py-3"></th>
                 <th class="border-b border-line px-3 py-3">{t('expert.col_app')}</th>
                 <th class="border-b border-line px-3 py-3">{t('expert.col_problems')}</th>
-                <th class="border-b border-line px-3 py-3">{t('expert.col_score')}</th>
-                <th class="border-b border-line px-3 py-3">{t('expert.col_source')}</th>
+                <th class="border-b border-line px-3 py-3 @max-[660px]:hidden">{t('expert.col_score')}</th>
+                <th class="border-b border-line px-3 py-3 @max-[660px]:hidden">{t('expert.col_source')}</th>
                 <th class="border-b border-line px-3 py-3">{t('expert.col_action')}</th>
               </tr>
             </thead>
@@ -108,11 +108,11 @@
             </div>
           </td>
           <td class="px-3 py-3"><ReasonTiles app={a} focusable={false} /></td>
-          <td class="px-3 py-3 whitespace-nowrap"><div class="flex items-center gap-2">
+          <td class="px-3 py-3 whitespace-nowrap @max-[660px]:hidden"><div class="flex items-center gap-2">
             <b class="mono {SCORE[a.verdict]}">{a.score}</b>
             <span class="h-1.5 w-12 overflow-hidden rounded-full bg-neutral-soft shadow-[var(--shadow-well)]"><i class="block h-full rounded-full {BAR[a.verdict]}" style="width: {a.score}%"></i></span>
           </div></td>
-          <td class="px-3 py-3 whitespace-nowrap">{a.source.label}<span class="block text-2xs text-soft">{when(a.source.days)}</span></td>
+          <td class="px-3 py-3 whitespace-nowrap @max-[660px]:hidden">{a.source.label}<span class="block text-2xs text-soft">{when(a.source.days)}</span></td>
           <td class="px-3 py-3">
             <select aria-label="{t('expert.col_action')} {a.package}" value={level ?? ''} disabled={done === 'remove'} onclick={(e) => e.stopPropagation()}
               onchange={(e) => ctl.setLevel(a.package, (e.currentTarget.value || null) as Level | null)}

@@ -2,8 +2,8 @@
 
 export const JSON_HEADERS = { "Content-Type": "application/json", "Cache-Control": "no-store" };
 
-export function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
+export function json(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
+  return new Response(JSON.stringify(body), { status, headers: { ...JSON_HEADERS, ...headers } });
 }
 
 // Czyta treść strumieniowo i przerywa po przekroczeniu limitu; null = za duża.

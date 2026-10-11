@@ -1,6 +1,6 @@
 import { env, exports } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
-import worker from "../src/index";
+import worker, { REPORTS_IP_DAILY } from "../src/index";
 
 const BASE = "https://admenot.test";
 const ID = /^R-[0-9A-HJKMNP-TV-Z]{6}$/;
@@ -116,6 +116,20 @@ describe("POST /api/v1/reports", () => {
   it("400 bez Content-Type JSON", async () => {
     const res = await post(report(), { "Content-Type": "text/plain" });
     expect(res.status).toBe(400);
+  });
+
+  it("one address sends at most REPORTS_IP_DAILY reports a day", async () => {
+    // Limiter minutowy (5/min) przepuszcza — sprawdzamy tylko limit dobowy na adres.
+    const open = { ...env, REPORTS_LIMITER: { limit: async () => ({ success: true }) } } as unknown as Env;
+    const send = () => worker.fetch(new Request(BASE + "/api/v1/reports", {
+      method: "POST", headers: { "Content-Type": "application/json", "CF-Connecting-IP": "198.51.100.9" },
+      body: JSON.stringify(report()),
+    }), open);
+    for (let i = 0; i < REPORTS_IP_DAILY; i++) expect((await send()).status).toBe(201);
+    const res = await send();
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: "budget" });
+    expect(Number(res.headers.get("Retry-After"))).toBeGreaterThan(0);
   });
 
   it("429 z limitera", async () => {

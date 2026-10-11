@@ -132,6 +132,7 @@ def test_journal_from_plan_2_gets_the_scan_table(tmp_path):
     with Journal(path) as j:
         order = j.create_order("S1", "M")
         j._db.execute("DROP TABLE order_scans")  # stan bazy sprzed Planu 6
+        j._db.execute("ALTER TABLE orders DROP COLUMN device_identity")  # i sprzed schematu v2
         j._db.execute("PRAGMA user_version = 0")  # i sprzed wersjonowania schematu
     with Journal(path) as j:
         assert j.order(order.id).number == order.number
@@ -247,34 +248,35 @@ def test_unversioned_journal_keeps_data_and_gets_version_1(tmp_path):
         db.execute("INSERT INTO orders(number, device_serial, created_at, status)"
                    " VALUES ('ZS/1', 'S1', '2026-10-01T10:00:00', 'done')")
         db.commit()
-    with Journal(path, migrations=MIGRATIONS[:1]) as j:
+    with Journal(path) as j:
         assert j.order_by_number("ZS/1").device_serial == "S1"
-    assert _version(path) == 1
+    assert _version(path) == len(MIGRATIONS)
 
 
 def test_migration_adds_column_and_backs_up_previous_version(tmp_path):
     path = tmp_path / "j.db"
-    with Journal(path, migrations=MIGRATIONS[:1]) as j:
+    with Journal(path) as j:
         j.create_order("S1", "M")
-    v2 = (*MIGRATIONS[:1], "ALTER TABLE orders ADD COLUMN note TEXT;")
-    with Journal(path, migrations=v2) as j:
+    latest = len(MIGRATIONS)
+    newer = (*MIGRATIONS, "ALTER TABLE orders ADD COLUMN note TEXT;")
+    with Journal(path, migrations=newer) as j:
         assert j.orders_for("S1")[0].device_model == "M"
-    assert _version(path) == 2
-    backup = tmp_path / "j.db.bak-v1"
-    assert _version(backup) == 1
+    assert _version(path) == latest + 1
+    backup = tmp_path / f"j.db.bak-v{latest}"
+    assert _version(backup) == latest
     with closing(sqlite3.connect(backup)) as db:
         assert db.execute("SELECT count(*) FROM orders").fetchone()[0] == 1
 
 
 def test_failed_migration_rolls_back(tmp_path):
     path = tmp_path / "j.db"
-    with Journal(path, migrations=MIGRATIONS[:1]) as j:
+    with Journal(path) as j:
         j.create_order("S1", "M")
-    broken = (*MIGRATIONS[:1], "ALTER TABLE orders ADD COLUMN note TEXT; SELECT * FROM nope;")
+    broken = (*MIGRATIONS, "ALTER TABLE orders ADD COLUMN note TEXT; SELECT * FROM nope;")
     with pytest.raises(sqlite3.OperationalError):
         Journal(path, migrations=broken)
-    assert _version(path) == 1
-    with Journal(path, migrations=MIGRATIONS[:1]) as j:
+    assert _version(path) == len(MIGRATIONS)
+    with Journal(path) as j:
         assert len(j.orders_for("S1")) == 1
     with closing(sqlite3.connect(path)) as db:
         cols = [r[1] for r in db.execute("PRAGMA table_info(orders)")]
@@ -289,3 +291,76 @@ def test_journal_from_newer_version_is_refused(tmp_path):
         db.execute(f"PRAGMA user_version = {len(MIGRATIONS) + 1}")
     with pytest.raises(JournalTooNew):
         Journal(path)
+
+
+def test_order_keeps_the_phone_identity_and_old_journals_migrate(tmp_path):
+    path = tmp_path / "j.db"
+    with closing(sqlite3.connect(path)) as db:  # dziennik z 0.9.x (v1), bez kolumny tożsamości
+        db.executescript(MIGRATIONS[0])
+        db.execute("INSERT INTO orders(number, device_serial, device_model, created_at, status)"
+                   " VALUES ('ZS/2026/1001/01', 'S1', 'M', '2026-10-01T10:00:00', 'done')")
+        db.execute("PRAGMA user_version = 1")
+        db.commit()
+    with Journal(path) as j:
+        old = j.order_by_number("ZS/2026/1001/01")
+        assert old.device_identity is None
+        new = j.create_order("S1", "M", None, {"android_id": "aaaa1111bbbb2222", "model": "M"})
+        assert j.order(new.id).device_identity == {"android_id": "aaaa1111bbbb2222", "model": "M"}
+        assert j.interrupted_orders("S1") == []
+    assert (tmp_path / "j.db.bak-v1").exists()
+
+
+def test_number_after_deleting_an_order_does_not_collide(tmp_path):
+    clock = Clock(datetime(2026, 10, 11, 10, 0))
+    with Journal(tmp_path / "j.db", now=clock) as j:
+        first = j.create_order("S1", "M")
+        j.create_order("S1", "M")
+        j.delete_order(first.id)
+        third = j.create_order("S1", "M")
+    assert third.number == "ZS/2026/1011/03"
+
+
+def test_delete_order_removes_its_rows_only(tmp_path):
+    with Journal(tmp_path / "j.db") as j:
+        keep, gone = j.create_order("S1", "M"), j.create_order("S1", "M")
+        for order in (keep, gone):
+            j.add_action(order.id, "com.ad", "remove",
+                         {"kind": "backup", "package": "com.ad", "params": {"dir": f"C:/b/{order.id}"}}, "backup")
+            j.save_scan(order.id, {"apps": []})
+            j.add_screenshot("S1", {}, order.id)
+        j.delete_order(gone.id)
+        assert j.order_by_number(gone.number) is None and j.actions(gone.id) == []
+        assert j.scan(gone.id) is None and j.screenshots(gone.id) == []
+        assert len(j.actions(keep.id)) == 1 and j.scan(keep.id) == {"apps": []}
+        assert j.backup_dirs() == {f"C:/b/{keep.id}"}
+        assert j.backup_dirs(exclude=keep.id) == set()
+
+
+def test_orders_before_a_cutoff(tmp_path):
+    clock = Clock(datetime(2026, 1, 1, 9, 0))
+    with Journal(tmp_path / "j.db", now=clock) as j:
+        old = j.create_order("S1", "M")
+        clock.t = datetime(2026, 10, 1, 9, 0)
+        j.create_order("S1", "M")
+        assert [o.number for o in j.orders_before(datetime(2026, 6, 1))] == [old.number]
+
+
+def test_number_after_deleting_the_last_order_of_the_day_is_not_reused(tmp_path):
+    """Protokół 02 mógł już trafić do klienta (albo zostać na dysku): nowe zlecenie nie dostaje 02."""
+    clock = Clock(datetime(2026, 10, 11, 10, 0))
+    with Journal(tmp_path / "j.db", now=clock) as j:
+        j.create_order("S1", "M")
+        second = j.create_order("S1", "M")
+        j.delete_order(second.id)
+        assert j.create_order("S1", "M").number == "ZS/2026/1011/03"
+    with Journal(tmp_path / "j.db", now=clock) as j:
+        last = j.create_order("S1", "M")
+        j.delete_order(last.id)
+        assert j.create_order("S1", "M").number == "ZS/2026/1011/05"
+
+
+def test_deleted_rows_are_overwritten_on_disk(tmp_path):
+    with Journal(tmp_path / "j.db") as j:
+        order = j.create_order("S1", "M", "Klientka-Unikalna-Nazwa")
+        j.delete_order(order.id)
+    assert b"Klientka-Unikalna-Nazwa" not in (tmp_path / "j.db").read_bytes()

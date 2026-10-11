@@ -23,6 +23,7 @@ from admenot.engine.actions.planner import AppPlan, Blocked, default_level, plan
 from admenot.engine.adb.transport import AdbTransport
 from admenot.engine.allowlist.trust import load_protected_list
 from admenot.engine.apk.cache import clear_cache
+from admenot.engine.device.identity import device_key, identity_of
 from admenot.engine.device.info import DeviceInfo
 from admenot.engine.facts import AppFacts
 from admenot.engine.journal.db import Action, Journal, Order
@@ -107,7 +108,8 @@ def plan_order(
     ctx = ctx or read_phone_context(adb, device.manufacturer)
     facts = {r.facts.package: r.facts for r in report.results}
     protected = load_protected_list()
-    root = backups_dir() / device_dir_name(device.serial)
+    # dwa telefony z jednym numerem seryjnym nie dzielą kopii
+    root = backups_dir() / device_dir_name(device_key(device))
     free = frozenset(unlocked)
     destroyed = frozenset(p for p, level in requests.items() if level in ("disable", "remove"))
     results = [plan_app(package, level, facts.get(package), ctx, protected, root, free, destroyed)
@@ -120,7 +122,8 @@ def plan_order(
 
 def start(journal: Journal, plan: OrderPlan, client: str | None,
           report: ScanReport | None = None, match: PhoneMatch | None = None) -> Order:
-    order = start_order(journal, plan.device.serial, plan.device.model, plan.plans, client)
+    order = start_order(journal, plan.device.serial, plan.device.model, plan.plans, client,
+                        identity_of(plan.device))
     if report is not None and match is not None:
         # Migawka dla protokołu (spec §9.3): telefon, zakres skanu, problemy i decyzje
         # serwisanta z chwili zlecenia.

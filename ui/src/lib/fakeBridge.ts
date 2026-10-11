@@ -50,7 +50,7 @@ export function createFakeBridge(name: string, options: { delay?: number; welcom
   const target = new EventTarget();
   const calls: FakeBridge['calls'] = [];
   let settings: Settings = { lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system', mirror_auto: false,
-    apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false, select_level: 'silence',
+    apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false, select_level: 'silence', retention_days: 60,
     check_updates: true, dismissed_update: null, last_run_version: null,
     welcome_version: options.welcome ? null : 1, welcome_current: 1, telemetry: false, telemetry_packages: false,
     telemetry_id: null, telemetry_delete_pending: false, donate_reminders: true };
@@ -88,6 +88,8 @@ export function createFakeBridge(name: string, options: { delay?: number; welcom
 
   const fallback = (method: string, args: unknown[]): unknown => {
     switch (method) {
+      case 'delete_order':
+        return { deleted: String(args[0]) };
       case 'get_settings':
         return { ...settings };
       case 'save_settings': {

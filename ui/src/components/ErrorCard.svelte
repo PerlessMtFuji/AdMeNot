@@ -35,7 +35,7 @@
     <span class="mt-0.5 text-bad"><Icon name="triangle-alert" size={16} /></span>
     <div class="min-w-0 flex-1">
       <b class="text-ink">{t(`error.${key}`, { device })}</b>
-      {#if s.error.message && key !== 'wrong_device'}
+      {#if s.error.message && key !== 'wrong_device' && key !== 'device_mismatch'}
         <div class="mono mt-1 text-xs break-words text-mut">{s.error.message}</div>
       {/if}
       {#if s.error.log}<div class="mt-1 text-xs text-mut">{t('error.log', { path: s.error.log })}</div>{/if}

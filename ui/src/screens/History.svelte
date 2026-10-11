@@ -90,7 +90,8 @@
             <OrderCard order={o} {scanned} disabled={s.orderRunning}
               onrestore={(pkg) => ctl.undo(o.number, null, pkg)}
               onrestoreStep={(id) => ctl.undo(o.number, id)}
-              onundoAll={() => ctl.undo(o.number)} />
+              onundoAll={() => ctl.undo(o.number)}
+              ondelete={() => ctl.deleteOrder(o.number)} />
           </li>
         {/each}
       </ol>
