@@ -312,3 +312,8 @@ def test_valid_steps_from_the_planner_still_pass():
         Step("backup", "com.ad", {"dir": "C:/b/com.ad/unknown", "version_code": ""}),
     ):
         S.check_step(step)
+
+
+def test_undo_of_an_appop_with_an_oem_mode_is_not_blocked():
+    """Inverse appop przechowuje tryb odczytany z telefonu — producenci mają własne (np. MIUI „ask”)."""
+    S.check_step(Step("appop", "com.ad", {"op": "SYSTEM_ALERT_WINDOW", "mode": "ask"}))

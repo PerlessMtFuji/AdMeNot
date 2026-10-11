@@ -30,7 +30,9 @@ NOTIF_LISTENERS_KEY = "enabled_notification_listeners"
 _COMPONENT = re.compile(r"^[A-Za-z][\w.]*/[\w.$]+$", re.ASCII)
 A11Y_KEY = "enabled_accessibility_services"
 SECURE_LIST_KEYS = (A11Y_KEY, NOTIF_LISTENERS_KEY)
-APPOP_MODES = frozenset({"allow", "ignore", "deny", "default", "foreground", "errored"})
+# Tryb appop: krok odwrotny zapisuje tryb odczytany z telefonu, a producenci mają własne (MIUI „ask”).
+# Sprawdzamy kształt (bezpieczny dla powłoki), nie listę trybów — inaczej cofnięcie by się blokowało.
+_APPOP_MODE = re.compile(r"^[a-z_]{1,32}$", re.ASCII)
 _OP = re.compile(r"^[A-Z_]{1,64}$", re.ASCII)
 _PERMISSION = re.compile(r"^[A-Za-z][\w.]{0,200}$", re.ASCII)
 _FLAGS = frozenset({"0", "1"})
@@ -56,7 +58,7 @@ def _components(v: Any) -> bool:
 
 
 _PARAMS: dict[str, dict[str, Callable[[Any], bool]]] = {
-    "appop": {"op": _text(_OP), "mode": lambda v: v in APPOP_MODES},
+    "appop": {"op": _text(_OP), "mode": _text(_APPOP_MODE)},
     "permission": {"permission": _text(_PERMISSION), "granted": _flag_value},
     "secure_list": {"key": lambda v: v in SECURE_LIST_KEYS, "op": lambda v: v in ("add", "remove"),
                     "components": _components},

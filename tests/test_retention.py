@@ -100,3 +100,31 @@ def test_prune_logs_keeps_recent_and_foreign_files():
         (logs_dir() / name).write_text("x", "utf-8")
     assert retention.prune_logs(logs_dir(), NOW, 90) == 2
     assert sorted(p.name for p in logs_dir().iterdir()) == sorted(names[2:])
+
+
+def test_purge_goes_on_past_an_order_that_fails(tmp_path, monkeypatch):
+    with Journal(journal_path(), now=lambda: NOW - timedelta(days=400)) as j:
+        broken, fine = _order(j, _backup(tmp_path, "1")), _order(j, _backup(tmp_path, "2"))
+        real = retention.delete_order
+
+        def flaky(journal, order):
+            if order.id == broken.id:
+                raise PermissionError("zrzut otwarty w przeglądarce")
+            real(journal, order)
+
+        monkeypatch.setattr(retention, "delete_order", flaky)
+        assert retention.purge(j, NOW, 365) == [fine.number]
+        assert j.order_by_number(broken.number) is not None
+
+
+def test_purge_removes_old_journal_backups(tmp_path):
+    import os
+    path = journal_path()
+    with Journal(path, now=lambda: NOW) as j:
+        old, fresh = path.with_name(path.name + ".bak-v1"), path.with_name(path.name + ".bak-v2")
+        for backup in (old, fresh):
+            backup.write_bytes(b"SQLite format 3")
+        stamp = (NOW - timedelta(days=retention.BACKUP_KEEP_DAYS + 1)).timestamp()
+        os.utime(old, (stamp, stamp))
+        retention.purge(j, NOW, 365)
+    assert not old.exists() and fresh.exists()

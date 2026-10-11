@@ -343,3 +343,24 @@ def test_orders_before_a_cutoff(tmp_path):
         clock.t = datetime(2026, 10, 1, 9, 0)
         j.create_order("S1", "M")
         assert [o.number for o in j.orders_before(datetime(2026, 6, 1))] == [old.number]
+
+
+def test_number_after_deleting_the_last_order_of_the_day_is_not_reused(tmp_path):
+    """Protokół 02 mógł już trafić do klienta (albo zostać na dysku): nowe zlecenie nie dostaje 02."""
+    clock = Clock(datetime(2026, 10, 11, 10, 0))
+    with Journal(tmp_path / "j.db", now=clock) as j:
+        j.create_order("S1", "M")
+        second = j.create_order("S1", "M")
+        j.delete_order(second.id)
+        assert j.create_order("S1", "M").number == "ZS/2026/1011/03"
+    with Journal(tmp_path / "j.db", now=clock) as j:
+        last = j.create_order("S1", "M")
+        j.delete_order(last.id)
+        assert j.create_order("S1", "M").number == "ZS/2026/1011/05"
+
+
+def test_deleted_rows_are_overwritten_on_disk(tmp_path):
+    with Journal(tmp_path / "j.db") as j:
+        order = j.create_order("S1", "M", "Klientka-Unikalna-Nazwa")
+        j.delete_order(order.id)
+    assert b"Klientka-Unikalna-Nazwa" not in (tmp_path / "j.db").read_bytes()

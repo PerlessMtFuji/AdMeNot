@@ -11,6 +11,7 @@ from __future__ import annotations
 import contextlib
 import re
 import shutil
+from collections.abc import Callable
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -22,6 +23,9 @@ from admenot.engine.report.files import report_stem
 from admenot.engine.screenshot import delete_shots
 
 LOG_KEEP_DAYS = 90
+# Kopia dziennika sprzed migracji schematu (`journal.db.bak-vN`) ma wszystkie zlecenia z chwili
+# aktualizacji: po tygodniu (czas na wycofanie wersji) usuwamy ją razem z retencją.
+BACKUP_KEEP_DAYS = 7
 _LOG_DAY = re.compile(r"^(?:app-)?(\d{4}-\d{2}-\d{2})\.log$")
 _REPORT_SUFFIXES = (".html", ".pdf", ".tmp.pdf")
 
@@ -55,9 +59,11 @@ def delete_order(journal: Journal, order: Order) -> None:
             _remove_backup(Path(path), package)
 
 
-def purge(journal: Journal, now: datetime, days: int) -> list[str]:
+def purge(journal: Journal, now: datetime, days: int,
+          on_error: Callable[[Exception], None] | None = None) -> list[str]:
     """Zlecenia starsze niż `days` dni bez kroków do dokończenia. Telefon zajęty przez inny
-    proces (CLI) — zlecenie zostaje do następnego razu."""
+    proces (CLI) albo błąd jednego zlecenia (np. zablokowany plik) — to zlecenie zostaje do
+    następnego razu, pozostałe idą dalej (`on_error` zapisuje błąd w logu)."""
     deleted: list[str] = []
     for order in journal.orders_before(now - timedelta(days=days)):
         if any(a.status == "pending" for a in journal.actions(order.id)):
@@ -67,8 +73,21 @@ def purge(journal: Journal, now: datetime, days: int) -> list[str]:
                 delete_order(journal, order)
         except DeviceBusy:
             continue
+        except Exception as exc:  # noqa: BLE001 — jedno zlecenie nie zatrzymuje retencji na zawsze
+            if on_error is not None:
+                on_error(exc)
+            continue
         deleted.append(order.number)
+    _prune_journal_backups(Path(journal.path), now)
     return deleted
+
+
+def _prune_journal_backups(path: Path, now: datetime) -> None:
+    cutoff = (now - timedelta(days=BACKUP_KEEP_DAYS)).timestamp()
+    for backup in path.parent.glob(f"{path.name}.bak-v*"):
+        with contextlib.suppress(OSError):
+            if backup.stat().st_mtime < cutoff:
+                backup.unlink()
 
 
 def prune_logs(directory: Path, now: datetime, days: int = LOG_KEEP_DAYS) -> int:

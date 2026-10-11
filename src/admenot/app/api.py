@@ -239,7 +239,7 @@ class Api:
             now = self._now()
             if self._settings.retention_days:
                 with self._journal() as journal:
-                    retention.purge(journal, now, self._settings.retention_days)
+                    retention.purge(journal, now, self._settings.retention_days, log_exception)
             retention.prune_logs(logs_dir(), now)
         except Exception as exc:  # noqa: BLE001 — sprzątanie nie może zablokować startu okna
             log_exception(exc)

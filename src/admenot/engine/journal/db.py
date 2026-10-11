@@ -61,9 +61,17 @@ _V2_IDENTITY = """
 ALTER TABLE orders ADD COLUMN device_identity TEXT;
 """
 
+_V3_ORDER_SEQ = """
+CREATE TABLE IF NOT EXISTS order_seq (
+    prefix TEXT PRIMARY KEY,
+    last INTEGER NOT NULL
+);
+"""
+
 # v1 to schemat sprzed wersjonowania — `IF NOT EXISTS` przyjmuje też bazy z user_version = 0.
 # v2: tożsamość telefonu w zleceniu (android_id, IMEI, model) — przegląd 2026-10-11.
-MIGRATIONS: tuple[str, ...] = (_SCHEMA_V1, _V2_IDENTITY)
+# v3: licznik numerów zleceń dnia — numer usuniętego zlecenia nie wraca (protokół mógł trafić do klienta).
+MIGRATIONS: tuple[str, ...] = (_SCHEMA_V1, _V2_IDENTITY, _V3_ORDER_SEQ)
 
 ORDER_STATUSES = frozenset({"running", "done", "failed", "undone", "partially_undone"})
 ACTION_STATUSES = frozenset({"pending", "done", "failed", "undone"})
@@ -182,6 +190,8 @@ class Journal:
         self._path = str(path)
         self._db = sqlite3.connect(str(path))
         self._db.row_factory = sqlite3.Row
+        # Usunięte wiersze (nazwiska, IMEI) nadpisywane zerami, nie zostają w wolnych stronach pliku.
+        self._db.execute("PRAGMA secure_delete = ON")
         try:
             _migrate(self._db, path, migrations)
         except BaseException:
@@ -208,14 +218,20 @@ class Journal:
         now = self._now()
         prefix = f"ZS/{now:%Y}/{now:%m%d}/"
         with self._db:
-            # MAX, nie COUNT: po usunięciu zlecenia z tego dnia numer nie może się powtórzyć
+            # Licznik dnia, nie COUNT ani MAX z tabeli: po usunięciu zlecenia (także ostatniego)
+            # jego numer nie wraca. MAX z tabeli — dla zleceń sprzed licznika (v3).
             (last,) = self._db.execute(
-                "SELECT MAX(CAST(substr(number, ?) AS INTEGER)) FROM orders WHERE number LIKE ?",
-                (len(prefix) + 1, prefix + "%")).fetchone()
+                "SELECT MAX(COALESCE((SELECT last FROM order_seq WHERE prefix = ?1), 0),"
+                " COALESCE((SELECT MAX(CAST(substr(number, ?2) AS INTEGER)) FROM orders"
+                " WHERE number LIKE ?1 || '%'), 0))",
+                (prefix, len(prefix) + 1)).fetchone()
+            self._db.execute(
+                "INSERT INTO order_seq (prefix, last) VALUES (?, ?)"
+                " ON CONFLICT(prefix) DO UPDATE SET last = excluded.last", (prefix, last + 1))
             cur = self._db.execute(
                 "INSERT INTO orders (number, device_serial, device_model, client_name, created_at, status,"
                 " device_identity) VALUES (?, ?, ?, ?, ?, 'running', ?)",
-                (f"{prefix}{(last or 0) + 1:02d}", serial, model, client_name or None,
+                (f"{prefix}{last + 1:02d}", serial, model, client_name or None,
                  now.isoformat(timespec="seconds"), _dump(identity)))
         return self.order(cur.lastrowid)
 
