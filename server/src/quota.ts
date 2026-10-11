@@ -1,31 +1,11 @@
 // Dobowy limit na adres (przegląd 2026-10-11): identyfikator instalacji podaje klient, więc limit na
-// instalację nie chroni wspólnego budżetu. Skrót adresu żyje tylko w pamięci tego obiektu i znika o
-// północy UTC albo przy jego wyładowaniu — nic nie trafia do D1 ani do magazynu obiektu (spec §2.2).
+// instalację nie chroni wspólnego budżetu. Licznik trzymamy w magazynie obiektu (pamięć znika po
+// minucie bezczynności i przy wdrożeniu), ale pod kluczem HMAC(QUOTA_KEY, dzień UTC, adres): bez
+// sekretu nie da się go odwrócić słownikiem adresów, a dzień w kluczu nie pozwala łączyć dni.
+// Alarm o północy UTC kasuje wszystkie liczniki (spec §2.2, polityka prywatności).
 import { DurableObject } from "cloudflare:workers";
 
-const today = (): string => new Date().toISOString().slice(0, 10);
-
-export class Quota extends DurableObject {
-  private day = today();
-  private used = new Map<string, number>();
-
-  take(key: string, amount: number, limit: number): boolean {
-    const now = today();
-    if (now !== this.day) {
-      this.day = now;
-      this.used.clear();
-    }
-    const total = (this.used.get(key) ?? 0) + amount;
-    if (total > limit) return false;
-    this.used.set(key, total);
-    return true;
-  }
-}
-
-async function hashed(ip: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip));
-  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
-}
+const today = (now = new Date()): string => now.toISOString().slice(0, 10);
 
 // Sekundy do północy UTC — wtedy limit wraca (nagłówek Retry-After).
 export function untilMidnight(now = new Date()): number {
@@ -33,8 +13,37 @@ export function untilMidnight(now = new Date()): number {
   return Math.max(1, Math.ceil((next - now.getTime()) / 1000));
 }
 
+export class Quota extends DurableObject {
+  async take(key: string, amount: number, limit: number): Promise<boolean> {
+    const storage = this.ctx.storage;
+    if ((await storage.getAlarm()) === null) await storage.setAlarm(Date.now() + untilMidnight() * 1000);
+    const total = ((await storage.get<number>(key)) ?? 0) + amount;
+    if (total > limit) return false;
+    await storage.put(key, total);
+    return true;
+  }
+
+  async alarm(): Promise<void> {
+    await this.ctx.storage.deleteAll(); // liczniki minionej doby; następny alarm ustawi `take`
+  }
+}
+
+async function hmac(secret: string, text: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" },
+    false, ["sign"]);
+  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(mac), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// false = limit na dziś wyczerpany. Awaria obiektu albo brak sekretu przepuszcza zapytanie:
+// wspólny dobowy sufit w D1 nadal chroni bazę, a program nie dostaje błędu 500.
 export async function takeQuota(request: Request, env: Env, scope: string, amount: number, limit: number): Promise<boolean> {
-  const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
-  const stub = env.QUOTA.get(env.QUOTA.idFromName("global"));
-  return stub.take(`${scope}:${await hashed(ip)}`, amount, limit);
+  try {
+    if (!env.QUOTA_KEY) throw new Error("QUOTA_KEY missing");
+    const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
+    const stub = env.QUOTA.get(env.QUOTA.idFromName("global"));
+    return await stub.take(`${scope}:${await hmac(env.QUOTA_KEY, `${today()}|${ip}`)}`, amount, limit);
+  } catch {
+    return true;
+  }
 }
