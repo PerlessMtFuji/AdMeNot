@@ -24,7 +24,7 @@ describe('fake bridge', () => {
     expect(seen).toEqual(['scan:device', 'scan:done', 'apk:done']);
     const rerender = await bridge.api.rerender();
     if (!isApiError(rerender)) expect(rerender.scan?.apps.length).toBeGreaterThan(0);
-    await bridge.api.execute({ 'com.wlive.forecast': 'disable' }, []);
+    await bridge.api.execute({ 'com.wlive.forecast': 'disable' }, [], null);
     await vi.waitFor(() => expect(seen.at(-1)).toBe('exec:done'));
     expect(bridge.calls.map((c) => c.method)).toEqual(
       ['list_devices', 'start_scan', 'rerender', 'execute']);

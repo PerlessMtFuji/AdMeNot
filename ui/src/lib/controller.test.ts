@@ -132,7 +132,7 @@ describe('controller with the adware scenario', () => {
   });
 
   test('two orders: undo goes to the newest one and falls back to the earlier level', () => {
-    const plan = (level: 'disable' | 'remove') => ({ runnable: 1, apps: [{ package: 'p', name: 'P', level, level_label: '',
+    const plan = (level: 'disable' | 'remove') => ({ runnable: 1, code: 'K7F3', apps: [{ package: 'p', name: 'P', level, level_label: '',
       blocked: false, reason: null, reason_text: null, steps: [], warnings: [] }] });
     const result = (order: string) => ({ order, status: 'done', status_label: '', stopped: false,
       apps: [{ package: 'p', name: 'P', outcome: 'ok' as const, errors: [], kinds: [] }] });
@@ -566,5 +566,66 @@ describe('first run and telemetry consent', () => {
     expect(ctl.state.settings.telemetry_delete_pending).toBe(true);
     bridge.emit('telemetry:deleted', {});
     expect(ctl.state.settings.telemetry_delete_pending).toBe(false);
+  });
+});
+
+describe('plan dla klienta', () => {
+  async function confirming() {
+    const env = await setupCtl('adware');
+    env.s.plan = { apps: [], runnable: 1, code: 'K7F3' };
+    return env;
+  }
+
+  test('sharePlan sets state before the call and accepts an event that arrives early', async () => {
+    const { ctl, s, bridge } = await confirming();
+    const pending = ctl.sharePlan();
+    const id = s.share!.id;
+    expect(s.share).toMatchObject({ status: 'sending', url: null });
+    bridge.emit('share:ready', { share_id: id, code: 'K7F3', url: 'https://x/plan#l.a', mode: 'local', expires: null });
+    await pending;
+    expect(s.share).toMatchObject({ status: 'ready', mode: 'local', code: 'K7F3' });
+    const call = bridge.calls.find((c) => c.method === 'share_plan')!;
+    expect(call.args[2]).toBe(id);
+  });
+
+  test('ignores events of an older share and marks the local → server upgrade', async () => {
+    const { ctl, s, bridge } = await confirming();
+    await ctl.sharePlan();
+    const id = s.share!.id;
+    bridge.emit('share:ready', { share_id: 'other', code: 'XXXX', url: 'u', mode: 'server', expires: null });
+    bridge.emit('share:ready', { share_id: id, code: 'K7F3', url: 'l', mode: 'local', expires: null });
+    bridge.emit('share:ready', { share_id: id, code: 'K7F3', url: 's', mode: 'server', expires: '2026-10-11T13:32:00Z' });
+    expect(s.share).toMatchObject({ url: 's', mode: 'server', upgraded: true });
+  });
+
+  test('closing or reopening the plan clears the share and the consent', async () => {
+    const { ctl, s, bridge } = await confirming();
+    await ctl.sharePlan();
+    s.consent = true;
+    ctl.closePlan();
+    expect(s.share).toBeNull();
+    expect(s.consent).toBe(false);
+    expect(bridge.calls.some((c) => c.method === 'cancel_share')).toBe(true);
+  });
+
+  test('execute passes the code only when consent is ticked', async () => {
+    const { ctl, s, bridge } = await confirming();
+    await ctl.execute();
+    expect(bridge.calls.at(-1)!.args[2]).toBeNull();
+    await ctl.sharePlan();
+    bridge.emit('share:ready', { share_id: s.share!.id, code: 'K7F3', url: 'u', mode: 'server', expires: null });
+    s.consent = true;
+    await ctl.execute();
+    expect(bridge.calls.filter((c) => c.method === 'execute').at(-1)!.args[2]).toEqual({ code: 'K7F3' });
+  });
+
+  test('plan_changed shows a notice, recomputes the plan and is not an error card', async () => {
+    const { ctl, s, bridge } = await confirming();
+    bridge.emit('job:error', { job_id: 'job-9', kind: 'exec', key: 'plan_changed', message: '' });
+    expect(s.planChanged).toBe(true);
+    expect(s.error).toBeNull();
+    expect(bridge.calls.some((c) => c.method === 'preview_plan')).toBe(true);
+    await ctl.sharePlan();
+    expect(s.planChanged).toBe(false);
   });
 });

@@ -153,3 +153,13 @@ test('pierwsze uruchomienie: ostrzeżenie i zgody', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Witaj w AdMeNot' })).toBeHidden();
   await expect(page.getByRole('heading', { name: 'Połączono' })).toBeVisible();
 });
+test('show the plan to the client: QR, code and consent go with the order', async ({ page }) => {
+  await scan(page, 'adware');
+  await page.getByRole('button', { name: /Napraw zaznaczone/ }).click();
+  await page.getByRole('button', { name: 'Pokaż klientowi' }).click();
+  await expect(page.getByRole('img', { name: /Kod QR/ })).toBeVisible();
+  await expect(page.getByText('K7F3', { exact: true })).toBeVisible();
+  await page.getByRole('checkbox', { name: /zapoznał się/ }).check();
+  await page.getByRole('button', { name: /^Wykonaj/ }).click();
+  await expect(page.getByRole('heading', { name: 'Telefon naprawiony' })).toBeVisible({ timeout: 15_000 });
+});

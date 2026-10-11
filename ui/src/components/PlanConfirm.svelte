@@ -6,6 +6,7 @@
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
   import Pill from '../ui/Pill.svelte';
+  import ShareQr from './ShareQr.svelte';
 
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
@@ -68,6 +69,7 @@
       {/each}
     </div>
     {#if plan.runnable === 0}<p class="text-bad">{t('plan.nothing')}</p>{/if}
+    <ShareQr disabled={plan.runnable === 0 || s.orderRunning} />
     <div class="mt-auto text-xs text-mut">{t('plan.undo_hint')}</div>
     <div class="flex gap-2">
       <Button variant="ghost" onclick={() => ctl.closePlan()}>{t('common.back')}</Button>

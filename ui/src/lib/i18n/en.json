@@ -148,7 +148,7 @@
     "deep": "Deep analysis", "deep_hint": "Looks in the app code for possible paths to sensitive calls. Takes up to a few minutes.", "limits": "Assessment limits", "incomplete_data": "Little data about the app's behavior", "confidence": "Confidence"
   },
   "actions": { "console": "ADB console", "fix": "Fix selected ({count})", "rescan": "Scan again" },
-  "plan": { "title": "Repair plan", "confirm_title": "What I will do on the phone", "blocked": "Skipped", "unlock": "Unlock", "unlock_prompt": "This is a system app — changing it can break phone features. To unlock it, type the package name: {package}", "unlock_label": "Package name to unlock", "undo_hint": "You can undo changes in History. Removing an app deletes its data — undo restores the app itself.", "run": "Run ({count})", "nothing": "Nothing to run — all apps are blocked." },
+  "plan": { "title": "Repair plan", "confirm_title": "What I will do on the phone", "blocked": "Skipped", "unlock": "Unlock", "unlock_prompt": "This is a system app — changing it can break phone features. To unlock it, type the package name: {package}", "unlock_label": "Package name to unlock", "undo_hint": "You can undo changes in History. Removing an app deletes its data — undo restores the app itself.", "run": "Run ({count})", "nothing": "Nothing to run — all apps are blocked.", "share": "Show the client", "share_hint": "The list will be encrypted and stored on the AdMeNot server for an hour. Only this code can read it.", "share_qr": "QR code with the repair plan for the client", "share_code": "Check code", "share_valid": "Valid until {time}", "share_local": "No connection to the server. The code works without icons. We will keep trying to send the full plan in the background.", "share_upgraded": "Code updated, now with icons. The list has not changed (code {code}).", "share_too_long": "No connection to the server, and the plan is too long for a code without internet.", "share_error": "The code for the client could not be prepared.", "consent": "The client has seen the scope of the repair (code {code})", "changed": "The plan has changed since it was shown to the client. Show the client the new code." },
   "exec": {
     "title": "Fixing the phone…", "step": "step {done} of {total}", "panel": "Order",
     "done_title": "Phone fixed", "done_warn": "Repair finished with remarks",
@@ -410,6 +410,7 @@
     "unknown_order": "Order not found.",
     "nothing_to_resume": "This order has no steps left to finish.",
     "nothing_to_do": "Nothing to run — the selected apps are blocked.",
+    "plan_changed": "The plan has changed since it was shown to the client. Show the client the new code.",
     "no_target": "No such app or step in the order.",
     "bad_request": "Invalid data.",
     "internal": "Unexpected program error.",

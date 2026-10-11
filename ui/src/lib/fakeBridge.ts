@@ -125,6 +125,14 @@ export function createFakeBridge(name: string, options: { delay?: number; welcom
       case 'start_incident':
       case 'mark_incident':
         return { ok: true };
+      case 'share_plan': {
+        const shareId = String(args[2]);
+        replay([['share:ready', { share_id: shareId, code: 'K7F3', mode: 'server', expires: '2026-10-11T13:32:00Z',
+          url: `https://admenot.e-wlodarski.workers.dev/plan#s.${'A'.repeat(22)}.${'B'.repeat(43)}` }]]);
+        return { share_id: shareId, code: 'K7F3' };
+      }
+      case 'cancel_share':
+        return { ok: true };
       case 'deep_analyze':
         return { job_id: 'job-deep' };
       case 'clear_apk_cache':
