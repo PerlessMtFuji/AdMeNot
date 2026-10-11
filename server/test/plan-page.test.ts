@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import vector from "../../tests/fixtures/share_vector.json";
-import { TEXTS, canInflate, decodeLocal, decryptShare, effect, initial, parseFragment } from "../public/plan.js";
+import { TEXTS, canInflate, decodeLocal, decryptShare, effect, groups, initial, parseFragment } from "../public/plan.js";
 
 const bytes = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 
@@ -53,6 +53,28 @@ describe("plan.js", () => {
     expect(canInflate({})).toBe(false);
     class Old { constructor(format: string) { if (format !== "gzip") throw new TypeError(format); } }
     expect(canInflate({ DecompressionStream: Old })).toBe(false);
+  });
+
+  it("grupuje aplikacje wg skutku: od najmocniejszego, zablokowane na końcu, nazwy alfabetycznie", () => {
+    const apps = [
+      { n: "Żaba", l: "silence" as const }, { n: "Ala", l: "remove" as const },
+      { n: "Ćma", l: "silence" as const }, { n: "Cebula", l: "silence" as const },
+      { n: "System", l: "remove" as const, b: 1 }, { n: "Bęben", l: "disable" as const },
+    ];
+    const got = groups(apps, false, TEXTS.pl, "pl");
+    expect(got.map((g) => g.key)).toEqual(["remove", "disable", "silence", "blocked"]);
+    expect(got.map((g) => g.apps.map((a) => a.n))).toEqual([["Ala"], ["Bęben"], ["Cebula", "Ćma", "Żaba"], ["System"]]);
+  });
+
+  it("jeden opis na grupę: liczba pojedyncza dla jednej aplikacji, mnoga dla kilku", () => {
+    const one = groups([{ n: "a", l: "remove" as const }], true, TEXTS.pl, "pl")[0];
+    expect(one.title).toBe("Do usunięcia");
+    expect(one.text).toBe("Zostanie usunięta razem ze swoimi danymi. Samą aplikację da się przywrócić.");
+    const many = groups([{ n: "a", l: "silence" as const }, { n: "b", l: "silence" as const }], false, TEXTS.pl, "pl")[0];
+    expect(many.text).toBe("Zostają na telefonie i nie będą wyświetlać okien nad innymi aplikacjami. "
+      + "Ich powiadomienia trzeba wyłączyć ręcznie w ustawieniach telefonu.");
+    expect(groups([{ n: "a", l: "disable" as const }, { n: "b", l: "disable" as const }], true, TEXTS.en, "en")[0].text)
+      .toBe("Will stop working. Their data stays on the phone.");
   });
 
   it("oba języki mają te same klucze", () => {
