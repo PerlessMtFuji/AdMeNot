@@ -110,6 +110,15 @@ describe('plan and execution', () => {
     expect(screen.getByText(/Nic do wykonania/)).toBeTruthy();
     expect((screen.getByRole('button', { name: /^Wykonaj/ }) as HTMLButtonElement).disabled).toBe(true);
     await fireEvent.click(screen.getByRole('button', { name: 'Odblokuj' }));
+    // QA-01: jedno kliknięcie nie wystarcza — trzeba przepisać nazwę pakietu.
+    const confirm = screen.getByRole('button', { name: 'Odblokuj' }) as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+    const input = screen.getByRole('textbox', { name: 'Nazwa pakietu do odblokowania' });
+    await fireEvent.input(input, { target: { value: 'com.sec.android' } });
+    expect(confirm.disabled).toBe(true);
+    expect(bridge.calls.at(-1)?.method).not.toBe('preview_plan');
+    await fireEvent.input(input, { target: { value: 'com.sec.android.app.launcher' } });
+    await fireEvent.click(confirm);
     expect(bridge.calls.at(-1)).toMatchObject({ method: 'preview_plan', args: [expect.anything(),
       ['com.sec.android.app.launcher']] });
   });

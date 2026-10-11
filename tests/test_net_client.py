@@ -200,3 +200,12 @@ def test_delete_sends_delete_method(stub):
     assert client.delete("/api/v1/telemetry/x") == {"deleted": 3}
     method, path, _, body = stub.requests[0]
     assert (method, path, body) == ("DELETE", "/api/v1/telemetry/x", b"")
+
+
+def test_oversized_response_is_refused_before_reading_it_all(stub):
+    """Audyt 2026-10-11, PERF-03: odpowiedź ponad limit nie trafia w całości do pamięci."""
+    stub.body = b'{"pad": "' + b"x" * 5000 + b'"}'
+    with pytest.raises(BackendError) as err:
+        client._fetch("/api/v1/health", max_bytes=1000)
+    assert err.value.kind == "invalid"
+    assert client._fetch("/api/v1/health", max_bytes=len(stub.body)) == stub.body

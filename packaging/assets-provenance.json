@@ -1,0 +1,8 @@
+{
+  "_comment": "Pochodzenie zasobów dołączanych do paczki (audyt 2026-10-11, REL-04). Uzupełnia autor: źródło, licencja i podstawa redystrybucji. Puste pola = składnik nierozstrzygnięty w THIRD_PARTY_NOTICES.",
+  "phone_assets": {
+    "source": "Zdjęcia i dane modeli (nazwa, marka, rok, przekątna, bateria, kody modeli) z GSMArena.com (https://www.gsmarena.com), zebrane przez projekt autora Szklodo (scripts/build_phone_db.py --source F:\\Szklodo) / Photos and model data from GSMArena.com, collected by the author's Szklodo project",
+    "license": "brak jawnej licencji; prawa do zdjęć należą do GSMArena.com lub producentów telefonów / no explicit license; photo rights belong to GSMArena.com or the phone manufacturers",
+    "basis": "Decyzja autora z 2026-10-11: dołączone z atrybucją źródła, wyłącznie do rozpoznania i pokazania modelu telefonu; usunięcie na żądanie właściciela praw / Author's decision of 2026-10-11: included with source attribution, only to recognize and show the phone model; removed on the rights holder's request"
+  }
+}

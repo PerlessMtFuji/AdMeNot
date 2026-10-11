@@ -649,7 +649,8 @@
      {
       "done": 1,
       "total": 3,
-      "package": "com.clean.pro.boost"
+      "package": "com.clean.pro.boost",
+      "job_id": "job-1"
      }
     ],
     [
@@ -657,7 +658,8 @@
      {
       "done": 2,
       "total": 3,
-      "package": "com.wlive.forecast"
+      "package": "com.wlive.forecast",
+      "job_id": "job-1"
      }
     ],
     [
@@ -665,7 +667,8 @@
      {
       "done": 3,
       "total": 3,
-      "package": "com.whatsapp"
+      "package": "com.whatsapp",
+      "job_id": "job-1"
      }
     ],
     [
@@ -822,7 +825,8 @@
         "total": 2,
         "user": 1
        }
-      }
+      },
+      "job_id": "job-1"
      }
     ],
     [

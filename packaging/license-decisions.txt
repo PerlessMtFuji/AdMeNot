@@ -1,0 +1,7 @@
+# Rozstrzygnięcia autora dla składników bez jasnej licencji albo podstawy redystrybucji
+# (audyt 2026-10-11, REL-04). Build wydania (bez --allow-dirty) zatrzymuje się na każdym
+# takim składniku z THIRD_PARTY_NOTICES, którego tu nie ma.
+#
+# Format: nazwa składnika dokładnie jak w THIRD_PARTY_NOTICES | decyzja i jej podstawa
+Google Play supported devices (supported_devices.csv) | decyzja autora 2026-10-11: publiczna lista Google dla deweloperów, dołączona bez zmian treści, ze źródłem w THIRD_PARTY_NOTICES
+Phone database and photos (phones.db, phones/*) | decyzja autora 2026-10-11: dołączone z atrybucją GSMArena.com mimo braku licencji (ryzyko świadomie przyjęte); usunięcie na żądanie właściciela praw — szczegóły w packaging/assets-provenance.json

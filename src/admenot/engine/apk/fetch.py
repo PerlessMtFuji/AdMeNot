@@ -83,6 +83,20 @@ def _remote_hashes(adb: AdbTransport, remotes: list[str]) -> dict[str, str] | No
     return hashes if set(hashes) == set(remotes) else None
 
 
+def installed_hashes(adb: AdbTransport, package: str) -> dict[str, str] | None:
+    """Nazwa pliku → SHA-256 zainstalowanych APK pakietu albo None (brak `sha256sum`/pakietu)."""
+    if not is_package_name(package):
+        raise ValueError(f"invalid package name: {package!r}")
+    try:
+        remotes = parse_pm_path(adb.shell(PM_PATH.format(package=package)))
+    except AdbError:
+        return None
+    hashes = _remote_hashes(adb, remotes) if remotes else None
+    if hashes is None:
+        return None
+    return {PurePosixPath(r).name: hashes[r] for r in remotes}
+
+
 def _sha256(path: Path) -> str:
     with path.open("rb") as f:
         return hashlib.file_digest(f, "sha256").hexdigest()

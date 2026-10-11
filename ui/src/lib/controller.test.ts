@@ -27,7 +27,7 @@ describe('controller with the adware scenario', () => {
     expect(s.apk.running).toBe(false);
     expect(s.apk.total).toBeGreaterThan(0);
     expect(s.device?.serial).toBe('R58T00TEST');
-    expect(s.selection['com.clean.pro.boost']).toBe('remove');
+    expect(s.selection['com.clean.pro.boost']).toBe('disable');
     expect(s.job).toBeNull();
   });
 
@@ -74,8 +74,12 @@ describe('controller with the adware scenario', () => {
     expect(s.selection['com.clean.pro.boost']).toBeUndefined(); // usuniętej nie ma już czego zmieniać
     ctl.setLevel('com.wlive.forecast', 'remove');
     expect(s.selection['com.wlive.forecast']).toBe('remove'); // wyłączoną można jeszcze usunąć
+    s.client = 'Anna Kowalska';
+    s.unlocked = ['com.android.systemui'];
     ctl.newScan();
     expect(s.acted).toEqual({});
+    expect(s.client).toBe(''); // PRIV-04: następny telefon to inny klient
+    expect(s.unlocked).toEqual([]);
   });
 
   test('undo one app from the results after back to repair', async () => {
@@ -143,7 +147,7 @@ describe('controller with the adware scenario', () => {
     ctl.toggle(app);
     expect(s.selection['com.clean.pro.boost']).toBeUndefined();
     ctl.toggle(app);
-    expect(s.selection['com.clean.pro.boost']).toBe('remove');
+    expect(s.selection['com.clean.pro.boost']).toBe('disable');
     expect(s.touched).toContain('com.clean.pro.boost');
   });
 
@@ -163,7 +167,7 @@ describe('controller with the adware scenario', () => {
     expect(s.selection['com.sec.android.app.launcher']).toBe('disable'); // producenta nie usuwamy domyślnie
     ctl.toggle(app('com.clean.pro.boost'));
     ctl.toggle(app('com.clean.pro.boost'));
-    expect(s.selection['com.clean.pro.boost']).toBe('remove'); // propozycja silnika ma pierwszeństwo
+    expect(s.selection['com.clean.pro.boost']).toBe('disable'); // propozycja silnika ma pierwszeństwo
   });
 
   test('on Android 12 and older the silence default from settings becomes disable', async () => {
@@ -211,6 +215,18 @@ describe('controller edge cases', () => {
       expect(s.serial).toBeNull();
       expect(s.devices.length).toBeGreaterThan(0);
     }
+  });
+
+  test('APK events of an abandoned job do not touch the current scan (BUG-10)', async () => {
+    const { ctl, s, bridge } = setup('empty');
+    await ctl.init();
+    s.job = { id: 'job-2', kind: 'scan' };
+    s.apk = { done: 0, total: 0, running: true, changed: [] };
+    bridge.emit('apk:progress', { done: 5, total: 9, package: 'old', job_id: 'job-1' });
+    bridge.emit('apk:stopped', { job_id: 'job-1' });
+    expect(s.apk).toEqual({ done: 0, total: 0, running: true, changed: [] });
+    bridge.emit('apk:progress', { done: 1, total: 3, package: 'new', job_id: 'job-2' });
+    expect(s.apk.done).toBe(1);
   });
 
   test('events: question, admin wait, job errors, console cap, close request', async () => {

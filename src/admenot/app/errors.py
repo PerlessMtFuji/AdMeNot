@@ -11,6 +11,7 @@ from admenot.app import crash
 from admenot.engine.actions.errors import ActionError
 from admenot.engine.adb.transport import AdbError
 from admenot.engine.journal.db import JournalTooNew
+from admenot.engine.oplock import DeviceBusy
 from admenot.engine.paths import logs_dir
 from admenot.engine.settings import SettingsTooNew
 
@@ -29,6 +30,8 @@ class AppError(Exception):
 def error_payload(exc: BaseException) -> dict[str, Any]:
     if isinstance(exc, AppError):
         return {"key": exc.key, "message": exc.message, **exc.extra}
+    if isinstance(exc, DeviceBusy):
+        return {"key": "device_busy", "message": exc.serial}
     if isinstance(exc, (SettingsTooNew, JournalTooNew)):
         return {"key": "data_too_new", "message": str(exc)}
     if isinstance(exc, AdbError):
@@ -51,10 +54,18 @@ def log_exception(exc: BaseException) -> Path:
 
 
 def report_error(exc: BaseException, context: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Payload błędu dla UI. Log i raport awarii to dodatki: pełny dysk albo brak uprawnień
+    nie może zamienić pierwotnej przyczyny w drugi wyjątek (audyt 2026-10-11, EDGE-02)."""
     payload = error_payload(exc)
     if payload["key"] == "internal":
-        payload["log"] = str(log_exception(exc))
-        crash_id = crash.capture(exc, context=context)
+        try:
+            payload["log"] = str(log_exception(exc))
+        except OSError:
+            payload["log_failed"] = True
+        try:
+            crash_id = crash.capture(exc, context=context)
+        except Exception:  # noqa: BLE001 — zgłoszenie błędu nie może samo zawieść
+            crash_id = None
         if crash_id:
             payload["crash"] = crash_id
     return payload

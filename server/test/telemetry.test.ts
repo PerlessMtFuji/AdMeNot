@@ -92,6 +92,50 @@ describe("POST /api/v1/telemetry", () => {
   });
 });
 
+describe("ochrona budżetu (audyt 2026-10-11, SEC-03, BUG-12)", () => {
+  const OTHER = "11111111-2222-4333-8444-555555555555";
+  const fill = (install: string, body: string) => env.DB.prepare(
+    "INSERT INTO events (install, created, t, type, app, body) VALUES (?, datetime('now'), 't', 'scan', 'a', ?)",
+  ).bind(install, body).run();
+
+  it("429 z limitera przed czytaniem treści i przed D1 — także DELETE", async () => {
+    const limitedEnv = { ...env, TELEMETRY_LIMITER: { limit: async () => ({ success: false }) } } as unknown as Env;
+    const res = await worker.fetch(new Request(BASE + "/api/v1/telemetry", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ format: 1, events: [start()] }),
+    }), limitedEnv);
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: "rate_limited" });
+    const del = await worker.fetch(new Request(`${BASE}/api/v1/telemetry/${ID}`, { method: "DELETE" }), limitedEnv);
+    expect(del.status).toBe(429);
+    expect(await rows()).toHaveLength(0);
+  });
+
+  it("jedna instalacja nie zajmie całego budżetu doby", async () => {
+    await fill(ID, "x".repeat(100 * 1024 - 100));
+    expect((await post([scan()])).status).toBe(429);
+    expect((await post([{ ...scan(), install: OTHER }])).status).toBe(200);
+  });
+
+  it("limit liczy bajty UTF-8, nie znaki", async () => {
+    await fill(OTHER, "€".repeat(68 * 1024)); // 68 Ki znaków = 204 KB
+    expect((await post([start()])).status).toBe(429);
+  });
+
+  it("paczka z różnymi instalacjami jest odrzucona", async () => {
+    expect((await post([start(), { ...start(), install: OTHER }])).status).toBe(400);
+  });
+
+  it("równoległe żądania na ostatnim wolnym miejscu nie przekraczają budżetu", async () => {
+    const event = scan({ packages: Array.from({ length: 150 }, (_, i) => ({ package: `com.app.n${i}`, verdict: "review", score: 30, confidence: "low", system: false })) });
+    const size = new TextEncoder().encode(JSON.stringify({ ...event })).byteLength;
+    await fill(OTHER, "x".repeat(200 * 1024 - Math.floor(size * 1.5)));
+    const results = await Promise.all([post([event]), post([{ ...event, install: "22222222-3333-4444-8555-666666666666" }])]);
+    expect(results.map((r) => r.status).sort()).toEqual([200, 429]);
+    const total = await env.DB.prepare("SELECT SUM(length(CAST(body AS BLOB))) AS n FROM events").first<{ n: number }>();
+    expect(total!.n).toBeLessThanOrEqual(200 * 1024);
+  });
+});
+
 describe("DELETE /api/v1/telemetry/{install}", () => {
   it("usuwa wiersze instalacji", async () => {
     await post([start(), scan()]);

@@ -101,7 +101,7 @@ def test_secure_list_refuses_value_with_quote():
     step = Step("secure_list", "com.ad", {"key": A11Y, "op": "remove", "components": service})
     with pytest.raises(ActionError) as exc:
         S.apply(phone, step)
-    assert exc.value.key == "failed"
+    assert exc.value.key == "unrecognized"
     assert phone.secure[A11Y] == f"com.x/.A'B:{service}"
 
 
@@ -114,7 +114,7 @@ def test_listener_access_is_revoked_in_notification_manager_not_only_in_setting(
     S.apply(phone, step)
     assert phone.listeners_allowed == [GEARHEAD]
     assert phone.secure[LISTENERS] == GEARHEAD
-    assert f"cmd notification disallow_listener '{AD_LISTENER}'" in phone.calls
+    assert f"cmd notification disallow_listener '{AD_LISTENER}' 0" in phone.calls
     assert not any(c.startswith("settings put") for c in phone.calls)
 
 
@@ -200,9 +200,9 @@ def test_disconnect_is_uncertain():
 def test_command_for_describes_step():
     assert S.command_for(Step("enabled", "com.ad", {"enabled": "0"})) == (
         "pm disable-user --user 0 com.ad")
-    assert S.command_for(_remove_listener()) == f"cmd notification disallow_listener '{AD_LISTENER}'"
+    assert S.command_for(_remove_listener()) == f"cmd notification disallow_listener '{AD_LISTENER}' 0"
     a11y = Step("secure_list", "com.ad", {"key": A11Y, "op": "remove", "components": "com.ad/.A"})
-    assert S.command_for(a11y) == f"settings put secure {A11Y} (-com.ad/.A)"
+    assert S.command_for(a11y) == f"settings put --user 0 secure {A11Y} (-com.ad/.A)"
     with pytest.raises(ValueError):
         S.command_for(Step("teleport", "com.ad"))
 
@@ -226,3 +226,51 @@ def test_security_hint_depends_on_manufacturer():
     assert hint_key("security", "Xiaomi") == "security_miui"
     assert hint_key("security", "samsung") == "security"
     assert hint_key("device_admin", "OPPO") == "device_admin"
+
+
+@pytest.mark.parametrize(("step", "command"), [
+    (Step("appop", "com.ad", {"op": "SYSTEM_ALERT_WINDOW", "mode": "deny"}),
+     "appops get --user 0 com.ad SYSTEM_ALERT_WINDOW"),
+    (Step("enabled", "com.ad", {"enabled": "0"}), "pm list packages -d --user 0"),
+    (Step("installed", "com.ad", {"installed": "0", "backup_dir": ""}),
+     "pm list packages --user 0 com.ad"),
+    (Step("permission", "com.ad", {"permission": POST, "granted": "0"}), "dumpsys package com.ad"),
+])
+def test_unrecognized_probe_is_an_error_not_a_state(step, command):
+    """Audyt 2026-10-11, BUG-03: nierozpoznany odczyt nie może trafić do dziennika jako stan
+    sprzed zmiany (np. „enabled”/„default”), bo cofnięcie przywróciłoby fałszywy stan."""
+    phone = _phone()
+    phone.fail[command] = "unsupported format\n"
+    with pytest.raises(ActionError) as caught:
+        S.probe(phone, step)
+    assert caught.value.key == "unrecognized"
+
+
+def test_known_empty_answers_stay_valid_states():
+    phone = _phone()
+    assert S.probe(phone, Step("enabled", "com.ad", {"enabled": "0"})) == {"enabled": True}
+    assert S.probe(phone, Step("appop", "com.ad", {"op": "SYSTEM_ALERT_WINDOW", "mode": "deny"})) == {
+        "mode": "default"}
+    gone = Step("installed", "com.gone", {"installed": "0", "backup_dir": ""})
+    assert S.probe(phone, gone) == {"installed": False}
+
+
+@pytest.mark.parametrize("bad", ["com.ad/.L'; echo audit_probe; #", "com.ad/.L$(id)", "com.ad/.L`id`",
+                                 "com.ad/.L\necho x", "com.ad/.Ł"])
+def test_listener_component_from_the_phone_is_validated_and_quoted(bad):
+    """Audyt 2026-10-11, SEC-01: niezaufany komponent nie dokleja polecenia w powłoce telefonu."""
+    phone = _phone()
+    step = _remove_listener(bad)
+    with pytest.raises(ActionError) as exc:
+        S.apply(phone, step)
+    assert exc.value.key == "unrecognized"
+    assert not [c for c in phone.calls if c.startswith("cmd notification")]
+    # Pokazane (i zapisane w dzienniku) polecenie to jedno słowo-argument, nie doklejona komenda.
+    import shlex
+
+    assert shlex.split(S.command_for(step)) == ["cmd", "notification", "disallow_listener", bad, "0"]
+
+
+def test_valid_component_with_dollar_still_works():
+    phone = _phone(secure={LISTENERS: "com.ad/.Outer$Listener"})
+    _apply_and_undo(phone, _remove_listener("com.ad/.Outer$Listener"))

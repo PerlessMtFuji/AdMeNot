@@ -3,6 +3,8 @@ import { json, readLimited } from "./http";
 
 export const TELEMETRY_MAX_BODY = 256 * 1024;
 export const TELEMETRY_DAILY_BYTES = 200 * 1024; // ~80 MB / 13 mies. obok raportów w 500 MB D1 free
+// Jedna instalacja (albo ktoś podszywający się pod nią) nie zajmie całego budżetu doby (SEC-03).
+export const TELEMETRY_INSTALL_DAILY_BYTES = 100 * 1024;
 const MAX_EVENTS = 100;
 const MAX_PACKAGES = 200;
 const MAX_ERRORS = 20;
@@ -110,8 +112,33 @@ function normalize(e: unknown): Obj {
   return { install: o.install, type: o.type, t: o.t, app: o.app, os: o.os, lang: o.lang, ...body(o) };
 }
 
+// Limiter przed czytaniem treści i przed D1, także dla DELETE (audyt 2026-10-11, SEC-03).
+// Klucz trzymany tylko w pamięci limitera — adresu IP nie zapisujemy (spec backendu §2.2).
+export async function limited(request: Request, env: Env): Promise<boolean> {
+  const { success } = await env.TELEMETRY_LIMITER.limit({ key: request.headers.get("CF-Connecting-IP") ?? "unknown" });
+  return !success;
+}
+
+// Bajty UTF-8 — tak liczy je transport i limit treści (BUG-12), nie jednostki UTF-16.
+const utf8 = new TextEncoder();
+const bytes = (s: string): number => utf8.encode(s).byteLength;
+
+// Rezerwacja budżetu i zapis w jednym poleceniu (BUG-12): podzapytania liczą zużycie doby
+// w chwili wstawiania, więc dwa równoległe żądania nie przejdą razem przy tym samym stanie.
+// SQLite: length(CAST(body AS BLOB)) = bajty UTF-8 treści.
+const INSERT_WITHIN_BUDGET = `
+INSERT INTO events (install, created, t, type, app, body)
+SELECT json_extract(value, '$.install'), datetime('now'), json_extract(value, '$.t'),
+       json_extract(value, '$.type'), json_extract(value, '$.app'), json_extract(value, '$.body')
+FROM json_each(?1)
+WHERE (SELECT COALESCE(SUM(length(CAST(body AS BLOB))), 0) FROM events
+       WHERE created >= datetime('now', '-1 day')) + ?2 <= ?3
+  AND (SELECT COALESCE(SUM(length(CAST(body AS BLOB))), 0) FROM events
+       WHERE install = ?4 AND created >= datetime('now', '-1 day')) + ?2 <= ?5`;
+
 export async function createEvents(request: Request, env: Env): Promise<Response> {
   if (!(request.headers.get("Content-Type") ?? "").toLowerCase().startsWith("application/json")) return json({ error: "invalid" }, 400);
+  if (await limited(request, env)) return json({ error: "rate_limited" }, 429);
   if (Number(request.headers.get("Content-Length") ?? "0") > TELEMETRY_MAX_BODY) return json({ error: "too_large" }, 413);
   const raw = await readLimited(request, TELEMETRY_MAX_BODY);
   if (raw === null) return json({ error: "too_large" }, 413);
@@ -122,25 +149,25 @@ export async function createEvents(request: Request, env: Env): Promise<Response
     const list = (parsed as Obj).events as unknown[];
     need(list.length >= 1 && list.length <= MAX_EVENTS);
     events = list.map(normalize);
+    need(events.every((e) => e.install === events[0].install)); // paczka = jedna instalacja
   } catch {
     return json({ error: "invalid" }, 400); // także SyntaxError z JSON.parse
   }
-  const bodies = events.map((e) => JSON.stringify(e));
-  const size = bodies.reduce((n, b) => n + b.length, 0);
+  const rows = events.map((e) => ({ install: e.install, t: e.t, type: e.type, app: e.app, body: JSON.stringify(e) }));
+  const size = rows.reduce((n, r) => n + bytes(r.body), 0);
   try {
-    const used = await env.DB.prepare("SELECT COALESCE(SUM(length(body)), 0) AS n FROM events WHERE created >= datetime('now', '-1 day')")
-      .first<{ n: number }>();
-    if ((used?.n ?? 0) + size > TELEMETRY_DAILY_BYTES) return json({ error: "busy" }, 429);
-    await env.DB.batch(events.map((e, i) => env.DB.prepare(
-      "INSERT INTO events (install, created, t, type, app, body) VALUES (?, datetime('now'), ?, ?, ?, ?)",
-    ).bind(e.install, e.t, e.type, e.app, bodies[i])));
+    const res = await env.DB.prepare(INSERT_WITHIN_BUDGET)
+      .bind(JSON.stringify(rows), size, TELEMETRY_DAILY_BYTES, events[0].install, TELEMETRY_INSTALL_DAILY_BYTES)
+      .run();
+    if ((res.meta.changes ?? 0) === 0) return json({ error: "busy" }, 429);
     return json({ ok: true, stored: events.length });
   } catch {
     return json({ error: "busy" }, 503);
   }
 }
 
-export async function deleteEvents(install: string, env: Env): Promise<Response> {
+export async function deleteEvents(request: Request, install: string, env: Env): Promise<Response> {
+  if (await limited(request, env)) return json({ error: "rate_limited" }, 429);
   if (!UUID.test(install)) return json({ error: "invalid" }, 400);
   try {
     const res = await env.DB.prepare("DELETE FROM events WHERE install = ?").bind(install).run();

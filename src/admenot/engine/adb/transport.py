@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from typing import Literal, Protocol
+import threading
+import time
+from typing import IO, Any, Literal, Protocol
 
 from admenot.engine.tools import resolve_adb
 
@@ -13,6 +15,64 @@ AdbErrorKind = Literal[
 ]
 
 _CREATE_NO_WINDOW = 0x08000000
+# Limit wyjścia jednego polecenia: dumpsys dużego telefonu to dziesiątki MB, a wadliwy albo
+# złośliwy wynik nie może zająć całej pamięci stanowiska (audyt 2026-10-11, PERF-03).
+MAX_STDOUT = 128 * 1024 * 1024
+MAX_STDERR = 1024 * 1024
+_CHUNK = 64 * 1024
+_JOIN = 5.0
+
+
+class OutputTooLarge(Exception):
+    """Polecenie wypisało więcej niż limit — proces zatrzymany przed odczytem reszty."""
+
+
+def _pump(stream: IO[bytes], sink: list[bytes], cap: int, over: threading.Event) -> None:
+    total = 0
+    while chunk := stream.read1(_CHUNK):  # type: ignore[attr-defined]
+        total += len(chunk)
+        if total > cap:
+            over.set()
+            return
+        sink.append(chunk)
+
+
+def _stop(proc: subprocess.Popen[bytes], threads: list[threading.Thread]) -> None:
+    proc.kill()
+    proc.wait()
+    for thread in threads:
+        thread.join(_JOIN)
+
+
+def _run_capped(cmd: list[str], *, stdin: Any, timeout: float, creationflags: int,
+                limit: int = MAX_STDOUT) -> subprocess.CompletedProcess[bytes]:
+    """`subprocess.run(capture_output=True)` z limitem bajtów wyjścia i czasu."""
+    proc = subprocess.Popen(cmd, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            creationflags=creationflags)
+    out: list[bytes] = []
+    err: list[bytes] = []
+    over = threading.Event()
+    threads = [threading.Thread(target=_pump, args=(proc.stdout, out, limit, over), daemon=True),
+               threading.Thread(target=_pump, args=(proc.stderr, err, MAX_STDERR, over), daemon=True)]
+    for thread in threads:
+        thread.start()
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            proc.wait(timeout=0.05)
+            break
+        except subprocess.TimeoutExpired:
+            if over.is_set():
+                _stop(proc, threads)
+                raise OutputTooLarge(" ".join(cmd[-2:])) from None
+            if time.monotonic() > deadline:
+                _stop(proc, threads)
+                raise subprocess.TimeoutExpired(cmd, timeout) from None
+    for thread in threads:
+        thread.join(_JOIN)
+    if over.is_set():
+        raise OutputTooLarge(" ".join(cmd[-2:]))
+    return subprocess.CompletedProcess(cmd, proc.returncode, b"".join(out), b"".join(err))
 
 
 class AdbError(Exception):
@@ -66,10 +126,11 @@ class RealAdb:
         flags = _CREATE_NO_WINDOW if sys.platform == "win32" else 0
         try:
             # stdin=DEVNULL: `adb shell` przekazuje stdin na telefon i zjadałby wpisy z konsoli.
-            proc = subprocess.run(cmd, capture_output=True, stdin=subprocess.DEVNULL, timeout=timeout,
-                                  creationflags=flags, check=False)
+            proc = _run_capped(cmd, stdin=subprocess.DEVNULL, timeout=timeout, creationflags=flags)
         except subprocess.TimeoutExpired as exc:
             raise AdbError("timeout", f"{' '.join(args)} (>{timeout}s)") from exc
+        except OutputTooLarge as exc:
+            raise AdbError("command_failed", f"{' '.join(args)}: output over the limit") from exc
         except OSError as exc:
             raise AdbError("adb_missing", str(exc)) from exc
         if proc.returncode != 0:

@@ -2,7 +2,14 @@
 
 ## Przygotowanie (raz)
 
-    .venv\Scripts\pip install -e ".[dev,gui,release]"
+    .venv\Scripts\pip install --require-hashes -r packaging\requirements-release.lock
+    .venv\Scripts\pip install --no-deps -e .
+
+Build sprawdza, że środowisko jest dokładnie takie jak w `packaging/requirements-release.lock`
+(`scripts/release_env.py`); inna wersja albo pakiet spoza listy zatrzymuje wydanie. Lock przypina
+wersje i skróty SHA-256 plików (pip odrzuci podmieniony plik). Zmiana zależności = świadoma
+aktualizacja locka (polecenie w jego nagłówku: `pip freeze`, potem `uv pip compile --generate-hashes`)
+w osobnym commicie i przegląd CVE nowych wersji na zatwierdzonym stanowisku.
 
 Inno Setup 6 w `C:\Program Files (x86)\Inno Setup 6\` (albo `--iscc`). Node.js 24 do UI.
 
@@ -81,7 +88,10 @@ Wycofanie wersji (bez nowego release'u):
 - Wdrożenie: z `server/` najpierw `npx wrangler d1 migrations apply admenot --remote`, potem `npx wrangler deploy`.
 - Odczyt: `.venv\Scripts\python scripts\telemetry.py active | phones | verdicts | packages [--left]` (`--days N`, `--local`).
 - Usunięcie na prośbę (RODO): `scripts\telemetry.py delete <identyfikator instalacji>`. Zdarzenia znikają same po 13 miesiącach.
-- Limit: 200 KB treści na dobę (`TELEMETRY_DAILY_BYTES` w `server/src/telemetry.ts`); po jego przekroczeniu program ponawia następnego dnia.
+- Limit: 200 KB treści (bajty UTF-8) na dobę (`TELEMETRY_DAILY_BYTES` w `server/src/telemetry.ts`), najwyżej 100 KB
+  na instalację; sprawdzenie i zapis to jedno polecenie D1. Po przekroczeniu program ponawia później.
+- Limiter `TELEMETRY_LIMITER` (60 zapytań/min na adres, przed czytaniem treści) jest w `wrangler.jsonc` — wymaga `wrangler deploy`.
+  Statystyki są niezaufane: każdy może wygenerować UUID i poprawne zdarzenie, więc liczby traktuj jako orientacyjne.
 
 ## Build
 
@@ -92,7 +102,13 @@ Wycofanie wersji (bez nowego release'u):
 
    Bez telefonu: bez `--device` (podsumowanie mówi, że porównanie skanu pominięto).
    Opcjonalnie: `VT_API_KEY` (VirusTotal), `ADMENOT_SIGN_CMD` (podpis, `{file}` = ścieżka).
-3. Wynik: `dist\release\AdMeNot-<wersja>-setup.exe`, `.sha256`, `-release-notes.md`.
+   Build najpierw przechodzi bramki: środowisko = lock, `pytest`, Ruff, skan historii, UI
+   (`npm run check`, `npm run test`) i Worker (to samo w `server/`). Pierwszy błąd zatrzymuje
+   wydanie. `--skip-gates` działa tylko z `--allow-dirty` (wynik `-dirty` nie jest wydaniem).
+   Narzędzia (scrcpy, adb, DLL) są porównywane plik po pliku z archiwum o przypiętej sumie
+   (`build\tools-cache`), a bootstrapper WebView2 musi mieć ważny podpis Microsoft Corporation.
+3. Wynik: `dist\release\AdMeNot-<wersja>-setup.exe`, `.sha256`, `-release-notes.md` (bramki, SHA-256
+   i podpis bootstrappera WebView2) i `-components.txt` (pakiety Python z wersjami i skrótami RECORD).
    Podsumowanie kończy się `NIEPODPISANE — …`, dopóki nie ma certyfikatu.
 
 ## Lista kontrolna
@@ -106,8 +122,10 @@ sprawdzić, zapisz wprost jako niesprawdzony.
          program w `%LOCALAPPDATA%\Programs\AdMeNot`, okno `AdMeNot <wersja> beta` się otwiera,
          `admenot-cli.exe selfcheck --online` → same `OK` (także `serwer` — TLS i proxy z paczki),
          w katalogu programu są `LICENSE.txt` i `THIRD_PARTY_NOTICES.txt`.
-   - [ ] 2b. To samo na maszynie testowej (czysty Windows): przywróć punkt kontrolny, skopiuj
-         instalator, zainstaluj i sprawdź jak w 2a. Można pominąć — wtedy zapisz to w „Uwagach”.
+   - [ ] 2b. To samo na maszynie testowej (czysty Windows, konto standardowe, bez WebView2): przywróć
+         punkt kontrolny, skopiuj instalator, zainstaluj i sprawdź jak w 2a. **Obowiązkowe przed
+         wydaniem publicznym** — także offline (komunikat o WebView2), za proxy i z profilem o nazwie
+         ze spacją, apostrofem i polskimi znakami oraz długą ścieżką `%LOCALAPPDATA%`.
 
              Restore-VMCheckpoint -VMName AdMeNot-Test -Name "czysty Windows" -Confirm:$false
 
@@ -184,4 +202,18 @@ sprawdzić, zapisz wprost jako niesprawdzony.
     - [ ] 11f. Po wdrożeniu na produkcję: włącz statystyki bez `ADMENOT_API_URL`, jeden skan; `telemetry.py phones --days 1`
           pokazuje telefon; potem `telemetry.py delete <ID z Ustawień>`.
     - [ ] 11g. Przywróć prawdziwy profil `%LOCALAPPDATA%\AdMeNot`.
-12. [ ] Wsparcie: w `server/public/donate.html` i `server/public/pl/donate.html` zamiast `https://suppi.pl/` jest adres profilu na suppi.pl; strony wdrożone (`npx wrangler deploy` z `server/`); w programie Ustawienia → „Wesprzyj projekt” otwiera stronę, a jej przycisk prowadzi do profilu. **Przed** publikacją instalatora.
+12. [ ] Zmiany na telefonie laboratoryjnym (tylko z listy modyfikowalnych, nigdy moto g54 ani Vivo),
+        z wersji zainstalowanej w 2a (audyt 2026-10-11, REL-03):
+    - [ ] 12a. Wycisz/Wyłącz/Usuń jednej aplikacji testowej z plikiem danych → cofnięcie: Wycisz i Wyłącz
+          wracają w całości; po Usuń wraca sama aplikacja (bez danych — zgodnie z ostrzeżeniem w planie).
+    - [ ] 12b. „Wstrzymaj” w trakcie zlecenia i w trakcie cofania; potem Dokończ / ponowne cofnięcie.
+    - [ ] 12c. Zamknięcie okna w trakcie instalacji z kopii (Usuń → cofnij): baner „program zamknie się sam”,
+          okno zamyka się po kroku, zlecenie w Historii bez kroku w połowie.
+    - [ ] 12d. Odłączenie USB w trakcie zlecenia i w trakcie cofania → „Dokończ” / ponowne cofnięcie.
+    - [ ] 12e. Pełny dysk z danymi (np. mały wirtualny dysk jako `%LOCALAPPDATA%`): skan i zlecenie kończą się
+          czytelnym błędem, bez drugiego wyjątku i bez zmian na telefonie bez zapisu w dzienniku.
+    - [ ] 12f. CLI `admenot fix` uruchomione obok okna na tym samym telefonie → „inne okno albo CLI wykonuje teraz
+          zlecenie”; instalator uruchomiony w trakcie pracy CLI czeka na jej zamknięcie.
+    - [ ] 12g. Wynik na każdej nakładce z macierzy (OPPO/Realme ColorOS, Xiaomi MIUI/HyperOS, Samsung One UI,
+          inne dostępne) zapisz w notatkach: zakres obsługi = tylko sprawdzone nakładki i wersje Androida.
+13. [ ] Wsparcie: w `server/public/donate.html` i `server/public/pl/donate.html` zamiast `https://suppi.pl/` jest adres profilu na suppi.pl; strony wdrożone (`npx wrangler deploy` z `server/`); w programie Ustawienia → „Wesprzyj projekt” otwiera stronę, a jej przycisk prowadzi do profilu. **Przed** publikacją instalatora.

@@ -26,9 +26,15 @@ class Collector(Protocol):
     def apply(self, facts: dict[str, AppFacts], data: Any) -> None: ...
 
 
-def _timed(collector: Collector, adb: AdbTransport, apps: list[AppFacts]) -> tuple[Any, float]:
+def _timed(collector: Collector, adb: AdbTransport, apps: list[AppFacts],
+           deadline: float) -> tuple[Any, float]:
     start = time.perf_counter()
-    data = collector.collect(adb, apps)
+    if getattr(collector, "uses_deadline", False):
+        # Kolektor z własną kolejką wywołań przestaje je zlecać po terminie skanu — inaczej
+        # opuszczony wątek dalej odpytuje telefon (audyt 2026-10-11, PERF-02).
+        data = collector.collect(adb, apps, deadline=deadline)  # type: ignore[call-arg]
+    else:
+        data = collector.collect(adb, apps)
     return data, time.perf_counter() - start
 
 
@@ -55,7 +61,7 @@ def run_collectors(
     deadline = time.monotonic() + timeout
     pool = ThreadPoolExecutor(max_workers=max_workers)
     try:
-        futures = [(c, pool.submit(_timed, c, adb, apps)) for c in collectors]
+        futures = [(c, pool.submit(_timed, c, adb, apps, deadline)) for c in collectors]
         for collector, future in futures:
             remaining = max(0.0, deadline - time.monotonic())
             try:

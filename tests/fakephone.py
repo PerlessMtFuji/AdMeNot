@@ -46,6 +46,10 @@ class FakeApp:
     admin: bool = False
     home_activity: str | None = None  # np. ".Launcher": aplikacja jest kandydatem HOME
     keeps_apk: bool = False  # po `pm uninstall --user 0` APK zostaje (aplikacje systemowe)
+    build: bytes = b""  # dopisywane do bajtów APK: przebudowana aplikacja z tym samym versionCode
+
+    def apk(self, name: str) -> bytes:
+        return apk_bytes(self.package, name) + self.build
 
 
 def apk_bytes(package: str, name: str) -> bytes:
@@ -180,7 +184,8 @@ class FakePhone:
         if command == RESOLVE_HOME:
             return _HOME_HEADER + (self.home or "android/com.android.internal.app.ResolverActivity") + "\n"
         if command == HOME_QUERY:
-            return "".join(f"{_HOME_HEADER}  {c}\n" for c in self._home_candidates())
+            found = "".join(f"{_HOME_HEADER}  {c}\n" for c in self._home_candidates())
+            return found or "No activities found\n"
         if command == DEVICE_POLICY:
             return self._device_policy()
         if command == NOTIF_MANAGER:
@@ -189,20 +194,20 @@ class FakePhone:
             return self._open(command)
         if re.fullmatch(r"am force-stop \S+", command):
             return ""
-        if m := re.fullmatch(r"appops get (\S+) (\w+)", command):
+        if m := re.fullmatch(r"appops get --user 0 (\S+) (\w+)", command):
             return self._appops_get(m[1], m[2])
-        if m := re.fullmatch(r"appops set (\S+) (\w+) (\w+)", command):
+        if m := re.fullmatch(r"appops set --user 0 (\S+) (\w+) (\w+)", command):
             return self._appops_set(m[1], m[2], m[3])
-        if m := re.fullmatch(r"pm (grant|revoke) (\S+) (\S+)", command):
+        if m := re.fullmatch(r"pm (grant|revoke) --user 0 (\S+) (\S+)", command):
             return self._permission(m[1], m[2], m[3])
         if (m := re.fullmatch(r"dumpsys package (\S+)", command)) and m[1] != "packages":
             return self._dumpsys_package(m[1])
-        if m := re.fullmatch(r"settings get secure (\S+)", command):
+        if m := re.fullmatch(r"settings get --user 0 secure (\S+)", command):
             return self.secure.get(m[1], "null") + "\n"
-        if m := re.fullmatch(r"settings put secure (\S+) (.+)", command):
+        if m := re.fullmatch(r"settings put --user 0 secure (\S+) (.+)", command):
             self.secure[m[1]] = _sh_word(m[2])
             return ""
-        if m := re.fullmatch(r"cmd notification (allow|disallow)_listener (.+)", command):
+        if m := re.fullmatch(r"cmd notification (allow|disallow)_listener (.+) 0", command):
             return self._listener(m[1] == "allow", _sh_word(m[2]))
         if m := re.fullmatch(r"cmd package set-home-activity --user 0 (.+)", command):
             return self._set_home(_sh_word(m[1]))
@@ -229,7 +234,7 @@ class FakePhone:
                 prefix = APK_DIR.format(package=app.package) + "/"
                 name = remote[len(prefix):]
                 if remote.startswith(prefix) and name in app.apks:
-                    digest = hashlib.sha256(apk_bytes(app.package, name)).hexdigest()
+                    digest = hashlib.sha256(app.apk(name)).hexdigest()
                     lines.append(f"{digest}  {remote}\n")
         return "".join(lines)
 
@@ -369,7 +374,7 @@ class FakePhone:
             prefix = APK_DIR.format(package=app.package) + "/"
             name = remote[len(prefix):]
             if remote.startswith(prefix) and name in app.apks:
-                local.write_bytes(apk_bytes(app.package, name))
+                local.write_bytes(app.apk(name))
                 return f"{remote}: 1 file pulled\n"
         raise AdbError("command_failed", f"remote object '{remote}' does not exist")
 

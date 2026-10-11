@@ -2,7 +2,7 @@
 
 **English** | [Polski](README.pl.md)
 
-A Windows program that, once an Android phone is connected (USB debugging), heuristically detects intrusive apps (ads, notification spam, overlays, fake launchers, device administrators), lets you mute, disable or remove them, and undo every change.
+A Windows program that, once an Android phone is connected (USB debugging), heuristically detects intrusive apps (ads, notification spam, overlays, fake launchers, device administrators), lets you mute, disable or remove them, and undo the changes (removal deletes the app's data; undo restores the app itself from an APK copy).
 
 ## Requirements
 

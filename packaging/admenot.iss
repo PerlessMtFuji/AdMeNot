@@ -48,8 +48,8 @@ Name: "pl"; MessagesFile: "compiler:Languages\Polish.isl"
 [CustomMessages]
 pl.DeleteData=Usunąć też folder danych %LOCALAPPDATA%\AdMeNot (dziennik zleceń, ustawienia, protokoły, zrzuty ekranu, pamięć podręczna APK i zapisane tam kopie)?%n%nDziennik jest potrzebny, żeby cofnąć zmiany na telefonach klientów.
 en.DeleteData=Also delete the AdMeNot data folder %LOCALAPPDATA%\AdMeNot (job journal, settings, reports, screenshots, APK cache and backups stored there)?%n%nThe journal is needed to undo changes on customers' phones.
-pl.CloseApp=AdMeNot jest uruchomiony. Zamknij program i kliknij OK.
-en.CloseApp=AdMeNot is running. Close the program and click OK.
+pl.CloseApp=AdMeNot jest uruchomiony (okno albo admenot-cli w wierszu poleceń). Poczekaj, aż skończy bieżące zlecenie, zamknij go i kliknij OK.
+en.CloseApp=AdMeNot is running (the window or admenot-cli in a command prompt). Let it finish the current order, close it and click OK.
 pl.InstallCancelled=Instalacja przerwana — zamknij AdMeNot i uruchom instalator ponownie.
 en.InstallCancelled=Setup cancelled — close AdMeNot and run Setup again.
 pl.InstallingWebView2=Instalowanie Microsoft Edge WebView2 Runtime...
@@ -109,21 +109,23 @@ begin
   Result := '''' + Path + '''';
 end;
 
-{ Spec §6.3: procesy z katalogu programu (adb, scrcpy, admenot-cli) — dopiero po zamknięciu
-  okna AdMeNot (CloseAppGate). Bez `adb kill-server` — zatrzymałby też serwer adb z Android SDK
+{ Spec §6.3: procesy pomocnicze z katalogu programu (adb, scrcpy) — dopiero po zamknięciu
+  okna i CLI AdMeNot (CloseAppGate). admenot-cli nie zabijamy: może właśnie zmieniać telefon
+  (audyt 2026-10-11, REL-05). Bez `adb kill-server` — zatrzymałby też serwer adb z Android SDK
   na porcie 5037. StartsWith zamiast -like: [, ] i ` w ścieżce nie są wzorcem, a nazwy procesów
   zawężają filtr, gdyby /DIR= wskazał folder wspólny z innymi programami. }
 procedure StopBundleProcesses(AppDir: String);
 begin
   PowerShell('Get-Process | Where-Object { $_.Path -and $_.Path.StartsWith('
     + Quoted(AppDir + '\') + ', [StringComparison]::OrdinalIgnoreCase)'
-    + ' -and $_.ProcessName -in ''adb'',''scrcpy'',''admenot-cli'' } | Stop-Process -Force');
+    + ' -and $_.ProcessName -in ''adb'',''scrcpy'' } | Stop-Process -Force');
 end;
 
+{ okno albo CLI z tego katalogu: oba mogą wykonywać albo cofać zlecenie na telefonie }
 function AppRunning(AppDir: String): Boolean;
 begin
-  Result := PowerShell('if (Get-Process AdMeNot -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq '
-    + Quoted(AppDir + '\AdMeNot.exe') + ' }) { exit 1 }') = 1;
+  Result := PowerShell('if (Get-Process AdMeNot,admenot-cli -ErrorAction SilentlyContinue | Where-Object { $_.Path -in '
+    + Quoted(AppDir + '\AdMeNot.exe') + ',' + Quoted(AppDir + '\admenot-cli.exe') + ' }) { exit 1 }') = 1;
 end;
 
 { okna nie zabijamy — przerwany zapis dziennika psuje dane do cofania zmian. Z /SUPPRESSMSGBOXES

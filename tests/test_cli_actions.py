@@ -52,7 +52,8 @@ def test_fix_asks_before_changing_anything(capsys, monkeypatch):
     monkeypatch.setattr("builtins.input", lambda prompt: "n")
     assert main(["fix", "--recommended"], host=phone) == 1
     out = capsys.readouterr().out
-    assert "USUŃ" in out and "com.clean.pro.boost" in out and "kopia APK" in out
+    # Domyślnie nic nie jest usuwane: odinstalowanie kasuje dane aplikacji (BUG-01).
+    assert "WYŁĄCZ" in out and "com.clean.pro.boost" in out and "USUŃ" not in out
     assert "com.whatsapp" not in out and "Anulowano" in out
     assert not [c for c in phone.calls if c.startswith(WRITES)]
     assert _orders() == []

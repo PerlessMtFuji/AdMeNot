@@ -13,11 +13,13 @@ from pathlib import Path
 from typing import Any
 
 from admenot.engine.apk.analyze import ApkReport, analyze_apk, report_from_json, report_to_json
+from admenot.engine.apk.limits import limit_process_memory
 
 AnalyzeFn = Callable[[str, list[Path]], ApkReport]
 
 
 def _serve(conn: Connection, analyze: AnalyzeFn) -> None:
+    limit_process_memory()  # parser zasobów nie zajmie pamięci całego stanowiska (PERF-01)
     while True:
         try:
             request = conn.recv()
@@ -28,6 +30,9 @@ def _serve(conn: Connection, analyze: AnalyzeFn) -> None:
         package, paths = request
         try:
             conn.send(("ok", report_to_json(analyze(package, [Path(p) for p in paths]))))
+        except MemoryError:  # limit pamięci procesu: ta aplikacja bez analizy, proces od nowa
+            conn.send(("error", "MemoryError: analysis exceeded the memory limit"))
+            return
         except Exception as exc:  # noqa: BLE001 — błąd jednej aplikacji wraca jako raport
             conn.send(("error", f"{type(exc).__name__}: {exc}"))
 

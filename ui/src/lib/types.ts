@@ -383,7 +383,7 @@ export interface Api {
   crash_preview(id: string, include_adb: boolean, comment: string): R<CrashPreview>;
   send_crash(id: string, include_adb: boolean, comment: string): R<{ sent_id: string }>;
   discard_crash(id: string): R<Record<string, never>>;
-  quit(): R<{ ok: boolean }>;
+  quit(): R<{ ok: boolean; closing_after_step?: boolean }>;
 }
 
 export interface EventMap {
@@ -391,11 +391,11 @@ export interface EventMap {
   'scan:stage': { stage: string };
   'scan:device': { device: PhoneCard };
   'scan:done': { scan: ScanView; interrupted: string[]; client: string | null };
-  'apk:progress': { done: number; total: number; package: string };
-  'apk:estimate': ApkEstimate;
+  'apk:progress': { done: number; total: number; package: string; job_id?: string };
+  'apk:estimate': ApkEstimate & { job_id?: string };
   'apk:question': ApkQuestion;
-  'apk:done': { scan: ScanView };
-  'apk:stopped': Record<string, never>;
+  'apk:done': { scan: ScanView; job_id?: string };
+  'apk:stopped': { job_id?: string };
   'exec:order': { order: string; plan: PlanView | null };
   'exec:step': StepEvent;
   'exec:admin_wait': { package: string; name: string; timeout: number };

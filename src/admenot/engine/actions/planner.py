@@ -31,38 +31,40 @@ class Blocked:
     package: str
     level: str
     reason: str  # unknown_level | not_installed | protected | active_ime | home_no_alternative
+    #              | context_unknown
+    detail: str = ""  # context_unknown: nierozpoznane odczyty, np. „ime, home”
 
 
 def default_level(result: AppResult) -> str | None:
     """Domyślny wybór w planie: werdykt + pewność, nie sam wynik (audyt 2026-09-27)."""
     if result.verdict == "malicious":
-        level = "remove"  # werdykt wymaga już wysokiej pewności (scoring.verdict_for)
-    elif result.verdict == "suspicious":
-        level = "silence" if result.confidence == "low" else "disable"
-    else:
-        return None
-    if result.facts.is_system and level == "remove":
-        level = "disable"  # komponent producenta: usunięcie ocenia serwisant, nie heurystyka
-    return level
+        # Nie „remove”: odinstalowanie kasuje dane aplikacji, a cofnięcie przywraca tylko APK
+        # (audyt 2026-10-11, BUG-01). Usunięcie wybiera serwisant, świadomy utraty danych.
+        return "disable"
+    if result.verdict == "suspicious":
+        return "silence" if result.confidence == "low" else "disable"
+    return None
 
 
 def backup_dir_for(root: Path, package: str, version_code: int | None) -> Path:
     return root / package / (str(version_code) if version_code is not None else "unknown")
 
 
-def _alternative_home(package: str, ctx: PhoneContext) -> str | None:
-    """Launcher, na który przełączamy: tylko systemowy (producenta), nigdy inna aplikacja z Play."""
+def _alternative_home(package: str, ctx: PhoneContext,
+                      avoid: frozenset[str] = frozenset()) -> str | None:
+    """Launcher, na który przełączamy: tylko systemowy (producenta), nigdy inna aplikacja z Play,
+    ani launcher, który ten sam plan wyłącza albo usuwa (audyt 2026-10-11, BUG-07)."""
     for candidate in sorted(ctx.system_launchers):
-        if candidate != package:
+        if candidate != package and candidate not in avoid:
             return ctx.home_candidates[candidate]
     return None
 
 
 def _silence_steps(package: str, facts: AppFacts, ctx: PhoneContext,
-                   warnings: list[str]) -> list[Step]:
+                   warnings: list[str], avoid: frozenset[str]) -> list[Step]:
     steps: list[Step] = []
     if ctx.home_package == package:
-        alternative = _alternative_home(package, ctx)
+        alternative = _alternative_home(package, ctx, avoid)
         if alternative:
             steps.append(Step("home", package, {"component": alternative}))
         else:
@@ -96,7 +98,9 @@ def plan_app(
     protected: PackagePatterns,
     backup_root: Path,
     unlocked: frozenset[str] = frozenset(),
+    avoid_homes: frozenset[str] = frozenset(),
 ) -> AppPlan | Blocked:
+    """`avoid_homes`: pakiety, które ten sam plan wyłącza albo usuwa — nie przełączamy na nie."""
     if level not in LEVELS:
         return Blocked(package, level, "unknown_level")
     if facts is None:
@@ -104,16 +108,19 @@ def plan_app(
     if (protected.matches(package) or package in ctx.system_launchers) and package not in unlocked:
         return Blocked(package, level, "protected")
     if level != "silence":
+        if ctx.unknown:
+            return Blocked(package, level, "context_unknown", ", ".join(sorted(ctx.unknown)))
         if package == ctx.ime_package:
             return Blocked(package, level, "active_ime")
-        if ctx.home_package == package and _alternative_home(package, ctx) is None:
+        if ctx.home_package == package and _alternative_home(package, ctx, avoid_homes) is None:
             return Blocked(package, level, "home_no_alternative")
 
     warnings: list[str] = []
-    steps = _silence_steps(package, facts, ctx, warnings)
+    steps = _silence_steps(package, facts, ctx, warnings, avoid_homes)
     if level == "disable":
         steps.append(Step("enabled", package, {"enabled": "0"}))
     elif level == "remove":
+        warnings.append("app_data_lost")
         backup = str(backup_dir_for(backup_root, package, facts.version_code))
         version = "" if facts.version_code is None else str(facts.version_code)
         steps.append(Step("backup", package, {"dir": backup, "version_code": version}))

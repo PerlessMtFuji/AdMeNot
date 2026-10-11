@@ -14,6 +14,7 @@
   import Settings from './screens/Settings.svelte';
   import Welcome from './screens/Welcome.svelte';
   import AppShell from './ui/AppShell.svelte';
+  import Banner from './ui/Banner.svelte';
   import Button from './ui/Button.svelte';
   import Dialog from './ui/Dialog.svelte';
   import UpdateDialog from './components/UpdateDialog.svelte';
@@ -71,6 +72,12 @@
       <Button variant="danger" onclick={() => ctl.quit()}>{t('close.confirm')}</Button>
     {/snippet}
   </Dialog>
+{/if}
+
+{#if s.closingAfterStep}
+  <div class="fixed inset-x-4 bottom-4 z-50 mx-auto max-w-xl" role="status">
+    <Banner tone="warn" icon="info" title={t('close.after_step')} />
+  </div>
 {/if}
 
 {#if !welcome}  <!-- aktualizacje i raporty awarii czekają na zamknięcie ekranu powitalnego -->

@@ -37,9 +37,13 @@ TEXTS: dict[str, dict[str, dict[str, str]]] = {
             "home_no_alternative": "to jedyny launcher — nie ma na co przełączyć ekranu głównego",
             "not_installed": "nie ma takiej aplikacji na telefonie",
             "unknown_level": "nieznany poziom (silence | disable | remove)",
+            "context_unknown": "nie rozpoznano odpowiedzi telefonu ({detail}) — bez tego nie "
+                               "wyłączam ani nie usuwam; możesz wyciszyć",
         },
         "warnings": {
             "home_not_switched": "ekran główny zostaje bez zmian (brak launchera systemowego)",
+            "app_data_lost": "usunięcie kasuje dane aplikacji (konta, ustawienia, pliki) — "
+                             "cofnięcie przywróci samą aplikację, bez danych",
         },
         "errors": {
             "device_admin": "aplikacja jest administratorem urządzenia i nie oddała uprawnień",
@@ -50,6 +54,13 @@ TEXTS: dict[str, dict[str, dict[str, str]]] = {
                                 "„Wyłącz monitorowanie uprawnień”",
             "unsupported": "niedostępne w tej wersji Androida",
             "failed": "polecenie nie powiodło się",
+            "unrecognized": "nierozpoznana odpowiedź telefonu — zmiany nie wysłano",
+            "context_unknown": "nie rozpoznano stanu telefonu — nie wyłączam ani nie usuwam",
+            "active_ime": "to teraz aktywna klawiatura — najpierw wybierz inną na telefonie",
+            "home_active": "to nadal ekran główny (przełączenie się nie udało) — nie wyłączam",
+            "backup_stale": "aplikacja zmieniła się od zrobienia kopii APK — zrób nowy plan",
+            "not_restored": "telefon przyjął polecenie, ale stan się nie zmienił — spróbuj ponownie",
+            "device_busy": "inne okno albo CLI wykonuje teraz zlecenie na tym telefonie",
             "backup_failed": "nie udało się zrobić kopii APK — aplikacji nie usunięto",
             "no_backup": "brak kopii APK — nie da się przywrócić aplikacji",
             "skipped": "pominięto, bo poprzedni krok się nie udał",
@@ -95,9 +106,13 @@ TEXTS: dict[str, dict[str, dict[str, str]]] = {
             "home_no_alternative": "this is the only launcher — nothing to switch the home screen to",
             "not_installed": "no such app on the phone",
             "unknown_level": "unknown level (silence | disable | remove)",
+            "context_unknown": "unrecognized phone response ({detail}) — not disabling or "
+                               "removing without it; you can silence",
         },
         "warnings": {
             "home_not_switched": "home screen stays as is (no system launcher)",
+            "app_data_lost": "removal deletes the app's data (accounts, settings, files) — "
+                             "undo restores the app itself, without its data",
         },
         "errors": {
             "device_admin": "the app is a device admin and kept its rights",
@@ -108,6 +123,13 @@ TEXTS: dict[str, dict[str, dict[str, str]]] = {
                                 "monitoring” in developer options",
             "unsupported": "not available on this Android version",
             "failed": "command failed",
+            "unrecognized": "unrecognized phone response — nothing was sent",
+            "context_unknown": "phone state not recognized — not disabling or removing",
+            "active_ime": "this is now the active keyboard — pick another one on the phone first",
+            "home_active": "this is still the home screen (switch failed) — not disabling",
+            "backup_stale": "the app changed since the APK backup — make a new plan",
+            "not_restored": "the phone accepted the command but the state did not change — retry",
+            "device_busy": "another window or the CLI is running an order on this phone",
             "backup_failed": "APK backup failed — the app was not removed",
             "no_backup": "no APK backup — the app cannot be restored",
             "skipped": "skipped because a previous step failed",
@@ -222,8 +244,8 @@ def verdict_label(verdict: str, lang: str) -> str:
     return VERDICT_LABELS[lang].get(verdict, verdict)
 
 
-def reason_text(reason: str, lang: str, package: str) -> str:
-    return TEXTS[lang]["reasons"].get(reason, reason).format(package=package)
+def reason_text(reason: str, lang: str, package: str, detail: str = "") -> str:
+    return TEXTS[lang]["reasons"].get(reason, reason).format(package=package, detail=detail)
 
 
 def warning_text(key: str, lang: str) -> str:

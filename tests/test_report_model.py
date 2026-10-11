@@ -268,3 +268,15 @@ def test_protocol_takes_the_eight_newest_chosen_shots_with_a_jpeg(monkeypatch, t
     assert [s.image.name for s in protocol.screenshots] == [
         f"{i}.jpg" for i in ids[2:] if i != ids[5]]
     assert protocol.screenshots[0].context == context
+
+
+def test_failed_step_with_unrestored_inverse_is_partially_undone(journal, photo):
+    """Audyt 2026-10-11, BUG-09: „failed” z krokiem odwrotnym mógł zmienić telefon."""
+    order = make_order(journal, snapshot(photo), (("com.x", "disable", ("undone",)),))
+    aid = journal.add_action(order.id, "com.x", "disable",
+                             {"kind": "enabled", "package": "com.x", "params": {"enabled": "0"}}, "cmd")
+    journal.record_prev_state(aid, {"enabled": True},
+                              {"kind": "enabled", "package": "com.x", "params": {"enabled": "1"}})
+    journal.set_action_status(aid, "failed", "timeout")
+    outcomes = {r.package: r.outcome for r in build_protocol(journal, order.id, "pl").rows}
+    assert outcomes["com.x"] == "partially_undone"

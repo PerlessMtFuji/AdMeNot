@@ -10,6 +10,19 @@
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
   const expert = $derived(s.settings.mode === 'expert');
+  // Odblokowanie pakietu chronionego to świadoma decyzja: trzeba przepisać jego nazwę
+  // (audyt 2026-10-11, QA-01), jak `--unlock PAKIET` w CLI.
+  let confirming = $state<string | null>(null);
+  let typed = $state('');
+  function startUnlock(pkg: string): void {
+    confirming = pkg;
+    typed = '';
+  }
+  async function confirmUnlock(pkg: string): Promise<void> {
+    if (typed.trim() !== pkg) return;
+    confirming = null;
+    await ctl.unlock(pkg);
+  }
 </script>
 
 {#if s.plan}
@@ -26,9 +39,20 @@
           {#if a.blocked}
             <p class="mt-1 text-sm text-bad">{a.reason_text}</p>
             {#if a.reason === 'protected' && expert}
-              <Button variant="ghost" size="sm" class="mt-1" onclick={() => ctl.unlock(a.package)}>
-                <Icon name="lock-open" />{t('plan.unlock')}
-              </Button>
+              {#if confirming === a.package}
+                <p class="mt-1.5 text-sm text-warn">{t('plan.unlock_prompt', { package: a.package })}</p>
+                <div class="mt-1.5 flex gap-2">
+                  <input class="field mono min-w-0 flex-1 rounded-[10px] px-2.5 py-1.5 text-sm" bind:value={typed}
+                    aria-label={t('plan.unlock_label')} placeholder={a.package} autocomplete="off" spellcheck="false" />
+                  <Button variant="danger" size="sm" disabled={typed.trim() !== a.package}
+                    onclick={() => confirmUnlock(a.package)}>{t('plan.unlock')}</Button>
+                  <Button variant="ghost" size="sm" onclick={() => (confirming = null)}>{t('common.cancel')}</Button>
+                </div>
+              {:else}
+                <Button variant="ghost" size="sm" class="mt-1" onclick={() => startUnlock(a.package)}>
+                  <Icon name="lock-open" />{t('plan.unlock')}
+                </Button>
+              {/if}
             {/if}
           {:else}
             <ul class="mt-1.5 flex flex-col gap-0.5 text-sm text-mut">

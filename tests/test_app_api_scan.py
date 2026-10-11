@@ -1,3 +1,4 @@
+import threading
 from collections import namedtuple
 
 import pytest
@@ -117,6 +118,37 @@ def test_new_scan_abandons_the_running_apk_analysis():
     rec.wait_for("apk:done")
     rec.wait_for("apk:stopped")
     assert len(rec.of("apk:done")) == 1
+    # BUG-10: zdarzenia niosą zadanie — UI odrzuca te z porzuconej analizy.
+    assert rec.of("apk:done")[0]["job_id"] == "job-2"
+    assert rec.of("apk:stopped")[0]["job_id"] == "job-1"
+
+
+def test_abandoned_analysis_cannot_publish_after_its_last_check(monkeypatch):
+    """BUG-10: stare zadanie minęło ostatni `check`, a w tym czasie wątek mostu je porzuca."""
+    slow = SlowApk()
+    api, rec = make_api(make_cli_phone(), sync=False, apk=slow)
+    original = api._apk_commit
+    entered, proceed = threading.Event(), threading.Event()
+
+    class GatedLock:
+        def __enter__(self):
+            if threading.current_thread().name == "admenot-scan":
+                entered.set()
+                proceed.wait(5)
+            return original.__enter__()
+
+        def __exit__(self, *exc):
+            return original.__exit__(*exc)
+
+    api._apk_commit = GatedLock()
+    api.start_scan(SERIAL)
+    rec.wait_for("apk:progress")
+    slow.release.set()
+    assert entered.wait(5)  # analiza skończona, zapis wyniku czeka
+    api._abandon_apk()  # jak `start_scan` drugiego telefonu
+    proceed.set()
+    rec.wait_for("apk:stopped")
+    assert rec.of("apk:done") == [] and api.rerender()["scan"] is not None
 
 
 def _fake_fetch(cache_dir, package):

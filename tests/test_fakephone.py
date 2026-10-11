@@ -23,7 +23,7 @@ def test_disable_changes_disabled_list():
 
 def test_unquoted_dollar_is_expanded_like_a_real_shell():
     phone = _phone()
-    phone.shell(f"settings put secure {LISTENERS} {GEARHEAD}")
+    phone.shell(f"settings put --user 0 secure {LISTENERS} {GEARHEAD}")
     assert "$" not in phone.secure[LISTENERS]
     phone.shell(C.SETTINGS_PUT.format(key=LISTENERS, value=GEARHEAD))
     assert phone.secure[LISTENERS] == GEARHEAD

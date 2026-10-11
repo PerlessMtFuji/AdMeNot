@@ -10,7 +10,7 @@ export const ERROR_KEYS = ['adb_missing', 'unauthorized', 'offline', 'disconnect
   'adb_error', 'action_error', 'busy', 'wrong_device', 'no_scan', 'no_device', 'unknown_order',
   'nothing_to_resume', 'nothing_to_do', 'no_target', 'bad_request', 'logo_missing', 'logo_type',
   'logo_size', 'internal', 'mirror_missing', 'mirror_failed', 'unknown_screenshot', 'shot_limit',
-  'data_too_new', 'retired', 'unknown_crash'] as const;
+  'data_too_new', 'retired', 'unknown_crash', 'device_busy'] as const;
 // Błędy okna aktualizacji (klucze `update.error.*`).
 export const UPDATE_ERROR_KEYS = ['update_download', 'update_corrupt', 'update_launch_failed', 'busy',
   'update_none', 'internal'] as const;

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime
@@ -116,6 +116,14 @@ class Screenshot:
     in_report: bool
 
 
+def unresolved(actions: Iterable[Action]) -> bool:
+    """Czy coś z tych kroków może nadal zmieniać telefon: wykonane, oczekujące albo „failed” z
+    zapisanym krokiem odwrotnym, którego nie udało się cofnąć (audyt 2026-10-11, BUG-09)."""
+    return any(a.status in ("done", "pending")
+               or (a.status == "failed" and a.prev_state is not None and a.inverse is not None)
+               for a in actions)
+
+
 def _dump(value: dict[str, Any] | None) -> str | None:
     return None if value is None else json.dumps(value, ensure_ascii=False, sort_keys=True)
 
@@ -164,6 +172,7 @@ class Journal:
                  migrations: Sequence[str] = MIGRATIONS) -> None:
         if str(path) != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
+        self._path = str(path)
         self._db = sqlite3.connect(str(path))
         self._db.row_factory = sqlite3.Row
         try:
@@ -245,11 +254,19 @@ class Journal:
         return cur.lastrowid
 
     def record_prev_state(self, action_id: int, prev_state: dict[str, Any],
-                          inverse: dict[str, Any] | None) -> None:
+                          inverse: dict[str, Any] | None) -> bool:
+        """Zapisuje stan sprzed zmiany tylko raz (porównaj-i-ustaw): False, gdy był już zapisany —
+        drugi zapis z nieaktualnej migawki nadpisałby krok odwrotny (audyt 2026-10-11, BUG-06)."""
         with self._db:
-            self._db.execute(
-                "UPDATE actions SET prev_state_json = ?, inverse_json = ?, ts = ? WHERE id = ?",
+            cur = self._db.execute(
+                "UPDATE actions SET prev_state_json = ?, inverse_json = ?, ts = ?"
+                " WHERE id = ? AND prev_state_json IS NULL",
                 (_dump(prev_state), _dump(inverse), self._ts(), action_id))
+        return cur.rowcount == 1
+
+    @property
+    def path(self) -> str:
+        return self._path
 
     def set_action_status(self, action_id: int, status: str, error: str | None = None) -> None:
         if status not in ACTION_STATUSES:

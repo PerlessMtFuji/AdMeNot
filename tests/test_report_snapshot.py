@@ -44,7 +44,7 @@ def test_snapshot_keeps_device_photo_scope_and_flagged_apps(tmp_path):
     assert (boost["verdict"], boost["confidence"], boost["incomplete"], boost["gaps"]) == (
         "malicious", "high", False, [])
     assert boost["score"] >= 75 and boost["trusted"] is False and boost["apk"] is None
-    assert boost["default_level"] == "remove" and boost["chosen_level"] is None
+    assert boost["default_level"] == "disable" and boost["chosen_level"] is None
     assert apps[FORECAST]["default_level"] is None  # „Do sprawdzenia”: silnik nic nie proponuje
     result = next(r for r in report.results if r.facts.package == BOOST)
     assert [f["rule_id"] for f in boost["findings"]] == [f.rule_id for f in result.findings]
@@ -72,13 +72,13 @@ def test_snapshot_adds_chosen_and_incomplete_apps_and_apk_identity(tmp_path):
     report = dataclasses.replace(report, results=results, apk_reports={BOOST: apk},
                                  apk=ApkStatus(requested=2, analyzed=1, failed={"x": "timeout"}))
     match = PhoneImageProvider(tmp_path / "missing", tmp_path / "o.json").match(report.device)
-    snap = scan_snapshot(report, match, {chosen_safe: "silence", BOOST: "disable"})
+    snap = scan_snapshot(report, match, {chosen_safe: "silence", BOOST: "silence"})
 
     apps = {a["package"]: a for a in snap["apps"]}
     assert set(apps) == {BOOST, FORECAST, chosen_safe, gapped}
     assert apps[chosen_safe]["verdict"] == "safe" and apps[chosen_safe]["chosen_level"] == "silence"
     assert apps[gapped]["incomplete"] is True and apps[gapped]["chosen_level"] is None
-    assert apps[BOOST]["chosen_level"] == "disable" and apps[BOOST]["default_level"] == "remove"
+    assert apps[BOOST]["chosen_level"] == "silence" and apps[BOOST]["default_level"] == "disable"
     assert apps[BOOST]["apk"] == {"files": {"base.apk": "ab" * 32}, "signers": ["cd" * 32],
                                   "error": None}
     assert snap["scope"]["apk"] == {"requested": 2, "analyzed": 1, "failed": {"x": "timeout"},

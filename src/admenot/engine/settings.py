@@ -15,11 +15,16 @@ import locale
 import os
 import re
 import shutil
-from collections.abc import Callable
+import tempfile
+import threading
+import time
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from admenot.engine.oplock import try_lock, unlock
 from admenot.engine.paths import settings_path
 
 LANGS = ("pl", "en")
@@ -116,11 +121,60 @@ def _read(path: Path) -> dict[str, Any]:
     return data
 
 
-def _write(path: Path, data: dict[str, Any]) -> None:
+def write_atomic(path: Path, text: str) -> None:
+    """Zapis przez unikalny plik tymczasowy w tym samym katalogu i `os.replace`."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), "utf-8")
-    os.replace(tmp, path)
+    fd, tmp = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        os.replace(tmp, path)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+
+
+def _write(path: Path, data: dict[str, Any]) -> None:
+    write_atomic(path, json.dumps(data, ensure_ascii=False, indent=2))
+
+
+_LOCK_WAIT = 10.0
+_local = threading.local()
+_thread_lock = threading.RLock()
+
+
+@contextmanager
+def settings_transaction(path: Path | None = None) -> Iterator[None]:
+    """Odczyt i zapis ustawień bez przeplotu z innym wątkiem lub procesem (audyt 2026-10-11,
+    PRIV-01): zapis motywu ze starej migawki nie może przywrócić cofniętej zgody na statystyki.
+    Zagnieżdżone wywołania w tym samym wątku korzystają z już trzymanej blokady."""
+    path = path or settings_path()
+    with _thread_lock:
+        depth = getattr(_local, "depth", 0)
+        if depth:
+            _local.depth = depth + 1
+            try:
+                yield
+            finally:
+                _local.depth = depth
+            return
+        lock = path.with_name(path.name + ".lock")
+        lock.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(lock, os.O_RDWR | os.O_CREAT, 0o600)
+        try:
+            deadline = time.monotonic() + _LOCK_WAIT
+            while not try_lock(fd):
+                if time.monotonic() > deadline:
+                    raise TimeoutError(f"settings locked: {lock}")
+                time.sleep(0.02)
+            _local.depth = 1
+            try:
+                yield
+            finally:
+                _local.depth = 0
+                unlock(fd)
+        finally:
+            os.close(fd)
 
 
 def _schema(data: dict[str, Any]) -> int:
@@ -137,14 +191,20 @@ def _load(path: Path) -> dict[str, Any]:
     return data
 
 
-def _save(path: Path, update: Callable[[dict[str, Any]], None]) -> None:
-    found = _schema(_read(path))
+def check_writable(path: Path | None = None) -> None:
+    """SettingsTooNew, gdy plik pochodzi z nowszej wersji programu (zapis by go zepsuł)."""
+    found = _schema(_read(path or settings_path()))
     if found > len(MIGRATIONS):
         raise SettingsTooNew(found, len(MIGRATIONS))
-    data = _load(path)
-    update(data)
-    data[SCHEMA_KEY] = len(MIGRATIONS)
-    _write(path, data)
+
+
+def _save(path: Path, update: Callable[[dict[str, Any]], None]) -> None:
+    with settings_transaction(path):  # odczyt świeżego pliku i zapis pod jedną blokadą
+        check_writable(path)
+        data = _load(path)
+        update(data)
+        data[SCHEMA_KEY] = len(MIGRATIONS)
+        _write(path, data)
 
 
 def _valid(key: str, value: Any) -> bool:

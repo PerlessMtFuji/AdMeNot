@@ -148,11 +148,11 @@
     "deep": "Głęboka analiza", "deep_hint": "Szuka w kodzie aplikacji możliwych ścieżek do wrażliwych wywołań. Trwa do kilku minut.", "limits": "Ograniczenia oceny", "incomplete_data": "Mało danych o zachowaniu aplikacji", "confidence": "Pewność wniosku"
   },
   "actions": { "console": "Konsola ADB", "fix": "Napraw zaznaczone ({count})", "rescan": "Skanuj ponownie" },
-  "plan": { "title": "Plan naprawy", "confirm_title": "Co zrobię na telefonie", "blocked": "Pominięta", "unlock": "Odblokuj", "undo_hint": "Każdą zmianę można cofnąć w Historii.", "run": "Wykonaj ({count})", "nothing": "Nic do wykonania — wszystkie aplikacje są zablokowane." },
+  "plan": { "title": "Plan naprawy", "confirm_title": "Co zrobię na telefonie", "blocked": "Pominięta", "unlock": "Odblokuj", "unlock_prompt": "To aplikacja systemowa — zmiana może zepsuć funkcje telefonu. Aby ją odblokować, przepisz nazwę pakietu: {package}", "unlock_label": "Nazwa pakietu do odblokowania", "undo_hint": "Zmiany cofniesz w Historii. Usunięcie aplikacji kasuje jej dane — cofnięcie przywróci samą aplikację.", "run": "Wykonaj ({count})", "nothing": "Nic do wykonania — wszystkie aplikacje są zablokowane." },
   "exec": {
     "title": "Naprawiam telefon…", "step": "krok {done} z {total}", "panel": "Zlecenie",
     "done_title": "Telefon naprawiony", "done_warn": "Naprawa zakończona z uwagami",
-    "done_sub": "{apps} · {steps} · każdą zmianę można cofnąć w Historii",
+    "done_sub": "{apps} · {steps} · zmiany cofniesz w Historii",
     "stopped_title": "Zlecenie wstrzymane",
     "stop_hint": "Wstrzymanie kończy bieżący krok. Zlecenie można potem dokończyć lub cofnąć.",
     "state": { "queued": "czeka", "running": "w toku", "ok": "gotowe", "still_active": "nadal aktywna", "failed": "błąd", "stopped": "wstrzymana" },
@@ -181,7 +181,7 @@
     "risk_title": "Ważne",
     "risk1": "AdMeNot jest w wersji beta i może zawierać błędy.",
     "risk2": "Program wyłącza i usuwa aplikacje na telefonie klienta. Decyzja o każdej zmianie należy do Ciebie — to Ty odpowiadasz za nią przed klientem.",
-    "risk3": "Większość zmian cofniesz w Historii; usunięcia aplikacji bez kopii APK nie zawsze.",
+    "risk3": "Większość zmian cofniesz w Historii. Usunięcie aplikacji kasuje jej dane — cofnięcie przywróci najwyżej samą aplikację z kopii APK.",
     "risk4": "Przed naprawą zrób kopię ważnych danych klienta.",
     "risk5": "Program jest udostępniany „tak jak jest”, bez żadnej gwarancji (licencja PolyForm Shield 1.0.0).",
     "accept": "Rozumiem i akceptuję",
@@ -379,7 +379,7 @@
       "internal": "Nieoczekiwany błąd aktualizacji."
     }
   },
-  "close": { "title": "Trwa zlecenie", "message": "Przerwać po bieżącym kroku i zamknąć program? Zlecenie da się później dokończyć albo cofnąć.", "confirm": "Przerwij i zamknij" },
+  "close": { "title": "Trwa zlecenie", "message": "Przerwać po bieżącym kroku i zamknąć program? Zlecenie da się później dokończyć albo cofnąć.", "confirm": "Przerwij i zamknij", "after_step": "Kończę bieżący krok na telefonie — program zamknie się sam." },
   "report": {
     "button": "Protokół PDF",
     "busy": "Tworzę protokół…",
@@ -418,6 +418,7 @@
     "unknown_screenshot": "Nie ma takiego zrzutu ekranu.",
     "unknown_crash": "Tego raportu już nie ma.",
     "shot_limit": "Do protokołu można wybrać najwyżej 8 zrzutów.",
+    "device_busy": "Inne okno AdMeNot albo CLI wykonuje teraz zlecenie na tym telefonie. Poczekaj, aż skończy.",
     "data_too_new": "Dane programu pochodzą z nowszej wersji AdMeNot — zaktualizuj program."
   }
 }

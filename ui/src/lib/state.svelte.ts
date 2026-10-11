@@ -84,6 +84,7 @@ export class AppState {
   consoleWarned = $state(false);
   error = $state<ApiErrorBody | null>(null);
   closeRequested = $state(false);
+  closingAfterStep = $state(false);  // zamknięcie czeka na koniec bieżącego kroku zlecenia
   update = $state<UpdateView | null>(null);
   updateDialog = $state(false);
   updateProgress = $state<{ done: number; total: number | null } | null>(null);

@@ -66,6 +66,8 @@ class _Session:
     def __init__(self) -> None:
         self.lock = threading.Lock()
         self.serials: set[str] = set()
+        # Nazwiska klientów wpisane w tej sesji: tylko w pamięci, nie w znaczniku na dysku (PRIV-02).
+        self.names: set[str] = set()
         self.device: dict[str, str] | None = None
         self.seen: dict[tuple[str, str | None], str] = {}  # (typ, miejsce) → id
         self.started: datetime | None = None
@@ -94,6 +96,12 @@ def note_serials(serials: Iterable[str]) -> None:
         _session.serials.update(s for s in serials if s)
         if len(_session.serials) != before:
             _save_marker()
+
+
+def note_names(names: Iterable[str | None]) -> None:
+    """Nazwy klientów do wycięcia z raportów błędów tej sesji (audyt 2026-10-11, PRIV-02)."""
+    with _session.lock:
+        _session.names.update(n.strip() for n in names if n and n.strip())
 
 
 def note_device(serial: str, manufacturer: str, model: str, android: str) -> None:
@@ -154,7 +162,7 @@ def _lang() -> str:
         return system_lang()
 
 
-def _adb_tail(now: datetime, serials: set[str]) -> list[str] | None:
+def _adb_tail(now: datetime, serials: set[str], names: set[str]) -> list[str] | None:
     path = session_log_path(logs_dir(), now)
     try:
         with path.open("rb") as fh:
@@ -168,7 +176,7 @@ def _adb_tail(now: datetime, serials: set[str]) -> list[str] | None:
     # „None” to wpis bez telefonu (transport bez numeru), nie numer seryjny
     found = {parts[1] for parts in (row.split("\t") for row in rows)
              if len(parts) >= 5 and parts[1] and parts[1] != "None"}
-    lines = [adb_line(line, serials | found) for line in rows]
+    lines = [adb_line(line, serials | found, names=names) for line in rows]
     kept = [line for line in lines if line]
     return kept[-ADB_LINES:] or None
 
@@ -253,6 +261,7 @@ def _capture(exc: BaseException | None, kind: str, context: dict[str, Any], type
     type_ = (type_ or "Error")[:TYPE_LIMIT]
     with _session.lock:
         serials = set(_session.serials)
+        names = set(_session.names)
         device = {k: _short(v) for k, v in _session.device.items()} if _session.device else None
         known = _session.seen.get((type_, where))
     if known is not None:
@@ -264,7 +273,7 @@ def _capture(exc: BaseException | None, kind: str, context: dict[str, Any], type
             return known
 
     def clean(text: str | None, limit: int) -> str | None:
-        return _tail(redact(text, serials), limit) if text else None
+        return _tail(redact(text, serials, names=names), limit) if text else None
 
     crash_id = f"{stamp:%Y%m%d-%H%M%S}-{''.join(secrets.choice(_ALPHABET) for _ in range(4))}"
     data = {
@@ -272,11 +281,12 @@ def _capture(exc: BaseException | None, kind: str, context: dict[str, Any], type
         "app": __version__, "os": f"{platform.system()} {platform.version()}", "lang": _lang(),
         "context": {"call": _short(context.get("call")), "job": _short(context.get("job")),
                     "screen": _short(context.get("screen")), "device": device},
-        "error": {"type": type_, "message": (redact(message or "", serials))[:MESSAGE_LIMIT],
-                  "where": redact(where, serials)[:WHERE_LIMIT] if where else None,
+        "error": {"type": type_,
+                  "message": (redact(message or "", serials, names=names))[:MESSAGE_LIMIT],
+                  "where": redact(where, serials, names=names)[:WHERE_LIMIT] if where else None,
                   "trace": clean(trace, TRACE_LIMIT)},
         "log_tail": clean(log_tail, LOG_LIMIT),
-        "adb_tail": _adb_tail(stamp, serials),
+        "adb_tail": _adb_tail(stamp, serials, names),
         "sent": None, "announced": False,
     }
     _write(crashes_dir() / f"{crash_id}.json", data)
@@ -361,8 +371,8 @@ def _cut_front(text: str | None, excess: int) -> str | None:
 
 def _body(data: dict[str, Any], include_adb: bool, comment: str | None) -> dict[str, Any]:
     with _session.lock:
-        serials = set(_session.serials)
-    text = redact((comment or "").strip(), serials)[:COMMENT_LIMIT]
+        serials, names = set(_session.serials), set(_session.names)
+    text = redact((comment or "").strip(), serials, names=names)[:COMMENT_LIMIT]
     body = {"format": FORMAT, "kind": data["kind"], "app": data["app"], "os": data["os"],
             "lang": data["lang"], "count": data["count"], "created": data["created"],
             "context": data["context"], "error": dict(data["error"]), "log_tail": data["log_tail"],
@@ -455,6 +465,11 @@ def send_queued(post: Post | None = None, now: Now | None = None,
             if _unreachable(exc):
                 return True  # serwer dalej nieosiągalny — reszta też poczeka
             _rejected_in_background(path, exc)
+        except PermissionError as failure:
+            # Windows: plik czyta akurat ktoś inny (antywirus, podgląd) i `os.replace` odmawia —
+            # to chwilowe, raport czeka na kolejną próbę zamiast do następnej awarii.
+            _log_failure(failure)
+            return True
         except Exception as failure:  # noqa: BLE001 — np. raport usunięty w międzyczasie
             _log_failure(failure)
     return False

@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from fakephone import make_cli_phone
 
@@ -41,7 +43,7 @@ def test_recommended_requests_and_blocked_protected_launcher():
     phone = make_cli_phone()
     report = run_scan(phone)
     requests = recommended_requests(report)
-    assert requests["com.clean.pro.boost"] == "remove" and "com.whatsapp" not in requests
+    assert requests["com.clean.pro.boost"] == "disable" and "com.whatsapp" not in requests
     plan = plan_order(phone, report, {"com.sec.android.app.launcher": "disable",
                                       "com.wlive.forecast": "disable"})
     blocked = [r for r in plan.results if isinstance(r, Blocked)]
@@ -50,6 +52,8 @@ def test_recommended_requests_and_blocked_protected_launcher():
     unlocked = plan_order(phone, report, {"com.sec.android.app.launcher": "silence"},
                           unlocked=["com.sec.android.app.launcher"])
     assert [p.package for p in unlocked.plans] == ["com.sec.android.app.launcher"]
+    assert unlocked.unlocked == {"com.sec.android.app.launcher"}  # QA-01: decyzja trafia do zlecenia
+    assert plan.unlocked == frozenset()
 
 
 def test_execute_disables_and_verifies(tmp_path):
@@ -211,3 +215,15 @@ def test_clear_cache_after_repair_only_when_enabled_and_finished(tmp_path):
     assert entry.exists()
     assert clear_cache_after_repair(finished, on, tmp_path) == 10
     assert not entry.exists()
+
+
+@pytest.mark.parametrize("serial", [r"C:\Other", "..", "../../x", r"a/b\c", "192.0.2.1:5555", "CON",
+                                    "R58T00TEST"])
+def test_backup_dir_of_any_serial_stays_under_the_root(serial, tmp_path):
+    """Audyt 2026-10-11, SEC-02: numer seryjny nie wybiera katalogu poza katalogiem kopii."""
+    from admenot.engine.paths import device_dir_name
+
+    name = device_dir_name(serial)
+    assert re.fullmatch(r"[A-Za-z0-9_-]+-[0-9a-f]{12}", name)
+    assert (tmp_path / name).resolve().parent == tmp_path.resolve()
+    assert device_dir_name(serial) == name and device_dir_name(serial + "x") != name

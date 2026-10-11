@@ -77,3 +77,22 @@ def test_paths_outside_the_archive_are_refused(tmp_path, bad):
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     with pytest.raises(m.FetchError, match="path"):
         m.install(archive, tmp_path / "tools" / "scrcpy", expected=digest)
+
+
+def test_cached_tools_are_checked_file_by_file_against_the_pinned_archive(tmp_path):
+    """Audyt 2026-10-11, REL-02: poprawny VERSION nie wystarcza."""
+    m = _module()
+    archive, digest = _archive(tmp_path, [*m.REQUIRED, "SDL3.dll"])
+    target = tmp_path / "tools" / "scrcpy"
+    m.install(archive, target, expected=digest, version="9.9")
+    assert m.problems(target, archive, expected=digest, version="9.9") == []
+
+    (target / "AdbWinApi.dll").write_bytes(b"tampered")
+    (target / "SDL3.dll").unlink()
+    (target / "extra.dll").write_bytes(b"x")
+    found = m.problems(target, archive, expected=digest, version="9.9")
+    assert "zmieniony AdbWinApi.dll" in found and "brak SDL3.dll" in found
+    assert "obcy plik extra.dll" in found
+    assert m.problems(target, archive, expected="0" * 64, version="9.9") == [
+        "brak zweryfikowanego archiwum scrcpy.zip"]
+    assert m.problems(target, archive, expected=digest, version="1.0") == ["inna wersja niż 1.0"]

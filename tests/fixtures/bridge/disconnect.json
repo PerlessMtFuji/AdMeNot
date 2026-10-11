@@ -533,7 +533,7 @@
          "from_play": false,
          "installer": "com.android.chrome",
          "is_admin": true,
-         "default_level": "remove",
+         "default_level": "disable",
          "problems": [
           "Jest aktywnym administratorem urządzenia — przed wyłączeniem lub usunięciem trzeba odebrać te uprawnienia.",
           "W ciągu ostatniej doby korzystała z wyświetlania okien nad innymi aplikacjami.",
@@ -975,7 +975,8 @@
      {
       "done": 1,
       "total": 3,
-      "package": "com.clean.pro.boost"
+      "package": "com.clean.pro.boost",
+      "job_id": "job-1"
      }
     ],
     [
@@ -983,7 +984,8 @@
      {
       "done": 2,
       "total": 3,
-      "package": "com.wlive.forecast"
+      "package": "com.wlive.forecast",
+      "job_id": "job-1"
      }
     ],
     [
@@ -991,7 +993,8 @@
      {
       "done": 3,
       "total": 3,
-      "package": "com.whatsapp"
+      "package": "com.whatsapp",
+      "job_id": "job-1"
      }
     ],
     [
@@ -1029,7 +1032,7 @@
          "from_play": false,
          "installer": "com.android.chrome",
          "is_admin": true,
-         "default_level": "remove",
+         "default_level": "disable",
          "problems": [
           "Jest aktywnym administratorem urządzenia — przed wyłączeniem lub usunięciem trzeba odebrać te uprawnienia.",
           "W ciągu ostatniej doby korzystała z wyświetlania okien nad innymi aplikacjami.",
@@ -1451,7 +1454,8 @@
         "total": 4,
         "user": 3
        }
-      }
+      },
+      "job_id": "job-1"
      }
     ],
     [
@@ -1558,7 +1562,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "settings get secure default_input_method",
+      "command": "settings get --user 0 secure default_input_method",
       "status": "ok",
       "duration": 0.0,
       "output": "null\n",
@@ -1570,7 +1574,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "settings get secure enabled_accessibility_services",
+      "command": "settings get --user 0 secure enabled_accessibility_services",
       "status": "ok",
       "duration": 0.0,
       "output": "null\n",
@@ -1656,7 +1660,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "settings get secure default_input_method",
+      "command": "settings get --user 0 secure default_input_method",
       "status": "ok",
       "duration": 0.0,
       "output": "null\n",
@@ -1668,7 +1672,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "settings get secure enabled_accessibility_services",
+      "command": "settings get --user 0 secure enabled_accessibility_services",
       "status": "ok",
       "duration": 0.0,
       "output": "null\n",
@@ -1732,7 +1736,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "pm revoke com.wlive.forecast android.permission.POST_NOTIFICATIONS",
+      "command": "pm revoke --user 0 com.wlive.forecast android.permission.POST_NOTIFICATIONS",
       "status": "ok",
       "duration": 0.0,
       "output": "",
@@ -1770,7 +1774,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "appops get com.wlive.forecast USE_FULL_SCREEN_INTENT",
+      "command": "appops get --user 0 com.wlive.forecast USE_FULL_SCREEN_INTENT",
       "status": "ok",
       "duration": 0.0,
       "output": "No operations.\nDefault mode: allow\n",
@@ -1782,7 +1786,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "appops set com.wlive.forecast USE_FULL_SCREEN_INTENT deny",
+      "command": "appops set --user 0 com.wlive.forecast USE_FULL_SCREEN_INTENT deny",
       "status": "ok",
       "duration": 0.0,
       "output": "",
@@ -1858,6 +1862,54 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
+      "command": "cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n  com.sec.android.app.launcher/com.android.launcher3.uioverrides.QuickstepLauncher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\ncom.sec.android.app.launcher/com.android.launcher3.uioverrides.QuickstepLauncher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys notification --package admenot.none",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Current Notification Manager state (filtered to 'admenot.none'):\n  Notification List:\n  Notification listeners:\n    Allowed notification listeners:\n      com.whatsapp/com.whatsapp.NotificationListener (user: 0 isPrimary: true)\n    Has user set:\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "getprop ro.build.version.sdk",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "34\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
       "command": "pm disable-user --user 0 com.wlive.forecast",
       "status": "error:no_device",
       "duration": 0.0,
@@ -1874,6 +1926,42 @@
       "status": "ok",
       "duration": 0.0,
       "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm list packages -s --user 0",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "package:com.sec.android.app.launcher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "settings get --user 0 secure default_input_method",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "null\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "settings get --user 0 secure enabled_accessibility_services",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "null\n",
       "tag": null
      }
     ],
@@ -2126,7 +2214,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "appops get com.wlive.forecast USE_FULL_SCREEN_INTENT",
+      "command": "appops get --user 0 com.wlive.forecast USE_FULL_SCREEN_INTENT",
       "status": "ok",
       "duration": 0.0,
       "output": "USE_FULL_SCREEN_INTENT: deny\n",

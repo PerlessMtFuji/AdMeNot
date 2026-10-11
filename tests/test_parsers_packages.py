@@ -169,3 +169,24 @@ def test_parse_dumpsys_packages_miui_unindented_overlay_lines():
     assert set(dumps) == {"com.android.providers.telephony", "com.clean.pro"}
     assert dumps["com.clean.pro"].version_code == 7
     assert dumps["com.clean.pro"].granted == {"android.permission.INTERNET"}
+
+
+def test_runtime_permissions_of_other_profiles_are_not_profile_0():
+    """Audyt 2026-10-11, BUG-08: User 10 (profil służbowy, klon) nie miesza się z User 0."""
+    text = (
+        "Packages:\n"
+        "  Package [com.x] (f00d):\n"
+        "    versionCode=5 minSdk=26 targetSdk=34\n"
+        "    install permissions:\n"
+        "      android.permission.INTERNET: granted=true\n"
+        "    User 0: ceDataInode=1 installed=true enabled=0\n"
+        "      runtime permissions:\n"
+        "        android.permission.POST_NOTIFICATIONS: granted=false\n"
+        "    User 10: ceDataInode=2 installed=true enabled=0\n"
+        "      runtime permissions:\n"
+        "        android.permission.POST_NOTIFICATIONS: granted=true\n"
+        "        android.permission.CAMERA: granted=true\n"
+    )
+    dump = parse_dumpsys_packages(text)["com.x"]
+    assert dump.granted == {"android.permission.INTERNET"}
+    assert {"android.permission.POST_NOTIFICATIONS", "android.permission.CAMERA"} <= dump.requested

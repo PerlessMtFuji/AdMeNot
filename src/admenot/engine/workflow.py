@@ -26,7 +26,7 @@ from admenot.engine.apk.cache import clear_cache
 from admenot.engine.device.info import DeviceInfo
 from admenot.engine.facts import AppFacts
 from admenot.engine.journal.db import Action, Journal, Order
-from admenot.engine.paths import backups_dir
+from admenot.engine.paths import backups_dir, device_dir_name
 from admenot.engine.phones.provider import PhoneMatch
 from admenot.engine.report.snapshot import scan_snapshot
 from admenot.engine.session import ScanReport
@@ -41,6 +41,7 @@ class OrderPlan:
     ctx: PhoneContext
     facts: dict[str, AppFacts]
     results: list[AppPlan | Blocked]
+    unlocked: frozenset[str] = frozenset()  # chronione pakiety odblokowane przez serwisanta
 
     @property
     def plans(self) -> list[AppPlan]:
@@ -106,11 +107,15 @@ def plan_order(
     ctx = ctx or read_phone_context(adb, device.manufacturer)
     facts = {r.facts.package: r.facts for r in report.results}
     protected = load_protected_list()
-    root = backups_dir() / device.serial
+    root = backups_dir() / device_dir_name(device.serial)
     free = frozenset(unlocked)
-    results = [plan_app(package, level, facts.get(package), ctx, protected, root, free)
+    destroyed = frozenset(p for p, level in requests.items() if level in ("disable", "remove"))
+    results = [plan_app(package, level, facts.get(package), ctx, protected, root, free, destroyed)
                for package, level in requests.items()]
-    return OrderPlan(device, ctx, facts, results)
+    used = frozenset(r.package for r in results if isinstance(r, AppPlan)
+                     and r.package in free and (protected.matches(r.package)
+                                                or r.package in ctx.system_launchers))
+    return OrderPlan(device, ctx, facts, results, used)
 
 
 def start(journal: Journal, plan: OrderPlan, client: str | None,
@@ -120,7 +125,10 @@ def start(journal: Journal, plan: OrderPlan, client: str | None,
         # Migawka dla protokołu (spec §9.3): telefon, zakres skanu, problemy i decyzje
         # serwisanta z chwili zlecenia.
         chosen = {p.package: p.level for p in plan.plans}
-        journal.save_scan(order.id, scan_snapshot(report, match, chosen))
+        snapshot = scan_snapshot(report, match, chosen)
+        if plan.unlocked:  # decyzja operatora zostaje w zleceniu (audyt 2026-10-11, QA-01)
+            snapshot["unlocked"] = sorted(plan.unlocked)
+        journal.save_scan(order.id, snapshot)
     return order
 
 

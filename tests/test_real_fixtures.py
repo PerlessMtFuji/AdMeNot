@@ -1,14 +1,14 @@
 """Regresja na nagraniach z prawdziwych telefonów (tests/fixtures/<nazwa>/manifest.json)."""
 
-from pathlib import Path
 
 import pytest
+from corpus import fixture_dirs
 
 from admenot.engine.adb.fake import FakeAdb
 from admenot.engine.apk.providers import StoredApkProvider
 from admenot.engine.session import run_scan
 
-FIXTURES = sorted(p.parent for p in (Path(__file__).parent / "fixtures").glob("*/manifest.json"))
+FIXTURES = fixture_dirs("manifest.json")  # prywatne nagrania tylko jawnie (QA-02)
 
 
 @pytest.mark.parametrize("fixture_dir", FIXTURES, ids=[p.name for p in FIXTURES])

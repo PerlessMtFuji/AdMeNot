@@ -157,6 +157,9 @@ class Api:
         self._provider = provider or PhoneImageProvider.default()
         self._apk_factory = apk_factory
         self._jobs = JobRunner(emitter, sync=sync_jobs)
+        # Porzucenie analizy APK i zapis jej wyniku wykluczają się: porzucone zadanie nie podmieni
+        # raportu nowego skanu (audyt 2026-10-11, BUG-10).
+        self._apk_commit = threading.Lock()
         self._admin_timeout = admin_timeout
         self._poll_interval = poll_interval
         self._now = now
@@ -241,9 +244,10 @@ class Api:
                 "image": data_uri(jpg) or data_uri(png)}
 
     def _abandon_apk(self) -> None:
-        job = self._jobs.current()
-        if job is not None and job.kind in ("apk", "deep"):
-            self._jobs.abandon(job.id)
+        with self._apk_commit:
+            job = self._jobs.current()
+            if job is not None and job.kind in ("apk", "deep"):
+                self._jobs.abandon(job.id)
 
     def _order_in_progress(self) -> Job | None:
         job = self._jobs.current()
@@ -421,6 +425,7 @@ class Api:
             self._open_order.pop(serial.strip(), None)
         adb = self._session(serial.strip())
         name = (client or "").strip() or None
+        crash.note_names([name])
 
         def run(job: Job) -> None:
             self._emit("scan:stage", {"stage": "identify"})
@@ -464,23 +469,25 @@ class Api:
             return job.ask("apk:question", {"kind": "no_space", **estimate_view(est, use)}) or "skip"
 
         policy = CachePolicy(self._cache_limit(),
-                             on_estimate=lambda est, use: self._emit("apk:estimate",
-                                                                     estimate_view(est, use)),
+                             on_estimate=lambda est, use: self._emit(
+                                 "apk:estimate", {**estimate_view(est, use), "job_id": job.id}),
                              decide=decide)
         provider = self._apk_factory(adb, policy=policy, deep=deep)
 
         def progress(done: int, total: int, package: str) -> None:
             job.check()
-            self._emit("apk:progress", {"done": done, "total": total, "package": package})
+            self._emit("apk:progress", {"done": done, "total": total, "package": package,
+                                        "job_id": job.id})
 
         try:
             updated = analyze_apks(report, provider, progress, only=deep or None)
-            job.check()
+            with self._apk_commit:  # sprawdzenie i zapis atomowo względem `_abandon_apk`
+                job.check()
+                self._report = updated
+                self._emit("apk:done", {"scan": scan_view(updated, self._lang), "job_id": job.id})
         except Stopped:
-            self._emit("apk:stopped", {})
+            self._emit("apk:stopped", {"job_id": job.id})
             return
-        self._report = updated
-        self._emit("apk:done", {"scan": scan_view(updated, self._lang)})
         if not deep:  # głęboka analiza jednej aplikacji to nie nowa ocena telefonu
             session = self._scan_session or ""
             telemetry.record("scan", lambda p: scan_event(updated, session,
@@ -1088,9 +1095,21 @@ class Api:
         job = self._order_in_progress()
         if job is not None:
             self._jobs.stop(job.id)
-            self._jobs.wait(QUIT_WAIT)
+            if not job.done.wait(QUIT_WAIT):
+                # Bieżący krok (np. instalacja z kopii, do INSTALL_TIMEOUT) jeszcze trwa: zamykamy
+                # dopiero po nim, bez zrywania ADB w połowie (audyt 2026-10-11, EDGE-01).
+                threading.Thread(target=self._close_after, args=(job,), daemon=True,
+                                 name="admenot-quit").start()
+                return {"ok": True, "closing_after_step": True}
+        self._close()
+        return {"ok": True}
+
+    def _close_after(self, job: Job) -> None:
+        job.done.wait()
+        self._close()
+
+    def _close(self) -> None:
         self._shutdown()
         self._quitting = True
         if self._close_fn is not None:
             self._close_fn()
-        return {"ok": True}
