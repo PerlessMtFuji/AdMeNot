@@ -155,13 +155,17 @@ export class Controller {
     on('share:ready', (d) => {
       const cur = s.share;
       if (!cur || cur.id !== d.share_id) return; // spóźnione zdarzenie poprzedniego kodu
+      if (this.staleShare(d.code)) return;
       s.share = { ...cur, code: d.code, status: 'ready', url: d.url, mode: d.mode, expires: d.expires,
-                  upgraded: cur.mode === 'local' && d.mode === 'server', reason: null };
+                  upgraded: cur.mode === 'local' && d.mode === 'server', reason: null,
+                  offline: d.offline ?? cur.offline };
     });
     on('share:failed', (d) => {
       const cur = s.share;
-      if (!cur || cur.id !== d.share_id) return;
-      s.share = { ...cur, code: d.code, status: 'failed', reason: d.reason };
+      // Kod już na ekranie działa dalej: późny błąd ponawiania w tle go nie zabiera.
+      if (!cur || cur.id !== d.share_id || cur.status === 'ready') return;
+      if (this.staleShare(d.code)) return;
+      s.share = { ...cur, code: d.code, status: 'failed', reason: d.reason, offline: d.offline };
     });
     on('exec:step', (d) => { s.steps = upsertStep(s.steps, d); });
     on('exec:admin_wait', (d) => { s.admin = { ...d, since: Date.now() }; });
@@ -409,12 +413,22 @@ export class Controller {
       if (s.share?.id === id) s.share = null;
       return;
     }
-    if (s.share?.id === id && s.share.code === null) s.share = { ...s.share, code: r.code };
+    if (s.share?.id === id && s.share.code === null && !this.staleShare(r.code)) s.share = { ...s.share, code: r.code };
+  }
+
+  /** Kod z udostępnienia inny niż kod planu na ekranie: telefon zmienił się od podglądu, więc klient
+   *  zobaczyłby inny plan niż serwisant. Przeliczamy plan i prosimy o nowy kod (spec plan-qr §6.2). */
+  private staleShare(code: string): boolean {
+    const s = this.state;
+    if (!s.plan?.code || s.plan.code === code) return false;
+    s.planChanged = true;
+    void this.openPlan();
+    return true;
   }
 
   resetShare(): void {
     const s = this.state;
-    if (s.share) void this.call(this.api.cancel_share());
+    if (s.share) void this.call(this.api.cancel_share(s.share.id));
     s.share = null;
     s.consent = false;
   }

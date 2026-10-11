@@ -5,6 +5,7 @@ from apphelpers import make_api
 from conftest import SERIAL
 from fakephone import make_cli_phone
 
+from admenot.app import api as api_module
 from admenot.engine import share
 from admenot.engine.journal.db import Journal
 from admenot.engine.paths import journal_path
@@ -22,15 +23,16 @@ def env(monkeypatch, tmp_path):
 
 
 class Uploader:
-    def __init__(self, fails: int = 0):
+    def __init__(self, fails: int = 0, error: BackendError | None = None):
         self.fails = fails
+        self.error = error or BackendError("offline")
         self.blobs: list[bytes] = []
 
     def __call__(self, blob: bytes) -> tuple[str, str]:
         self.blobs.append(blob)
         if self.fails:
             self.fails -= 1
-            raise BackendError("offline")
+            raise self.error
         return SID, "2026-10-11T13:32:00Z"
 
 
@@ -71,7 +73,7 @@ def test_offline_first_gives_local_url_then_upgrades_in_background():
     api.share_plan(WLIVE, [], "ui-2")
     first = rec.wait_for("share:ready")
     assert first["mode"] == "local" and first["url"].startswith("https://admenot.test/plan#l.")
-    assert first["expires"] is None
+    assert first["expires"] is None and first["offline"] is True
     rec.events.remove(("share:ready", first))
     second = rec.wait_for("share:ready")
     assert second["mode"] == "server" and second["share_id"] == "ui-2"
@@ -82,7 +84,20 @@ def test_offline_too_long_reports_failure(monkeypatch):
     api, rec = _scanned(Uploader(fails=99))
     api.share_plan(WLIVE, [], "ui-3")
     failed = rec.wait_for("share:failed")
-    assert failed == {"share_id": "ui-3", "code": api.preview_plan(WLIVE, [])["code"], "reason": "too_long"}
+    assert failed == {"share_id": "ui-3", "code": api.preview_plan(WLIVE, [])["code"], "reason": "too_long",
+                      "offline": True}
+
+
+def test_server_refusing_the_plan_is_not_reported_as_no_connection(monkeypatch):
+    # Serwer odpowiada, ale błędem (stara wersja Workera, limit): UI nie może pisać „brak połączenia”.
+    api, rec = _scanned(Uploader(fails=99, error=BackendError("http", 404)))
+    api.share_plan(WLIVE, [], "ui-7")
+    ready = rec.wait_for("share:ready")
+    assert ready["mode"] == "local" and ready["offline"] is False
+    monkeypatch.setattr(share, "LOCAL_LIMIT", 10)
+    rec.events.clear()
+    api.share_plan(WLIVE, [], "ui-8")
+    assert rec.wait_for("share:failed")["offline"] is False
 
 
 def test_cancel_stops_background_retries():
@@ -90,10 +105,33 @@ def test_cancel_stops_background_retries():
     api, rec = _scanned(up, sync=False)
     api.share_plan(WLIVE, [], "ui-4")
     rec.wait_for("share:ready")
-    assert api.cancel_share() == {"ok": True}
+    assert api.cancel_share("ui-4") == {"ok": True}
     seen = len(up.blobs)
     time.sleep(0.1)
     assert len(up.blobs) <= seen + 1  # najwyżej jedna próba już w toku
+
+
+def test_cancel_of_an_older_share_leaves_the_current_one_running():
+    # Spóźnione `cancel_share` poprzedniego kodu (UI już poprosiło o nowy) nie może zatrzymać nowego.
+    up = Uploader(fails=10_000)
+    api, rec = _scanned(up, sync=False)
+    api.share_plan(WLIVE, [], "new")
+    rec.wait_for("share:ready")
+    api.cancel_share("old")
+    up.fails = 0
+    deadline = time.monotonic() + 5
+    while not [d for d in rec.of("share:ready") if d["mode"] == "server"] and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert [d["share_id"] for d in rec.of("share:ready") if d["mode"] == "server"] == ["new"]
+
+
+def test_shown_codes_are_bounded():
+    api, rec = _scanned()
+    api._shown.update({f"X{i:03}": None for i in range(api_module.SHOWN_MAX)})
+    api.share_plan(WLIVE, [], "ui-9")
+    code = rec.wait_for("share:ready")["code"]
+    assert len(api._shown) == api_module.SHOWN_MAX
+    assert code in api._shown and "X000" not in api._shown
 
 
 def test_new_share_cancels_the_previous_one():

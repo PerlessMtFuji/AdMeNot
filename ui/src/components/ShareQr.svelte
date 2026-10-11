@@ -78,12 +78,13 @@
     </Dialog>
   {/if}
   {#if share.mode === 'local' && share.status === 'ready'}
-    <Banner tone="warn" icon="info" title={t('plan.share_local')} />
+    <Banner tone="warn" icon="info" title={t(share.offline === false ? 'plan.share_local_server' : 'plan.share_local')} />
   {:else if share.upgraded}
     <Banner tone="ok" icon="check" title={t('plan.share_upgraded', { code: share.code ?? '' })} />
   {:else if share.status === 'failed'}
     <Banner tone="bad" icon="triangle-alert"
-      title={t(share.reason === 'too_long' ? 'plan.share_too_long' : 'plan.share_error')} />
+      title={t(share.reason !== 'too_long' ? 'plan.share_error'
+        : share.offline === false ? 'plan.share_too_long_server' : 'plan.share_too_long')} />
   {/if}
   {#if share.url}
     <label class="flex items-center gap-2 text-sm">

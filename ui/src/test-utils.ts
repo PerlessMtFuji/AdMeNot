@@ -1,10 +1,10 @@
 import { render } from '@testing-library/svelte';
 import { createRawSnippet, type Component, type Snippet } from 'svelte';
 import { Controller } from './lib/controller';
-import { createFakeBridge } from './lib/fakeBridge';
+import { createFakeBridge, type ShareScenario } from './lib/fakeBridge';
 import { AppState } from './lib/state.svelte';
 
-type BridgeOptions = { welcome?: boolean };
+type BridgeOptions = { welcome?: boolean; share?: ShareScenario };
 
 export async function setupCtl(scenario = 'empty', options: BridgeOptions = {}) {
   const bridge = createFakeBridge(scenario, { delay: 0, ...options });

@@ -39,7 +39,11 @@ export type FakeBridge = Bridge & {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function createFakeBridge(name: string, options: { delay?: number; welcome?: boolean } = {}): FakeBridge {
+/** Wysyłka planu dla klienta (spec plan-qr §6.4): serwer od razu, kod lokalny i potem serwer, plan za długi. */
+export type ShareScenario = 'server' | 'local' | 'too_long';
+
+export function createFakeBridge(name: string,
+  options: { delay?: number; welcome?: boolean; share?: ShareScenario } = {}): FakeBridge {
   const data = scenarios[name];
   if (!data) throw new Error(`unknown scenario: ${name}`);
   const delay = options.delay ?? 15;
@@ -63,6 +67,7 @@ export function createFakeBridge(name: string, options: { delay?: number; welcom
   let crashStartup: string[] = [];
   let failSend: string | null = null;
   const failures = new Map<string, string>();
+  let planCode = 'K7F3'; // kod ostatniego podglądu planu: udostępnienie liczy ten sam plan
   const SHOT_IMAGE = 'data:image/svg+xml,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="200"><rect width="90" height="200" rx="8" fill="#1f2937"/>'
     + '<rect x="8" y="40" width="74" height="90" rx="6" fill="#f59e0b"/></svg>');
@@ -127,9 +132,19 @@ export function createFakeBridge(name: string, options: { delay?: number; welcom
         return { ok: true };
       case 'share_plan': {
         const shareId = String(args[2]);
-        replay([['share:ready', { share_id: shareId, code: 'K7F3', mode: 'server', expires: '2026-10-11T13:32:00Z',
-          url: `https://admenot.e-wlodarski.workers.dev/plan#s.${'A'.repeat(22)}.${'B'.repeat(43)}` }]]);
-        return { share_id: shareId, code: 'K7F3' };
+        const code = planCode;
+        const server: [string, unknown] = ['share:ready', { share_id: shareId, code, mode: 'server',
+          expires: '2026-10-11T13:32:00Z', url: `https://admenot.e-wlodarski.workers.dev/plan#s.${'A'.repeat(22)}.${'B'.repeat(43)}` }];
+        if (options.share === 'too_long') {
+          replay([['share:failed', { share_id: shareId, code, reason: 'too_long', offline: true }]]);
+        } else if (options.share === 'local') {
+          replay([['share:ready', { share_id: shareId, code, mode: 'local', expires: null, offline: true,
+            url: `https://admenot.e-wlodarski.workers.dev/plan#l.${'x'.repeat(1498)}` }]]);
+          setTimeout(() => dispatch(...server), 3000); // pełny plan dochodzi po powrocie sieci
+        } else {
+          replay([server]);
+        }
+        return { share_id: shareId, code };
       }
       case 'cancel_share':
         return { ok: true };
@@ -247,6 +262,7 @@ export function createFakeBridge(name: string, options: { delay?: number; welcom
     if (!queue || queue.length === 0) return fallback(method, args);
     const call = queue.length > 1 ? queue.shift()! : queue[0];
     replay(call.events);
+    if (method === 'preview_plan') planCode = (call.result as { code?: string }).code ?? planCode;
     return structuredClone(call.result);
   };
 

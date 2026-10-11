@@ -33,6 +33,32 @@ describe('ShareQr', () => {
     expect(screen.queryByRole('checkbox')).toBeNull();
   });
 
+  it('a server that answers with an error is not reported as no connection', async () => {
+    const { s, bridge } = await renderWith(ShareQr, 'adware');
+    s.share = { id: 'a', code: 'K7F3', status: 'sending', url: null, mode: null, expires: null, upgraded: false, reason: null };
+    bridge.emit('share:ready', { share_id: 'a', code: 'K7F3', url: 'https://x/plan#l.q', mode: 'local', expires: null, offline: false });
+    await tick();
+    expect(screen.getByText(/Serwer AdMeNot nie przyjął planu\. Kod działa bez ikon/)).toBeTruthy();
+    expect(screen.queryByText(/Brak połączenia/)).toBeNull();
+    s.share = { id: 'b', code: 'K7F3', status: 'sending', url: null, mode: null, expires: null, upgraded: false, reason: null };
+    bridge.emit('share:failed', { share_id: 'b', code: 'K7F3', reason: 'too_long', offline: false });
+    await tick();
+    expect(screen.getByText(/Serwer AdMeNot nie przyjął planu, a plan jest za długi/)).toBeTruthy();
+  });
+
+  it('fake bridge scenarios: local code first, plan too long without internet', async () => {
+    const local = await renderWith(ShareQr, 'adware', {}, { share: 'local' });
+    local.s.plan = { apps: [], runnable: 1, code: 'K7F3' };
+    await fireEvent.click(screen.getByRole('button', { name: /Pokaż klientowi/ }));
+    expect(await screen.findByText(/Kod działa bez ikon/)).toBeTruthy();
+    local.unmount();
+    const long = await renderWith(ShareQr, 'adware', {}, { share: 'too_long' });
+    long.s.plan = { apps: [], runnable: 1, code: 'K7F3' };
+    await fireEvent.click(screen.getByRole('button', { name: /Pokaż klientowi/ }));
+    expect(await screen.findByText(/za długi na kod bez internetu/)).toBeTruthy();
+    expect(screen.queryByRole('img', { name: /Kod QR/ })).toBeNull();
+  });
+
   it('plan_changed notice is visible', async () => {
     const { s } = await renderWith(ShareQr, 'adware');
     s.planChanged = true;

@@ -608,6 +608,34 @@ describe('plan dla klienta', () => {
     expect(bridge.calls.some((c) => c.method === 'cancel_share')).toBe(true);
   });
 
+  test('cancel_share names the share it cancels', async () => {
+    const { ctl, s, bridge } = await confirming();
+    await ctl.sharePlan();
+    const id = s.share!.id;
+    ctl.closePlan();
+    expect(bridge.calls.find((c) => c.method === 'cancel_share')!.args).toEqual([id]);
+  });
+
+  test('a late share:failed keeps a code that is already on screen', async () => {
+    const { ctl, s, bridge } = await confirming();
+    await ctl.sharePlan();
+    const id = s.share!.id;
+    bridge.emit('share:ready', { share_id: id, code: 'K7F3', url: 'l', mode: 'local', expires: null, offline: false });
+    bridge.emit('share:failed', { share_id: id, code: 'K7F3', reason: 'error' });
+    expect(s.share).toMatchObject({ status: 'ready', url: 'l', reason: null, offline: false });
+  });
+
+  test('a shared code other than the plan on screen recomputes the plan and asks for a new code', async () => {
+    const { ctl, s, bridge } = await confirming();
+    await ctl.sharePlan();
+    s.consent = true;
+    bridge.emit('share:ready', { share_id: s.share!.id, code: 'ABCD', url: 'u', mode: 'server', expires: null });
+    expect(s.share).toBeNull();
+    expect(s.consent).toBe(false);
+    expect(s.planChanged).toBe(true);
+    expect(bridge.calls.some((c) => c.method === 'preview_plan')).toBe(true);
+  });
+
   test('execute passes the code only when consent is ticked', async () => {
     const { ctl, s, bridge } = await confirming();
     await ctl.execute();

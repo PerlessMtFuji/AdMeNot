@@ -109,6 +109,7 @@ QUIT_WAIT = 30.0
 SHARE_RETRY_S = 15.0  # ponawianie wysyłki planu bez sieci (spec plan-qr §5.3)
 SHARE_RETRY_WINDOW_S = 120.0
 _SHARE_ID = re.compile(r"[A-Za-z0-9-]{1,64}")
+SHOWN_MAX = 200  # pamiętane kody kontrolne pokazane klientom w tej sesji; najstarsze odpadają
 
 
 def _real_host(adb_path: str | None) -> AdbTransport:
@@ -202,7 +203,7 @@ class Api:
         self._share_retry_s = share_retry_s
         self._share_retry_window_s = share_retry_window_s
         self._share_lock = threading.Lock()
-        self._share_cancel: threading.Event | None = None
+        self._share_cancel: tuple[str, threading.Event] | None = None  # (share_id, sygnał przerwania)
         self._shown: dict[str, datetime] = {}  # kod kontrolny → kiedy pokazany klientowi
         self._clean_screenshots()
         self._purge_old_data()
@@ -786,12 +787,15 @@ class Api:
         full = share.fit(share.build_payload(plan, **common))
         local = share.local_url(client.base_url(), share.build_payload(plan, icons=False, **common))
         code = full["code"]
+        self._shown.pop(code, None)
         self._shown[code] = at
+        while len(self._shown) > SHOWN_MAX:
+            del self._shown[next(iter(self._shown))]
         cancel = threading.Event()
         with self._share_lock:
             if self._share_cancel is not None:
-                self._share_cancel.set()
-            self._share_cancel = cancel
+                self._share_cancel[1].set()
+            self._share_cancel = (share_id, cancel)
 
         def emit(name: str, detail: dict[str, Any]) -> None:
             if not cancel.is_set():
@@ -807,13 +811,16 @@ class Api:
                     emit("share:ready", {"url": share.server_url(client.base_url(), sid, key),
                                          "mode": "server", "expires": expires})
                     return
-                except BackendError:
+                except BackendError as exc:
                     if first:
                         first = False
+                        # offline=False: serwer odpowiedział błędem (np. stara wersja), a nie brak sieci.
+                        offline = exc.kind == "offline"
                         if local is not None:
-                            emit("share:ready", {"url": local, "mode": "local", "expires": None})
+                            emit("share:ready", {"url": local, "mode": "local", "expires": None,
+                                                 "offline": offline})
                         else:
-                            emit("share:failed", {"reason": "too_long"})
+                            emit("share:failed", {"reason": "too_long", "offline": offline})
                 except Exception as exc:  # noqa: BLE001 — błąd przygotowania trafia do UI i logu
                     report_error(exc, {"call": "share_plan"})
                     emit("share:failed", {"reason": "error"})
@@ -828,10 +835,11 @@ class Api:
         return {"share_id": share_id, "code": code}
 
     @_api
-    def cancel_share(self) -> dict[str, Any]:
+    def cancel_share(self, share_id: str) -> dict[str, Any]:
+        """Przerywa tylko wskazane udostępnienie: spóźnione anulowanie starego kodu nie rusza nowego."""
         with self._share_lock:
-            if self._share_cancel is not None:
-                self._share_cancel.set()
+            if self._share_cancel is not None and self._share_cancel[0] == share_id:
+                self._share_cancel[1].set()
                 self._share_cancel = None
         return {"ok": True}
 
