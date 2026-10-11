@@ -3,7 +3,8 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: 'e2e',
   timeout: 30_000,
-  expect: { toHaveScreenshot: { maxDiffPixelRatio: 0.01 } },
+  // Stały margines na wygładzanie krawędzi; dawne 1% ekranu przepuszczało zmienione ekrany.
+  expect: { toHaveScreenshot: { maxDiffPixels: 100 } },
   use: {
     baseURL: 'http://localhost:4173',
     locale: 'pl-PL',
