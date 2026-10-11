@@ -15,6 +15,10 @@ async function inject(page: Page, fn: (env: any) => void) {
 for (const theme of ['light', 'dark'] as const) {
   test.describe(`screens (PL, 1280×800, ${theme})`, () => {
     test.use({ colorScheme: theme });
+    // Zegar w makiecie telefonu i daty pokazują czas systemowy; bez tego zrzut zmienia się co minutę.
+    test.beforeEach(async ({ page }) => {
+      await page.clock.setFixedTime(new Date('2026-10-11T09:41:00'));
+    });
 
     test('ekran powitalny', async ({ page }) => {
       await page.goto('/?scenario=empty&welcome=1');
