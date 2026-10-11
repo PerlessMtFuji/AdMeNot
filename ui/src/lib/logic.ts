@@ -193,27 +193,37 @@ export const VERDICT_TONE: Record<Verdict, 'bad' | 'warn' | 'neutral' | 'ok'> = 
 };
 
 export type PlanGroupKey = Level | 'blocked';
-export interface PlanGroup {
-  key: PlanGroupKey;
-  steps: string[]; // wspólne dla wszystkich aplikacji grupy: pokazane raz pod nagłówkiem
-  warnings: string[];
-  apps: { app: PlanApp; steps: string[]; warnings: string[] }[]; // tylko to, czego nie ma w części wspólnej
-}
+/** Krok albo ostrzeżenie w grupie; only: nazwy aplikacji, których dotyczy (pusta = wszystkich w grupie). */
+export interface PlanGroupLine { text: string; only: string[] }
+export interface PlanGroup { key: PlanGroupKey; apps: PlanApp[]; steps: PlanGroupLine[]; warnings: PlanGroupLine[] }
 
 const PLAN_GROUPS: PlanGroupKey[] = ['remove', 'disable', 'silence', 'blocked']; // od najmocniejszej zmiany
 
-const shared = (lists: string[][]) => lists[0].filter((x) => lists.every((l) => l.includes(x)));
+/** Jedna lista dla grupy w kolejności wykonania: krok, którego część aplikacji nie ma, zostaje między
+ *  sąsiadami z ich listy (planista układa kroki zawsze w tej samej kolejności). */
+function mergeLines(apps: PlanApp[], pick: (a: PlanApp) => string[]): PlanGroupLine[] {
+  const order: string[] = [];
+  for (const a of apps) {
+    let at = -1;
+    for (const text of pick(a)) {
+      const found = order.indexOf(text);
+      if (found >= 0) at = found;
+      else order.splice(++at, 0, text);
+    }
+  }
+  return order.map((text) => {
+    const having = apps.filter((a) => pick(a).includes(text));
+    return { text, only: having.length === apps.length ? [] : having.map((a) => a.name) };
+  });
+}
 
 /** Podsumowanie przed naprawą pogrupowane wg akcji, jak strona planu dla klienta. */
 export function planGroups(apps: PlanApp[], lang: string): PlanGroup[] {
   const order = new Intl.Collator(lang);
   return PLAN_GROUPS.flatMap((key) => {
     const list = apps.filter((a) => (a.blocked ? 'blocked' : a.level) === key).sort((a, b) => order.compare(a.name, b.name));
-    if (list.length === 0) return [];
-    const steps = list.length > 1 ? shared(list.map((a) => a.steps)) : list[0].steps;
-    const warnings = list.length > 1 ? shared(list.map((a) => a.warnings)) : list[0].warnings;
-    return [{ key, steps, warnings, apps: list.map((app) => ({ app,
-      steps: app.steps.filter((x) => !steps.includes(x)), warnings: app.warnings.filter((x) => !warnings.includes(x)) })) }];
+    return list.length === 0 ? []
+      : [{ key, apps: list, steps: mergeLines(list, (a) => a.steps), warnings: mergeLines(list, (a) => a.warnings) }];
   });
 }
 

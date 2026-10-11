@@ -123,24 +123,30 @@ describe('plan and execution', () => {
       ['com.sec.android.app.launcher']] });
   });
 
-  test('the summary groups apps by action with shared steps listed once', async () => {
+  test('the summary groups apps by action: apps with icons, then steps in execution order', async () => {
     const { s } = await scanned();
-    const app = (name: string, level: 'silence' | 'remove', steps: string[]) => ({ package: `p.${name}`, name, level,
-      level_label: '', blocked: false, reason: null, reason_text: null, steps, warnings: [] });
+    const app = (name: string, level: 'silence' | 'remove', steps: string[], pkg = `p.${name}`) => ({ package: pkg, name,
+      level, level_label: '', blocked: false, reason: null, reason_text: null, steps, warnings: [] });
+    const withIcon = s.scan!.apps[0];
+    withIcon.icon = 'data:image/png;base64,iVBORw0KGgo=';
     s.plan = { runnable: 3, code: 'K7F3', apps: [
-      app('Zegar', 'silence', ['blokada okien nad innymi aplikacjami']),
+      app('Zegar', 'silence', ['blokada okien nad innymi aplikacjami'], withIcon.package),
       app('Cleaner', 'remove', ['zatrzymanie aplikacji', 'odinstalowanie (użytkownik 0)']),
-      app('Bateria', 'silence', ['blokada okien nad innymi aplikacjami', 'odebranie zgody na powiadomienia']),
+      app('Bateria', 'silence', ['odebranie zgody na powiadomienia', 'blokada okien nad innymi aplikacjami']),
     ] };
     await tick();
     const region = screen.getByRole('region', { name: 'Plan naprawy' });
     expect(within(region).getAllByRole('heading', { level: 3 }).map((h) => h.textContent?.trim()))
       .toEqual(['Do usunięcia (1)', 'Do wyciszenia (2)']);
-    expect(within(region).getAllByText('blokada okien nad innymi aplikacjami')).toHaveLength(1);
     const silence = within(region).getByRole('list', { name: 'Do wyciszenia (2)' });
-    expect([...silence.children].map((li) => li.querySelector('b')?.textContent))
-      .toEqual(['Bateria', 'Zegar']);
-    expect(within(silence).getByText('odebranie zgody na powiadomienia')).toBeTruthy();
+    const rows = [...silence.children];
+    expect(rows.map((li) => li.querySelector('b')?.textContent)).toEqual(['Bateria', 'Zegar']);
+    expect(rows[0].querySelector('[data-app-icon]')).toBeNull(); // bez ikony: inicjał
+    expect(rows[0].textContent).toContain('B');
+    expect(rows[1].querySelector('[data-app-icon]')?.getAttribute('src')).toBe(withIcon.icon);
+    const steps = within(region).getByRole('list', { name: 'Kroki: Do wyciszenia (2)' });
+    expect(within(steps).getAllByRole('listitem').map((li) => li.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
+      'odebranie zgody na powiadomienia — tylko: Bateria', 'blokada okien nad innymi aplikacjami']);
   });
 
   test('back from the confirmation returns to the plan panel', async () => {

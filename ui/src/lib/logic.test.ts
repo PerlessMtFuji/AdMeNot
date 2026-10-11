@@ -389,16 +389,27 @@ describe('plan groups', () => {
       app('Cebula', 'silence', ['a']), app('System', 'remove', [], { blocked: true }), app('Bęben', 'disable', ['d']),
     ], 'pl');
     expect(groups.map((g) => g.key)).toEqual(['remove', 'disable', 'silence', 'blocked']);
-    expect(groups.map((g) => g.apps.map((a) => a.app.name))).toEqual([['Ala'], ['Bęben'], ['Cebula', 'Ćma', 'Żaba'], ['System']]);
+    expect(groups.map((g) => g.apps.map((a) => a.name))).toEqual([['Ala'], ['Bęben'], ['Cebula', 'Ćma', 'Żaba'], ['System']]);
   });
 
-  test('steps and warnings shared by the whole group are listed once, the rest stays with the app', () => {
+  test('one step list per group in execution order, steps not for every app name their apps', () => {
     const [g] = planGroups([
-      app('B', 'remove', ['zgoda', 'okna', 'stop', 'odinstalowanie'], { warnings: ['dane'] }),
-      app('A', 'remove', ['zgoda', 'stop', 'odinstalowanie'], { warnings: ['dane', 'konto'] }),
+      app('Ultimate', 'disable', ['powiadomienia', 'zatrzymanie', 'wyłączenie'], { warnings: ['konto'] }),
+      app('IntelliClean', 'disable', ['zatrzymanie', 'wyłączenie'], { warnings: [] }),
     ], 'pl');
-    expect(g.steps).toEqual(['zgoda', 'stop', 'odinstalowanie']);
-    expect(g.warnings).toEqual(['dane']);
-    expect(g.apps.map((a) => [a.app.name, a.steps, a.warnings])).toEqual([['A', [], ['konto']], ['B', ['okna'], []]]);
+    expect(g.apps.map((a) => a.name)).toEqual(['IntelliClean', 'Ultimate']);
+    expect(g.steps).toEqual([
+      { text: 'powiadomienia', only: ['Ultimate'] }, { text: 'zatrzymanie', only: [] }, { text: 'wyłączenie', only: [] },
+    ]);
+    expect(g.warnings).toEqual([{ text: 'konto', only: ['Ultimate'] }]);
+  });
+
+  test('a step only some apps have keeps its place between the shared ones', () => {
+    const [g] = planGroups([
+      app('A', 'remove', ['zgoda', 'stop', 'odinstalowanie']),
+      app('B', 'remove', ['zgoda', 'okna', 'stop', 'odinstalowanie']),
+    ], 'pl');
+    expect(g.steps.map((x) => x.text)).toEqual(['zgoda', 'okna', 'stop', 'odinstalowanie']);
+    expect(g.steps[1].only).toEqual(['B']);
   });
 });
