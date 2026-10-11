@@ -9,7 +9,9 @@ export function parseFragment(hash: string):
   { mode: "server"; id: string; key: string } | { mode: "local"; data: string } | null;
 export function decodeLocal(data: string): Promise<PlanPayload>;
 export function decryptShare(blob: Uint8Array, key: string): Promise<PlanPayload>;
-export function effect(app: { n: string; l: string; b?: number }, notif: boolean, t: PlanTexts): string;
+export function effect(app: { n: string; l: string; b?: number }, notif: boolean, t: PlanTexts, many?: boolean): string;
+export interface PlanGroup { key: "remove" | "disable" | "silence" | "blocked"; title: string; text: string; apps: PlanApp[] }
+export function groups(apps: PlanApp[], notif: boolean, t: PlanTexts, lang: string): PlanGroup[];
 export function render(root: Element, payload: PlanPayload, mode: "server" | "local"): void;
 export function canInflate(g: object): boolean;
 export function initial(name: string): string;

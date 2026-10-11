@@ -14,6 +14,16 @@ export const TEXTS = {
     disable: "Przestanie działać. Jej dane zostają na telefonie.",
     remove: "Zostanie usunięta razem ze swoimi danymi. Samą aplikację da się przywrócić.",
     blocked: "Nie zostanie zmieniona.",
+    silence_on_many: "Zostają na telefonie, ale nie będą wyświetlać powiadomień ani okien nad innymi aplikacjami.",
+    silence_off_many: "Zostają na telefonie i nie będą wyświetlać okien nad innymi aplikacjami. "
+      + "Ich powiadomienia trzeba wyłączyć ręcznie w ustawieniach telefonu.",
+    disable_many: "Przestaną działać. Ich dane zostają na telefonie.",
+    remove_many: "Zostaną usunięte razem ze swoimi danymi. Same aplikacje da się przywrócić.",
+    blocked_many: "Nie zostaną zmienione.",
+    remove_title: "Do usunięcia",
+    disable_title: "Do wyłączenia",
+    silence_title: "Do wyciszenia",
+    blocked_title: "Bez zmian",
     footer_server: "Ten plan zobaczy tylko osoba z tym kodem QR. Wygasa godzinę po utworzeniu.",
     footer_local: "Ten plan nie był wysyłany na serwer — cała lista jest zapisana w kodzie QR.",
     expired: "Ten plan wygasł albo nie istnieje. Poproś serwisanta o nowy kod.",
@@ -31,6 +41,16 @@ export const TEXTS = {
     disable: "Will stop working. Its data stays on the phone.",
     remove: "Will be removed together with its data. The app itself can be restored.",
     blocked: "Will not be changed.",
+    silence_on_many: "Stay on the phone, but will not show notifications or windows over other apps.",
+    silence_off_many: "Stay on the phone and will not show windows over other apps. "
+      + "Their notifications have to be turned off by hand in the phone's settings.",
+    disable_many: "Will stop working. Their data stays on the phone.",
+    remove_many: "Will be removed together with their data. The apps themselves can be restored.",
+    blocked_many: "Will not be changed.",
+    remove_title: "To be removed",
+    disable_title: "To be turned off",
+    silence_title: "To be silenced",
+    blocked_title: "No change",
     footer_server: "Only someone with this QR code can see this plan. It expires an hour after it was created.",
     footer_local: "This plan was not sent to a server — the whole list is stored in the QR code.",
     expired: "This plan has expired or does not exist. Ask the technician for a new code.",
@@ -100,10 +120,21 @@ export async function decryptShare(blob, keyText) {
   return validate(await inflate(new Uint8Array(plain)));
 }
 
-export function effect(app, notif, t) {
-  if (app.b) return t.blocked;
-  if (app.l === "silence") return notif ? t.silence_on : t.silence_off;
-  return t[app.l];
+/** Skutek dla klienta; many: opis całej grupy kilku aplikacji (liczba mnoga). */
+export function effect(app, notif, t, many = false) {
+  const key = app.b ? "blocked" : app.l === "silence" ? (notif ? "silence_on" : "silence_off") : app.l;
+  return t[many ? `${key}_many` : key];
+}
+
+const GROUPS = ["remove", "disable", "silence", "blocked"]; // od najmocniejszej zmiany; bez zmian na końcu
+
+/** Aplikacje pogrupowane wg skutku, w grupie alfabetycznie: jeden opis na grupę zamiast przy każdej. */
+export function groups(apps, notif, t, lang) {
+  const order = new Intl.Collator(lang);
+  return GROUPS.map((key) => {
+    const list = apps.filter((a) => (a.b ? "blocked" : a.l) === key).sort((a, b) => order.compare(a.n, b.n));
+    return list.length ? { key, title: t[`${key}_title`], text: effect(list[0], notif, t, list.length > 1), apps: list } : null;
+  }).filter((g) => g !== null);
 }
 
 function el(tag, cls, text) {
@@ -126,25 +157,28 @@ export function render(root, p, mode) {
   const code = el("p", "code");
   code.append(el("span", null, t.code), el("b", null, String(p.code ?? "")));
   head.append(code);
-  const list = el("ul", "apps");
-  for (const a of p.apps) {
-    const li = el("li", a.b ? "app blocked" : `app ${a.l}`);
-    if (typeof a.i === "string" && ICON.test(a.i)) {
-      const img = el("img", "icon");
-      img.alt = "";
-      img.src = a.i;
-      li.append(img);
-    } else {
-      li.append(el("span", "icon initial", initial(a.n)));
+  const sections = groups(p.apps, p.notif === 1, t, lang).map((g) => {
+    const section = el("section", `group ${g.key}`);
+    const list = el("ul", "apps");
+    for (const a of g.apps) {
+      const li = el("li", "app");
+      if (typeof a.i === "string" && ICON.test(a.i)) {
+        const img = el("img", "icon");
+        img.alt = "";
+        img.src = a.i;
+        li.append(img);
+      } else {
+        li.append(el("span", "icon initial", initial(a.n)));
+      }
+      const name = el("b", null, a.n);
+      name.dir = "auto"; // nazwy po arabsku czy hebrajsku nie mieszają kierunku z tekstem strony
+      li.append(name);
+      list.append(li);
     }
-    const body = el("div");
-    const name = el("b", null, a.n);
-    name.dir = "auto"; // nazwy po arabsku czy hebrajsku nie mieszają kierunku z tekstem strony
-    body.append(name, el("p", null, effect(a, p.notif === 1, t)));
-    li.append(body);
-    list.append(li);
-  }
-  root.replaceChildren(head, list, el("footer", null, mode === "server" ? t.footer_server : t.footer_local));
+    section.append(el("h2", null, g.title), el("p", "desc", g.text), list);
+    return section;
+  });
+  root.replaceChildren(head, ...sections, el("footer", null, mode === "server" ? t.footer_server : t.footer_local));
 }
 
 function fail(root, key) {
