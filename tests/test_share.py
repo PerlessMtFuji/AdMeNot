@@ -172,3 +172,29 @@ def test_vector_fixture_matches_python_format():
     blob = base64.b64decode(vec["blob"])
     assert share.decrypt(blob, vec["key"]) == vec["payload"]
     assert share.decode_local(vec["local_fragment"]) == vec["local_payload"]
+
+
+def _png_header(width: int, height: int) -> str:
+    """Mały plik PNG, który deklaruje ogromny obraz (ikona z adware jest wrogim wejściem)."""
+    import struct
+    import zlib as z
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", z.crc32(kind + data))
+
+    raw = z.compress(b"\x00" * (width // 8 + 1) * 4)  # ucięte dane: dekoder i tak alokuje cały obraz
+    png = (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 1, 0, 0, 0, 0))
+           + chunk(b"IDAT", raw) + chunk(b"IEND", b""))
+    return "data:image/png;base64," + base64.b64encode(png).decode("ascii")
+
+
+def test_shrink_icon_rejects_huge_declared_size():
+    assert share.shrink_icon(_png_header(11000, 11000)) is None
+
+
+@pytest.mark.parametrize("exc", [EOFError, SyntaxError, MemoryError, RuntimeError])
+def test_shrink_icon_turns_any_decoder_failure_into_none(monkeypatch, exc):
+    def boom(*_a, **_k):
+        raise exc("dekoder")
+    monkeypatch.setattr(share.Image, "open", boom)
+    assert share.shrink_icon(_icon()) is None

@@ -13,6 +13,7 @@ import hashlib
 import io
 import json
 import os
+import warnings
 import zlib
 from datetime import datetime
 from typing import Any
@@ -33,6 +34,7 @@ PAYLOAD_LIMIT = 96 * 1024  # bajty JSON-a przed kompresją
 LOCAL_LIMIT = 1500  # znaki fragmentu adresu w trybie bez serwera
 LOCAL_NAME_MAX = 40
 ICON_PX = 48
+ICON_SRC_MAX = 1024  # ikony launchera mają do 512 px; większa deklaracja to wrogi plik z APK
 PAGE_PATH = "/plan"
 
 
@@ -55,12 +57,17 @@ def shrink_icon(uri: str | None) -> str | None:
         return None
     try:
         data = base64.b64decode(checked.split(",", 1)[1])
-        with Image.open(io.BytesIO(data)) as img:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            img = Image.open(io.BytesIO(data))
+        with img:
+            if max(img.size) > ICON_SRC_MAX:  # przed dekodowaniem: rozmiar pochodzi z nagłówka
+                return None
             img = img.convert("RGBA")
             img.thumbnail((ICON_PX, ICON_PX))
             out = io.BytesIO()
             img.save(out, "WEBP", quality=80)
-    except (OSError, ValueError, Image.DecompressionBombError):
+    except Exception:  # noqa: BLE001 — ikona z obcego APK: każdy błąd dekodera = inicjał na stronie
         return None
     return "data:image/webp;base64," + base64.b64encode(out.getvalue()).decode("ascii")
 
