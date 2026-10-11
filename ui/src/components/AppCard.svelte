@@ -43,14 +43,14 @@
             onclick={onundo}><Icon name="undo-2" size={14} />{t('history.undo_changes')}</Button>{/if}{/if}
       </div>
       {#if app.symptoms.length}
-        <div data-testid="reasons" class="mt-1 flex min-w-0 items-center gap-2">
+        <div data-testid="reasons" class="mt-1 flex min-w-0 flex-wrap items-center gap-2">
           <ReasonTiles {app} />
           <button type="button" class="text-xs font-semibold text-accent hover:underline" aria-expanded={open}
             onclick={() => (open = !open)}>{t('results.why')}</button>
         </div>
       {/if}
     </div>
-    <div class="w-[240px] flex-none">
+    <div class="w-[240px] max-[1200px]:w-[210px] flex-none">
       <Segmented stretch size="sm" label={t('results.action_for', { name: app.name })} value={level} {options} disabled={gone} onchange={onlevel} />
     </div>
   </div>
