@@ -76,7 +76,7 @@ describe("POST /api/v1/shares", () => {
     const res = await post(blob(), ip, e);
     expect(res.status).toBe(429);
     expect(await res.json()).toEqual({ error: "budget" });
-  });
+  }, 30_000); // 300 kolejnych zapisów nie mieści się w domyślnych 5 s
 
   it("503 po osiągnięciu sufitu aktywnych planów", async () => {
     const stmt = env.DB.prepare(
