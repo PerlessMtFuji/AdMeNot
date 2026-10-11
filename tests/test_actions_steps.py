@@ -114,7 +114,7 @@ def test_listener_access_is_revoked_in_notification_manager_not_only_in_setting(
     S.apply(phone, step)
     assert phone.listeners_allowed == [GEARHEAD]
     assert phone.secure[LISTENERS] == GEARHEAD
-    assert f"cmd notification disallow_listener '{AD_LISTENER}'" in phone.calls
+    assert f"cmd notification disallow_listener '{AD_LISTENER}' 0" in phone.calls
     assert not any(c.startswith("settings put") for c in phone.calls)
 
 
@@ -200,9 +200,9 @@ def test_disconnect_is_uncertain():
 def test_command_for_describes_step():
     assert S.command_for(Step("enabled", "com.ad", {"enabled": "0"})) == (
         "pm disable-user --user 0 com.ad")
-    assert S.command_for(_remove_listener()) == f"cmd notification disallow_listener '{AD_LISTENER}'"
+    assert S.command_for(_remove_listener()) == f"cmd notification disallow_listener '{AD_LISTENER}' 0"
     a11y = Step("secure_list", "com.ad", {"key": A11Y, "op": "remove", "components": "com.ad/.A"})
-    assert S.command_for(a11y) == f"settings put secure {A11Y} (-com.ad/.A)"
+    assert S.command_for(a11y) == f"settings put --user 0 secure {A11Y} (-com.ad/.A)"
     with pytest.raises(ValueError):
         S.command_for(Step("teleport", "com.ad"))
 
@@ -230,7 +230,7 @@ def test_security_hint_depends_on_manufacturer():
 
 @pytest.mark.parametrize(("step", "command"), [
     (Step("appop", "com.ad", {"op": "SYSTEM_ALERT_WINDOW", "mode": "deny"}),
-     "appops get com.ad SYSTEM_ALERT_WINDOW"),
+     "appops get --user 0 com.ad SYSTEM_ALERT_WINDOW"),
     (Step("enabled", "com.ad", {"enabled": "0"}), "pm list packages -d --user 0"),
     (Step("installed", "com.ad", {"installed": "0", "backup_dir": ""}),
      "pm list packages --user 0 com.ad"),
@@ -268,7 +268,7 @@ def test_listener_component_from_the_phone_is_validated_and_quoted(bad):
     # Pokazane (i zapisane w dzienniku) polecenie to jedno słowo-argument, nie doklejona komenda.
     import shlex
 
-    assert shlex.split(S.command_for(step)) == ["cmd", "notification", "disallow_listener", bad]
+    assert shlex.split(S.command_for(step)) == ["cmd", "notification", "disallow_listener", bad, "0"]
 
 
 def test_valid_component_with_dollar_still_works():

@@ -202,7 +202,7 @@ class _SecureList:
             return "; ".join(C.NOTIF_LISTENER.format(action=action, component=C.quoted(c))
                              for c in split_items(step.params["components"]))
         sign = "-" if step.params["op"] == "remove" else "+"
-        return f"settings put secure {step.params['key']} ({sign}{step.params['components']})"
+        return f"settings put --user 0 secure {step.params['key']} ({sign}{step.params['components']})"
 
     def apply(self, adb: AdbTransport, step: Step, cache: Path | None) -> None:
         if step.params["key"] == NOTIF_LISTENERS_KEY:

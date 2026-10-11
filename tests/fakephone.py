@@ -194,20 +194,20 @@ class FakePhone:
             return self._open(command)
         if re.fullmatch(r"am force-stop \S+", command):
             return ""
-        if m := re.fullmatch(r"appops get (\S+) (\w+)", command):
+        if m := re.fullmatch(r"appops get --user 0 (\S+) (\w+)", command):
             return self._appops_get(m[1], m[2])
-        if m := re.fullmatch(r"appops set (\S+) (\w+) (\w+)", command):
+        if m := re.fullmatch(r"appops set --user 0 (\S+) (\w+) (\w+)", command):
             return self._appops_set(m[1], m[2], m[3])
         if m := re.fullmatch(r"pm (grant|revoke) --user 0 (\S+) (\S+)", command):
             return self._permission(m[1], m[2], m[3])
         if (m := re.fullmatch(r"dumpsys package (\S+)", command)) and m[1] != "packages":
             return self._dumpsys_package(m[1])
-        if m := re.fullmatch(r"settings get secure (\S+)", command):
+        if m := re.fullmatch(r"settings get --user 0 secure (\S+)", command):
             return self.secure.get(m[1], "null") + "\n"
-        if m := re.fullmatch(r"settings put secure (\S+) (.+)", command):
+        if m := re.fullmatch(r"settings put --user 0 secure (\S+) (.+)", command):
             self.secure[m[1]] = _sh_word(m[2])
             return ""
-        if m := re.fullmatch(r"cmd notification (allow|disallow)_listener (.+)", command):
+        if m := re.fullmatch(r"cmd notification (allow|disallow)_listener (.+) 0", command):
             return self._listener(m[1] == "allow", _sh_word(m[2]))
         if m := re.fullmatch(r"cmd package set-home-activity --user 0 (.+)", command):
             return self._set_home(_sh_word(m[1]))

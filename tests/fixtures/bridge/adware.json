@@ -1583,7 +1583,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "settings get secure default_input_method",
+      "command": "settings get --user 0 secure default_input_method",
       "status": "ok",
       "duration": 0.0,
       "output": "null\n",
@@ -1595,7 +1595,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "settings get secure enabled_accessibility_services",
+      "command": "settings get --user 0 secure enabled_accessibility_services",
       "status": "ok",
       "duration": 0.0,
       "output": "null\n",
@@ -1682,7 +1682,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "settings get secure default_input_method",
+      "command": "settings get --user 0 secure default_input_method",
       "status": "ok",
       "duration": 0.0,
       "output": "null\n",
@@ -1694,7 +1694,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "settings get secure enabled_accessibility_services",
+      "command": "settings get --user 0 secure enabled_accessibility_services",
       "status": "ok",
       "duration": 0.0,
       "output": "null\n",
@@ -1816,7 +1816,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "appops get com.clean.pro.boost SYSTEM_ALERT_WINDOW",
+      "command": "appops get --user 0 com.clean.pro.boost SYSTEM_ALERT_WINDOW",
       "status": "ok",
       "duration": 0.0,
       "output": "SYSTEM_ALERT_WINDOW: allow\n",
@@ -1828,7 +1828,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "appops set com.clean.pro.boost SYSTEM_ALERT_WINDOW deny",
+      "command": "appops set --user 0 com.clean.pro.boost SYSTEM_ALERT_WINDOW deny",
       "status": "ok",
       "duration": 0.0,
       "output": "",
@@ -1866,7 +1866,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "appops get com.clean.pro.boost USE_FULL_SCREEN_INTENT",
+      "command": "appops get --user 0 com.clean.pro.boost USE_FULL_SCREEN_INTENT",
       "status": "ok",
       "duration": 0.0,
       "output": "No operations.\nDefault mode: allow\n",
@@ -1878,7 +1878,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "appops set com.clean.pro.boost USE_FULL_SCREEN_INTENT deny",
+      "command": "appops set --user 0 com.clean.pro.boost USE_FULL_SCREEN_INTENT deny",
       "status": "ok",
       "duration": 0.0,
       "output": "",
@@ -2184,7 +2184,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "settings get secure default_input_method",
+      "command": "settings get --user 0 secure default_input_method",
       "status": "ok",
       "duration": 0.0,
       "output": "null\n",
@@ -2196,7 +2196,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "settings get secure enabled_accessibility_services",
+      "command": "settings get --user 0 secure enabled_accessibility_services",
       "status": "ok",
       "duration": 0.0,
       "output": "null\n",
@@ -2355,7 +2355,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "settings get secure default_input_method",
+      "command": "settings get --user 0 secure default_input_method",
       "status": "ok",
       "duration": 0.0,
       "output": "null\n",
@@ -2367,7 +2367,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "settings get secure enabled_accessibility_services",
+      "command": "settings get --user 0 secure enabled_accessibility_services",
       "status": "ok",
       "duration": 0.0,
       "output": "null\n",
@@ -2467,7 +2467,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "appops get com.wlive.forecast USE_FULL_SCREEN_INTENT",
+      "command": "appops get --user 0 com.wlive.forecast USE_FULL_SCREEN_INTENT",
       "status": "ok",
       "duration": 0.0,
       "output": "No operations.\nDefault mode: allow\n",
@@ -2479,7 +2479,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "appops set com.wlive.forecast USE_FULL_SCREEN_INTENT deny",
+      "command": "appops set --user 0 com.wlive.forecast USE_FULL_SCREEN_INTENT deny",
       "status": "ok",
       "duration": 0.0,
       "output": "",
@@ -2639,7 +2639,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "settings get secure default_input_method",
+      "command": "settings get --user 0 secure default_input_method",
       "status": "ok",
       "duration": 0.0,
       "output": "null\n",
@@ -2651,7 +2651,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "settings get secure enabled_accessibility_services",
+      "command": "settings get --user 0 secure enabled_accessibility_services",
       "status": "ok",
       "duration": 0.0,
       "output": "null\n",
@@ -2680,7 +2680,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "appops get com.wlive.forecast USE_FULL_SCREEN_INTENT",
+      "command": "appops get --user 0 com.wlive.forecast USE_FULL_SCREEN_INTENT",
       "status": "ok",
       "duration": 0.0,
       "output": "USE_FULL_SCREEN_INTENT: deny\n",
@@ -3138,7 +3138,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "appops get com.wlive.forecast USE_FULL_SCREEN_INTENT",
+      "command": "appops get --user 0 com.wlive.forecast USE_FULL_SCREEN_INTENT",
       "status": "ok",
       "duration": 0.0,
       "output": "USE_FULL_SCREEN_INTENT: deny\n",
@@ -3163,7 +3163,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "appops get com.wlive.forecast USE_FULL_SCREEN_INTENT",
+      "command": "appops get --user 0 com.wlive.forecast USE_FULL_SCREEN_INTENT",
       "status": "ok",
       "duration": 0.0,
       "output": "No operations.\nDefault mode: allow\n",
@@ -3175,7 +3175,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "appops set com.wlive.forecast USE_FULL_SCREEN_INTENT default",
+      "command": "appops set --user 0 com.wlive.forecast USE_FULL_SCREEN_INTENT default",
       "status": "ok",
       "duration": 0.0,
       "output": "",
@@ -3386,7 +3386,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "appops get com.clean.pro.boost USE_FULL_SCREEN_INTENT",
+      "command": "appops get --user 0 com.clean.pro.boost USE_FULL_SCREEN_INTENT",
       "status": "ok",
       "duration": 0.0,
       "output": "USE_FULL_SCREEN_INTENT: deny\n",
@@ -3411,7 +3411,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "appops get com.clean.pro.boost USE_FULL_SCREEN_INTENT",
+      "command": "appops get --user 0 com.clean.pro.boost USE_FULL_SCREEN_INTENT",
       "status": "ok",
       "duration": 0.0,
       "output": "No operations.\nDefault mode: allow\n",
@@ -3423,7 +3423,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "appops set com.clean.pro.boost USE_FULL_SCREEN_INTENT default",
+      "command": "appops set --user 0 com.clean.pro.boost USE_FULL_SCREEN_INTENT default",
       "status": "ok",
       "duration": 0.0,
       "output": "",
@@ -3448,7 +3448,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "appops get com.clean.pro.boost SYSTEM_ALERT_WINDOW",
+      "command": "appops get --user 0 com.clean.pro.boost SYSTEM_ALERT_WINDOW",
       "status": "ok",
       "duration": 0.0,
       "output": "SYSTEM_ALERT_WINDOW: deny\n",
@@ -3473,7 +3473,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "appops get com.clean.pro.boost SYSTEM_ALERT_WINDOW",
+      "command": "appops get --user 0 com.clean.pro.boost SYSTEM_ALERT_WINDOW",
       "status": "ok",
       "duration": 0.0,
       "output": "SYSTEM_ALERT_WINDOW: allow\n",
@@ -3485,7 +3485,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "appops set com.clean.pro.boost SYSTEM_ALERT_WINDOW allow",
+      "command": "appops set --user 0 com.clean.pro.boost SYSTEM_ALERT_WINDOW allow",
       "status": "ok",
       "duration": 0.0,
       "output": "",
