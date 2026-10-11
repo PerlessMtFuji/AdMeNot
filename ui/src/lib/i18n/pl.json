@@ -402,6 +402,7 @@
     "action_error": "Telefon odrzucił polecenie.",
     "busy": "Trwa inne zadanie — poczekaj na jego koniec.",
     "wrong_device": "Podłącz telefon {device}, którego dotyczy zlecenie.",
+    "device_mismatch": "To nie jest telefon {device} z tego zlecenia — inny telefon z tym samym numerem seryjnym albo telefon po przywróceniu ustawień fabrycznych. Zmian z tego zlecenia nie wykonamy ani nie cofniemy na tym telefonie.",
     "no_scan": "Najpierw zeskanuj telefon.",
     "no_device": "Najpierw podłącz i zeskanuj telefon.",
     "unknown_order": "Nie znaleziono zlecenia.",

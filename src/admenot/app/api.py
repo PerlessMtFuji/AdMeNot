@@ -50,7 +50,8 @@ from admenot.engine.adb.transport import AdbError, AdbTransport, RealAdb
 from admenot.engine.apk.cache import GB, CacheUsage, Estimate, clear_cache, disk_total, usage
 from admenot.engine.apk.fetch import default_cache_dir
 from admenot.engine.apk.providers import ApkProvider, CachePolicy, DeviceApkProvider
-from admenot.engine.device.info import read_device_info
+from admenot.engine.device.identity import same_device
+from admenot.engine.device.info import DeviceInfo, read_device_info
 from admenot.engine.foreground import read_foreground
 from admenot.engine.incident import attribute, load_incident, record, save_incident
 from admenot.engine.journal.db import (
@@ -257,9 +258,11 @@ class Api:
         if self._report is None or self._adb is None:
             raise AppError("no_scan")
 
-    def _interrupted(self, serial: str) -> list[str]:
+    def _interrupted(self, device: DeviceInfo) -> list[str]:
+        """Przerwane zlecenia tego telefonu — bez zleceń innego egzemplarza o tym samym numerze."""
         with self._journal() as journal:
-            return [o.number for o in journal.interrupted_orders(serial)]
+            return [o.number for o in journal.interrupted_orders(device.serial)
+                    if same_device(o.device_identity, device) is not False]
 
     def _note_version(self) -> str | None:
         """Wersja, do której program właśnie się zaktualizował — komunikat raz (spec §6.5)."""
@@ -447,7 +450,7 @@ class Api:
             job.check()
             self._report = report
             self._emit("scan:done", {"scan": scan_view(report, self._lang),
-                                     "interrupted": self._interrupted(device.serial),
+                                     "interrupted": self._interrupted(device),
                                      "client": name})
             telemetry.record("scan", lambda p: scan_event(report, session,
                                                           int(time.monotonic() - started), p))
@@ -767,25 +770,35 @@ class Api:
 
         return {"job_id": self._jobs.start("exec", run)}
 
-    def _order_adb(self, number: str) -> tuple[Order, AdbTransport]:
+    def _order_adb(self, number: str) -> tuple[Order, AdbTransport, DeviceInfo]:
         with self._journal() as journal:
             order = journal.order_by_number(number)
         if order is None:
             raise AppError("unknown_order", number)
         if self._adb is not None and self._serial == order.device_serial:
-            return order, self._adb
-        ready = {e.serial for e in list_devices(self._host) if e.state == "device"}
-        if order.device_serial not in ready:
-            with self._journal() as journal:
-                name, imei = device_identity(journal, order.device_serial)
-            raise AppError("wrong_device", order.device_serial, serial=order.device_serial,
-                           device=name, imei=imei)
-        return order, self._session(order.device_serial)
+            adb: AdbTransport = self._adb
+        else:
+            ready = {e.serial for e in list_devices(self._host) if e.state == "device"}
+            if order.device_serial not in ready:
+                with self._journal() as journal:
+                    name, imei = device_identity(journal, order.device_serial)
+                raise AppError("wrong_device", order.device_serial, serial=order.device_serial,
+                               device=name, imei=imei)
+            adb = self._session(order.device_serial)
+        device = read_device_info(adb)
+        if same_device(order.device_identity, device) is False:
+            # Ten sam numer seryjny, inny telefon (albo ten po przywróceniu ustawień fabrycznych):
+            # kroki zlecenia nie mogą trafić na ten telefon (przegląd 2026-10-11).
+            identity = order.device_identity or {}
+            raise AppError("device_mismatch", order.device_serial, serial=order.device_serial,
+                           device=order.device_model or order.device_serial,
+                           imei=identity.get("imei"))
+        return order, adb, device
 
     @_api
     def resume(self, number: str) -> dict[str, Any]:
         self._require_current()
-        order, adb = self._order_adb(number)
+        order, adb, device = self._order_adb(number)
         with self._journal() as journal:
             if not any(a.status == "pending" for a in journal.actions(order.id)):
                 raise AppError("nothing_to_resume", number)
@@ -793,7 +806,7 @@ class Api:
         names = self._names()
 
         def run(job: Job) -> None:
-            manufacturer = read_device_info(adb).manufacturer
+            manufacturer = device.manufacturer
             with self._journal() as journal:
                 self._bind_order(journal, order.device_serial, order.id)
                 self._emit("exec:order", {"order": order.number, "plan": None})
@@ -805,7 +818,7 @@ class Api:
     @_api
     def undo(self, number: str, action_id: int | None = None,
              package: str | None = None) -> dict[str, Any]:
-        order, adb = self._order_adb(number)
+        order, adb, device = self._order_adb(number)
         with self._journal() as journal:
             targeted = targeted_actions(journal, order.id, package, action_id)
         if not targeted:
@@ -814,7 +827,6 @@ class Api:
         names = self._names()
 
         def run(job: Job) -> None:
-            device = read_device_info(adb)
             manufacturer = device.manufacturer
             with self._journal() as journal:
                 try:

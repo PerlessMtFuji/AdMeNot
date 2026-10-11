@@ -402,6 +402,7 @@
     "action_error": "The phone rejected the command.",
     "busy": "Another task is running — wait for it to finish.",
     "wrong_device": "Connect the {device}, which this order is for.",
+    "device_mismatch": "This is not the {device} from this order — another phone with the same serial number, or the phone after a factory reset. Changes from this order will not be made or undone on this phone.",
     "no_scan": "Scan the phone first.",
     "no_device": "Connect and scan a phone first.",
     "unknown_order": "Order not found.",

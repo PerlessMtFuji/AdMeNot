@@ -45,3 +45,13 @@ test('fatal screen offers the report when one was captured', async () => {
   await tick();
   expect(screen.getByRole('button', { name: 'Wyślij raport' })).toBeTruthy();
 });
+
+test('device_mismatch names the phone and hides the raw serial line', async () => {
+  const { s } = await renderWith(ErrorCard);
+  s.error = { key: 'device_mismatch', message: '0123456789ABCDEF', serial: '0123456789ABCDEF',
+    device: 'SM-A145R', imei: null };
+  await tick();
+  const alert = screen.getByRole('alert');
+  expect(alert.textContent).toContain('To nie jest telefon SM-A145R (0123456789ABCDEF) z tego zlecenia');
+  expect(alert.querySelector('.mono')).toBeNull();
+});

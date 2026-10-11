@@ -227,3 +227,45 @@ def test_failing_cache_clear_does_not_fail_a_finished_repair(monkeypatch):
     api.save_settings({"apk_cache_clear_after_repair": True})
     api.execute(WLIVE, [])
     assert rec.of("exec:done") and rec.of("job:error") == []
+
+
+ID_A, ID_B = "1111222233334444", "9999888877776666"
+
+
+def _phone_with_id(android_id):
+    phone = make_cli_phone()
+    phone.secure["android_id"] = android_id
+    return phone
+
+
+def test_undo_and_resume_refuse_another_phone_with_the_same_serial():
+    phone, api, rec = _scanned(_phone_with_id(ID_A))
+    api.execute(WLIVE, [])
+    number = rec.of("exec:order")[0]["order"]
+    phone.secure["android_id"] = ID_B  # inny egzemplarz z tym samym numerem seryjnym
+    error = api.undo(number)["error"]
+    assert error["key"] == "device_mismatch" and error["serial"] == SERIAL
+    assert api.resume(number)["error"]["key"] == "device_mismatch"
+    assert phone.apps["com.wlive.forecast"].enabled is False  # nic nie zostało cofnięte
+
+
+def test_undo_on_the_same_phone_with_a_known_android_id():
+    _, api, rec = _scanned(_phone_with_id(ID_A))
+    api.execute(WLIVE, [])
+    number = rec.of("exec:order")[0]["order"]
+    assert "error" not in api.undo(number)
+    assert rec.of("undo:done")[-1]["status"] == "undone"
+
+
+def test_scan_hides_interrupted_orders_of_another_phone_with_the_same_serial():
+    phone, api, rec = _scanned(_phone_with_id(ID_A))
+    phone.lose_response.add(DISABLE)
+    api.execute(WLIVE, [])
+    phone.lose_response.clear()
+    phone.disconnected = False
+    phone.secure["android_id"] = ID_B
+    api.start_scan(SERIAL)
+    assert rec.of("scan:done")[-1]["interrupted"] == []
+    phone.secure["android_id"] = ID_A
+    api.start_scan(SERIAL)
+    assert len(rec.of("scan:done")[-1]["interrupted"]) == 1
