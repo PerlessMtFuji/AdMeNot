@@ -17,6 +17,7 @@ NOW = datetime(2026, 10, 10, 14, 30, tzinfo=UTC)
 def env(monkeypatch, tmp_path):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     save_settings({"lang": "pl"})
+    telemetry._throttled.clear()  # stan modułu: 429 z innego testu nie wydłuża tu przerwy
 
 
 def body(with_packages):
@@ -416,3 +417,13 @@ def test_413_splits_the_batch_instead_of_dropping_it():
 
     telemetry.send_pending(post=post, delete=server.delete)
     assert seen[:3] == [4, 2, 1] and sum(len(b) for b in server.batches) == 4
+
+
+def test_server_limit_waits_hours_not_minutes():
+    telemetry.set_consent(True, False, NOW)
+    telemetry.record("scan", body, now=lambda: NOW)
+    server = Server(fail=BackendError("http", 429))
+    telemetry.send_pending(post=server.post, delete=server.delete, now=lambda: NOW)
+    assert len(lines()) == 1  # nic nie przepada
+    assert telemetry._next_delay() == telemetry.PERIOD
+    assert telemetry._next_delay() == telemetry.RETRY  # jednorazowo; potem zwykły rytm kolejki
