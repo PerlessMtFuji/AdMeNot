@@ -308,3 +308,38 @@ def test_order_keeps_the_phone_identity_and_old_journals_migrate(tmp_path):
         assert j.order(new.id).device_identity == {"android_id": "aaaa1111bbbb2222", "model": "M"}
         assert j.interrupted_orders("S1") == []
     assert (tmp_path / "j.db.bak-v1").exists()
+
+
+def test_number_after_deleting_an_order_does_not_collide(tmp_path):
+    clock = Clock(datetime(2026, 10, 11, 10, 0))
+    with Journal(tmp_path / "j.db", now=clock) as j:
+        first = j.create_order("S1", "M")
+        j.create_order("S1", "M")
+        j.delete_order(first.id)
+        third = j.create_order("S1", "M")
+    assert third.number == "ZS/2026/1011/03"
+
+
+def test_delete_order_removes_its_rows_only(tmp_path):
+    with Journal(tmp_path / "j.db") as j:
+        keep, gone = j.create_order("S1", "M"), j.create_order("S1", "M")
+        for order in (keep, gone):
+            j.add_action(order.id, "com.ad", "remove",
+                         {"kind": "backup", "package": "com.ad", "params": {"dir": f"C:/b/{order.id}"}}, "backup")
+            j.save_scan(order.id, {"apps": []})
+            j.add_screenshot("S1", {}, order.id)
+        j.delete_order(gone.id)
+        assert j.order_by_number(gone.number) is None and j.actions(gone.id) == []
+        assert j.scan(gone.id) is None and j.screenshots(gone.id) == []
+        assert len(j.actions(keep.id)) == 1 and j.scan(keep.id) == {"apps": []}
+        assert j.backup_dirs() == {f"C:/b/{keep.id}"}
+        assert j.backup_dirs(exclude=keep.id) == set()
+
+
+def test_orders_before_a_cutoff(tmp_path):
+    clock = Clock(datetime(2026, 1, 1, 9, 0))
+    with Journal(tmp_path / "j.db", now=clock) as j:
+        old = j.create_order("S1", "M")
+        clock.t = datetime(2026, 10, 1, 9, 0)
+        j.create_order("S1", "M")
+        assert [o.number for o in j.orders_before(datetime(2026, 6, 1))] == [old.number]

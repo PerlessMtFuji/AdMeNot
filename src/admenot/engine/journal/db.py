@@ -208,12 +208,14 @@ class Journal:
         now = self._now()
         prefix = f"ZS/{now:%Y}/{now:%m%d}/"
         with self._db:
-            (count,) = self._db.execute(
-                "SELECT COUNT(*) FROM orders WHERE number LIKE ?", (prefix + "%",)).fetchone()
+            # MAX, nie COUNT: po usunięciu zlecenia z tego dnia numer nie może się powtórzyć
+            (last,) = self._db.execute(
+                "SELECT MAX(CAST(substr(number, ?) AS INTEGER)) FROM orders WHERE number LIKE ?",
+                (len(prefix) + 1, prefix + "%")).fetchone()
             cur = self._db.execute(
                 "INSERT INTO orders (number, device_serial, device_model, client_name, created_at, status,"
                 " device_identity) VALUES (?, ?, ?, ?, ?, 'running', ?)",
-                (f"{prefix}{count + 1:02d}", serial, model, client_name or None,
+                (f"{prefix}{(last or 0) + 1:02d}", serial, model, client_name or None,
                  now.isoformat(timespec="seconds"), _dump(identity)))
         return self.order(cur.lastrowid)
 
@@ -249,6 +251,26 @@ class Journal:
             raise ValueError(f"invalid order status: {status!r}")
         with self._db:
             self._db.execute("UPDATE orders SET status = ? WHERE id = ?", (status, order_id))
+
+    def orders_before(self, cutoff: datetime) -> list[Order]:
+        rows = self._db.execute("SELECT * FROM orders WHERE created_at < ? ORDER BY id",
+                                (cutoff.isoformat(timespec="seconds"),))
+        return [_order(r) for r in rows]
+
+    def delete_order(self, order_id: int) -> None:
+        """Wiersze zlecenia; pliki (zrzuty, protokół, kopie APK) usuwa `engine.retention`."""
+        with self._db:
+            for table, column in (("actions", "order_id"), ("order_scans", "order_id"),
+                                  ("screenshots", "order_id"), ("orders", "id")):
+                self._db.execute(f"DELETE FROM {table} WHERE {column} = ?", (order_id,))  # stałe nazwy
+
+    def backup_dirs(self, exclude: int | None = None) -> set[str]:
+        """Katalogi kopii APK, do których odwołują się kroki zleceń (poza `exclude`)."""
+        found: set[str] = set()
+        for (text,) in self._db.execute("SELECT step FROM actions WHERE order_id IS NOT ?", (exclude,)):
+            params = json.loads(text).get("params") or {}
+            found.update(params[key] for key in ("dir", "backup_dir") if params.get(key))
+        return found
 
     # --- akcje --------------------------------------------------------------------------------
 
