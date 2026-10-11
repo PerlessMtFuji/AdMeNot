@@ -20,7 +20,11 @@
   // (przegląd 2026-10-11). Gęsty kod lokalny nie mieści się w panelu: wtedy jest „Powiększ kod”.
   const MIN_PX = 3;
   const INLINE_PX = 180;
-  const ZOOM_PX = 440;
+  // Powiększony kod wypełnia okno programu: okno dialogowe zajmuje do 96vw × 90vh, minus marginesy,
+  // tytuł i przycisk. Rośnie i maleje razem z oknem.
+  let winW = $state(window.innerWidth);
+  let winH = $state(window.innerHeight);
+  const ZOOM_PX = $derived(Math.min(winW * 0.96 - 56, winH * 0.9 - 160));
   const inline = $derived(qr ? Math.max(1, Math.floor(INLINE_PX / qr.size)) : 0);
   const zoom = $derived(qr ? Math.max(MIN_PX, Math.floor(ZOOM_PX / qr.size)) : 0);
   let zoomed = $state(false);
@@ -34,6 +38,8 @@
     ? new Date(share.expires).toLocaleTimeString(s.settings.lang, { hour: '2-digit', minute: '2-digit' })
     : null);
 </script>
+
+<svelte:window bind:innerWidth={winW} bind:innerHeight={winH} />
 
 {#if s.planChanged}
   <Banner tone="warn" icon="triangle-alert" title={t('plan.changed')} />
@@ -63,7 +69,7 @@
     {/if}
   </div>
   {#if zoomed && qr}
-    <Dialog title={t('plan.share_qr')} oncancel={() => (zoomed = false)}>
+    <Dialog fit title={t('plan.share_qr')} oncancel={() => (zoomed = false)}>
       <svg role="img" aria-label={t('plan.share_qr')} viewBox="0 0 {qr.size} {qr.size}" width={qr.size * zoom}
         height={qr.size * zoom} shape-rendering="crispEdges" class="mx-auto block rounded-lg bg-white"><path d={path} fill="#000" /></svg>
       {#snippet actions()}

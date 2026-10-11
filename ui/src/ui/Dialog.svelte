@@ -3,8 +3,9 @@
   import { fade, scale } from 'svelte/transition';
   import { DUR, ms } from '../lib/motion';
 
-  type Props = { title: string; children: Snippet; actions: Snippet; oncancel: () => void };
-  let { title, children, actions, oncancel }: Props = $props();
+  // fit: okno na miarę treści (do 96vw) zamiast stałych 500 px, np. powiększony kod QR.
+  type Props = { title: string; children: Snippet; actions: Snippet; oncancel: () => void; fit?: boolean };
+  let { title, children, actions, oncancel, fit = false }: Props = $props();
   let box: HTMLDivElement;
   const id = `dialog-${Math.random().toString(36).slice(2, 9)}`;
   const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -14,6 +15,12 @@
     box.querySelector<HTMLElement>(FOCUSABLE)?.focus();
     return () => previous?.focus?.();
   });
+
+  // Okno żyje w <body>: przodek z backdrop-filter (panel boczny) zamknąłby `position: fixed` w swojej kolumnie.
+  function portal(node: HTMLElement) {
+    document.body.appendChild(node);
+    return { destroy: () => node.remove() };
+  }
 
   function keydown(e: KeyboardEvent) {
     if (e.key === 'Escape') {
@@ -36,10 +43,10 @@
   }
 </script>
 
-<div class="fixed inset-0 z-50 grid place-items-center bg-[rgb(15_23_42/.45)] backdrop-blur-[6px]"
+<div use:portal class="fixed inset-0 z-50 grid place-items-center bg-[rgb(15_23_42/.45)] backdrop-blur-[6px]"
   transition:fade={{ duration: ms(DUR.micro) }}>
   <div bind:this={box} role="dialog" aria-modal="true" aria-labelledby={id} tabindex="-1" onkeydown={keydown}
-    class="flex max-h-[90vh] w-[min(500px,92vw)] flex-col rounded-[20px] card p-6"
+    class="flex max-h-[90vh] flex-col rounded-[20px] card p-6 {fit ? 'w-auto max-w-[96vw]' : 'w-[min(500px,92vw)]'}"
     transition:scale={{ start: 0.96, duration: ms(DUR.dialog) }}>
     <!-- treść przewija się w oknie, tytuł i przyciski zostają widoczne -->
     <h2 {id} class="shrink-0 text-lg font-bold">{title}</h2>

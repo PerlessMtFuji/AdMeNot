@@ -67,6 +67,31 @@ describe('ShareQr readability', () => {
     const dialog = screen.getByRole('dialog');
     const big = within(dialog).getByRole('img', { name: /Kod QR/ });
     expect(pxPerModule(big)).toBeGreaterThanOrEqual(MIN_PX);
-    expect(Number(big.getAttribute('width'))).toBeLessThanOrEqual(440); // treść okna: 500 px − marginesy
+  });
+
+  // Panel boczny ma backdrop-blur, który zamyka `position: fixed` w kolumnie: okno ląduje w <body>.
+  it('the enlarged code opens over the whole window and grows with it', async () => {
+    const { s, bridge, container } = await renderWith(ShareQr, 'adware');
+    s.share = { id: 'c', code: 'K7F3', status: 'sending', url: null, mode: null, expires: null, upgraded: false, reason: null };
+    bridge.emit('share:ready', { share_id: 'c', code: 'K7F3', url: longUrl, mode: 'local', expires: null });
+    await tick();
+    const resize = async (w: number, h: number) => {
+      Object.assign(window, { innerWidth: w, innerHeight: h });
+      window.dispatchEvent(new Event('resize'));
+      await tick();
+    };
+    await resize(1280, 900);
+    await fireEvent.click(screen.getByRole('button', { name: /Powiększ kod/ }));
+    const dialog = screen.getByRole('dialog');
+    expect(container.contains(dialog)).toBe(false);
+    const big = () => within(dialog).getByRole('img', { name: /Kod QR/ });
+    const small = Number(big().getAttribute('width'));
+    expect(small).toBeGreaterThan(440);
+    expect(small).toBeLessThanOrEqual(900);
+    await resize(1920, 1080);
+    expect(Number(big().getAttribute('width'))).toBeGreaterThan(small);
+    expect(Number(big().getAttribute('width'))).toBeLessThanOrEqual(1080);
+    await resize(300, 300);
+    expect(pxPerModule(big())).toBeGreaterThanOrEqual(MIN_PX);
   });
 });
