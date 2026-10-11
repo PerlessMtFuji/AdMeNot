@@ -274,3 +274,41 @@ def test_listener_component_from_the_phone_is_validated_and_quoted(bad):
 def test_valid_component_with_dollar_still_works():
     phone = _phone(secure={LISTENERS: "com.ad/.Outer$Listener"})
     _apply_and_undo(phone, _remove_listener("com.ad/.Outer$Listener"))
+
+
+@pytest.mark.parametrize("step", [
+    Step("appop", "com.ad; reboot", {"op": "SYSTEM_ALERT_WINDOW", "mode": "deny"}),
+    Step("appop", "com.ad", {"op": "SYSTEM_ALERT_WINDOW; reboot", "mode": "deny"}),
+    Step("appop", "com.ad", {"op": "SYSTEM_ALERT_WINDOW", "mode": "deny && reboot"}),
+    Step("permission", "com.ad", {"permission": "x;reboot", "granted": "0"}),
+    Step("secure_list", "com.ad", {"key": "enabled_accessibility_services;reboot", "op": "remove",
+                                   "components": AD_LISTENER}),
+    Step("secure_list", "com.ad", {"key": LISTENERS, "op": "remove",
+                                   "components": "com.ad/x';reboot;'"}),
+    Step("home", "com.ad", {"component": "com.ad/.Home' ; reboot"}),
+    Step("enabled", "com.ad", {"enabled": "0 ; reboot"}),
+    Step("installed", "com.ad", {"installed": "1", "backup_dir": 7}),
+    Step("installed", "com.ad; reboot", {"installed": "1", "backup_dir": ""}),
+])
+def test_tampered_step_never_reaches_the_phone(step):
+    """Kroki czytane z dziennika (SQLite na dysku) nie mogą wstrzyknąć polecenia do powłoki."""
+    phone = _phone()
+    with pytest.raises(ActionError) as caught:
+        S.probe(phone, step)
+    assert caught.value.key == "unrecognized"
+    with pytest.raises(ActionError):
+        S.apply(phone, step)
+    assert phone.calls == []
+
+
+def test_valid_steps_from_the_planner_still_pass():
+    for step in (
+        Step("appop", "com.ad", {"op": "USE_FULL_SCREEN_INTENT", "mode": "deny"}),
+        Step("permission", "com.ad", {"permission": POST, "granted": "0"}),
+        _remove_listener(GEARHEAD.split("/")[0] + "/" + GEARHEAD.split("/")[1]),
+        Step("home", "com.ad", {"component": "com.android.launcher/.Launcher"}),
+        Step("installed", "com.ad", {"installed": "1", "backup_dir": ""}),
+        Step("backup", "com.ad", {"dir": "C:/b/com.ad/7", "version_code": "7"}),
+        Step("backup", "com.ad", {"dir": "C:/b/com.ad/unknown", "version_code": ""}),
+    ):
+        S.check_step(step)

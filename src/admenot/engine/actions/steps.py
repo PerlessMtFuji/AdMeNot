@@ -4,6 +4,7 @@ wykonać zmianę i opisać krok odwrotny na podstawie stanu sprzed zmiany."""
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
@@ -27,6 +28,12 @@ from admenot.engine.parsers.system import (
 State = dict[str, Any]
 NOTIF_LISTENERS_KEY = "enabled_notification_listeners"
 _COMPONENT = re.compile(r"^[A-Za-z][\w.]*/[\w.$]+$", re.ASCII)
+A11Y_KEY = "enabled_accessibility_services"
+SECURE_LIST_KEYS = (A11Y_KEY, NOTIF_LISTENERS_KEY)
+APPOP_MODES = frozenset({"allow", "ignore", "deny", "default", "foreground", "errored"})
+_OP = re.compile(r"^[A-Z_]{1,64}$", re.ASCII)
+_PERMISSION = re.compile(r"^[A-Za-z][\w.]{0,200}$", re.ASCII)
+_FLAGS = frozenset({"0", "1"})
 
 
 def valid_component(value: str) -> str:
@@ -34,6 +41,45 @@ def valid_component(value: str) -> str:
     if not _COMPONENT.match(value):
         raise ActionError("unrecognized", f"component {value[:120]!r}")
     return value
+
+
+def _text(pattern: re.Pattern[str]) -> Callable[[Any], bool]:
+    return lambda v: isinstance(v, str) and bool(pattern.match(v))
+
+
+def _flag_value(v: Any) -> bool:
+    return v in _FLAGS
+
+
+def _components(v: Any) -> bool:
+    return isinstance(v, str) and all(_COMPONENT.match(c) for c in split_items(v))
+
+
+_PARAMS: dict[str, dict[str, Callable[[Any], bool]]] = {
+    "appop": {"op": _text(_OP), "mode": lambda v: v in APPOP_MODES},
+    "permission": {"permission": _text(_PERMISSION), "granted": _flag_value},
+    "secure_list": {"key": lambda v: v in SECURE_LIST_KEYS, "op": lambda v: v in ("add", "remove"),
+                    "components": _components},
+    "home": {"component": _text(_COMPONENT)},
+    "enabled": {"enabled": _flag_value},
+    "installed": {"installed": _flag_value, "backup_dir": lambda v: isinstance(v, str)},
+    "backup": {"dir": lambda v: isinstance(v, str) and v != "",
+               "version_code": lambda v: v is None or (isinstance(v, str) and (v == "" or v.isdigit()))},
+}
+_OPTIONAL = {"installed": {"enabled": _flag_value}}
+
+
+def check_step(step: Step) -> None:
+    """Krok z planu albo z dziennika (plik SQLite na dysku), zanim cokolwiek trafi do powłoki
+    telefonu: nazwa pakietu i parametry wstawiamy do poleceń bez cudzysłowu (przegląd 2026-10-11)."""
+    if not is_package_name(step.package):
+        raise ActionError("unrecognized", f"package {step.package[:120]!r}")
+    for key, ok in _PARAMS.get(step.kind, {}).items():
+        if not ok(step.params.get(key)):
+            raise ActionError("unrecognized", f"{step.kind} {key}: {str(step.params.get(key))[:120]!r}")
+    for key, ok in _OPTIONAL.get(step.kind, {}).items():
+        if key in step.params and not ok(step.params[key]):
+            raise ActionError("unrecognized", f"{step.kind} {key}: {str(step.params[key])[:120]!r}")
 
 
 @dataclass
@@ -414,7 +460,9 @@ def _handler(step: Step) -> StepHandler:
 
 
 def probe(adb: AdbTransport, step: Step) -> State:
-    return _handler(step).probe(adb, step)
+    handler = _handler(step)
+    check_step(step)
+    return handler.probe(adb, step)
 
 
 def is_applied(step: Step, state: State) -> bool:
@@ -426,9 +474,9 @@ def command_for(step: Step) -> str:
 
 
 def apply(adb: AdbTransport, step: Step, apk_cache_dir: Path | None = None) -> None:
-    if not is_package_name(step.package):  # nazwa trafia do powłoki telefonu bez cudzysłowu
-        raise ActionError("unrecognized", f"package {step.package[:120]!r}")
-    _handler(step).apply(adb, step, apk_cache_dir)
+    handler = _handler(step)
+    check_step(step)
+    handler.apply(adb, step, apk_cache_dir)
 
 
 def inverse(step: Step, state: State) -> Step | None:
