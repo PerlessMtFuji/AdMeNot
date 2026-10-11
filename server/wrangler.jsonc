@@ -25,7 +25,8 @@
     // zapytań na 10 minut, więc 60/min na adres zatrzymuje tylko zalew (audyt 2026-10-11, SEC-03).
     { "name": "TELEMETRY_LIMITER", "namespace_id": "1002", "simple": { "limit": 60, "period": 60 } }
   ],
-  // Dobowy limit na adres: liczniki pod kluczem HMAC(sekret QUOTA_KEY, dzień, adres), kasowane o północy UTC.
+  // Dobowy limit na adres: liczniki pod kluczem HMAC(klucz doby losowany przez obiekt, adres); klucz
+  // i liczniki kasuje alarm o północy UTC (spec §2.2).
   "durable_objects": { "bindings": [{ "name": "QUOTA", "class_name": "Quota" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Quota"] }],
   // Codzienne usuwanie raportów starszych niż 90 dni (spec raportów §6.3).
