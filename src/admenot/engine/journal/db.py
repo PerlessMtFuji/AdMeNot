@@ -57,8 +57,13 @@ CREATE TABLE IF NOT EXISTS screenshots (
 CREATE INDEX IF NOT EXISTS screenshots_by_order ON screenshots(order_id);
 """
 
+_V2_IDENTITY = """
+ALTER TABLE orders ADD COLUMN device_identity TEXT;
+"""
+
 # v1 to schemat sprzed wersjonowania — `IF NOT EXISTS` przyjmuje też bazy z user_version = 0.
-MIGRATIONS: tuple[str, ...] = (_SCHEMA_V1,)
+# v2: tożsamość telefonu w zleceniu (android_id, IMEI, model) — przegląd 2026-10-11.
+MIGRATIONS: tuple[str, ...] = (_SCHEMA_V1, _V2_IDENTITY)
 
 ORDER_STATUSES = frozenset({"running", "done", "failed", "undone", "partially_undone"})
 ACTION_STATUSES = frozenset({"pending", "done", "failed", "undone"})
@@ -89,6 +94,7 @@ class Order:
     client_name: str | None
     created_at: datetime
     status: str
+    device_identity: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -153,7 +159,8 @@ def _migrate(db: sqlite3.Connection, path: Path | str, migrations: Sequence[str]
 
 def _order(row: sqlite3.Row) -> Order:
     return Order(row["id"], row["number"], row["device_serial"], row["device_model"],
-                 row["client_name"], datetime.fromisoformat(row["created_at"]), row["status"])
+                 row["client_name"], datetime.fromisoformat(row["created_at"]), row["status"],
+                 _load(row["device_identity"]))
 
 
 def _action(row: sqlite3.Row) -> Action:
@@ -196,17 +203,18 @@ class Journal:
 
     # --- zlecenia -----------------------------------------------------------------------------
 
-    def create_order(self, serial: str, model: str | None, client_name: str | None = None) -> Order:
+    def create_order(self, serial: str, model: str | None, client_name: str | None = None,
+                     identity: dict[str, Any] | None = None) -> Order:
         now = self._now()
         prefix = f"ZS/{now:%Y}/{now:%m%d}/"
         with self._db:
             (count,) = self._db.execute(
                 "SELECT COUNT(*) FROM orders WHERE number LIKE ?", (prefix + "%",)).fetchone()
             cur = self._db.execute(
-                "INSERT INTO orders (number, device_serial, device_model, client_name, created_at, status)"
-                " VALUES (?, ?, ?, ?, ?, 'running')",
+                "INSERT INTO orders (number, device_serial, device_model, client_name, created_at, status,"
+                " device_identity) VALUES (?, ?, ?, ?, ?, 'running', ?)",
                 (f"{prefix}{count + 1:02d}", serial, model, client_name or None,
-                 now.isoformat(timespec="seconds")))
+                 now.isoformat(timespec="seconds"), _dump(identity)))
         return self.order(cur.lastrowid)
 
     def order(self, order_id: int) -> Order:

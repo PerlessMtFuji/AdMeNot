@@ -132,6 +132,7 @@ def test_journal_from_plan_2_gets_the_scan_table(tmp_path):
     with Journal(path) as j:
         order = j.create_order("S1", "M")
         j._db.execute("DROP TABLE order_scans")  # stan bazy sprzed Planu 6
+        j._db.execute("ALTER TABLE orders DROP COLUMN device_identity")  # i sprzed schematu v2
         j._db.execute("PRAGMA user_version = 0")  # i sprzed wersjonowania schematu
     with Journal(path) as j:
         assert j.order(order.id).number == order.number
@@ -247,34 +248,35 @@ def test_unversioned_journal_keeps_data_and_gets_version_1(tmp_path):
         db.execute("INSERT INTO orders(number, device_serial, created_at, status)"
                    " VALUES ('ZS/1', 'S1', '2026-10-01T10:00:00', 'done')")
         db.commit()
-    with Journal(path, migrations=MIGRATIONS[:1]) as j:
+    with Journal(path) as j:
         assert j.order_by_number("ZS/1").device_serial == "S1"
-    assert _version(path) == 1
+    assert _version(path) == len(MIGRATIONS)
 
 
 def test_migration_adds_column_and_backs_up_previous_version(tmp_path):
     path = tmp_path / "j.db"
-    with Journal(path, migrations=MIGRATIONS[:1]) as j:
+    with Journal(path) as j:
         j.create_order("S1", "M")
-    v2 = (*MIGRATIONS[:1], "ALTER TABLE orders ADD COLUMN note TEXT;")
-    with Journal(path, migrations=v2) as j:
+    latest = len(MIGRATIONS)
+    newer = (*MIGRATIONS, "ALTER TABLE orders ADD COLUMN note TEXT;")
+    with Journal(path, migrations=newer) as j:
         assert j.orders_for("S1")[0].device_model == "M"
-    assert _version(path) == 2
-    backup = tmp_path / "j.db.bak-v1"
-    assert _version(backup) == 1
+    assert _version(path) == latest + 1
+    backup = tmp_path / f"j.db.bak-v{latest}"
+    assert _version(backup) == latest
     with closing(sqlite3.connect(backup)) as db:
         assert db.execute("SELECT count(*) FROM orders").fetchone()[0] == 1
 
 
 def test_failed_migration_rolls_back(tmp_path):
     path = tmp_path / "j.db"
-    with Journal(path, migrations=MIGRATIONS[:1]) as j:
+    with Journal(path) as j:
         j.create_order("S1", "M")
-    broken = (*MIGRATIONS[:1], "ALTER TABLE orders ADD COLUMN note TEXT; SELECT * FROM nope;")
+    broken = (*MIGRATIONS, "ALTER TABLE orders ADD COLUMN note TEXT; SELECT * FROM nope;")
     with pytest.raises(sqlite3.OperationalError):
         Journal(path, migrations=broken)
-    assert _version(path) == 1
-    with Journal(path, migrations=MIGRATIONS[:1]) as j:
+    assert _version(path) == len(MIGRATIONS)
+    with Journal(path) as j:
         assert len(j.orders_for("S1")) == 1
     with closing(sqlite3.connect(path)) as db:
         cols = [r[1] for r in db.execute("PRAGMA table_info(orders)")]
@@ -289,3 +291,20 @@ def test_journal_from_newer_version_is_refused(tmp_path):
         db.execute(f"PRAGMA user_version = {len(MIGRATIONS) + 1}")
     with pytest.raises(JournalTooNew):
         Journal(path)
+
+
+def test_order_keeps_the_phone_identity_and_old_journals_migrate(tmp_path):
+    path = tmp_path / "j.db"
+    with closing(sqlite3.connect(path)) as db:  # dziennik z 0.9.x (v1), bez kolumny tożsamości
+        db.executescript(MIGRATIONS[0])
+        db.execute("INSERT INTO orders(number, device_serial, device_model, created_at, status)"
+                   " VALUES ('ZS/2026/1001/01', 'S1', 'M', '2026-10-01T10:00:00', 'done')")
+        db.execute("PRAGMA user_version = 1")
+        db.commit()
+    with Journal(path) as j:
+        old = j.order_by_number("ZS/2026/1001/01")
+        assert old.device_identity is None
+        new = j.create_order("S1", "M", None, {"android_id": "aaaa1111bbbb2222", "model": "M"})
+        assert j.order(new.id).device_identity == {"android_id": "aaaa1111bbbb2222", "model": "M"}
+        assert j.interrupted_orders("S1") == []
+    assert (tmp_path / "j.db.bak-v1").exists()
