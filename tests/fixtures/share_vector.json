@@ -1,0 +1,66 @@
+{
+  "key": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+  "blob": "AWRlZmdoaWprbG1ubyWLEyx62EZZYUeTobtu8aATyrAdymN5+rhxukcSTdFTCKQCUuFk0CvDcA9QQ8slLDhjTZ1KJbLXAvxv+o6P7+xIVu2uFlhfpZggqB0NhFXY9IpJKg937RkQbXNK1aIg3DYFm/tHlBciDkxRi2l+7j4HGIWKpmne+gEGEFAf8Hk4widGRRQ2d3VLrLKh1kTiaEfd6U9Z7Ejk7bDwT1Z/K9acGfxNPW7eBCl/vGlZjF22aS2ZChYHh0GWsHhT08Mqst9TfuKGGUFgCgQZHPFbmRu1zOCy8KnnEJmUOqdCxAW86jD5M0ZyWMH6f7bW+LQyJEqe8KkWqZaPTt+MSw==",
+  "payload": {
+    "v": 1,
+    "lang": "pl",
+    "at": "2026-10-11T14:32",
+    "phone": "Redmi Note 13",
+    "code": "7F3K",
+    "notif": 0,
+    "shop": "Serwis XYZ",
+    "apps": [
+      {
+        "n": "Czyszczenie telefonu",
+        "l": "remove",
+        "i": null
+      },
+      {
+        "n": "Latarka 🔦",
+        "l": "silence",
+        "i": null
+      },
+      {
+        "n": "<img src=x onerror=alert(1)>",
+        "l": "disable",
+        "i": null
+      },
+      {
+        "n": "Usługi Google Play",
+        "l": "disable",
+        "b": 1,
+        "i": null
+      }
+    ]
+  },
+  "local_fragment": "l.XZDPSgMxEIdfJcxJIYXNrigE60XQgyLiH1CLh3R3ug1mMyFJq92yF5_BuzffxPfxEZxioeBt5vt9MwyzhiVoJcEZ34KG4ECCyVyVRXk4UsVIqTt1oKuSeZiTR45usOmsuKKMQlXMa2o2-OisuuDOU7Yz0IWENKfA_Bbjq03i4fFpszuEBHqyBs_Jab9Kfd2jtygyOpyRX7DjOIrY0RJhkH_mpckmvhjx8_nxtTWSdejrnXJsu1akWI_fBJ8ZI8WxcRjznto_2Y40Npmp243cp-_3RWvFOVHrUFw7s_pnSpjye4bn4Rc",
+  "local_payload": {
+    "v": 1,
+    "lang": "pl",
+    "at": "2026-10-11T14:32",
+    "phone": "Redmi Note 13",
+    "code": "7F3K",
+    "notif": 0,
+    "shop": "Serwis XYZ",
+    "apps": [
+      {
+        "n": "Czyszczenie telefonu",
+        "l": "remove"
+      },
+      {
+        "n": "Latarka 🔦",
+        "l": "silence"
+      },
+      {
+        "n": "<img src=x onerror=alert(1)>",
+        "l": "disable"
+      },
+      {
+        "n": "Usługi Google Play",
+        "l": "disable",
+        "b": 1
+      }
+    ]
+  },
+  "local_limit": 1500
+}

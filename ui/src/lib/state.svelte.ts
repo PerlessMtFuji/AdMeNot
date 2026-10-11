@@ -1,7 +1,7 @@
 import { actedLevels, type ActedLog, type OpenGroups, type Phase } from './logic';
 import type {
   ApiErrorBody, ApkEstimate, ApkQuestion, Category, ConsoleEntry, DeviceEntry, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
-  PlanView, Question, ReportResult, ScanView, Settings, ShotsView, ShotView, StepEvent, UndoDone, UpdateView, Verdict, WhoView,
+  PlanView, Question, ReportResult, ScanView, Settings, ShareState, ShotsView, ShotView, StepEvent, UndoDone, UpdateView, Verdict, WhoView,
 } from './types';
 
 export type Screen = 'main' | 'history' | 'settings';
@@ -45,6 +45,9 @@ export class AppState {
   /** „Szczegóły techniczne" w panelu Eksperta — pamiętane do zamknięcia programu. */
   detailsOpen = $state(false);
   plan = $state<PlanView | null>(null);
+  share = $state<ShareState | null>(null); // kod QR planu dla klienta (spec plan-qr §6)
+  consent = $state(false);
+  planChanged = $state(false); // `execute` odrzucił zgodę: plan inny niż pokazany
   job = $state<{ id: string; kind: string } | null>(null);
   incident = $state<{ recording: boolean; marks: number; result: IncidentDone | null }>({ recording: false, marks: 0, result: null });
   order = $state<string | null>(null);

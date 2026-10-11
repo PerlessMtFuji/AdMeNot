@@ -142,3 +142,22 @@ def test_home_pages_link_the_donate_page():
     _, pl = load("pl/index.html")
     assert "/donate" in [a.get("href") for a in en.all("a")]
     assert "/pl/donate" in [a.get("href") for a in pl.all("a")]
+
+
+def test_plan_page_loads_only_own_files_and_has_csp():
+    text, page = load("plan.html")
+    assert [s.get("src") for s in page.all("script")] == ["/plan.js"]
+    assert [link.get("href") for link in page.all("link")] == ["/plan.css"]
+    assert "http" not in text.replace("http-equiv", "")
+    headers = (PUBLIC / "_headers").read_text("utf-8")
+    block = headers.split("/plan\n", 1)[1].split("\n/", 1)[0]
+    assert "Content-Security-Policy: default-src 'none'" in block
+    assert "Referrer-Policy: no-referrer" in block and "X-Robots-Tag: noindex" in block
+    js = (PUBLIC / "plan.js").read_text("utf-8")
+    assert "innerHTML" not in js and "insertAdjacentHTML" not in js
+
+
+@pytest.mark.parametrize("name", ["privacy.html", "pl/privacy.html"])
+def test_privacy_describes_the_client_plan(name):
+    text, _ = load(name)
+    assert "/api/v1/shares" in text and "60" in text

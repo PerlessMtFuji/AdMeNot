@@ -186,6 +186,19 @@ def test_start_stores_the_snapshot_and_execute_the_verification(tmp_path):
     assert journal.verification(order.id) == {}
 
 
+def test_start_stores_consent_only_when_given(tmp_path):
+    phone = make_cli_phone()
+    report = run_scan(phone)
+    plan = plan_order(phone, report, {"com.wlive.forecast": "disable"})
+    match = PhoneImageProvider(tmp_path / "missing", tmp_path / "o.json").match(report.device)
+    journal = Journal(tmp_path / "j.db")
+    consent = {"code": "K7F3", "shown_at": "a", "confirmed_at": "b"}
+    agreed = start(journal, plan, "Anna", report, match, consent)
+    plain = start(journal, plan, "Anna", report, match)
+    assert journal.scan(agreed.id)["consent"] == consent
+    assert "consent" not in journal.scan(plain.id)
+
+
 def test_start_without_report_keeps_the_order_without_snapshot(tmp_path):
     journal, order, _ = _run(tmp_path, make_cli_phone(), {"com.wlive.forecast": "disable"})
     assert journal.scan(order.id) is None and journal.verification(order.id) == {}

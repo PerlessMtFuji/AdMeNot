@@ -24,6 +24,7 @@ from admenot.engine.report.model import device_block
 from admenot.engine.rules.model import CATEGORIES, Finding
 from admenot.engine.scoring import AppResult
 from admenot.engine.session import ScanReport
+from admenot.engine.share import plan_code
 from admenot.engine.texts import (
     TEXTS,
     capability_label,
@@ -205,7 +206,7 @@ def plan_view(plan: OrderPlan, lang: str) -> dict[str, Any]:
             apps.append({**base, "blocked": False, "reason": None, "reason_text": None,
                          "steps": [step_label(s.to_dict(), lang) for s in r.steps],
                          "warnings": [warning_text(w, lang) for w in r.warnings]})
-    return {"apps": apps, "runnable": len(plan.plans)}
+    return {"apps": apps, "runnable": len(plan.plans), "code": plan_code(plan)}
 
 
 def step_view(event: dict[str, Any], lang: str, manufacturer: str,

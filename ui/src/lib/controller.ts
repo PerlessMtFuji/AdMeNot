@@ -149,6 +149,23 @@ export class Controller {
       s.plan = null;
       s.screen = 'main';
       s.phase = 'executing';
+      this.resetShare();
+      s.planChanged = false;
+    });
+    on('share:ready', (d) => {
+      const cur = s.share;
+      if (!cur || cur.id !== d.share_id) return; // spóźnione zdarzenie poprzedniego kodu
+      if (this.staleShare(d.code)) return;
+      s.share = { ...cur, code: d.code, status: 'ready', url: d.url, mode: d.mode, expires: d.expires,
+                  upgraded: cur.mode === 'local' && d.mode === 'server', reason: null,
+                  offline: d.offline ?? cur.offline };
+    });
+    on('share:failed', (d) => {
+      const cur = s.share;
+      // Kod już na ekranie działa dalej: późny błąd ponawiania w tle go nie zabiera.
+      if (!cur || cur.id !== d.share_id || cur.status === 'ready') return;
+      if (this.staleShare(d.code)) return;
+      s.share = { ...cur, code: d.code, status: 'failed', reason: d.reason, offline: d.offline };
     });
     on('exec:step', (d) => { s.steps = upsertStep(s.steps, d); });
     on('exec:admin_wait', (d) => { s.admin = { ...d, since: Date.now() }; });
@@ -190,6 +207,12 @@ export class Controller {
     });
     on('adb:command', (d) => { s.console = [...s.console.slice(-(CONSOLE_LIMIT - 1)), d]; });
     on('job:error', (d) => {
+      if (d.kind === 'exec' && d.key === 'plan_changed') {
+        // Plan inny niż pokazany klientowi: nic nie ruszyło, pokazujemy nowy plan (spec plan-qr §6.3).
+        s.planChanged = true;
+        void this.openPlan();
+        return;
+      }
       if (d.kind === 'update') { // błędy aktualizacji pokazuje okno instalacji, nie karta błędu
         s.updateError = d;
         s.updateProgress = null;
@@ -366,12 +389,48 @@ export class Controller {
   async openPlan(): Promise<void> {
     const s = this.state;
     s.diagnostics = false;
+    this.resetShare();
     const r = await this.call(this.api.preview_plan({ ...s.selection }, [...s.unlocked]));
     if (r) s.plan = r;
   }
 
   closePlan(): void {
+    this.resetShare();
+    this.state.planChanged = false;
     this.state.plan = null;
+  }
+
+  /** Kod QR dla klienta (spec plan-qr §6.1). Identyfikator nadaje UI, bo zdarzenie może przyjść
+   *  przed wynikiem wywołania. */
+  async sharePlan(): Promise<void> {
+    const s = this.state;
+    this.resetShare();
+    s.planChanged = false;
+    const id = crypto.randomUUID();
+    s.share = { id, code: null, status: 'sending', url: null, mode: null, expires: null, upgraded: false, reason: null };
+    const r = await this.call(this.api.share_plan({ ...s.selection }, [...s.unlocked], id));
+    if (!r) {
+      if (s.share?.id === id) s.share = null;
+      return;
+    }
+    if (s.share?.id === id && s.share.code === null && !this.staleShare(r.code)) s.share = { ...s.share, code: r.code };
+  }
+
+  /** Kod z udostępnienia inny niż kod planu na ekranie: telefon zmienił się od podglądu, więc klient
+   *  zobaczyłby inny plan niż serwisant. Przeliczamy plan i prosimy o nowy kod (spec plan-qr §6.2). */
+  private staleShare(code: string): boolean {
+    const s = this.state;
+    if (!s.plan?.code || s.plan.code === code) return false;
+    s.planChanged = true;
+    void this.openPlan();
+    return true;
+  }
+
+  resetShare(): void {
+    const s = this.state;
+    if (s.share) void this.call(this.api.cancel_share(s.share.id));
+    s.share = null;
+    s.consent = false;
   }
 
   async unlock(pkg: string): Promise<void> {
@@ -384,7 +443,8 @@ export class Controller {
   async execute(): Promise<void> {
     const s = this.state;
     s.error = null;
-    const r = await this.call(this.api.execute({ ...s.selection }, [...s.unlocked]));
+    const consent = s.consent && s.share?.code ? { code: s.share.code } : null;
+    const r = await this.call(this.api.execute({ ...s.selection }, [...s.unlocked], consent));
     if (r) this.setJob(r.job_id, 'exec');
     else this.retiredToDialog();
   }

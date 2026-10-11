@@ -1,3 +1,4 @@
+import type { ShareScenario } from './fakeBridge';
 import type { Api, ApiError, EventMap, EventName } from './types';
 
 export interface Bridge {
@@ -39,7 +40,8 @@ export async function connectBridge(): Promise<Bridge> {
   if (import.meta.env.VITE_FAKE_BRIDGE === '1' && !(window as PywebviewWindow).pywebview) {
     const { createFakeBridge } = await import('./fakeBridge');
     const params = new URLSearchParams(location.search);
-    return createFakeBridge(params.get('scenario') ?? 'adware', { welcome: params.get('welcome') === '1' });
+    return createFakeBridge(params.get('scenario') ?? 'adware', { welcome: params.get('welcome') === '1',
+      share: (params.get('share') ?? undefined) as ShareScenario | undefined });
   }
   return { api: await waitForPywebview(), on: windowEvents() };
 }

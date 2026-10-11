@@ -1,4 +1,5 @@
 import base64
+from dataclasses import replace
 from datetime import datetime
 
 import pytest
@@ -6,6 +7,7 @@ import pytest
 from admenot.engine.phones.provider import SILHOUETTE
 from admenot.engine.report.model import (
     AppRow,
+    Consent,
     DeviceBlock,
     Protocol,
     Recommendation,
@@ -298,3 +300,18 @@ def test_no_screenshots_no_attachment(photo):
 def test_shot_texts_exist_in_both_languages():
     assert TEXTS["pl"]["shots_title"] == "Załącznik: zrzuty ekranu"
     assert TEXTS["en"]["shots_title"] == "Attachment: screenshots"
+
+
+@pytest.mark.parametrize(("lang", "text"), [
+    ("pl", "Zakres naprawy przedstawiono klientowi przed wykonaniem (kod K7F3, 14:32)."),
+    ("en", "The scope of the repair was shown to the client before it was carried out (code K7F3, 14:32)."),
+])
+def test_consent_line(photo, lang, text):
+    p = replace(make_protocol(photo, lang=lang),
+                consent=Consent("K7F3", datetime(2026, 10, 11, 14, 32), datetime(2026, 10, 11, 14, 35)))
+    assert text in render_html(p, ServiceInfo(), GENERATED)
+
+
+def test_no_consent_no_line(photo):
+    html = render_html(make_protocol(photo, lang="pl"), ServiceInfo(), GENERATED)
+    assert "przedstawiono klientowi" not in html

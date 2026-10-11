@@ -52,6 +52,7 @@
 </section>
 
 <h2>{{ t.apps_title }}</h2>
+{% if consent %}<p class="note">{{ consent }}</p>{% endif %}
 {% if not p.has_scan %}<p class="note">{{ t.no_scan }}</p>{% endif %}
 {% if rows %}
 <table>

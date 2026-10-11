@@ -29,6 +29,7 @@ from admenot.engine.journal.db import Journal
 from admenot.engine.phones.provider import SILHOUETTE, PhoneMatch
 from admenot.engine.rules.model import Finding
 from admenot.engine.session import run_scan
+from admenot.engine.share import plan_code
 from admenot.engine.workflow import execute_order, plan_order, start
 
 
@@ -135,6 +136,7 @@ def test_plan_step_result_and_history_views(tmp_path):
     assert "chroniona" in blocked["reason_text"] and blocked["level_label"] == "WYŁĄCZ"
     assert ok["blocked"] is False and "wyłączenie aplikacji" in ok["steps"]
     assert view["runnable"] == 1
+    assert view["code"] == plan_code(plan)  # kod kontrolny planu dla klienta (spec plan-qr §3.1)
 
     names = {p: app_name(f, p) for p, f in plan.facts.items()}
     event = {"type": "step", "action_id": 3, "package": "com.wlive.forecast",

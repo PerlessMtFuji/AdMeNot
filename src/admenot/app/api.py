@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import functools
 import os
+import re
 import secrets
 import sys
 import threading
@@ -41,7 +42,7 @@ from admenot.app.present import (
 from admenot.app.telemetry_events import repair_event, sample, scan_event, undo_event
 from admenot.app.updates import UpdateService, update_view
 from admenot.app.watcher import DeviceWatcher
-from admenot.engine import donate, retention, welcome
+from admenot.engine import donate, retention, share, welcome
 from admenot.engine.actions.executor import ExecOptions, run_order
 from admenot.engine.actions.executor import resume as resume_steps
 from admenot.engine.adb.devices import list_devices
@@ -105,6 +106,10 @@ INCIDENT_MAX_S = 600.0  # nagranie incydentu: najwyżej 10 min
 INCIDENT_INTERVAL_S = 2.0
 CONSOLE_TIMEOUT = 30.0
 QUIT_WAIT = 30.0
+SHARE_RETRY_S = 15.0  # ponawianie wysyłki planu bez sieci (spec plan-qr §5.3)
+SHARE_RETRY_WINDOW_S = 120.0
+_SHARE_ID = re.compile(r"[A-Za-z0-9-]{1,64}")
+SHOWN_MAX = 200  # pamiętane kody kontrolne pokazane klientom w tej sesji; najstarsze odpadają
 
 
 def _real_host(adb_path: str | None) -> AdbTransport:
@@ -153,6 +158,9 @@ class Api:
         launch_setup: Callable[[Path], object] = installer.launch,
         open_url: Callable[[str], object] = webbrowser.open,
         frozen: bool | None = None,
+        share_upload: Callable[[bytes], tuple[str, str]] = client.create_share,
+        share_retry_s: float = SHARE_RETRY_S,
+        share_retry_window_s: float = SHARE_RETRY_WINDOW_S,
     ) -> None:
         self._emitter = emitter
         self._host_factory = host_factory
@@ -191,6 +199,12 @@ class Api:
         self._identities: dict[str, tuple[str | None, str | None]] = {}  # telefon → (nazwa, IMEI)
         self._pending: dict[str, list[int]] = {}  # telefon → zrzuty czekające na zlecenie
         self._shots_lock = threading.Lock()  # chroni _open_order/_pending; nigdy pod adb/screencap
+        self._share_upload = share_upload
+        self._share_retry_s = share_retry_s
+        self._share_retry_window_s = share_retry_window_s
+        self._share_lock = threading.Lock()
+        self._share_cancel: tuple[str, threading.Event] | None = None  # (share_id, sygnał przerwania)
+        self._shown: dict[str, datetime] = {}  # kod kontrolny → kiedy pokazany klientowi
         self._clean_screenshots()
         self._purge_old_data()
         self._mirror = mirror_factory(
@@ -757,9 +771,85 @@ class Api:
         return plan_view(plan, self._lang)
 
     @_api
-    def execute(self, requests: dict[str, str], unlocked: list[str] | None = None) -> dict[str, Any]:
+    def share_plan(self, requests: dict[str, str], unlocked: list[str] | None,
+                   share_id: str) -> dict[str, Any]:
+        """Plan dla klienta (spec plan-qr §5.3): wynik przychodzi zdarzeniem `share:ready|failed`."""
+        if not isinstance(share_id, str) or not _SHARE_ID.fullmatch(share_id):
+            raise AppError("bad_request", "share_id")
+        self._require_scan()
+        plan = plan_order(self._adb, self._report, dict(requests), unlocked or ())
+        if not plan.plans:
+            raise AppError("nothing_to_do")
+        names = {p: app_name(f, p) for p, f in plan.facts.items()}
+        at = self._now()
+        common = {"lang": self._lang, "phone": device_card(plan.device, self._match)["name"],
+                  "at": at, "names": names, "shop": load_service().name}
+        full = share.fit(share.build_payload(plan, **common))
+        local = share.local_url(client.base_url(), share.build_payload(plan, icons=False, **common))
+        code = full["code"]
+        self._shown.pop(code, None)
+        self._shown[code] = at
+        while len(self._shown) > SHOWN_MAX:
+            del self._shown[next(iter(self._shown))]
+        cancel = threading.Event()
+        with self._share_lock:
+            if self._share_cancel is not None:
+                self._share_cancel[1].set()
+            self._share_cancel = (share_id, cancel)
+
+        def emit(name: str, detail: dict[str, Any]) -> None:
+            if not cancel.is_set():
+                self._emit(name, {"share_id": share_id, "code": code, **detail})
+
+        def run() -> None:
+            deadline = time.monotonic() + self._share_retry_window_s
+            first = True
+            while not cancel.is_set():
+                try:
+                    blob, key = share.encrypt(full)
+                    sid, expires = self._share_upload(blob)
+                    emit("share:ready", {"url": share.server_url(client.base_url(), sid, key),
+                                         "mode": "server", "expires": expires})
+                    return
+                except BackendError as exc:
+                    if first:
+                        first = False
+                        # offline=False: serwer odpowiedział błędem (np. stara wersja), a nie brak sieci.
+                        offline = exc.kind == "offline"
+                        if local is not None:
+                            emit("share:ready", {"url": local, "mode": "local", "expires": None,
+                                                 "offline": offline})
+                        else:
+                            emit("share:failed", {"reason": "too_long", "offline": offline})
+                except Exception as exc:  # noqa: BLE001 — błąd przygotowania trafia do UI i logu
+                    report_error(exc, {"call": "share_plan"})
+                    emit("share:failed", {"reason": "error"})
+                    return
+                if time.monotonic() >= deadline or cancel.wait(self._share_retry_s):
+                    return
+
+        if self._sync:
+            run()
+        else:
+            threading.Thread(target=run, daemon=True, name="admenot-share").start()
+        return {"share_id": share_id, "code": code}
+
+    @_api
+    def cancel_share(self, share_id: str) -> dict[str, Any]:
+        """Przerywa tylko wskazane udostępnienie: spóźnione anulowanie starego kodu nie rusza nowego."""
+        with self._share_lock:
+            if self._share_cancel is not None and self._share_cancel[0] == share_id:
+                self._share_cancel[1].set()
+                self._share_cancel = None
+        return {"ok": True}
+
+    @_api
+    def execute(self, requests: dict[str, str], unlocked: list[str] | None = None,
+                consent: dict[str, Any] | None = None) -> dict[str, Any]:
         self._require_current()
         self._require_scan()
+        if consent is not None and not (isinstance(consent, dict) and isinstance(consent.get("code"), str)):
+            raise AppError("bad_request", "consent")
         self._abandon_apk()
         adb, report, match, client = self._adb, self._report, self._match, self._client
         wanted, free = dict(requests), list(unlocked or ())
@@ -768,9 +858,17 @@ class Api:
             plan = plan_order(adb, report, wanted, free)
             if not plan.plans:
                 raise AppError("nothing_to_do")
+            agreed = None
+            if consent is not None:
+                # Zgoda dotyczy dokładnie pokazanego planu — inny plan nie rusza (spec plan-qr §5.3).
+                shown = self._shown.get(consent["code"])
+                if shown is None or share.plan_code(plan) != consent["code"]:
+                    raise AppError("plan_changed")
+                agreed = {"code": consent["code"], "shown_at": shown.isoformat(timespec="seconds"),
+                          "confirmed_at": self._now().isoformat(timespec="seconds")}
             names = {p: app_name(f, p) for p, f in plan.facts.items()}
             with self._journal() as journal:
-                order = start(journal, plan, client, report, match)
+                order = start(journal, plan, client, report, match, agreed)
                 self._bind_order(journal, plan.device.serial, order.id)
                 self._emit("exec:order", {"order": order.number,
                                           "plan": plan_view(plan, self._lang)})

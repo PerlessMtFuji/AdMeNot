@@ -101,7 +101,7 @@ describe('plan and execution', () => {
     const { s, ctl, bridge } = await scanned();
     await ctl.setMode('expert');
     s.plan = {
-      runnable: 0,
+      runnable: 0, code: 'K7F3',
       apps: [{ package: 'com.sec.android.app.launcher', name: 'Launcher', level: 'disable',
         level_label: 'WYŁĄCZ', blocked: true, reason: 'protected',
         reason_text: 'aplikacja chroniona', steps: [], warnings: [] }],
@@ -204,7 +204,7 @@ describe('plan and execution', () => {
     const { s, bridge } = await app('empty');
     const plan = (pkg: string, name: string) => ({ package: pkg, name, level: 'disable' as const,
       level_label: 'WYŁĄCZ', blocked: false, reason: null, reason_text: null, steps: [], warnings: [] });
-    bridge.emit('exec:order', { order: 'ZS/2026/0926/05', plan: { runnable: 2,
+    bridge.emit('exec:order', { order: 'ZS/2026/0926/05', plan: { runnable: 2, code: 'K7F3',
       apps: [plan('a', 'Pierwsza'), plan('b', 'Druga')] } });
     bridge.emit('exec:step', { action_id: 1, package: 'a', name: 'Pierwsza', kind: 'enabled',
       label: 'wyłączenie aplikacji', status: 'done', error: null });
@@ -239,7 +239,7 @@ describe('plan and execution', () => {
     const { bridge } = await app('empty');
     const plan = { package: 'a', name: 'Pierwsza', level: 'disable' as const, level_label: 'WYŁĄCZ', blocked: false,
       reason: null, reason_text: null, steps: ['x', 'y', 'z', 'w'], warnings: [] };
-    bridge.emit('exec:order', { order: 'ZS/2026/0926/06', plan: { runnable: 1, apps: [plan] } });
+    bridge.emit('exec:order', { order: 'ZS/2026/0926/06', plan: { runnable: 1, code: 'K7F3', apps: [plan] } });
     bridge.emit('exec:step', { action_id: 1, package: 'a', name: 'Pierwsza', kind: 'x', label: 'x', status: 'done', error: null });
     bridge.emit('exec:step', { action_id: 2, package: 'a', name: 'Pierwsza', kind: 'y', label: 'y', status: 'running', error: null });
     await tick();

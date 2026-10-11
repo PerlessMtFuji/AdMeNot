@@ -179,6 +179,22 @@ export interface PlanApp {
 export interface PlanView {
   apps: PlanApp[];
   runnable: number;
+  code: string;
+}
+
+// offline: tylko przy pierwszej nieudanej wysyłce; false = serwer odpowiedział błędem, a nie brak sieci.
+export interface ShareReady { share_id: string; code: string; url: string; mode: 'server' | 'local'; expires: string | null; offline?: boolean }
+export interface ShareFailed { share_id: string; code: string; reason: 'too_long' | 'error'; offline?: boolean }
+export interface ShareState {
+  id: string;
+  code: string | null;
+  status: 'sending' | 'ready' | 'failed';
+  url: string | null;
+  mode: 'server' | 'local' | null;
+  expires: string | null;
+  upgraded: boolean; // kod z trybu lokalnego podmieniony na pełny (z ikonami)
+  reason: ShareFailed['reason'] | null;
+  offline?: boolean;
 }
 
 export type StepStatus = 'running' | 'done' | 'failed' | 'skipped' | 'undone';
@@ -355,7 +371,9 @@ export interface Api {
   mark_incident(): R<{ ok: boolean }>;
   rerender(): R<{ scan: ScanView | null }>;
   preview_plan(requests: Record<string, Level>, unlocked: string[]): R<PlanView>;
-  execute(requests: Record<string, Level>, unlocked: string[]): R<{ job_id: string }>;
+  share_plan(requests: Record<string, Level>, unlocked: string[], shareId: string): R<{ share_id: string; code: string }>;
+  cancel_share(shareId: string): R<{ ok: boolean }>;
+  execute(requests: Record<string, Level>, unlocked: string[], consent: { code: string } | null): R<{ job_id: string }>;
   resume(order: string): R<{ job_id: string }>;
   undo(order: string, actionId: number | null, pkg: string | null): R<{ job_id: string }>;
   stop(jobId: string): R<{ ok: boolean }>;
@@ -411,6 +429,8 @@ export interface EventMap {
   'undo:done': UndoDone;
   'adb:command': ConsoleEntry;
   'job:error': JobError;
+  'share:ready': ShareReady;
+  'share:failed': ShareFailed;
   'job:end': { job_id: string; kind: string };
   'app:close_requested': { kind: string };
   'update:state': UpdateView;

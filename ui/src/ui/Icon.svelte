@@ -17,6 +17,7 @@
   import Megaphone from '@lucide/svelte/icons/megaphone';
   import Pause from '@lucide/svelte/icons/pause';
   import Plus from '@lucide/svelte/icons/plus';
+  import QrCode from '@lucide/svelte/icons/qr-code';
   import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
   import ScanSearch from '@lucide/svelte/icons/scan-search';
   import ScreenShare from '@lucide/svelte/icons/screen-share';
@@ -40,7 +41,7 @@
     'venetian-mask': VenetianMask, clock: Clock, download: Download, zap: Zap, check: Check, x: X,
     'triangle-alert': TriangleAlert, info: Info, 'undo-2': Undo2, 'trash-2': Trash2, 'rotate-ccw': RotateCcw, 'arrow-left': ArrowLeft,
     'chevron-down': ChevronDown, 'chevron-right': ChevronRight, search: Search, terminal: Terminal,
-    history: HistoryIcon, settings: SettingsIcon, plus: Plus, pause: Pause, smartphone: Smartphone,
+    history: HistoryIcon, settings: SettingsIcon, plus: Plus, pause: Pause, 'qr-code': QrCode, smartphone: Smartphone,
     'shield-x': ShieldX, 'shield-alert': ShieldAlert, 'shield-user': ShieldUser, 'scan-search': ScanSearch,
     'file-text': FileText, camera: Camera, 'screen-share': ScreenShare, 'screen-share-off': ScreenShareOff,
     heart: Heart,

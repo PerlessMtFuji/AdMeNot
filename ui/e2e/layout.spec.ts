@@ -1,7 +1,8 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
 // Najmniejsze okno (min_size 1024×700 w src/admenot/app/main.py) to w WebView2 ok. 1008×661 px.
-test.use({ viewport: { width: 1008, height: 661 } });
+// Bez animacji: przy zmianie widoku stary <main> znikałby dopiero po animacji wyjścia.
+test.use({ viewport: { width: 1008, height: 661 }, reducedMotion: 'reduce' });
 
 type Box = { x: number; y: number; width: number; height: number };
 
@@ -10,6 +11,9 @@ async function scan(page: Page) {
   await page.getByPlaceholder('np. Anna K.').fill('Anna K.');
   await page.getByRole('button', { name: 'Skanuj' }).click();
   await expect(page.getByText(/Analiza APK w tle/)).toBeHidden({ timeout: 15_000 });
+  // App.svelte tworzy <main> od nowa przy zmianie widoku ({#key view}); napis o analizie znika chwilę
+  // przed przejściem na wyniki, a pomiar starego <main> dawał null (niestabilny test).
+  await expect(page.getByRole('heading', { name: /wymagają uwagi/ })).toBeVisible();
 }
 
 async function box(locator: Locator): Promise<Box> {
