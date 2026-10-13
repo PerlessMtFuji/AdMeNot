@@ -8,6 +8,9 @@ import { DurableObject } from "cloudflare:workers";
 const today = (now = new Date()): string => now.toISOString().slice(0, 10);
 const KEY = "key"; // { day, secret } — klucz HMAC bieżącej doby
 
+// Raporty błędów na adres i dobę (przegląd 2026-10-11): sufit 100/dobę jest wspólny dla wszystkich.
+export const REPORTS_IP_DAILY = 20;
+
 // Sekundy do północy UTC — wtedy limit wraca (nagłówek Retry-After).
 export function untilMidnight(now = new Date()): number {
   const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);

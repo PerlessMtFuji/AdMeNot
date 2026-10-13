@@ -4,27 +4,33 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Support the project — AdMeNot</title>
-<link rel="icon" href="/favicon.ico">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <header class="top">
-  <a class="brand" href="/"><img src="/icon.png" alt="" width="32" height="32"> AdMeNot</a>
-  <a class="lang" href="/pl/donate" hreflang="pl" lang="pl">Polski</a>
+  <a class="brand" href="/"><img src="/logo.svg" alt="" width="36" height="36">AdMeNot</a>
+  <nav class="nav" aria-label="Main">
+    <a class="lang" href="/pl/donate" hreflang="pl" lang="pl">Polski</a>
+  </nav>
 </header>
-<main>
+<main class="doc">
   <section>
     <h1>Support the project</h1>
     <p>AdMeNot is free and its source code is public. I develop it in my spare time.</p>
     <p>Right now the project's only cost is a Claude Code subscription — PLN 100 a month. Covering it would be a huge motivation for me! It is entirely voluntary: it unlocks nothing, and the program works the same for everyone.</p>
-    <p><a class="button download" href="https://suppi.pl/perlessmtfuji" rel="noopener">Support on suppi.pl</a></p>
+    <p class="actions"><a class="button cta" href="https://suppi.pl/perlessmtfuji" rel="noopener">Support on suppi.pl</a></p>
     <p class="note">For now, support goes through suppi.pl, a Polish service (BLIK, bank transfer). The AdMeNot program sends no data there.</p>
   </section>
 </main>
-<footer>
-  <a href="/">AdMeNot</a> ·
-  <a href="https://github.com/PerlessMtFuji/AdMeNot">Source code</a> ·
-  <a href="/privacy">Privacy policy</a>
+<footer class="foot">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/logo.svg" alt="" width="24" height="24">AdMeNot</a>
+    <a href="https://github.com/PerlessMtFuji/AdMeNot">Source code</a>
+    <a href="/privacy">Privacy policy</a>
+    <a href="/donate">Support the project</a>
+  </div>
 </footer>
 </body>
 </html>

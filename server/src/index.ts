@@ -1,14 +1,13 @@
 // Worker AdMeNot: statyczna strona z public/ (bez kodu) + API pod /api/v1/ (spec backendu §2).
 // Nie logujemy zapytań ani nagłówków — adresów IP nie zapisujemy nigdzie (§2.2).
 import { json, readLimited } from "./http";
-import { takeQuota, untilMidnight } from "./quota";
+import { REPORTS_IP_DAILY, takeQuota, untilMidnight } from "./quota";
 import { createShare, getShare, pruneShares } from "./shares";
 import { createEvents, deleteEvents, pruneEvents } from "./telemetry";
 
+// Eksportujemy tylko punkty wejścia: workerd traktuje każdy eksport tego pliku jako handler
+// i nie startuje, gdy trafi na zwykłą stałą.
 export { Quota } from "./quota";
-export { SHARE_MAX_BODY, SHARES_IP_DAILY, SHARES_LIVE_CAP } from "./shares";
-// Raporty błędów na adres i dobę (przegląd 2026-10-11): sufit 100/dobę jest wspólny dla wszystkich.
-export const REPORTS_IP_DAILY = 20;
 
 const TELEMETRY_ITEM = /^\/api\/v1\/telemetry\/([^/]+)$/;
 const SHARE_ITEM = /^\/api\/v1\/shares\/([^/]+)$/;

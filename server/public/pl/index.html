@@ -4,44 +4,207 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AdMeNot — usuwanie adware z telefonów klientów</title>
-<meta name="description" content="Darmowy program na Windows dla serwisów GSM: znajduje i usuwa adware z telefonów z Androidem przez USB.">
-<link rel="icon" href="/favicon.ico">
+<meta name="description" content="Darmowy program na Windows dla serwisów GSM: znajduje i usuwa adware z telefonów z Androidem przez USB, wyjaśnia każdą decyzję i pozwala ją cofnąć.">
+<meta name="theme-color" content="#4f46e5">
+<meta property="og:title" content="AdMeNot — usuwanie adware z telefonów klientów">
+<meta property="og:description" content="Darmowy program na Windows dla serwisów GSM: znajduje i usuwa adware z telefonów z Androidem przez USB.">
+<meta property="og:image" content="https://admenot.perlessmtfuji.workers.dev/img/pl/results-simple.webp">
+<link rel="alternate" hreflang="en" href="/">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
+<link rel="preload" href="/fonts/manrope-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/style.css">
+<script>document.documentElement.classList.add("js")</script>
+<script src="/site.js" defer></script>
 </head>
 <body data-released="false">
 <header class="top">
-  <a class="brand" href="/pl/"><img src="/icon.png" alt="" width="32" height="32"> AdMeNot</a>
-  <a class="lang" href="/" hreflang="en" lang="en">English</a>
+  <a class="brand" href="/pl/"><img src="/logo.svg" alt="" width="36" height="36">AdMeNot</a>
+  <nav class="nav" aria-label="Główna">
+    <a class="opt" href="#jak">Jak to działa</a>
+    <a class="opt" href="#pobierz">Pobierz</a>
+    <a class="opt" href="#wsparcie">Wsparcie</a>
+    <a class="lang" href="/" hreflang="en" lang="en">English</a>
+  </nav>
 </header>
+
 <main>
-  <section>
-    <h1>Usuwanie adware z telefonów klientów</h1>
-    <p class="lead">AdMeNot to darmowy program na Windows dla serwisów GSM. Podłączasz telefon z Androidem przez USB, a program znajduje aplikacje wyświetlające reklamy nad innymi aplikacjami, wyjaśnia, dlaczego każdą oznaczył, i usuwa je — z możliwością cofnięcia.</p>
-    <p>
-      <a class="button download" href="https://github.com/PerlessMtFuji/AdMeNot/releases/latest">Pobierz na Windows</a>
-      <span class="button soon" aria-disabled="true">Wkrótce</span>
-    </p>
-    <p class="note">Publiczna beta · za darmo · kod jawny</p>
+  <section class="hero wrap">
+    <div>
+      <h1>Usuwanie adware z&nbsp;telefonów klientów</h1>
+      <p class="lead">AdMeNot to darmowy program na Windows dla serwisów GSM. Podłączasz telefon z Androidem przez USB, a program znajduje aplikacje wyświetlające reklamy nad innymi aplikacjami, wyjaśnia, dlaczego każdą oznaczył, i usuwa je z możliwością cofnięcia.</p>
+      <div class="actions">
+        <a class="button download" href="https://github.com/PerlessMtFuji/AdMeNot/releases/latest">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
+          Pobierz na Windows
+        </a>
+        <span class="button soon" aria-disabled="true">Pobieranie wkrótce</span>
+        <a class="button ghost" href="#jak">Zobacz, jak działa</a>
+      </div>
+      <ul class="facts" aria-label="W skrócie">
+        <li>Za darmo</li>
+        <li>Windows 10 i 11</li>
+        <li>Po polsku i angielsku</li>
+        <li>Publiczna beta</li>
+      </ul>
+    </div>
+    <div class="stage">
+      <figure class="window">
+        <img src="/img/pl/results-simple.webp" width="1280" height="800" alt="Wyniki skanu AdMeNot: jedna szkodliwa aplikacja, com.clean.pro.boost, z ikonami problemów i proponowaną akcją Wyłącz" fetchpriority="high">
+      </figure>
+      <figure class="phone">
+        <img src="/img/pl/client-plan.webp" width="390" height="780" alt="Plan naprawy tak, jak widzi go klient na swoim telefonie">
+      </figure>
+    </div>
   </section>
-  <section>
-    <h2>Wymagania</h2>
-    <ul>
-      <li>Windows 10 lub 11</li>
-      <li>Kabel USB do telefonu</li>
-      <li>Włączone debugowanie USB w telefonie (Opcje programisty)</li>
-    </ul>
+
+  <section class="band alt" id="jak">
+    <div class="wrap">
+      <div class="intro">
+        <h2>Jedno zlecenie od początku do końca</h2>
+        <p>Klient mówi: „wyskakują mi reklamy”. Oto, co dzieje się dalej.</p>
+      </div>
+      <div class="steps">
+        <ol class="step-list" role="tablist" aria-orientation="vertical" aria-label="Kroki naprawy">
+          <li><button role="tab" id="tab-1" aria-controls="shot-1" aria-selected="true">
+            <h3>Podłączenie i skan</h3>
+            <p>Podłącz telefon z włączonym debugowaniem USB. AdMeNot rozpoznaje model i odczytuje aplikacje oraz to, co robiły przez ostatnią dobę. Skan niczego na telefonie nie zmienia.</p>
+          </button></li>
+          <li><button role="tab" id="tab-2" aria-controls="shot-2" aria-selected="false">
+            <h3>Co jest nie tak</h3>
+            <p>Aplikacje trafiają do grup: szkodliwe, podejrzane, do sprawdzenia i bez uwag. Przy każdej jest zrozumiałe „Dlaczego?”.</p>
+          </button></li>
+          <li><button role="tab" id="tab-3" aria-controls="shot-3" aria-selected="false">
+            <h3>Pokaż klientowi</h3>
+            <p>Podsumowanie pokazuje każdy krok, zanim cokolwiek się wykona. Kod QR przenosi plan na telefon klienta, z kodem kontrolnym takim samym jak na Twoim ekranie.</p>
+          </button></li>
+          <li><button role="tab" id="tab-4" aria-controls="shot-4" aria-selected="false">
+            <h3>Naprawa, protokół, cofanie</h3>
+            <p>Program sprawdza każdy krok. Dostajesz protokół serwisowy w PDF, a każdą zmianę cofniesz w Historii.</p>
+          </button></li>
+        </ol>
+        <div class="step-shots">
+          <figure id="shot-1" role="tabpanel" aria-labelledby="tab-1">
+            <div class="window"><img src="/img/pl/connect.webp" width="1280" height="800" alt="Podłączony telefon rozpoznany i gotowy do skanu" loading="lazy"></div>
+            <figcaption>Podłączenie i skan</figcaption>
+          </figure>
+          <figure id="shot-2" role="tabpanel" aria-labelledby="tab-2">
+            <div class="window"><img src="/img/pl/results-simple.webp" width="1280" height="800" alt="Wyniki w trybie prostym, z jedną szkodliwą aplikacją" loading="lazy"></div>
+            <figcaption>Co jest nie tak</figcaption>
+          </figure>
+          <figure id="shot-3" role="tabpanel" aria-labelledby="tab-3">
+            <div class="window"><img src="/img/pl/share-qr.webp" width="1280" height="800" alt="Podsumowanie naprawy z listą kroków, kodem QR i kodem kontrolnym dla klienta" loading="lazy"></div>
+            <figcaption>Pokaż klientowi</figcaption>
+          </figure>
+          <figure id="shot-4" role="tabpanel" aria-labelledby="tab-4">
+            <div class="window"><img src="/img/pl/done.webp" width="1280" height="800" alt="Telefon naprawiony: każdy krok sprawdzony" loading="lazy"></div>
+            <figcaption>Naprawa, protokół, cofanie</figcaption>
+          </figure>
+        </div>
+      </div>
+    </div>
   </section>
-  <section>
-    <h2>Przed instalacją</h2>
-    <p>To wersja beta. Instalator nie ma jeszcze podpisu cyfrowego, więc Windows SmartScreen może ostrzec. Kliknij <strong>Więcej informacji</strong>, a potem <strong>Uruchom mimo to</strong>.</p>
-    <p>W notatkach do każdego wydania na GitHubie jest suma SHA-256 instalatora i wynik skanu VirusTotal.</p>
+
+  <section class="band">
+    <div class="wrap split">
+      <figure class="window">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="/img/pl/results-expert-dark.webp">
+          <img src="/img/pl/results-expert.webp" width="1280" height="800" alt="Tryb ekspercki: szkodliwa aplikacja ma wynik 100 przy wysokiej pewności; obok lista powodów" loading="lazy">
+        </picture>
+      </figure>
+      <div class="intro">
+        <h2>Każde oznaczenie ma uzasadnienie</h2>
+        <p>Każda aplikacja dostaje wynik od 0 do 100 i poziom pewności. Widzisz dokładnie, które sygnały się złożyły, na przykład:</p>
+        <ul class="reasons">
+          <li>Wyświetla okna nad innymi aplikacjami</li>
+          <li>Jest administratorem urządzenia</li>
+          <li>Budzi telefon wiele razy na godzinę</li>
+          <li>Nie pochodzi ze Sklepu Play</li>
+          <li>Ma nazwę udającą aplikację systemową</li>
+        </ul>
+        <p class="caveat">Oceny są heurystyczne: mówią, co aplikacja robi i jak pewny jest program, a nie że jest złośliwa. Ostateczną decyzję podejmujesz Ty. <a href="https://github.com/PerlessMtFuji/AdMeNot/blob/master/README.pl.md#jak-oceniane-są-aplikacje">Jak oceniane są aplikacje</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band alt">
+    <div class="wrap">
+      <div class="intro">
+        <h2>Ostrożnie z telefonem klienta</h2>
+      </div>
+      <ul class="safety">
+        <li>
+          <h3>Każdą zmianę da się cofnąć</h3>
+          <p>Usuwana aplikacja najpierw trafia do kopii na komputerze i można ją zainstalować z powrotem z Historii. Usunięcie kasuje dane aplikacji, więc program o tym ostrzega.</p>
+        </li>
+        <li>
+          <h3>Aplikacje systemowe są zablokowane</h3>
+          <p>Ustawień, telefonu, interfejsu systemu i instalatora nie da się ruszyć przez przypadek. Aktywną klawiaturę można wyciszyć, ale nie wyłączyć.</p>
+        </li>
+        <li>
+          <h3>Znajdź prawdziwe źródło reklamy</h3>
+          <p>Gdy winowajca nie jest oczywisty, wywołaj reklamę i kliknij „Kto to wyświetla?”, żeby sprawdzić, do której aplikacji należy okno.</p>
+        </li>
+        <li>
+          <h3>Nic nie dzieje się po cichu</h3>
+          <p>Konsola ADB pokazuje każde polecenie wysłane do telefonu. Gdy kabel wypadnie w trakcie naprawy, podłącz go ponownie i dokończ albo cofnij zlecenie.</p>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="band" id="pobierz">
+    <div class="wrap">
+      <div class="intro">
+        <h2>Pobierz AdMeNot</h2>
+        <p>Za darmo dla serwisów. Bez konta i bez uprawnień administratora przy instalacji.</p>
+      </div>
+      <div class="get">
+        <div>
+          <h3>Czego potrzebujesz</h3>
+          <ul>
+            <li>Komputer z Windows 10 lub 11 (64-bitowy)</li>
+            <li>Kabel USB do telefonu</li>
+            <li>Włączone debugowanie USB w telefonie (Opcje programisty)</li>
+          </ul>
+          <div class="actions">
+            <a class="button download" href="https://github.com/PerlessMtFuji/AdMeNot/releases/latest">
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14"/></svg>
+              Pobierz na Windows
+            </a>
+            <span class="button soon" aria-disabled="true">Pobieranie wkrótce</span>
+          </div>
+        </div>
+        <div>
+          <h3>Przed instalacją</h3>
+          <p>To wersja beta. Instalator nie ma jeszcze podpisu cyfrowego, więc Windows SmartScreen może ostrzec. Kliknij <strong>Więcej informacji</strong>, a potem <strong>Uruchom mimo to</strong>.</p>
+          <p>W notatkach do każdego wydania na GitHubie jest suma SHA-256 instalatora i wynik skanu VirusTotal.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wrap" id="wsparcie">
+    <div class="support">
+      <svg class="heart" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M12 21s-7.5-4.6-9.6-9.3C.9 8.2 3.1 4.5 6.8 4.5c2.1 0 3.6 1.1 4.4 2.4h1.6c.8-1.3 2.3-2.4 4.4-2.4 3.7 0 5.9 3.7 4.4 7.2C19.5 16.4 12 21 12 21Z"/></svg>
+      <div>
+        <h2>Robi go jedna osoba, za darmo dla wszystkich</h2>
+        <p>Jeśli AdMeNot oszczędza Ci czas, możesz wesprzeć jego rozwój. To dobrowolne i niczego nie odblokowuje: program działa tak samo dla wszystkich. <a href="/pl/donate">Na co idą wpłaty</a></p>
+      </div>
+      <a class="button cta" href="https://suppi.pl/perlessmtfuji" rel="noopener">Wesprzyj na suppi.pl</a>
+    </div>
   </section>
 </main>
-<footer>
-  <a href="https://github.com/PerlessMtFuji/AdMeNot">Kod źródłowy</a> ·
-  <a href="https://github.com/PerlessMtFuji/AdMeNot/blob/master/LICENSE">Licencja (PolyForm Shield 1.0.0)</a> ·
-  <a href="/pl/privacy">Polityka prywatności</a> ·
-  <a href="/pl/donate">Wesprzyj projekt</a>
+
+<footer class="foot">
+  <div class="wrap">
+    <a class="brand" href="/pl/"><img src="/logo.svg" alt="" width="24" height="24">AdMeNot</a>
+    <a href="https://github.com/PerlessMtFuji/AdMeNot">Kod źródłowy</a>
+    <a href="https://github.com/PerlessMtFuji/AdMeNot/blob/master/LICENSE">Licencja (PolyForm Shield 1.0.0)</a>
+    <a href="/pl/privacy">Polityka prywatności</a>
+    <a href="/pl/donate">Wesprzyj projekt</a>
+  </div>
 </footer>
 </body>
 </html>

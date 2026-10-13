@@ -1,6 +1,7 @@
 import { env, exports } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
-import worker, { REPORTS_IP_DAILY } from "../src/index";
+import worker from "../src/index";
+import { REPORTS_IP_DAILY } from "../src/quota";
 
 const BASE = "https://admenot.test";
 const ID = /^R-[0-9A-HJKMNP-TV-Z]{6}$/;

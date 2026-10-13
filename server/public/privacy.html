@@ -4,15 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Privacy policy — AdMeNot</title>
-<link rel="icon" href="/favicon.ico">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <header class="top">
-  <a class="brand" href="/"><img src="/icon.png" alt="" width="32" height="32"> AdMeNot</a>
-  <a class="lang" href="/pl/privacy" hreflang="pl" lang="pl">Polski</a>
+  <a class="brand" href="/"><img src="/logo.svg" alt="" width="36" height="36">AdMeNot</a>
+  <nav class="nav" aria-label="Main">
+    <a class="lang" href="/pl/privacy" hreflang="pl" lang="pl">Polski</a>
+  </nav>
 </header>
-<main>
+<main class="doc">
   <section>
     <h1>Privacy policy</h1>
     <p class="note">Version of 9 October 2026</p>
@@ -68,9 +71,13 @@
     <p>Under the GDPR you may ask for access to your data, its correction or deletion, restriction of its processing, its portability, and object to its processing. Write to the address above. You may also lodge a complaint with a supervisory authority — in Poland, the President of the Personal Data Protection Office (UODO).</p>
   </section>
 </main>
-<footer>
-  <a href="/">AdMeNot</a> ·
-  <a href="https://github.com/PerlessMtFuji/AdMeNot">Source code</a>
+<footer class="foot">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/logo.svg" alt="" width="24" height="24">AdMeNot</a>
+    <a href="https://github.com/PerlessMtFuji/AdMeNot">Source code</a>
+    <a href="/privacy">Privacy policy</a>
+    <a href="/donate">Support the project</a>
+  </div>
 </footer>
 </body>
 </html>

@@ -1,7 +1,8 @@
 import { runDurableObjectAlarm, runInDurableObject } from "cloudflare:test";
 import { env, exports } from "cloudflare:workers";
 import { describe, expect, it } from "vitest";
-import worker, { REPORTS_IP_DAILY } from "../src/index";
+import worker from "../src/index";
+import { REPORTS_IP_DAILY } from "../src/quota";
 import type { Quota } from "../src/quota";
 
 const BASE = "https://admenot.test";

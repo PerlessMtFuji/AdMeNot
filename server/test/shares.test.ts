@@ -1,6 +1,7 @@
 import { env, exports } from "cloudflare:workers";
 import { beforeEach, describe, expect, it } from "vitest";
-import worker, { SHARE_MAX_BODY, SHARES_IP_DAILY, SHARES_LIVE_CAP } from "../src/index";
+import worker from "../src/index";
+import { SHARE_MAX_BODY, SHARES_IP_DAILY, SHARES_LIVE_CAP } from "../src/shares";
 
 const BASE = "https://admenot.test";
 const ID = /^[A-Za-z0-9_-]{22}$/;
