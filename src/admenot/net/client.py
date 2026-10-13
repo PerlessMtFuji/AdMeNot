@@ -19,7 +19,7 @@ from typing import Any, Literal
 
 from admenot import __version__
 
-BASE_URL = "https://admenot.e-wlodarski.workers.dev"
+BASE_URL = "https://admenot.perlessmtfuji.workers.dev"
 ENV_URL = "ADMENOT_API_URL"  # nadpisuje BASE_URL: testy, `wrangler dev`
 TIMEOUT = 5.0  # sekundy; bez ponowień
 DOWNLOAD_TIMEOUT = 30.0  # sekundy na operację gniazda przy pobieraniu instalatora

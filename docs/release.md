@@ -29,7 +29,7 @@ plik i przepisz lokalny commit (`git commit --amend`) przed pushem.
 ## Backend (Cloudflare Worker `admenot`)
 
 Kod w `server/`: strona (`public/`), API (`src/index.ts`), migracje D1 (`migrations/`).
-Adres: `https://admenot.e-wlodarski.workers.dev` (ten sam co `BASE_URL` w `src/admenot/net/client.py`).
+Adres: `https://admenot.perlessmtfuji.workers.dev` (ten sam co `BASE_URL` w `src/admenot/net/client.py`).
 
 Przed wdrożeniem: `npm test` i `npm run check` w `server/` oraz `pytest tests/test_site.py`.
 

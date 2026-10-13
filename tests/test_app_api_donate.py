@@ -78,7 +78,7 @@ def test_donate_page_and_reminder_switch():
     api, _ = make_api(make_cli_phone(), open_url=opened.append)
     assert api.get_settings()["donate_reminders"] is True
     assert api.open_donate() == {"ok": True}
-    assert opened == ["https://admenot.e-wlodarski.workers.dev/pl/donate"]
+    assert opened == ["https://admenot.perlessmtfuji.workers.dev/pl/donate"]
     view = api.set_donate_reminders(False)
     assert view["donate_reminders"] is False and load_settings().donate_off is True
     assert api.set_donate_reminders(True)["donate_reminders"] is True

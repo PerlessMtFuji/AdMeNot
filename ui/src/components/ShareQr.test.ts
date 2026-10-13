@@ -70,7 +70,7 @@ describe('ShareQr', () => {
 // Kod musi dać się zeskanować telefonem: co najmniej 3 px ekranu na moduł (przegląd 2026-10-11).
 // Adres na granicy limitu trybu lokalnego (engine/share.py LOCAL_LIMIT) z adresem produkcyjnym.
 const MIN_PX = 3;
-const longUrl = 'https://admenot.e-wlodarski.workers.dev/plan#l.' + 'x'.repeat(vector.local_limit - 2);
+const longUrl = 'https://admenot.perlessmtfuji.workers.dev/plan#l.' + 'x'.repeat(vector.local_limit - 2);
 const pxPerModule = (svg: Element) => Number(svg.getAttribute('width')) / Number(svg.getAttribute('viewBox')!.split(' ')[2]);
 
 describe('ShareQr readability', () => {
@@ -78,7 +78,7 @@ describe('ShareQr readability', () => {
     const { s, bridge } = await renderWith(ShareQr, 'adware');
     s.share = { id: 'a', code: 'K7F3', status: 'sending', url: null, mode: null, expires: null, upgraded: false, reason: null };
     bridge.emit('share:ready', { share_id: 'a', code: 'K7F3', mode: 'server', expires: null,
-      url: `https://admenot.e-wlodarski.workers.dev/plan#s.${'A'.repeat(22)}.${'B'.repeat(43)}` });
+      url: `https://admenot.perlessmtfuji.workers.dev/plan#s.${'A'.repeat(22)}.${'B'.repeat(43)}` });
     await tick();
     expect(pxPerModule(screen.getByRole('img', { name: /Kod QR/ }))).toBeGreaterThanOrEqual(MIN_PX);
     expect(screen.queryByRole('button', { name: /Powiększ kod/ })).toBeNull();

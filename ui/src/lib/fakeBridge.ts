@@ -1,6 +1,6 @@
 // Atrapa mostu: odtwarza scenariusze nagrane z prawdziwego Api (scripts/record_bridge_fixtures.py).
 import type { Bridge } from './bridge';
-import type { Api, CrashSummary, EventMap, EventName, ScanView, ServiceInfo, Settings, ShotView, TelemetrySample, UpdateView } from './types';
+import type { Api, CrashSummary, EventMap, EventName, Lang, ScanView, ServiceInfo, Settings, ShotView, TelemetrySample, UpdateView } from './types';
 // Wynik `telemetry_events.sample()` z Pythona (Task 7 planu kroku H) — ten sam kształt co prawdziwe zdarzenia.
 import SAMPLE from './telemetrySample.json';
 
@@ -43,7 +43,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export type ShareScenario = 'server' | 'local' | 'too_long';
 
 export function createFakeBridge(name: string,
-  options: { delay?: number; welcome?: boolean; share?: ShareScenario } = {}): FakeBridge {
+  options: { delay?: number; welcome?: boolean; share?: ShareScenario; lang?: Lang } = {}): FakeBridge {
   const data = scenarios[name];
   if (!data) throw new Error(`unknown scenario: ${name}`);
   const delay = options.delay ?? 15;
@@ -53,7 +53,7 @@ export function createFakeBridge(name: string,
   }
   const target = new EventTarget();
   const calls: FakeBridge['calls'] = [];
-  let settings: Settings = { lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system', mirror_auto: false,
+  let settings: Settings = { lang: options.lang ?? 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system', mirror_auto: false,
     apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false, select_level: 'silence', retention_days: 60,
     check_updates: true, dismissed_update: null, last_run_version: null,
     welcome_version: options.welcome ? null : 1, welcome_current: 1, telemetry: false, telemetry_packages: false,
@@ -134,12 +134,12 @@ export function createFakeBridge(name: string,
         const shareId = String(args[2]);
         const code = planCode;
         const server: [string, unknown] = ['share:ready', { share_id: shareId, code, mode: 'server',
-          expires: '2026-10-11T13:32:00Z', url: `https://admenot.e-wlodarski.workers.dev/plan#s.${'A'.repeat(22)}.${'B'.repeat(43)}` }];
+          expires: '2026-10-11T13:32:00Z', url: `https://admenot.perlessmtfuji.workers.dev/plan#s.${'A'.repeat(22)}.${'B'.repeat(43)}` }];
         if (options.share === 'too_long') {
           replay([['share:failed', { share_id: shareId, code, reason: 'too_long', offline: true }]]);
         } else if (options.share === 'local') {
           replay([['share:ready', { share_id: shareId, code, mode: 'local', expires: null, offline: true,
-            url: `https://admenot.e-wlodarski.workers.dev/plan#l.${'x'.repeat(1498)}` }]]);
+            url: `https://admenot.perlessmtfuji.workers.dev/plan#l.${'x'.repeat(1498)}` }]]);
           setTimeout(() => dispatch(...server), 3000); // pełny plan dochodzi po powrocie sieci
         } else {
           replay([server]);

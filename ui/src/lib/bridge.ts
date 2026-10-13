@@ -41,7 +41,8 @@ export async function connectBridge(): Promise<Bridge> {
     const { createFakeBridge } = await import('./fakeBridge');
     const params = new URLSearchParams(location.search);
     return createFakeBridge(params.get('scenario') ?? 'adware', { welcome: params.get('welcome') === '1',
-      share: (params.get('share') ?? undefined) as ShareScenario | undefined });
+      share: (params.get('share') ?? undefined) as ShareScenario | undefined,
+      lang: params.get('lang') === 'en' ? 'en' : undefined });
   }
   return { api: await waitForPywebview(), on: windowEvents() };
 }

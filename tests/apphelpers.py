@@ -42,10 +42,10 @@ class SlowApk:
         return {}
 
 
-def make_api(phone, *, sync=True, apk=None, **kw):
+def make_api(phone, *, sync=True, apk=None, lang="pl", **kw):
     # Controller ruling F2: testy nie mogą zależeć od locale Windows — język ustawiony na
     # sztywno przed skonstruowaniem `Api`, które przy starcie wczytuje ustawienia.
-    save_settings({"lang": "pl"})
+    save_settings({"lang": lang})
     rec = RecordingEmitter()
     kw.setdefault("open_file", lambda path: None)
     provider = apk or NoApk()
