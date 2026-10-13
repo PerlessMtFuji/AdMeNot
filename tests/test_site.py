@@ -11,7 +11,7 @@ PUBLIC = Path(__file__).resolve().parents[1] / "server" / "public"
 PAGES = ("index.html", "privacy.html", "donate.html", "pl/index.html", "pl/privacy.html",
          "pl/donate.html", "404.html")
 DOWNLOAD = "https://github.com/PerlessMtFuji/AdMeNot/releases/latest"
-SUPPI = "https://suppi.pl/"
+SUPPI = "https://suppi.pl/perlessmtfuji"
 
 
 class Page(HTMLParser):
@@ -134,7 +134,7 @@ def test_donate_pages_link_each_other_and_suppi():
     en_links = [a.get("href") or "" for a in en.all("a")]
     pl_links = [a.get("href") or "" for a in pl.all("a")]
     assert "/pl/donate" in en_links and "/donate" in pl_links
-    assert any(h.startswith(SUPPI) for h in en_links) and any(h.startswith(SUPPI) for h in pl_links)
+    assert any(h == SUPPI for h in en_links) and any(h == SUPPI for h in pl_links)
 
 
 def test_home_pages_link_the_donate_page():

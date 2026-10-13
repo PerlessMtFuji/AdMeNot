@@ -59,9 +59,9 @@ def _sort_adb_runs(events: list[list[Any]]) -> list[list[Any]]:
 class Recorder:
     """Woła metody `Api` i zbiera parę (wynik, zdarzenia) dla każdego wywołania."""
 
-    def __init__(self, phone: Any) -> None:
-        # apphelpers.make_api pina język na "pl" (save_settings) i czas na NOW zanim zbuduje `Api`.
-        self.api, self.emitter = make_api(phone, sync=True, poll_interval=0.0)
+    def __init__(self, phone: Any, lang: str = "pl") -> None:
+        # apphelpers.make_api pina język (save_settings) i czas na NOW zanim zbuduje `Api`.
+        self.api, self.emitter = make_api(phone, sync=True, lang=lang, poll_interval=0.0)
         self.calls: list[dict[str, Any]] = []
 
     def call(self, method: str, *args: Any) -> Any:
@@ -98,7 +98,7 @@ def _normalize(value: Any, tmp: str) -> Any:
 
 
 @contextmanager
-def _isolated() -> Iterator[str]:
+def _isolated(lang: str = "pl") -> Iterator[str]:
     keys = ("LOCALAPPDATA", "ADMENOT_ASSETS")
     saved = {k: os.environ.get(k) for k in keys}
     with tempfile.TemporaryDirectory() as tmp:
@@ -107,7 +107,7 @@ def _isolated() -> Iterator[str]:
         # Ruling F2: nagranie nie może zależeć od locale Windows -- język na sztywno zanim
         # jakikolwiek `Api` wczyta ustawienia (make_api robi to samo, ale robimy to i tu, na
         # wszelki wypadek, gdyby krok scenariusza zbudował `Api` inaczej).
-        save_settings({"lang": "pl"})
+        save_settings({"lang": lang})
         try:
             yield tmp
         finally:
@@ -118,10 +118,10 @@ def _isolated() -> Iterator[str]:
                     os.environ[k] = v
 
 
-def _scenario(name: str, steps: Callable[[Recorder, Any], None]) -> dict[str, Any]:
-    with _isolated() as tmp:
+def _scenario(name: str, steps: Callable[[Recorder, Any], None], lang: str = "pl") -> dict[str, Any]:
+    with _isolated(lang) as tmp:
         phone = make_cli_phone()
-        recorder = Recorder(phone)
+        recorder = Recorder(phone, lang)
         steps(recorder, phone)
         return _normalize({"name": name, "calls": recorder.calls}, tmp)
 
@@ -210,6 +210,8 @@ def record_all() -> dict[str, dict[str, Any]]:
             "HT7A1B2C3  device usb:1-2 model:Pixel_7\n")
     return {
         "adware": adware,
+        # Teksty silnika po angielsku: zrzuty do README.md (ui/readme-shots, `?lang=en`).
+        "adware-en": _scenario("adware-en", _adware, lang="en"),
         "clean": _clean(adware),
         "disconnect": _scenario("disconnect", _disconnect),
         "report": _scenario("report", _report),
