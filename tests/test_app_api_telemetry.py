@@ -112,7 +112,7 @@ def test_sample_and_privacy_link():
     sample = api.telemetry_sample()
     assert {e["type"] for e in sample["basic"]} == {"start", "scan", "repair", "undo"}
     api.open_privacy()
-    assert opened == ["https://admenot.e-wlodarski.workers.dev/pl/privacy"]
+    assert opened == ["https://admenot.perlessmtfuji.workers.dev/pl/privacy"]
 
 
 def test_consent_records_start_for_today():

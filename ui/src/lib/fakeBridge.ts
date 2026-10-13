@@ -134,12 +134,12 @@ export function createFakeBridge(name: string,
         const shareId = String(args[2]);
         const code = planCode;
         const server: [string, unknown] = ['share:ready', { share_id: shareId, code, mode: 'server',
-          expires: '2026-10-11T13:32:00Z', url: `https://admenot.e-wlodarski.workers.dev/plan#s.${'A'.repeat(22)}.${'B'.repeat(43)}` }];
+          expires: '2026-10-11T13:32:00Z', url: `https://admenot.perlessmtfuji.workers.dev/plan#s.${'A'.repeat(22)}.${'B'.repeat(43)}` }];
         if (options.share === 'too_long') {
           replay([['share:failed', { share_id: shareId, code, reason: 'too_long', offline: true }]]);
         } else if (options.share === 'local') {
           replay([['share:ready', { share_id: shareId, code, mode: 'local', expires: null, offline: true,
-            url: `https://admenot.e-wlodarski.workers.dev/plan#l.${'x'.repeat(1498)}` }]]);
+            url: `https://admenot.perlessmtfuji.workers.dev/plan#l.${'x'.repeat(1498)}` }]]);
           setTimeout(() => dispatch(...server), 3000); // pełny plan dochodzi po powrocie sieci
         } else {
           replay([server]);

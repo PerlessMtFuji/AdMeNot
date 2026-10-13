@@ -45,8 +45,8 @@ test('launch failure names the download page', async () => {
   const { bridge } = await opened();
   await fireEvent.click(screen.getAllByRole('button', { name: 'Zainstaluj' }).at(-1)!);
   bridge.emit('job:error', { job_id: 'job-update', kind: 'update', key: 'update_launch_failed', message: 'x',
-    page: 'https://admenot.e-wlodarski.workers.dev/pl/' });
-  expect(await screen.findByText(/Pobierz go ze strony: https:\/\/admenot\.e-wlodarski\.workers\.dev\/pl\//)).toBeTruthy();
+    page: 'https://admenot.perlessmtfuji.workers.dev/pl/' });
+  expect(await screen.findByText(/Pobierz go ze strony: https:\/\/admenot\.perlessmtfuji\.workers\.dev\/pl\//)).toBeTruthy();
 });
 
 test('development build closes the dialog after opening the page', async () => {
