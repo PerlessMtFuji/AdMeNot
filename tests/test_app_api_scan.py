@@ -6,6 +6,7 @@ from apphelpers import SlowApk, make_api, names
 from conftest import SERIAL
 from fakephone import make_cli_phone
 
+from admenot.app.present import image_uri
 from admenot.engine.actions.steps import Step
 from admenot.engine.adb.transport import AdbError
 from admenot.engine.apk import cache as C
@@ -14,6 +15,7 @@ from admenot.engine.apk.fetch import FetchedApks, default_cache_dir
 from admenot.engine.apk.providers import DeviceApkProvider
 from admenot.engine.journal.db import Journal
 from admenot.engine.paths import journal_path
+from admenot.engine.phones.provider import SILHOUETTE
 
 Disk = namedtuple("Disk", "total used free")
 
@@ -47,7 +49,8 @@ def test_list_devices_and_adb_missing():
     api, _ = make_api(phone)
     assert api.list_devices() == {"devices": [{"serial": SERIAL, "state": "device",
                                                "model": "SM_A145R", "name": "samsung SM-A145R",
-                                               "imei": None}], "error": None}
+                                               "imei": None, "image": image_uri(SILHOUETTE)}],
+                                  "error": None}
     phone.host["devices -l"] = AdbError("adb_missing", "adb not found")
     assert api.list_devices() == {"devices": [], "error": "adb_missing"}
 
@@ -59,6 +62,7 @@ def test_device_list_reads_name_and_imei_once_per_connection():
     api, _ = make_api(phone)
     (entry,) = api.list_devices()["devices"]
     assert (entry["name"], entry["imei"]) == ("samsung SM-A145R", "499001200000004")
+    assert entry["image"].startswith("data:image/")  # zdjęcie (albo sylwetka) już na ekranie 1
     getprops = phone.calls.count("getprop")
     api.list_devices()
     assert phone.calls.count("getprop") == getprops  # odpytywanie listy nie męczy telefonu

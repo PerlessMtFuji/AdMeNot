@@ -55,13 +55,13 @@
               <label class="block cursor-pointer rounded-2xl {s.serial === d.serial ? 'ring-2 ring-accent' : ''}">
                 <input class="sr-only" type="radio" name="device" checked={s.serial === d.serial}
                   aria-label="{d.name ?? modelName(d.model)} {d.serial}" onchange={() => ctl.selectDevice(d.serial)} />
-                <DeviceCard name={d.name ?? modelName(d.model)} details={t('connect.title.ready')} serial={d.serial} imei={d.imei} connected />
+                <DeviceCard name={d.name ?? modelName(d.model)} details={t('connect.title.ready')} serial={d.serial} imei={d.imei} image={d.image} connected />
               </label>
               <div class="pl-[80px]"><MirrorControls serial={d.serial} name={d.name ?? modelName(d.model)} /></div>
             </div>
           {:else}
             <label class="block cursor-pointer rounded-2xl">
-              <DeviceCard name={d.name ?? modelName(d.model)} details={t('connect.title.ready')} serial={d.serial} imei={d.imei} connected>
+              <DeviceCard name={d.name ?? modelName(d.model)} details={t('connect.title.ready')} serial={d.serial} imei={d.imei} image={d.image} connected>
                 <MirrorControls serial={d.serial} name={d.name ?? modelName(d.model)} />
               </DeviceCard>
             </label>

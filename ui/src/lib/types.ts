@@ -69,6 +69,7 @@ export interface DeviceEntry {
   model: string | null;
   name?: string | null; // nazwa handlowa z bazy telefonów (Api._identity); brak → kod modelu
   imei?: string | null;
+  image?: string | null; // zdjęcie z bazy telefonów (albo sylwetka) jako data URI, jak w PhoneCard
 }
 
 export interface DevicesPayload {

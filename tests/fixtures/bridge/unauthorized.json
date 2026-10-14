@@ -11,7 +11,8 @@
       "state": "unauthorized",
       "model": null,
       "name": null,
-      "imei": null
+      "imei": null,
+      "image": null
      }
     ],
     "error": null
