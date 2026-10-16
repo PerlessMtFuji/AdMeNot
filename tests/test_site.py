@@ -48,7 +48,9 @@ def test_page_basics(name):
     assert page.all("html")[0].get("lang") in ("en", "pl")
     assert {"charset": "utf-8"} in page.all("meta")
     assert any(m.get("name") == "viewport" for m in page.all("meta"))
-    assert page.all("script") == []  # bez JavaScriptu
+    # JS tylko na stronach głównych: klasa .js w treści i /site.js (karty przebiegu naprawy)
+    scripts = [a.get("src") for a in page.all("script")]
+    assert scripts == ([None, "/site.js"] if name.endswith("index.html") else [])
 
 
 @pytest.mark.parametrize("name", PAGES)
@@ -56,6 +58,8 @@ def test_no_external_resources(name):
     _, page = load(name)
     for tag in ("link", "script", "img"):
         for attrs in page.all(tag):
+            if tag == "script" and "src" not in attrs:
+                continue  # skrypt w treści strony
             ref = attrs.get("href") or attrs.get("src") or ""
             assert ref.startswith("/") and not ref.startswith("//"), f"{name}: <{tag}> {ref}"  # zasoby tylko z tego hosta
 
