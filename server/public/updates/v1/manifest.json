@@ -1,0 +1,4 @@
+{
+  "payload": "{\"format\":1,\"latest\":\"0.9.3\",\"published\":\"2026-10-16\",\"min_supported\":\"0.9.3\",\"url\":\"https://github.com/PerlessMtFuji/AdMeNot/releases/download/v0.9.3/AdMeNot-0.9.3-setup.exe\",\"sha256\":\"c9a6c0e3b281a87222c1f5e1f74b60b88340867672b0947721b89cdc502f9326\",\"size\":75773997,\"notes\":{\"pl\":\"Pierwsza publiczna beta AdMeNot.\",\"en\":\"First public beta of AdMeNot.\"}}",
+  "sig": "rwIhyvtUUdOf1dVMFlidxljoVT55kn1APTSXT6BOwC20CA0nVdPhgUukK9I6rO1v1EMi70itqJU4trKBdPmUBw=="
+}
