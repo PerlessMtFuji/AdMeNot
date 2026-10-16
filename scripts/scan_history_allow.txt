@@ -33,3 +33,5 @@ Jan  # C:\Users\Jan Kowalski\ — fikcyjny profil w testach wycinania (tests/tes
 JANKOW~1  # krótka nazwa 8.3 fikcyjnego profilu w testach wycinania (tests/test_app_redact.py)
 anna.kowalska  # fikcyjne konto Androida w testach wycinania (tests/test_app_redact.py)
 Operator  # fikcyjny użytkownik Windows w testach wycinania (tests/test_app_redact.py)
+0123456789ABCDEF  # wspólny serial adb tanich telefonów w testach (tests/test_device_identity.py) — publicznie znany
+OTHER  # serial-zaślepka w tests/test_share.py
