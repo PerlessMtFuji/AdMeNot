@@ -33,6 +33,9 @@
     {/if}
     {#if s.updateError}
       <p role="alert" class="mt-3 text-bad">{t(`update.error.${errorKey}`, { page: String(s.updateError.page ?? '') })}</p>
+    {:else if s.job !== null && !running}
+      <!-- Instalator zamyka adb — przycisk czeka na koniec skanu, analizy albo zlecenia. -->
+      <p role="status" class="mt-3 text-mut">{t('update.busy')}.</p>
     {/if}
     {#snippet actions()}
       {#if running}

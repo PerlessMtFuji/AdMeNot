@@ -68,3 +68,15 @@ test('a change blocked by a withdrawn version opens the dialog', async () => {
   const dialog = await screen.findByRole('dialog', { name: 'AdMeNot 9.9.9' });
   expect(dialog.textContent).toContain('Błąd cofania');
 });
+
+test('dialog says why install waits while a job runs', async () => {
+  const { s } = await opened();
+  s.job = { id: 'job-1', kind: 'deep' };
+  await tick();
+  const dialog = await screen.findByRole('dialog', { name: 'AdMeNot 9.9.9' });
+  expect(dialog.textContent).toContain('Dostępne po zakończeniu bieżącego zadania.');
+  expect((screen.getAllByRole('button', { name: 'Zainstaluj' }).at(-1) as HTMLButtonElement).disabled).toBe(true);
+  s.job = null;
+  await tick();
+  expect(dialog.textContent).not.toContain('Dostępne po zakończeniu bieżącego zadania.');
+});
