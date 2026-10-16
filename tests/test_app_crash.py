@@ -361,8 +361,11 @@ def test_background_queue_retries_until_sent(monkeypatch):
     crash.start_queue()
     try:
         for _ in range(300):
-            if load(crash_id)["sent"]:
-                break
+            try:
+                if load(crash_id)["sent"]:
+                    break
+            except PermissionError:  # Windows: wątek kolejki właśnie podmienia plik (os.replace)
+                pass
             time.sleep(0.01)
     finally:
         crash.stop_queue()
