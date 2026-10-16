@@ -1,0 +1,7 @@
+[extend]
+useDefault = true
+
+# Wektor testowy szyfrowania planu dla klienta: "key" to bajty 0..31 w base64, nie sekret.
+[[allowlists]]
+description = "wektor testowy planu dla klienta (tests/fixtures/share_vector.json)"
+paths = ['''^tests/fixtures/share_vector\.json$''']
