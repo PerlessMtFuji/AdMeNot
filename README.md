@@ -128,16 +128,17 @@ A signal is a rule that matched. Every signal belongs to one **class** and has a
 3. **Combinations** add a bonus — at most one, the largest:
    - no icon + not from Play + draws over other apps: **+20**
    - device administrator from outside Play that also shows content (overlay, notifications): **+15**
-   - 5+ ad networks plus ad-like behavior on the phone: **+15**
+   - 5+ ad networks, and the app shows notifications or windows over other apps: **+15**, within the APK cap (at most 30 together with the networks)
 4. The sum is capped at 100.
 5. **Trusted apps** (on the [trusted list](src/admenot/engine/allowlist/data/trusted.yaml) with a matching signing certificate) keep only behavior and confirmed indicators — identity signals no longer count, but what the app does still does.
 6. **System apps** with no observed behavior are capped at 24, which is always *No issues*.
+7. **Declarations alone stop at 49 points** (*To review*): ad networks, code, install source and name, with nothing observed or granted on the phone, never reach *Suspicious*.
 
 ### 3. Confidence
 
 Confidence says what the score rests on, not how high it is:
 
-- **high** — a confirmed indicator, or observed behavior of at least two different kinds (e.g. ads and background activity) with complete data;
+- **high** — a confirmed indicator, or two different ways of showing content observed with complete data: notifications, windows over other apps, coming to the foreground. A notification flood and a full-screen notification are one way; waking the phone doesn't raise confidence;
 - **medium** — some observed behavior;
 - **low** — only declarations, permissions and code.
 
@@ -147,12 +148,12 @@ Data counts as incomplete when the phone has been on for less than 6 hours, usag
 
 | Verdict | Condition | Selected by default |
 |---|---|---|
-| **Malicious** | score ≥ 75 **and** high confidence | Disable |
-| **Suspicious** | score ≥ 50 (or ≥ 75 without high confidence) | Disable; Silence when confidence is low |
+| **Malicious** | score ≥ 75, high confidence **and** at least 50 points from behavior observed and access granted on the phone | Disable |
+| **Suspicious** | score ≥ 50 (or ≥ 75 without the *Malicious* conditions) | Silence; nothing when the app has accessibility, notification access or is the home screen |
 | **To review** | score ≥ 25 | nothing — the technician decides |
 | **No issues** | score < 25 | nothing |
 
-Removal is never pre-selected, because it deletes the app's data. Without a confirmed indicator, *Malicious* needs at least two kinds of behavior seen on this phone — permissions and code alone stop at *Suspicious*.
+Removal is never pre-selected, because it deletes the app's data. Without a confirmed indicator, *Malicious* needs two ways of showing content observed on this phone and at least 50 points from observations and granted access — permissions, ad networks and code alone stop at *Suspicious*. For an app with accessibility, notification access or the home screen role, Silence would take that function away, so the technician decides.
 
 ### Example
 
@@ -166,13 +167,13 @@ The app from the screenshots above:
 | Combination | no icon + not from Play + draws over apps | +20 |
 | **Total** | | 120 → **100** |
 
-Behavior of two kinds (ads and background) with complete data gives high confidence, so the verdict is **Malicious**. The weather app next to it sends 20+ notifications an hour: 25 points from behavior alone — *To review*, nothing selected.
+Two ways of showing content (windows over apps and a full-screen notification) with complete data give high confidence, and behavior (45) plus device administrator (25) make 70 points from observations and granted access, so the verdict is **Malicious**. The weather app next to it sends 20+ notifications an hour: 25 points from behavior alone — *To review*, nothing selected.
 
 ## False positives
 
 A rating describes what an app does, not what it is. Legitimate apps can collect points:
 
-- **Messengers and social apps** — chat heads draw over other apps (20) and busy group chats exceed 20 notifications an hour (25): 45 points, *To review*.
+- **Messengers and social apps** — chat heads draw over other apps (20) and busy group chats exceed 20 notifications an hour (25): 45 points, *To review*. An ongoing call (full-screen notification) adds nothing — it's the same mechanism as notifications.
 - **Parental control, anti-theft and work (MDM) apps** — device administrator (25), accessibility (20), drawing over apps (20), often a hidden icon. Several such signals can reach *Suspicious*.
 - **Automation, password managers, accessibility tools** (e.g. Tasker, MacroDroid, screen readers) — accessibility (20), notification access (10), overlays.
 - **Custom launchers** — home screen (8) plus a frequent overlay.
@@ -183,7 +184,7 @@ A rating describes what an app does, not what it is. Legitimate apps can collect
 What limits the damage:
 
 - Nothing is changed during a scan, and nothing is changed without the technician's confirmation. *To review* is never pre-selected, removal is never pre-selected.
-- *Malicious* needs high confidence: without a confirmed threat indicator, two kinds of behavior observed on this phone.
+- *Malicious* needs high confidence and at least 50 points from what the app did or was given on this phone; without a confirmed threat indicator, two ways of showing content.
 - Every reason is shown with its points, so the technician can check if the reason holds (“does this customer use Messenger chat heads?”).
 - Every change can be undone; a backup of the APK is made before removal.
 - The trusted list removes identity signals for verified apps, but it is short — most legitimate apps go through the same rules.
