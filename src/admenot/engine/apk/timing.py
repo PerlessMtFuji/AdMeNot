@@ -8,6 +8,7 @@ analizy mierzy pobieranie, analizę i narzut na aplikację; średnia krocząca t
 from __future__ import annotations
 
 import json
+import math
 import os
 import threading
 from collections.abc import Iterable
@@ -24,6 +25,10 @@ MIN_APPS = 5
 MIN_BYTES = 50 * MB
 ROUGH_LOW, ROUGH_HIGH = 0.6, 1.5
 BLEND_FULL_AT = 10  # od tylu aplikacji bieżący przebieg w pełni zastępuje historię
+# Granice wiarygodnych prędkości: poza nimi plik jest uszkodzony (NaN, Infinity, 1e308 z json.loads).
+MIN_BPS, MAX_BPS = 1024, 100 * 1024 * MB
+MAX_PER_APP_S = 3600.0
+MAX_SAMPLES = 1_000_000
 
 
 @dataclass(frozen=True)
@@ -113,11 +118,22 @@ def blend(history: Speeds, run: RunStats) -> Speeds:
                   mix(history.per_app_s, now.per_app_s), history.samples)
 
 
+def sane(speeds: Speeds) -> bool:
+    bps = (speeds.pull_bps, speeds.analyze_bps)
+    return (all(math.isfinite(b) and MIN_BPS <= b <= MAX_BPS for b in bps)
+            and math.isfinite(speeds.per_app_s) and 0 <= speeds.per_app_s <= MAX_PER_APP_S
+            and 0 <= speeds.samples <= MAX_SAMPLES)
+
+
 def eta_for(speeds: Speeds, *, to_fetch_bytes: int, total_bytes: int, apps: int,
             workers: int) -> Eta:
+    if not sane(speeds):  # uszkodzona historia albo pomiar: jak bez historii, nigdy wyjątek
+        speeds = DEFAULT_SPEEDS
     lanes = max(1, min(workers, apps))
     s = (to_fetch_bytes / speeds.pull_bps + total_bytes / speeds.analyze_bps
          + apps * speeds.per_app_s) / lanes
+    if not math.isfinite(s):
+        s = 0.0
     if speeds.samples:
         return Eta(round(s), "measured", round(s), round(s))
     return Eta(round(s), "rough", round(s * ROUGH_LOW), round(s * ROUGH_HIGH))
@@ -138,6 +154,8 @@ def live_eta(history: Speeds, run: RunStats | None, est: Estimate | None,
              remaining_apps: int, workers: int) -> int | None:
     if run is None or est is None:
         return None
+    if remaining_apps <= 0:
+        return 0  # bajty bez znanego rozmiaru nie mają już aplikacji, której by dotyczyły
     speeds = blend(history, run)
     return eta_for(speeds, to_fetch_bytes=max(0, est.to_fetch_bytes - run.pulled_bytes),
                    total_bytes=max(0, est.total_bytes - run.analyzed_bytes),
@@ -154,11 +172,9 @@ def load_speeds(path: Path | None = None) -> Speeds:
         raw = json.loads((path or timing_path()).read_text("utf-8"))
         speeds = Speeds(float(raw["pull_bps"]), float(raw["analyze_bps"]),
                         float(raw["per_app_s"]), int(raw["samples"]))
-    except (OSError, ValueError, KeyError, TypeError):
+    except (OSError, ValueError, KeyError, TypeError, OverflowError):
         return DEFAULT_SPEEDS
-    if min(speeds.pull_bps, speeds.analyze_bps) <= 0 or speeds.per_app_s < 0 or speeds.samples < 0:
-        return DEFAULT_SPEEDS
-    return speeds
+    return speeds if sane(speeds) else DEFAULT_SPEEDS
 
 
 def save_speeds(speeds: Speeds, path: Path | None = None) -> None:

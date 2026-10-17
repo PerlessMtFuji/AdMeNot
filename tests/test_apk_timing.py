@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from admenot.engine.apk.cache import Estimate
 from admenot.engine.apk.timing import (
     DEFAULT_SPEEDS,
@@ -105,3 +107,34 @@ def test_load_save_roundtrip_and_broken_file(tmp_path):
     assert load_speeds(path) == DEFAULT_SPEEDS
     path.write_text(json.dumps({"pull_bps": -1, "analyze_bps": 1, "per_app_s": 1, "samples": 1}), "utf-8")
     assert load_speeds(path) == DEFAULT_SPEEDS
+
+
+@pytest.mark.parametrize("raw", [
+    '{"pull_bps": NaN, "analyze_bps": 1, "per_app_s": 1, "samples": 1}',
+    '{"pull_bps": 1, "analyze_bps": Infinity, "per_app_s": 1, "samples": 1}',
+    '{"pull_bps": 1, "analyze_bps": 1, "per_app_s": NaN, "samples": 1}',
+    '{"pull_bps": 1e308, "analyze_bps": 1, "per_app_s": 1, "samples": 1}',
+    '{"pull_bps": 1, "analyze_bps": 1, "per_app_s": 1e308, "samples": 1}',
+    '{"pull_bps": 1, "analyze_bps": 1, "per_app_s": 1, "samples": 1e308}',
+])
+def test_non_finite_or_absurd_timing_file_falls_back_to_defaults(tmp_path, raw):
+    path = tmp_path / "apk-timing.json"
+    path.write_text(raw, "utf-8")
+    assert load_speeds(path) == DEFAULT_SPEEDS
+
+
+@pytest.mark.parametrize("speeds", [
+    Speeds(float("nan"), 1.0, 1.0, 1), Speeds(1.0, float("inf"), 1.0, 1),
+    Speeds(1e-320, 1.0, 1.0, 1), Speeds(1.0, 1.0, float("inf"), 0),
+])
+def test_eta_never_raises_on_broken_speeds(speeds):
+    eta = eta_for(speeds, to_fetch_bytes=100 * MB, total_bytes=100 * MB, apps=10, workers=1)
+    fallback = eta_for(DEFAULT_SPEEDS, to_fetch_bytes=100 * MB, total_bytes=100 * MB, apps=10, workers=1)
+    assert eta == fallback
+
+
+def test_live_eta_is_zero_when_no_apps_remain():
+    est = _est({f"p{i}": 10 * MB for i in range(20)}, to_fetch={f"p{i}" for i in range(20)})
+    run = _run(apps=5, size=10 * MB)  # część bajtów niepobrana (np. brak rozmiaru), ale aplikacji już nie ma
+    assert live_eta(KNOWN, run, est, remaining_apps=0, workers=1) == 0
+    assert live_eta(KNOWN, run, est, remaining_apps=-1, workers=1) == 0
