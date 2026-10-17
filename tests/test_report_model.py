@@ -305,3 +305,31 @@ def test_manual_snapshot_gives_manual_protocol_without_clean_count(journal, phot
 def test_snapshot_without_apk_mode_is_not_manual(journal, photo):
     p = build_protocol(journal, make_order(journal, snapshot(photo)).id, "pl")
     assert p.manual is False and p.clean_count == 37
+
+
+@pytest.mark.parametrize("mode", ["manual", "partial"])
+def test_manual_protocol_hides_heuristic_verdicts_of_blind_picks(journal, photo, mode):
+    # Serwisant wybrał BOOST (oznaczony przez heurystyki) i cofnął zmianę; werdyktu nie widział.
+    snap = snapshot(photo)
+    snap["apps"][0]["incomplete"] = True
+    snap["apps"] = [snap["apps"][0], snap["apps"][1]]
+    snap |= {"apk_mode": mode, "on_demand": [FORECAST] if mode == "partial" else []}
+    acts = ((BOOST, "remove", ("undone",)), (FORECAST, "disable", ("done",))) if mode == "partial" \
+        else ((BOOST, "remove", ("undone",)),)
+    order = make_order(journal, snap, acts)
+    p = build_protocol(journal, order.id, "pl")
+    boost = next(r for r in p.rows if r.package == BOOST)
+    assert (boost.verdict, boost.problems, boost.incomplete) == (None, [], False)
+    assert not any(r.key.startswith("review_left") for r in p.recommendations)
+    assert Recommendation("incomplete_scan") not in p.recommendations
+    assert journal.scan(order.id)["apps"][0]["verdict"] == "malicious"  # dowody w migawce zostają
+    if mode == "partial":  # analiza na żądanie: werdykt widoczny
+        forecast = next(r for r in p.rows if r.package == FORECAST)
+        assert (forecast.verdict, forecast.problems) == ("suspicious", ["Spam powiadomień"])
+
+
+def test_manual_protocol_shows_untouched_on_demand_app_with_its_verdict(journal, photo):
+    snap = snapshot(photo) | {"apk_mode": "partial", "on_demand": [GAME]}
+    p = build_protocol(journal, make_order(journal, snap, ((BOOST, "remove", ("done",)),)).id, "pl")
+    assert {r.package: r.verdict for r in p.rows} == {BOOST: None, GAME: "review"}
+    assert Recommendation("review_left", {"apps": GAME}) in p.recommendations

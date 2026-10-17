@@ -237,6 +237,13 @@ def build_protocol(journal: Journal, order_id: int, lang: str) -> Protocol:
     snap = journal.scan(order_id)
     verification = journal.verification(order_id) or {}
     scanned = {a["package"]: a for a in (snap or {}).get("apps", [])}
+    manual = (snap or {}).get("apk_mode") in ("manual", "partial")
+    if manual:
+        # Werdykt heurystyk aplikacji wybranej na ślepo był przed serwisantem ukryty: w protokole
+        # bez oceny, problemów i zaleceń z niej (migawka zostaje nietknięta jako dowód).
+        seen = set((snap or {}).get("on_demand") or [])
+        scanned = {p: a if p in seen else {**a, "verdict": None, "problems": {}, "incomplete": False}
+                   for p, a in scanned.items()}
 
     by_package: dict[str, list[Action]] = {}
     for action in journal.actions(order_id):
@@ -248,9 +255,8 @@ def build_protocol(journal: Journal, order_id: int, lang: str) -> Protocol:
     # Aplikacje bez uwag (safe) z oceną niepełną nie są wierszami — trafiają do zakresu skanu.
     untouched = {p: a for p, a in scanned.items() if p not in by_package}
     rows += [_row(package, app, lang, None, "none")
-             for package, app in untouched.items() if app.get("verdict") != "safe"]
+             for package, app in untouched.items() if app.get("verdict") not in (None, "safe")]
 
-    manual = (snap or {}).get("apk_mode") in ("manual", "partial")
     device = device_block(snap or {}, order)
     scope, clean = None, None
     if snap is not None:
