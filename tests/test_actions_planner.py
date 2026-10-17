@@ -140,6 +140,16 @@ def test_suspicious_app_with_a_role_is_left_to_the_technician():
         assert default_level(_r("malicious", "high", **role)) == "disable"
 
 
+def test_suspicious_gets_disable_where_silence_cannot_stop_notifications():
+    """Android ≤12: „Wycisz” nie wyłączy powiadomień przez ADB, więc domyślnie „Wyłącz” — tak jak
+    zaznaczenie z ustawień w UI (controller.selectLevel; przegląd Etapu 0)."""
+    assert default_level(_r("suspicious"), sdk=31) == "disable"
+    assert default_level(_r("suspicious"), sdk=33) == "silence"
+    assert default_level(_r("suspicious"), sdk=0) == "silence"  # wersja nieznana: jak dotąd
+    assert default_level(_r("suspicious", notification_listener=True), sdk=31) is None
+    assert default_level(_r("review"), sdk=31) is None
+
+
 def test_bundled_protected_list_covers_core_system_apps():
     protected = load_protected_list()
     for package in ("com.android.systemui", "com.android.settings", "com.google.android.gms",

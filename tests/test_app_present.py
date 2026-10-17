@@ -62,6 +62,25 @@ def test_scan_view_pl_and_en(synthetic_adb):
     assert scan_view(report, "en")["apps"][0]["verdict_label"] in ("Malicious", "Suspicious")
 
 
+def test_default_level_follows_the_phone_android_version(synthetic_adb):
+    """Plan w GUI, zlecenie i protokół liczą domyślne działanie z wersji Androida telefonu."""
+    from dataclasses import replace
+
+    from admenot.engine.report.snapshot import scan_snapshot
+    from admenot.engine.workflow import recommended_requests
+
+    report = run_scan(synthetic_adb)
+    r = report.results[0]
+    report.results = [replace(r, verdict="suspicious", facts=replace(
+        r.facts, accessibility_enabled=False, notification_listener=False, is_home_holder=False))]
+    report.device = replace(report.device, sdk=31)
+    pkg = r.facts.package
+    assert scan_view(report, "pl")["apps"][0]["default_level"] == "disable"
+    assert recommended_requests(report) == {pkg: "disable"}
+    snap = scan_snapshot(report, PhoneMatch("none", "silhouette", SILHOUETTE))
+    assert {a["package"]: a["default_level"] for a in snap["apps"]} == {pkg: "disable"}
+
+
 def test_device_card_with_and_without_photo(synthetic_adb, tmp_path):
     report = run_scan(synthetic_adb)
     card = device_card(report.device, None)
