@@ -14,6 +14,7 @@ from typing import Any
 
 from admenot import __version__
 from admenot.engine.actions.planner import AppPlan
+from admenot.engine.apk.timing import Eta
 from admenot.engine.device.info import DeviceInfo
 from admenot.engine.session import ScanReport
 from admenot.engine.workflow import AppStatus, OrderResult
@@ -63,7 +64,7 @@ def start_body(mode: str) -> dict[str, Any]:
 
 
 def scan_event(report: ScanReport, session: str, seconds: int, packages: bool,
-               apk_stage: bool = False) -> dict[str, Any]:
+               apk_stage: bool = False, eta: Eta | None = None) -> dict[str, Any]:
     flagged = [r for r in report.results if r.verdict != "safe"]  # wyniki są już po wyniku malejąco
     apk = report.apk
     return {

@@ -33,6 +33,7 @@ from admenot.app.present import (
     device_card,
     device_identity,
     estimate_view,
+    eta_view,
     history_view,
     plan_view,
     result_view,
@@ -50,7 +51,16 @@ from admenot.engine.adb.sessionlog import SessionLogAdb, session_log_path
 from admenot.engine.adb.transport import AdbError, AdbTransport, RealAdb
 from admenot.engine.apk.cache import GB, CacheUsage, Estimate, clear_cache, disk_total, usage
 from admenot.engine.apk.fetch import default_cache_dir
-from admenot.engine.apk.providers import ApkProvider, CachePolicy, DeviceApkProvider
+from admenot.engine.apk.providers import ApkProvider, CachePolicy, DeviceApkProvider, ManualMode
+from admenot.engine.apk.timing import (
+    Eta,
+    Speeds,
+    estimate_eta,
+    learn,
+    live_eta,
+    load_speeds,
+    save_speeds,
+)
 from admenot.engine.device.identity import same_device
 from admenot.engine.device.info import DeviceInfo, read_device_info
 from admenot.engine.foreground import read_foreground
@@ -101,6 +111,7 @@ HostFactory = Callable[[str | None], AdbTransport]
 ApkFactory = Callable[..., ApkProvider]
 
 ADMIN_TIMEOUT = 180.0
+DEFAULT_WORKERS = 2  # równoległość DeviceApkProvider (apk/providers.py)
 ORDER_KINDS = frozenset({"exec", "resume", "undo"})
 INCIDENT_MAX_S = 600.0  # nagranie incydentu: najwyżej 10 min
 INCIDENT_INTERVAL_S = 2.0
@@ -183,6 +194,9 @@ class Api:
         self._client: str | None = None
         self._scan_session: str | None = None  # łączy skan z naprawą w statystykach
         self._report: ScanReport | None = None
+        self._estimate: Estimate | None = None  # ostatni pełny szacunek: czas analizy zaznaczonych
+        self._eta: Eta | None = None  # szacunek pokazany przy wyborze trybu (telemetria)
+        self._to_manual: str | None = None  # zadanie APK przerwane „Przerwij i szukaj ręcznie”
         self._match: PhoneMatch | None = None
         self._pick_folder_fn: Callable[[], str | None] | None = None
         self._close_fn: Callable[[], None] | None = None
@@ -487,46 +501,113 @@ class Api:
                                                           int(time.monotonic() - started), p))
             if self._apk_factory is not None:
                 job.kind = "apk"
-                self._run_apk(job, adb, report)
+                self._estimate, self._eta = None, None
+                self._run_apk(job, adb, report, choose=True)
 
+        self._estimate, self._eta = None, None  # nowy telefon: stary szacunek nie obowiązuje
         return {"job_id": self._jobs.start("scan", run)}
 
     def _cache_limit(self) -> int:
         return self._settings.apk_cache_limit_gb * GB
 
     def _run_apk(self, job: Job, adb: AdbTransport, report: ScanReport,
-                 deep: frozenset[str] = frozenset()) -> None:
+                 deep: frozenset[str] = frozenset(), only: frozenset[str] = frozenset(),
+                 choose: bool = False) -> None:
         started = time.monotonic()
+        speeds = load_speeds()
+        whole = not deep and not only  # pełny zakres: szacunek przyda się później
+        provider: ApkProvider | None = None
+
+        def workers() -> int:
+            return getattr(provider, "workers", 1)
 
         def decide(est: Estimate, use: CacheUsage) -> str:
             # Zatrzymanie zadania w trakcie pytania (None) = pominięcie; `job.check` niżej kończy.
             return job.ask("apk:question", {"kind": "no_space", **estimate_view(est, use)}) or "skip"
 
-        policy = CachePolicy(self._cache_limit(),
-                             on_estimate=lambda est, use: self._emit(
-                                 "apk:estimate", {**estimate_view(est, use), "job_id": job.id}),
-                             decide=decide)
+        def on_estimate(est: Estimate, use: CacheUsage) -> None:
+            eta = estimate_eta(est, speeds, workers())
+            if whole:
+                self._estimate, self._eta = est, eta
+            self._emit("apk:estimate", {**estimate_view(est, use), **eta_view(eta), "job_id": job.id})
+
+        def pick(est: Estimate | None, use: CacheUsage | None, apps: int) -> str:
+            eta = estimate_eta(est, speeds, workers()) if est is not None else None
+            self._estimate, self._eta = est, eta
+            default = self._settings.apk_mode_default
+            if default != "ask":
+                return default
+            sizes = estimate_view(est, use) if est is not None and use is not None else {}
+            # Zatrzymanie w trakcie pytania (None) = tryb ręczny: nic nie pobieramy (spec §2.1 p. 5).
+            answer = job.ask("apk:question", {"kind": "mode", "apps": apps, **sizes, **eta_view(eta)})
+            return answer if answer in ("full", "manual") else "manual"
+
+        policy = CachePolicy(self._cache_limit(), on_estimate=on_estimate, decide=decide,
+                             choose=pick if choose else None)
         provider = self._apk_factory(adb, policy=policy, deep=deep)
 
         def progress(done: int, total: int, package: str) -> None:
             job.check()
+            eta = live_eta(speeds, getattr(provider, "stats", None),
+                           getattr(provider, "estimate", None), total - done, workers())
             self._emit("apk:progress", {"done": done, "total": total, "package": package,
-                                        "job_id": job.id})
+                                        "eta_s": eta, "job_id": job.id})
 
         try:
-            updated = analyze_apks(report, provider, progress, only=deep or None)
+            updated = analyze_apks(report, provider, progress, only=deep or only or None)
             with self._apk_commit:  # sprawdzenie i zapis atomowo względem `_abandon_apk`
                 job.check()
                 self._report = updated
                 self._emit("apk:done", {"scan": scan_view(updated, self._lang), "job_id": job.id})
-        except Stopped:
-            self._emit("apk:stopped", {"job_id": job.id})
+        except ManualMode:
+            self._publish_manual(job, report, started)
             return
-        if not deep:  # głęboka analiza jednej aplikacji to nie nowa ocena telefonu
+        except Stopped:
+            if not deep:
+                self._learn(speeds, provider)
+            # `finally` czyści `_to_manual` dopiero po tym odczycie — nie przenoś go wyżej.
+            if self._to_manual == job.id:
+                self._publish_manual(job, report, started)
+            else:
+                self._emit("apk:stopped", {"job_id": job.id})
+            return
+        finally:
+            if self._to_manual == job.id:
+                self._to_manual = None
+        if not deep:
+            self._learn(speeds, provider)
+        if whole:  # głęboka analiza i analiza zaznaczonych to nie nowa ocena telefonu
             session = self._scan_session or ""
+            eta = self._eta
             telemetry.record("scan", lambda p: scan_event(updated, session,
                                                           int(time.monotonic() - started), p,
-                                                          apk_stage=True))
+                                                          apk_stage=True, eta=eta))
+
+    def _learn(self, speeds: Speeds, provider: ApkProvider | None) -> None:
+        stats = getattr(provider, "stats", None)
+        if stats is None:
+            return
+        new = learn(speeds, stats)
+        if new != speeds:
+            try:
+                save_speeds(new)
+            except OSError:
+                pass  # brak zapisu = następny szacunek z poprzedniej historii
+
+    def _publish_manual(self, job: Job, report: ScanReport, started: float) -> None:
+        """Tryb ręczny po wyborze albo po „Przerwij i szukaj ręcznie” (spec §2.2)."""
+        mode = "partial" if report.analyzed_on_demand else "manual"
+        with self._apk_commit:
+            # `job.check` nie wchodzi w grę (zadanie bywa zatrzymane celowo); porzucone przez
+            # nowy skan albo wykonanie nie jest już bieżące — wtedy nic nie publikujemy.
+            if self._jobs.current() is not job:
+                return
+            published = self._report = replace(report, apk_mode=mode)
+            self._emit("apk:manual", {"scan": scan_view(published, self._lang), "job_id": job.id})
+        session, eta = self._scan_session or "", self._eta
+        telemetry.record("scan", lambda p: scan_event(published, session,
+                                                      int(time.monotonic() - started), p,
+                                                      apk_stage=True, eta=eta))
 
     @_api
     def deep_analyze(self, package: str) -> dict[str, Any]:
@@ -543,6 +624,54 @@ class Api:
             self._run_apk(job, adb, report, deep=frozenset({package}))
 
         return {"job_id": self._jobs.start("deep", run)}
+
+    @_api
+    def analyze_selected(self, packages: list[str]) -> dict[str, Any]:
+        """Analiza tylko wskazanych aplikacji (tryb ręczny, spec §2.2)."""
+        self._require_scan()
+        if self._apk_factory is None:
+            raise AppError("bad_request", "apk")
+        report = self._report
+        known = {r.facts.package for r in report.results}
+        if (not isinstance(packages, list) or not packages
+                or not all(isinstance(p, str) and p in known for p in packages)):
+            raise AppError("bad_request", "packages")
+        adb, chosen = self._adb, frozenset(packages)
+
+        def run(job: Job) -> None:
+            self._run_apk(job, adb, report, only=chosen)
+
+        return {"job_id": self._jobs.start("apk", run)}
+
+    @_api
+    def analyze_all(self) -> dict[str, Any]:
+        """Pełna analiza z trybu ręcznego — bez ponownego pytania o tryb."""
+        self._require_scan()
+        if self._apk_factory is None:
+            raise AppError("bad_request", "apk")
+        adb, report = self._adb, self._report
+
+        def run(job: Job) -> None:
+            self._run_apk(job, adb, report)
+
+        return {"job_id": self._jobs.start("apk", run)}
+
+    @_api
+    def stop_apk_to_manual(self) -> dict[str, Any]:
+        job = self._jobs.current()
+        if job is None or job.kind != "apk":
+            raise AppError("bad_request", "job")
+        self._to_manual = job.id
+        self._jobs.stop(job.id)
+        return {"ok": True}
+
+    @_api
+    def selection_eta(self, packages: list[str]) -> dict[str, Any]:
+        """Czas analizy zaznaczonych — z ostatniego pełnego szacunku, bez telefonu."""
+        est = self._estimate
+        if est is None or not isinstance(packages, list) or not all(isinstance(p, str) for p in packages):
+            return eta_view(None)
+        return eta_view(estimate_eta(est, load_speeds(), DEFAULT_WORKERS, packages))
 
     @_api
     def who_is_showing(self) -> dict[str, Any]:

@@ -1,4 +1,5 @@
 import threading
+import time
 from collections import namedtuple
 
 import pytest
@@ -297,3 +298,150 @@ def test_deep_analysis_needs_a_scan_and_a_known_package():
     api.start_scan(SERIAL)
     assert api.deep_analyze("com.not.installed")["error"]["key"] == "bad_request"
     assert api.deep_analyze("com.a;rm")["error"]["key"] == "bad_request"
+
+
+def _mode_api(monkeypatch, mode="ask", sync=False, free=500 * C.GB):
+    monkeypatch.setattr(C, "disk_usage", lambda path: Disk(500 * C.GB, 0, free))
+    api, rec = make_api(make_cli_phone(), sync=sync, apk_mode=mode)
+    policies = []
+    api._apk_factory = _policy_factory(policies)
+    return api, rec
+
+
+def test_mode_question_after_estimate_then_manual(monkeypatch):
+    api, rec = _mode_api(monkeypatch)
+    api.start_scan(SERIAL)
+    q = rec.wait_for("apk:question")
+    assert q["kind"] == "mode" and q["apps"] >= 1 and q["eta_kind"] == "rough"
+    assert q["eta_min_s"] <= q["eta_s"] <= q["eta_max_s"]
+    assert names(rec).index("apk:estimate") < names(rec).index("apk:question")
+    api.answer(q["job_id"], "manual")
+    scan = rec.wait_for("apk:manual")["scan"]
+    assert scan["apk_mode"] == "manual"
+    assert rec.of("apk:progress") == [] and C.cache_size(default_cache_dir()) == 0
+    rec.wait_for("job:end")  # wątek zadania kończy się przed sprzątnięciem LOCALAPPDATA
+
+
+def test_mode_question_full_runs_the_analysis(monkeypatch):
+    api, rec = _mode_api(monkeypatch)
+    api.start_scan(SERIAL)
+    api.answer(rec.wait_for("apk:question")["job_id"], "full")
+    done = rec.wait_for("apk:done")["scan"]
+    assert done["apk_mode"] == "full"
+    assert all("eta_s" in p for p in rec.of("apk:progress"))
+    rec.wait_for("job:end")
+
+
+@pytest.mark.parametrize("mode,event", [("manual", "apk:manual"), ("full", "apk:done")])
+def test_remembered_mode_skips_the_question(monkeypatch, mode, event):
+    api, rec = _mode_api(monkeypatch, mode=mode, sync=True)
+    api.start_scan(SERIAL)
+    assert rec.of("apk:question") == [] and rec.of(event)
+
+
+def test_mode_question_without_disk_usage_has_no_sizes(monkeypatch):
+    def broken(path):
+        raise OSError("no disk usage")
+    api, rec = _mode_api(monkeypatch)
+    monkeypatch.setattr(C, "disk_usage", broken)
+    api.start_scan(SERIAL)
+    q = rec.wait_for("apk:question")
+    assert q["kind"] == "mode" and "to_fetch_bytes" not in q
+    api.answer(q["job_id"], "manual")
+    rec.wait_for("apk:manual")
+    rec.wait_for("job:end")
+
+
+def test_analyze_selected_gives_partial_and_selection_eta(monkeypatch):
+    api, rec = _mode_api(monkeypatch, mode="manual", sync=True)
+    api.start_scan(SERIAL)
+    package = rec.of("apk:manual")[0]["scan"]["apps"][0]["package"]
+    eta = api.selection_eta([package])
+    assert eta["eta_s"] is not None and eta["eta_kind"] in ("rough", "measured")
+    api.analyze_selected([package])
+    scan = rec.of("apk:done")[-1]["scan"]
+    assert scan["apk_mode"] == "partial" and scan["on_demand"] == [package]
+    api.analyze_all()
+    assert rec.of("apk:done")[-1]["scan"]["apk_mode"] == "full"
+
+
+def test_analyze_selected_validates_packages(monkeypatch):
+    api, _ = _mode_api(monkeypatch, mode="manual", sync=True)
+    assert api.analyze_selected(["com.x"])["error"]["key"] == "no_scan"
+    api.start_scan(SERIAL)
+    assert api.analyze_selected([])["error"]["key"] == "bad_request"
+    assert api.analyze_selected(["com.not.there"])["error"]["key"] == "bad_request"
+
+
+def test_selection_eta_without_estimate_is_empty(monkeypatch):
+    api, _ = _mode_api(monkeypatch, mode="manual", sync=True)
+    assert api.selection_eta(["com.x"])["eta_s"] is None
+
+
+def test_stop_to_manual_during_full_analysis(monkeypatch):
+    slow = SlowApk()
+    api, rec = make_api(make_cli_phone(), sync=False, apk=slow)
+    api.start_scan(SERIAL)
+    rec.wait_for("apk:progress")
+    assert api.stop_apk_to_manual() == {"ok": True}
+    slow.release.set()
+    assert rec.wait_for("apk:manual")["scan"]["apk_mode"] == "manual"
+    assert rec.of("apk:stopped") == []
+    rec.wait_for("job:end")
+
+
+def test_stop_to_manual_after_partial_keeps_on_demand(monkeypatch):
+    api, rec = _mode_api(monkeypatch, mode="manual", sync=True)
+    api.start_scan(SERIAL)
+    package = rec.of("apk:manual")[0]["scan"]["apps"][0]["package"]
+    api.analyze_selected([package])
+    slow = SlowApk()
+    api._apk_factory = lambda adb, policy=None, **kw: slow
+    api._jobs._sync = False
+    progress, manual = len(rec.of("apk:progress")), len(rec.of("apk:manual"))
+    ended = len(rec.of("job:end"))
+    api.analyze_all()
+    _wait_new(rec, "apk:progress", progress)  # `wait_for` oddałby zdarzenie z pierwszego skanu
+    api.stop_apk_to_manual()
+    slow.release.set()
+    scan = _wait_new(rec, "apk:manual", manual)["scan"]
+    assert scan["apk_mode"] == "partial" and scan["on_demand"] == [package]
+    _wait_new(rec, "job:end", ended)
+
+
+def _wait_new(rec, name, seen, timeout=5.0):
+    """Jak `rec.wait_for`, ale tylko zdarzenie nowsze niż pierwsze `seen`."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        found = rec.of(name)
+        if len(found) > seen:
+            return found[-1]
+        time.sleep(0.01)
+    raise TimeoutError(name)
+
+
+def test_stop_to_manual_needs_a_running_analysis(monkeypatch):
+    api, _ = _mode_api(monkeypatch, mode="manual", sync=True)
+    assert api.stop_apk_to_manual()["error"]["key"] == "bad_request"
+
+
+def test_abandoned_analysis_does_not_publish_manual(monkeypatch):
+    api, rec = _mode_api(monkeypatch)
+    api.start_scan(SERIAL)
+    q = rec.wait_for("apk:question")
+    api._abandon_apk()  # jak nowy skan albo wykonanie planu
+    api.answer(q["job_id"], "manual")
+    rec.wait_for("job:end")  # zadanie skończone: później nic już nie opublikuje
+    assert rec.of("apk:manual") == []
+
+
+def test_full_analysis_teaches_the_timing(monkeypatch):
+    from admenot.engine.apk import timing
+    monkeypatch.setattr(timing, "MIN_APPS", 1)  # telefon testowy ma mało aplikacji
+    api, rec = _mode_api(monkeypatch, mode="full", sync=True)
+    api.start_scan(SERIAL)
+    assert rec.of("apk:done")
+    assert timing.load_speeds().samples == 1
+    api.start_scan(SERIAL)
+    q = rec.of("apk:estimate")[-1]
+    assert q["eta_kind"] == "measured"
