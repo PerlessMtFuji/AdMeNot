@@ -107,7 +107,7 @@ def _isolated(lang: str = "pl") -> Iterator[str]:
         # Ruling F2: nagranie nie może zależeć od locale Windows -- język na sztywno zanim
         # jakikolwiek `Api` wczyta ustawienia (make_api robi to samo, ale robimy to i tu, na
         # wszelki wypadek, gdyby krok scenariusza zbudował `Api` inaczej).
-        save_settings({"lang": lang})
+        save_settings({"lang": lang, "apk_mode_default": "full"})
         try:
             yield tmp
         finally:
