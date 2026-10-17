@@ -9,6 +9,7 @@ from admenot.app.present import (
     app_name,
     app_view,
     device_card,
+    eta_view,
     history_view,
     image_uri,
     plain,
@@ -22,6 +23,7 @@ from admenot.app.present import (
 )
 from admenot.engine.actions.executor import ExecOptions
 from admenot.engine.adb.transport import AdbError
+from admenot.engine.apk.timing import Eta
 from admenot.engine.collectors.profiles import PM_USERS
 from admenot.engine.collectors.system import DEVICE_POLICY
 from admenot.engine.facts import AppFacts
@@ -275,6 +277,33 @@ def test_history_orders_name_apps_and_show_icons_from_the_order_snapshot(tmp_pat
     assert o["apps"] == {"com.wlive.forecast": {"name": "Weather Live", "icon": "data:image/png;base64,AA=="},
                          "com.gone": {"name": None, "icon": None}}
     assert old["apps"] == {}
+
+
+def test_eta_view():
+    assert eta_view(None) == {"eta_s": None, "eta_kind": None, "eta_min_s": None, "eta_max_s": None}
+    assert eta_view(Eta(90, "rough", 54, 135)) == {"eta_s": 90, "eta_kind": "rough",
+                                                   "eta_min_s": 54, "eta_max_s": 135}
+
+
+def test_scan_view_carries_mode_and_install_dates(scan_report):
+    view = scan_view(scan_report, "pl")
+    assert view["apk_mode"] == "pending" and view["on_demand"] == []
+    assert all("first_install" in a for a in view["apps"])
+    dated = [r for r in scan_report.results if r.facts.first_install]
+    if dated:
+        app = next(a for a in view["apps"] if a["package"] == dated[0].facts.package)
+        assert datetime.fromisoformat(app["first_install"]) == dated[0].facts.first_install.replace(microsecond=0)
+
+
+def test_history_marks_manual_orders(tmp_path):
+    with Journal(tmp_path / "j.db") as journal:
+        manual = journal.create_order("R58", "SM-A145R", None)
+        journal.save_scan(manual.id, {"apps": [], "apk_mode": "manual"})
+        plain_order = journal.create_order("R58", "SM-A145R", None)
+        journal.save_scan(plain_order.id, {"apps": []})
+        orders = history_view(journal, "R58", ["R58"], "pl")["orders"]
+    by_id = {o["id"]: o["manual"] for o in orders}
+    assert by_id == {manual.id: True, plain_order.id: False}
 
 
 def test_app_view_lists_analysis_scope_for_a_quiet_app():
