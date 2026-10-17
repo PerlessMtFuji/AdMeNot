@@ -131,6 +131,16 @@ def test_source_view_names_installers():
     assert source_view(AppFacts("p", is_system=True), "en")["label"] == "system"
 
 
+def test_source_view_names_vendor_stores():
+    """Sklepy producentów po nazwie, nie po pakiecie — długi pakiet nie mieści się w kolumnie „Źródło”."""
+    stores = {"com.xiaomi.mipicks": "GetApps", "com.xiaomi.market": "GetApps",
+              "com.huawei.appmarket": "AppGallery", "com.sec.android.app.samsungapps": "Galaxy Store",
+              "com.heytap.market": "App Market", "com.oppo.market": "App Market",
+              "com.bbk.appstore": "V-Appstore", "com.amazon.venezia": "Amazon Appstore"}
+    for installer, label in stores.items():
+        assert source_view(AppFacts("p", installer=installer), "pl")["label"] == label
+
+
 def test_scan_view_has_symptoms_labels_and_source(synthetic_adb):
     view = scan_view(run_scan(synthetic_adb), "pl")
     apps = {a["package"]: a for a in view["apps"]}
