@@ -5,7 +5,7 @@
   import type { Controller } from '../lib/controller';
   import { i18n, t } from '../lib/i18n/index.svelte';
   import { formatGb, LEVEL_TONE } from '../lib/logic';
-  import type { CacheUsage, Lang, Level, Mode, Theme } from '../lib/types';
+  import type { ApkModeDefault, CacheUsage, Lang, Level, Mode, Theme } from '../lib/types';
   import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
   import Card from '../ui/Card.svelte';
@@ -36,6 +36,7 @@
     { value: 'expert' as Mode, label: t('settings.mode_expert') },
   ]);
   const levels = $derived((['silence', 'disable', 'remove'] as Level[]).map((value) => ({ value, label: t(`choice.${value}`), tone: LEVEL_TONE[value] })));
+  const apkModes = $derived((['ask', 'full', 'manual'] as ApkModeDefault[]).map((value) => ({ value, label: t(`settings.apk_mode_${value}`) })));
   const INPUT = 'field mono min-w-0 flex-1 rounded-xl px-3.5 py-2.5';
   const FIELD = 'field min-w-0 flex-1 rounded-xl px-3.5 py-2.5';
   let svc = $state({ name: '', address: '', phone: '', logo: '' });
@@ -227,6 +228,9 @@
 
     <Card><div class="flex flex-col gap-4 p-6">
       <span class="lbl">{t('settings.cache_title')}</span>
+      <div class="flex items-center justify-between gap-4"><span class="font-semibold">{t('settings.apk_mode_default')}</span>
+        <Segmented label={t('settings.apk_mode_default')} value={s.settings.apk_mode_default} options={apkModes}
+          onchange={(v) => ctl.saveSettings({ apk_mode_default: v })} /></div>
       <div class="flex flex-col gap-1">
         <label class="font-semibold" for="cache-limit">{t('settings.cache_limit')}</label>
         <div class="flex gap-2">

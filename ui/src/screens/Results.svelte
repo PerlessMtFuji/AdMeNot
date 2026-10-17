@@ -2,6 +2,7 @@
   import { getContext } from 'svelte';
   import { flip } from 'svelte/animate';
   import { fade } from 'svelte/transition';
+  import ApkModeChoice from '../components/ApkModeChoice.svelte';
   import ApkProgress from '../components/ApkProgress.svelte';
   import ApkSpace from '../components/ApkSpace.svelte';
   import AppCard from '../components/AppCard.svelte';
@@ -9,6 +10,7 @@
   import ExpertTable from '../components/ExpertTable.svelte';
   import DiagnosticsPanel from '../components/DiagnosticsPanel.svelte';
   import InterruptedBanner from '../components/InterruptedBanner.svelte';
+  import ManualList from '../components/ManualList.svelte';
   import NoticeLine from '../components/NoticeLine.svelte';
   import PhoneThumb from '../components/PhoneThumb.svelte';
   import PlanConfirm from '../components/PlanConfirm.svelte';
@@ -17,7 +19,7 @@
   import StepTimeline from '../components/StepTimeline.svelte';
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
-  import { facetCounts, flaggedApps, focusedApp, groupOpen, notices, verdictGroups, visibleApps } from '../lib/logic';
+  import { facetCounts, flaggedApps, focusedApp, groupOpen, isManual, notices, verdictGroups, visibleApps } from '../lib/logic';
   import { DUR, enter, ms, stagger } from '../lib/motion';
   import type { Mode, Verdict } from '../lib/types';
   import Banner from '../ui/Banner.svelte';
@@ -31,7 +33,13 @@
 
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
-  const expert = $derived(s.settings.mode === 'expert');
+  // Tryb ręczny (spec trybu ręcznego §3): werdykty heurystyk ukryte — bez grup, tabeli eksperta i przełącznika widoku.
+  const manual = $derived(isManual(s.scan));
+  const choosing = $derived(s.apkQuestion?.kind === 'mode');
+  // „Zawsze ręcznie”: do `apk:manual` (ok. sekundy) stan „w toku” zamiast grup z ukrytymi werdyktami.
+  const awaitingManual = $derived(s.scan?.apk_mode === 'pending' && s.settings.apk_mode_default === 'manual');
+  const verdictsHidden = $derived(manual || choosing || awaitingManual);
+  const expert = $derived(s.settings.mode === 'expert' && !verdictsHidden);
   const apps = $derived(s.scan?.apps ?? []);
   const flagged = $derived(flaggedApps(apps));
   const anyIncomplete = $derived(apps.some((a) => a.incomplete));
@@ -86,7 +94,9 @@
         {[s.client.trim(), s.device?.name].filter(Boolean).join(' · ')}
       </div>
       <div class="flex items-center gap-2">
-        <Segmented label={t('results.mode')} value={s.settings.mode} options={modes} onchange={(m) => ctl.setMode(m)} />
+        {#if !verdictsHidden}
+          <Segmented label={t('results.mode')} value={s.settings.mode} options={modes} onchange={(m) => ctl.setMode(m)} />
+        {/if}
         <div class="flex items-center gap-1.5">
           <Tooltip text={findLabel}>
             <Button size="icon" pressed={s.diagnostics} label={findLabel}
@@ -105,7 +115,11 @@
         </div>
         <Button onclick={() => ctl.newScan()}><Icon name="rotate-ccw" />{t('actions.rescan')}</Button>
       </div>
-      {#if flagged.length > 0}
+      {#if manual}
+        <h1 class="col-span-2 text-2xl font-extrabold">{t('manual.title')}</h1>
+      {:else if choosing || awaitingManual}
+        <h1 class="col-span-2 text-2xl font-extrabold">{t('results.apk_title')}</h1>
+      {:else if flagged.length > 0}
         <h1 class="col-span-2 text-2xl font-extrabold" aria-label={tp('results.title', flagged.length)}>
           {titleParts[0]}<CountUp value={flagged.length} />{titleParts[1]}
         </h1>
@@ -115,7 +129,7 @@
       {/if}
     </header>
 
-    {#if s.apk.running && flagged.length > 0}<ApkProgress />{/if}
+    {#if s.apk.running && flagged.length > 0 && !verdictsHidden}<ApkProgress />{/if}
     <ApkSpace />
     {#if s.interrupted.length}<InterruptedBanner orders={s.interrupted} />{/if}
     {#if undoName && s.job?.kind === 'undo'}
@@ -129,7 +143,11 @@
     {/if}
     <NoticeLine items={noteItems} details={noteDetails} />
 
-    {#if flagged.length === 0 && s.apk.running}
+    {#if choosing}
+      <ApkModeChoice />
+    {:else if manual}
+      <ManualList />
+    {:else if awaitingManual || (flagged.length === 0 && s.apk.running)}
       <div in:enter><ApkProgress hero /></div>
     {:else if flagged.length === 0}
       <div class="grid place-items-center gap-2 py-10 text-center" in:enter>
@@ -147,7 +165,7 @@
     {/if}
     {#if expert}
       <ExpertTable groups={expertGroups} {focused} {facets} {searching} {navRows} />
-    {:else if flagged.length > 0}
+    {:else if flagged.length > 0 && !verdictsHidden}
       {#each simpleGroups.filter((g) => g.verdict !== 'safe') as g (g.verdict)}
         {#if g.apps.length || DANGER.includes(g.verdict)}
           <VerdictSection verdict={g.verdict} count={g.apps.length} open={isOpen(g.verdict)} apps={g.apps}
@@ -164,7 +182,7 @@
         {/if}
       {/each}
     {/if}
-    {#if !expert && safeGroup.apps.length}
+    {#if !expert && !verdictsHidden && safeGroup.apps.length}
       <VerdictSection verdict="safe" count={safeGroup.apps.length} open={isOpen('safe')} collapsible
         ontoggle={() => ctl.setGroupOpen('safe', !isOpen('safe'))}>
         {#each safeGroup.apps as app (app.package)}

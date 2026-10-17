@@ -772,4 +772,77 @@ describe('tryb ręczny', () => {
     expect(s.selection).toEqual({ [other]: 'disable' });
     expect(first in s.selection).toBe(false);
   });
+
+  test('zaznaczenie w trybie ręcznym nie bierze poziomu z ukrytego werdyktu', async () => {
+    const { ctl, s, bridge } = await scanned({ select_level: 'remove' });
+    const boost = s.scan!.apps.find((a) => a.package === 'com.clean.pro.boost')!;
+    expect(boost.default_level).toBe('disable');
+    bridge.emit('apk:manual', { scan: { ...snap(s.scan), apk_mode: 'manual', on_demand: [] } });
+    ctl.toggle(boost);
+    expect(s.selection[boost.package]).toBe('remove');
+    ctl.toggle(boost);
+    // Po analizie na żądanie werdykt jest widoczny — wtedy obowiązuje propozycja silnika.
+    bridge.emit('apk:done', { scan: { ...snap(s.scan), apk_mode: 'partial', on_demand: [boost.package] } });
+    ctl.toggle(boost);
+    expect(s.selection[boost.package]).toBe('disable');
+  });
+
+  // Atrapa z ręcznie rozstrzyganymi odpowiedziami selection_eta.
+  async function withEta() {
+    const bridge = createFakeBridge('adware', { delay: 0 });
+    const pending: { pkgs: string[]; resolve: (v: unknown) => void; reject: (e: unknown) => void }[] = [];
+    const api = new Proxy(bridge.api, {
+      get: (target, method: string) => (method === 'selection_eta'
+        ? (pkgs: string[]) => new Promise((resolve, reject) => pending.push({ pkgs, resolve, reject }))
+        : target[method as keyof typeof target]),
+    });
+    const ctl = new Controller(new AppState(), { ...bridge, api });
+    await ctl.init();
+    await ctl.startScan();
+    await vi.waitFor(() => expect(ctl.state.job).toBeNull());
+    bridge.emit('apk:manual', { scan: { ...snap(ctl.state.scan), apk_mode: 'manual', on_demand: [] } });
+    return { ctl, s: ctl.state, bridge, pending };
+  }
+  const eta = (n: number) => ({ eta_s: n, eta_kind: 'measured', eta_min_s: n, eta_max_s: n });
+
+  test('szacunek dla zaznaczenia: starsza odpowiedź nie nadpisuje nowszej', async () => {
+    const { ctl, s, pending } = await withEta();
+    pending.length = 0;
+    ctl.setLevel('com.clean.pro.boost', 'remove');
+    ctl.setLevel('com.wlive.forecast', 'remove');
+    expect(pending).toHaveLength(2);
+    pending[1].resolve(eta(120));
+    await vi.waitFor(() => expect(s.selectionEta?.eta_s).toBe(120));
+    pending[0].resolve(eta(60));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(s.selectionEta?.eta_s).toBe(120);
+  });
+
+  test('szacunek dla zaznaczenia: błąd bez banera, zmiana trybu w trakcie ignoruje odpowiedź', async () => {
+    const { ctl, s, bridge, pending } = await withEta();
+    ctl.setLevel('com.clean.pro.boost', 'remove');
+    pending.at(-1)!.reject(new Error('boom'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(s.error).toBeNull();
+    expect(s.selectionEta).toBeNull();
+    ctl.setLevel('com.wlive.forecast', 'remove');
+    bridge.emit('apk:done', { scan: { ...snap(s.scan), apk_mode: 'full' } });
+    for (const p of pending) p.resolve(eta(60));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(s.selectionEta).toBeNull();
+  });
+
+  test('szacunek dla zaznaczenia po apk:done w trybie częściowym i po powrocie do naprawy', async () => {
+    const { s, ctl, bridge, pending } = await withEta();
+    s.selection = { 'com.clean.pro.boost': 'remove' };
+    pending.length = 0;
+    bridge.emit('apk:done', { scan: { ...snap(s.scan), apk_mode: 'partial', on_demand: ['com.wlive.forecast'] } });
+    expect(pending.map((p) => p.pkgs)).toEqual([['com.clean.pro.boost']]);
+    pending[0].resolve(eta(90));
+    await vi.waitFor(() => expect(s.selectionEta?.eta_s).toBe(90));
+    s.result = { stopped: false } as never;
+    ctl.backToRepair();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(s.selectionEta).toBeNull();
+  });
 });

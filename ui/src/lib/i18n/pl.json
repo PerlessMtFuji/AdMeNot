@@ -1,5 +1,23 @@
 {
   "eta": { "unknown": "czas nieznany", "under_min": "< 1 min", "min": "~{n} min", "range": "{lo}–{hi} min", "rough": "orientacyjnie", "now": "od razu" },
+  "apk_mode": {
+    "summary": "{apps} · {size} do pobrania",
+    "summary_cached": "{apps} · {size} do pobrania ({cached} już w pamięci)",
+    "full": "Pełna analiza", "full_sub": "werdykt dla każdej aplikacji",
+    "manual": "Szukaj ręcznie", "manual_sub": "wyszukaj, zaznacz, usuń",
+    "remember": "Zapamiętaj wybór (zmienisz w Ustawieniach)",
+    "stop_to_manual": "Przerwij i szukaj ręcznie"
+  },
+  "manual": {
+    "title": "Wyszukaj aplikacje do usunięcia",
+    "search": "Szukaj po nazwie albo pakiecie",
+    "show_system": "Pokaż systemowe",
+    "installed": "zainstalowana {date}",
+    "analyze_selected": "Przeanalizuj zaznaczone ({count}) {eta}",
+    "analyze_all": "Przeanalizuj wszystko {eta}",
+    "empty": "Nic nie pasuje do wyszukiwania.",
+    "tag": { "non_play": "spoza Play", "admin": "administrator", "accessibility": "ułatwienia dostępu", "overlay": "nakładka", "disabled": "wyłączona" }
+  },
   "groups": { "malicious": "Szkodliwe", "suspicious": "Podejrzane", "review": "Do sprawdzenia", "safe": "Bez uwag",
     "empty": "nic nie znaleziono", "show": "pokaż", "hide": "ukryj" },
   "bulk": { "select_all": "Zaznacz wszystkie", "select_all_in": "Zaznacz wszystkie: {group}",
@@ -234,6 +252,7 @@
     "reminders": "Przypominaj o wsparciu"
   },
   "history": {
+    "manual": "tryb ręczny",
     "title": "Historia zleceń", "phone": "Telefon", "empty": "Brak zleceń dla tego telefonu.", "none": "Brak zapisanych zleceń.",
     "restore": "Przywróć", "undo_all": "Cofnij całe zlecenie", "resume": "Dokończ",
     "delete": "Usuń zlecenie", "delete_title": "Usunąć zlecenie {number}?", "delete_text": "Znikną kroki, zrzuty ekranu, protokół i kopie APK tego zlecenia. Zmian na telefonie nie będzie już można cofnąć w AdMeNot.", "delete_confirm": "Usuń",
@@ -282,6 +301,7 @@
     "history": "Zrzuty ({count})"
   },
   "settings": {
+    "apk_mode_default": "Analiza APK po skanie", "apk_mode_ask": "Pytaj", "apk_mode_full": "Zawsze pełna", "apk_mode_manual": "Zawsze ręcznie",
     "appearance": "Wygląd", "theme": "Motyw", "theme_system": "System", "theme_light": "Jasny", "theme_dark": "Ciemny", "paths": "Programy i katalogi",
     "title": "Ustawienia", "lang": "Język", "mode": "Tryb domyślny", "mode_simple": "Prosty", "mode_expert": "Ekspercki",
     "adb": "Ścieżka do adb.exe", "adb_hint": "Puste = adb dołączony do programu (a bez niego adb z PATH)", "check": "Sprawdź", "adb_ok": "Działa: {version}", "adb_fail": "Nie działa: {message}",

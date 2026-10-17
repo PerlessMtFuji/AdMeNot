@@ -4,7 +4,7 @@ import { actedAfter, changedVerdicts, defaultSelection, isManual, mergeSelection
 import type { AppState } from './state.svelte';
 import { applyTheme } from './theme';
 import type {
-  ApiError, AppView, CacheUsage, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, TelemetrySample, Theme, Verdict,
+  ApiError, AppView, CacheUsage, EtaView, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, TelemetrySample, Theme, Verdict,
 } from './types';
 
 const CONSOLE_LIMIT = 500;
@@ -14,6 +14,7 @@ export class Controller {
   private knownLoaded = false;
   private autoMirrored = new Set<string>();
   private uiErrorSent = false;
+  private etaSeq = 0;  // szacunek dla zaznaczenia: liczy się tylko odpowiedź na ostatnie zapytanie
 
   constructor(readonly state: AppState, readonly bridge: Bridge) {}
 
@@ -129,6 +130,7 @@ export class Controller {
       s.scan = d.scan;
       s.apkQuestion = null;
       s.apk = { ...s.apk, running: false, changed, eta: null };
+      if (isManual(d.scan)) void this.refreshSelectionEta();
     });
     on('apk:manual', (d) => {
       if (stale(d)) return;
@@ -344,6 +346,7 @@ export class Controller {
     if (serial) void this.call(this.api.close_order(serial));
     Object.assign(s, { phase: 'results', screen: 'main', result: null, order: null, execPlan: null, plan: null,
       selection: {}, touched: Object.keys(s.acted), steps: [], lastShot: null, lastShotSerial: null, shotCount: 0 });
+    void this.refreshSelectionEta();
   }
 
   /** Cofa jedną aplikację w jej najnowszym zleceniu, bez wychodzenia z listy wyników. */
@@ -368,7 +371,11 @@ export class Controller {
   }
 
   toggle(app: AppView): void {
-    this.setLevel(app.package, this.state.selection[app.package] ? null : app.default_level ?? this.selectLevel(app));
+    const s = this.state;
+    // Tryb ręczny: propozycja silnika wynika z ukrytego werdyktu — tylko po analizie na żądanie jest widoczna.
+    const hidden = isManual(s.scan) && !s.scan!.on_demand.includes(app.package);
+    this.setLevel(app.package, s.selection[app.package] ? null
+      : (hidden ? null : app.default_level) ?? this.selectLevel(app));
   }
 
   /** Wiele zmian naraz (akcje zbiorcze grupy); `null` odznacza. */
@@ -794,11 +801,25 @@ export class Controller {
     await this.call(this.api.stop_apk_to_manual());
   }
 
+  /** Czas analizy zaznaczonych (tryb ręczny). Tylko dopisek przy przycisku: błąd nie trafia do banera. */
   async refreshSelectionEta(): Promise<void> {
     const s = this.state;
-    if (!isManual(s.scan)) return;
+    const seq = ++this.etaSeq;
     const pkgs = Object.keys(s.selection);
-    s.selectionEta = pkgs.length ? await this.call(this.api.selection_eta(pkgs)) : null;
+    if (!isManual(s.scan) || !pkgs.length) {
+      s.selectionEta = null;
+      return;
+    }
+    let r: EtaView | ApiError | null = null;
+    try {
+      r = await this.api.selection_eta(pkgs);
+    } catch {
+      r = null;
+    }
+    // W międzyczasie mogło przyjść nowsze zapytanie, zmiana trybu albo zaznaczenia.
+    const now = Object.keys(s.selection);
+    if (seq !== this.etaSeq || !isManual(s.scan) || now.length !== pkgs.length || now.some((p) => !pkgs.includes(p))) return;
+    s.selectionEta = r && !isApiError(r) ? r : null;
   }
 
   loadApkCache(): Promise<CacheUsage | null> {

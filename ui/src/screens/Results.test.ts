@@ -547,3 +547,63 @@ describe('Results: APK analysis in progress and bulk group actions', () => {
     expect(cell.getAttribute('title')).toBe('com.some.very.long.vendor.store');
   });
 });
+
+describe('Results: manual mode (tryb ręczny)', () => {
+  const snap = (v: unknown) => JSON.parse(JSON.stringify(v));
+
+  test('manual mode: no view switch, the search title, no verdict groups and never the all-clear title', async () => {
+    const { ctl, s, bridge } = await scanned('clean');
+    expect(screen.getByRole('group', { name: t('results.mode') })).toBeTruthy();
+    bridge.emit('apk:manual', { scan: { ...snap(s.scan), apk_mode: 'manual', on_demand: [] } });
+    await tick();
+    expect(screen.queryByRole('group', { name: t('results.mode') })).toBeNull();
+    expect(screen.getByRole('heading', { name: t('manual.title') })).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: t('results.clean_title') })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Bez uwag' })).toBeNull();
+    expect(screen.queryByRole('button', { name: new RegExp(tp('results.safe', s.scan!.counts.safe)) })).toBeNull();
+    expect(screen.getByRole('searchbox', { name: t('manual.search') })).toBeTruthy();
+    // Domyślny tryb Ekspert też nie pokazuje tabeli z werdyktami ani panelu dowodów.
+    await ctl.setMode('expert');
+    await tick();
+    expect(screen.queryByRole('group', { name: 'Tabela aplikacji' })).toBeNull();
+    expect(screen.getByRole('complementary', { name: t('panel.plan') })).toBeTruthy();
+    // Częściowy (po analizie na żądanie) — nadal bez grup i przełącznika.
+    bridge.emit('apk:done', { scan: { ...snap(s.scan), apk_mode: 'partial', on_demand: [s.scan!.apps[0].package] } });
+    await tick();
+    expect(screen.queryByRole('group', { name: t('results.mode') })).toBeNull();
+    expect(screen.getByRole('heading', { name: t('manual.title') })).toBeTruthy();
+  });
+
+  test('mode question: the choice card instead of the groups', async () => {
+    const { s, bridge } = await scanned();
+    s.job = { id: 'j1', kind: 'apk' };
+    bridge.emit('apk:question', { job_id: 'j1', kind: 'mode', apps: 12, eta_s: 90, eta_kind: 'measured', eta_min_s: 90, eta_max_s: 90 });
+    await tick();
+    expect(screen.getByRole('button', { name: new RegExp(t('apk_mode.full')) })).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Szkodliwe' })).toBeNull();
+    expect(screen.queryByRole('group', { name: t('results.mode') })).toBeNull();
+    expect(screen.getByRole('heading', { name: t('results.apk_title') })).toBeTruthy();
+  });
+
+  test('full analysis: remaining time and “stop and search by hand”; not for a selected-only or deep job', async () => {
+    const { ctl, s, bridge } = await scanned('clean');
+    s.job = { id: 'j1', kind: 'apk' };
+    s.apkScope = 'all';
+    s.apk = { done: 5, total: 140, running: true, changed: [], eta: 30 };
+    await tick();
+    expect(screen.getByText(t('eta.under_min'))).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: t('apk_mode.stop_to_manual') }));
+    expect(bridge.calls.some((c) => c.method === 'stop_apk_to_manual')).toBe(true);
+    s.apk = { ...s.apk, eta: 600 };
+    await tick();
+    expect(screen.getByText(t('eta.min', { n: 10 }))).toBeTruthy();
+    s.apkScope = 'selected';
+    await tick();
+    expect(screen.queryByRole('button', { name: t('apk_mode.stop_to_manual') })).toBeNull();
+    s.apkScope = 'all';
+    s.job = { id: 'j2', kind: 'deep' };
+    await tick();
+    expect(screen.queryByRole('button', { name: t('apk_mode.stop_to_manual') })).toBeNull();
+    expect(ctl).toBeTruthy();
+  });
+});

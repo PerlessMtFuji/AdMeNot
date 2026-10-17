@@ -145,3 +145,15 @@ test('history: deleting an order asks first, then calls the bridge', async () =>
   await vi.waitFor(() =>
     expect(bridge.calls.some((c) => c.method === 'delete_order' && c.args[0] === order.number)).toBe(true));
 });
+
+test('history: an order made in manual mode is tagged', async () => {
+  const { ctl, s } = await setupCtl('empty');
+  render(App, { props: { ctl } });
+  s.history = view({ interrupted: false, status: 'done', status_label: 'wykonane' });
+  s.screen = 'history';
+  await tick();
+  expect(within(screen.getByRole('article', { name: 'ZS/2026/0926/05' })).queryByText('tryb ręczny')).toBeNull();
+  s.history = view({ interrupted: false, status: 'done', status_label: 'wykonane', manual: true });
+  await tick();
+  expect(within(screen.getByRole('article', { name: 'ZS/2026/0926/05' })).getByText('tryb ręczny')).toBeTruthy();
+});
