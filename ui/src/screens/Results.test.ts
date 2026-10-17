@@ -476,3 +476,73 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     expect((within(screen.getByRole('main').querySelector('header')!).getByRole('button', { name: 'Włącz podgląd ekranu' }) as HTMLButtonElement).disabled).toBe(true);
   });
 });
+
+describe('Results: APK analysis in progress and bulk group actions', () => {
+  test('APK analysis on a clean phone: progress state instead of the green all clear', async () => {
+    const { s } = await scanned('clean');
+    s.apk = { done: 5, total: 140, running: true, changed: [] };
+    await tick();
+    expect(screen.queryByRole('heading', { name: t('results.clean_title') })).toBeNull();
+    expect(screen.getByRole('heading', { name: t('results.apk_title') })).toBeTruthy();
+    expect(screen.getByText(t('results.apk_sub'))).toBeTruthy();
+    expect(screen.getByRole('progressbar', { name: t('summary.apk_running', { done: 5, total: 140 }) })).toBeTruthy();
+    s.apk = { ...s.apk, running: false };
+    await tick();
+    expect(screen.getByRole('heading', { name: t('results.clean_title') })).toBeTruthy();
+  });
+
+  test('simple mode: select all in a group asks first when it would disable, clearing does not ask', async () => {
+    const { s } = await scanned();
+    s.selection = {};
+    await tick();
+    const region = screen.getByRole('region', { name: 'Szkodliwe' });
+    const all = within(region).getByRole('checkbox', { name: t('bulk.select_all_in', { group: 'Szkodliwe' }) });
+    await fireEvent.click(all);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(t('bulk.check'))).toBeTruthy();
+    expect(s.selection).toEqual({});
+    await fireEvent.click(within(dialog).getByRole('button', { name: t('bulk.confirm') }));
+    expect(s.selection).toEqual({ 'com.clean.pro.boost': 'disable' });
+    await tick();
+    expect((all as HTMLInputElement).checked).toBe(true);
+    await fireEvent.click(all);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(s.selection).toEqual({});
+  });
+
+  test('bulk action: silence applies at once, remove asks and warns about data', async () => {
+    const { s, ctl } = await scanned();
+    ctl.setGroupOpen('review', true);
+    s.selection = { 'com.wlive.forecast': 'disable' };
+    await tick();
+    const region = screen.getByRole('region', { name: 'Do sprawdzenia' });
+    const action = within(region).getByRole('combobox', { name: t('bulk.action_in', { group: 'Do sprawdzenia' }) });
+    await fireEvent.change(action, { target: { value: 'silence' } });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(s.selection['com.wlive.forecast']).toBe('silence');
+    await fireEvent.change(action, { target: { value: 'remove' } });
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(t('bulk.data_lost'))).toBeTruthy();
+    await fireEvent.click(within(dialog).getByRole('button', { name: t('common.cancel') }));
+    expect(s.selection['com.wlive.forecast']).toBe('silence');
+    await fireEvent.change(action, { target: { value: 'remove' } });
+    await fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: t('bulk.apply') }));
+    expect(s.selection['com.wlive.forecast']).toBe('remove');
+  });
+
+  test('expert mode: bulk controls on flagged groups only; long source names are cut with the full name on hover', async () => {
+    const { s, ctl } = await scanned();
+    await ctl.setMode('expert');
+    ctl.setGroupOpen('safe', true);
+    const boost = s.scan!.apps.find((a) => a.package === 'com.clean.pro.boost')!;
+    s.scan = { ...s.scan!, apps: s.scan!.apps.map((a) => a.package === boost.package
+      ? { ...a, source: { label: 'com.some.very.long.vendor.store', days: 3 } } : a) };
+    await tick();
+    const table = screen.getByRole('group', { name: 'Tabela aplikacji' });
+    expect(within(table).getByRole('checkbox', { name: t('bulk.select_all_in', { group: 'Szkodliwe' }) })).toBeTruthy();
+    expect(within(table).queryByRole('checkbox', { name: t('bulk.select_all_in', { group: 'Bez uwag' }) })).toBeNull();
+    const cell = within(table).getByText('com.some.very.long.vendor.store');
+    expect(cell.classList.contains('truncate')).toBe(true);
+    expect(cell.getAttribute('title')).toBe('com.some.very.long.vendor.store');
+  });
+});

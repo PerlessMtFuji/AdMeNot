@@ -354,6 +354,42 @@ export class Controller {
     this.setLevel(app.package, this.state.selection[app.package] ? null : app.default_level ?? this.selectLevel(app));
   }
 
+  /** Wiele zmian naraz (akcje zbiorcze grupy); `null` odznacza. */
+  setLevels(levels: Record<string, Level | null>): void {
+    const s = this.state;
+    const next = { ...s.selection };
+    const touched = new Set(s.touched);
+    for (const [pkg, level] of Object.entries(levels)) {
+      if (level && s.acted[pkg] === 'remove') continue;
+      if (level) next[pkg] = level;
+      else delete next[pkg];
+      touched.add(pkg);
+    }
+    s.selection = next;
+    s.touched = [...touched];
+  }
+
+  /** „Zaznacz wszystkie” w grupie: własny wybór zostaje, reszta jak pojedyncze zaznaczenie (toggle). */
+  groupSelectLevels(apps: AppView[]): Record<string, Level> {
+    const s = this.state;
+    const out: Record<string, Level> = {};
+    for (const a of apps) {
+      if (s.acted[a.package] !== 'remove') out[a.package] = s.selection[a.package] ?? a.default_level ?? this.selectLevel(a);
+    }
+    return out;
+  }
+
+  /** Jedna akcja dla zaznaczonych w grupie; aplikacji producenta zbiorczo nie usuwamy, tylko wyłączamy. */
+  groupActionLevels(apps: AppView[], level: Level): Record<string, Level> {
+    const s = this.state;
+    const out: Record<string, Level> = {};
+    for (const a of apps) {
+      if (!s.selection[a.package] || s.acted[a.package] === 'remove') continue;
+      out[a.package] = a.is_system && level === 'remove' ? 'disable' : level;
+    }
+    return out;
+  }
+
   /** Akcja z ustawień dla aplikacji bez propozycji silnika; producenta nie usuwamy domyślnie (planner.default_level). */
   private selectLevel(app: AppView): Level {
     let level = this.state.settings.select_level;

@@ -441,3 +441,19 @@ export function updateBanner(u: UpdateView | null, updatedSeen: boolean): 'retir
 export function needsWelcome(s: Settings): boolean {
   return s.welcome_version === null || s.welcome_version < s.welcome_current;
 }
+
+/** Grupy z polem „zaznacz wszystkie” i akcją zbiorczą; „Bez uwag” nie, żeby nie zaznaczyć setek aplikacji naraz. */
+export const BULK_VERDICTS: Verdict[] = ['malicious', 'suspicious', 'review'];
+
+/** Stan pola „zaznacz wszystkie”: liczą się tylko aplikacje, które można jeszcze zmienić (nieusunięte). */
+export function groupCheck(apps: AppView[], selection: Record<string, Level>,
+  acted: Record<string, Level>): 'none' | 'some' | 'all' {
+  const open = apps.filter((a) => acted[a.package] !== 'remove');
+  const picked = open.filter((a) => selection[a.package]).length;
+  return picked === 0 ? 'none' : picked === open.length ? 'all' : 'some';
+}
+
+/** „Wyłącz” i „Usuń” dla wielu aplikacji naraz wymagają potwierdzenia; „Wycisz” jest najłagodniejsze. */
+export function bulkNeedsConfirm(levels: Record<string, Level>): boolean {
+  return Object.values(levels).some((l) => l !== 'silence');
+}

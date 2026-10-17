@@ -36,6 +36,8 @@ import {
   notices,
   updateBanner,
   needsWelcome,
+  groupCheck,
+  bulkNeedsConfirm,
 } from './logic';
 import type { AppView, Category, Level, PlanApp, StepEvent, Finding, ScanView, Settings, UpdateView } from './types';
 
@@ -411,5 +413,24 @@ describe('plan groups', () => {
     ], 'pl');
     expect(g.steps.map((x) => x.text)).toEqual(['zgoda', 'okna', 'stop', 'odinstalowanie']);
     expect(g.steps[1].only).toEqual(['B']);
+  });
+});
+
+describe('group select-all (bulk actions)', () => {
+  const apps = [app('a', 'malicious'), app('b', 'malicious'), app('c', 'malicious')];
+
+  test('the group checkbox is empty, partial or full; removed apps do not count', () => {
+    expect(groupCheck(apps, {}, {})).toBe('none');
+    expect(groupCheck(apps, { a: 'disable' }, {})).toBe('some');
+    expect(groupCheck(apps, { a: 'disable', b: 'silence', c: 'remove' }, {})).toBe('all');
+    expect(groupCheck(apps, { a: 'disable', b: 'silence' }, { c: 'remove' })).toBe('all');
+    expect(groupCheck(apps, {}, { a: 'remove', b: 'remove', c: 'remove' })).toBe('none');
+  });
+
+  test('only disable and remove ask for confirmation; silence is the mild one', () => {
+    expect(bulkNeedsConfirm({ a: 'silence', b: 'silence' })).toBe(false);
+    expect(bulkNeedsConfirm({ a: 'silence', b: 'disable' })).toBe(true);
+    expect(bulkNeedsConfirm({ a: 'remove' })).toBe(true);
+    expect(bulkNeedsConfirm({})).toBe(false);
   });
 });
