@@ -293,3 +293,15 @@ def test_consent_is_read_from_the_snapshot(journal, photo):
 def test_broken_consent_is_ignored(journal, photo, bad):
     order = make_order(journal, {**snapshot(photo), "consent": bad})
     assert build_protocol(journal, order.id, "pl").consent is None
+
+
+def test_manual_snapshot_gives_manual_protocol_without_clean_count(journal, photo):
+    snap = snapshot(photo)
+    snap["apk_mode"] = "manual"
+    p = build_protocol(journal, make_order(journal, snap).id, "pl")
+    assert p.manual is True and p.clean_count is None
+
+
+def test_snapshot_without_apk_mode_is_not_manual(journal, photo):
+    p = build_protocol(journal, make_order(journal, snapshot(photo)).id, "pl")
+    assert p.manual is False and p.clean_count == 37

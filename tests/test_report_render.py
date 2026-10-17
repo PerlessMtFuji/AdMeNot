@@ -315,3 +315,17 @@ def test_consent_line(photo, lang, text):
 def test_no_consent_no_line(photo):
     html = render_html(make_protocol(photo, lang="pl"), ServiceInfo(), GENERATED)
     assert "przedstawiono klientowi" not in html
+
+
+def test_manual_protocol_has_note_and_no_clean_headline(photo):
+    rows = [AppRow("com.torch", "Latarka", "safe", [], "silence", "done")]
+    html = render_html(make_protocol(photo, rows=rows, clean_count=None, manual=True,
+                                     recommendations=[Recommendation("general")]),
+                       ServiceInfo(), GENERATED)
+    assert TEXTS["pl"]["manual_note"] in html
+    assert TEXTS["pl"]["no_signs"] not in html and "Aplikacje bez uwag" not in html
+
+
+def test_protocol_without_manual_has_no_note(photo):
+    html = render_html(make_protocol(photo), ServiceInfo(), GENERATED)
+    assert TEXTS["pl"]["manual_note"] not in html
