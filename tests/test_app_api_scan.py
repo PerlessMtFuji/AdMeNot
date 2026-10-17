@@ -412,3 +412,15 @@ def test_full_analysis_teaches_the_timing(monkeypatch):
     api.start_scan(SERIAL)
     q = rec.of("apk:estimate")[-1]
     assert q["eta_kind"] == "measured"
+
+
+def test_estimate_scope_tells_the_whole_phone_from_a_subset(monkeypatch):
+    api, rec = _mode_api(monkeypatch, mode="manual", sync=True)
+    api.start_scan(SERIAL)
+    assert rec.of("apk:estimate")[-1]["scope"] == "all"
+    package = rec.of("apk:manual")[0]["scan"]["apps"][0]["package"]
+    api.analyze_selected([package])
+    subset = rec.of("apk:estimate")[-1]
+    assert subset["scope"] == "part" and subset["apps"] == 1
+    api.analyze_all()
+    assert rec.of("apk:estimate")[-1]["scope"] == "all"

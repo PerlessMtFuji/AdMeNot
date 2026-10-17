@@ -521,15 +521,25 @@ class Api:
         def workers() -> int:
             return getattr(provider, "workers", 1)
 
+        def ask(payload: dict[str, Any]) -> str | None:
+            # Czas namysłu serwisanta nad pytaniem to nie czas analizy (telemetria `seconds`).
+            nonlocal started
+            asked = time.monotonic()
+            answer = job.ask("apk:question", payload)
+            started += time.monotonic() - asked
+            return answer
+
         def decide(est: Estimate, use: CacheUsage) -> str:
             # Zatrzymanie zadania w trakcie pytania (None) = pominięcie; `job.check` niżej kończy.
-            return job.ask("apk:question", {"kind": "no_space", **estimate_view(est, use)}) or "skip"
+            return ask({"kind": "no_space", **estimate_view(est, use)}) or "skip"
 
         def on_estimate(est: Estimate, use: CacheUsage) -> None:
             eta = estimate_eta(est, speeds, workers())
             if whole:
                 self._estimate, self._eta = est, eta
-            self._emit("apk:estimate", {**estimate_view(est, use), **eta_view(eta), "job_id": job.id})
+            # `scope`: UI trzyma czas „Przeanalizuj wszystko” tylko z szacunku całego telefonu.
+            self._emit("apk:estimate", {**estimate_view(est, use), **eta_view(eta),
+                                        "scope": "all" if whole else "part", "job_id": job.id})
 
         def pick(est: Estimate | None, use: CacheUsage | None, apps: int) -> str:
             eta = estimate_eta(est, speeds, workers()) if est is not None else None
@@ -539,7 +549,7 @@ class Api:
                 return default
             sizes = estimate_view(est, use) if est is not None and use is not None else {}
             # Zatrzymanie w trakcie pytania (None) = tryb ręczny: nic nie pobieramy (spec §2.1 p. 5).
-            answer = job.ask("apk:question", {"kind": "mode", "apps": apps, **sizes, **eta_view(eta)})
+            answer = ask({"kind": "mode", "apps": apps, **sizes, **eta_view(eta)})
             return answer if answer in ("full", "manual") else "manual"
 
         policy = CachePolicy(self._cache_limit(), on_estimate=on_estimate, decide=decide,
@@ -560,14 +570,14 @@ class Api:
                 self._report = updated
                 self._emit("apk:done", {"scan": scan_view(updated, self._lang), "job_id": job.id})
         except ManualMode:
-            self._publish_manual(job, report, started)
+            self._publish_manual(job, report, started, record=whole)
             return
         except Stopped:
             if not deep:
                 self._learn(speeds, provider)
             # `finally` czyści `_to_manual` dopiero po tym odczycie — nie przenoś go wyżej.
             if self._to_manual == job.id:
-                self._publish_manual(job, report, started)
+                self._publish_manual(job, report, started, record=whole)
             else:
                 self._emit("apk:stopped", {"job_id": job.id})
             return
@@ -594,8 +604,12 @@ class Api:
             except OSError:
                 pass  # brak zapisu = następny szacunek z poprzedniej historii
 
-    def _publish_manual(self, job: Job, report: ScanReport, started: float) -> None:
-        """Tryb ręczny po wyborze albo po „Przerwij i szukaj ręcznie” (spec §2.2)."""
+    def _publish_manual(self, job: Job, report: ScanReport, started: float, record: bool) -> None:
+        """Tryb ręczny po wyborze albo po „Przerwij i szukaj ręcznie” (spec §2.2).
+
+        `record`: tylko przebieg całego telefonu jest nową oceną w telemetrii — przerwana
+        analiza zaznaczonych zostawia ocenę z wyboru trybu.
+        """
         mode = "partial" if report.analyzed_on_demand else "manual"
         with self._apk_commit:
             # `job.check` nie wchodzi w grę (zadanie bywa zatrzymane celowo); porzucone przez
@@ -604,6 +618,8 @@ class Api:
                 return
             published = self._report = replace(report, apk_mode=mode)
             self._emit("apk:manual", {"scan": scan_view(published, self._lang), "job_id": job.id})
+        if not record:
+            return
         session, eta = self._scan_session or "", self._eta
         telemetry.record("scan", lambda p: scan_event(published, session,
                                                       int(time.monotonic() - started), p,

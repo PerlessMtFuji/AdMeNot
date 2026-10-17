@@ -18,8 +18,7 @@
   const label = $derived(t('summary.apk_running', { done: s.apk.done, total: s.apk.total }));
   const remaining = $derived(s.apk.eta === null ? null
     : formatEta({ eta_s: s.apk.eta, eta_kind: 'measured', eta_min_s: s.apk.eta, eta_max_s: s.apk.eta }, i18n.lang));
-  // Pełna analiza (po skanie albo „Przeanalizuj wszystko”) — z niej można przejść do trybu ręcznego.
-  const canStop = $derived(s.job?.kind === 'apk' && s.apkScope === 'all');
+  const canStop = $derived(s.canStopToManual);
   const R = 34;
   const C = 2 * Math.PI * R;
 </script>

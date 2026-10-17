@@ -435,7 +435,7 @@ export interface EventMap {
   'scan:device': { device: PhoneCard };
   'scan:done': { scan: ScanView; interrupted: string[]; client: string | null };
   'apk:progress': { done: number; total: number; package: string; eta_s: number | null; job_id?: string };
-  'apk:estimate': ApkEstimate & { job_id?: string };
+  'apk:estimate': ApkEstimate & { job_id?: string; scope: 'all' | 'part' };  // part: zaznaczone albo jedna aplikacja
   'apk:question': ApkQuestion;
   'apk:done': { scan: ScanView; job_id?: string };
   'apk:manual': { scan: ScanView; job_id?: string };

@@ -139,3 +139,19 @@ def test_repair_event_marks_blind_picks():
                            True, blind=frozenset({"com.a", "com.b"}))
     assert body["sources"] == {"flagged": 0, "manual": 0, "blind": 2}
     assert {p["source"] for p in body["packages"]} == {"blind"}
+
+
+def test_ui_sample_json_matches_sample_and_shows_a_quick_scan():
+    # Plik „co wysyłamy” w UI (atrapa mostu) = `sample()`; wersja programu zmienia się z wydaniem.
+    from pathlib import Path
+
+    path = Path(__file__).parent.parent / "ui" / "src" / "lib" / "telemetrySample.json"
+    shown = json.loads(path.read_text("utf-8"))
+
+    def strip(s):
+        return {k: [{**e, "app": None} for e in v] for k, v in s.items()}
+
+    assert strip(shown) == strip(ev.sample())
+    scan = next(e for e in ev.sample()["basic"] if e["type"] == "scan")
+    assert scan["apk_stage"] is False and scan["apk_mode"] == "pending" and scan["eta"] is None
+    assert scan["apk"] is None

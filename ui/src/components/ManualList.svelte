@@ -19,7 +19,7 @@
   const facets = $derived({ ...facetCounts(manualRows(apps, { query: s.query, showSystem: s.showSystem, source: null })),
     categories: [] });
   const picked = $derived(Object.keys(s.selection).length);
-  const allEta = $derived(formatEta(s.apkEstimate, i18n.lang));
+  const allEta = $derived(formatEta(s.apkFullEta, i18n.lang));
 </script>
 
 <div class="flex flex-col gap-3">

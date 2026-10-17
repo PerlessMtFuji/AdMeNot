@@ -362,7 +362,7 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     const GB = 1024 ** 3;
     s.apk = { ...s.apk, running: true };
     bridge.emit('apk:estimate', { to_fetch_bytes: 7.2 * GB, total_bytes: 7.2 * GB, apps: 142, unknown: 3, cached: 0,
-      largest_bytes: 3 * GB, limit_bytes: 10 * GB, effective_bytes: 2 * GB, free_bytes: 4 * GB, eta_s: null, eta_kind: null, eta_min_s: null, eta_max_s: null });
+      largest_bytes: 3 * GB, limit_bytes: 10 * GB, effective_bytes: 2 * GB, free_bytes: 4 * GB, eta_s: null, eta_kind: null, eta_min_s: null, eta_max_s: null, scope: 'all' });
     expect(await screen.findByText(/Analiza pobierze ok. 7,2 GB \(142 aplikacje\)/)).toBeTruthy();
     expect(screen.getByText(/Na dysku jest miejsce na 2,0 GB/)).toBeTruthy();
     expect(tp('apk_cache.estimate', 5, { size: '1,0 GB' })).toBe('Analiza pobierze ok. 1,0 GB (5 aplikacji)');
@@ -382,10 +382,10 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     const base = { total_bytes: 5 * GB, unknown: 0, largest_bytes: 0, limit_bytes: 10 * GB,
       effective_bytes: 10 * GB, free_bytes: 50 * GB, eta_s: null, eta_kind: null, eta_min_s: null, eta_max_s: null };
     s.apk = { ...s.apk, running: true };
-    bridge.emit('apk:estimate', { ...base, to_fetch_bytes: 0, apps: 89, cached: 89 });
+    bridge.emit('apk:estimate', { ...base, to_fetch_bytes: 0, apps: 89, cached: 89, scope: 'all' });
     expect(await screen.findByText(
       'Pliki wszystkich aplikacji do analizy (89) są już na komputerze — nic nie trzeba pobierać.')).toBeTruthy();
-    bridge.emit('apk:estimate', { ...base, to_fetch_bytes: 30 * 1024 ** 2, apps: 89, cached: 87 });
+    bridge.emit('apk:estimate', { ...base, to_fetch_bytes: 30 * 1024 ** 2, apps: 89, cached: 87, scope: 'all' });
     expect(await screen.findByText(
       'Analiza pobierze ok. 30 MB (2 z 89 aplikacji, pozostałe są już na komputerze).')).toBeTruthy();
   });

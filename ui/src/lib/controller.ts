@@ -110,6 +110,7 @@ export class Controller {
       s.who = null;
       s.apk = { done: 0, total: 0, running: true, changed: [], eta: null };
       s.apkEstimate = null;
+      s.apkFullEta = null;
       s.apkQuestion = null;
       s.selectionEta = null;
       s.showSystem = false;
@@ -118,10 +119,28 @@ export class Controller {
     });
     // Zdarzenia porzuconej analizy APK (poprzedni skan) nie mogą zmienić nowego (BUG-10).
     const stale = (d: { job_id?: string }): boolean => !!d.job_id && !!s.job && d.job_id !== s.job.id;
-    on('apk:estimate', (d) => { if (!stale(d)) s.apkEstimate = d; });
-    on('apk:question', (d) => { if (!stale(d)) s.apkQuestion = d; });
+    // Most prowadzi analizę APK po skanie w tym samym zadaniu (kind „scan” → „apk”) i nie wysyła
+    // zmiany rodzaju: pierwsze zdarzenie analizy tego zadania ją oznacza (przycisk „Przerwij i szukaj ręcznie”).
+    const apkStage = (d: { job_id?: string }): void => {
+      if (s.job?.kind === 'scan' && d.job_id === s.job.id) s.job = { ...s.job, kind: 'apk' };
+    };
+    const eta = (d: EtaView): EtaView => ({ eta_s: d.eta_s, eta_kind: d.eta_kind, eta_min_s: d.eta_min_s, eta_max_s: d.eta_max_s });
+    on('apk:estimate', (d) => {
+      if (stale(d)) return;
+      apkStage(d);
+      s.apkEstimate = d;
+      if (d.scope === 'all') s.apkFullEta = eta(d);
+    });
+    on('apk:question', (d) => {
+      if (stale(d)) return;
+      apkStage(d);
+      s.apkQuestion = d;
+      if (d.kind === 'mode') s.apkFullEta = eta(d);  // pytanie o tryb dotyczy całego telefonu
+    });
     on('apk:progress', (d) => {
-      if (!stale(d)) s.apk = { ...s.apk, done: d.done, total: d.total, running: true, eta: stableEta(s.apk.eta, d.eta_s) };
+      if (stale(d)) return;
+      apkStage(d);
+      s.apk = { ...s.apk, done: d.done, total: d.total, running: true, eta: stableEta(s.apk.eta, d.eta_s) };
     });
     on('apk:done', (d) => {
       if (stale(d)) return;
@@ -301,6 +320,7 @@ export class Controller {
     });
     s.apk = { done: 0, total: 0, running: false, changed: [], eta: null };
     s.apkEstimate = null;
+    s.apkFullEta = null;
     s.apkQuestion = null;
     const r = await this.call(this.api.start_scan(s.serial, s.client.trim() || null));
     if (r) this.setJob(r.job_id, 'scan');
@@ -773,10 +793,15 @@ export class Controller {
   }
 
   async chooseApkMode(mode: 'full' | 'manual', remember: boolean): Promise<void> {
-    const q = this.state.apkQuestion;
+    const s = this.state;
+    const q = s.apkQuestion;
     if (!q || q.kind !== 'mode') return;
-    this.state.apkQuestion = null;
-    if (mode === 'full') this.state.apkFullChosen = true;
+    s.apkQuestion = null;
+    if (mode === 'full') {
+      s.apkFullChosen = true;
+      // Werdykty heurystyk są od teraz widoczne: propozycje jak przed trybem ręcznym, zmiany serwisanta zostają.
+      if (s.scan) s.selection = mergeSelection(s.selection, s.scan.apps, s.touched);
+    }
     if (remember) await this.saveSettings({ apk_mode_default: mode });
     await this.call(this.api.answer(q.job_id, mode));
   }

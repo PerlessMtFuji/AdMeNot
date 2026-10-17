@@ -892,4 +892,73 @@ describe('tryb ręczny', () => {
     await new Promise((r) => setTimeout(r, 0));
     expect(s.selectionEta).toBeNull();
   });
+
+  // Atrapa bez nagrania skanu: zdarzenia zadania wysyła test, jak most po kolei.
+  async function liveScan(setting: Settings['apk_mode_default']) {
+    const { s: s0 } = await scanned();
+    const scan = { ...snap(s0.scan), apk_mode: 'pending', on_demand: [] };
+    const bridge = createFakeBridge('adware', { delay: 0 });
+    const api = new Proxy(bridge.api, {
+      get: (target, method: string) => (method === 'start_scan'
+        ? async () => ({ job_id: 'job-1' })
+        : target[method as keyof typeof target]),
+    });
+    const ctl = new Controller(new AppState(), { ...bridge, api });
+    await ctl.init();
+    await ctl.saveSettings({ apk_mode_default: setting });
+    await ctl.startScan();
+    bridge.emit('scan:done', { scan, interrupted: [], client: null });
+    return { ctl, s: ctl.state, bridge };
+  }
+
+  test('„Przerwij i szukaj ręcznie”: pełna analiza po skanie (to samo zadanie) pozwala przejść do ręcznego', async () => {
+    const { ctl, s, bridge } = await liveScan('ask');
+    expect(s.canStopToManual).toBe(false);  // szybki skan jeszcze nie przeszedł w analizę APK
+    bridge.emit('apk:question', { job_id: 'job-1', kind: 'mode', apps: 3, eta_s: 60, eta_kind: 'rough', eta_min_s: 36, eta_max_s: 90 });
+    await ctl.chooseApkMode('full', false);
+    bridge.emit('apk:progress', { done: 1, total: 3, package: 'com.a', eta_s: 40, job_id: 'job-1' });
+    expect(s.job).toEqual({ id: 'job-1', kind: 'apk' });
+    expect(s.canStopToManual).toBe(true);
+    await ctl.stopToManual();
+    expect(bridge.calls.some((c) => c.method === 'stop_apk_to_manual')).toBe(true);
+  });
+
+  test('„Przerwij i szukaj ręcznie”: także przy ustawieniu „zawsze pełna” (bez pytania)', async () => {
+    const { s, bridge } = await liveScan('full');
+    bridge.emit('apk:progress', { done: 1, total: 3, package: 'com.a', eta_s: 40, job_id: 'job-1' });
+    expect(s.canStopToManual).toBe(true);
+  });
+
+  test('„Przerwij i szukaj ręcznie” niedostępne w analizie zaznaczonych', async () => {
+    const { ctl, s, bridge } = await scanned();
+    bridge.emit('apk:manual', { scan: { ...snap(s.scan), apk_mode: 'manual', on_demand: [] } });
+    ctl.setLevel('com.clean.pro.boost', 'remove');
+    await ctl.analyzeSelected();
+    expect(s.canStopToManual).toBe(false);
+    await ctl.analyzeAll();
+    expect(s.canStopToManual).toBe(true);
+  });
+
+  test('„Przeanalizuj wszystko”: czas z szacunku całego telefonu, nie z analizy zaznaczonych', async () => {
+    const { s, bridge } = await liveScan('ask');
+    const GB = 1024 ** 3;
+    const est = { to_fetch_bytes: GB, total_bytes: GB, unknown: 0, cached: 0, largest_bytes: 0, limit_bytes: 10 * GB,
+      effective_bytes: 10 * GB, free_bytes: 50 * GB, eta_kind: 'measured' as const, job_id: 'job-1' };
+    bridge.emit('apk:estimate', { ...est, apps: 90, eta_s: 600, eta_min_s: 600, eta_max_s: 600, scope: 'all' });
+    bridge.emit('apk:manual', { scan: { ...snap(s.scan), apk_mode: 'manual', on_demand: [] }, job_id: 'job-1' });
+    bridge.emit('job:end', { job_id: 'job-1', kind: 'apk' });
+    bridge.emit('apk:estimate', { ...est, apps: 1, eta_s: 20, eta_min_s: 20, eta_max_s: 20, scope: 'part', job_id: 'job-2' });
+    expect(s.apkEstimate?.apps).toBe(1);  // karta postępu: rozmiar bieżącej analizy
+    expect(s.apkFullEta?.eta_s).toBe(600);
+  });
+
+  test('„pytaj” → pełna: domyślne zaznaczenia od razu po wyborze, z poszanowaniem zmian serwisanta', async () => {
+    const { ctl, s, bridge } = await pending('ask');
+    ctl.setLevel('com.wlive.forecast', 'remove');
+    ctl.setLevel('com.wlive.forecast', null);
+    bridge.emit('apk:question', { job_id: 'j1', kind: 'mode', apps: 3, eta_s: 60, eta_kind: 'measured', eta_min_s: 60, eta_max_s: 60 });
+    await ctl.chooseApkMode('full', false);
+    expect(s.selection['com.clean.pro.boost']).toBe('disable');
+    expect('com.wlive.forecast' in s.selection).toBe(false);
+  });
 });

@@ -131,8 +131,8 @@ def _sample_scan(packages: bool) -> dict[str, Any]:
                 "confidence": "medium", "system": False}]
     return {"device": device_of(_SAMPLE_DEVICE), "session": "ab12cd34", "apps": 187,
             "verdicts": {"malicious": 1, "suspicious": 0, "review": 1}, "low_behavior_data": False,
-            "apk": {"requested": 2, "analyzed": 2, "failed": 0}, "seconds": 41,
-            "apk_stage": False, "apk_mode": "full", "eta": {"kind": "measured", "seconds": 38},
+            # Szybki skan (apk_stage False): APK jeszcze nie przeanalizowane, tryb dopiero do wyboru.
+            "apk": None, "seconds": 41, "apk_stage": False, "apk_mode": "pending", "eta": None,
             "packages": flagged if packages else None}
 
 

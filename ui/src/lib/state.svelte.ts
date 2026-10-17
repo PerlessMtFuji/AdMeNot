@@ -26,6 +26,8 @@ export class AppState {
   scan = $state<ScanView | null>(null);
   apk = $state({ done: 0, total: 0, running: false, changed: [] as string[], eta: null as number | null });
   apkEstimate = $state<ApkEstimate | null>(null);
+  /** Czas analizy całego telefonu (przycisk „Przeanalizuj wszystko”); szacunek zaznaczonych go nie zmienia. */
+  apkFullEta = $state<EtaView | null>(null);
   apkQuestion = $state<ApkQuestion | null>(null);
   selectionEta = $state<EtaView | null>(null);
   showSystem = $state(false);
@@ -114,5 +116,10 @@ export class AppState {
 
   get orderRunning(): boolean {
     return this.job !== null && ORDER_KINDS.includes(this.job.kind);
+  }
+
+  /** Pełna analiza (po skanie albo „Przeanalizuj wszystko”) — z niej można przejść do trybu ręcznego. */
+  get canStopToManual(): boolean {
+    return this.job?.kind === 'apk' && this.apkScope === 'all';
   }
 }
