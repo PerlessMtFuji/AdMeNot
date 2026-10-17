@@ -57,7 +57,7 @@ export function createFakeBridge(name: string,
     apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false, select_level: 'silence', retention_days: 60,
     check_updates: true, dismissed_update: null, last_run_version: null,
     welcome_version: options.welcome ? null : 1, welcome_current: 1, telemetry: false, telemetry_packages: false,
-    telemetry_id: null, telemetry_delete_pending: false, donate_reminders: true };
+    telemetry_id: null, telemetry_delete_pending: false, donate_reminders: true, apk_mode_default: 'full' };
   let service: ServiceInfo = { name: null, address: null, phone: null, logo: null };
   let lastScan: ScanView | null = null;
   let mirror: { serial: string | null; state: string } = { serial: null, state: 'stopped' };
@@ -127,6 +127,13 @@ export function createFakeBridge(name: string,
         return { size_bytes: 3.4 * GB, free_bytes: 4 * GB, disk_bytes: 120 * GB, limit_bytes: limit,
                  effective_bytes: Math.min(limit, 5.4 * GB), path: 'C:\\Users\\serwis\\AppData\\Local\\AdMeNot\\apk-cache' };
       }
+      case 'analyze_selected':
+      case 'analyze_all':
+        return { job_id: 'job-apk' };
+      case 'stop_apk_to_manual':
+        return { ok: true };
+      case 'selection_eta':
+        return { eta_s: 20, eta_kind: 'measured', eta_min_s: 20, eta_max_s: 20 };
       case 'start_incident':
       case 'mark_incident':
         return { ok: true };

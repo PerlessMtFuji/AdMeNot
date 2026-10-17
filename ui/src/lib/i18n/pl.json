@@ -1,4 +1,5 @@
 {
+  "eta": { "unknown": "czas nieznany", "under_min": "< 1 min", "min": "~{n} min", "range": "{lo}–{hi} min", "rough": "orientacyjnie", "now": "od razu" },
   "groups": { "malicious": "Szkodliwe", "suspicious": "Podejrzane", "review": "Do sprawdzenia", "safe": "Bez uwag",
     "empty": "nic nie znaleziono", "show": "pokaż", "hide": "ukryj" },
   "bulk": { "select_all": "Zaznacz wszystkie", "select_all_in": "Zaznacz wszystkie: {group}",

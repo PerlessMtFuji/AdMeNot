@@ -14,7 +14,7 @@
   const apk = $derived(s.scan?.apk ?? null);
 </script>
 
-{#if q}
+{#if q?.kind === 'no_space'}
   <Banner tone="warn" icon="info" title={t('apk_cache.question_title')}>
     {t('apk_cache.question_text', { free: gb(q.free_bytes), need: gb(q.largest_bytes + RESERVE) })}
     {#snippet actions()}

@@ -1,6 +1,6 @@
 import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
-import { actedAfter, changedVerdicts, defaultSelection, mergeSelection, notificationsManual, upsertStep, withoutUndone } from './logic';
+import { actedAfter, changedVerdicts, defaultSelection, isManual, mergeSelection, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
 import type { AppState } from './state.svelte';
 import { applyTheme } from './theme';
 import type {
@@ -96,7 +96,8 @@ export class Controller {
     on('scan:done', (d) => {
       s.scan = d.scan;
       s.interrupted = d.interrupted;
-      s.selection = defaultSelection(d.scan.apps);
+      // „Zawsze ręcznie”: werdykty heurystyk są ukryte, więc nic nie może być zaznaczone za serwisanta.
+      s.selection = s.settings.apk_mode_default === 'manual' ? {} : defaultSelection(d.scan.apps);
       s.actedLog = {};
       s.undoTarget = null;
       s.touched = [];
@@ -105,9 +106,12 @@ export class Controller {
       s.openGroups = {};
       s.diagnostics = false;
       s.who = null;
-      s.apk = { done: 0, total: 0, running: true, changed: [] };
+      s.apk = { done: 0, total: 0, running: true, changed: [], eta: null };
       s.apkEstimate = null;
       s.apkQuestion = null;
+      s.selectionEta = null;
+      s.showSystem = false;
+      s.apkScope = 'all';
       s.phase = 'results';
     });
     // Zdarzenia porzuconej analizy APK (poprzedni skan) nie mogą zmienić nowego (BUG-10).
@@ -115,15 +119,27 @@ export class Controller {
     on('apk:estimate', (d) => { if (!stale(d)) s.apkEstimate = d; });
     on('apk:question', (d) => { if (!stale(d)) s.apkQuestion = d; });
     on('apk:progress', (d) => {
-      if (!stale(d)) s.apk = { ...s.apk, done: d.done, total: d.total, running: true };
+      if (!stale(d)) s.apk = { ...s.apk, done: d.done, total: d.total, running: true, eta: stableEta(s.apk.eta, d.eta_s) };
     });
     on('apk:done', (d) => {
       if (stale(d)) return;
       const changed = changedVerdicts(s.scan?.apps ?? [], d.scan.apps);
-      s.selection = mergeSelection(s.selection, d.scan.apps, s.touched);
+      // Tryb częściowy: werdykty spoza analizy na żądanie są ukryte — bez domyślnych zaznaczeń.
+      if (!isManual(d.scan)) s.selection = mergeSelection(s.selection, d.scan.apps, s.touched);
       s.scan = d.scan;
       s.apkQuestion = null;
-      s.apk = { ...s.apk, running: false, changed };
+      s.apk = { ...s.apk, running: false, changed, eta: null };
+    });
+    on('apk:manual', (d) => {
+      if (stale(d)) return;
+      // Z pełnej analizy do ręcznego: zostaje tylko to, co serwisant sam zaznaczył lub zmienił.
+      if (!isManual(s.scan)) {
+        s.selection = Object.fromEntries(Object.entries(s.selection).filter(([p]) => s.touched.includes(p)));
+      }
+      s.scan = d.scan;
+      s.apkQuestion = null;
+      s.apk = { ...s.apk, running: false, eta: null };
+      void this.refreshSelectionEta();
     });
     on('incident:state', (d) => { s.incident = { recording: d.recording, marks: 0, result: null }; });
     on('incident:done', (d) => {
@@ -133,7 +149,7 @@ export class Controller {
     on('apk:stopped', (d) => {
       if (stale(d)) return;
       s.apkQuestion = null;
-      s.apk = { ...s.apk, running: false };
+      s.apk = { ...s.apk, running: false, eta: null };
     });
     on('exec:order', (d) => {
       s.order = d.order;
@@ -278,7 +294,7 @@ export class Controller {
       error: null, phase: 'scanning', scanStage: 'identify', device: null, scan: null, plan: null,
       result: null, order: null, disconnectedOrder: null, steps: [], screen: 'main',
     });
-    s.apk = { done: 0, total: 0, running: false, changed: [] };
+    s.apk = { done: 0, total: 0, running: false, changed: [], eta: null };
     s.apkEstimate = null;
     s.apkQuestion = null;
     const r = await this.call(this.api.start_scan(s.serial, s.client.trim() || null));
@@ -300,7 +316,7 @@ export class Controller {
     const s = this.state;
     const r = await this.call(this.api.deep_analyze(pkg));
     if (!r) return;
-    s.apk = { ...s.apk, done: 0, total: 1, running: true, changed: [] };
+    s.apk = { ...s.apk, done: 0, total: 1, running: true, changed: [], eta: null };
     this.setJob(r.job_id, 'deep');
   }
 
@@ -348,6 +364,7 @@ export class Controller {
     else delete next[pkg];
     s.selection = next;
     if (!s.touched.includes(pkg)) s.touched = [...s.touched, pkg];
+    void this.refreshSelectionEta();
   }
 
   toggle(app: AppView): void {
@@ -740,9 +757,48 @@ export class Controller {
 
   async answerApk(value: 'clear' | 'skip' | 'run'): Promise<void> {
     const q = this.state.apkQuestion;
-    if (!q) return;
+    if (!q || q.kind !== 'no_space') return;
     this.state.apkQuestion = null;
     await this.call(this.api.answer(q.job_id, value));
+  }
+
+  async chooseApkMode(mode: 'full' | 'manual', remember: boolean): Promise<void> {
+    const q = this.state.apkQuestion;
+    if (!q || q.kind !== 'mode') return;
+    this.state.apkQuestion = null;
+    if (remember) await this.saveSettings({ apk_mode_default: mode });
+    await this.call(this.api.answer(q.job_id, mode));
+  }
+
+  async analyzeSelected(): Promise<void> {
+    const s = this.state;
+    const pkgs = Object.keys(s.selection);
+    if (!pkgs.length) return;
+    const r = await this.call(this.api.analyze_selected(pkgs));
+    if (!r) return;
+    s.apk = { done: 0, total: pkgs.length, running: true, changed: [], eta: s.selectionEta?.eta_s ?? null };
+    s.apkScope = 'selected';
+    this.setJob(r.job_id, 'apk');
+  }
+
+  async analyzeAll(): Promise<void> {
+    const s = this.state;
+    const r = await this.call(this.api.analyze_all());
+    if (!r) return;
+    s.apk = { done: 0, total: 0, running: true, changed: [], eta: null };
+    s.apkScope = 'all';
+    this.setJob(r.job_id, 'apk');
+  }
+
+  async stopToManual(): Promise<void> {
+    await this.call(this.api.stop_apk_to_manual());
+  }
+
+  async refreshSelectionEta(): Promise<void> {
+    const s = this.state;
+    if (!isManual(s.scan)) return;
+    const pkgs = Object.keys(s.selection);
+    s.selectionEta = pkgs.length ? await this.call(this.api.selection_eta(pkgs)) : null;
   }
 
   loadApkCache(): Promise<CacheUsage | null> {

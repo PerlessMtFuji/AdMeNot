@@ -1,4 +1,5 @@
 {
+  "eta": { "unknown": "time unknown", "under_min": "< 1 min", "min": "~{n} min", "range": "{lo}–{hi} min", "rough": "approximate", "now": "right away" },
   "groups": { "malicious": "Malicious", "suspicious": "Suspicious", "review": "To review", "safe": "No issues",
     "empty": "nothing found", "show": "show", "hide": "hide" },
   "bulk": { "select_all": "Select all", "select_all_in": "Select all: {group}",

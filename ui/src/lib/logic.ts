@@ -1,5 +1,5 @@
 import { CATEGORY_ORDER } from './categories';
-import type { AppView, Category, DeviceEntry, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanView, ScanView, Settings, StepEvent, UpdateView, Verdict } from './types';
+import type { AppView, Category, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanView, ScanView, Settings, StepEvent, UpdateView, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done';
 export type StageState = 'done' | 'now' | 'todo';
@@ -456,4 +456,37 @@ export function groupCheck(apps: AppView[], selection: Record<string, Level>,
 /** „Wyłącz” i „Usuń” dla wielu aplikacji naraz wymagają potwierdzenia; „Wycisz” jest najłagodniejsze. */
 export function bulkNeedsConfirm(levels: Record<string, Level>): boolean {
   return Object.values(levels).some((l) => l !== 'silence');
+}
+
+export type FactTag = 'non_play' | 'admin' | 'accessibility' | 'overlay' | 'disabled';
+
+export function isManual(scan: ScanView | null): boolean {
+  return scan?.apk_mode === 'manual' || scan?.apk_mode === 'partial';
+}
+
+const installedAt = (a: AppView): number => (a.first_install ? Date.parse(a.first_install) : -Infinity);
+
+export function manualRows(apps: AppView[], opts: { query: string; showSystem: boolean; source: string | null }): AppView[] {
+  const found = visibleApps(apps, { showAll: true, verdict: 'all', query: opts.query, source: opts.source });
+  return found.filter((a) => opts.showSystem || !a.is_system)
+    .sort((a, b) => installedAt(b) - installedAt(a) || a.name.localeCompare(b.name));
+}
+
+// Tylko to, co telefon pokazuje bez analizy APK: przyznane albo zaobserwowane, nie zadeklarowane.
+const live = (a: AppView, key: string): boolean =>
+  a.capabilities.some((c) => c.key === key && (c.levels.granted === true || c.levels.observed === true));
+
+export function factTags(a: AppView): FactTag[] {
+  const out: FactTag[] = [];
+  if (!a.is_system && !a.from_play) out.push('non_play');
+  if (a.is_admin) out.push('admin');
+  if (live(a, 'accessibility')) out.push('accessibility');
+  if (live(a, 'overlay')) out.push('overlay');
+  if (!a.enabled) out.push('disabled');
+  return out;
+}
+
+export function stableEta(shown: number | null, next: number | null): number | null {
+  if (next === null || shown === null) return next;
+  return next > shown && next - shown < 60 ? shown : next;
 }

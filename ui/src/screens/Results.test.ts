@@ -362,12 +362,13 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     const GB = 1024 ** 3;
     s.apk = { ...s.apk, running: true };
     bridge.emit('apk:estimate', { to_fetch_bytes: 7.2 * GB, total_bytes: 7.2 * GB, apps: 142, unknown: 3, cached: 0,
-      largest_bytes: 3 * GB, limit_bytes: 10 * GB, effective_bytes: 2 * GB, free_bytes: 4 * GB });
+      largest_bytes: 3 * GB, limit_bytes: 10 * GB, effective_bytes: 2 * GB, free_bytes: 4 * GB, eta_s: null, eta_kind: null, eta_min_s: null, eta_max_s: null });
     expect(await screen.findByText(/Analiza pobierze ok. 7,2 GB \(142 aplikacje\)/)).toBeTruthy();
     expect(screen.getByText(/Na dysku jest miejsce na 2,0 GB/)).toBeTruthy();
     expect(tp('apk_cache.estimate', 5, { size: '1,0 GB' })).toBe('Analiza pobierze ok. 1,0 GB (5 aplikacji)');
     bridge.emit('apk:question', { job_id: 'job-9', kind: 'no_space', to_fetch_bytes: 7.2 * GB, total_bytes: 7.2 * GB,
-      apps: 142, unknown: 0, cached: 0, largest_bytes: 3 * GB, limit_bytes: 10 * GB, effective_bytes: 2 * GB, free_bytes: 4 * GB });
+      apps: 142, unknown: 0, cached: 0, largest_bytes: 3 * GB, limit_bytes: 10 * GB, effective_bytes: 2 * GB, free_bytes: 4 * GB,
+      eta_s: null, eta_kind: null, eta_min_s: null, eta_max_s: null });
     await fireEvent.click(await screen.findByRole('button', { name: 'Wyczyść i analizuj' }));
     expect(bridge.calls.at(-1)).toEqual({ method: 'answer', args: ['job-9', 'clear'] });
     const stopped = { ...JSON.parse(JSON.stringify(s.scan)), apk: { requested: 142, analyzed: 61, failed: {}, stopped_no_space: true } };
@@ -379,7 +380,7 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     const { s, bridge } = await scanned();
     const GB = 1024 ** 3;
     const base = { total_bytes: 5 * GB, unknown: 0, largest_bytes: 0, limit_bytes: 10 * GB,
-      effective_bytes: 10 * GB, free_bytes: 50 * GB };
+      effective_bytes: 10 * GB, free_bytes: 50 * GB, eta_s: null, eta_kind: null, eta_min_s: null, eta_max_s: null };
     s.apk = { ...s.apk, running: true };
     bridge.emit('apk:estimate', { ...base, to_fetch_bytes: 0, apps: 89, cached: 89 });
     expect(await screen.findByText(
@@ -480,7 +481,7 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
 describe('Results: APK analysis in progress and bulk group actions', () => {
   test('APK analysis on a clean phone: progress state instead of the green all clear', async () => {
     const { s } = await scanned('clean');
-    s.apk = { done: 5, total: 140, running: true, changed: [] };
+    s.apk = { done: 5, total: 140, running: true, changed: [], eta: null };
     await tick();
     expect(screen.queryByRole('heading', { name: t('results.clean_title') })).toBeNull();
     expect(screen.getByRole('heading', { name: t('results.apk_title') })).toBeTruthy();

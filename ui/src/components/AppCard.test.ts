@@ -8,7 +8,7 @@ const finding = (rule_id: string, category: Finding['category'], label: string, 
     source: 'phone', locations: [] }) as Finding;
 
 const evil: AppView = {
-  package: 'com.evil', name: '<img src=x onerror="alert(1)"> & „Cleaner”', score: 90,
+  first_install: null, package: 'com.evil', name: '<img src=x onerror="alert(1)"> & „Cleaner”', score: 90,
   verdict: 'malicious', verdict_label: 'Szkodliwa', confidence: 'high', confidence_label: 'wysoka',
   gaps: [], scope: [], trusted: false, incomplete: false,
   is_system: false, enabled: true, from_play: false, installer: 'com.android.chrome', is_admin: true,

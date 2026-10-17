@@ -5,6 +5,7 @@ import { createFakeBridge } from './fakeBridge';
 import { i18n } from './i18n/index.svelte';
 import { actedAfter, actedLevels, needsWelcome, withoutUndone } from './logic';
 import { AppState } from './state.svelte';
+import type { Settings } from './types';
 
 function setup(scenario: string) {
   const bridge = createFakeBridge(scenario, { delay: 0 });
@@ -230,11 +231,11 @@ describe('controller edge cases', () => {
     const { ctl, s, bridge } = setup('empty');
     await ctl.init();
     s.job = { id: 'job-2', kind: 'scan' };
-    s.apk = { done: 0, total: 0, running: true, changed: [] };
-    bridge.emit('apk:progress', { done: 5, total: 9, package: 'old', job_id: 'job-1' });
+    s.apk = { done: 0, total: 0, running: true, changed: [], eta: null };
+    bridge.emit('apk:progress', { done: 5, total: 9, package: 'old', eta_s: null, job_id: 'job-1' });
     bridge.emit('apk:stopped', { job_id: 'job-1' });
-    expect(s.apk).toEqual({ done: 0, total: 0, running: true, changed: [] });
-    bridge.emit('apk:progress', { done: 1, total: 3, package: 'new', job_id: 'job-2' });
+    expect(s.apk).toEqual({ done: 0, total: 0, running: true, changed: [], eta: null });
+    bridge.emit('apk:progress', { done: 1, total: 3, package: 'new', eta_s: null, job_id: 'job-2' });
     expect(s.apk.done).toBe(1);
   });
 
@@ -278,7 +279,7 @@ describe('controller edge cases', () => {
     const { ctl, s, bridge } = setup('empty');
     await ctl.init();
     s.phase = 'results';
-    s.apk = { done: 3, total: 9, running: true, changed: [] };
+    s.apk = { done: 3, total: 9, running: true, changed: [], eta: null };
     bridge.emit('job:error', { job_id: 'job-2', kind: 'apk', key: 'timeout', message: '' });
     expect(s.apk.running).toBe(false);
     expect(s.phase).toBe('results');
@@ -692,5 +693,83 @@ describe('bulk selection of a verdict group', () => {
     expect(s.touched).toEqual(expect.arrayContaining(['com.wlive.forecast', 'com.sec.android.app.launcher']));
     ctl.setLevels({ 'com.wlive.forecast': null, 'com.sec.android.app.launcher': null });
     expect(s.selection).toEqual({});
+  });
+});
+
+describe('tryb ręczny', () => {
+  async function scanned(settings: Partial<Settings> = {}) {
+    const env = await setupCtl('adware');
+    if (Object.keys(settings).length) await env.ctl.saveSettings(settings);
+    await env.ctl.startScan();
+    await vi.waitFor(() => expect(env.s.phase).toBe('results'));
+    await vi.waitFor(() => expect(env.s.job).toBeNull());
+    return env;
+  }
+
+  const snap = (v: unknown) => JSON.parse(JSON.stringify(v));
+
+  test('apk:manual czyści domyślne zaznaczenia i pytanie', async () => {
+    const { ctl, s, bridge } = await scanned();
+    s.job = { id: 'j1', kind: 'apk' } as never;
+    expect(Object.keys(s.selection).length).toBeGreaterThan(0);
+    bridge.emit('apk:question', { job_id: 'j1', kind: 'mode', apps: 3, eta_s: 60, eta_kind: 'rough', eta_min_s: 36, eta_max_s: 90 });
+    expect(s.apkQuestion?.kind).toBe('mode');
+    bridge.emit('apk:manual', { scan: { ...snap(s.scan), apk_mode: 'manual' }, job_id: 'j1' });
+    expect(s.selection).toEqual({});
+    expect(s.apkQuestion).toBeNull();
+    expect(s.apk.running).toBe(false);
+    expect(ctl.state.scan?.apk_mode).toBe('manual');
+  });
+
+  test('apk:done w trybie częściowym nie dokleja domyślnych zaznaczeń', async () => {
+    const { ctl, s, bridge } = await scanned();
+    bridge.emit('apk:manual', { scan: { ...snap(s.scan), apk_mode: 'manual' } });
+    const pkg = s.scan!.apps[0].package;
+    ctl.setLevel(pkg, 'remove');
+    bridge.emit('apk:done', { scan: { ...snap(s.scan), apk_mode: 'partial', on_demand: [pkg] } });
+    expect(Object.keys(s.selection)).toEqual([pkg]);
+  });
+
+  test('ustawienie „zawsze ręcznie” — scan:done bez domyślnych zaznaczeń', async () => {
+    // Nagranie scenariusza odtwarza potem apk:done starego trybu — sprawdzamy stan zaraz po scan:done.
+    const env = await setupCtl('adware');
+    await env.ctl.saveSettings({ apk_mode_default: 'manual' });
+    let atScanDone: Record<string, string> | null = null;
+    env.bridge.on('scan:done', () => { atScanDone = { ...env.s.selection }; });
+    await env.ctl.startScan();
+    await vi.waitFor(() => expect(env.s.phase).toBe('results'));
+    expect(atScanDone).toEqual({});
+  });
+
+  test('chooseApkMode odpowiada i zapamiętuje wybór', async () => {
+    const { ctl, s, bridge } = await scanned();
+    bridge.emit('apk:question', { job_id: 'j1', kind: 'mode', apps: 3, eta_s: null, eta_kind: null, eta_min_s: null, eta_max_s: null });
+    await ctl.chooseApkMode('manual', true);
+    expect(s.apkQuestion).toBeNull();
+    expect(bridge.calls.some((c) => c.method === 'answer' && c.args[1] === 'manual')).toBe(true);
+    expect(bridge.calls.some((c) => c.method === 'save_settings'
+      && (c.args[0] as Partial<Settings>).apk_mode_default === 'manual')).toBe(true);
+  });
+
+  test('analyzeSelected wysyła zaznaczone i startuje zadanie apk', async () => {
+    const { ctl, s, bridge } = await scanned();
+    bridge.emit('apk:manual', { scan: { ...snap(s.scan), apk_mode: 'manual' } });
+    ctl.setLevel('com.clean.pro.boost', 'remove');
+    await ctl.analyzeSelected();
+    expect(bridge.calls.find((c) => c.method === 'analyze_selected')?.args[0]).toEqual(['com.clean.pro.boost']);
+    expect(s.apk.running).toBe(true);
+    expect(s.apkScope).toBe('selected');
+    await ctl.analyzeAll();
+    expect(s.apkScope).toBe('all');
+  });
+
+  test('przejście z pełnej analizy zostawia tylko zaznaczenia serwisanta', async () => {
+    const { ctl, s, bridge } = await scanned();
+    const [first] = Object.keys(s.selection);
+    const other = s.scan!.apps.find((a) => !(a.package in s.selection))!.package;
+    ctl.setLevel(other, 'disable');
+    bridge.emit('apk:manual', { scan: { ...snap(s.scan), apk_mode: 'manual' } });
+    expect(s.selection).toEqual({ [other]: 'disable' });
+    expect(first in s.selection).toBe(false);
   });
 });
