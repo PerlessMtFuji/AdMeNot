@@ -154,8 +154,9 @@ def analyze_apks(
     results = score_all(facts, ruleset, trust, report.low_behavior_data)
     if only is None:
         mode, on_demand = "full", frozenset()
-    elif report.apk_mode == "full":
-        mode, on_demand = "full", report.analyzed_on_demand
+    elif report.apk_mode in ("full", "pending"):
+        # głęboka analiza przy pełnym lub niezakończonym skanie nie zmienia trybu
+        mode, on_demand = report.apk_mode, report.analyzed_on_demand
     else:
         mode = "partial"
         on_demand = report.analyzed_on_demand | frozenset(t.package for t in targets)

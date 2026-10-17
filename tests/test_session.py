@@ -263,4 +263,10 @@ def test_modes_after_analysis(scan_report):
     assert part.apk_mode == "partial" and part.analyzed_on_demand == {package}
     again = analyze_apks(part, _OneClass(), only=frozenset({package}))
     assert again.analyzed_on_demand == {package}
+    other = scan_report.results[1].facts.package
+    both = analyze_apks(part, _OneClass(), only=frozenset({other}))
+    assert both.analyzed_on_demand == {package, other}
+    assert deep.analyzed_on_demand == frozenset()
+    pending = analyze_apks(scan_report, _OneClass(), only=frozenset({package}))
+    assert pending.apk_mode == "pending" and pending.analyzed_on_demand == frozenset()
     assert analyze_apks(part, _OneClass()).apk_mode == "full"
