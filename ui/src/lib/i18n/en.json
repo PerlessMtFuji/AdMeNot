@@ -1,6 +1,15 @@
 {
   "groups": { "malicious": "Malicious", "suspicious": "Suspicious", "review": "To review", "safe": "No issues",
     "empty": "nothing found", "show": "show", "hide": "hide" },
+  "bulk": { "select_all": "Select all", "select_all_in": "Select all: {group}",
+    "action": "Action for selected…", "action_in": "Action for selected: {group}",
+    "select_title": { "one": "Select {count} app?", "few": "Select {count} apps?", "many": "Select {count} apps?", "other": "Select {count} apps?" },
+    "level_title": { "one": "Set “{level}” for {count} app?", "few": "Set “{level}” for {count} apps?", "many": "Set “{level}” for {count} apps?", "other": "Set “{level}” for {count} apps?" },
+    "check": "Make sure each of these apps can be changed. Disabling an app the customer uses, or a manufacturer app, can break phone features.",
+    "system": "Manufacturer or system apps among them: {count}.",
+    "system_no_remove": "Manufacturer apps are not removed in bulk — they get “Disable”.",
+    "data_lost": "Removing deletes the app’s data — undo restores only the app.",
+    "confirm": "Select", "apply": "Apply" },
   "common": { "cancel": "Cancel", "close": "Close", "back": "Back", "save": "Save", "saved": "Saved" },
   "category": { "ads": "Ads", "notif": "Notification spam", "removal": "Hard to remove", "data": "Access to data", "disguise": "Impersonation", "background": "Runs in background", "origin": "Origin", "combo": "Signal combination" },
   "choice": { "silence": "Silence", "disable": "Disable", "remove": "Remove" },
@@ -9,6 +18,7 @@
     "safe": { "one": "{count} app without issues", "few": "{count} apps without issues", "many": "{count} apps without issues", "other": "{count} apps without issues" },
     "mode": "View mode", "action_for": "Action for {name}",
     "clean_title": "No signs of a threat", "clean_title_incomplete": "No signs of a threat — incomplete assessment", "clean_sub": "Within the scope of this scan · apps checked: {count}",
+    "apk_title": "Checking app files…", "apk_sub": "No signs of a threat so far. The result may change after the analysis.",
     "safe_show": "Show the list", "safe_hide": "Hide the list",
     "incomplete": "Incomplete assessment", "disabled": "Disabled on the phone", "why": "Why?",
     "safe_incomplete": { "one": "incl. {count} with an incomplete assessment", "few": "incl. {count} with an incomplete assessment", "many": "incl. {count} with an incomplete assessment", "other": "incl. {count} with an incomplete assessment" }

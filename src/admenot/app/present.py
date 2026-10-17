@@ -79,6 +79,15 @@ INSTALLER_NAMES: dict[str, str | dict[str, str]] = {
     "com.apkpure.aegon": "APKPure",
     "com.google.android.packageinstaller": {"pl": "Instalator pakietów", "en": "Package installer"},
     "com.android.packageinstaller": {"pl": "Instalator pakietów", "en": "Package installer"},
+    # sklepy producentów: pełny pakiet nie mieści się w kolumnie „Źródło”
+    "com.xiaomi.mipicks": "GetApps",
+    "com.xiaomi.market": "GetApps",
+    "com.huawei.appmarket": "AppGallery",
+    "com.sec.android.app.samsungapps": "Galaxy Store",
+    "com.heytap.market": "App Market",  # OPPO, Realme, OnePlus
+    "com.oppo.market": "App Market",
+    "com.bbk.appstore": "V-Appstore",  # vivo
+    "com.amazon.venezia": "Amazon Appstore",
 }
 SOURCE_TEXTS = {"pl": {"system": "systemowa", "unknown": "nieznane", "play": "Sklep Play"},
                 "en": {"system": "system", "unknown": "unknown", "play": "Play Store"}}

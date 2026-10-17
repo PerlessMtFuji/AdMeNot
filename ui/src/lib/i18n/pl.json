@@ -1,6 +1,15 @@
 {
   "groups": { "malicious": "Szkodliwe", "suspicious": "Podejrzane", "review": "Do sprawdzenia", "safe": "Bez uwag",
     "empty": "nic nie znaleziono", "show": "pokaż", "hide": "ukryj" },
+  "bulk": { "select_all": "Zaznacz wszystkie", "select_all_in": "Zaznacz wszystkie: {group}",
+    "action": "Akcja dla zaznaczonych…", "action_in": "Akcja dla zaznaczonych: {group}",
+    "select_title": { "one": "Zaznaczyć {count} aplikację?", "few": "Zaznaczyć {count} aplikacje?", "many": "Zaznaczyć {count} aplikacji?", "other": "Zaznaczyć {count} aplikacji?" },
+    "level_title": { "one": "Ustawić „{level}” dla {count} aplikacji?", "few": "Ustawić „{level}” dla {count} aplikacji?", "many": "Ustawić „{level}” dla {count} aplikacji?", "other": "Ustawić „{level}” dla {count} aplikacji?" },
+    "check": "Upewnij się, że każdą z tych aplikacji można modyfikować. Wyłączenie aplikacji, której klient używa, albo aplikacji producenta może zepsuć funkcje telefonu.",
+    "system": "Aplikacje producenta lub systemowe wśród nich: {count}.",
+    "system_no_remove": "Aplikacji producenta nie usuwamy zbiorczo — dostaną „Wyłącz”.",
+    "data_lost": "Usunięcie kasuje dane aplikacji — cofnięcie przywróci samą aplikację.",
+    "confirm": "Zaznacz", "apply": "Zastosuj" },
   "common": { "cancel": "Anuluj", "close": "Zamknij", "back": "Wróć", "save": "Zapisz", "saved": "Zapisano" },
   "category": { "ads": "Reklamy", "notif": "Spam powiadomień", "removal": "Utrudnia usunięcie", "data": "Dostęp do danych", "disguise": "Podszywa się", "background": "Działa w tle", "origin": "Pochodzenie", "combo": "Połączenie sygnałów" },
   "choice": { "silence": "Wycisz", "disable": "Wyłącz", "remove": "Usuń" },
@@ -9,6 +18,7 @@
     "safe": { "one": "{count} aplikacja bez uwag", "few": "{count} aplikacje bez uwag", "many": "{count} aplikacji bez uwag", "other": "{count} aplikacji bez uwag" },
     "mode": "Tryb widoku", "action_for": "Akcja dla {name}",
     "clean_title": "Nie wykryto oznak zagrożenia", "clean_title_incomplete": "Nie wykryto oznak zagrożenia — ocena niepełna", "clean_sub": "W zakresie wykonanego skanu · sprawdzone aplikacje: {count}",
+    "apk_title": "Sprawdzam pliki aplikacji…", "apk_sub": "Na razie bez oznak zagrożenia. Wynik może się zmienić po analizie.",
     "safe_show": "Pokaż listę", "safe_hide": "Zwiń listę",
     "incomplete": "Ocena niepełna", "disabled": "Wyłączona na telefonie", "why": "Dlaczego?",
     "safe_incomplete": { "one": "w tym {count} z oceną niepełną", "few": "w tym {count} z oceną niepełną", "many": "w tym {count} z oceną niepełną", "other": "w tym {count} z oceną niepełną" }

@@ -657,3 +657,40 @@ describe('plan dla klienta', () => {
     expect(s.planChanged).toBe(false);
   });
 });
+
+describe('bulk selection of a verdict group', () => {
+  async function scanned() {
+    const { ctl, s } = setup('adware');
+    await ctl.init();
+    await ctl.startScan();
+    await vi.waitFor(() => expect(s.phase).toBe('results'));
+    const app = (pkg: string) => s.scan!.apps.find((a) => a.package === pkg)!;
+    return { ctl, s, group: [app('com.clean.pro.boost'), app('com.wlive.forecast'), app('com.sec.android.app.launcher')] };
+  }
+
+  test('select all keeps own choices, uses the engine proposal, then the settings action', async () => {
+    const { ctl, s, group } = await scanned();
+    s.selection = { 'com.wlive.forecast': 'remove' };
+    expect(ctl.groupSelectLevels(group)).toEqual({
+      'com.clean.pro.boost': 'disable', 'com.wlive.forecast': 'remove', 'com.sec.android.app.launcher': 'silence' });
+  });
+
+  test('one action for the selected apps; a system app gets disable instead of remove', async () => {
+    const { ctl, s, group } = await scanned();
+    s.selection = { 'com.clean.pro.boost': 'disable', 'com.sec.android.app.launcher': 'silence' };
+    expect(ctl.groupActionLevels(group, 'remove')).toEqual({
+      'com.clean.pro.boost': 'remove', 'com.sec.android.app.launcher': 'disable' });
+  });
+
+  test('apps removed in this order are left out; setLevels applies and clears at once', async () => {
+    const { ctl, s, group } = await scanned();
+    s.selection = {};
+    s.actedLog = { 'com.clean.pro.boost': [{ order: 'A', level: 'remove' }] };
+    expect(Object.keys(ctl.groupSelectLevels(group))).toEqual(['com.wlive.forecast', 'com.sec.android.app.launcher']);
+    ctl.setLevels(ctl.groupSelectLevels(group));
+    expect(s.selection).toEqual({ 'com.wlive.forecast': 'silence', 'com.sec.android.app.launcher': 'silence' });
+    expect(s.touched).toEqual(expect.arrayContaining(['com.wlive.forecast', 'com.sec.android.app.launcher']));
+    ctl.setLevels({ 'com.wlive.forecast': null, 'com.sec.android.app.launcher': null });
+    expect(s.selection).toEqual({});
+  });
+});

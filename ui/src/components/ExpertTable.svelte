@@ -69,7 +69,7 @@
 <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
 <div role="group" aria-label={t('expert.table')} tabindex="0" onkeydown={keydown} bind:this={table} class="@container flex flex-col gap-4 outline-none">
   {#each shown as g (g.verdict)}
-    <VerdictSection verdict={g.verdict} count={g.apps.length} open={isOpen(g.verdict)}
+    <VerdictSection verdict={g.verdict} count={g.apps.length} open={isOpen(g.verdict)} apps={g.apps}
       collapsible={!searching && g.apps.length > 0 && !DANGER.includes(g.verdict)}
       ontoggle={() => ctl.setGroupOpen(g.verdict, !isOpen(g.verdict))}>
       <div class="flex-none overflow-hidden rounded-2xl card">
@@ -112,7 +112,7 @@
             <b class="mono {SCORE[a.verdict]}">{a.score}</b>
             <span class="h-1.5 w-12 overflow-hidden rounded-full bg-neutral-soft shadow-[var(--shadow-well)]"><i class="block h-full rounded-full {BAR[a.verdict]}" style="width: {a.score}%"></i></span>
           </div></td>
-          <td class="px-3 py-3 whitespace-nowrap @max-[660px]:hidden">{a.source.label}<span class="block text-2xs text-soft">{when(a.source.days)}</span></td>
+          <td class="px-3 py-3 whitespace-nowrap @max-[660px]:hidden"><span class="block truncate" title={a.source.label}>{a.source.label}</span><span class="block text-2xs text-soft">{when(a.source.days)}</span></td>
           <td class="px-3 py-3">
             <select aria-label="{t('expert.col_action')} {a.package}" value={level ?? ''} disabled={done === 'remove'} onclick={(e) => e.stopPropagation()}
               onchange={(e) => ctl.setLevel(a.package, (e.currentTarget.value || null) as Level | null)}
