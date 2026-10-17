@@ -2,6 +2,7 @@
   import { getContext } from 'svelte';
   import { flip } from 'svelte/animate';
   import { fade } from 'svelte/transition';
+  import ApkProgress from '../components/ApkProgress.svelte';
   import ApkSpace from '../components/ApkSpace.svelte';
   import AppCard from '../components/AppCard.svelte';
   import EvidencePanel from '../components/EvidencePanel.svelte';
@@ -24,7 +25,6 @@
   import CountUp from '../ui/CountUp.svelte';
   import Icon from '../ui/Icon.svelte';
   import Pill from '../ui/Pill.svelte';
-  import Progress from '../ui/Progress.svelte';
   import Segmented from '../ui/Segmented.svelte';
   import SidePanel from '../ui/SidePanel.svelte';
   import Tooltip from '../ui/Tooltip.svelte';
@@ -110,16 +110,12 @@
           {titleParts[0]}<CountUp value={flagged.length} />{titleParts[1]}
         </h1>
       {:else}
-        <h1 class="col-span-2 text-2xl font-extrabold">{t(anyIncomplete ? 'results.clean_title_incomplete' : 'results.clean_title')}</h1>
+        <h1 class="col-span-2 text-2xl font-extrabold">{t(s.apk.running ? 'results.apk_title'
+          : anyIncomplete ? 'results.clean_title_incomplete' : 'results.clean_title')}</h1>
       {/if}
     </header>
 
-    {#if s.apk.running}
-      <div class="flex items-center gap-3 text-sm text-mut">
-        <span class="whitespace-nowrap">{t('summary.apk_running', { done: s.apk.done, total: s.apk.total })}</span>
-        <div class="w-40"><Progress value={s.apk.total ? s.apk.done / s.apk.total : 0} label={t('scan.stage.apk')} /></div>
-      </div>
-    {/if}
+    {#if s.apk.running && flagged.length > 0}<ApkProgress />{/if}
     <ApkSpace />
     {#if s.interrupted.length}<InterruptedBanner orders={s.interrupted} />{/if}
     {#if undoName && s.job?.kind === 'undo'}
@@ -133,7 +129,9 @@
     {/if}
     <NoticeLine items={noteItems} details={noteDetails} />
 
-    {#if flagged.length === 0}
+    {#if flagged.length === 0 && s.apk.running}
+      <div in:enter><ApkProgress hero /></div>
+    {:else if flagged.length === 0}
       <div class="grid place-items-center gap-2 py-10 text-center" in:enter>
         {#if anyIncomplete}
           <span class="grid h-20 w-20 place-items-center rounded-full bg-warn-strong text-white shadow-[0_0_0_12px_var(--color-warn-soft),0_0_40px_-4px_var(--color-warn-strong)] [animation:pop-in_.6s]">
@@ -152,7 +150,7 @@
     {:else if flagged.length > 0}
       {#each simpleGroups.filter((g) => g.verdict !== 'safe') as g (g.verdict)}
         {#if g.apps.length || DANGER.includes(g.verdict)}
-          <VerdictSection verdict={g.verdict} count={g.apps.length} open={isOpen(g.verdict)}
+          <VerdictSection verdict={g.verdict} count={g.apps.length} open={isOpen(g.verdict)} apps={g.apps}
             collapsible={g.apps.length > 0 && !DANGER.includes(g.verdict)}
             ontoggle={() => ctl.setGroupOpen(g.verdict, !isOpen(g.verdict))}>
             {#each g.apps as app, i (app.package)}
