@@ -77,17 +77,17 @@ EXPECTED: dict[str, tuple[int, str, str, str | None]] = {
     "A komunikator z Play w trakcie połączenia": (45, "review", "high", None),
     "A2 komunikator bez połączenia": (45, "review", "high", None),
     "B aplikacja pogodowa: 6 SDK, 10 powiadomień/h, widżet nad aplikacjami":
-        (65, "suspicious", "high", "disable"),
+        (65, "suspicious", "high", "silence"),
     "C gra: 5 SDK i tylko wybudzenia": (38, "review", "medium", None),
     "D Tasker: administrator, dostępność, powiadomienia, okna, start z telefonem":
-        (64, "suspicious", "medium", "disable"),
+        (64, "suspicious", "medium", None),
     "E adware z Play: reklama z tła, 2 starty po odblokowaniu": (6, "safe", "low", None),
     "F to samo, 3 starty po odblokowaniu": (18, "safe", "medium", None),
     "G aplikacja producenta z 5 SDK, bez zachowania": (0, "safe", "low", None),
-    "H launcher spoza Play: ekran główny, okna, 5 SDK": (66, "suspicious", "medium", "disable"),
-    "I komunikator z 5 SDK": (75, "suspicious", "high", "disable"),
+    "H launcher spoza Play: ekran główny, okna, 5 SDK": (66, "suspicious", "medium", None),
+    "I komunikator z 5 SDK": (75, "suspicious", "high", "silence"),
     "J automatyka spoza Play: administrator, dostępność, okna, 7 wybudzeń/h":
-        (93, "suspicious", "medium", "disable"),
+        (93, "suspicious", "medium", None),
 }
 
 
