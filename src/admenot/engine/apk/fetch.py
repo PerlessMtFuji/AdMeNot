@@ -54,6 +54,7 @@ class FetchedApks:
     paths: list[Path]
     verified: bool  # True: bajty zgodne z SHA-256 zainstalowanych plików na telefonie
     expected: dict[str, str] | None = None  # nazwa pliku → SHA-256 z telefonu (gdy verified)
+    from_cache: bool = False  # pliki już były w pamięci podręcznej — nic nie pobrano (pomiar czasu)
 
 
 def default_cache_dir() -> Path:
@@ -201,7 +202,7 @@ def fetch_apks(adb: AdbTransport, package: str, cache_dir: Path) -> FetchedApks:
         target = root / _install_id(expected)
         if (paths := _cached(target, expected)) is not None:
             _touch(target)
-            return FetchedApks(paths, verified=True, expected=expected)
+            return FetchedApks(paths, verified=True, expected=expected, from_cache=True)
 
         # Unikalny katalog roboczy: inny proces (CLI obok okna) nie zobaczy połowy plików.
         partial = Path(tempfile.mkdtemp(prefix=PART, dir=root))
