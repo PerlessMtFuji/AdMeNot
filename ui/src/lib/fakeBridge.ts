@@ -74,7 +74,7 @@ export function createFakeBridge(name: string,
 
   const dispatch = (event: string, detail: unknown) => {
     if (event === 'update:state') update = structuredClone(detail as UpdateView);
-    if (event === 'scan:done' || event === 'apk:done') lastScan = (detail as { scan: ScanView }).scan;
+    if (event === 'scan:done' || event === 'apk:done' || event === 'apk:manual') lastScan = (detail as { scan: ScanView }).scan;
     target.dispatchEvent(new CustomEvent(event, { detail: structuredClone(detail) }));
   };
 

@@ -16,8 +16,8 @@ def _module():
 
 def test_bridge_fixtures_are_up_to_date():
     fresh = _module().record_all()
-    assert set(fresh) == {"adware", "adware-en", "clean", "disconnect", "report", "unauthorized",
-                          "many", "empty"}
+    assert set(fresh) == {"adware", "adware-en", "clean", "manual", "disconnect", "report",
+                          "unauthorized", "many", "empty"}
     for name, data in fresh.items():
         path = OUT / f"{name}.json"
         assert path.exists(), f"brak {path} — uruchom: python scripts/record_bridge_fixtures.py"
@@ -37,3 +37,13 @@ def test_adware_scenario_covers_the_whole_flow():
     clean = _module().record_all()["clean"]
     done = next(d for c in clean["calls"] for n, d in c["events"] if n == "scan:done")
     assert {a["verdict"] for a in done["scan"]["apps"]} == {"safe"}
+
+
+def test_manual_scenario_goes_manual_then_partial():
+    data = _module().record_all()["manual"]
+    modes = [(name, detail["scan"]["apk_mode"]) for c in data["calls"] for name, detail in c["events"]
+             if name in ("scan:done", "apk:manual", "apk:done")]
+    assert modes == [("scan:done", "pending"), ("apk:manual", "manual"), ("apk:done", "partial")]
+    done = next(d for c in data["calls"] for n, d in c["events"] if n == "apk:done")
+    assert done["scan"]["on_demand"] == ["com.clean.pro.boost"]
+    assert "exec:done" in [n for c in data["calls"] for n, _ in c["events"]]

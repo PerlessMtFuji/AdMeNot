@@ -24,16 +24,18 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "tests" / "fixtures" / "bridge"
 sys.path.insert(0, str(ROOT / "tests"))  # conftest.py, fakephone.py, apphelpers.py
 
-from apphelpers import make_api
+from apphelpers import Disk, make_api, policy_factory
 from conftest import SERIAL
 from fakephone import make_cli_phone
 
+from admenot.engine.apk import cache as C
 from admenot.engine.report.pdf import PdfError
 from admenot.engine.settings import save_settings
 
 CLIENT = "Anna K."
 DISABLE = "pm disable-user --user 0 com.wlive.forecast"
 ADWARE = {"com.clean.pro.boost": "remove", "com.wlive.forecast": "disable"}
+ADWARE_PACKAGE = "com.clean.pro.boost"
 
 
 def _sort_adb_runs(events: list[list[Any]]) -> list[list[Any]]:
@@ -59,9 +61,13 @@ def _sort_adb_runs(events: list[list[Any]]) -> list[list[Any]]:
 class Recorder:
     """Woła metody `Api` i zbiera parę (wynik, zdarzenia) dla każdego wywołania."""
 
-    def __init__(self, phone: Any, lang: str = "pl") -> None:
-        # apphelpers.make_api pina język (save_settings) i czas na NOW zanim zbuduje `Api`.
-        self.api, self.emitter = make_api(phone, sync=True, lang=lang, poll_interval=0.0)
+    def __init__(self, phone: Any, lang: str = "pl", apk_mode: str = "full") -> None:
+        # apphelpers.make_api pina język i tryb APK (save_settings) i czas na NOW zanim zbuduje `Api`.
+        self.api, self.emitter = make_api(phone, sync=True, lang=lang, apk_mode=apk_mode,
+                                          poll_interval=0.0)
+        if apk_mode != "full":
+            # `NoApk` z make_api pomija `CachePolicy`, więc trybu ręcznego by nie było.
+            self.api._apk_factory = policy_factory([])
         self.calls: list[dict[str, Any]] = []
 
     def call(self, method: str, *args: Any) -> Any:
@@ -118,10 +124,13 @@ def _isolated(lang: str = "pl") -> Iterator[str]:
                     os.environ[k] = v
 
 
-def _scenario(name: str, steps: Callable[[Recorder, Any], None], lang: str = "pl") -> dict[str, Any]:
-    with _isolated(lang) as tmp:
+def _scenario(name: str, steps: Callable[[Recorder, Any], None], lang: str = "pl",
+              apk_mode: str = "full") -> dict[str, Any]:
+    # Dysk na sztywno: szacunek i pytanie o miejsce nie mogą zależeć od komputera nagrywającego.
+    with _isolated(lang) as tmp, mock.patch.object(C, "disk_usage",
+                                                   lambda path: Disk(500 * C.GB, 0, 500 * C.GB)):
         phone = make_cli_phone()
-        recorder = Recorder(phone, lang)
+        recorder = Recorder(phone, lang, apk_mode=apk_mode)
         steps(recorder, phone)
         return _normalize({"name": name, "calls": recorder.calls}, tmp)
 
@@ -136,6 +145,18 @@ def _adware(r: Recorder, phone: Any) -> None:
     r.call("history", None)
     number = r.events("exec:order")[0]["order"]
     r.call("undo", number, None, None)
+    r.call("history", None)
+
+
+def _manual(r: Recorder, phone: Any) -> None:
+    phone.on_admin_screen = lambda p: setattr(p.apps[ADWARE_PACKAGE], "admin", False)
+    r.call("list_devices")
+    r.call("history", None)  # UI przy starcie pyta o znane telefony (Controller.loadKnownSerials)
+    r.call("start_scan", SERIAL, CLIENT)
+    r.call("selection_eta", [ADWARE_PACKAGE])
+    r.call("analyze_selected", [ADWARE_PACKAGE])
+    r.call("preview_plan", {ADWARE_PACKAGE: "remove"}, [])
+    r.call("execute", {ADWARE_PACKAGE: "remove"}, [])
     r.call("history", None)
 
 
@@ -213,6 +234,7 @@ def record_all() -> dict[str, dict[str, Any]]:
         # Teksty silnika po angielsku: zrzuty do README.md (ui/readme-shots, `?lang=en`).
         "adware-en": _scenario("adware-en", _adware, lang="en"),
         "clean": _clean(adware),
+        "manual": _scenario("manual", _manual, apk_mode="manual"),
         "disconnect": _scenario("disconnect", _disconnect),
         "report": _scenario("report", _report),
         "unauthorized": _scenario("unauthorized", _devices_only(unauthorized)),

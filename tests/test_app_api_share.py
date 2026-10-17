@@ -1,10 +1,9 @@
 import time
 
 import pytest
-from apphelpers import make_api
+from apphelpers import Disk, make_api, policy_factory
 from conftest import SERIAL
 from fakephone import make_cli_phone
-from test_app_api_scan import Disk, _policy_factory
 
 from admenot.app import api as api_module
 from admenot.engine import share
@@ -75,7 +74,7 @@ def test_share_marks_manual_mode_in_payload_only_when_not_full(monkeypatch, mode
     monkeypatch.setattr(C, "disk_usage", lambda path: Disk(500 * C.GB, 0, 500 * C.GB))
     up = Uploader()
     api, rec = make_api(make_cli_phone(), share_upload=up, apk_mode=mode)
-    api._apk_factory = _policy_factory([])
+    api._apk_factory = policy_factory([])
     api.start_scan(SERIAL, "Anna")
     rec.wait_for("apk:manual" if mode == "manual" else "apk:done")
     assert api._jobs.wait(5)

@@ -1,9 +1,8 @@
 import threading
 import time
-from collections import namedtuple
 
 import pytest
-from apphelpers import SlowApk, make_api, names
+from apphelpers import Disk, SlowApk, fake_fetch, make_api, names, policy_factory
 from conftest import SERIAL
 from fakephone import make_cli_phone
 
@@ -12,13 +11,10 @@ from admenot.engine.actions.steps import Step
 from admenot.engine.adb.transport import AdbError
 from admenot.engine.apk import cache as C
 from admenot.engine.apk.analyze import ApkReport
-from admenot.engine.apk.fetch import FetchedApks, default_cache_dir
-from admenot.engine.apk.providers import DeviceApkProvider
+from admenot.engine.apk.fetch import default_cache_dir
 from admenot.engine.journal.db import Journal
 from admenot.engine.paths import journal_path
 from admenot.engine.phones.provider import SILHOUETTE
-
-Disk = namedtuple("Disk", "total used free")
 
 
 @pytest.fixture(autouse=True)
@@ -156,40 +152,11 @@ def test_abandoned_analysis_cannot_publish_after_its_last_check(monkeypatch):
     assert rec.of("apk:done") == [] and api.rerender()["scan"] is not None
 
 
-def _fake_fetch(cache_dir, package):
-    """Pobranie bez telefonu: 1 bajt we wpisie `<pakiet>/id`, jak gotowy wpis `fetch_apks`."""
-    entry = cache_dir / package / "id"
-    entry.mkdir(parents=True, exist_ok=True)
-    (entry / "base.apk").write_bytes(b"x")
-    return FetchedApks([entry / "base.apk"], verified=True)
-
-
-def _policy_factory(policies):
-    """Prawdziwy `DeviceApkProvider` z polityką od `Api`; `stat` podaje 1 GB na każdy cel."""
-    def factory(adb, policy=None, **kw):
-        policies.append(policy)
-        real = adb.shell
-
-        def shell(command, timeout=20.0):
-            if command.startswith("stat -c"):
-                paths = [a.strip("'") for a in command.split() if a.endswith(".apk'") or
-                         (a.endswith(".apk") and "*" not in a)]
-                return "".join(f"{C.GB} {path}\n" for path in paths)
-            return real(command, timeout)
-
-        adb.shell = shell
-        return DeviceApkProvider(adb, cache_dir=default_cache_dir(), workers=1,
-                                 fetch=lambda a, package, d: _fake_fetch(d, package),
-                                 analyze=lambda package, paths: ApkReport(package, class_count=1),
-                                 policy=policy)
-    return factory
-
-
 def _policy_api(monkeypatch, free, sync=True):
     monkeypatch.setattr(C, "disk_usage", lambda path: Disk(500 * C.GB, 0, free))
     api, rec = make_api(make_cli_phone(), sync=sync)
     policies = []
-    api._apk_factory = _policy_factory(policies)
+    api._apk_factory = policy_factory(policies)
     return api, rec, policies
 
 
@@ -228,7 +195,7 @@ def test_stopping_during_the_space_question_skips_the_analysis(monkeypatch):
 def test_apk_cache_status_and_clear(monkeypatch):
     monkeypatch.setattr(C, "disk_usage", lambda path: Disk(120 * C.GB, 0, 4 * C.GB))
     api, _ = make_api(make_cli_phone())
-    _fake_fetch(default_cache_dir(), "com.a")
+    fake_fetch(default_cache_dir(), "com.a")
     status = api.apk_cache()
     assert status["size_bytes"] == 1 and status["limit_bytes"] == 10 * C.GB
     assert status["effective_bytes"] == 2 * C.GB + 1
@@ -304,7 +271,7 @@ def _mode_api(monkeypatch, mode="ask", sync=False, free=500 * C.GB):
     monkeypatch.setattr(C, "disk_usage", lambda path: Disk(500 * C.GB, 0, free))
     api, rec = make_api(make_cli_phone(), sync=sync, apk_mode=mode)
     policies = []
-    api._apk_factory = _policy_factory(policies)
+    api._apk_factory = policy_factory(policies)
     return api, rec
 
 
