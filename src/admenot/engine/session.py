@@ -37,6 +37,9 @@ class ApkStatus:
     stopped_no_space: bool = False  # analiza przerwana: zabrakło miejsca na dysku
 
 
+REPORT_MODES = ("pending", "full", "manual", "partial")
+
+
 @dataclass
 class ScanReport:
     device: DeviceInfo
@@ -48,6 +51,10 @@ class ScanReport:
     usage_window_h: float | None = None
     profiles: ProfileScope | None = None
     versions: dict[str, str] = field(default_factory=dict)
+    # Tryb analizy APK (spec trybu ręcznego §2.3): pending po szybkim skanie, full po pełnej,
+    # manual — wybrany tryb ręczny, partial — ręczny z analizą wybranych aplikacji.
+    apk_mode: str = "pending"
+    analyzed_on_demand: frozenset[str] = frozenset()
 
 
 def score_all(
@@ -145,7 +152,15 @@ def analyze_apks(
         stopped_no_space=any(r.error == NO_SPACE for r in reports.values()),
     )
     results = score_all(facts, ruleset, trust, report.low_behavior_data)
-    return dataclasses.replace(report, results=results, apk=status, apk_reports=reports)
+    if only is None:
+        mode, on_demand = "full", frozenset()
+    elif report.apk_mode == "full":
+        mode, on_demand = "full", report.analyzed_on_demand
+    else:
+        mode = "partial"
+        on_demand = report.analyzed_on_demand | frozenset(t.package for t in targets)
+    return dataclasses.replace(report, results=results, apk=status, apk_reports=reports,
+                               apk_mode=mode, analyzed_on_demand=on_demand)
 
 
 def report_to_dict(report: ScanReport, lang: str = "pl") -> dict[str, Any]:
