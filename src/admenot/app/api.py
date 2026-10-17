@@ -916,7 +916,8 @@ class Api:
         names = {p: app_name(f, p) for p, f in plan.facts.items()}
         at = self._now()
         common = {"lang": self._lang, "phone": device_card(plan.device, self._match)["name"],
-                  "at": at, "names": names, "shop": load_service().name}
+                  "at": at, "names": names, "shop": load_service().name,
+                  "partial": self._report.apk_mode != "full"}
         full = share.fit(share.build_payload(plan, **common))
         local = share.local_url(client.base_url(), share.build_payload(plan, icons=False, **common))
         code = full["code"]

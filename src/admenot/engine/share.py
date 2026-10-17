@@ -74,7 +74,7 @@ def shrink_icon(uri: str | None) -> str | None:
 
 def build_payload(plan: OrderPlan, *, lang: str, phone: str, at: datetime,
                   names: dict[str, str], shop: str | None = None,
-                  icons: bool = True) -> dict[str, Any]:
+                  icons: bool = True, partial: bool = False) -> dict[str, Any]:
     apps: list[dict[str, Any]] = []
     for r in plan.results:
         app: dict[str, Any] = {"n": names.get(r.package) or r.package, "l": r.level}
@@ -89,6 +89,8 @@ def build_payload(plan: OrderPlan, *, lang: str, phone: str, at: datetime,
                                "notif": 1 if notif_blocked(plan) else 0, "apps": apps}
     if shop:
         payload["shop"] = shop
+    if partial:  # tryb ręczny albo analiza niedokończona (spec trybu ręcznego §5.1)
+        payload["m"] = 1
     return payload
 
 

@@ -1,7 +1,7 @@
 // Typy eksportów plan.js dla testów (server/test/plan-page.test.ts); plik nie jest publikowany (.assetsignore).
 export interface PlanApp { n: string; l: "silence" | "disable" | "remove"; b?: number; i?: string | null }
 export interface PlanPayload {
-  v: number; lang: string; at: string; phone: string; code: string; notif: number; shop?: string; apps: PlanApp[];
+  v: number; lang: string; at: string; phone: string; code: string; notif: number; shop?: string; m?: number; apps: PlanApp[];
 }
 export type PlanTexts = Record<string, string>;
 export const TEXTS: Record<"pl" | "en", PlanTexts>;

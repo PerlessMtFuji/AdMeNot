@@ -88,6 +88,12 @@ def test_shop_is_omitted_without_name_and_icons_without_flag():
     assert "shop" not in p and all("i" not in a for a in p["apps"])
 
 
+def test_payload_marks_a_partial_analysis():
+    assert "m" not in _payload()
+    assert _payload(partial=True)["m"] == 1
+    assert share.plan_code(_plan())  # kod nie zależy od trybu
+
+
 def test_name_falls_back_to_package_when_unknown():
     p = share.build_payload(_plan(), lang="pl", phone="X", at=AT, names={})
     assert p["apps"][0]["n"] == "com.clean.pro"
