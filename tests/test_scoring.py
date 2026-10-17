@@ -134,8 +134,9 @@ def test_low_behavior_data_marks_untrusted_incomplete():
 
 def test_trusted_app_is_scored_on_behavior_only():
     findings = [F("DM-ADMIN-01", "position", 25), F("DM-A11Y-01", "position", 20),
-                F("DM-SRC-01", "context", 8), F("DM-NOTIF-02", "behavior", 25),
-                F("DM-OVERLAY-01", "behavior", 25), F("DM-FSI-01", "behavior", 15)]
+                F("DM-SRC-01", "context", 8), FB("DM-NOTIF-02", "behavior", 25, "observed"),
+                FB("DM-OVERLAY-01", "behavior", 25, "observed"),
+                FB("DM-FSI-01", "behavior", 15, "observed")]
     result = score_app(AppFacts("com.x"), findings, trusted=True, low_behavior_data=False)
     assert result.score == 60  # zachowanie liczy się w pełni (limit klasy 60), tożsamość nie
     assert {f.rule_id for f in result.findings} >= {"DM-ADMIN-01", "DM-SRC-01"}  # nadal widoczne
@@ -204,3 +205,36 @@ def test_findings_in_one_group_count_once():
     assert score_app(facts, [observed, code], False, False).score == 25
     other = Finding("DM-ADSDK-01", "apk", 3, {}, {}, {}, category="ads")
     assert score_app(facts, [observed, code, other], False, False).score == 28
+
+
+def test_malicious_needs_direct_evidence_not_declarations():
+    """75 pkt i wysoka pewność, ale tylko 45 z obserwacji: SDK i kontekst nie dobijają do „Szkodliwa”."""
+    findings = [FG("DM-NOTIF-02", "behavior", 25, "observed", "notif", "notif"),
+                FG("DM-OVERLAY-01", "behavior", 20, "observed", "overlay"),
+                FG("DM-ADSDK-02", "apk", 30, "declared"),
+                FG("DM-SRC-01", "context", 20, "declared", category="origin")]
+    result = score_app(AppFacts("com.x"), findings, trusted=False, low_behavior_data=False)
+    assert (result.score, result.confidence, result.verdict) == (95, "high", "suspicious")
+    granted = findings + [FG("DM-ADMIN-01", "position", 25, "granted", category="removal")]
+    result = score_app(AppFacts("com.x"), granted, trusted=False, low_behavior_data=False)
+    assert result.verdict == "malicious"  # 45 zaobserwowane + 25 przyznane ≥ 50
+
+
+def test_confirmed_indicator_skips_direct_evidence_and_declaration_cap():
+    ioc = FG("DM-IOC-01", "ioc", 80, "confirmed", category="origin")
+    result = score_app(AppFacts("com.x"), [ioc], trusted=False, low_behavior_data=False)
+    assert (result.score, result.verdict) == (80, "malicious")
+
+
+def test_declarations_alone_stop_at_review():
+    """SDK, kod, pochodzenie i nazwa to deklaracje: bez niczego zaobserwowanego ani przyznanego ≤ 49."""
+    declared = [FG("DM-HIDDEN-01", "position", 10, "declared", category="removal"),
+                FG("DM-SRC-01", "context", 8, "declared", category="origin"),
+                FG("DM-LABEL-01", "context", 8, "declared", category="disguise"),
+                FG("DM-ADSDK-02", "apk", 25, "declared"),
+                FG("DM-DYNDEX-01", "apk", 3, "declared", category="background")]
+    result = score_app(AppFacts("com.x"), declared, trusted=False, low_behavior_data=False)
+    assert (result.score, result.verdict) == (49, "review")
+    granted = declared + [FG("DM-NLS-01", "position", 10, "granted", category="data")]
+    result = score_app(AppFacts("com.x"), granted, trusted=False, low_behavior_data=False)
+    assert (result.score, result.verdict) == (64, "suspicious")

@@ -85,7 +85,7 @@ EXPECTED: dict[str, tuple[int, str, str, str | None]] = {
     "F to samo, 3 starty po odblokowaniu": (18, "safe", "medium", None),
     "G aplikacja producenta z 5 SDK, bez zachowania": (0, "safe", "low", None),
     "H launcher spoza Play: ekran główny, okna, 5 SDK": (66, "suspicious", "medium", "disable"),
-    "I komunikator z 5 SDK": (75, "malicious", "high", "disable"),
+    "I komunikator z 5 SDK": (75, "suspicious", "high", "disable"),
     "J automatyka spoza Play: administrator, dostępność, okna, 7 wybudzeń/h":
         (93, "suspicious", "medium", "disable"),
 }

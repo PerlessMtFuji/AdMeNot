@@ -10,6 +10,11 @@ SYSTEM_NO_BEHAVIOR_CAP = 24
 # Grupy reguł, które pokazują coś użytkownikowi. Dwie różne dają wysoką pewność; wybudzenia (`wake`)
 # to działanie w tle i pewności nie podnoszą (ocena 2026-10-16 §2).
 DISPLAY_GROUPS = frozenset({"notif", "overlay", "launch"})
+# „Szkodliwa” bez potwierdzonego wskaźnika: tyle punktów z tego, co aplikacja zrobiła albo dostała
+# na tym telefonie (zachowanie zaobserwowane + dostęp przyznany), nie z deklaracji (ocena 2026-10-16 §1).
+DIRECT_EVIDENCE_MIN = 50
+# Same deklaracje (SDK, kod, pochodzenie, nazwa) kończą się na „Do sprawdzenia”.
+DECLARED_ONLY_MAX = 49
 
 
 @dataclass(frozen=True)
@@ -133,9 +138,10 @@ def score_app(
     per_class: dict[str, int] = {}
     for f in counted:
         per_class[f.rule_class] = per_class.get(f.rule_class, 0) + f.weight
-    score = sum(min(total, CLASS_CAPS.get(cls, total)) for cls, total in per_class.items())
-
-    score = min(score, 100)
+    capped = {cls: min(total, CLASS_CAPS.get(cls, total)) for cls, total in per_class.items()}
+    score = min(sum(capped.values()), 100)
+    if not any(f.basis in ("observed", "granted", "confirmed") for f in counted):
+        score = min(score, DECLARED_ONLY_MAX)
     if facts.is_system and not any(f.rule_class == "behavior" or f.basis == "confirmed"
                                    for f in all_findings):
         score = min(score, SYSTEM_NO_BEHAVIOR_CAP)
@@ -143,12 +149,23 @@ def score_app(
 
     incomplete = low_behavior_data or bool(facts.gaps)
     confidence = confidence_for(all_findings, incomplete)
+    verdict = verdict_for(score, confidence)
+    confirmed = any(f.basis == "confirmed" for f in counted)
+    if verdict == "malicious" and not confirmed and _direct_points(counted) < DIRECT_EVIDENCE_MIN:
+        verdict = "suspicious"
     return AppResult(
         facts=facts,
         findings=sorted(all_findings, key=lambda f: -f.weight),
         score=score,
-        verdict=verdict_for(score, confidence),
+        verdict=verdict,
         trusted=trusted,
         incomplete=incomplete,
         confidence=confidence,
     )
+
+
+def _direct_points(counted: list[Finding]) -> int:
+    """Punkty z tego, co aplikacja zrobiła albo dostała na telefonie — każda część w limicie klasy."""
+    observed = sum(f.weight for f in counted if f.rule_class == "behavior" and f.basis == "observed")
+    granted = sum(f.weight for f in counted if f.rule_class == "position" and f.basis == "granted")
+    return min(observed, CLASS_CAPS["behavior"]) + min(granted, CLASS_CAPS["position"])
