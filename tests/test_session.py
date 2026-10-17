@@ -94,7 +94,7 @@ def test_apk_analysis_rescores_targets(synthetic_adb):
     weather = _by_pkg(report)["com.wlive.forecast"]
     assert weather.facts.label == "Weather Live"
     assert {"DM-NOTIF-02", "DM-ADSDK-02", "DM-COMBO-03"} <= {f.rule_id for f in weather.findings}
-    assert (weather.score, weather.verdict) == (65, "suspicious")
+    assert (weather.score, weather.verdict) == (55, "suspicious")
     assert report.apk.requested == 3 and report.apk.analyzed == 1 and report.apk.failed == {}
 
 

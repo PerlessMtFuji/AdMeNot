@@ -21,6 +21,7 @@ class Combo:
     text_simple: dict[str, str]
     text_expert: dict[str, str]
     label: dict[str, str]
+    rule_class: str = COMBO  # klasa limitu; premia z dowodów pakietu liczy się w limicie apk
 
 
 COMBOS = (
@@ -42,22 +43,24 @@ COMBOS = (
         15,
         {"pl": "Administrator urządzenia spoza Sklepu Play, który jednocześnie wyświetla treści.",
          "en": "A device administrator from outside the Play Store that also shows content."},
-        {"pl": "kombinacja: DM-ADMIN-01 + DM-SRC-01 + zachowanie reklamowe",
-         "en": "combination: DM-ADMIN-01 + DM-SRC-01 + ad-like behavior"},
+        {"pl": "kombinacja: DM-ADMIN-01 + DM-SRC-01 + okna lub powiadomienia",
+         "en": "combination: DM-ADMIN-01 + DM-SRC-01 + windows or notifications"},
         {"pl": "Administrator spoza Play + wyświetlanie treści",
          "en": "Non-Play admin + shows content"},
     ),
     Combo(
         "DM-COMBO-03",
         frozenset({"DM-ADSDK-02"}),
-        frozenset({"DM-NOTIF-01", "DM-NOTIF-02", "DM-NOTIF-03", "DM-OVERLAY-01", "DM-FSI-01",
-                   "DM-ALARM-01"}),
+        frozenset({"DM-NOTIF-01", "DM-NOTIF-02", "DM-NOTIF-03", "DM-OVERLAY-01", "DM-FSI-01"}),
         15,
-        {"pl": "Wiele bibliotek reklamowych i zaobserwowane zachowanie reklamowe na telefonie.",
-         "en": "Many ad libraries plus ad-like behavior observed on the phone."},
-        {"pl": "kombinacja: DM-ADSDK-02 + zachowanie reklamowe",
-         "en": "combination: DM-ADSDK-02 + ad-like behavior"},
-        {"pl": "Biblioteki reklamowe + zachowanie", "en": "Ad libraries + behavior"},
+        {"pl": "Wiele bibliotek reklamowych, a na telefonie aplikacja wyświetla powiadomienia "
+               "lub okna nad innymi aplikacjami.",
+         "en": "Many ad libraries, and on the phone the app shows notifications or windows "
+               "over other apps."},
+        {"pl": "kombinacja: DM-ADSDK-02 + powiadomienia lub okna (w limicie APK)",
+         "en": "combination: DM-ADSDK-02 + notifications or windows (within the APK cap)"},
+        {"pl": "Biblioteki reklamowe + wyświetlanie", "en": "Ad libraries + shows content"},
+        rule_class="apk",
     ),
 )
 
@@ -105,8 +108,8 @@ def _combo_findings(findings: list[Finding]) -> list[Finding]:
     if not matched:
         return []
     combo = max(matched, key=lambda c: c.bonus)  # max() zwraca pierwszy przy remisie
-    return [Finding(combo.rule_id, "combo", combo.bonus, {}, combo.text_simple, combo.text_expert,
-                    category=COMBO, label=combo.label, basis="declared")]
+    return [Finding(combo.rule_id, combo.rule_class, combo.bonus, {}, combo.text_simple,
+                    combo.text_expert, category=COMBO, label=combo.label, basis="declared")]
 
 
 def score_app(

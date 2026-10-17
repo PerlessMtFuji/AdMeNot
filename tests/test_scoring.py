@@ -178,7 +178,16 @@ def test_combo_03_many_ad_networks_plus_behavior():
     assert alone.score == 20 and "DM-COMBO-03" not in {f.rule_id for f in alone.findings}
     both = score_app(facts, [F("DM-ADSDK-02", "apk", 20), F("DM-NOTIF-01", "behavior", 15)],
                      trusted=False, low_behavior_data=False)
-    assert both.score == 50 and "DM-COMBO-03" in {f.rule_id for f in both.findings}
+    # premia to dowód z pakietu: razem z SDK w limicie klasy apk (30), nie ponad nim
+    assert both.score == 30 + 15 and "DM-COMBO-03" in {f.rule_id for f in both.findings}
+
+
+def test_combo_03_needs_shown_content_not_wakeups():
+    facts = AppFacts("com.x", installer="com.android.vending")
+    result = score_app(facts, [F("DM-ADSDK-02", "apk", 25), F("DM-ALARM-01", "behavior", 10)],
+                       trusted=False, low_behavior_data=False)
+    assert "DM-COMBO-03" not in {f.rule_id for f in result.findings}
+    assert result.score == 35
 
 
 def test_static_code_path_is_not_an_observation():
