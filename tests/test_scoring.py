@@ -16,6 +16,11 @@ def FB(rule_id, cls, weight, basis, category="ads"):
                    category=category, basis=basis)
 
 
+def FG(rule_id, cls, weight, basis, group="", category="ads"):
+    return Finding(rule_id, cls, weight, {}, {"pl": rule_id, "en": rule_id}, {"pl": "", "en": ""},
+                   category=category, basis=basis, group=group)
+
+
 @pytest.mark.parametrize(("score", "verdict"), [
     (0, "safe"), (24, "safe"), (25, "review"), (49, "review"),
     (50, "suspicious"), (74, "suspicious"), (75, "malicious"), (100, "malicious"),
@@ -25,14 +30,31 @@ def test_verdict_thresholds(score, verdict):
 
 
 def test_confidence_levels():
-    declared = [FB("A", "context", 8, "declared")]
-    one_obs = declared + [FB("B", "behavior", 25, "observed", "ads")]
-    two_obs = one_obs + [FB("C", "behavior", 10, "observed", "background")]
+    declared = [FG("A", "context", 8, "declared")]
+    one_obs = declared + [FG("B", "behavior", 20, "observed", "overlay")]
+    two_obs = one_obs + [FG("C", "behavior", 15, "observed", "notif", "notif")]
     assert confidence_for(declared, incomplete=False) == "low"
     assert confidence_for(one_obs, incomplete=False) == "medium"
     assert confidence_for(two_obs, incomplete=False) == "high"
     assert confidence_for(two_obs, incomplete=True) == "medium"
-    assert confidence_for([FB("I", "ioc", 80, "confirmed", "origin")], incomplete=True) == "high"
+    assert confidence_for([FG("I", "ioc", 80, "confirmed", category="origin")],
+                          incomplete=True) == "high"
+
+
+def test_wakeups_do_not_raise_confidence():
+    """Wybudzenia to działanie w tle, nie wyświetlanie: same nie potwierdzają intruzywności."""
+    findings = [FG("DM-OVERLAY-01", "behavior", 20, "observed", "overlay"),
+                FG("DM-ALARM-01", "behavior", 10, "observed", "wake", "background")]
+    assert confidence_for(findings, incomplete=False) == "medium"
+
+
+def test_one_mechanism_in_two_categories_is_one_kind_of_behavior():
+    """Zalew powiadomień i powiadomienie pełnoekranowe to ten sam mechanizm (ocena 2026-10-16 §2)."""
+    findings = [FG("DM-NOTIF-02", "behavior", 25, "observed", "notif", "notif"),
+                FG("DM-FSI-01", "behavior", 15, "observed", "notif", "ads")]
+    assert confidence_for(findings, incomplete=False) == "medium"
+    result = score_app(AppFacts("com.x"), findings, trusted=False, low_behavior_data=False)
+    assert result.score == 25
 
 
 def test_high_score_without_strong_evidence_is_only_suspicious():

@@ -7,6 +7,9 @@ from admenot.engine.rules.model import COMBO, Finding
 
 CLASS_CAPS = {"behavior": 60, "position": 40, "context": 20, "apk": 30, "ioc": 100}
 SYSTEM_NO_BEHAVIOR_CAP = 24
+# Grupy reguł, które pokazują coś użytkownikowi. Dwie różne dają wysoką pewność; wybudzenia (`wake`)
+# to działanie w tle i pewności nie podnoszą (ocena 2026-10-16 §2).
+DISPLAY_GROUPS = frozenset({"notif", "overlay", "launch"})
 
 
 @dataclass(frozen=True)
@@ -77,9 +80,10 @@ def confidence_for(findings: list[Finding], incomplete: bool) -> str:
     """Pewność wniosku: z jakiego rodzaju dowodów wynika wynik, nie ile ma punktów."""
     if any(f.basis == "confirmed" for f in findings):
         return "high"
-    # „static” to możliwość, nie obserwacja
-    observed = {f.category for f in findings if f.basis == "observed"}
-    if len(observed) >= 2 and not incomplete:
+    # „static” to możliwość, nie obserwacja; kategorie bywają różne dla jednego mechanizmu
+    observed = [f for f in findings if f.basis == "observed"]
+    shown = {f.group for f in observed if f.group in DISPLAY_GROUPS}
+    if len(shown) >= 2 and not incomplete:
         return "high"
     return "medium" if observed else "low"
 

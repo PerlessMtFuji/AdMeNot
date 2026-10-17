@@ -74,7 +74,7 @@ SCENARIOS = {
 
 # (wynik, werdykt, pewność, domyślne działanie)
 EXPECTED: dict[str, tuple[int, str, str, str | None]] = {
-    "A komunikator z Play w trakcie połączenia": (60, "suspicious", "high", "disable"),
+    "A komunikator z Play w trakcie połączenia": (45, "review", "high", None),
     "A2 komunikator bez połączenia": (45, "review", "high", None),
     "B aplikacja pogodowa: 6 SDK, 10 powiadomień/h, widżet nad aplikacjami":
         (78, "malicious", "high", "disable"),
@@ -87,7 +87,7 @@ EXPECTED: dict[str, tuple[int, str, str, str | None]] = {
     "H launcher spoza Play: ekran główny, okna, 5 SDK": (76, "suspicious", "medium", "disable"),
     "I komunikator z 5 SDK": (85, "malicious", "high", "disable"),
     "J automatyka spoza Play: administrator, dostępność, okna, 7 wybudzeń/h":
-        (93, "malicious", "high", "disable"),
+        (93, "suspicious", "medium", "disable"),
 }
 
 

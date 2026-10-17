@@ -350,3 +350,15 @@ def test_code_overlay_text_does_not_claim_a_window_over_other_apps():
     rule = next(r for r in load_default_ruleset().yaml_rules if r.id == "DM-CODE-OVERLAY-01")
     texts = " ".join([*rule.text_simple.values(), *rule.label.values()]).lower()
     assert "nad innymi" not in texts and "over other apps" not in texts and "reklamow" not in texts
+
+
+def test_every_observed_rule_names_its_mechanism():
+    """Pewność liczy grupy wyświetlania: reguła zaobserwowana bez grupy nigdy by jej nie podniosła."""
+    from admenot.engine.scoring import DISPLAY_GROUPS
+
+    groups = {r.id: r.group for r in load_default_ruleset().yaml_rules if r.basis == "observed"}
+    assert all(groups.values()), groups
+    assert {groups[i] for i in ("DM-NOTIF-01", "DM-NOTIF-02", "DM-NOTIF-03", "DM-FSI-01")} == {"notif"}
+    assert groups["DM-OVERLAY-01"] == groups["DM-INCIDENT-01"] == "overlay"
+    assert groups["DM-BGACT-01"] == "launch"
+    assert groups["DM-ALARM-01"] == "wake" and "wake" not in DISPLAY_GROUPS
