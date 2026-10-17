@@ -787,6 +787,53 @@ describe('tryb ręczny', () => {
     expect(s.selection[boost.package]).toBe('disable');
   });
 
+  // Raport po szybkim skanie, zanim wybrano tryb analizy APK.
+  async function pending(setting: Settings['apk_mode_default']) {
+    const env = await scanned({ apk_mode_default: setting });
+    const scan = { ...snap(env.s.scan), apk_mode: 'pending', on_demand: [] };
+    env.bridge.emit('scan:done', { scan, interrupted: [], client: null });
+    return env;
+  }
+
+  test('„pytaj”: scan:done bez domyślnych zaznaczeń; wybór pełnej, apk:done uzupełnia propozycje', async () => {
+    const { ctl, s, bridge } = await pending('ask');
+    expect(s.selection).toEqual({});
+    expect(s.apk.running).toBe(true);
+    expect(s.apkFullChosen).toBe(false);
+    bridge.emit('apk:question', { job_id: 'j1', kind: 'mode', apps: 3, eta_s: 60, eta_kind: 'measured', eta_min_s: 60, eta_max_s: 60 });
+    await ctl.chooseApkMode('full', false);
+    expect(s.apkFullChosen).toBe(true);
+    bridge.emit('apk:done', { scan: { ...snap(s.scan), apk_mode: 'full' } });
+    expect(s.selection['com.clean.pro.boost']).toBe('disable');
+  });
+
+  test('„pytaj”: pełna analiza przerwana bez apk:done — propozycje jak dawniej, z poszanowaniem zmian serwisanta', async () => {
+    const { ctl, s, bridge } = await pending('ask');
+    bridge.emit('apk:question', { job_id: 'j1', kind: 'mode', apps: 3, eta_s: 60, eta_kind: 'measured', eta_min_s: 60, eta_max_s: 60 });
+    await ctl.chooseApkMode('full', false);
+    ctl.setLevel('com.wlive.forecast', 'remove');
+    ctl.setLevel('com.wlive.forecast', null);
+    bridge.emit('apk:stopped', {});
+    expect(s.selection['com.clean.pro.boost']).toBe('disable');
+    expect('com.wlive.forecast' in s.selection).toBe(false);
+  });
+
+  test('„pytaj”: błąd zadania po wyborze pełnej też uzupełnia propozycje; bez wyboru — nie', async () => {
+    const a = await pending('ask');
+    a.bridge.emit('apk:question', { job_id: 'j1', kind: 'mode', apps: 3, eta_s: 60, eta_kind: 'measured', eta_min_s: 60, eta_max_s: 60 });
+    await a.ctl.chooseApkMode('full', false);
+    a.bridge.emit('job:error', { job_id: 'j1', kind: 'apk', key: 'internal', message: '' });
+    expect(a.s.selection['com.clean.pro.boost']).toBe('disable');
+    const b = await pending('ask');
+    b.bridge.emit('apk:stopped', {});
+    expect(b.s.selection).toEqual({});
+  });
+
+  test('„zawsze pełna”: scan:done z domyślnymi zaznaczeniami jak dawniej', async () => {
+    const { s } = await pending('full');
+    expect(s.selection['com.clean.pro.boost']).toBe('disable');
+  });
+
   // Atrapa z ręcznie rozstrzyganymi odpowiedziami selection_eta.
   async function withEta() {
     const bridge = createFakeBridge('adware', { delay: 0 });

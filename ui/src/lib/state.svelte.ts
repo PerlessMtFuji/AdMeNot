@@ -31,6 +31,8 @@ export class AppState {
   showSystem = $state(false);
   /** Czy bieżąca analiza APK obejmuje wszystko (przycisk „Przerwij i szukaj ręcznie”) czy tylko zaznaczone. */
   apkScope = $state<'all' | 'selected'>('all');
+  /** Serwisant wybrał pełną analizę po pytaniu o tryb — od tej chwili werdykty heurystyk są widoczne. */
+  apkFullChosen = $state(false);
   interrupted = $state<string[]>([]);
   selection = $state<Record<string, Level>>({});
   touched = $state<string[]>([]);

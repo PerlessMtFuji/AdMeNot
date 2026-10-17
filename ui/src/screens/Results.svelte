@@ -19,7 +19,7 @@
   import StepTimeline from '../components/StepTimeline.svelte';
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
-  import { facetCounts, flaggedApps, focusedApp, groupOpen, isManual, notices, verdictGroups, visibleApps } from '../lib/logic';
+  import { facetCounts, flaggedApps, focusedApp, groupOpen, isManual, modeUndecided, notices, verdictGroups, visibleApps } from '../lib/logic';
   import { DUR, enter, ms, stagger } from '../lib/motion';
   import type { Mode, Verdict } from '../lib/types';
   import Banner from '../ui/Banner.svelte';
@@ -36,9 +36,10 @@
   // Tryb ręczny (spec trybu ręcznego §3): werdykty heurystyk ukryte — bez grup, tabeli eksperta i przełącznika widoku.
   const manual = $derived(isManual(s.scan));
   const choosing = $derived(s.apkQuestion?.kind === 'mode');
-  // „Zawsze ręcznie”: do `apk:manual` (ok. sekundy) stan „w toku” zamiast grup z ukrytymi werdyktami.
-  const awaitingManual = $derived(s.scan?.apk_mode === 'pending' && s.settings.apk_mode_default === 'manual');
-  const verdictsHidden = $derived(manual || choosing || awaitingManual);
+  // Tryb jeszcze nie wybrany (szacunek, pytanie, „zawsze ręcznie” do `apk:manual`): stan „w toku” zamiast grup.
+  const undecided = $derived(modeUndecided({ scan: s.scan, setting: s.settings.apk_mode_default, running: s.apk.running,
+    fullChosen: s.apkFullChosen }));
+  const verdictsHidden = $derived(manual || choosing || undecided);
   const expert = $derived(s.settings.mode === 'expert' && !verdictsHidden);
   const apps = $derived(s.scan?.apps ?? []);
   const flagged = $derived(flaggedApps(apps));
@@ -117,7 +118,7 @@
       </div>
       {#if manual}
         <h1 class="col-span-2 text-2xl font-extrabold">{t('manual.title')}</h1>
-      {:else if choosing || awaitingManual}
+      {:else if choosing || undecided}
         <h1 class="col-span-2 text-2xl font-extrabold">{t('results.apk_title')}</h1>
       {:else if flagged.length > 0}
         <h1 class="col-span-2 text-2xl font-extrabold" aria-label={tp('results.title', flagged.length)}>
@@ -147,7 +148,7 @@
       <ApkModeChoice />
     {:else if manual}
       <ManualList />
-    {:else if awaitingManual || (flagged.length === 0 && s.apk.running)}
+    {:else if undecided || (flagged.length === 0 && s.apk.running)}
       <div in:enter><ApkProgress hero /></div>
     {:else if flagged.length === 0}
       <div class="grid place-items-center gap-2 py-10 text-center" in:enter>

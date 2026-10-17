@@ -17,7 +17,7 @@
   let { app }: { app: AppView } = $props();
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
-  const analyzed = $derived(s.scan?.on_demand.includes(app.package) ?? false);
+  const analyzed = $derived((s.scan?.on_demand ?? []).includes(app.package));
   const level = $derived(s.selection[app.package] ?? null);
   const done = $derived(s.acted[app.package] ?? null);
   const tags = $derived(factTags(app));

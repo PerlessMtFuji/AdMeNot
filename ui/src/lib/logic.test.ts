@@ -40,6 +40,7 @@ import {
   bulkNeedsConfirm,
   factTags,
   isManual,
+  modeUndecided,
   manualRows,
   stableEta,
 } from './logic';
@@ -448,6 +449,17 @@ describe('tryb ręczny', () => {
     expect(isManual(scan('full'))).toBe(false);
     expect(isManual(scan('manual'))).toBe(true);
     expect(isManual(scan('partial'))).toBe(true);
+  });
+
+  test('modeUndecided: tylko przy trwającej analizie raportu „pending”, bez „zawsze pełna” i bez wyboru pełnej', () => {
+    const base = { scan: scan('pending'), setting: 'ask' as const, running: true, fullChosen: false };
+    expect(modeUndecided(base)).toBe(true);
+    expect(modeUndecided({ ...base, setting: 'manual' })).toBe(true);
+    expect(modeUndecided({ ...base, setting: 'full' })).toBe(false);
+    expect(modeUndecided({ ...base, fullChosen: true })).toBe(false);
+    expect(modeUndecided({ ...base, running: false })).toBe(false);
+    expect(modeUndecided({ ...base, scan: scan('manual') })).toBe(false);
+    expect(modeUndecided({ ...base, scan: null })).toBe(false);
   });
 
   test('manualRows: najświeższe pierwsze, bez daty na końcu, systemowe ukryte', () => {

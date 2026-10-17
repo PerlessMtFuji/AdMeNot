@@ -464,6 +464,12 @@ export function isManual(scan: ScanView | null): boolean {
   return scan?.apk_mode === 'manual' || scan?.apk_mode === 'partial';
 }
 
+/** Tryb analizy jeszcze nierozstrzygnięty: werdykty heurystyk ukryte do wyboru „pełna” (albo „zawsze pełna”). */
+export function modeUndecided(o: { scan: ScanView | null; setting: Settings['apk_mode_default']; running: boolean;
+  fullChosen: boolean }): boolean {
+  return o.scan?.apk_mode === 'pending' && o.setting !== 'full' && o.running && !o.fullChosen;
+}
+
 const installedAt = (a: AppView): number => (a.first_install ? Date.parse(a.first_install) : -Infinity);
 
 export function manualRows(apps: AppView[], opts: { query: string; showSystem: boolean; source: string | null }): AppView[] {

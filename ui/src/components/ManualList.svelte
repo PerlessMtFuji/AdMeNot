@@ -3,7 +3,7 @@
   import type { Controller } from '../lib/controller';
   import { formatEta } from '../lib/eta';
   import { i18n, t } from '../lib/i18n/index.svelte';
-  import { facetCounts, manualRows, visibleApps } from '../lib/logic';
+  import { facetCounts, manualRows } from '../lib/logic';
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
   import ApkProgress from './ApkProgress.svelte';

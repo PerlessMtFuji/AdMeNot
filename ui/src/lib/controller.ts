@@ -97,8 +97,9 @@ export class Controller {
     on('scan:done', (d) => {
       s.scan = d.scan;
       s.interrupted = d.interrupted;
-      // „Zawsze ręcznie”: werdykty heurystyk są ukryte, więc nic nie może być zaznaczone za serwisanta.
-      s.selection = s.settings.apk_mode_default === 'manual' ? {} : defaultSelection(d.scan.apps);
+      // Bez „zawsze pełna” werdykty heurystyk są ukryte do wyboru trybu: nic nie może być zaznaczone za serwisanta.
+      s.selection = s.settings.apk_mode_default === 'full' ? defaultSelection(d.scan.apps) : {};
+      s.apkFullChosen = false;
       s.actedLog = {};
       s.undoTarget = null;
       s.touched = [];
@@ -152,6 +153,7 @@ export class Controller {
       if (stale(d)) return;
       s.apkQuestion = null;
       s.apk = { ...s.apk, running: false, eta: null };
+      this.fullEndedWithoutReport();
     });
     on('exec:order', (d) => {
       s.order = d.order;
@@ -245,6 +247,7 @@ export class Controller {
       } else if (d.kind === 'apk' || d.kind === 'deep') {
         s.apkQuestion = null;
         s.apk = { ...s.apk, running: false };
+        if (d.kind === 'apk') this.fullEndedWithoutReport();
       } else if ((d.kind === 'exec' || d.kind === 'resume') && s.phase === 'executing') {
         if (s.order && !s.interrupted.includes(s.order)) s.interrupted = [...s.interrupted, s.order];
         s.admin = null;
@@ -373,7 +376,7 @@ export class Controller {
   toggle(app: AppView): void {
     const s = this.state;
     // Tryb ręczny: propozycja silnika wynika z ukrytego werdyktu — tylko po analizie na żądanie jest widoczna.
-    const hidden = isManual(s.scan) && !s.scan!.on_demand.includes(app.package);
+    const hidden = isManual(s.scan) && !(s.scan?.on_demand ?? []).includes(app.package);
     this.setLevel(app.package, s.selection[app.package] ? null
       : (hidden ? null : app.default_level) ?? this.selectLevel(app));
   }
@@ -773,8 +776,15 @@ export class Controller {
     const q = this.state.apkQuestion;
     if (!q || q.kind !== 'mode') return;
     this.state.apkQuestion = null;
+    if (mode === 'full') this.state.apkFullChosen = true;
     if (remember) await this.saveSettings({ apk_mode_default: mode });
     await this.call(this.api.answer(q.job_id, mode));
+  }
+
+  /** Wybrana pełna analiza skończyła się bez apk:done: raport szybkiego skanu z propozycjami jak przed trybem ręcznym. */
+  private fullEndedWithoutReport(): void {
+    const s = this.state;
+    if (s.apkFullChosen && s.scan?.apk_mode === 'pending') s.selection = mergeSelection(s.selection, s.scan.apps, s.touched);
   }
 
   async analyzeSelected(): Promise<void> {

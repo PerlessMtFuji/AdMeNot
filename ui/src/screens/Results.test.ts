@@ -574,6 +574,42 @@ describe('Results: manual mode (tryb ręczny)', () => {
     expect(screen.getByRole('heading', { name: t('manual.title') })).toBeTruthy();
   });
 
+  test('“ask” setting: no verdicts, title or plan before and during the question; groups after choosing full', async () => {
+    const { ctl, s, bridge } = await scanned();
+    await ctl.saveSettings({ apk_mode_default: 'ask' });
+    s.job = { id: 'j1', kind: 'apk' };
+    bridge.emit('scan:done', { scan: { ...snap(s.scan), apk_mode: 'pending', on_demand: [] }, interrupted: [], client: null });
+    await tick();
+    const flagged = s.scan!.apps.filter((a) => a.verdict !== 'safe');
+    const panel = () => screen.getByRole('complementary', { name: t('panel.plan') });
+    const hidden = () => {
+      expect(s.selection).toEqual({});
+      expect(screen.queryByRole('region', { name: 'Szkodliwe' })).toBeNull();
+      expect(screen.queryByRole('heading', { name: tp('results.title', flagged.length) })).toBeNull();
+      expect(screen.getByRole('heading', { name: t('results.apk_title') })).toBeTruthy();
+      expect(screen.queryByRole('group', { name: t('results.mode') })).toBeNull();
+      expect((within(panel()).getByRole('button', { name: t('actions.fix', { count: 0 }) }) as HTMLButtonElement).disabled).toBe(true);
+    };
+    hidden();
+    expect(screen.getByText(t('results.apk_sub'))).toBeTruthy();
+    // Nawet wymuszone zaznaczenie nie trafia do panelu, dopóki tryb nie jest wybrany.
+    s.selection = { [flagged[0].package]: 'disable' };
+    await tick();
+    expect(within(panel()).queryByText(flagged[0].name)).toBeNull();
+    s.selection = {};
+    bridge.emit('apk:question', { job_id: 'j1', kind: 'mode', apps: 12, eta_s: 90, eta_kind: 'measured', eta_min_s: 90, eta_max_s: 90 });
+    await tick();
+    hidden();
+    await fireEvent.click(screen.getByRole('button', { name: new RegExp(t('apk_mode.full')) }));
+    await tick();
+    expect(screen.getByRole('region', { name: 'Szkodliwe' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: tp('results.title', flagged.length) })).toBeTruthy();
+    bridge.emit('apk:done', { scan: { ...snap(s.scan), apk_mode: 'full' }, job_id: 'j1' });
+    await tick();
+    expect(s.selection['com.clean.pro.boost']).toBe('disable');
+    expect(within(panel()).getByText(s.scan!.apps.find((a) => a.package === 'com.clean.pro.boost')!.name)).toBeTruthy();
+  });
+
   test('mode question: the choice card instead of the groups', async () => {
     const { s, bridge } = await scanned();
     s.job = { id: 'j1', kind: 'apk' };
@@ -586,7 +622,7 @@ describe('Results: manual mode (tryb ręczny)', () => {
   });
 
   test('full analysis: remaining time and “stop and search by hand”; not for a selected-only or deep job', async () => {
-    const { ctl, s, bridge } = await scanned('clean');
+    const { s, bridge } = await scanned('clean');
     s.job = { id: 'j1', kind: 'apk' };
     s.apkScope = 'all';
     s.apk = { done: 5, total: 140, running: true, changed: [], eta: 30 };
@@ -604,6 +640,5 @@ describe('Results: manual mode (tryb ręczny)', () => {
     s.job = { id: 'j2', kind: 'deep' };
     await tick();
     expect(screen.queryByRole('button', { name: t('apk_mode.stop_to_manual') })).toBeNull();
-    expect(ctl).toBeTruthy();
   });
 });

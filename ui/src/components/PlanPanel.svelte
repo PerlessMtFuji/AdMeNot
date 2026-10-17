@@ -3,7 +3,7 @@
   import { flip } from 'svelte/animate';
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
-  import { groupOpen, isManual, LEVEL_TONE, planEntries } from '../lib/logic';
+  import { groupOpen, isManual, LEVEL_TONE, modeUndecided, planEntries } from '../lib/logic';
   import { DUR, enter, ms } from '../lib/motion';
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
@@ -21,9 +21,13 @@
     if (opening) requestAnimationFrame(() => document.getElementById('group-safe')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
   }
   const apps = $derived(s.scan?.apps ?? []);
-  const entries = $derived(planEntries(apps, s.selection));
+  // Tryb nierozstrzygnięty: plan pusty i zablokowany (zaznaczenia mogłyby pochodzić z ukrytych werdyktów).
+  // W trybie ręcznym/częściowym plan to wybory serwisanta — zostaje widoczny.
+  const undecided = $derived(s.apkQuestion?.kind === 'mode' || modeUndecided({ scan: s.scan,
+    setting: s.settings.apk_mode_default, running: s.apk.running, fullChosen: s.apkFullChosen }));
+  const entries = $derived(undecided ? [] : planEntries(apps, s.selection));
   // Tryb ręczny: licznik „bez uwag” zdradzałby ukryte werdykty.
-  const verdictsHidden = $derived(isManual(s.scan) || s.apkQuestion?.kind === 'mode');
+  const verdictsHidden = $derived(isManual(s.scan) || undecided);
   const safeIncomplete = $derived(apps.filter((a) => a.verdict === 'safe' && a.incomplete).length);
   const details = $derived(s.device
     ? `${s.device.model} · Android ${s.device.android}${s.device.patch ? ` · ${t('phone.patch')} ${s.device.patch}` : ''}`
