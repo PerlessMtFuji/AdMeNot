@@ -149,7 +149,7 @@ Dane są niepełne, gdy telefon jest włączony krócej niż 6 godzin, statystyk
 | Werdykt | Warunek | Domyślnie zaznaczone |
 |---|---|---|
 | **Szkodliwa** | wynik ≥ 75, wysoka pewność **i** co najmniej 50 pkt z zachowania zaobserwowanego i dostępu przyznanego na telefonie | Wyłącz |
-| **Podejrzana** | wynik ≥ 50 (albo ≥ 75 bez warunków *Szkodliwa*) | Wycisz; nic, gdy aplikacja ma ułatwienia dostępu, odbiór powiadomień albo jest ekranem głównym |
+| **Podejrzana** | wynik ≥ 50 (albo ≥ 75 bez warunków *Szkodliwa*) | Wycisz (na Androidzie ≤12 Wyłącz, bo tam Wycisz nie wyłącza powiadomień); nic, gdy aplikacja ma ułatwienia dostępu, odbiór powiadomień albo jest ekranem głównym |
 | **Do sprawdzenia** | wynik ≥ 25 | nic — decyduje serwisant |
 | **Bez uwag** | wynik < 25 | nic |
 

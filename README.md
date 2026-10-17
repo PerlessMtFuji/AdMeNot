@@ -149,7 +149,7 @@ Data counts as incomplete when the phone has been on for less than 6 hours, usag
 | Verdict | Condition | Selected by default |
 |---|---|---|
 | **Malicious** | score ≥ 75, high confidence **and** at least 50 points from behavior observed and access granted on the phone | Disable |
-| **Suspicious** | score ≥ 50 (or ≥ 75 without the *Malicious* conditions) | Silence; nothing when the app has accessibility, notification access or is the home screen |
+| **Suspicious** | score ≥ 50 (or ≥ 75 without the *Malicious* conditions) | Silence (Disable on Android ≤12, where Silence can't turn off notifications); nothing when the app has accessibility, notification access or is the home screen |
 | **To review** | score ≥ 25 | nothing — the technician decides |
 | **No issues** | score < 25 | nothing |
 
