@@ -7,6 +7,14 @@ from admenot.engine.rules.model import COMBO, Finding
 
 CLASS_CAPS = {"behavior": 60, "position": 40, "context": 20, "apk": 30, "ioc": 100}
 SYSTEM_NO_BEHAVIOR_CAP = 24
+# Grupy reguł, które pokazują coś użytkownikowi. Dwie różne dają wysoką pewność; wybudzenia (`wake`)
+# to działanie w tle i pewności nie podnoszą (ocena 2026-10-16 §2).
+DISPLAY_GROUPS = frozenset({"notif", "overlay", "launch"})
+# „Szkodliwa” bez potwierdzonego wskaźnika: tyle punktów z tego, co aplikacja zrobiła albo dostała
+# na tym telefonie (zachowanie zaobserwowane + dostęp przyznany), nie z deklaracji (ocena 2026-10-16 §1).
+DIRECT_EVIDENCE_MIN = 50
+# Same deklaracje (SDK, kod, pochodzenie, nazwa) kończą się na „Do sprawdzenia”.
+DECLARED_ONLY_MAX = 49
 
 
 @dataclass(frozen=True)
@@ -18,6 +26,7 @@ class Combo:
     text_simple: dict[str, str]
     text_expert: dict[str, str]
     label: dict[str, str]
+    rule_class: str = COMBO  # klasa limitu; premia z dowodów pakietu liczy się w limicie apk
 
 
 COMBOS = (
@@ -39,22 +48,24 @@ COMBOS = (
         15,
         {"pl": "Administrator urządzenia spoza Sklepu Play, który jednocześnie wyświetla treści.",
          "en": "A device administrator from outside the Play Store that also shows content."},
-        {"pl": "kombinacja: DM-ADMIN-01 + DM-SRC-01 + zachowanie reklamowe",
-         "en": "combination: DM-ADMIN-01 + DM-SRC-01 + ad-like behavior"},
+        {"pl": "kombinacja: DM-ADMIN-01 + DM-SRC-01 + okna lub powiadomienia",
+         "en": "combination: DM-ADMIN-01 + DM-SRC-01 + windows or notifications"},
         {"pl": "Administrator spoza Play + wyświetlanie treści",
          "en": "Non-Play admin + shows content"},
     ),
     Combo(
         "DM-COMBO-03",
         frozenset({"DM-ADSDK-02"}),
-        frozenset({"DM-NOTIF-01", "DM-NOTIF-02", "DM-NOTIF-03", "DM-OVERLAY-01", "DM-FSI-01",
-                   "DM-ALARM-01"}),
+        frozenset({"DM-NOTIF-01", "DM-NOTIF-02", "DM-NOTIF-03", "DM-OVERLAY-01", "DM-FSI-01"}),
         15,
-        {"pl": "Wiele bibliotek reklamowych i zaobserwowane zachowanie reklamowe na telefonie.",
-         "en": "Many ad libraries plus ad-like behavior observed on the phone."},
-        {"pl": "kombinacja: DM-ADSDK-02 + zachowanie reklamowe",
-         "en": "combination: DM-ADSDK-02 + ad-like behavior"},
-        {"pl": "Biblioteki reklamowe + zachowanie", "en": "Ad libraries + behavior"},
+        {"pl": "Wiele bibliotek reklamowych, a na telefonie aplikacja wyświetla powiadomienia "
+               "lub okna nad innymi aplikacjami.",
+         "en": "Many ad libraries, and on the phone the app shows notifications or windows "
+               "over other apps."},
+        {"pl": "kombinacja: DM-ADSDK-02 + powiadomienia lub okna (w limicie APK)",
+         "en": "combination: DM-ADSDK-02 + notifications or windows (within the APK cap)"},
+        {"pl": "Biblioteki reklamowe + wyświetlanie", "en": "Ad libraries + shows content"},
+        rule_class="apk",
     ),
 )
 
@@ -77,9 +88,10 @@ def confidence_for(findings: list[Finding], incomplete: bool) -> str:
     """Pewność wniosku: z jakiego rodzaju dowodów wynika wynik, nie ile ma punktów."""
     if any(f.basis == "confirmed" for f in findings):
         return "high"
-    # „static” to możliwość, nie obserwacja
-    observed = {f.category for f in findings if f.basis == "observed"}
-    if len(observed) >= 2 and not incomplete:
+    # „static” to możliwość, nie obserwacja; kategorie bywają różne dla jednego mechanizmu
+    observed = [f for f in findings if f.basis == "observed"]
+    shown = {f.group for f in observed if f.group in DISPLAY_GROUPS}
+    if len(shown) >= 2 and not incomplete:
         return "high"
     return "medium" if observed else "low"
 
@@ -101,8 +113,8 @@ def _combo_findings(findings: list[Finding]) -> list[Finding]:
     if not matched:
         return []
     combo = max(matched, key=lambda c: c.bonus)  # max() zwraca pierwszy przy remisie
-    return [Finding(combo.rule_id, "combo", combo.bonus, {}, combo.text_simple, combo.text_expert,
-                    category=COMBO, label=combo.label, basis="declared")]
+    return [Finding(combo.rule_id, combo.rule_class, combo.bonus, {}, combo.text_simple,
+                    combo.text_expert, category=COMBO, label=combo.label, basis="declared")]
 
 
 def score_app(
@@ -126,9 +138,10 @@ def score_app(
     per_class: dict[str, int] = {}
     for f in counted:
         per_class[f.rule_class] = per_class.get(f.rule_class, 0) + f.weight
-    score = sum(min(total, CLASS_CAPS.get(cls, total)) for cls, total in per_class.items())
-
-    score = min(score, 100)
+    capped = {cls: min(total, CLASS_CAPS.get(cls, total)) for cls, total in per_class.items()}
+    score = min(sum(capped.values()), 100)
+    if not any(f.basis in ("observed", "granted", "confirmed") for f in counted):
+        score = min(score, DECLARED_ONLY_MAX)
     if facts.is_system and not any(f.rule_class == "behavior" or f.basis == "confirmed"
                                    for f in all_findings):
         score = min(score, SYSTEM_NO_BEHAVIOR_CAP)
@@ -136,12 +149,23 @@ def score_app(
 
     incomplete = low_behavior_data or bool(facts.gaps)
     confidence = confidence_for(all_findings, incomplete)
+    verdict = verdict_for(score, confidence)
+    confirmed = any(f.basis == "confirmed" for f in counted)
+    if verdict == "malicious" and not confirmed and _direct_points(counted) < DIRECT_EVIDENCE_MIN:
+        verdict = "suspicious"
     return AppResult(
         facts=facts,
         findings=sorted(all_findings, key=lambda f: -f.weight),
         score=score,
-        verdict=verdict_for(score, confidence),
+        verdict=verdict,
         trusted=trusted,
         incomplete=incomplete,
         confidence=confidence,
     )
+
+
+def _direct_points(counted: list[Finding]) -> int:
+    """Punkty z tego, co aplikacja zrobiła albo dostała na telefonie — każda część w limicie klasy."""
+    observed = sum(f.weight for f in counted if f.rule_class == "behavior" and f.basis == "observed")
+    granted = sum(f.weight for f in counted if f.rule_class == "position" and f.basis == "granted")
+    return min(observed, CLASS_CAPS["behavior"]) + min(granted, CLASS_CAPS["position"])

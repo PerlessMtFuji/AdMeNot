@@ -139,7 +139,7 @@ def device_card(info: DeviceInfo, match: PhoneMatch | None) -> dict[str, Any]:
     }
 
 
-def app_view(r: AppResult, lang: str) -> dict[str, Any]:
+def app_view(r: AppResult, lang: str, sdk: int = 0) -> dict[str, Any]:
     findings = [
         {"rule_id": f.rule_id, "class": f.rule_class, "weight": f.weight,
          "text": f.text(lang), "text_expert": f.text(lang, expert=True),
@@ -158,7 +158,7 @@ def app_view(r: AppResult, lang: str) -> dict[str, Any]:
         "trusted": r.trusted, "incomplete": r.incomplete, "is_system": facts.is_system,
         "enabled": facts.enabled,
         "from_play": facts.from_play, "installer": facts.installer,
-        "is_admin": facts.is_device_admin, "default_level": default_level(r),
+        "is_admin": facts.is_device_admin, "default_level": default_level(r, sdk),
         "problems": list(dict.fromkeys(f["text"] for f in findings))[:MAX_PROBLEMS],
         "findings": findings, "apk_error": facts.apk_error, "icon": facts.icon,
         "ad_sdks": sorted(facts.ad_sdks) if facts.ad_sdks is not None else None,
@@ -179,7 +179,7 @@ def scan_view(report: ScanReport, lang: str) -> dict[str, Any]:
                                    for s in statuses if s.ok and s.partial]},
         "low_behavior_data": report.low_behavior_data,
         "apk": plain(asdict(report.apk)) if report.apk else None,
-        "apps": [app_view(r, lang) for r in results],
+        "apps": [app_view(r, lang, report.device.sdk) for r in results],
         "profiles": {"others": list(report.profiles.others) if report.profiles else [],
                      "known": bool(report.profiles and report.profiles.present is not None)},
         "usage_window_h": report.usage_window_h,

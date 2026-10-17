@@ -35,14 +35,23 @@ class Blocked:
     detail: str = ""  # context_unknown: nierozpoznane odczyty, np. „ime, home”
 
 
-def default_level(result: AppResult) -> str | None:
-    """Domyślny wybór w planie: werdykt + pewność, nie sam wynik (audyt 2026-09-27)."""
+def default_level(result: AppResult, sdk: int = 0) -> str | None:
+    """Domyślny wybór w planie: werdykt, nie sam wynik (audyt 2026-09-27, ocena 2026-10-16).
+
+    `sdk` to wersja Androida telefonu (0 = nieznana)."""
     if result.verdict == "malicious":
         # Nie „remove”: odinstalowanie kasuje dane aplikacji, a cofnięcie przywraca tylko APK
         # (audyt 2026-10-11, BUG-01). Usunięcie wybiera serwisant, świadomy utraty danych.
         return "disable"
     if result.verdict == "suspicious":
-        return "silence" if result.confidence == "low" else "disable"
+        # „Wycisz” zdejmuje też ułatwienia dostępu, odbiór powiadomień i ekran główny: aplikacji,
+        # która je ma (Tasker, launcher), nie odbieramy ich bez decyzji serwisanta.
+        f = result.facts
+        if f.accessibility_enabled or f.notification_listener or f.is_home_holder:
+            return None
+        # Android ≤12: „Wycisz” nie wyłączy powiadomień przez ADB (_silence_steps), więc „Wyłącz” —
+        # tak jak zaznaczenie z ustawień w UI (controller.selectLevel).
+        return "disable" if 0 < sdk < NOTIF_PERMISSION_MIN_SDK else "silence"
     return None
 
 

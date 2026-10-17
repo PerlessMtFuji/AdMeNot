@@ -10,6 +10,7 @@
   weight: 15
   category: notif
   basis: observed
+  group: notif
   label: {pl: "Dużo powiadomień", en: "Many notifications"}
   when: {notif_per_hour_24h: {gte: 8, lt: 20}}
   evidence: [notif_interruptions_24h, notif_per_hour_24h]
@@ -26,6 +27,7 @@
   weight: 25
   category: notif
   basis: observed
+  group: notif
   label: {pl: "Zalew powiadomień", en: "Notification flood"}
   when: {notif_per_hour_24h: {gte: 20}}
   evidence: [notif_interruptions_24h, notif_per_hour_24h]
@@ -42,6 +44,7 @@
   weight: 15
   category: notif
   basis: observed
+  group: notif
   label: {pl: "Seria powiadomień", en: "Notification burst"}
   # Seria, której średnia dobowa nie pokazuje; nie dubluje DM-NOTIF-01/02.
   when: {notif_peak_1h: {gte: 30}, notif_per_hour_24h: {lt: 8}}
@@ -95,6 +98,7 @@
   weight: 15
   category: ads
   basis: observed
+  group: notif
   label: {pl: "Powiadomienie pełnoekranowe", en: "Full-screen notification"}
   when: {notif_fsi: true}
   evidence: [notif_active]
@@ -111,6 +115,7 @@
   weight: 10
   category: background
   basis: observed
+  group: wake
   label: {pl: "Częste wybudzanie telefonu", en: "Frequent wake-ups"}
   when: {alarm_wakeups_per_hour: {gte: 6}, is_system: false}
   evidence: [alarm_wakeups, alarm_wakeups_per_hour]
@@ -127,6 +132,7 @@
   weight: 12
   category: ads
   basis: observed
+  group: launch
   label: {pl: "Na pierwszym planie po odblokowaniu", en: "In front right after unlock"}
   when: {unlock_launches_24h: {gte: 3}, is_system: false, is_home_holder: false}
   evidence: [unlock_launches_24h]

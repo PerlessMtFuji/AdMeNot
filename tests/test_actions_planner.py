@@ -117,17 +117,37 @@ def test_missing_app_and_unknown_level():
     assert _plan("com.other", "nuke") == Blocked("com.other", "nuke", "unknown_level")
 
 
-def _r(verdict, confidence="medium", is_system=False):
-    return AppResult(AppFacts("com.x", is_system=is_system), [], 0, verdict, False, False, confidence)
+def _r(verdict, confidence="medium", is_system=False, **facts):
+    return AppResult(AppFacts("com.x", is_system=is_system, **facts), [], 0, verdict, False, False,
+                     confidence)
 
 
-def test_default_level_depends_on_verdict_and_confidence():
+def test_default_level_depends_on_verdict():
     # Usunięcie kasuje dane aplikacji, a undo ich nie odtworzy: domyślnie tylko odwracalne poziomy.
     assert default_level(_r("malicious", "high")) == "disable"
-    assert default_level(_r("suspicious", "medium")) == "disable"
-    assert default_level(_r("suspicious", "low")) == "silence"
-    assert default_level(_r("review")) is None and default_level(_r("safe")) is None
     assert default_level(_r("malicious", "high", is_system=True)) == "disable"
+    for confidence in ("low", "medium", "high"):
+        assert default_level(_r("suspicious", confidence)) == "silence"
+    assert default_level(_r("review")) is None and default_level(_r("safe")) is None
+
+
+def test_suspicious_app_with_a_role_is_left_to_the_technician():
+    """„Wycisz” zdejmuje ułatwienia dostępu, odbiór powiadomień i ekran główny — u Taskera
+    czy launchera to odebranie funkcji, więc nic nie jest zaznaczone (ocena 2026-10-16 §8)."""
+    for role in ({"accessibility_enabled": True}, {"notification_listener": True},
+                 {"is_home_holder": True}):
+        assert default_level(_r("suspicious", **role)) is None
+        assert default_level(_r("malicious", "high", **role)) == "disable"
+
+
+def test_suspicious_gets_disable_where_silence_cannot_stop_notifications():
+    """Android ≤12: „Wycisz” nie wyłączy powiadomień przez ADB, więc domyślnie „Wyłącz” — tak jak
+    zaznaczenie z ustawień w UI (controller.selectLevel; przegląd Etapu 0)."""
+    assert default_level(_r("suspicious"), sdk=31) == "disable"
+    assert default_level(_r("suspicious"), sdk=33) == "silence"
+    assert default_level(_r("suspicious"), sdk=0) == "silence"  # wersja nieznana: jak dotąd
+    assert default_level(_r("suspicious", notification_listener=True), sdk=31) is None
+    assert default_level(_r("review"), sdk=31) is None
 
 
 def test_bundled_protected_list_covers_core_system_apps():

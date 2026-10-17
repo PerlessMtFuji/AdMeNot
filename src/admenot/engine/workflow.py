@@ -92,7 +92,7 @@ class OrderInterrupted(Exception):
 def recommended_requests(report: ScanReport) -> dict[str, str]:
     requests: dict[str, str] = {}
     for r in report.results:
-        if (level := default_level(r)) is not None:
+        if (level := default_level(r, report.device.sdk)) is not None:
             requests[r.facts.package] = level
     return requests
 

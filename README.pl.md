@@ -128,16 +128,17 @@ Sygnał to reguła, która pasuje. Każdy sygnał należy do jednej **klasy** i 
 3. **Kombinacje** dodają premię — najwyżej jedną, największą:
    - bez ikony + spoza Play + okna nad innymi aplikacjami: **+20**
    - administrator urządzenia spoza Play, który wyświetla treści (okna, powiadomienia): **+15**
-   - 5+ sieci reklamowych i zachowanie reklamowe na telefonie: **+15**
+   - 5+ sieci reklamowych, a aplikacja wyświetla powiadomienia lub okna nad innymi: **+15**, w limicie APK (razem z sieciami najwyżej 30)
 4. Suma jest ograniczona do 100.
 5. **Zaufane aplikacje** (z [listy zaufanych](src/admenot/engine/allowlist/data/trusted.yaml), z pasującym certyfikatem podpisującym) zachowują tylko zachowanie i potwierdzone wskaźniki — sygnały tożsamości przestają się liczyć, ale to, co aplikacja robi, liczy się nadal.
 6. **Aplikacje systemowe** bez zaobserwowanego zachowania mają wynik najwyżej 24, czyli zawsze *Bez uwag*.
+7. **Same deklaracje kończą się na 49 punktach** (*Do sprawdzenia*): sieci reklamowe, kod, pochodzenie i nazwa bez niczego zaobserwowanego ani przyznanego na telefonie nie dają *Podejrzana*.
 
 ### 3. Pewność wniosku
 
 Pewność mówi, na czym opiera się wynik, a nie jak jest wysoki:
 
-- **wysoka** — potwierdzony wskaźnik albo zaobserwowane zachowanie co najmniej dwóch różnych rodzajów (np. reklamy i działanie w tle) przy pełnych danych;
+- **wysoka** — potwierdzony wskaźnik albo dwa różne sposoby pokazywania treści zaobserwowane przy pełnych danych: powiadomienia, okna nad innymi aplikacjami, pojawianie się na pierwszym planie. Zalew powiadomień i powiadomienie pełnoekranowe to jeden sposób; wybudzanie telefonu pewności nie podnosi;
 - **średnia** — jakieś zaobserwowane zachowanie;
 - **niska** — tylko deklaracje, uprawnienia i kod.
 
@@ -147,12 +148,12 @@ Dane są niepełne, gdy telefon jest włączony krócej niż 6 godzin, statystyk
 
 | Werdykt | Warunek | Domyślnie zaznaczone |
 |---|---|---|
-| **Szkodliwa** | wynik ≥ 75 **i** wysoka pewność | Wyłącz |
-| **Podejrzana** | wynik ≥ 50 (albo ≥ 75 bez wysokiej pewności) | Wyłącz; Wycisz przy niskiej pewności |
+| **Szkodliwa** | wynik ≥ 75, wysoka pewność **i** co najmniej 50 pkt z zachowania zaobserwowanego i dostępu przyznanego na telefonie | Wyłącz |
+| **Podejrzana** | wynik ≥ 50 (albo ≥ 75 bez warunków *Szkodliwa*) | Wycisz (na Androidzie ≤12 Wyłącz, bo tam Wycisz nie wyłącza powiadomień); nic, gdy aplikacja ma ułatwienia dostępu, odbiór powiadomień albo jest ekranem głównym |
 | **Do sprawdzenia** | wynik ≥ 25 | nic — decyduje serwisant |
 | **Bez uwag** | wynik < 25 | nic |
 
-Usunięcie nigdy nie jest zaznaczane domyślnie, bo kasuje dane aplikacji. Bez potwierdzonego wskaźnika werdykt *Szkodliwa* wymaga co najmniej dwóch rodzajów zachowania zaobserwowanych na tym telefonie — same uprawnienia i kod kończą się na *Podejrzana*.
+Usunięcie nigdy nie jest zaznaczane domyślnie, bo kasuje dane aplikacji. Bez potwierdzonego wskaźnika *Szkodliwa* wymaga dwóch sposobów pokazywania treści zaobserwowanych na tym telefonie i co najmniej 50 pkt z obserwacji i przyznanego dostępu — same uprawnienia, sieci reklamowe i kod kończą się na *Podejrzana*. Przy aplikacji z ułatwieniami dostępu, odbiorem powiadomień albo rolą ekranu głównego „Wycisz” odebrałoby jej tę funkcję, więc decyzję zostawiamy serwisantowi.
 
 ### Przykład
 
@@ -166,13 +167,13 @@ Aplikacja ze zrzutów powyżej:
 | Kombinacja | bez ikony + spoza Play + okna nad aplikacjami | +20 |
 | **Razem** | | 120 → **100** |
 
-Zachowanie dwóch rodzajów (reklamy i działanie w tle) przy pełnych danych daje wysoką pewność, więc werdykt to **Szkodliwa**. Aplikacja pogodowa obok wysyła 20+ powiadomień na godzinę: 25 punktów z samego zachowania — *Do sprawdzenia*, nic nie jest zaznaczone.
+Dwa sposoby pokazywania treści (okna nad aplikacjami i powiadomienie pełnoekranowe) przy pełnych danych dają wysoką pewność, a zachowanie (45) i administrator (25) to 70 pkt z obserwacji i przyznanego dostępu, więc werdykt to **Szkodliwa**. Aplikacja pogodowa obok wysyła 20+ powiadomień na godzinę: 25 punktów z samego zachowania — *Do sprawdzenia*, nic nie jest zaznaczone.
 
 ## Fałszywe alarmy
 
 Ocena opisuje, co aplikacja robi, a nie czym jest. Legalne aplikacje też zbierają punkty:
 
-- **Komunikatory i aplikacje społecznościowe** — dymki czatu to okna nad innymi aplikacjami (20), a aktywne czaty grupowe przekraczają 20 powiadomień na godzinę (25): 45 punktów, *Do sprawdzenia*.
+- **Komunikatory i aplikacje społecznościowe** — dymki czatu to okna nad innymi aplikacjami (20), a aktywne czaty grupowe przekraczają 20 powiadomień na godzinę (25): 45 punktów, *Do sprawdzenia*. Trwające połączenie (powiadomienie pełnoekranowe) nic nie dodaje — to ten sam mechanizm co powiadomienia.
 - **Kontrola rodzicielska, aplikacje antykradzieżowe i służbowe (MDM)** — administrator urządzenia (25), ułatwienia dostępu (20), okna nad innymi aplikacjami (20), często ukryta ikona. Kilka takich sygnałów potrafi dać *Podejrzana*.
 - **Automatyzacja, menedżery haseł, narzędzia ułatwień dostępu** (np. Tasker, MacroDroid, czytniki ekranu) — ułatwienia dostępu (20), dostęp do powiadomień (10), okna nad innymi.
 - **Alternatywne launchery** — ekran główny (8) i częste okna nakładane.
@@ -183,7 +184,7 @@ Ocena opisuje, co aplikacja robi, a nie czym jest. Legalne aplikacje też zbiera
 Co ogranicza szkody:
 
 - Skan niczego nie zmienia i nic nie dzieje się bez potwierdzenia serwisanta. *Do sprawdzenia* nigdy nie jest zaznaczane domyślnie, usunięcie też nie.
-- *Szkodliwa* wymaga wysokiej pewności: bez potwierdzonego wskaźnika — dwóch rodzajów zachowania zaobserwowanego na tym telefonie.
+- *Szkodliwa* wymaga wysokiej pewności i co najmniej 50 pkt z tego, co aplikacja zrobiła albo dostała na tym telefonie; bez potwierdzonego wskaźnika — dwóch sposobów pokazywania treści.
 - Każdy powód jest pokazany z punktami, więc serwisant może sprawdzić, czy się zgadza („czy klient używa dymków Messengera?”).
 - Każdą zmianę da się cofnąć; przed usunięciem powstaje kopia APK.
 - Lista zaufanych usuwa sygnały tożsamości dla sprawdzonych aplikacji, ale jest krótka — większość legalnych aplikacji przechodzi przez te same reguły.

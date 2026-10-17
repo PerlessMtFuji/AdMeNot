@@ -16,6 +16,11 @@ def FB(rule_id, cls, weight, basis, category="ads"):
                    category=category, basis=basis)
 
 
+def FG(rule_id, cls, weight, basis, group="", category="ads"):
+    return Finding(rule_id, cls, weight, {}, {"pl": rule_id, "en": rule_id}, {"pl": "", "en": ""},
+                   category=category, basis=basis, group=group)
+
+
 @pytest.mark.parametrize(("score", "verdict"), [
     (0, "safe"), (24, "safe"), (25, "review"), (49, "review"),
     (50, "suspicious"), (74, "suspicious"), (75, "malicious"), (100, "malicious"),
@@ -25,14 +30,31 @@ def test_verdict_thresholds(score, verdict):
 
 
 def test_confidence_levels():
-    declared = [FB("A", "context", 8, "declared")]
-    one_obs = declared + [FB("B", "behavior", 25, "observed", "ads")]
-    two_obs = one_obs + [FB("C", "behavior", 10, "observed", "background")]
+    declared = [FG("A", "context", 8, "declared")]
+    one_obs = declared + [FG("B", "behavior", 20, "observed", "overlay")]
+    two_obs = one_obs + [FG("C", "behavior", 15, "observed", "notif", "notif")]
     assert confidence_for(declared, incomplete=False) == "low"
     assert confidence_for(one_obs, incomplete=False) == "medium"
     assert confidence_for(two_obs, incomplete=False) == "high"
     assert confidence_for(two_obs, incomplete=True) == "medium"
-    assert confidence_for([FB("I", "ioc", 80, "confirmed", "origin")], incomplete=True) == "high"
+    assert confidence_for([FG("I", "ioc", 80, "confirmed", category="origin")],
+                          incomplete=True) == "high"
+
+
+def test_wakeups_do_not_raise_confidence():
+    """Wybudzenia to działanie w tle, nie wyświetlanie: same nie potwierdzają intruzywności."""
+    findings = [FG("DM-OVERLAY-01", "behavior", 20, "observed", "overlay"),
+                FG("DM-ALARM-01", "behavior", 10, "observed", "wake", "background")]
+    assert confidence_for(findings, incomplete=False) == "medium"
+
+
+def test_one_mechanism_in_two_categories_is_one_kind_of_behavior():
+    """Zalew powiadomień i powiadomienie pełnoekranowe to ten sam mechanizm (ocena 2026-10-16 §2)."""
+    findings = [FG("DM-NOTIF-02", "behavior", 25, "observed", "notif", "notif"),
+                FG("DM-FSI-01", "behavior", 15, "observed", "notif", "ads")]
+    assert confidence_for(findings, incomplete=False) == "medium"
+    result = score_app(AppFacts("com.x"), findings, trusted=False, low_behavior_data=False)
+    assert result.score == 25
 
 
 def test_high_score_without_strong_evidence_is_only_suspicious():
@@ -112,8 +134,9 @@ def test_low_behavior_data_marks_untrusted_incomplete():
 
 def test_trusted_app_is_scored_on_behavior_only():
     findings = [F("DM-ADMIN-01", "position", 25), F("DM-A11Y-01", "position", 20),
-                F("DM-SRC-01", "context", 8), F("DM-NOTIF-02", "behavior", 25),
-                F("DM-OVERLAY-01", "behavior", 25), F("DM-FSI-01", "behavior", 15)]
+                F("DM-SRC-01", "context", 8), FB("DM-NOTIF-02", "behavior", 25, "observed"),
+                FB("DM-OVERLAY-01", "behavior", 25, "observed"),
+                FB("DM-FSI-01", "behavior", 15, "observed")]
     result = score_app(AppFacts("com.x"), findings, trusted=True, low_behavior_data=False)
     assert result.score == 60  # zachowanie liczy się w pełni (limit klasy 60), tożsamość nie
     assert {f.rule_id for f in result.findings} >= {"DM-ADMIN-01", "DM-SRC-01"}  # nadal widoczne
@@ -156,7 +179,16 @@ def test_combo_03_many_ad_networks_plus_behavior():
     assert alone.score == 20 and "DM-COMBO-03" not in {f.rule_id for f in alone.findings}
     both = score_app(facts, [F("DM-ADSDK-02", "apk", 20), F("DM-NOTIF-01", "behavior", 15)],
                      trusted=False, low_behavior_data=False)
-    assert both.score == 50 and "DM-COMBO-03" in {f.rule_id for f in both.findings}
+    # premia to dowód z pakietu: razem z SDK w limicie klasy apk (30), nie ponad nim
+    assert both.score == 30 + 15 and "DM-COMBO-03" in {f.rule_id for f in both.findings}
+
+
+def test_combo_03_needs_shown_content_not_wakeups():
+    facts = AppFacts("com.x", installer="com.android.vending")
+    result = score_app(facts, [F("DM-ADSDK-02", "apk", 25), F("DM-ALARM-01", "behavior", 10)],
+                       trusted=False, low_behavior_data=False)
+    assert "DM-COMBO-03" not in {f.rule_id for f in result.findings}
+    assert result.score == 35
 
 
 def test_static_code_path_is_not_an_observation():
@@ -173,3 +205,36 @@ def test_findings_in_one_group_count_once():
     assert score_app(facts, [observed, code], False, False).score == 25
     other = Finding("DM-ADSDK-01", "apk", 3, {}, {}, {}, category="ads")
     assert score_app(facts, [observed, code, other], False, False).score == 28
+
+
+def test_malicious_needs_direct_evidence_not_declarations():
+    """75 pkt i wysoka pewność, ale tylko 45 z obserwacji: SDK i kontekst nie dobijają do „Szkodliwa”."""
+    findings = [FG("DM-NOTIF-02", "behavior", 25, "observed", "notif", "notif"),
+                FG("DM-OVERLAY-01", "behavior", 20, "observed", "overlay"),
+                FG("DM-ADSDK-02", "apk", 30, "declared"),
+                FG("DM-SRC-01", "context", 20, "declared", category="origin")]
+    result = score_app(AppFacts("com.x"), findings, trusted=False, low_behavior_data=False)
+    assert (result.score, result.confidence, result.verdict) == (95, "high", "suspicious")
+    granted = findings + [FG("DM-ADMIN-01", "position", 25, "granted", category="removal")]
+    result = score_app(AppFacts("com.x"), granted, trusted=False, low_behavior_data=False)
+    assert result.verdict == "malicious"  # 45 zaobserwowane + 25 przyznane ≥ 50
+
+
+def test_confirmed_indicator_skips_direct_evidence_and_declaration_cap():
+    ioc = FG("DM-IOC-01", "ioc", 80, "confirmed", category="origin")
+    result = score_app(AppFacts("com.x"), [ioc], trusted=False, low_behavior_data=False)
+    assert (result.score, result.verdict) == (80, "malicious")
+
+
+def test_declarations_alone_stop_at_review():
+    """SDK, kod, pochodzenie i nazwa to deklaracje: bez niczego zaobserwowanego ani przyznanego ≤ 49."""
+    declared = [FG("DM-HIDDEN-01", "position", 10, "declared", category="removal"),
+                FG("DM-SRC-01", "context", 8, "declared", category="origin"),
+                FG("DM-LABEL-01", "context", 8, "declared", category="disguise"),
+                FG("DM-ADSDK-02", "apk", 25, "declared"),
+                FG("DM-DYNDEX-01", "apk", 3, "declared", category="background")]
+    result = score_app(AppFacts("com.x"), declared, trusted=False, low_behavior_data=False)
+    assert (result.score, result.verdict) == (49, "review")
+    granted = declared + [FG("DM-NLS-01", "position", 10, "granted", category="data")]
+    result = score_app(AppFacts("com.x"), granted, trusted=False, low_behavior_data=False)
+    assert (result.score, result.verdict) == (64, "suspicious")

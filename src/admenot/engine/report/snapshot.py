@@ -49,7 +49,8 @@ def _apk(report: ApkReport | None) -> dict[str, Any] | None:
             "error": report.error}
 
 
-def _app(result: AppResult, apk: ApkReport | None, chosen: str | None) -> dict[str, Any]:
+def _app(result: AppResult, apk: ApkReport | None, chosen: str | None,
+         sdk: int) -> dict[str, Any]:
     facts = result.facts
     label, _ = clean_label(facts.label)
     return {
@@ -66,7 +67,7 @@ def _app(result: AppResult, apk: ApkReport | None, chosen: str | None) -> dict[s
         "apk": _apk(apk),
         "findings": [_finding(f) for f in result.findings],
         "problems": {lang: _problems(result, lang) for lang in LANGS},
-        "default_level": default_level(result),
+        "default_level": default_level(result, sdk),
         "chosen_level": chosen,
     }
 
@@ -109,7 +110,7 @@ def scan_snapshot(report: ScanReport, match: PhoneMatch,
             "image": str(match.image),
         },
         "app_count": len(report.results),
-        "apps": [_app(r, report.apk_reports.get(r.facts.package), chosen.get(r.facts.package))
+        "apps": [_app(r, report.apk_reports.get(r.facts.package), chosen.get(r.facts.package), d.sdk)
                  for r in report.results
                  if r.verdict != "safe" or r.incomplete or r.facts.package in chosen],
     }
