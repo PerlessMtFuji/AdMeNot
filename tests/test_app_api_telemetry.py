@@ -1,5 +1,6 @@
 import json
 import re
+from collections import namedtuple
 
 import pytest
 from apphelpers import make_api
@@ -132,3 +133,23 @@ def test_finished_deletion_reaches_the_ui(monkeypatch):
     api._start_telemetry()
     started["cb"]()  # wątek wysyłki: lista ID do usunięcia właśnie opustoszała
     assert rec.wait_for("telemetry:deleted") == {}
+
+
+def test_repair_event_marks_blind_picks_in_manual_mode(monkeypatch):
+    from test_app_api_scan import _policy_factory
+
+    from admenot.engine.apk import cache as C
+
+    disk = namedtuple("Disk", "total used free")
+    monkeypatch.setattr(C, "disk_usage", lambda path: disk(500 * C.GB, 0, 500 * C.GB))
+    api, rec = make_api(make_cli_phone(), apk_mode="manual")
+    api._apk_factory = _policy_factory([])
+    api.set_telemetry(True, False)
+    api.start_scan(SERIAL, "Anna")
+    rec.wait_for("apk:manual")
+    assert api._jobs.wait(5)
+    api.execute(WLIVE, [])
+    rec.wait_for("exec:done")
+    assert api._jobs.wait(5)
+    repair = next(e for e in events() if e["type"] == "repair")
+    assert repair["sources"]["blind"] == 1

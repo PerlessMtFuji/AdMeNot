@@ -1010,8 +1010,11 @@ class Api:
                                                       plan.ctx.manufacturer, names, run_order)
             verdicts = {r.facts.package: r.verdict for r in report.results}
             session = self._scan_session or ""
+            blind = (frozenset(p.package for p in plan.plans) - report.analyzed_on_demand
+                     if report.apk_mode in ("manual", "partial") else frozenset())
             telemetry.record("repair", lambda p: repair_event(plan.device, session, plan.plans,
-                                                              verdicts, result, interrupted, p))
+                                                              verdicts, result, interrupted, p,
+                                                              blind=blind))
 
         return {"job_id": self._jobs.start("exec", run)}
 

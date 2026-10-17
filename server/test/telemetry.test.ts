@@ -21,6 +21,11 @@ const repair = () => common("repair", {
   failed: 0, errors: [], interrupted: null,
   packages: [{ package: "com.clean.pro.boost", source: "flagged", level: "remove", ok: true }],
 });
+const blindRepair = () => common("repair", {
+  device: DEVICE, session: "ab12cd34", levels: { silence: 0, disable: 0, remove: 1 },
+  sources: { flagged: 0, manual: 0, blind: 1 }, failed: 0, errors: [], interrupted: null,
+  packages: [{ package: "com.a", source: "blind", level: "remove", ok: true }],
+});
 const undo = () => common("undo", { device: DEVICE, apps: 1, failed: 0, age_days: 2, packages: null });
 const start = () => common("start", { mode: "simple" });
 
@@ -39,6 +44,20 @@ beforeEach(async () => {
 });
 
 describe("POST /api/v1/telemetry", () => {
+  it("przyjmuje tryb, szacunek i źródło blind", async () => {
+    const withMode = scan({ apk_mode: "manual", eta: { kind: "rough", seconds: 600 } });
+    expect((await post([withMode, blindRepair()])).status).toBe(200);
+  });
+
+  it("starsze zdarzenia bez nowych pól nadal przechodzą", async () => {
+    expect((await post([scan(), repair()])).status).toBe(200);
+  });
+
+  it("odrzuca nieznany tryb i zły szacunek", async () => {
+    expect((await post([scan({ apk_mode: "fast" })])).status).toBe(400);
+    expect((await post([scan({ eta: { kind: "exact", seconds: 1 } })])).status).toBe(400);
+  });
+
   it("one address cannot exceed its daily share, whatever install IDs it claims", async () => {
     const ip = "198.51.100.7";
     const big = () => ({ ...scan({ packages: Array.from({ length: 200 }, (_, i) => ({

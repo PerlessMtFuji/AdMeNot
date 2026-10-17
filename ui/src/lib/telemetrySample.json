@@ -36,6 +36,11 @@
       },
       "seconds": 41,
       "apk_stage": false,
+      "apk_mode": "full",
+      "eta": {
+        "kind": "measured",
+        "seconds": 38
+      },
       "packages": null
     },
     {
@@ -58,7 +63,8 @@
       },
       "sources": {
         "flagged": 2,
-        "manual": 0
+        "manual": 0,
+        "blind": 0
       },
       "failed": 0,
       "errors": [],
@@ -120,6 +126,11 @@
       },
       "seconds": 41,
       "apk_stage": false,
+      "apk_mode": "full",
+      "eta": {
+        "kind": "measured",
+        "seconds": 38
+      },
       "packages": [
         {
           "package": "com.clean.pro.boost",
@@ -157,7 +168,8 @@
       },
       "sources": {
         "flagged": 2,
-        "manual": 0
+        "manual": 0,
+        "blind": 0
       },
       "failed": 0,
       "errors": [],
