@@ -1,2 +1,5 @@
 # Lista Google w UTF-16: bez konwersji końców linii i bez diffu tekstowego.
 data/supported_devices.csv -text -diff
+
+# Obrazki SVG idą do GUI jako data URI (fixtures mostka): te same bajty na każdym checkoucie.
+*.svg text eol=lf
