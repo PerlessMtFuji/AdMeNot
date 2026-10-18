@@ -1013,10 +1013,10 @@
       "limit_bytes": 10737418240,
       "effective_bytes": 10737418240,
       "free_bytes": 536870912000,
-      "eta_s": 696,
+      "eta_s": 292,
       "eta_kind": "rough",
-      "eta_min_s": 417,
-      "eta_max_s": 1044,
+      "eta_min_s": 176,
+      "eta_max_s": 439,
       "scope": "all",
       "job_id": "job-1"
      }
@@ -1515,10 +1515,10 @@
     ]
    ],
    "result": {
-    "eta_s": 232,
+    "eta_s": 98,
     "eta_kind": "rough",
-    "eta_min_s": 139,
-    "eta_max_s": 348
+    "eta_min_s": 58,
+    "eta_max_s": 146
    },
    "events": []
   },
@@ -1545,10 +1545,10 @@
       "limit_bytes": 10737418240,
       "effective_bytes": 10737418240,
       "free_bytes": 536870912000,
-      "eta_s": 232,
+      "eta_s": 98,
       "eta_kind": "rough",
-      "eta_min_s": 139,
-      "eta_max_s": 348,
+      "eta_min_s": 58,
+      "eta_max_s": 146,
       "scope": "part",
       "job_id": "job-2"
      }

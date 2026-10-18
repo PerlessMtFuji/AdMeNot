@@ -23,7 +23,7 @@ TIMING_FILE = "apk-timing.json"
 EMA_WEIGHT = 0.3
 MIN_APPS = 5
 MIN_BYTES = 50 * MB
-ROUGH_LOW, ROUGH_HIGH = 0.6, 1.5
+ROUGH_LOW, ROUGH_HIGH = 0.6, 1.5  # bez historii: zapas na nieznany komputer i kabel
 BLEND_FULL_AT = 10  # od tylu aplikacji bieżący przebieg w pełni zastępuje historię
 # Granice wiarygodnych prędkości: poza nimi plik jest uszkodzony (NaN, Infinity, 1e308 z json.loads).
 MIN_BPS, MAX_BPS = 1024, 100 * 1024 * MB
@@ -39,8 +39,12 @@ class Speeds:
     samples: int = 0  # 0 = wartości domyślne, szacunek orientacyjny
 
 
-# Ostrożne założenia dla wolnego komputera; skalibrowane w Task 2, Step 5.
-DEFAULT_SPEEDS = Speeds(pull_bps=10 * MB, analyze_bps=8 * MB, per_app_s=1.5)
+# Bez historii. Stanowisko testowe (4 przebiegi, OPPO CPH2271, USB 3): pobieranie 33 MB/s, analiza
+# 75 MB/s, 1,05 s na aplikację. Domyślne to ok. połowa tych prędkości (pobieranie 16, analiza
+# 32 MB/s) i 1,5 s na aplikację — zapas na wolniejszy komputer i USB 2.0, a zakres ROUGH_HIGH
+# pokrywa jeszcze ok. 3× wolniejsze stanowisko. Dawne 10/8/1,5 dawały 6–16 min dla skanu 4,3 min.
+# Po pierwszym przebiegu liczy się historia (`learn`).
+DEFAULT_SPEEDS = Speeds(pull_bps=16 * MB, analyze_bps=32 * MB, per_app_s=1.5)
 
 
 @dataclass(frozen=True)
