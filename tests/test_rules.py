@@ -7,7 +7,7 @@ from admenot.engine.rules.conditions import check
 from admenot.engine.rules.engine import load_default_ruleset, load_yaml_rules, parse_rules
 from admenot.engine.rules.model import BASES, Finding
 from admenot.engine.rules.python_rules import rule_name_mimic, rule_random_name
-from admenot.engine.scoring import COMBOS
+from admenot.engine.scoring import COMBOS, score_app
 
 
 def test_check_operators():
@@ -67,7 +67,7 @@ EXPECTED_CATEGORIES = {
     "DM-HIDDEN-01": "removal",
     "DM-A11Y-01": "data", "DM-NLS-01": "data", "DM-SMS-01": "data", "DM-BROWSER-01": "data",
     "DM-SRC-01": "origin", "DM-FRESH-01": "origin",
-    "DM-LABEL-01": "disguise",
+    "DM-LABEL-01": "disguise", "DM-LABEL-02": "disguise",
 }
 
 
@@ -229,6 +229,18 @@ def test_label_rule_evidence():
     assert "IntelliClean" in finding.text("pl")
 
 
+def test_padded_name_from_the_phone_and_from_the_apk_counts_once():
+    apk = AppFacts("com.x", installer="com.android.vending", label="X", label_padded=True)
+    both = AppFacts("com.x", installer="com.android.vending", label="X", label_padded=True,
+                    phone_label_padded=True)
+    phone = AppFacts("com.x", installer="com.android.vending", label="X", phone_label_padded=True)
+    rules = load_default_ruleset()
+    assert {"DM-LABEL-01", "DM-LABEL-02"} <= _ids(both)
+    assert "DM-LABEL-02" in _ids(phone) and "DM-LABEL-01" not in _ids(phone)
+    assert (score_app(both, rules.evaluate(both), False, False).score
+            == score_app(apk, rules.evaluate(apk), False, False).score)
+
+
 def test_alarm_rule_uses_rate_per_hour():
     noisy = AppFacts("com.x", alarm_wakeups=600, alarm_window_h=77.8)
     quiet = AppFacts("com.x", alarm_wakeups=20, alarm_window_h=77.8)
@@ -307,6 +319,7 @@ def test_rule_source_defaults_by_class_and_can_be_set():
     assert rules["DM-ADSDK-02"].source == "apk"
     assert rules["DM-NOTIF-01"].source == "phone"
     assert rules["DM-LABEL-01"].source == "apk"
+    assert rules["DM-LABEL-02"].source == "phone"
     [rule] = parse_rules([_rule(source="ioc")])
     assert rule.evaluate(AppFacts("com.a", notif_interruptions_24h=240)).source == "ioc"
 

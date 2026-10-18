@@ -89,6 +89,7 @@ def make_api(phone, *, sync=True, apk=None, lang="pl", apk_mode="full", **kw):
     save_settings({"lang": lang, "apk_mode_default": apk_mode})
     rec = RecordingEmitter()
     kw.setdefault("open_file", lambda path: None)
+    kw.setdefault("app_labels", lambda serial, adb, stop, on_line: {})  # bez scrcpy na komputerze testów
     provider = apk or NoApk()
     api = Api(rec, host_factory=lambda path: phone, apk_factory=lambda adb, policy=None, **kw: provider,
               sync_jobs=sync, now=lambda: NOW, **kw)

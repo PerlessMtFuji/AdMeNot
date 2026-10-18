@@ -134,6 +134,14 @@ def test_apply_failed_report_keeps_facts_unknown():
     assert f.apk_error.startswith("pull")
     assert (f.ad_sdks, f.ad_sdk_count, f.dynamic_code, f.label_padded) == (None, None, None, None)
 
+def test_apk_label_replaces_the_phone_label_but_a_missing_one_keeps_it():
+    f = AppFacts("com.clean.x", label="Z telefonu")
+    apply_apk_report(f, ApkReport("com.clean.x", label=None, cert_sha256=["aa"], class_count=1))
+    assert f.label == "Z telefonu"
+    apply_apk_report(f, ApkReport("com.clean.x", label="Z APK", class_count=1))
+    assert f.label == "Z APK"
+
+
 def test_apply_apk_report_cleans_stored_label():
     f = AppFacts("com.clean.x")
     apply_apk_report(f, ApkReport("com.clean.x", label="\x1b[31mRed", class_count=1))

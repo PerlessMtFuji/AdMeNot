@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -13,6 +13,7 @@ from admenot.engine.allowlist.trust import TrustList, load_default_trust_list
 from admenot.engine.apk.analyze import ApkReport, apply_apk_report
 from admenot.engine.apk.cache import NO_SPACE
 from admenot.engine.apk.providers import ApkProvider, ProgressFn, select_apk_targets
+from admenot.engine.applabels import PhoneLabel
 from admenot.engine.collectors.base import CollectorStatus, run_collectors
 from admenot.engine.collectors.packages import collect_packages
 from admenot.engine.collectors.profiles import ProfileScope, read_profiles
@@ -163,6 +164,28 @@ def analyze_apks(
     return dataclasses.replace(report, results=results, apk=status, apk_reports=reports,
                                apk_mode=mode, analyzed_on_demand=on_demand)
 
+
+def apply_phone_labels(
+    report: ScanReport,
+    labels: Mapping[str, PhoneLabel],
+    ruleset: RuleSet | None = None,
+    trust: TrustList | None = None,
+) -> ScanReport:
+    """Nazwy z ekranu telefonu (engine/applabels.py) i nowa ocena — DM-LABEL-02 bez analizy APK.
+
+    Pracuje na kopii faktów jak `analyze_apks`; etykieta z APK ma pierwszeństwo.
+    """
+    if not labels:
+        return report
+    ruleset = ruleset or load_default_ruleset()
+    trust = trust or load_default_trust_list()
+    facts = {r.facts.package: copy.deepcopy(r.facts) for r in report.results}
+    for package, phone in labels.items():
+        if package in facts:
+            facts[package].label = facts[package].label or phone.label
+            facts[package].phone_label_padded = phone.padded
+    return dataclasses.replace(report, results=score_all(facts, ruleset, trust,
+                                                         report.low_behavior_data))
 
 def report_to_dict(report: ScanReport, lang: str = "pl") -> dict[str, Any]:
     return {

@@ -51,6 +51,9 @@ class AppFacts:
     # Analiza APK (Plan 4); None = aplikacja nieanalizowana
     label: str | None = None
     label_padded: bool | None = None
+    # Nazwa z ekranu telefonu (`scrcpy --list-apps`, engine/applabels.py) zaczyna się od niewidocznych
+    # znaków; None = telefon nie podał nazwy (aplikacja bez ikony w menu albo brak scrcpy).
+    phone_label_padded: bool | None = None
     ad_sdks: set[str] | None = None
     dynamic_code: bool | None = None
     obfuscation_ratio: float | None = None

@@ -471,6 +471,7 @@
   category: disguise
   basis: declared
   source: apk
+  group: label_padding
   label: {pl: "Niewidoczne znaki w nazwie", en: "Invisible characters in the name"}
   when: {label_padded: true, is_system: false}
   evidence: [label]
@@ -481,3 +482,22 @@
     expert:
       pl: "etykieta zaczyna się od białego/niewidocznego znaku"
       en: "label starts with a whitespace/invisible character"
+
+# To samo z nazwy na ekranie telefonu (scrcpy --list-apps) — działa też w trybie ręcznym, bez APK.
+- id: DM-LABEL-02
+  class: context
+  weight: 8
+  category: disguise
+  basis: declared
+  source: phone
+  group: label_padding
+  label: {pl: "Niewidoczne znaki w nazwie", en: "Invisible characters in the name"}
+  when: {phone_label_padded: true, is_system: false}
+  evidence: [label]
+  text:
+    simple:
+      pl: "Nazwa aplikacji („{label}”) zaczyna się od niewidocznych znaków — przez to wyświetla się na początku listy."
+      en: "The app name (“{label}”) starts with invisible characters — so it sorts to the top of the list."
+    expert:
+      pl: "nazwa na telefonie zaczyna się od białego/niewidocznego znaku"
+      en: "the name on the phone starts with a whitespace/invisible character"

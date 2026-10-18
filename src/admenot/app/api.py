@@ -61,6 +61,7 @@ from admenot.engine.apk.timing import (
     load_speeds,
     save_speeds,
 )
+from admenot.engine.applabels import LabelFetch, PhoneLabel, list_apps
 from admenot.engine.device.identity import same_device
 from admenot.engine.device.info import DeviceInfo, read_device_info
 from admenot.engine.foreground import read_foreground
@@ -79,7 +80,7 @@ from admenot.engine.phones.provider import PhoneImageProvider, PhoneMatch
 from admenot.engine.report.files import UnknownOrder, write_report
 from admenot.engine.report.render import data_uri
 from admenot.engine.screenshot import delete_shots, take_screenshot
-from admenot.engine.session import ScanReport, analyze_apks, run_scan
+from admenot.engine.session import ScanReport, analyze_apks, apply_phone_labels, run_scan
 from admenot.engine.settings import (
     LogoError,
     ServiceInfo,
@@ -111,6 +112,9 @@ HostFactory = Callable[[str | None], AdbTransport]
 ApkFactory = Callable[..., ApkProvider]
 
 ADMIN_TIMEOUT = 180.0
+# Dwa scrcpy naraz wgrywają ten sam /data/local/tmp/scrcpy-server.jar: nazwy aplikacji czekają,
+# aż podgląd wystartuje, a start podglądu — aż skończy się odczyt nazw (zwykle ~3 s).
+SCRCPY_TURN_WAIT_S = 10.0
 DEFAULT_WORKERS = 2  # równoległość DeviceApkProvider (apk/providers.py)
 ORDER_KINDS = frozenset({"exec", "resume", "undo"})
 INCIDENT_MAX_S = 600.0  # nagranie incydentu: najwyżej 10 min
@@ -164,6 +168,7 @@ class Api:
         now: Callable[[], datetime] = datetime.now,
         open_file: Callable[[Path], None] = _startfile,
         mirror_factory: Callable[..., Mirror] = Mirror,
+        app_labels: Callable[..., dict[str, PhoneLabel]] = list_apps,
         update_fetch: Callable[[], update.Manifest] = update.fetch,
         update_download: Callable[..., Path] = installer.download,
         launch_setup: Callable[[Path], object] = installer.launch,
@@ -177,6 +182,8 @@ class Api:
         self._host_factory = host_factory
         self._provider = provider or PhoneImageProvider.default()
         self._apk_factory = apk_factory
+        self._app_labels = app_labels
+        self._labels: LabelFetch | None = None  # odczyt nazw bieżącego skanu
         self._jobs = JobRunner(emitter, sync=sync_jobs)
         # Porzucenie analizy APK i zapis jej wyniku wykluczają się: porzucone zadanie nie podmieni
         # raportu nowego skanu (audyt 2026-10-11, BUG-10).
@@ -490,22 +497,54 @@ class Api:
             if os.environ.get(crash.CRASH_TEST) == "error":  # próba ręczna (spec raportów §10.2)
                 raise RuntimeError(crash.CRASH_TEST)
             incidents = load_incident(incident_path(device.serial), self._now())
-            report = run_scan(adb, device=device, incidents=incidents,
-                              on_stage=lambda stage: self._emit("scan:stage", {"stage": stage}))
-            job.check()
-            self._report = report
-            self._emit("scan:done", {"scan": scan_view(report, self._lang),
-                                     "interrupted": self._interrupted(device),
-                                     "client": name})
-            telemetry.record("scan", lambda p: scan_event(report, session,
-                                                          int(time.monotonic() - started), p))
-            if self._apk_factory is not None:
-                job.kind = "apk"
+            # Nazwy z telefonu równolegle ze skanem — w trybie ręcznym bez APK nie ma innych.
+            labels = self._fetch_labels(device.serial) if self._apk_factory is not None else None
+            try:
+                report = run_scan(adb, device=device, incidents=incidents,
+                                  on_stage=lambda stage: self._emit("scan:stage", {"stage": stage}))
+                job.check()
+                self._report = scanned = report
+                self._emit("scan:done", {"scan": scan_view(report, self._lang),
+                                         "interrupted": self._interrupted(device),
+                                         "client": name})
+                telemetry.record("scan", lambda p: scan_event(scanned, session,
+                                                              int(time.monotonic() - started), p))
+                if labels is None:
+                    return
+                job.kind = "apk"  # od teraz nowy skan porzuca to zadanie (`_abandon_apk`)
                 self._estimate, self._eta = None, None
-                self._run_apk(job, adb, report, choose=True)
+                # Wyniki są już na ekranie; nazwy (i DM-LABEL-02) wchodzą przed wyborem trybu,
+                # a raport z nimi publikuje dopiero `_run_apk` (apk:manual / apk:done).
+                report = apply_phone_labels(report, labels.wait(job.check))
+                job.check()
+            finally:
+                if labels is not None:
+                    labels.cancel()
+            self._run_apk(job, adb, report, choose=True)
 
         self._estimate, self._eta = None, None  # nowy telefon: stary szacunek nie obowiązuje
         return {"job_id": self._jobs.start("scan", run)}
+
+    def _fetch_labels(self, serial: str) -> LabelFetch:
+        adb = resolve_adb(self._settings.adb_path).path
+        log = self._session(serial).tagged("scrcpy")
+
+        def fetch(stop: threading.Event) -> dict[str, PhoneLabel]:
+            self._wait_mirror_start(serial, stop)
+            return self._app_labels(serial, adb, stop, log.note)
+
+        if self._labels is not None:
+            self._labels.cancel()  # poprzedni skan: jego scrcpy już niepotrzebny
+        self._labels = LabelFetch(fetch, log_exception)
+        return self._labels
+
+    def _wait_mirror_start(self, serial: str, stop: threading.Event) -> None:
+        deadline = time.monotonic() + SCRCPY_TURN_WAIT_S
+        while time.monotonic() < deadline and not stop.is_set():
+            status = self._mirror.status()
+            if status.get("serial") != serial or status.get("state") != "starting":
+                return
+            stop.wait(0.2)
 
     def _cache_limit(self) -> int:
         return self._settings.apk_cache_limit_gb * GB
@@ -779,6 +818,8 @@ class Api:
             raise AppError("bad_request", "name")
         serial = serial.strip()
         title = f"AdMeNot — {(name or '').strip() or serial}"
+        if self._labels is not None:
+            self._labels.wait(timeout=SCRCPY_TURN_WAIT_S)  # SCRCPY_TURN_WAIT_S: jeden scrcpy naraz
         try:
             return self._mirror.start(serial, title)
         except MirrorUnavailable:
@@ -1371,6 +1412,8 @@ class Api:
         self._mirror.stop()
         self._watcher.stop()
         self._abandon_apk()
+        if self._labels is not None:
+            self._labels.cancel()
 
     def _on_closing(self) -> bool:
         if self._quitting:

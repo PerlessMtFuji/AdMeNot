@@ -12,6 +12,7 @@ from admenot.engine.adb.transport import AdbError
 from admenot.engine.apk import cache as C
 from admenot.engine.apk.analyze import ApkReport
 from admenot.engine.apk.fetch import default_cache_dir
+from admenot.engine.applabels import PhoneLabel
 from admenot.engine.journal.db import Journal
 from admenot.engine.paths import journal_path
 from admenot.engine.phones.provider import SILHOUETTE
@@ -424,3 +425,68 @@ def test_estimate_scope_tells_the_whole_phone_from_a_subset(monkeypatch):
     assert subset["scope"] == "part" and subset["apps"] == 1
     api.analyze_all()
     assert rec.of("apk:estimate")[-1]["scope"] == "all"
+
+
+def test_manual_mode_shows_labels_read_from_the_phone(monkeypatch):
+    api, rec = _mode_api(monkeypatch, mode="manual", sync=True)
+    api._app_labels = lambda serial, adb, stop, on_line: {"com.whatsapp": PhoneLabel("WhatsApp", False),
+                                                          "com.unknown": PhoneLabel("Inna", False)}
+    api.start_scan(SERIAL)
+    apps = {a["package"]: a["name"] for a in rec.wait_for("apk:manual")["scan"]["apps"]}
+    assert apps["com.whatsapp"] == "WhatsApp"
+    assert apps["com.wlive.forecast"] == "com.wlive.forecast"  # spoza listy scrcpy: nazwa pakietu
+
+
+def test_padded_name_on_the_phone_is_a_finding_without_the_apk(monkeypatch):
+    api, rec = _mode_api(monkeypatch, mode="manual", sync=True)
+    api._app_labels = lambda serial, adb, stop, on_line: {
+        "com.wlive.forecast": PhoneLabel("Pogoda", True)}
+    api.start_scan(SERIAL)
+    app = next(a for a in rec.wait_for("apk:manual")["scan"]["apps"]
+               if a["package"] == "com.wlive.forecast")
+    assert app["name"] == "Pogoda"
+    assert [(f["rule_id"], f["source"]) for f in app["findings"]
+            if f["rule_id"].startswith("DM-LABEL")] == [("DM-LABEL-02", "phone")]
+
+
+def test_results_do_not_wait_for_names_and_stop_kills_the_names_fetch(monkeypatch):
+    api, rec = _mode_api(monkeypatch, mode="manual")
+    asked, stopped = threading.Event(), threading.Event()
+
+    def labels(serial, adb, stop, on_line):
+        asked.set()
+        stop.wait(10)  # scrcpy wisi, dopóki skan go nie przerwie
+        stopped.set()
+        return {}
+
+    api._app_labels = labels
+    job = api.start_scan(SERIAL)["job_id"]
+    rec.wait_for("scan:done")  # wyniki bez czekania na nazwy
+    assert asked.wait(5)
+    api.stop(job)
+    rec.wait_for("job:end")
+    assert stopped.wait(5)
+    assert "apk:manual" not in names(rec) and "apk:question" not in names(rec)
+
+
+def test_name_fetch_errors_go_to_the_error_log(monkeypatch):
+    logged = []
+    monkeypatch.setattr("admenot.app.api.log_exception", logged.append)
+    api, rec = _mode_api(monkeypatch, mode="manual", sync=True)
+
+    def broken(serial, adb, stop, on_line):
+        raise TypeError("parse bug")
+
+    api._app_labels = broken
+    api.start_scan(SERIAL)
+    rec.wait_for("apk:manual")
+    assert [str(e) for e in logged] == ["parse bug"]
+
+
+def test_names_wait_for_the_mirror_to_start(monkeypatch):
+    api, _ = _mode_api(monkeypatch, mode="manual")
+    states = iter(["starting", "starting", "running"])
+    api._mirror.status = lambda: {"serial": SERIAL, "state": next(states, "running")}
+    seen = []
+    api._app_labels = lambda serial, adb, stop, on_line: seen.append(api._mirror.status()["state"]) or {}
+    assert api._fetch_labels(SERIAL).wait(timeout=5) == {} and seen == ["running"]

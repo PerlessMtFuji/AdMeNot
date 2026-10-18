@@ -1,0 +1,12 @@
+scrcpy 4.1 <https://github.com/Genymobile/scrcpy>
+INFO: ADB device found:
+INFO:     -->   (usb)  79SSSW6PDMEMCI6S                device  CPH2271
+C:\Program Files\AdMeNot\tools\scrcpy\scrcpy-server: 1 file pushed, 0 skipped. 30.9 MB/s (733706 bytes in 0.023s)
+[server] INFO: Device: [OPPO] OPPO CPH2271 (Android 12)
+[server] INFO: Processing Android apps... (this may take some time)
+[server] INFO: List of apps:
+ * Chrome                         com.android.chrome
+ * Kalkulator                     com.coloros.calculator
+ - Adblock Plus                   com.Adblockerplus.ahmadprokhan
+ -  PDF Reader, PDF Viewer        com.trusted.pdfeditor.pdfreader
+ - Śmieszne Filtry                com.thirtythreeapps.facefilters
