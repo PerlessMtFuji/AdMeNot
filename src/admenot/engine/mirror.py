@@ -32,6 +32,10 @@ from typing import Any, Protocol
 from admenot.engine.tools import kill_tree, resolve_scrcpy, scrcpy_env, spawn_scrcpy
 
 FIRST_FRAME = "INFO: Texture:"
+# Po tym błędzie scrcpy 4.1 nie kończy się, tylko wisi (np. telefon przełączony na „Tylko
+# ładowanie”, nagranie 2026-10-18) — bez zabicia podgląd zostałby na zawsze w `starting`.
+START_FAILED = "Server connection failed"
+START_TIMEOUT_S = 30.0  # bez pierwszej klatki po tym czasie start uznajemy za nieudany
 CONTROL_BLOCKED = "INJECT_EVENTS"
 # OPPO/realme/Xiaomi przy monitorowaniu uprawnień: `--stay-awake` nie zmieni ustawienia, ekran gaśnie.
 STAY_AWAKE_BLOCKED = 'Could not change "stay_on_while_plugged_in"'
@@ -130,7 +134,16 @@ class Mirror:
             self._thread = threading.Thread(target=self._read, args=(run,), daemon=True,
                                             name="admenot-mirror")
             self._thread.start()
+            watchdog = threading.Timer(START_TIMEOUT_S, self._start_timeout, args=(run,))
+            watchdog.daemon = True
+            watchdog.start()
             return view
+
+    def _start_timeout(self, run: _Run) -> None:
+        with self._lock:
+            if self._current(run) and run.state == "starting":
+                run.last_error = f"ERROR: no picture after {START_TIMEOUT_S:.0f} s"
+                self._kill(run.proc)  # wątek czytający zgłosi `failed` z tym powodem
 
     def stop(self) -> None:
         with self._lock:
@@ -195,6 +208,8 @@ class Mirror:
                 if run.state == "starting" and FIRST_FRAME in line:
                     run.state = "running"
                     self._events.put(("state", self._view(run)))
+                if run.state == "starting" and START_FAILED in line:
+                    self._kill(run.proc)  # sam scrcpy by nie wyszedł (START_FAILED)
                 for marker, code in _WARNINGS:
                     if marker in line and code not in run.warned:
                         run.warned.add(code)

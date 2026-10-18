@@ -113,6 +113,38 @@ def test_start_failure_reports_the_last_error_line():
     assert h.names() == [("starting", None), ("failed", "ERROR: Server connection failed")]
 
 
+def test_start_failure_kills_scrcpy_that_would_hang_forever():
+    # scrcpy 4.1 po „Server connection failed” nie wychodzi sam (telefon na „Tylko ładowanie”)
+    proc = FakeProc(FAILURE, code=1)
+    h = Harness(proc, FakeProc(OPPO))
+    h.mirror.start("NOPE", "t")
+    h.mirror.wait()
+    assert proc.killed
+    assert h.names() == [("starting", None), ("failed", "ERROR: Server connection failed")]
+    assert h.mirror.start("NOPE", "t")["state"] == "starting" and len(h.spawned) == 2  # da się ponowić
+
+
+def test_start_without_a_picture_times_out(monkeypatch):
+    monkeypatch.setattr("admenot.engine.mirror.START_TIMEOUT_S", 0.2)
+    proc = FakeProc(["scrcpy 4.1"])
+    h = Harness(proc)
+    h.mirror.start("S1", "t")
+    assert proc.ended.wait(5) and proc.killed
+    h.mirror.wait()
+    assert h.names()[-1] == ("failed", "ERROR: no picture after 0 s")
+
+
+def test_running_mirror_is_not_killed_by_the_start_timeout(monkeypatch):
+    monkeypatch.setattr("admenot.engine.mirror.START_TIMEOUT_S", 0.2)
+    proc = FakeProc(OPPO)
+    h = Harness(proc)
+    h.mirror.start("S1", "t")
+    assert not proc.ended.wait(0.6) and not proc.killed
+    assert h.mirror.status()["state"] == "running"
+    proc.close_window()
+    h.mirror.wait()
+
+
 def test_failure_without_error_lines_reports_the_exit_code():
     h = Harness(FakeProc(["scrcpy 4.1"], code=3, ends=True))
     h.mirror.start("S1", "t")
