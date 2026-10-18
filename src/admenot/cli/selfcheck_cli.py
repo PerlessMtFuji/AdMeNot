@@ -24,7 +24,7 @@ from admenot.engine import paths
 from admenot.engine.allowlist.trust import load_default_trust_list, load_protected_list
 from admenot.engine.apk.iocs import load_default_iocs
 from admenot.engine.apk.sdks import load_default_ad_sdks
-from admenot.engine.phones.build import DB_NAME, IMAGES_DIR
+from admenot.engine.phones.build import DB_NAME
 from admenot.engine.rules.engine import load_default_ruleset
 from admenot.engine.tools import tools_dir
 from admenot.net import client, update
@@ -61,12 +61,6 @@ def _phones_db() -> None:
         con.execute("SELECT count(*) FROM meta").fetchone()
 
 
-def _phone_images() -> None:
-    images = paths.assets_dir() / IMAGES_DIR
-    if not images.is_dir():
-        raise FileNotFoundError(str(images))
-
-
 def androguard_resources() -> Path:
     spec = importlib.util.find_spec("androguard.core.resources")
     return Path(next(iter(spec.submodule_search_locations)))
@@ -97,7 +91,7 @@ CHECKS: tuple[tuple[str, Callable[[], object]], ...] = (
     ("scrcpy-server", lambda: _file(tools_dir() / "scrcpy-server")),
     ("SDL3.dll", lambda: _file(tools_dir() / "SDL3.dll")),  # DLL-e scrcpy zostają przy scrcpy.exe
     ("phones.db", _phones_db),
-    ("phones/", _phone_images),
+    ("silhouette.svg", lambda: _file(paths.PACKAGE_ASSETS / "silhouette.svg")),
     ("app/web/index.html", lambda: _file(app_main.WEB_DIR / "index.html")),
     ("admenot.ico", lambda: _file(paths.PACKAGE_ASSETS / "icon" / "admenot.ico")),
     ("androguard public.xml", _androguard),

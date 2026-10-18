@@ -79,20 +79,18 @@ def test_default_level_follows_the_phone_android_version(synthetic_adb):
     pkg = r.facts.package
     assert scan_view(report, "pl")["apps"][0]["default_level"] == "disable"
     assert recommended_requests(report) == {pkg: "disable"}
-    snap = scan_snapshot(report, PhoneMatch("none", "silhouette", SILHOUETTE))
+    snap = scan_snapshot(report, PhoneMatch("none", "silhouette"))
     assert {a["package"]: a["default_level"] for a in snap["apps"]} == {pkg: "disable"}
 
 
-def test_device_card_with_and_without_photo(synthetic_adb, tmp_path):
+def test_device_card_always_shows_the_silhouette(synthetic_adb, tmp_path):
     report = run_scan(synthetic_adb)
     card = device_card(report.device, None)
-    assert card["image"].startswith("data:image/svg+xml;base64,")
+    assert card["image"] == image_uri(SILHOUETTE)
     assert card["name"] == "samsung SM-A145R" and card["match"] is None and card["sdk"] == 34
-    photo = tmp_path / "a14.webp"
-    photo.write_bytes(b"RIFF....WEBP")
-    match = PhoneMatch("exact", "model_code", photo, None, "SM-A145R")
+    match = PhoneMatch("exact", "model_code", None, "SM-A145R")
     card = device_card(report.device, match)
-    assert card["image"].startswith("data:image/webp;base64,")
+    assert card["image"] == image_uri(SILHOUETTE)
     assert card["match"] == {"confidence": "exact", "step": "model_code", "matched": "SM-A145R"}
     assert image_uri(tmp_path / "missing.webp") == ""
     assert image_uri(SILHOUETTE).startswith("data:image/svg+xml")
@@ -242,8 +240,8 @@ def test_scan_view_reports_partial_collectors(synthetic_adb):
     assert view["collectors"]["failed"] == []
 
 
-def test_history_devices_show_phone_name_model_and_photo(tmp_path):
-    photo = tmp_path / "samsung-galaxy-a14.webp"
+def test_history_devices_show_phone_name_model_and_silhouette(tmp_path):
+    photo = tmp_path / "samsung-galaxy-a14.webp"  # migawka z wersji ≤ 0.9.4 ze zdjęciem
     photo.write_bytes(b"RIFF\0\0\0\0WEBP")
     with Journal(tmp_path / "j.db") as journal:
         order = journal.create_order("R58", "SM-A145R", "Anna")
@@ -257,7 +255,7 @@ def test_history_devices_show_phone_name_model_and_photo(tmp_path):
     json.dumps(hv)
     a14, old = hv["devices"]
     assert (a14["serial"], a14["name"], a14["model"]) == ("R58", "Samsung Galaxy A14", "SM-A145R")
-    assert a14["image"] == image_uri(photo)
+    assert a14["image"] == image_uri(SILHOUETTE)
     assert (old["serial"], old["name"], old["model"]) == ("OLD1", "Redmi_Note_8", "Redmi_Note_8")
     assert old["image"] == image_uri(SILHOUETTE)
 

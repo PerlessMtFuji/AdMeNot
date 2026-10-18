@@ -129,14 +129,13 @@ def test_google_device_list_points_at_the_repo_copy():
 
 
 def test_phone_assets_need_documented_provenance(tmp_path):
-    """Audyt 2026-10-11, REL-04: zdjęcia i baza telefonów to też składnik z licencją i źródłem."""
+    """Audyt 2026-10-11, REL-04: baza telefonów to też składnik z licencją i źródłem."""
     m = _module()
     assets = tmp_path / "assets"
-    (assets / "phones").mkdir(parents=True)
+    assets.mkdir()
     (assets / "phones.db").write_bytes(b"db")
-    (assets / "phones" / "a.webp").write_bytes(b"x")
     undocumented = m._phone_assets(assets, tmp_path / "missing.json")
-    assert undocumented.version.endswith("1 images")
+    assert undocumented.name == "Phone database (phones.db)" and len(undocumented.version) == 12
     assert m.missing_licenses([undocumented]) == [undocumented.name]
     provenance = tmp_path / "p.json"
     provenance.write_text(json.dumps({"phone_assets": {"source": "Szklodo", "license": "own work",

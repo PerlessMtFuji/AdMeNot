@@ -26,7 +26,7 @@
 
 ### Connect and scan
 
-Plug in a phone with USB debugging on. AdMeNot recognizes the model (with a photo from its phone database), reads the installed apps and what they did on the phone in the last 24 hours, then — in the background — copies and analyzes the APK files of user apps. Nothing on the phone is changed during a scan.
+Plug in a phone with USB debugging on. AdMeNot recognizes the model from its phone database, reads the installed apps and what they did on the phone in the last 24 hours, then — in the background — copies and analyzes the APK files of user apps. Nothing on the phone is changed during a scan.
 
 <img src="docs/img/en/connect.png" alt="Connected phone ready to scan" width="49%"> <img src="docs/img/en/results-simple.png" alt="Results in simple mode" width="49%">
 
@@ -209,7 +209,7 @@ Download the installer from [Releases](https://github.com/PerlessMtFuji/AdMeNot/
 
     py -3.13 -m venv .venv
     .venv\Scripts\pip install -e ".[dev,gui,release]"
-    python scripts\build_phone_db.py            # phone database and photos
+    python scripts\build_phone_db.py            # phone database
     python scripts\fetch_tools.py               # scrcpy 4.1 with adb (screen preview)
     powershell -ExecutionPolicy Bypass -File scripts\build_ui.ps1
     python scripts\build_icons.py               # only after changing assets\icon\*.svg (PNG, ICO, copy for the UI)

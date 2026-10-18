@@ -1,4 +1,4 @@
-"""Budowa `phones.db` i katalogu zdjęć z danych Szklodo (spec §4.2)."""
+"""Budowa `phones.db` z danych Szklodo (spec §4.2). Zdjęć modeli program nie dołącza (od 0.9.5)."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from admenot.engine.phones.names import (
 
 SCHEMA_VERSION = 1
 DB_NAME = "phones.db"
-IMAGES_DIR = "phones"
+OLD_IMAGES_DIR = "phones"  # zdjęcia z wersji ≤ 0.9.4; build je usuwa, by nie trafiły do paczki
 
 SCHEMA = """
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -44,12 +44,10 @@ CREATE INDEX gplay_device_model ON gplay(device, model);
 class BuildStats:
     phones: int = 0
     skipped: int = 0
-    with_image: int = 0
     codes: int = 0
     code_conflicts: int = 0
     names: int = 0
     gplay_rows: int = 0
-    images_copied: int = 0
     images_removed: int = 0
 
 
@@ -69,15 +67,8 @@ def read_gplay_csv(path: Path) -> list[tuple[str, str, str, str]]:
     return rows
 
 
-def build_phone_db(records: list[dict], images_src: Path, gplay_csv: Path | None,
-                   out_dir: Path) -> BuildStats:
-    if not images_src.is_dir():
-        raise FileNotFoundError(images_src)  # pusty katalog źródłowy skasowałby zdjęcia
+def build_phone_db(records: list[dict], gplay_csv: Path | None, out_dir: Path) -> BuildStats:
     slugs = record_slugs(records)
-    if not any((images_src / f"{slug}.webp").is_file() for slug in slugs if slug):
-        # Katalog istnieje, ale nie ma w nim żadnego znanego zdjęcia: to źle wskazane
-        # źródło, a nie „usuń wszystkie zdjęcia” — nic w out_dir nie może się zmienić.
-        raise FileNotFoundError(f"brak zdjęć w {images_src}")
     out_dir.mkdir(parents=True, exist_ok=True)
     stats = BuildStats()
     tmp = out_dir / f"{DB_NAME}.tmp"
@@ -88,12 +79,15 @@ def build_phone_db(records: list[dict], images_src: Path, gplay_csv: Path | None
         _fill(con, records, slugs, gplay_csv, stats)
         con.commit()
         con.close()
-        _sync_images(slugs, images_src, out_dir / IMAGES_DIR, stats)
     except BaseException:
         con.close()  # bezpieczne, jeśli już zamknięte powyżej
         tmp.unlink(missing_ok=True)
         raise
     os.replace(tmp, out_dir / DB_NAME)
+    old = out_dir / OLD_IMAGES_DIR
+    if old.is_dir():
+        stats.images_removed = sum(1 for _ in old.glob("*.webp"))
+        shutil.rmtree(old)
     return stats
 
 
@@ -137,26 +131,3 @@ def _insert(con: sqlite3.Connection, table: str, key: str, slug: str) -> bool:
         return False
     return con.execute(f"INSERT OR IGNORE INTO {table} VALUES (?, ?)", (key, slug)).rowcount == 1
 
-
-def _sync_images(slugs: list[str | None], src_dir: Path, dst_dir: Path, stats: BuildStats) -> None:
-    """Kopiuje tylko pełne zdjęcia rekordów (bez `-sm`), pomija niezmienione, usuwa zbędne."""
-    dst_dir.mkdir(parents=True, exist_ok=True)
-    wanted: set[str] = set()
-    for slug in slugs:
-        if slug is None:
-            continue
-        src = src_dir / f"{slug}.webp"
-        if not src.is_file():
-            continue
-        wanted.add(src.name)
-        stats.with_image += 1
-        dst = dst_dir / src.name
-        s = src.stat()
-        if dst.is_file() and dst.stat().st_size == s.st_size and dst.stat().st_mtime >= s.st_mtime:
-            continue
-        shutil.copy2(src, dst)
-        stats.images_copied += 1
-    for old in dst_dir.glob("*.webp"):
-        if old.name not in wanted:
-            old.unlink()
-            stats.images_removed += 1

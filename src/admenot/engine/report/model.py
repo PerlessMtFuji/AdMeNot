@@ -13,8 +13,6 @@ from typing import Any
 
 from admenot.engine import paths
 from admenot.engine.journal.db import MAX_REPORT_SCREENSHOTS, Action, Journal, Order, unresolved
-from admenot.engine.phones.build import IMAGES_DIR
-from admenot.engine.phones.provider import SILHOUETTE
 
 PATCH_MAX_AGE_DAYS = 365
 UNFINISHED = frozenset({"failed", "interrupted", "still_active"})
@@ -29,8 +27,6 @@ class DeviceBlock:
     android: str | None
     serial: str
     security_patch: str | None
-    image: Path
-    photo: str  # exact | approximate | none
     imei: str | None = None  # w protokole zamiast numeru seryjnego, gdy dało się go odczytać
 
 
@@ -151,13 +147,6 @@ def _scope(snap: dict[str, Any], incomplete_apps: int) -> ScanScope:
 def device_block(snap: dict[str, Any], order: Order) -> DeviceBlock:
     dev = snap.get("device") or {}
     phone = snap.get("phone") or {}
-    image = Path(phone["image"]) if phone.get("image") else SILHOUETTE
-    if not image.is_file():
-        # Ścieżka z migawki jest bezwzględna i może wskazywać katalog, którego już nie ma (program
-        # przeniesiony/przeinstalowany) — spróbuj tej samej nazwy pliku pod bieżącymi zasobami,
-        # tym samym układem co provider.py (`assets_dir()/phones/<slug>.webp`).
-        relocated = (paths.assets_dir() / IMAGES_DIR / image.name) if phone.get("slug") else None
-        image = relocated if relocated is not None and relocated.is_file() else SILHOUETTE
     confidence = phone.get("confidence") or "none"
     if phone.get("name") and confidence in ("manual", "exact"):
         name = phone["name"]
@@ -165,20 +154,12 @@ def device_block(snap: dict[str, Any], order: Order) -> DeviceBlock:
         brand = (dev.get("brand") or "").capitalize()
         name = (dev.get("market_name") or f"{brand} {dev.get('model') or ''}".strip()
                 or order.device_model or order.device_serial)
-    if image == SILHOUETTE:
-        photo = "none"
-    elif confidence == "approximate":
-        photo = "approximate"
-    else:
-        photo = "exact"
     return DeviceBlock(
         name=name,
         model=dev.get("model") or order.device_model,
         android=dev.get("android_release") or None,
         serial=dev.get("serial") or order.device_serial,
         security_patch=dev.get("security_patch") or None,
-        image=image,
-        photo=photo,
         imei=dev.get("imei") or None,
     )
 

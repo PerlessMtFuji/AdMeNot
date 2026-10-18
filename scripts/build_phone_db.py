@@ -1,4 +1,4 @@
-"""Buduje bazę telefonów i katalog zdjęć (spec §4.2). Uruchamiane przy budowaniu wersji.
+"""Buduje bazę telefonów (spec §4.2) i usuwa zdjęcia z wersji ≤ 0.9.4. Uruchamiane przy budowaniu wersji.
 
 python scripts/build_phone_db.py [--source F:\\Szklodo] [--gplay data/supported_devices.csv]
                                  [--out src/admenot/assets]
@@ -34,8 +34,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--out", type=Path, default=PACKAGE_ASSETS)
     args = parser.parse_args(argv)
     data = args.source / "data" / "phones_full_data.json"
-    images = args.source / "public" / "assets" / "phones"
-    for path in (data, images, args.gplay):
+    for path in (data, args.gplay):
         if not path.exists():
             print(f"Brak {path}", file=sys.stderr)
             return 1
@@ -44,15 +43,12 @@ def main(argv: list[str]) -> int:
     except ValueError as exc:
         print(f"Błąd w {data}: {exc}", file=sys.stderr)
         return 1
-    try:
-        s = build_phone_db(records, images, args.gplay, args.out)
-    except FileNotFoundError as exc:
-        print(f"Brak zdjęć: {exc}", file=sys.stderr)
-        return 1
-    print(f"Telefony: {s.phones} (pominięte bez nazwy: {s.skipped}), ze zdjęciem: {s.with_image}")
+    s = build_phone_db(records, args.gplay, args.out)
+    print(f"Telefony: {s.phones} (pominięte bez nazwy: {s.skipped}) → {args.out}")
     print(f"Kody modeli: {s.codes} (konflikty: {s.code_conflicts}), nazwy: {s.names}, "
           f"lista Google: {s.gplay_rows}")
-    print(f"Zdjęcia: skopiowane {s.images_copied}, usunięte {s.images_removed} → {args.out}")
+    if s.images_removed:
+        print(f"Usunięte stare zdjęcia: {s.images_removed}")
     return 0
 
 

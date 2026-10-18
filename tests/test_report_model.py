@@ -3,7 +3,6 @@ from datetime import datetime
 import pytest
 
 from admenot.engine.journal.db import Journal
-from admenot.engine.phones.provider import SILHOUETTE
 from admenot.engine.report.model import AppRow, Consent, Recommendation, ScanScope, build_protocol
 
 NOW = datetime(2026, 9, 26, 14, 5)
@@ -80,7 +79,7 @@ def test_rows_device_and_recommendations(journal, photo):
     d = p.device
     assert (d.name, d.model, d.android, d.serial, d.security_patch) == (
         "Samsung Galaxy A14", "SM-A145R", "14", "R58", "2026-07-01")
-    assert (d.image, d.photo, d.imei) == (photo, "exact", None)
+    assert d.imei is None
     assert p.scope == ScanScope([], True, False, 72.0, 0) and not p.scope.limited
     assert p.recommendations == [
         Recommendation("review_left", {"apps": GAME}),
@@ -148,19 +147,18 @@ def test_order_without_snapshot(journal):
                       AppRow(FORECAST, None, None, [], "disable", "done")]
     assert (p.device.name, p.device.model, p.device.android, p.device.serial) == (
         "SM-A145R", "SM-A145R", None, "R58")
-    assert (p.device.image, p.device.photo) == (SILHOUETTE, "none")
     assert p.recommendations == [Recommendation("removed"), Recommendation("disabled"),
                                  Recommendation("general")]
 
 
-def test_photo_missing_after_rebuild_and_approximate_match(journal, tmp_path, photo):
+def test_old_snapshot_photo_path_and_approximate_match(journal, tmp_path, photo):
+    # migawki z wersji ≤ 0.9.4 mają ścieżkę zdjęcia; nazwa nie zależy od tego, czy plik jest
     gone = build_protocol(journal, make_order(journal, snapshot(tmp_path / "gone.webp")).id, "pl")
-    assert (gone.device.image, gone.device.photo, gone.device.name) == (
-        SILHOUETTE, "none", "Samsung Galaxy A14")
+    assert gone.device.name == "Samsung Galaxy A14"
 
     approx = build_protocol(journal, make_order(
         journal, snapshot(photo, confidence="approximate")).id, "pl")
-    assert (approx.device.photo, approx.device.name) == ("approximate", "Samsung SM-A145R")
+    assert approx.device.name == "Samsung SM-A145R"
 
     named = build_protocol(journal, make_order(
         journal, snapshot(photo, confidence="approximate", market_name="Galaxy A14")).id, "pl")
@@ -221,19 +219,6 @@ def test_undone_flagged_app_still_gets_review_left(journal, photo, statuses, out
     boost = next(r for r in p.rows if r.package == BOOST)
     assert boost.outcome == outcome
     assert Recommendation("review_left", {"apps": "Cleaner"}) in p.recommendations
-
-
-def test_photo_relocated_after_app_moved(journal, tmp_path, monkeypatch):
-    assets = tmp_path / "assets"
-    (assets / "phones").mkdir(parents=True)
-    relocated = assets / "phones" / "samsung-galaxy-a14.webp"
-    relocated.write_bytes(b"RIFF\0\0\0\0WEBP")
-    monkeypatch.setenv("ADMENOT_ASSETS", str(assets))
-    old_path = tmp_path / "old-install" / "samsung-galaxy-a14.webp"  # katalog już nie istnieje
-    order = make_order(journal, snapshot(old_path))
-    p = build_protocol(journal, order.id, "pl")
-    assert p.device.image == relocated
-    assert p.device.photo == "exact"
 
 
 def test_safe_app_chosen_by_the_technician_is_a_row(journal, photo):

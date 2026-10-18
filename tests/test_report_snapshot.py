@@ -5,16 +5,16 @@ from conftest import SERIAL, make_synthetic_adb
 from phonedb import make_phone_assets
 
 from admenot.engine.apk.analyze import ApkReport
-from admenot.engine.phones.provider import SILHOUETTE, PhoneImageProvider
+from admenot.engine.phones.provider import PhoneProvider
 from admenot.engine.report.snapshot import MAX_PROBLEMS, scan_snapshot
 from admenot.engine.session import ApkStatus, run_scan
 
 BOOST, FORECAST = "com.clean.pro.boost", "com.wlive.forecast"
 
 
-def test_snapshot_keeps_device_photo_scope_and_flagged_apps(tmp_path):
+def test_snapshot_keeps_device_phone_scope_and_flagged_apps(tmp_path):
     report = run_scan(make_synthetic_adb())
-    provider = PhoneImageProvider(make_phone_assets(tmp_path), tmp_path / "overrides.json")
+    provider = PhoneProvider(make_phone_assets(tmp_path), tmp_path / "overrides.json")
     snap = scan_snapshot(report, provider.match(report.device))
 
     assert json.loads(json.dumps(snap)) == snap
@@ -28,7 +28,7 @@ def test_snapshot_keeps_device_photo_scope_and_flagged_apps(tmp_path):
     }
     assert snap["phone"]["slug"] == "samsung-galaxy-a14" and "Galaxy A14" in snap["phone"]["name"]
     assert snap["phone"]["confidence"] == "exact"
-    assert snap["phone"]["image"].endswith("samsung-galaxy-a14.webp")
+    assert "image" not in snap["phone"]
     assert snap["app_count"] == len(report.results)
 
     scope = snap["scope"]
@@ -71,7 +71,7 @@ def test_snapshot_adds_chosen_and_incomplete_apps_and_apk_identity(tmp_path):
                if r.facts.package == BOOST else r for r in results]
     report = dataclasses.replace(report, results=results, apk_reports={BOOST: apk},
                                  apk=ApkStatus(requested=2, analyzed=1, failed={"x": "timeout"}))
-    match = PhoneImageProvider(tmp_path / "missing", tmp_path / "o.json").match(report.device)
+    match = PhoneProvider(tmp_path / "missing", tmp_path / "o.json").match(report.device)
     snap = scan_snapshot(report, match, {chosen_safe: "silence", BOOST: "silence"})
 
     apps = {a["package"]: a for a in snap["apps"]}
@@ -86,16 +86,15 @@ def test_snapshot_adds_chosen_and_incomplete_apps_and_apk_identity(tmp_path):
     assert apps[BOOST]["icon"] == icon and apps[FORECAST]["icon"] is None
 
 
-def test_snapshot_without_phone_database_uses_silhouette(tmp_path):
+def test_snapshot_without_phone_database(tmp_path):
     report = run_scan(make_synthetic_adb())
-    provider = PhoneImageProvider(tmp_path / "missing", tmp_path / "overrides.json")
+    provider = PhoneProvider(tmp_path / "missing", tmp_path / "overrides.json")
     snap = scan_snapshot(report, provider.match(report.device))
-    assert snap["phone"] == {"name": None, "slug": None, "confidence": "none",
-                             "image": str(SILHOUETTE)}
+    assert snap["phone"] == {"name": None, "slug": None, "confidence": "none"}
 
 
 def _match(report, tmp_path):
-    return PhoneImageProvider(tmp_path / "missing", tmp_path / "o.json").match(report.device)
+    return PhoneProvider(tmp_path / "missing", tmp_path / "o.json").match(report.device)
 
 
 def test_manual_snapshot_keeps_only_chosen_and_on_demand(scan_report, tmp_path):

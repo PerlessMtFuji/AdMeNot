@@ -32,7 +32,6 @@
     <div>
     <span class="lbl">{{ t.subject }}</span>
     <b class="name">{{ p.device.name }}</b>
-    {% if p.device.photo == "approximate" %}<span class="note">{{ t.photo_approximate }}</span>{% endif %}
     <dl>
       {% if p.device.model %}<dt>{{ t.model }}</dt><dd class="mono">{{ p.device.model }}</dd>{% endif %}
       {% if p.device.android %}<dt>{{ t.android }}</dt><dd>{{ p.device.android }}</dd>{% endif %}
