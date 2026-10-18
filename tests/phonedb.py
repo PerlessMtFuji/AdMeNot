@@ -1,4 +1,4 @@
-"""Mała baza telefonów do testów: rekordy w formacie Szklodo, atrapy zdjęć i wycinek listy Google."""
+"""Mała baza telefonów do testów: rekordy w formacie Szklodo i wycinek listy Google."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ from pathlib import Path
 
 from admenot.engine.device.info import DeviceInfo
 from admenot.engine.phones.build import build_phone_db
-from admenot.engine.phones.names import record_slugs
 
 GSM = "https://www.gsmarena.com/"
 
@@ -46,7 +45,6 @@ RECORDS = [
      "year": "2021, September 09"},
     {"name": "", "manufacturer": "Nokia", "url": GSM + "nokia_x-1.php"},
 ]
-NO_PHOTO = {"google-pixel-7"}
 
 GPLAY_CSV = (
     "Retail Branding,Marketing Name,Device,Model\r\n"
@@ -60,26 +58,20 @@ GPLAY_CSV = (
 )
 
 
-def write_sources(root: Path) -> tuple[Path, Path]:
-    """Układ katalogów jak w Szklodo; zwraca (katalog zdjęć, CSV Google w UTF-16)."""
-    images = root / "public" / "assets" / "phones"
-    images.mkdir(parents=True)
-    for slug in record_slugs(RECORDS):
-        if slug and slug not in NO_PHOTO:
-            (images / f"{slug}.webp").write_bytes(b"RIFF\0\0\0\0WEBP" + slug.encode())
-            (images / f"{slug}-sm.webp").write_bytes(b"small")
-    (root / "data").mkdir()
+def write_sources(root: Path) -> Path:
+    """Układ katalogów jak w Szklodo; zwraca CSV Google w UTF-16."""
+    (root / "data").mkdir(parents=True)
     (root / "data" / "phones_full_data.json").write_text(
         json.dumps(RECORDS, ensure_ascii=False), "utf-8")
     gplay = root / "supported_devices.csv"
     gplay.write_bytes(GPLAY_CSV.encode("utf-16"))
-    return images, gplay
+    return gplay
 
 
 def make_phone_assets(root: Path) -> Path:
-    images, gplay = write_sources(root / "szklodo")
+    gplay = write_sources(root / "szklodo")
     assets = root / "assets"
-    build_phone_db(RECORDS, images, gplay, assets)
+    build_phone_db(RECORDS, gplay, assets)
     return assets
 
 

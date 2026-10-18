@@ -25,7 +25,7 @@ from admenot.engine.incident import load_incident
 from admenot.engine.journal.db import Journal, Order
 from admenot.engine.oplock import DeviceBusy
 from admenot.engine.paths import incident_path, journal_path, logs_dir
-from admenot.engine.phones.provider import PhoneImageProvider
+from admenot.engine.phones.provider import PhoneProvider
 from admenot.engine.session import ScanReport, run_scan
 from admenot.engine.settings import load_settings
 from admenot.engine.texts import TEXTS, error_text, step_label
@@ -266,7 +266,7 @@ def cmd_fix(args: argparse.Namespace, adb: AdbTransport, lang: str,
         if not args.yes and not _yes(_ask(ask, _m(lang, "confirm"))):
             print(_m(lang, "cancelled"))
             return 1
-        match = PhoneImageProvider.default().match(report.device)
+        match = PhoneProvider.default().match(report.device)
         order = start(journal, plan, args.client, report, match)
         manufacturer = plan.ctx.manufacturer
         options = _options(args, lang, manufacturer, ask)

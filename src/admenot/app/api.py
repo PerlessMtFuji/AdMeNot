@@ -76,7 +76,7 @@ from admenot.engine.journal.db import (
 from admenot.engine.mirror import Mirror, MirrorUnavailable
 from admenot.engine.oplock import device_lock
 from admenot.engine.paths import incident_path, journal_path, logs_dir, screenshot_files
-from admenot.engine.phones.provider import PhoneImageProvider, PhoneMatch
+from admenot.engine.phones.provider import PhoneMatch, PhoneProvider
 from admenot.engine.report.files import UnknownOrder, write_report
 from admenot.engine.report.render import data_uri
 from admenot.engine.screenshot import delete_shots, take_screenshot
@@ -159,7 +159,7 @@ class Api:
         self,
         emitter: Emitter,
         host_factory: HostFactory = _real_host,
-        provider: PhoneImageProvider | None = None,
+        provider: PhoneProvider | None = None,
         apk_factory: ApkFactory | None = DeviceApkProvider,
         *,
         sync_jobs: bool = False,
@@ -180,7 +180,7 @@ class Api:
     ) -> None:
         self._emitter = emitter
         self._host_factory = host_factory
-        self._provider = provider or PhoneImageProvider.default()
+        self._provider = provider or PhoneProvider.default()
         self._apk_factory = apk_factory
         self._app_labels = app_labels
         self._labels: LabelFetch | None = None  # odczyt nazw bieżącego skanu
@@ -217,7 +217,7 @@ class Api:
         self._incident_lock = threading.Lock()
         self._pick_file_fn: Callable[[], str | None] | None = None
         self._open_order: dict[str, int] = {}  # telefon → zlecenie, do którego idą nowe zrzuty
-        self._identities: dict[str, tuple[str | None, str | None, str | None]] = {}  # → (nazwa, IMEI, zdjęcie)
+        self._identities: dict[str, tuple[str | None, str | None, str | None]] = {}  # → (nazwa, IMEI, obrazek)
         self._pending: dict[str, list[int]] = {}  # telefon → zrzuty czekające na zlecenie
         self._shots_lock = threading.Lock()  # chroni _open_order/_pending; nigdy pod adb/screencap
         self._share_upload = share_upload
@@ -371,8 +371,8 @@ class Api:
         return {"devices": devices, "error": None}
 
     def _identity(self, serial: str) -> tuple[str | None, str | None, str | None]:
-        """Nazwa handlowa, IMEI i zdjęcie już na ekranie podłączenia — raz na podłączenie, nie co
-        odpytanie (zdarzenie `devices` idzie tylko przy zmianie, więc zdjęcie leci raz)."""
+        """Nazwa handlowa, IMEI i obrazek telefonu już na ekranie podłączenia — raz na podłączenie, nie co
+        odpytanie (zdarzenie `devices` idzie tylko przy zmianie, więc obrazek leci raz)."""
         if serial not in self._identities:
             try:
                 device = read_device_info(self._session(serial))

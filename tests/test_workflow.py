@@ -7,7 +7,7 @@ from admenot.engine.actions import commands as C
 from admenot.engine.actions.executor import ExecOptions, resume, run_order
 from admenot.engine.actions.planner import Blocked
 from admenot.engine.journal.db import Journal
-from admenot.engine.phones.provider import PhoneImageProvider
+from admenot.engine.phones.provider import PhoneProvider
 from admenot.engine.session import run_scan
 from admenot.engine.settings import Settings
 from admenot.engine.workflow import (
@@ -172,7 +172,7 @@ def test_start_stores_the_snapshot_and_execute_the_verification(tmp_path):
     phone = make_cli_phone()
     report = run_scan(phone)
     plan = plan_order(phone, report, {"com.wlive.forecast": "disable"})
-    match = PhoneImageProvider(tmp_path / "missing", tmp_path / "o.json").match(report.device)
+    match = PhoneProvider(tmp_path / "missing", tmp_path / "o.json").match(report.device)
     journal = Journal(tmp_path / "j.db")
     order = start(journal, plan, "Anna", report, match)
     snap = journal.scan(order.id)
@@ -190,7 +190,7 @@ def test_start_stores_consent_only_when_given(tmp_path):
     phone = make_cli_phone()
     report = run_scan(phone)
     plan = plan_order(phone, report, {"com.wlive.forecast": "disable"})
-    match = PhoneImageProvider(tmp_path / "missing", tmp_path / "o.json").match(report.device)
+    match = PhoneProvider(tmp_path / "missing", tmp_path / "o.json").match(report.device)
     journal = Journal(tmp_path / "j.db")
     consent = {"code": "K7F3", "shown_at": "a", "confirmed_at": "b"}
     agreed = start(journal, plan, "Anna", report, match, consent)

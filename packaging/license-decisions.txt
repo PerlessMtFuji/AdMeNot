@@ -4,4 +4,4 @@
 #
 # Format: nazwa składnika dokładnie jak w THIRD_PARTY_NOTICES | decyzja i jej podstawa
 Google Play supported devices (supported_devices.csv) | decyzja autora 2026-10-11: publiczna lista Google dla deweloperów, dołączona bez zmian treści, ze źródłem w THIRD_PARTY_NOTICES
-Phone database and photos (phones.db, phones/*) | decyzja autora 2026-10-11: dołączone z atrybucją GSMArena.com mimo braku licencji (ryzyko świadomie przyjęte); usunięcie na żądanie właściciela praw — szczegóły w packaging/assets-provenance.json
+Phone database (phones.db) | decyzja autora 2026-10-11: dane modeli dołączone z atrybucją GSMArena.com mimo braku licencji (ryzyko świadomie przyjęte); usunięcie na żądanie właściciela praw; od 0.9.5 bez zdjęć — szczegóły w packaging/assets-provenance.json

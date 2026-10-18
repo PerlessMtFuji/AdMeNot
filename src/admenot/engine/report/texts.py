@@ -11,7 +11,6 @@ TEXTS: dict[str, dict[str, Any]] = {
     "pl": {
         "title": "Protokół serwisowy",
         "subject": "Przedmiot zlecenia",
-        "photo_approximate": "zdjęcie podobnego modelu",
         "model": "Kod modelu",
         "android": "Android",
         "serial": "Nr seryjny",
@@ -91,7 +90,6 @@ TEXTS: dict[str, dict[str, Any]] = {
     "en": {
         "title": "Service report",
         "subject": "Subject of the order",
-        "photo_approximate": "photo of a similar model",
         "model": "Model code",
         "android": "Android",
         "serial": "Serial no.",

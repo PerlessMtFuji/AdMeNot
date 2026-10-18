@@ -12,6 +12,7 @@ from typing import Any
 from jinja2 import Environment, PackageLoader, StrictUndefined
 
 from admenot.engine.apk.analyze import safe_icon
+from admenot.engine.phones.provider import SILHOUETTE
 from admenot.engine.report.model import FLAGGED, AppRow, Protocol, ScanScope
 from admenot.engine.report.texts import TEXTS
 from admenot.engine.settings import LOGO_TYPES, ServiceInfo
@@ -133,7 +134,7 @@ def render_html(protocol: Protocol, service: ServiceInfo, generated_at: datetime
         service=service,
         rows=[_row(r, t, lang) for r in protocol.rows if not _compact(r)],
         watch=[_row(r, t, lang) for r in protocol.rows if _compact(r)],
-        photo=data_uri(protocol.device.image),
+        photo=data_uri(SILHOUETTE),
         logo=data_uri(service.logo) if service.logo else None,
         date=protocol.created_at.strftime(t["date_format"]),
         headline=_headline(protocol, t),

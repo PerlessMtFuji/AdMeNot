@@ -26,7 +26,7 @@
 
 ### Podłączenie i skan
 
-Podłącz telefon z włączonym debugowaniem USB. AdMeNot rozpoznaje model (ze zdjęciem z bazy telefonów), odczytuje zainstalowane aplikacje i to, co robiły na telefonie przez ostatnią dobę, a potem — w tle — kopiuje i analizuje pliki APK aplikacji użytkownika. Skan niczego na telefonie nie zmienia.
+Podłącz telefon z włączonym debugowaniem USB. AdMeNot rozpoznaje model z bazy telefonów, odczytuje zainstalowane aplikacje i to, co robiły na telefonie przez ostatnią dobę, a potem — w tle — kopiuje i analizuje pliki APK aplikacji użytkownika. Skan niczego na telefonie nie zmienia.
 
 <img src="docs/img/pl/connect.png" alt="Podłączony telefon gotowy do skanu" width="49%"> <img src="docs/img/pl/results-simple.png" alt="Wyniki w trybie prostym" width="49%">
 
@@ -209,7 +209,7 @@ Pobierz instalator z [Releases](https://github.com/PerlessMtFuji/AdMeNot/release
 
     py -3.13 -m venv .venv
     .venv\Scripts\pip install -e ".[dev,gui,release]"
-    python scripts\build_phone_db.py            # baza telefonów i zdjęcia
+    python scripts\build_phone_db.py            # baza telefonów
     python scripts\fetch_tools.py               # scrcpy 4.1 z adb (podgląd ekranu)
     powershell -ExecutionPolicy Bypass -File scripts\build_ui.ps1
     python scripts\build_icons.py               # tylko po zmianie assets\icon\*.svg (PNG, ICO, kopia dla UI)

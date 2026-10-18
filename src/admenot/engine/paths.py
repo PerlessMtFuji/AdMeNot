@@ -98,6 +98,6 @@ PACKAGE_ASSETS = Path(__file__).resolve().parents[1] / "assets"
 
 
 def assets_dir() -> Path:
-    """Zbudowane dane telefonów (phones.db, phones/*.webp); ADMENOT_ASSETS nadpisuje."""
+    """Zbudowana baza telefonów (phones.db); ADMENOT_ASSETS nadpisuje."""
     override = os.environ.get("ADMENOT_ASSETS")
     return Path(override) if override else PACKAGE_ASSETS

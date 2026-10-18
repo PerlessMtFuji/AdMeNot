@@ -45,7 +45,8 @@ def version_info(description, internal_name):
 
 
 # androguard nie ma hooka: bez public.xml analiza manifestu pada po cichu (próba pakowania)
-datas = (collect_data_files("admenot", excludes=["**/__pycache__/**"])
+# assets/phones: zdjęcia telefonów z wersji ≤ 0.9.4, które mogły zostać w drzewie; nie wolno ich pakować
+datas = (collect_data_files("admenot", excludes=["**/__pycache__/**", "**/assets/phones/**"])
          + collect_data_files("androguard"))
 
 a = Analysis(

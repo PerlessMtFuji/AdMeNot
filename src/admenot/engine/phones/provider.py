@@ -1,4 +1,6 @@
-"""Rozpoznanie modelu telefonu i jego zdjęcie (spec §4.3). Jedyny moduł, który czyta `phones.db`."""
+"""Rozpoznanie modelu telefonu (spec §4.3). Jedyny moduł, który czyta `phones.db`.
+
+Zdjęć modeli nie ma od 0.9.5: GUI i protokół zawsze pokazują sylwetkę `SILHOUETTE`."""
 
 from __future__ import annotations
 
@@ -12,7 +14,7 @@ from pathlib import Path
 
 from admenot.engine import paths
 from admenot.engine.device.info import DeviceInfo
-from admenot.engine.phones.build import DB_NAME, IMAGES_DIR
+from admenot.engine.phones.build import DB_NAME
 from admenot.engine.phones.names import (
     canonical_brand,
     key_tokens,
@@ -43,35 +45,28 @@ class PhoneRecord:
 class PhoneMatch:
     confidence: str  # manual | exact | approximate | none
     step: str        # override | model_code | market_name | gplay | fuzzy | silhouette | no_db
-    image: Path
     phone: PhoneRecord | None = None
     matched: str | None = None  # kod albo znormalizowana nazwa, po której dopasowano
-
-    @property
-    def has_photo(self) -> bool:
-        return self.image.suffix == ".webp"
 
     def to_dict(self) -> dict:
         return {
             "confidence": self.confidence, "step": self.step, "matched": self.matched,
-            "has_photo": self.has_photo, "image": str(self.image),
             "phone": asdict(self.phone) if self.phone else None,
         }
 
 
-class PhoneImageProvider:
-    """Baza telefonów i zdjęcia. Wymiana źródła zdjęć (§4.4) dotyczy tylko tego modułu i build.py."""
+class PhoneProvider:
+    """Baza telefonów: dopasowanie modelu, wyszukiwanie i ręczne wybory modelu."""
 
     def __init__(self, assets: Path, overrides: Path) -> None:
         self.db_path = assets / DB_NAME
-        self.images = assets / IMAGES_DIR
         self.overrides_path = overrides
         self._entries: list[_Entry] | None = None
         self._by_brand: dict[str, list[_Entry]] = {}
         self._index_lock = threading.Lock()
 
     @classmethod
-    def default(cls) -> PhoneImageProvider:
+    def default(cls) -> PhoneProvider:
         return cls(paths.assets_dir(), paths.phone_overrides_path())
 
     @property
@@ -80,13 +75,13 @@ class PhoneImageProvider:
 
     def match(self, device: DeviceInfo) -> PhoneMatch:
         if not self.available:
-            return PhoneMatch("none", "no_db", SILHOUETTE)
+            return PhoneMatch("none", "no_db")
         try:
             with self._connect() as con:
                 found = self._match(con, device)
         except sqlite3.Error:
-            return PhoneMatch("none", "no_db", SILHOUETTE)
-        return found or PhoneMatch("none", "silhouette", SILHOUETTE)
+            return PhoneMatch("none", "no_db")
+        return found or PhoneMatch("none", "silhouette")
 
     def phone(self, slug: str) -> PhoneRecord | None:
         if not self.available:
@@ -229,8 +224,7 @@ class PhoneImageProvider:
         phone = self._record(con, slug)
         if phone is None:
             return None
-        image = self.images / f"{slug}.webp"
-        return PhoneMatch(confidence, step, image if image.is_file() else SILHOUETTE, phone, matched)
+        return PhoneMatch(confidence, step, phone, matched)
 
     @staticmethod
     def _record(con: sqlite3.Connection, slug: str) -> PhoneRecord | None:

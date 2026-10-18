@@ -160,10 +160,9 @@ def _gplay(csv: Path) -> Component:
 
 
 def _phone_assets(assets: Path, provenance: Path = PROVENANCE) -> Component:
-    """Baza telefonów i zdjęcia z katalogu autora: wersja = skrót bazy i liczba zdjęć, a licencja
-    i podstawa redystrybucji z packaging/assets-provenance.json (bez niej: nierozstrzygnięta)."""
+    """Baza telefonów z katalogu autora: wersja = skrót bazy, a licencja i podstawa redystrybucji
+    z packaging/assets-provenance.json (bez niej: nierozstrzygnięta)."""
     db = assets / "phones.db"
-    images = sorted((assets / "phones").glob("*")) if (assets / "phones").is_dir() else []
     digest = hashlib.sha256(db.read_bytes()).hexdigest()[:12] if db.is_file() else "brak"
     try:
         info = json.loads(provenance.read_text("utf-8"))["phone_assets"]
@@ -171,8 +170,7 @@ def _phone_assets(assets: Path, provenance: Path = PROVENANCE) -> Component:
         info = {}
     source = info.get("source") or "nieopisane / undocumented"
     basis = info.get("basis") or "brak udokumentowanej podstawy / no documented basis"
-    return Component("Phone database and photos (phones.db, phones/*)",
-                     f"{digest}, {len(images)} images", info.get("license"),
+    return Component("Phone database (phones.db)", digest, info.get("license"),
                      (f"Źródło / Source: {source}", f"Podstawa / Basis: {basis}"))
 
 

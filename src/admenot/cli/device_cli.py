@@ -1,4 +1,4 @@
-"""CLI `device`: rozpoznany model, zdjęcie i ręczny wybór zdjęcia (spec §4)."""
+"""CLI `device`: rozpoznany model i ręczny wybór modelu (spec §4)."""
 
 from __future__ import annotations
 
@@ -9,49 +9,45 @@ from collections.abc import Callable
 
 from admenot.engine.adb.transport import AdbTransport
 from admenot.engine.device.info import DeviceInfo, read_device_info
-from admenot.engine.phones.provider import PhoneImageProvider, PhoneMatch
+from admenot.engine.phones.provider import PhoneMatch, PhoneProvider
 
 MESSAGES = {
     "pl": {
         "confidence": {"manual": "wybrane ręcznie", "exact": "dokładne",
-                       "approximate": "przybliżone (~ podobny model)", "none": "brak (sylwetka)"},
-        "step": {"override": "zdjęcie wskazane dla {matched}", "model_code": "kod modelu {matched}",
+                       "approximate": "przybliżone (~ podobny model)", "none": "brak"},
+        "step": {"override": "model wskazany dla {matched}", "model_code": "kod modelu {matched}",
                  "market_name": "nazwa handlowa „{matched}”",
                  "gplay": "lista urządzeń Google „{matched}”", "fuzzy": "podobna nazwa „{matched}”",
                  "silhouette": "model nierozpoznany", "no_db": "brak bazy telefonów"},
         "match": "Dopasowanie: {confidence}, {step}",
-        "photo": "Zdjęcie: {path}",
-        "silhouette": "Sylwetka: {path}",
         "phone": "Telefon: {brand} {model} · {device} · Android {release} (SDK {sdk}) · "
                  "poprawka {patch} · uptime {uptime:.1f} h · SN {serial}",
         "no_db": "Baza telefonów nie jest zbudowana. Uruchom: python scripts/build_phone_db.py",
         "unknown_slug": "Nie ma w bazie telefonu „{slug}”. Znajdź nazwę: "
                         "admenot device --search <tekst>",
         "no_model": "Telefon nie podaje kodu modelu (ro.product.model), nie da się zapisać wyboru.",
-        "saved": "Zapisano zdjęcie dla {model}: {slug}",
-        "cleared": "Usunięto ręczny wybór zdjęcia dla {model}.",
-        "not_set": "Dla {model} nie było ręcznego wyboru zdjęcia.",
+        "saved": "Zapisano model dla {model}: {slug}",
+        "cleared": "Usunięto ręczny wybór modelu dla {model}.",
+        "not_set": "Dla {model} nie było ręcznego wyboru modelu.",
         "no_results": "Brak telefonów pasujących do „{text}”.",
     },
     "en": {
         "confidence": {"manual": "chosen manually", "exact": "exact",
-                       "approximate": "approximate (~ similar model)", "none": "none (silhouette)"},
-        "step": {"override": "photo chosen for {matched}", "model_code": "model code {matched}",
+                       "approximate": "approximate (~ similar model)", "none": "none"},
+        "step": {"override": "model chosen for {matched}", "model_code": "model code {matched}",
                  "market_name": "marketing name “{matched}”",
                  "gplay": "Google device list “{matched}”", "fuzzy": "similar name “{matched}”",
                  "silhouette": "model not recognized", "no_db": "no phone database"},
         "match": "Match: {confidence}, {step}",
-        "photo": "Photo: {path}",
-        "silhouette": "Silhouette: {path}",
         "phone": "Phone: {brand} {model} · {device} · Android {release} (SDK {sdk}) · "
                  "patch {patch} · uptime {uptime:.1f} h · SN {serial}",
         "no_db": "The phone database is not built. Run: python scripts/build_phone_db.py",
         "unknown_slug": "No phone “{slug}” in the database. Find it: "
                         "admenot device --search <text>",
         "no_model": "The phone reports no model code (ro.product.model); cannot save the choice.",
-        "saved": "Saved photo for {model}: {slug}",
-        "cleared": "Removed the manual photo choice for {model}.",
-        "not_set": "There was no manual photo choice for {model}.",
+        "saved": "Saved the model for {model}: {slug}",
+        "cleared": "Removed the manual model choice for {model}.",
+        "not_set": "There was no manual model choice for {model}.",
         "no_results": "No phones match “{text}”.",
     },
 }
@@ -65,8 +61,8 @@ PickDevice = Callable[[AdbTransport, str | None, str], str]
 def cmd_device(args: argparse.Namespace, host: AdbTransport, lang: str,
                pick_device: PickDevice) -> int:
     m = MESSAGES[lang]
-    provider = PhoneImageProvider.default()
-    needs_db = args.search is not None or args.set_photo or args.clear_photo
+    provider = PhoneProvider.default()
+    needs_db = args.search is not None or args.set_model or args.clear_model
     if needs_db and not provider.available:
         print(m["no_db"], file=sys.stderr)
         return 2
@@ -76,17 +72,17 @@ def cmd_device(args: argparse.Namespace, host: AdbTransport, lang: str,
     args.picked_serial = serial
     info = read_device_info(host.with_serial(serial))
     out = sys.stderr if args.json else sys.stdout  # potwierdzenia nie psują JSON-a
-    if args.set_photo:
+    if args.set_model:
         try:
-            provider.set_override(info.model, args.set_photo)
+            provider.set_override(info.model, args.set_model)
         except KeyError:
-            print(m["unknown_slug"].format(slug=args.set_photo), file=sys.stderr)
+            print(m["unknown_slug"].format(slug=args.set_model), file=sys.stderr)
             return 2
         except ValueError:
             print(m["no_model"], file=sys.stderr)
             return 2
-        print(m["saved"].format(model=info.model, slug=args.set_photo), file=out)
-    elif args.clear_photo:
+        print(m["saved"].format(model=info.model, slug=args.set_model), file=out)
+    elif args.clear_model:
         key = "cleared" if provider.clear_override(info.model) else "not_set"
         print(m[key].format(model=info.model), file=out)
     match = provider.match(info)
@@ -98,7 +94,7 @@ def cmd_device(args: argparse.Namespace, host: AdbTransport, lang: str,
     return 0
 
 
-def _search(provider: PhoneImageProvider, text: str, lang: str) -> int:
+def _search(provider: PhoneProvider, text: str, lang: str) -> int:
     results = provider.search(text, limit=20)
     if not results:
         print(MESSAGES[lang]["no_results"].format(text=text))
@@ -117,7 +113,6 @@ def _print_match(info: DeviceInfo, match: PhoneMatch, lang: str) -> None:
         print(info.market_name or f"{info.brand} {info.model}".strip())
     step = m["step"][match.step].format(matched=match.matched or "")
     print(m["match"].format(confidence=m["confidence"][match.confidence], step=step))
-    print(m["photo" if match.has_photo else "silhouette"].format(path=match.image))
     print(m["phone"].format(
         brand=info.brand, model=info.model, device=info.device, release=info.android_release,
         sdk=info.sdk, patch=info.security_patch or "?", uptime=info.uptime_s / 3600,

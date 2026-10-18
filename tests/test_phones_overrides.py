@@ -1,7 +1,7 @@
 import pytest
 from phonedb import make_device, make_phone_assets
 
-from admenot.engine.phones.provider import PhoneImageProvider
+from admenot.engine.phones.provider import PhoneProvider
 
 
 @pytest.fixture(scope="module")
@@ -16,7 +16,7 @@ def overrides(tmp_path):
 
 @pytest.fixture
 def provider(assets, overrides):
-    return PhoneImageProvider(assets, overrides)
+    return PhoneProvider(assets, overrides)
 
 
 def _summary(m):
@@ -41,7 +41,7 @@ def test_override_is_per_model_code(provider):
 
 def test_override_is_saved_to_disk(assets, overrides, provider):
     provider.set_override("SM-A145R", "huawei-nova-8")
-    again = PhoneImageProvider(assets, overrides)
+    again = PhoneProvider(assets, overrides)
     assert _summary(again.match(make_device("SM-A145R"))) == ("manual", "override", "huawei-nova-8")
 
 
@@ -79,5 +79,5 @@ def test_search(provider):
 def test_phone_lookup(provider, tmp_path):
     assert provider.phone("huawei-nova-8").name == "Huawei nova 8"
     assert provider.phone("nope") is None
-    missing = PhoneImageProvider(tmp_path / "none", tmp_path / "o.json")
+    missing = PhoneProvider(tmp_path / "none", tmp_path / "o.json")
     assert missing.phone("huawei-nova-8") is None and missing.search("nova") == []

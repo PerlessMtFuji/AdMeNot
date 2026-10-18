@@ -4,7 +4,7 @@ import xml.etree.ElementTree as ET
 import pytest
 from phonedb import make_device, make_phone_assets
 
-from admenot.engine.phones.provider import SILHOUETTE, PhoneImageProvider
+from admenot.engine.phones.provider import SILHOUETTE, PhoneProvider
 
 
 @pytest.fixture(scope="module")
@@ -14,18 +14,17 @@ def assets(tmp_path_factory):
 
 @pytest.fixture
 def provider(assets, tmp_path):
-    return PhoneImageProvider(assets, tmp_path / "overrides.json")
+    return PhoneProvider(assets, tmp_path / "overrides.json")
 
 
 def _summary(m):
     return m.confidence, m.step, m.phone.slug if m.phone else None
 
 
-def test_model_code(provider, assets):
+def test_model_code(provider):
     m = provider.match(make_device("SM-A145R"))
     assert _summary(m) == ("exact", "model_code", "samsung-galaxy-a14")
-    assert m.matched == "SM-A145R" and m.has_photo
-    assert m.image == assets / "phones" / "samsung-galaxy-a14.webp"
+    assert m.matched == "SM-A145R"
     assert (m.phone.name, m.phone.year) == ("Samsung Galaxy A14", 2023)
 
 
@@ -58,11 +57,10 @@ def test_gplay_name_matches_slug_variant(provider):
     assert _summary(m) == ("exact", "gplay", "samsung-galaxy-a57-5g")
 
 
-def test_matched_phone_without_photo_uses_silhouette(provider):
+def test_gplay_model_equal_to_marketing_name(provider):
     m = provider.match(make_device("Pixel 7", brand="google", manufacturer="Google",
                                    device="panther"))
     assert _summary(m) == ("exact", "gplay", "google-pixel-7")
-    assert m.image == SILHOUETTE and not m.has_photo
 
 
 def test_fuzzy_prefers_closest_name(provider):
@@ -87,24 +85,24 @@ def test_unknown_phone_gets_silhouette(provider):
     m = provider.match(make_device("CPH2271", brand="OPPO", manufacturer="OPPO",
                                    device="OP4F97"))
     assert _summary(m) == ("none", "silhouette", None)
-    assert m.image == SILHOUETTE and m.image.is_file() and not m.has_photo
 
 
-def test_silhouette_is_svg_of_photo_size():
+def test_silhouette_is_svg_with_margin():
+    # margines w viewBox: zaokrąglone ramki miniatur w GUI nie ucinają telefonu
     root = ET.parse(SILHOUETTE).getroot()
-    assert root.tag.endswith("svg") and root.get("viewBox") == "0 0 160 212"
+    assert root.tag.endswith("svg") and root.get("viewBox") == "-16 -16 156 272"
 
 
 def test_missing_db(tmp_path):
-    provider = PhoneImageProvider(tmp_path / "none", tmp_path / "o.json")
+    provider = PhoneProvider(tmp_path / "none", tmp_path / "o.json")
     assert not provider.available
     m = provider.match(make_device("SM-A145R"))
-    assert _summary(m) == ("none", "no_db", None) and m.image == SILHOUETTE
+    assert _summary(m) == ("none", "no_db", None)
 
 
 def test_corrupted_db(tmp_path):
     (tmp_path / "phones.db").write_bytes(b"to nie jest baza SQLite")
-    m = PhoneImageProvider(tmp_path, tmp_path / "o.json").match(make_device("SM-A145R"))
+    m = PhoneProvider(tmp_path, tmp_path / "o.json").match(make_device("SM-A145R"))
     assert _summary(m) == ("none", "no_db", None)
 
 
@@ -130,6 +128,6 @@ def test_index_is_built_once_under_concurrency(provider):
 
 def test_to_dict(provider):
     d = provider.match(make_device("SM-A145R")).to_dict()
-    assert (d["confidence"], d["step"], d["has_photo"]) == ("exact", "model_code", True)
+    assert (d["confidence"], d["step"], d["matched"]) == ("exact", "model_code", "SM-A145R")
     assert d["phone"]["slug"] == "samsung-galaxy-a14"
-    assert d["image"].endswith("samsung-galaxy-a14.webp")
+    assert "image" not in d and "has_photo" not in d

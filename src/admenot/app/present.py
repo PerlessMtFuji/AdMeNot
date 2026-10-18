@@ -145,7 +145,7 @@ def device_card(info: DeviceInfo, match: PhoneMatch | None) -> dict[str, Any]:
         "uptime_s": info.uptime_s, "imei": info.imei,
         "match": ({"confidence": match.confidence, "step": match.step, "matched": match.matched}
                   if match is not None else None),
-        "image": image_uri(match.image if match is not None else SILHOUETTE),
+        "image": image_uri(SILHOUETTE),
     }
 
 
@@ -260,7 +260,7 @@ def action_view(a: Action, lang: str) -> dict[str, Any]:
 
 
 def _history_device(journal: Journal, serial: str, orders: list[Order]) -> dict[str, Any]:
-    # Nazwa i zdjęcie jak w protokole: z migawki najnowszego zlecenia, które ją ma.
+    # Nazwa jak w protokole: z migawki najnowszego zlecenia, które ją ma.
     if not orders:
         return {"serial": serial, "name": serial, "model": None, "image": image_uri(SILHOUETTE),
                 "imei": None}
@@ -271,7 +271,7 @@ def _history_device(journal: Journal, serial: str, orders: list[Order]) -> dict[
             order = o
             break
     block = device_block(snap or {}, order)
-    return {"serial": serial, "name": block.name, "model": block.model, "image": image_uri(block.image),
+    return {"serial": serial, "name": block.name, "model": block.model, "image": image_uri(SILHOUETTE),
             "imei": block.imei}
 
 

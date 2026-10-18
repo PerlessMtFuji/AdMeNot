@@ -15,7 +15,7 @@ TOOLS = ("adb.exe", "scrcpy.exe", "scrcpy-server", "SDL3.dll")
 
 @pytest.fixture
 def installed(monkeypatch, tmp_path):
-    """Kompletna „instalacja” w tmp: narzędzia, phones.db, zdjęcia, UI."""
+    """Kompletna „instalacja” w tmp: narzędzia, phones.db, UI."""
     assets = tmp_path / "assets"
     tools = assets / "tools" / "scrcpy"
     tools.mkdir(parents=True)
@@ -25,7 +25,6 @@ def installed(monkeypatch, tmp_path):
     con.execute("CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
     con.commit()
     con.close()
-    (assets / "phones").mkdir()
     web = tmp_path / "web"
     web.mkdir()
     (web / "index.html").write_text("<!doctype html>", "utf-8")
