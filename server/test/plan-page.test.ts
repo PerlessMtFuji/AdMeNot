@@ -97,13 +97,13 @@ describe("plan.js", () => {
         return null;
       } }
     (globalThis as any).document = { documentElement: {}, title: "", createElement: (tag: string) => new Node(tag) };
-    const root = new Node("main") as unknown as Element;
+    const node = new Node("main"), root = node as unknown as Element;
     const plan = { v: 1, lang: "pl", at: "2026-10-17T12:00", phone: "OPPO A78", code: "ABCD", notif: 0,
       apps: [{ n: "Latarka", l: "disable" as const }] };
     render(root, { ...plan, m: 1 }, "server");
     expect(TEXTS.pl.manual_note).toBeTruthy();
-    expect(root.querySelector("p.note")?.textContent).toBe(TEXTS.pl.manual_note);
+    expect(node.querySelector("p.note")?.textContent).toBe(TEXTS.pl.manual_note);
     render(root, plan, "server");
-    expect(root.querySelector("p.note")).toBeNull();
+    expect(node.querySelector("p.note")).toBeNull();
   });
 });
