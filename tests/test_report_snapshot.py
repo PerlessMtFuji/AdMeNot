@@ -92,3 +92,27 @@ def test_snapshot_without_phone_database_uses_silhouette(tmp_path):
     snap = scan_snapshot(report, provider.match(report.device))
     assert snap["phone"] == {"name": None, "slug": None, "confidence": "none",
                              "image": str(SILHOUETTE)}
+
+
+def _match(report, tmp_path):
+    return PhoneImageProvider(tmp_path / "missing", tmp_path / "o.json").match(report.device)
+
+
+def test_manual_snapshot_keeps_only_chosen_and_on_demand(scan_report, tmp_path):
+    match = _match(scan_report, tmp_path)
+    flagged = next(r.facts.package for r in scan_report.results if r.verdict != "safe")
+    other = next(r.facts.package for r in scan_report.results if r.facts.package != flagged)
+    report = dataclasses.replace(scan_report, apk_mode="partial",
+                                 analyzed_on_demand=frozenset({other}))
+    snap = scan_snapshot(report, match, {other: "remove"})
+    assert snap["apk_mode"] == "partial" and snap["on_demand"] == [other]
+    assert [a["package"] for a in snap["apps"]] == [other]  # ukryty werdykt `flagged` nie trafia
+    manual = dataclasses.replace(scan_report, apk_mode="manual")
+    assert [a["package"] for a in scan_snapshot(manual, match, {flagged: "remove"})["apps"]] \
+        == [flagged]
+
+
+def test_full_snapshot_is_unchanged(scan_report, tmp_path):
+    snap = scan_snapshot(scan_report, _match(scan_report, tmp_path), {})
+    assert snap["apk_mode"] == "pending"
+    assert any(a["verdict"] != "safe" for a in snap["apps"])

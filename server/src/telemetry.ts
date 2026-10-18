@@ -69,9 +69,16 @@ function body(e: Obj): Obj {
         && int(e.seconds, 86_400) && typeof e.apk_stage === "boolean");
       let apk: Obj | null = null;
       if (e.apk !== null && e.apk !== undefined) apk = counts(e.apk, ["requested", "analyzed", "failed"]);
+      need(e.apk_mode === undefined || oneOf(e.apk_mode, ["pending", "full", "manual", "partial"]));
+      let eta: Obj | null = null;
+      if (e.eta !== null && e.eta !== undefined) {
+        need(isObj(e.eta) && oneOf((e.eta as Obj).kind, ["measured", "rough"]) && int((e.eta as Obj).seconds, 86_400));
+        eta = { kind: (e.eta as Obj).kind, seconds: (e.eta as Obj).seconds };
+      }
       return {
         device: device(e.device), session: e.session, apps: e.apps, verdicts: counts(e.verdicts, VERDICTS),
         low_behavior_data: e.low_behavior_data, apk, seconds: e.seconds, apk_stage: e.apk_stage,
+        apk_mode: e.apk_mode ?? null, eta,
         packages: packages(e.packages, (p) => {
           need(oneOf(p.verdict, VERDICTS) && int(p.score, 1000) && oneOf(p.confidence, ["low", "medium", "high"])
             && typeof p.system === "boolean");
@@ -79,20 +86,23 @@ function body(e: Obj): Obj {
         }),
       };
     }
-    case "repair":
+    case "repair": {
       need(SESSION.test(String(e.session)) && int(e.failed) && Array.isArray(e.errors)
         && (e.errors as unknown[]).length <= MAX_ERRORS && (e.errors as unknown[]).every((k) => str(k))
         && (e.interrupted === null || oneOf(e.interrupted, ["stopped", "disconnected"])));
+      const SOURCES = isObj(e.sources) && "blind" in (e.sources as Obj)
+        ? ["flagged", "manual", "blind"] : ["flagged", "manual"];
       return {
         device: device(e.device), session: e.session, levels: counts(e.levels, LEVELS),
-        sources: counts(e.sources, ["flagged", "manual"]), failed: e.failed, errors: e.errors,
+        sources: counts(e.sources, SOURCES), failed: e.failed, errors: e.errors,
         interrupted: e.interrupted,
         packages: packages(e.packages, (p) => {
-          need(oneOf(p.source, ["flagged", "manual"]) && oneOf(p.level, LEVELS)
+          need(oneOf(p.source, ["flagged", "manual", "blind"]) && oneOf(p.level, LEVELS)
             && (p.ok === null || typeof p.ok === "boolean"));
           return { source: p.source, level: p.level, ok: p.ok };
         }),
       };
+    }
     case "undo":
       need(int(e.apps) && int(e.failed) && int(e.age_days));
       return {

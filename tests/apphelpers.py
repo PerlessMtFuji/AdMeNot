@@ -1,12 +1,16 @@
 """Atrapy dla testów mostu `Api` (tests/test_app_api_*.py)."""
 
 import threading
+from collections import namedtuple
 from datetime import datetime
 from typing import ClassVar
 
 from admenot.app.api import Api
 from admenot.app.events import RecordingEmitter
+from admenot.engine.apk import cache as C
 from admenot.engine.apk.analyze import ApkReport
+from admenot.engine.apk.fetch import FetchedApks, default_cache_dir
+from admenot.engine.apk.providers import DeviceApkProvider
 from admenot.engine.settings import save_settings
 
 NOW = datetime(2026, 9, 26, 14, 30, 0)
@@ -42,12 +46,50 @@ class SlowApk:
         return {}
 
 
-def make_api(phone, *, sync=True, apk=None, lang="pl", **kw):
+Disk = namedtuple("Disk", "total used free")
+
+
+def fake_fetch(cache_dir, package):
+    """Pobranie bez telefonu: 1 bajt we wpisie `<pakiet>/id`, jak gotowy wpis `fetch_apks`."""
+    entry = cache_dir / package / "id"
+    entry.mkdir(parents=True, exist_ok=True)
+    (entry / "base.apk").write_bytes(b"x")
+    return FetchedApks([entry / "base.apk"], verified=True)
+
+
+def policy_factory(policies):
+    """Prawdziwy `DeviceApkProvider` z polityką od `Api`; `stat` podaje 1 GB na każdy cel.
+
+    `NoApk` pomija `CachePolicy`, więc tryb ręczny (pytanie o tryb, `apk:manual`) widać tylko
+    z tym dostawcą; trzeba też podstawić `cache.disk_usage` (`Disk`).
+    """
+    def factory(adb, policy=None, **kw):
+        policies.append(policy)
+        real = adb.shell
+
+        def shell(command, timeout=20.0):
+            if command.startswith("stat -c"):
+                paths = [a.strip("'") for a in command.split() if a.endswith(".apk'") or
+                         (a.endswith(".apk") and "*" not in a)]
+                return "".join(f"{C.GB} {path}\n" for path in paths)
+            return real(command, timeout)
+
+        adb.shell = shell
+        return DeviceApkProvider(adb, cache_dir=default_cache_dir(), workers=1,
+                                 fetch=lambda a, package, d: fake_fetch(d, package),
+                                 analyze=lambda package, paths: ApkReport(package, class_count=1),
+                                 policy=policy)
+    return factory
+
+
+def make_api(phone, *, sync=True, apk=None, lang="pl", apk_mode="full", **kw):
     # Controller ruling F2: testy nie mogą zależeć od locale Windows — język ustawiony na
     # sztywno przed skonstruowaniem `Api`, które przy starcie wczytuje ustawienia.
-    save_settings({"lang": lang})
+    # Tryb APK „full”: zadanie synchroniczne nie odpowie na pytanie o tryb (spec trybu ręcznego).
+    save_settings({"lang": lang, "apk_mode_default": apk_mode})
     rec = RecordingEmitter()
     kw.setdefault("open_file", lambda path: None)
+    kw.setdefault("app_labels", lambda serial, adb, stop, on_line: {})  # bez scrcpy na komputerze testów
     provider = apk or NoApk()
     api = Api(rec, host_factory=lambda path: phone, apk_factory=lambda adb, policy=None, **kw: provider,
               sync_jobs=sync, now=lambda: NOW, **kw)

@@ -14,6 +14,7 @@ from typing import Any
 
 from admenot import __version__
 from admenot.engine.actions.planner import AppPlan
+from admenot.engine.apk.timing import Eta
 from admenot.engine.device.info import DeviceInfo
 from admenot.engine.session import ScanReport
 from admenot.engine.workflow import AppStatus, OrderResult
@@ -63,7 +64,7 @@ def start_body(mode: str) -> dict[str, Any]:
 
 
 def scan_event(report: ScanReport, session: str, seconds: int, packages: bool,
-               apk_stage: bool = False) -> dict[str, Any]:
+               apk_stage: bool = False, eta: Eta | None = None) -> dict[str, Any]:
     flagged = [r for r in report.results if r.verdict != "safe"]  # wyniki są już po wyniku malejąco
     apk = report.apk
     return {
@@ -73,6 +74,8 @@ def scan_event(report: ScanReport, session: str, seconds: int, packages: bool,
         "apk": None if apk is None else {"requested": apk.requested, "analyzed": apk.analyzed,
                                          "failed": len(apk.failed)},
         "seconds": _count(seconds, MAX_SECONDS), "apk_stage": apk_stage,
+        "apk_mode": report.apk_mode,
+        "eta": {"kind": eta.kind, "seconds": _count(eta.seconds, MAX_SECONDS)} if eta else None,
         "packages": _listed({"package": r.facts.package, "verdict": r.verdict, "score": _count(r.score, MAX_SCORE),
                              "confidence": r.confidence, "system": r.facts.is_system}
                             for r in flagged) if packages else None,
@@ -81,10 +84,12 @@ def scan_event(report: ScanReport, session: str, seconds: int, packages: bool,
 
 def repair_event(device: DeviceInfo, session: str, plans: list[AppPlan], verdicts: dict[str, str],
                  result: OrderResult | None, interrupted: str | None,
-                 packages: bool) -> dict[str, Any]:
+                 packages: bool, blind: frozenset[str] = frozenset()) -> dict[str, Any]:
     statuses: dict[str, AppStatus] = {a.package: a for a in result.apps} if result else {}
 
     def source(package: str) -> str:
+        if package in blind:  # wybrana w trybie ręcznym; ukryty werdykt heurystyk jest w skanie
+            return "blind"
         return "flagged" if verdicts.get(package, "safe") != "safe" else "manual"
 
     def ok(package: str) -> bool | None:
@@ -97,7 +102,7 @@ def repair_event(device: DeviceInfo, session: str, plans: list[AppPlan], verdict
         "device": device_of(device), "session": session,
         "levels": {lvl: sum(1 for p in plans if p.level == lvl) for lvl in LEVELS},
         "sources": {src: sum(1 for p in plans if source(p.package) == src)
-                    for src in ("flagged", "manual")},
+                    for src in ("flagged", "manual", "blind")},
         "failed": len(failed), "errors": errors, "interrupted": interrupted,
         "packages": _listed({"package": p.package, "source": source(p.package), "level": p.level,
                              "ok": ok(p.package)} for p in plans) if packages else None,
@@ -126,8 +131,9 @@ def _sample_scan(packages: bool) -> dict[str, Any]:
                 "confidence": "medium", "system": False}]
     return {"device": device_of(_SAMPLE_DEVICE), "session": "ab12cd34", "apps": 187,
             "verdicts": {"malicious": 1, "suspicious": 0, "review": 1}, "low_behavior_data": False,
-            "apk": {"requested": 2, "analyzed": 2, "failed": 0}, "seconds": 41,
-            "apk_stage": False, "packages": flagged if packages else None}
+            # Szybki skan (apk_stage False): APK jeszcze nie przeanalizowane, tryb dopiero do wyboru.
+            "apk": None, "seconds": 41, "apk_stage": False, "apk_mode": "pending", "eta": None,
+            "packages": flagged if packages else None}
 
 
 def sample() -> dict[str, list[dict[str, Any]]]:

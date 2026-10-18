@@ -115,6 +115,8 @@ def _compact(row: AppRow) -> bool:
 def _headline(protocol: Protocol, t: dict[str, Any]) -> str | None:
     if not protocol.has_scan:
         return None
+    if protocol.manual:
+        return None
     if not any(r.verdict in FLAGGED for r in protocol.rows):
         return t["no_signs"]
     if not protocol.clean_count:  # None (brak migawki) albo 0 (nic bez uwag): bez nagłówka
@@ -142,6 +144,7 @@ def render_html(protocol: Protocol, service: ServiceInfo, generated_at: datetime
         consent=(t["consent"].format(code=protocol.consent.code,
                                      time=protocol.consent.shown_at.strftime("%H:%M"))
                  if protocol.consent else None),
+        manual=t["manual_note"] if protocol.manual else None,
         shots=[{"image": image, "time": s.taken_at.strftime(t["datetime_format"]),
                 "caption": screenshot_caption(s.context, lang)}
                for s in protocol.screenshots if (image := data_uri(s.image))],

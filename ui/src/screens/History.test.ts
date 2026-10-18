@@ -50,7 +50,7 @@ function view(over: Partial<HistoryView['orders'][number]>): HistoryView {
   return { serial: 'S1', serials: ['S1', 'S2'], devices: [{ serial: 'S1', name: 'Samsung Galaxy A14', model: 'SM-A145R', image: '' },
     { serial: 'S2', name: 'S2', model: null, image: '' }],
     orders: [{ id: 1, number: 'ZS/2026/0926/05', created_at: '2026-09-26T14:30', status: 'running',
-      status_label: 'w toku', client: null, model: 'SM-A145R', interrupted: true, screenshots: 0,
+      status_label: 'w toku', client: null, model: 'SM-A145R', interrupted: true, manual: false, screenshots: 0,
       actions: [
         { id: 2, package: 'p', level: 'disable', level_label: 'WYŁĄCZ', kind: 'notif', step_label: 'odebranie zgody',
           status: 'done', status_label: 'wykonane', error: null },
@@ -144,4 +144,16 @@ test('history: deleting an order asks first, then calls the bridge', async () =>
   await fireEvent.click(within(dialog).getByRole('button', { name: 'Usuń' }));
   await vi.waitFor(() =>
     expect(bridge.calls.some((c) => c.method === 'delete_order' && c.args[0] === order.number)).toBe(true));
+});
+
+test('history: an order made in manual mode is tagged', async () => {
+  const { ctl, s } = await setupCtl('empty');
+  render(App, { props: { ctl } });
+  s.history = view({ interrupted: false, status: 'done', status_label: 'wykonane' });
+  s.screen = 'history';
+  await tick();
+  expect(within(screen.getByRole('article', { name: 'ZS/2026/0926/05' })).queryByText('tryb ręczny')).toBeNull();
+  s.history = view({ interrupted: false, status: 'done', status_label: 'wykonane', manual: true });
+  await tick();
+  expect(within(screen.getByRole('article', { name: 'ZS/2026/0926/05' })).getByText('tryb ręczny')).toBeTruthy();
 });

@@ -92,6 +92,14 @@ def scan_snapshot(report: ScanReport, match: PhoneMatch,
                   chosen: Mapping[str, str] | None = None) -> dict[str, Any]:
     chosen = chosen or {}
     d = report.device
+    manual = report.apk_mode in ("manual", "partial")
+    on_demand = report.analyzed_on_demand
+
+    def kept(r: AppResult) -> bool:
+        if manual:  # werdyktów spoza wyboru i analizy na żądanie serwisant nie widział
+            return r.facts.package in chosen or r.facts.package in on_demand
+        return r.verdict != "safe" or r.incomplete or r.facts.package in chosen
+
     return {
         "version": SNAPSHOT_VERSION,
         "scanned_at": d.local_now.isoformat(timespec="seconds"),
@@ -110,7 +118,8 @@ def scan_snapshot(report: ScanReport, match: PhoneMatch,
             "image": str(match.image),
         },
         "app_count": len(report.results),
+        "apk_mode": report.apk_mode,
+        "on_demand": sorted(on_demand),
         "apps": [_app(r, report.apk_reports.get(r.facts.package), chosen.get(r.facts.package), d.sdk)
-                 for r in report.results
-                 if r.verdict != "safe" or r.incomplete or r.facts.package in chosen],
+                 for r in report.results if kept(r)],
     }

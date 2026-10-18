@@ -33,7 +33,7 @@ class Wrangler:
 
 
 @pytest.mark.parametrize("command", [["active"], ["phones"], ["verdicts"], ["packages"],
-                                     ["packages", "--left"]])
+                                     ["packages", "--left"], ["missed"]])
 def test_queries_run_and_print(script, command, capsys):
     run = Wrangler([{"a": 1, "b": "x\x1b[31m"}])
     assert script.main([*command, "--days", "7", "--local"], run=run) == 0
@@ -81,3 +81,12 @@ def test_verdicts_and_left_use_the_final_scan_of_a_session(script):
     assert (scan["events"], scan["review"]) == (2, 5)  # s1 po APK (3) + s2 bez APK (2)
     left = {r[0] for r in db.execute(script.QUERIES["left"](30))}
     assert left == {"a.a", "c.c", "d.d", "e.e"}
+
+
+def test_manual_mode_is_not_left_and_blind_picks_not_flagged_are_missed(script):
+    manual = {**_scan("s3", False, 1, ["f.f"]), "apk_mode": "manual"}
+    repair = {"type": "repair", "session": "s3", "sources": {"flagged": 0, "manual": 0, "blind": 2},
+              "packages": [{"package": "f.f", "source": "blind"}, {"package": "g.g", "source": "blind"}]}
+    db = _db(manual, repair)
+    assert list(db.execute(script.QUERIES["left"](30))) == []  # ukryte werdykty to nie przeoczenia serwisanta
+    assert [r[0] for r in db.execute(script.QUERIES["missed"](30))] == ["g.g"]  # f.f było w skanie

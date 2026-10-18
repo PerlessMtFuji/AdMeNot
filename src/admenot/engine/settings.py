@@ -31,11 +31,13 @@ LANGS = ("pl", "en")
 MODES = ("simple", "expert")
 THEMES = ("system", "light", "dark")
 SELECT_LEVELS = ("silence", "disable", "remove")  # poziomy akcji (actions/planner.LEVELS)
+APK_MODES = ("ask", "full", "manual")  # co po szybkim skanie: pytać, pełna analiza APK, tryb ręczny
 RETENTION_DAYS = (30, 60, 90, 180, 365)  # okres przechowywania zleceń do wyboru; None = nie usuwaj
 DEFAULT_RETENTION_DAYS = 60  # RODO: domyślnie ograniczone przechowywanie danych klientów
 KEYS = ("lang", "mode", "adb_path", "backups_dir", "theme", "mirror_auto",
         "apk_cache_limit_gb", "apk_cache_clear_after_repair", "select_level",
-        "check_updates", "dismissed_update", "last_run_version", "retention_days")
+        "check_updates", "dismissed_update", "last_run_version", "retention_days",
+        "apk_mode_default")
 # Klucze zmieniane tylko przez dedykowane funkcje (ostrzeżenie, zgody telemetrii), nigdy z ekranu
 # ustawień: UI nie może podstawić własnego ID instalacji ani „zaakceptować” ostrzeżenia bokiem.
 INTERNAL_KEYS = ("welcome_version", "welcome_at", "telemetry", "telemetry_packages",
@@ -78,6 +80,7 @@ class Settings:
     apk_cache_limit_gb: int = 10  # górna granica; działa tyle, ile mieści dysk (apk/cache.py)
     apk_cache_clear_after_repair: bool = False
     select_level: str = "silence"  # akcja po zaznaczeniu aplikacji, dla której silnik nic nie proponuje
+    apk_mode_default: str = "ask"  # tryb po szybkim skanie (spec trybu ręcznego §5.4)
     check_updates: bool = True  # wyłączone = zero zapytań o aktualizacje (spec aktualizacji §4.3)
     dismissed_update: str | None = None  # wersja ukryta krzyżykiem na banerze
     last_run_version: str | None = None  # komunikat „Zaktualizowano” po zmianie wersji
@@ -236,6 +239,8 @@ def _valid(key: str, value: Any) -> bool:
         return value in THEMES
     if key == "select_level":
         return value in SELECT_LEVELS
+    if key == "apk_mode_default":
+        return value in APK_MODES
     if key == "retention_days":
         return value is None or (type(value) is int and value in RETENTION_DAYS)
     return value is None or (isinstance(value, str) and value.strip() != "")

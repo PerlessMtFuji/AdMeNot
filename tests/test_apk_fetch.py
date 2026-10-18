@@ -52,12 +52,14 @@ def test_fetch_pulls_all_splits_and_records_hashes(tmp_path):
 
 
 def test_same_installed_bytes_reuse_cache_but_always_ask_the_phone(tmp_path):
-    fetch_apks(_adb(), "com.clean.x", tmp_path)
+    first = fetch_apks(_adb(), "com.clean.x", tmp_path)
     adb = _adb()
     fetched = fetch_apks(adb, "com.clean.x", tmp_path)
     assert _pulls(adb) == []
     assert adb.calls[:2] == [PM_PATH.format(package="com.clean.x"), sha256_command([BASE, SPLIT])]
     assert fetched.verified
+    assert first.from_cache is False
+    assert fetched.from_cache is True
 
 
 def test_other_phone_with_same_version_gets_its_own_bytes(tmp_path):

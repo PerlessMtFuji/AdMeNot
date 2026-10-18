@@ -242,3 +242,31 @@ def test_no_space_marks_the_apk_status_and_passes_flagged(synthetic_adb):
     before = run_scan(synthetic_adb)  # werdykty sprzed analizy APK
     assert seen["flagged"] == {r.facts.package for r in before.results if r.verdict != "safe"}
     assert all("apk" in r.facts.gaps for r in report.results if r.facts.package in report.apk.failed)
+
+
+class _OneClass:
+    def reports_for(self, apps, progress=None, flagged=frozenset()):
+        return {f.package: ApkReport(f.package, class_count=1) for f in apps}
+
+
+def test_modes_after_analysis(scan_report):
+    import dataclasses
+
+    assert scan_report.apk_mode == "pending"
+    full = analyze_apks(scan_report, _OneClass())
+    assert full.apk_mode == "full" and full.analyzed_on_demand == frozenset()
+    package = scan_report.results[0].facts.package
+    deep = analyze_apks(full, _OneClass(), only=frozenset({package}))
+    assert deep.apk_mode == "full"  # głęboka analiza po pełnej nie zmienia trybu
+    manual = dataclasses.replace(scan_report, apk_mode="manual")
+    part = analyze_apks(manual, _OneClass(), only=frozenset({package}))
+    assert part.apk_mode == "partial" and part.analyzed_on_demand == {package}
+    again = analyze_apks(part, _OneClass(), only=frozenset({package}))
+    assert again.analyzed_on_demand == {package}
+    other = scan_report.results[1].facts.package
+    both = analyze_apks(part, _OneClass(), only=frozenset({other}))
+    assert both.analyzed_on_demand == {package, other}
+    assert deep.analyzed_on_demand == frozenset()
+    pending = analyze_apks(scan_report, _OneClass(), only=frozenset({package}))
+    assert pending.apk_mode == "pending" and pending.analyzed_on_demand == frozenset()
+    assert analyze_apks(part, _OneClass()).apk_mode == "full"

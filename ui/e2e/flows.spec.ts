@@ -23,6 +23,21 @@ test('adware: scan, confirm the plan, fix with the admin step, undo from history
   await expect(page.getByText(/ZS\/2026\/0926\/01: cofnięte/).first()).toBeVisible({ timeout: 15_000 });
 });
 
+test('tryb ręczny: wyszukaj, zaznacz, przeanalizuj, napraw', async ({ page }) => {
+  await scan(page, 'manual');
+  await expect(page.getByRole('heading', { name: 'Wyszukaj aplikacje do usunięcia' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Tryb widoku' })).toHaveCount(0);
+  await page.getByRole('searchbox').fill('clean');
+  await page.getByRole('checkbox', { name: /clean/ }).check();
+  await page.getByRole('button', { name: /Przeanalizuj zaznaczone \(1\)/ }).click();
+  await expect(page.getByRole('button', { name: 'Dlaczego?' })).toBeVisible({ timeout: 15_000 }); // karta z werdyktem
+  await expect(page.getByRole('heading', { name: 'Nie wykryto oznak zagrożenia' })).toHaveCount(0);
+  await page.getByRole('button', { name: /Podsumowanie \(1\)/ }).click();
+  await expect(page.getByRole('region', { name: 'Plan naprawy' })).toBeVisible();
+  await page.getByRole('button', { name: /^Wykonaj/ }).click();
+  await expect(page.getByRole('heading', { name: 'Telefon naprawiony' })).toBeVisible({ timeout: 15_000 });
+});
+
 test('clean phone has nothing to fix', async ({ page }) => {
   await scan(page, 'clean');
   await expect(page.getByRole('heading', { name: 'Nie wykryto oznak zagrożenia' })).toBeVisible();

@@ -13,6 +13,7 @@ from admenot.engine.apk.isolated import IsolatedAnalyzer
 from admenot.engine.apk.providers import (
     CachePolicy,
     DeviceApkProvider,
+    ManualMode,
     StoredApkProvider,
     select_apk_targets,
 )
@@ -448,3 +449,65 @@ def test_failed_deep_analysis_keeps_the_normal_result(tmp_path):
     facts = AppFacts("com.a")
     apply_apk_report(facts, report)
     assert facts.code_hides_icon is None and "code_undetermined" in scope_notes(facts)
+
+
+def _choosing(tmp_path, sizes, answer, seen):
+    provider, apps = _estimating(tmp_path, sizes, "run", seen)
+    provider.policy = CachePolicy(
+        limit_bytes=provider.policy.limit_bytes, on_estimate=provider.policy.on_estimate,
+        decide=provider.policy.decide,
+        choose=lambda est, use, n: seen.append(("choose", est and est.total_bytes, n)) or answer)
+    return provider, apps
+
+
+def test_manual_choice_pulls_nothing(tmp_path, free):
+    seen = []
+    provider, apps = _choosing(tmp_path, [100, 200], "manual", seen)
+    with pytest.raises(ManualMode):
+        provider.reports_for(apps)
+    assert seen == [("estimate", 300), ("choose", 300, 2)]
+    assert not any(tmp_path.joinpath(f"com.app{i}").exists() for i in range(2))
+
+
+def test_full_choice_runs_as_before(tmp_path, free):
+    seen = []
+    provider, apps = _choosing(tmp_path, [100, 200], "full", seen)
+    reports = provider.reports_for(apps)
+    assert all(r.error is None for r in reports.values())
+    assert seen[:2] == [("estimate", 300), ("choose", 300, 2)]
+
+
+def test_choice_is_asked_without_disk_usage(tmp_path, monkeypatch):
+    def broken(path):
+        raise OSError("no disk usage")
+    monkeypatch.setattr(C, "disk_usage", broken)
+    seen = []
+    provider, apps = _choosing(tmp_path, [100, 200], "manual", seen)
+    with pytest.raises(ManualMode):
+        provider.reports_for(apps)
+    assert ("choose", 300, 2) in seen and not any(s[0] == "estimate" for s in seen)
+
+
+def test_choice_is_asked_when_the_estimate_fails(tmp_path, free, monkeypatch):
+    monkeypatch.setattr("admenot.engine.apk.providers.estimate", lambda *a: None)
+    seen = []
+    provider, apps = _choosing(tmp_path, [100, 200], "manual", seen)
+    with pytest.raises(ManualMode):
+        provider.reports_for(apps)
+    assert seen == [("choose", None, 2)]
+
+
+def test_provider_measures_pull_and_analysis(tmp_path, free):
+    provider = _provider(tmp_path, CachePolicy(limit_bytes=10 * C.GB), _writing_fetch(1000))
+    provider.reports_for(_apps(3))
+    assert provider.stats.apps == 3 and provider.stats.analyzed_bytes == 3000
+    assert provider.stats.pulled == 3 and provider.stats.hits == 0
+
+
+def test_deep_and_failed_apps_are_not_measured(tmp_path):
+    def failing(adb, package, cache_dir):
+        raise AdbError("command_failed", "boom")
+    provider = DeviceApkProvider(FakeAdb(), cache_dir=tmp_path, workers=1, fetch=failing,
+                                 analyze=lambda package, paths: ApkReport(package, class_count=1))
+    provider.reports_for(_apps(2))
+    assert provider.stats.apps == 0

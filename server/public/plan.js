@@ -26,6 +26,7 @@ export const TEXTS = {
     blocked_title: "Bez zmian",
     footer_server: "Ten plan zobaczy tylko osoba z tym kodem QR. Wygasa godzinę po utworzeniu.",
     footer_local: "Ten plan nie był wysyłany na serwer — cała lista jest zapisana w kodzie QR.",
+    manual_note: "Telefon nie został przeanalizowany w całości — aplikacje do zmiany wskazał serwisant.",
     expired: "Ten plan wygasł albo nie istnieje. Poproś serwisanta o nowy kod.",
     unreadable: "Nie da się odczytać planu.",
     offline: "Brak połączenia.",
@@ -53,6 +54,7 @@ export const TEXTS = {
     blocked_title: "No change",
     footer_server: "Only someone with this QR code can see this plan. It expires an hour after it was created.",
     footer_local: "This plan was not sent to a server — the whole list is stored in the QR code.",
+    manual_note: "The phone was not analysed in full — the technician chose the apps to change.",
     expired: "This plan has expired or does not exist. Ask the technician for a new code.",
     unreadable: "The plan cannot be read.",
     offline: "No connection.",
@@ -178,7 +180,9 @@ export function render(root, p, mode) {
     section.append(el("h2", null, g.title), el("p", "desc", g.text), list);
     return section;
   });
-  root.replaceChildren(head, ...sections, el("footer", null, mode === "server" ? t.footer_server : t.footer_local));
+  const note = p.m === 1 ? [el("p", "note", t.manual_note)] : [];
+  root.replaceChildren(head, ...sections, ...note,
+    el("footer", null, mode === "server" ? t.footer_server : t.footer_local));
 }
 
 function fail(root, key) {

@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import re
 from datetime import UTC, datetime, timedelta, timezone
@@ -6,6 +7,7 @@ from conftest import SERIAL
 
 from admenot.app import telemetry_events as ev
 from admenot.engine.actions.planner import AppPlan
+from admenot.engine.apk.timing import Eta
 from admenot.engine.session import run_scan
 from admenot.engine.workflow import AppStatus, OrderResult
 
@@ -61,7 +63,7 @@ def test_repair_event_sources_levels_and_errors(synthetic_adb):
     verdicts = {"com.clean.pro.boost": "malicious", "com.user.notes": "safe"}
     e = ev.repair_event(device, "ab12cd34", _plans(), verdicts, result, None, packages=True)
     assert e["levels"] == {"silence": 0, "disable": 1, "remove": 1}
-    assert e["sources"] == {"flagged": 1, "manual": 1}
+    assert e["sources"] == {"flagged": 1, "manual": 1, "blind": 0}
     assert e["failed"] == 1 and e["errors"] == ["admin_refused"] and e["interrupted"] is None
     assert e["packages"] == [
         {"package": "com.clean.pro.boost", "source": "flagged", "level": "remove", "ok": True},
@@ -122,3 +124,34 @@ def test_values_fit_server_limits(synthetic_adb):
     e = ev.repair_event(odd, "s", [AppPlan("a.b", "disable", [])], {}, result, None, packages=False)
     assert e["errors"] == ["x" * 64]
     assert len(ev.common("id", "start", datetime(2026, 10, 10, tzinfo=UTC), "pl")["os"]) <= 64
+
+
+def test_scan_event_carries_mode_and_eta(scan_report):
+    body = ev.scan_event(dataclasses.replace(scan_report, apk_mode="manual"), "ab12cd34", 5, False,
+                         apk_stage=True, eta=Eta(600, "rough", 360, 900))
+    assert body["apk_mode"] == "manual" and body["eta"] == {"kind": "rough", "seconds": 600}
+    assert ev.scan_event(scan_report, "ab12cd34", 5, False)["eta"] is None
+
+
+def test_repair_event_marks_blind_picks():
+    plans = [AppPlan("com.a", "remove", []), AppPlan("com.b", "disable", [])]
+    body = ev.repair_event(ev._SAMPLE_DEVICE, "ab12cd34", plans, {"com.a": "malicious"}, None, None,
+                           True, blind=frozenset({"com.a", "com.b"}))
+    assert body["sources"] == {"flagged": 0, "manual": 0, "blind": 2}
+    assert {p["source"] for p in body["packages"]} == {"blind"}
+
+
+def test_ui_sample_json_matches_sample_and_shows_a_quick_scan():
+    # Plik „co wysyłamy” w UI (atrapa mostu) = `sample()`; wersja programu zmienia się z wydaniem.
+    from pathlib import Path
+
+    path = Path(__file__).parent.parent / "ui" / "src" / "lib" / "telemetrySample.json"
+    shown = json.loads(path.read_text("utf-8"))
+
+    def strip(s):
+        return {k: [{**e, "app": None} for e in v] for k, v in s.items()}
+
+    assert strip(shown) == strip(ev.sample())
+    scan = next(e for e in ev.sample()["basic"] if e["type"] == "scan")
+    assert scan["apk_stage"] is False and scan["apk_mode"] == "pending" and scan["eta"] is None
+    assert scan["apk"] is None

@@ -1,12 +1,13 @@
 import time
 
 import pytest
-from apphelpers import make_api
+from apphelpers import Disk, make_api, policy_factory
 from conftest import SERIAL
 from fakephone import make_cli_phone
 
 from admenot.app import api as api_module
 from admenot.engine import share
+from admenot.engine.apk import cache as C
 from admenot.engine.journal.db import Journal
 from admenot.engine.paths import journal_path
 from admenot.net.client import BackendError
@@ -66,6 +67,21 @@ def test_share_sends_encrypted_plan_and_emits_server_url():
     assert payload["code"] == code and payload["apps"][0]["l"] == "disable"
     # Bez analizy APK nazwą jest pakiet (spec §2); poza nazwą treść nie ma żadnych pól technicznych.
     assert all(set(app) <= {"n", "l", "b", "i"} for app in payload["apps"])
+
+
+@pytest.mark.parametrize("mode,expected", [("manual", 1), ("full", None)])
+def test_share_marks_manual_mode_in_payload_only_when_not_full(monkeypatch, mode, expected):
+    monkeypatch.setattr(C, "disk_usage", lambda path: Disk(500 * C.GB, 0, 500 * C.GB))
+    up = Uploader()
+    api, rec = make_api(make_cli_phone(), share_upload=up, apk_mode=mode)
+    api._apk_factory = policy_factory([])
+    api.start_scan(SERIAL, "Anna")
+    rec.wait_for("apk:manual" if mode == "manual" else "apk:done")
+    assert api._jobs.wait(5)
+    api.share_plan(WLIVE, [], "ui-m")
+    ready = rec.wait_for("share:ready")
+    payload = share.decrypt(up.blobs[0], ready["url"].rsplit(".", 1)[1])
+    assert payload.get("m") == expected
 
 
 def test_offline_first_gives_local_url_then_upgrades_in_background():

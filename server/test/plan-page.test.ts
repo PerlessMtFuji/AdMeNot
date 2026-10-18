@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import vector from "../../tests/fixtures/share_vector.json";
-import { TEXTS, canInflate, decodeLocal, decryptShare, effect, groups, initial, parseFragment } from "../public/plan.js";
+import { TEXTS, canInflate, decodeLocal, decryptShare, effect, groups, initial, parseFragment, render } from "../public/plan.js";
 
 const bytes = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 
@@ -79,5 +79,31 @@ describe("plan.js", () => {
 
   it("oba języki mają te same klucze", () => {
     expect(Object.keys(TEXTS.en).sort()).toEqual(Object.keys(TEXTS.pl).sort());
+  });
+
+  it("pokazuje zdanie o niepełnej analizie tylko z m=1", () => {
+    // Testy idą w workerd bez DOM-u: wystarcza atrapa tylko tego, czego używa render.
+    class Node { className = ""; textContent = ""; dir = ""; alt = ""; src = ""; children: Node[] = [];
+      constructor(public tag: string) {}
+      append(...c: Node[]) { this.children.push(...c); }
+      replaceChildren(...c: Node[]) { this.children = c; }
+      querySelector(sel: string): Node | null {
+        const [tag, cls] = sel.split(".");
+        for (const c of this.children) {
+          if (c.tag === tag && c.className === cls) return c;
+          const deep = c.querySelector(sel);
+          if (deep) return deep;
+        }
+        return null;
+      } }
+    (globalThis as any).document = { documentElement: {}, title: "", createElement: (tag: string) => new Node(tag) };
+    const root = new Node("main") as unknown as Element;
+    const plan = { v: 1, lang: "pl", at: "2026-10-17T12:00", phone: "OPPO A78", code: "ABCD", notif: 0,
+      apps: [{ n: "Latarka", l: "disable" as const }] };
+    render(root, { ...plan, m: 1 }, "server");
+    expect(TEXTS.pl.manual_note).toBeTruthy();
+    expect(root.querySelector("p.note")?.textContent).toBe(TEXTS.pl.manual_note);
+    render(root, plan, "server");
+    expect(root.querySelector("p.note")).toBeNull();
   });
 });

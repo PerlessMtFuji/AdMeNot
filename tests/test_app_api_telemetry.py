@@ -1,8 +1,10 @@
 import json
 import re
+import time
+from collections import namedtuple
 
 import pytest
-from apphelpers import make_api
+from apphelpers import make_api, policy_factory
 from conftest import SERIAL
 from fakephone import make_cli_phone
 
@@ -132,3 +134,67 @@ def test_finished_deletion_reaches_the_ui(monkeypatch):
     api._start_telemetry()
     started["cb"]()  # wątek wysyłki: lista ID do usunięcia właśnie opustoszała
     assert rec.wait_for("telemetry:deleted") == {}
+
+
+def test_repair_event_marks_blind_picks_in_manual_mode(monkeypatch):
+    from admenot.engine.apk import cache as C
+
+    disk = namedtuple("Disk", "total used free")
+    monkeypatch.setattr(C, "disk_usage", lambda path: disk(500 * C.GB, 0, 500 * C.GB))
+    api, rec = make_api(make_cli_phone(), apk_mode="manual")
+    api._apk_factory = policy_factory([])
+    api.set_telemetry(True, False)
+    api.start_scan(SERIAL, "Anna")
+    rec.wait_for("apk:manual")
+    assert api._jobs.wait(5)
+    api.execute(WLIVE, [])
+    rec.wait_for("exec:done")
+    assert api._jobs.wait(5)
+    repair = next(e for e in events() if e["type"] == "repair")
+    assert repair["sources"]["blind"] == 1
+
+
+def _manual_api(monkeypatch, mode, sync):
+    from admenot.engine.apk import cache as C
+
+    disk = namedtuple("Disk", "total used free")
+    monkeypatch.setattr(C, "disk_usage", lambda path: disk(500 * C.GB, 0, 500 * C.GB))
+    api, rec = make_api(make_cli_phone(), apk_mode=mode, sync=sync)
+    api._apk_factory = policy_factory([])
+    api.set_telemetry(True, False)
+    return api, rec
+
+
+def _apk_scans():
+    return [e for e in events() if e["type"] == "scan" and e["apk_stage"]]
+
+
+def test_full_run_seconds_exclude_the_time_at_the_mode_question(monkeypatch):
+    api, rec = _manual_api(monkeypatch, "ask", sync=False)
+    api.start_scan(SERIAL)
+    q = rec.wait_for("apk:question")
+    time.sleep(1.2)  # serwisant się zastanawia — to nie czas analizy
+    api.answer(q["job_id"], "full")
+    rec.wait_for("apk:done")
+    assert api._jobs.wait(5)
+    scans = _apk_scans()
+    assert len(scans) == 1 and scans[0]["apk_mode"] == "full" and scans[0]["seconds"] == 0
+
+
+def test_stopping_analysis_of_selected_apps_records_no_new_scan(monkeypatch):
+    from apphelpers import SlowApk
+
+    api, rec = _manual_api(monkeypatch, "manual", sync=True)
+    api.start_scan(SERIAL)
+    package = rec.of("apk:manual")[0]["scan"]["apps"][0]["package"]
+    assert len(_apk_scans()) == 1  # wybór trybu ręcznego to ocena telefonu
+    slow = SlowApk()
+    api._apk_factory = lambda adb, policy=None, **kw: slow
+    api._jobs._sync = False
+    api.analyze_selected([package])
+    rec.wait_for("apk:progress")
+    api.stop_apk_to_manual()
+    slow.release.set()
+    assert api._jobs.wait(5)
+    assert len(rec.of("apk:manual")) == 2
+    assert len(_apk_scans()) == 1

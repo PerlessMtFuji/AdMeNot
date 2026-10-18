@@ -1,10 +1,10 @@
 import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
-import { actedAfter, changedVerdicts, defaultSelection, mergeSelection, notificationsManual, upsertStep, withoutUndone } from './logic';
+import { actedAfter, changedVerdicts, defaultSelection, isManual, mergeSelection, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
 import type { AppState } from './state.svelte';
 import { applyTheme } from './theme';
 import type {
-  ApiError, AppView, CacheUsage, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, TelemetrySample, Theme, Verdict,
+  ApiError, AppView, CacheUsage, EtaView, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, TelemetrySample, Theme, Verdict,
 } from './types';
 
 const CONSOLE_LIMIT = 500;
@@ -14,6 +14,7 @@ export class Controller {
   private knownLoaded = false;
   private autoMirrored = new Set<string>();
   private uiErrorSent = false;
+  private etaSeq = 0;  // szacunek dla zaznaczenia: liczy się tylko odpowiedź na ostatnie zapytanie
 
   constructor(readonly state: AppState, readonly bridge: Bridge) {}
 
@@ -96,7 +97,9 @@ export class Controller {
     on('scan:done', (d) => {
       s.scan = d.scan;
       s.interrupted = d.interrupted;
-      s.selection = defaultSelection(d.scan.apps);
+      // Bez „zawsze pełna” werdykty heurystyk są ukryte do wyboru trybu: nic nie może być zaznaczone za serwisanta.
+      s.selection = s.settings.apk_mode_default === 'full' ? defaultSelection(d.scan.apps) : {};
+      s.apkFullChosen = false;
       s.actedLog = {};
       s.undoTarget = null;
       s.touched = [];
@@ -105,25 +108,60 @@ export class Controller {
       s.openGroups = {};
       s.diagnostics = false;
       s.who = null;
-      s.apk = { done: 0, total: 0, running: true, changed: [] };
+      s.apk = { done: 0, total: 0, running: true, changed: [], eta: null };
       s.apkEstimate = null;
+      s.apkFullEta = null;
       s.apkQuestion = null;
+      s.selectionEta = null;
+      s.showSystem = false;
+      s.apkScope = 'all';
       s.phase = 'results';
     });
     // Zdarzenia porzuconej analizy APK (poprzedni skan) nie mogą zmienić nowego (BUG-10).
     const stale = (d: { job_id?: string }): boolean => !!d.job_id && !!s.job && d.job_id !== s.job.id;
-    on('apk:estimate', (d) => { if (!stale(d)) s.apkEstimate = d; });
-    on('apk:question', (d) => { if (!stale(d)) s.apkQuestion = d; });
+    // Most prowadzi analizę APK po skanie w tym samym zadaniu (kind „scan” → „apk”) i nie wysyła
+    // zmiany rodzaju: pierwsze zdarzenie analizy tego zadania ją oznacza (przycisk „Przerwij i szukaj ręcznie”).
+    const apkStage = (d: { job_id?: string }): void => {
+      if (s.job?.kind === 'scan' && d.job_id === s.job.id) s.job = { ...s.job, kind: 'apk' };
+    };
+    const eta = (d: EtaView): EtaView => ({ eta_s: d.eta_s, eta_kind: d.eta_kind, eta_min_s: d.eta_min_s, eta_max_s: d.eta_max_s });
+    on('apk:estimate', (d) => {
+      if (stale(d)) return;
+      apkStage(d);
+      s.apkEstimate = d;
+      if (d.scope === 'all') s.apkFullEta = eta(d);
+    });
+    on('apk:question', (d) => {
+      if (stale(d)) return;
+      apkStage(d);
+      s.apkQuestion = d;
+      if (d.kind === 'mode') s.apkFullEta = eta(d);  // pytanie o tryb dotyczy całego telefonu
+    });
     on('apk:progress', (d) => {
-      if (!stale(d)) s.apk = { ...s.apk, done: d.done, total: d.total, running: true };
+      if (stale(d)) return;
+      apkStage(d);
+      s.apk = { ...s.apk, done: d.done, total: d.total, running: true, eta: stableEta(s.apk.eta, d.eta_s) };
     });
     on('apk:done', (d) => {
       if (stale(d)) return;
       const changed = changedVerdicts(s.scan?.apps ?? [], d.scan.apps);
-      s.selection = mergeSelection(s.selection, d.scan.apps, s.touched);
+      // Tryb częściowy: werdykty spoza analizy na żądanie są ukryte — bez domyślnych zaznaczeń.
+      if (!isManual(d.scan)) s.selection = mergeSelection(s.selection, d.scan.apps, s.touched);
       s.scan = d.scan;
       s.apkQuestion = null;
-      s.apk = { ...s.apk, running: false, changed };
+      s.apk = { ...s.apk, running: false, changed, eta: null };
+      if (isManual(d.scan)) void this.refreshSelectionEta();
+    });
+    on('apk:manual', (d) => {
+      if (stale(d)) return;
+      // Z pełnej analizy do ręcznego: zostaje tylko to, co serwisant sam zaznaczył lub zmienił.
+      if (!isManual(s.scan)) {
+        s.selection = Object.fromEntries(Object.entries(s.selection).filter(([p]) => s.touched.includes(p)));
+      }
+      s.scan = d.scan;
+      s.apkQuestion = null;
+      s.apk = { ...s.apk, running: false, eta: null };
+      void this.refreshSelectionEta();
     });
     on('incident:state', (d) => { s.incident = { recording: d.recording, marks: 0, result: null }; });
     on('incident:done', (d) => {
@@ -133,7 +171,8 @@ export class Controller {
     on('apk:stopped', (d) => {
       if (stale(d)) return;
       s.apkQuestion = null;
-      s.apk = { ...s.apk, running: false };
+      s.apk = { ...s.apk, running: false, eta: null };
+      this.fullEndedWithoutReport();
     });
     on('exec:order', (d) => {
       s.order = d.order;
@@ -227,6 +266,7 @@ export class Controller {
       } else if (d.kind === 'apk' || d.kind === 'deep') {
         s.apkQuestion = null;
         s.apk = { ...s.apk, running: false };
+        if (d.kind === 'apk') this.fullEndedWithoutReport();
       } else if ((d.kind === 'exec' || d.kind === 'resume') && s.phase === 'executing') {
         if (s.order && !s.interrupted.includes(s.order)) s.interrupted = [...s.interrupted, s.order];
         s.admin = null;
@@ -278,8 +318,9 @@ export class Controller {
       error: null, phase: 'scanning', scanStage: 'identify', device: null, scan: null, plan: null,
       result: null, order: null, disconnectedOrder: null, steps: [], screen: 'main',
     });
-    s.apk = { done: 0, total: 0, running: false, changed: [] };
+    s.apk = { done: 0, total: 0, running: false, changed: [], eta: null };
     s.apkEstimate = null;
+    s.apkFullEta = null;
     s.apkQuestion = null;
     const r = await this.call(this.api.start_scan(s.serial, s.client.trim() || null));
     if (r) this.setJob(r.job_id, 'scan');
@@ -300,7 +341,7 @@ export class Controller {
     const s = this.state;
     const r = await this.call(this.api.deep_analyze(pkg));
     if (!r) return;
-    s.apk = { ...s.apk, done: 0, total: 1, running: true, changed: [] };
+    s.apk = { ...s.apk, done: 0, total: 1, running: true, changed: [], eta: null };
     this.setJob(r.job_id, 'deep');
   }
 
@@ -328,6 +369,7 @@ export class Controller {
     if (serial) void this.call(this.api.close_order(serial));
     Object.assign(s, { phase: 'results', screen: 'main', result: null, order: null, execPlan: null, plan: null,
       selection: {}, touched: Object.keys(s.acted), steps: [], lastShot: null, lastShotSerial: null, shotCount: 0 });
+    void this.refreshSelectionEta();
   }
 
   /** Cofa jedną aplikację w jej najnowszym zleceniu, bez wychodzenia z listy wyników. */
@@ -348,10 +390,15 @@ export class Controller {
     else delete next[pkg];
     s.selection = next;
     if (!s.touched.includes(pkg)) s.touched = [...s.touched, pkg];
+    void this.refreshSelectionEta();
   }
 
   toggle(app: AppView): void {
-    this.setLevel(app.package, this.state.selection[app.package] ? null : app.default_level ?? this.selectLevel(app));
+    const s = this.state;
+    // Tryb ręczny: propozycja silnika wynika z ukrytego werdyktu — tylko po analizie na żądanie jest widoczna.
+    const hidden = isManual(s.scan) && !(s.scan?.on_demand ?? []).includes(app.package);
+    this.setLevel(app.package, s.selection[app.package] ? null
+      : (hidden ? null : app.default_level) ?? this.selectLevel(app));
   }
 
   /** Wiele zmian naraz (akcje zbiorcze grupy); `null` odznacza. */
@@ -740,9 +787,74 @@ export class Controller {
 
   async answerApk(value: 'clear' | 'skip' | 'run'): Promise<void> {
     const q = this.state.apkQuestion;
-    if (!q) return;
+    if (!q || q.kind !== 'no_space') return;
     this.state.apkQuestion = null;
     await this.call(this.api.answer(q.job_id, value));
+  }
+
+  async chooseApkMode(mode: 'full' | 'manual', remember: boolean): Promise<void> {
+    const s = this.state;
+    const q = s.apkQuestion;
+    if (!q || q.kind !== 'mode') return;
+    s.apkQuestion = null;
+    if (mode === 'full') {
+      s.apkFullChosen = true;
+      // Werdykty heurystyk są od teraz widoczne: propozycje jak przed trybem ręcznym, zmiany serwisanta zostają.
+      if (s.scan) s.selection = mergeSelection(s.selection, s.scan.apps, s.touched);
+    }
+    if (remember) await this.saveSettings({ apk_mode_default: mode });
+    await this.call(this.api.answer(q.job_id, mode));
+  }
+
+  /** Wybrana pełna analiza skończyła się bez apk:done: raport szybkiego skanu z propozycjami jak przed trybem ręcznym. */
+  private fullEndedWithoutReport(): void {
+    const s = this.state;
+    if (s.apkFullChosen && s.scan?.apk_mode === 'pending') s.selection = mergeSelection(s.selection, s.scan.apps, s.touched);
+  }
+
+  async analyzeSelected(): Promise<void> {
+    const s = this.state;
+    const pkgs = Object.keys(s.selection);
+    if (!pkgs.length) return;
+    const r = await this.call(this.api.analyze_selected(pkgs));
+    if (!r) return;
+    s.apk = { done: 0, total: pkgs.length, running: true, changed: [], eta: s.selectionEta?.eta_s ?? null };
+    s.apkScope = 'selected';
+    this.setJob(r.job_id, 'apk');
+  }
+
+  async analyzeAll(): Promise<void> {
+    const s = this.state;
+    const r = await this.call(this.api.analyze_all());
+    if (!r) return;
+    s.apk = { done: 0, total: 0, running: true, changed: [], eta: null };
+    s.apkScope = 'all';
+    this.setJob(r.job_id, 'apk');
+  }
+
+  async stopToManual(): Promise<void> {
+    await this.call(this.api.stop_apk_to_manual());
+  }
+
+  /** Czas analizy zaznaczonych (tryb ręczny). Tylko dopisek przy przycisku: błąd nie trafia do banera. */
+  async refreshSelectionEta(): Promise<void> {
+    const s = this.state;
+    const seq = ++this.etaSeq;
+    const pkgs = Object.keys(s.selection);
+    if (!isManual(s.scan) || !pkgs.length) {
+      s.selectionEta = null;
+      return;
+    }
+    let r: EtaView | ApiError | null = null;
+    try {
+      r = await this.api.selection_eta(pkgs);
+    } catch {
+      r = null;
+    }
+    // W międzyczasie mogło przyjść nowsze zapytanie, zmiana trybu albo zaznaczenia.
+    const now = Object.keys(s.selection);
+    if (seq !== this.etaSeq || !isManual(s.scan) || now.length !== pkgs.length || now.some((p) => !pkgs.includes(p))) return;
+    s.selectionEta = r && !isApiError(r) ? r : null;
   }
 
   loadApkCache(): Promise<CacheUsage | null> {

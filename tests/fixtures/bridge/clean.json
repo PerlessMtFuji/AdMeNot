@@ -522,6 +522,8 @@
        },
        "low_behavior_data": false,
        "apk": null,
+       "apk_mode": "pending",
+       "on_demand": [],
        "apps": [
         {
          "package": "com.whatsapp",
@@ -542,6 +544,7 @@
          "incomplete": false,
          "is_system": false,
          "enabled": true,
+         "first_install": "2025-01-10T09:00:00",
          "from_play": true,
          "installer": "com.android.vending",
          "is_admin": false,
@@ -599,6 +602,7 @@
          "incomplete": false,
          "is_system": true,
          "enabled": true,
+         "first_install": "2008-12-31T16:00:00",
          "from_play": false,
          "installer": null,
          "is_admin": false,
@@ -675,6 +679,7 @@
       "done": 1,
       "total": 3,
       "package": "com.clean.pro.boost",
+      "eta_s": null,
       "job_id": "job-1"
      }
     ],
@@ -684,6 +689,7 @@
       "done": 2,
       "total": 3,
       "package": "com.wlive.forecast",
+      "eta_s": null,
       "job_id": "job-1"
      }
     ],
@@ -693,6 +699,7 @@
       "done": 3,
       "total": 3,
       "package": "com.whatsapp",
+      "eta_s": null,
       "job_id": "job-1"
      }
     ],
@@ -713,6 +720,8 @@
         "failed": {},
         "stopped_no_space": false
        },
+       "apk_mode": "full",
+       "on_demand": [],
        "apps": [
         {
          "package": "com.whatsapp",
@@ -728,6 +737,7 @@
          "incomplete": false,
          "is_system": false,
          "enabled": true,
+         "first_install": "2025-01-10T09:00:00",
          "from_play": true,
          "installer": "com.android.vending",
          "is_admin": false,
@@ -785,6 +795,7 @@
          "incomplete": false,
          "is_system": true,
          "enabled": true,
+         "first_install": "2008-12-31T16:00:00",
          "from_play": false,
          "installer": null,
          "is_admin": false,

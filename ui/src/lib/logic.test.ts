@@ -38,6 +38,11 @@ import {
   needsWelcome,
   groupCheck,
   bulkNeedsConfirm,
+  factTags,
+  isManual,
+  modeUndecided,
+  manualRows,
+  stableEta,
 } from './logic';
 import type { AppView, Category, Level, PlanApp, StepEvent, Finding, ScanView, Settings, UpdateView } from './types';
 
@@ -48,7 +53,7 @@ function app(pkg: string, verdict: AppView['verdict'], extra: Partial<AppView> =
     confidence: 'high', confidence_label: 'high', gaps: [], scope: [],
     trusted: false, incomplete: false, is_system: false, enabled: true, from_play: true, installer: null,
     is_admin: false, default_level: level, problems: [], findings: [], apk_error: null, icon: null,
-    ad_sdks: null, symptoms: [], source: { label: '', days: null }, capabilities: [], ...extra,
+    ad_sdks: null, symptoms: [], source: { label: '', days: null }, capabilities: [], first_install: null, ...extra,
   };
 }
 
@@ -432,5 +437,56 @@ describe('group select-all (bulk actions)', () => {
     expect(bulkNeedsConfirm({ a: 'silence', b: 'disable' })).toBe(true);
     expect(bulkNeedsConfirm({ a: 'remove' })).toBe(true);
     expect(bulkNeedsConfirm({})).toBe(false);
+  });
+});
+
+describe('tryb ręczny', () => {
+  const scan = (apk_mode: ScanView['apk_mode']) => ({ apk_mode }) as ScanView;
+
+  test('isManual', () => {
+    expect(isManual(null)).toBe(false);
+    expect(isManual(scan('pending'))).toBe(false);
+    expect(isManual(scan('full'))).toBe(false);
+    expect(isManual(scan('manual'))).toBe(true);
+    expect(isManual(scan('partial'))).toBe(true);
+  });
+
+  test('modeUndecided: tylko przy trwającej analizie raportu „pending”, bez „zawsze pełna” i bez wyboru pełnej', () => {
+    const base = { scan: scan('pending'), setting: 'ask' as const, running: true, fullChosen: false };
+    expect(modeUndecided(base)).toBe(true);
+    expect(modeUndecided({ ...base, setting: 'manual' })).toBe(true);
+    expect(modeUndecided({ ...base, setting: 'full' })).toBe(false);
+    expect(modeUndecided({ ...base, fullChosen: true })).toBe(false);
+    expect(modeUndecided({ ...base, running: false })).toBe(false);
+    expect(modeUndecided({ ...base, scan: scan('manual') })).toBe(false);
+    expect(modeUndecided({ ...base, scan: null })).toBe(false);
+  });
+
+  test('manualRows: najświeższe pierwsze, bez daty na końcu, systemowe ukryte', () => {
+    const apps = [
+      app('a', 'safe', { first_install: '2026-10-01T10:00:00' }),
+      app('b', 'safe', { first_install: null }),
+      app('c', 'safe', { first_install: '2026-10-15T10:00:00' }),
+      app('d', 'safe', { first_install: '2026-10-16T10:00:00', is_system: true }),
+    ];
+    expect(manualRows(apps, { query: '', showSystem: false, source: null }).map((a) => a.package)).toEqual(['c', 'a', 'b']);
+    expect(manualRows(apps, { query: '', showSystem: true, source: null })[0].package).toBe('d');
+    expect(manualRows(apps, { query: 'c', showSystem: false, source: null }).map((a) => a.package)).toEqual(['c']);
+  });
+
+  test('factTags tylko z faktów szybkiego skanu', () => {
+    const cap = (key: string, levels: Partial<AppView['capabilities'][number]['levels']>) =>
+      ({ key, label: '', levels: { declared: null, code: null, granted: null, observed: null, ...levels } });
+    const tags = factTags(app('x', 'safe', { from_play: false, is_admin: true, enabled: false, is_system: false,
+      capabilities: [cap('accessibility', { granted: true }), cap('overlay', { declared: true })] }));
+    expect(tags).toEqual(['non_play', 'admin', 'accessibility', 'disabled']); // overlay tylko zadeklarowany — bez znacznika
+  });
+
+  test('stableEta nie podnosi czasu o mniej niż minutę', () => {
+    expect(stableEta(null, 300)).toBe(300);
+    expect(stableEta(300, 280)).toBe(280);
+    expect(stableEta(300, 340)).toBe(300);
+    expect(stableEta(300, 380)).toBe(380);
+    expect(stableEta(300, null)).toBeNull();
   });
 });

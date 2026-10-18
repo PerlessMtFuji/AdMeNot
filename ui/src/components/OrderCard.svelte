@@ -7,6 +7,7 @@
   import Button from '../ui/Button.svelte';
   import Dialog from '../ui/Dialog.svelte';
   import Icon from '../ui/Icon.svelte';
+  import Pill from '../ui/Pill.svelte';
   import AppIcon from './AppIcon.svelte';
   import ReportButton from './ReportButton.svelte';
   import ScreenshotStrip from './ScreenshotStrip.svelte';
@@ -45,7 +46,7 @@
   <div class="flex items-start gap-3 px-5 pt-4 pb-3">
     <div class="min-w-0 flex-1">
       <div class="text-lg {undone ? 'font-semibold text-mut' : 'font-bold'}">{title}</div>
-      <div class="text-sm text-soft">{order.client ? `${order.client} · ` : ''}<span class="mono">{order.number}</span>{order.interrupted ? ` · ${order.status_label}` : ''}</div>
+      <div class="text-sm text-soft">{order.client ? `${order.client} · ` : ''}<span class="mono">{order.number}</span>{order.interrupted ? ` · ${order.status_label}` : ''}{#if order.manual}{' '}<Pill tone="neutral">{t('history.manual')}</Pill>{/if}</div>
       {#if order.screenshots}
         <button type="button" class="mt-1 text-sm font-semibold text-soft hover:text-ink" aria-expanded={shotsOpen}
           onclick={() => (shotsOpen = !shotsOpen)}>{t('shot.history', { count: order.screenshots })}</button>

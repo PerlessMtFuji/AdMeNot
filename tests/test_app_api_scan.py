@@ -1,8 +1,8 @@
 import threading
-from collections import namedtuple
+import time
 
 import pytest
-from apphelpers import SlowApk, make_api, names
+from apphelpers import Disk, SlowApk, fake_fetch, make_api, names, policy_factory
 from conftest import SERIAL
 from fakephone import make_cli_phone
 
@@ -11,13 +11,11 @@ from admenot.engine.actions.steps import Step
 from admenot.engine.adb.transport import AdbError
 from admenot.engine.apk import cache as C
 from admenot.engine.apk.analyze import ApkReport
-from admenot.engine.apk.fetch import FetchedApks, default_cache_dir
-from admenot.engine.apk.providers import DeviceApkProvider
+from admenot.engine.apk.fetch import default_cache_dir
+from admenot.engine.applabels import PhoneLabel
 from admenot.engine.journal.db import Journal
 from admenot.engine.paths import journal_path
 from admenot.engine.phones.provider import SILHOUETTE
-
-Disk = namedtuple("Disk", "total used free")
 
 
 @pytest.fixture(autouse=True)
@@ -155,40 +153,11 @@ def test_abandoned_analysis_cannot_publish_after_its_last_check(monkeypatch):
     assert rec.of("apk:done") == [] and api.rerender()["scan"] is not None
 
 
-def _fake_fetch(cache_dir, package):
-    """Pobranie bez telefonu: 1 bajt we wpisie `<pakiet>/id`, jak gotowy wpis `fetch_apks`."""
-    entry = cache_dir / package / "id"
-    entry.mkdir(parents=True, exist_ok=True)
-    (entry / "base.apk").write_bytes(b"x")
-    return FetchedApks([entry / "base.apk"], verified=True)
-
-
-def _policy_factory(policies):
-    """Prawdziwy `DeviceApkProvider` z polityką od `Api`; `stat` podaje 1 GB na każdy cel."""
-    def factory(adb, policy=None, **kw):
-        policies.append(policy)
-        real = adb.shell
-
-        def shell(command, timeout=20.0):
-            if command.startswith("stat -c"):
-                paths = [a.strip("'") for a in command.split() if a.endswith(".apk'") or
-                         (a.endswith(".apk") and "*" not in a)]
-                return "".join(f"{C.GB} {path}\n" for path in paths)
-            return real(command, timeout)
-
-        adb.shell = shell
-        return DeviceApkProvider(adb, cache_dir=default_cache_dir(), workers=1,
-                                 fetch=lambda a, package, d: _fake_fetch(d, package),
-                                 analyze=lambda package, paths: ApkReport(package, class_count=1),
-                                 policy=policy)
-    return factory
-
-
 def _policy_api(monkeypatch, free, sync=True):
     monkeypatch.setattr(C, "disk_usage", lambda path: Disk(500 * C.GB, 0, free))
     api, rec = make_api(make_cli_phone(), sync=sync)
     policies = []
-    api._apk_factory = _policy_factory(policies)
+    api._apk_factory = policy_factory(policies)
     return api, rec, policies
 
 
@@ -227,7 +196,7 @@ def test_stopping_during_the_space_question_skips_the_analysis(monkeypatch):
 def test_apk_cache_status_and_clear(monkeypatch):
     monkeypatch.setattr(C, "disk_usage", lambda path: Disk(120 * C.GB, 0, 4 * C.GB))
     api, _ = make_api(make_cli_phone())
-    _fake_fetch(default_cache_dir(), "com.a")
+    fake_fetch(default_cache_dir(), "com.a")
     status = api.apk_cache()
     assert status["size_bytes"] == 1 and status["limit_bytes"] == 10 * C.GB
     assert status["effective_bytes"] == 2 * C.GB + 1
@@ -297,3 +266,227 @@ def test_deep_analysis_needs_a_scan_and_a_known_package():
     api.start_scan(SERIAL)
     assert api.deep_analyze("com.not.installed")["error"]["key"] == "bad_request"
     assert api.deep_analyze("com.a;rm")["error"]["key"] == "bad_request"
+
+
+def _mode_api(monkeypatch, mode="ask", sync=False, free=500 * C.GB):
+    monkeypatch.setattr(C, "disk_usage", lambda path: Disk(500 * C.GB, 0, free))
+    api, rec = make_api(make_cli_phone(), sync=sync, apk_mode=mode)
+    policies = []
+    api._apk_factory = policy_factory(policies)
+    return api, rec
+
+
+def test_mode_question_after_estimate_then_manual(monkeypatch):
+    api, rec = _mode_api(monkeypatch)
+    api.start_scan(SERIAL)
+    q = rec.wait_for("apk:question")
+    assert q["kind"] == "mode" and q["apps"] >= 1 and q["eta_kind"] == "rough"
+    assert q["eta_min_s"] <= q["eta_s"] <= q["eta_max_s"]
+    assert names(rec).index("apk:estimate") < names(rec).index("apk:question")
+    api.answer(q["job_id"], "manual")
+    scan = rec.wait_for("apk:manual")["scan"]
+    assert scan["apk_mode"] == "manual"
+    assert rec.of("apk:progress") == [] and C.cache_size(default_cache_dir()) == 0
+    rec.wait_for("job:end")  # wątek zadania kończy się przed sprzątnięciem LOCALAPPDATA
+
+
+def test_mode_question_full_runs_the_analysis(monkeypatch):
+    api, rec = _mode_api(monkeypatch)
+    api.start_scan(SERIAL)
+    api.answer(rec.wait_for("apk:question")["job_id"], "full")
+    done = rec.wait_for("apk:done")["scan"]
+    assert done["apk_mode"] == "full"
+    assert all("eta_s" in p for p in rec.of("apk:progress"))
+    rec.wait_for("job:end")
+
+
+@pytest.mark.parametrize("mode,event", [("manual", "apk:manual"), ("full", "apk:done")])
+def test_remembered_mode_skips_the_question(monkeypatch, mode, event):
+    api, rec = _mode_api(monkeypatch, mode=mode, sync=True)
+    api.start_scan(SERIAL)
+    assert rec.of("apk:question") == [] and rec.of(event)
+
+
+def test_mode_question_without_disk_usage_has_no_sizes(monkeypatch):
+    def broken(path):
+        raise OSError("no disk usage")
+    api, rec = _mode_api(monkeypatch)
+    monkeypatch.setattr(C, "disk_usage", broken)
+    api.start_scan(SERIAL)
+    q = rec.wait_for("apk:question")
+    assert q["kind"] == "mode" and "to_fetch_bytes" not in q
+    api.answer(q["job_id"], "manual")
+    rec.wait_for("apk:manual")
+    rec.wait_for("job:end")
+
+
+def test_analyze_selected_gives_partial_and_selection_eta(monkeypatch):
+    api, rec = _mode_api(monkeypatch, mode="manual", sync=True)
+    api.start_scan(SERIAL)
+    package = rec.of("apk:manual")[0]["scan"]["apps"][0]["package"]
+    eta = api.selection_eta([package])
+    assert eta["eta_s"] is not None and eta["eta_kind"] in ("rough", "measured")
+    api.analyze_selected([package])
+    scan = rec.of("apk:done")[-1]["scan"]
+    assert scan["apk_mode"] == "partial" and scan["on_demand"] == [package]
+    api.analyze_all()
+    assert rec.of("apk:done")[-1]["scan"]["apk_mode"] == "full"
+
+
+def test_analyze_selected_validates_packages(monkeypatch):
+    api, _ = _mode_api(monkeypatch, mode="manual", sync=True)
+    assert api.analyze_selected(["com.x"])["error"]["key"] == "no_scan"
+    api.start_scan(SERIAL)
+    assert api.analyze_selected([])["error"]["key"] == "bad_request"
+    assert api.analyze_selected(["com.not.there"])["error"]["key"] == "bad_request"
+
+
+def test_selection_eta_without_estimate_is_empty(monkeypatch):
+    api, _ = _mode_api(monkeypatch, mode="manual", sync=True)
+    assert api.selection_eta(["com.x"])["eta_s"] is None
+
+
+def test_stop_to_manual_during_full_analysis(monkeypatch):
+    slow = SlowApk()
+    api, rec = make_api(make_cli_phone(), sync=False, apk=slow)
+    api.start_scan(SERIAL)
+    rec.wait_for("apk:progress")
+    assert api.stop_apk_to_manual() == {"ok": True}
+    slow.release.set()
+    assert rec.wait_for("apk:manual")["scan"]["apk_mode"] == "manual"
+    assert rec.of("apk:stopped") == []
+    rec.wait_for("job:end")
+
+
+def test_stop_to_manual_after_partial_keeps_on_demand(monkeypatch):
+    api, rec = _mode_api(monkeypatch, mode="manual", sync=True)
+    api.start_scan(SERIAL)
+    package = rec.of("apk:manual")[0]["scan"]["apps"][0]["package"]
+    api.analyze_selected([package])
+    slow = SlowApk()
+    api._apk_factory = lambda adb, policy=None, **kw: slow
+    api._jobs._sync = False
+    progress, manual = len(rec.of("apk:progress")), len(rec.of("apk:manual"))
+    ended = len(rec.of("job:end"))
+    api.analyze_all()
+    _wait_new(rec, "apk:progress", progress)  # `wait_for` oddałby zdarzenie z pierwszego skanu
+    api.stop_apk_to_manual()
+    slow.release.set()
+    scan = _wait_new(rec, "apk:manual", manual)["scan"]
+    assert scan["apk_mode"] == "partial" and scan["on_demand"] == [package]
+    _wait_new(rec, "job:end", ended)
+
+
+def _wait_new(rec, name, seen, timeout=5.0):
+    """Jak `rec.wait_for`, ale tylko zdarzenie nowsze niż pierwsze `seen`."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        found = rec.of(name)
+        if len(found) > seen:
+            return found[-1]
+        time.sleep(0.01)
+    raise TimeoutError(name)
+
+
+def test_stop_to_manual_needs_a_running_analysis(monkeypatch):
+    api, _ = _mode_api(monkeypatch, mode="manual", sync=True)
+    assert api.stop_apk_to_manual()["error"]["key"] == "bad_request"
+
+
+def test_abandoned_analysis_does_not_publish_manual(monkeypatch):
+    api, rec = _mode_api(monkeypatch)
+    api.start_scan(SERIAL)
+    q = rec.wait_for("apk:question")
+    api._abandon_apk()  # jak nowy skan albo wykonanie planu
+    api.answer(q["job_id"], "manual")
+    rec.wait_for("job:end")  # zadanie skończone: później nic już nie opublikuje
+    assert rec.of("apk:manual") == []
+
+
+def test_full_analysis_teaches_the_timing(monkeypatch):
+    from admenot.engine.apk import timing
+    monkeypatch.setattr(timing, "MIN_APPS", 1)  # telefon testowy ma mało aplikacji
+    api, rec = _mode_api(monkeypatch, mode="full", sync=True)
+    api.start_scan(SERIAL)
+    assert rec.of("apk:done")
+    assert timing.load_speeds().samples == 1
+    api.start_scan(SERIAL)
+    q = rec.of("apk:estimate")[-1]
+    assert q["eta_kind"] == "measured"
+
+
+def test_estimate_scope_tells_the_whole_phone_from_a_subset(monkeypatch):
+    api, rec = _mode_api(monkeypatch, mode="manual", sync=True)
+    api.start_scan(SERIAL)
+    assert rec.of("apk:estimate")[-1]["scope"] == "all"
+    package = rec.of("apk:manual")[0]["scan"]["apps"][0]["package"]
+    api.analyze_selected([package])
+    subset = rec.of("apk:estimate")[-1]
+    assert subset["scope"] == "part" and subset["apps"] == 1
+    api.analyze_all()
+    assert rec.of("apk:estimate")[-1]["scope"] == "all"
+
+
+def test_manual_mode_shows_labels_read_from_the_phone(monkeypatch):
+    api, rec = _mode_api(monkeypatch, mode="manual", sync=True)
+    api._app_labels = lambda serial, adb, stop, on_line: {"com.whatsapp": PhoneLabel("WhatsApp", False),
+                                                          "com.unknown": PhoneLabel("Inna", False)}
+    api.start_scan(SERIAL)
+    apps = {a["package"]: a["name"] for a in rec.wait_for("apk:manual")["scan"]["apps"]}
+    assert apps["com.whatsapp"] == "WhatsApp"
+    assert apps["com.wlive.forecast"] == "com.wlive.forecast"  # spoza listy scrcpy: nazwa pakietu
+
+
+def test_padded_name_on_the_phone_is_a_finding_without_the_apk(monkeypatch):
+    api, rec = _mode_api(monkeypatch, mode="manual", sync=True)
+    api._app_labels = lambda serial, adb, stop, on_line: {
+        "com.wlive.forecast": PhoneLabel("Pogoda", True)}
+    api.start_scan(SERIAL)
+    app = next(a for a in rec.wait_for("apk:manual")["scan"]["apps"]
+               if a["package"] == "com.wlive.forecast")
+    assert app["name"] == "Pogoda"
+    assert [(f["rule_id"], f["source"]) for f in app["findings"]
+            if f["rule_id"].startswith("DM-LABEL")] == [("DM-LABEL-02", "phone")]
+
+
+def test_results_do_not_wait_for_names_and_stop_kills_the_names_fetch(monkeypatch):
+    api, rec = _mode_api(monkeypatch, mode="manual")
+    asked, stopped = threading.Event(), threading.Event()
+
+    def labels(serial, adb, stop, on_line):
+        asked.set()
+        stop.wait(10)  # scrcpy wisi, dopóki skan go nie przerwie
+        stopped.set()
+        return {}
+
+    api._app_labels = labels
+    job = api.start_scan(SERIAL)["job_id"]
+    rec.wait_for("scan:done")  # wyniki bez czekania na nazwy
+    assert asked.wait(5)
+    api.stop(job)
+    rec.wait_for("job:end")
+    assert stopped.wait(5)
+    assert "apk:manual" not in names(rec) and "apk:question" not in names(rec)
+
+
+def test_name_fetch_errors_go_to_the_error_log(monkeypatch):
+    logged = []
+    monkeypatch.setattr("admenot.app.api.log_exception", logged.append)
+    api, rec = _mode_api(monkeypatch, mode="manual", sync=True)
+
+    def broken(serial, adb, stop, on_line):
+        raise TypeError("parse bug")
+
+    api._app_labels = broken
+    api.start_scan(SERIAL)
+    rec.wait_for("apk:manual")
+    assert [str(e) for e in logged] == ["parse bug"]
+
+
+def test_names_wait_for_the_mirror_to_start(monkeypatch):
+    api, _ = _mode_api(monkeypatch, mode="manual")
+    states = iter(["starting", "starting", "running"])
+    api._mirror.status = lambda: {"serial": SERIAL, "state": next(states, "running")}
+    seen = []
+    api._app_labels = lambda serial, adb, stop, on_line: seen.append(api._mirror.status()["state"]) or {}
+    assert api._fetch_labels(SERIAL).wait(timeout=5) == {} and seen == ["running"]

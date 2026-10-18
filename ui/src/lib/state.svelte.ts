@@ -1,6 +1,6 @@
 import { actedLevels, type ActedLog, type OpenGroups, type Phase } from './logic';
 import type {
-  ApiErrorBody, ApkEstimate, ApkQuestion, Category, ConsoleEntry, DeviceEntry, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
+  ApiErrorBody, ApkEstimate, ApkQuestion, Category, ConsoleEntry, DeviceEntry, EtaView, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
   PlanView, Question, ReportResult, ScanView, Settings, ShareState, ShotsView, ShotView, StepEvent, UndoDone, UpdateView, Verdict, WhoView,
 } from './types';
 
@@ -14,7 +14,7 @@ export class AppState {
     apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false, select_level: 'silence', retention_days: 60,
     check_updates: true, dismissed_update: null, last_run_version: null,
     welcome_version: 1, welcome_current: 1, telemetry: false, telemetry_packages: false, telemetry_id: null,
-    telemetry_delete_pending: false, donate_reminders: true });
+    telemetry_delete_pending: false, donate_reminders: true, apk_mode_default: 'ask' });
   settingsLoaded = $state(false);  // ekran powitalny dopiero po odczycie ustawień
   devices = $state<DeviceEntry[]>([]);
   devicesError = $state<string | null>(null);
@@ -24,9 +24,17 @@ export class AppState {
   scanStage = $state<string | null>(null);
   device = $state<PhoneCard | null>(null);
   scan = $state<ScanView | null>(null);
-  apk = $state({ done: 0, total: 0, running: false, changed: [] as string[] });
+  apk = $state({ done: 0, total: 0, running: false, changed: [] as string[], eta: null as number | null });
   apkEstimate = $state<ApkEstimate | null>(null);
+  /** Czas analizy całego telefonu (przycisk „Przeanalizuj wszystko”); szacunek zaznaczonych go nie zmienia. */
+  apkFullEta = $state<EtaView | null>(null);
   apkQuestion = $state<ApkQuestion | null>(null);
+  selectionEta = $state<EtaView | null>(null);
+  showSystem = $state(false);
+  /** Czy bieżąca analiza APK obejmuje wszystko (przycisk „Przerwij i szukaj ręcznie”) czy tylko zaznaczone. */
+  apkScope = $state<'all' | 'selected'>('all');
+  /** Serwisant wybrał pełną analizę po pytaniu o tryb — od tej chwili werdykty heurystyk są widoczne. */
+  apkFullChosen = $state(false);
   interrupted = $state<string[]>([]);
   selection = $state<Record<string, Level>>({});
   touched = $state<string[]>([]);
@@ -108,5 +116,10 @@ export class AppState {
 
   get orderRunning(): boolean {
     return this.job !== null && ORDER_KINDS.includes(this.job.kind);
+  }
+
+  /** Pełna analiza (po skanie albo „Przeanalizuj wszystko”) — z niej można przejść do trybu ręcznego. */
+  get canStopToManual(): boolean {
+    return this.job?.kind === 'apk' && this.apkScope === 'all';
   }
 }

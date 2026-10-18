@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeout
@@ -29,10 +30,15 @@ from admenot.engine.apk.deep import DEEP_TIMEOUT_S, current_deep_version, deep_a
 from admenot.engine.apk.fetch import PULL_TIMEOUT, FetchedApks, default_cache_dir, fetch_apks
 from admenot.engine.apk.isolated import IsolatedAnalyzer
 from admenot.engine.apk.results import ResultStore, result_key
+from admenot.engine.apk.timing import RunStats
 from admenot.engine.facts import AppFacts
 from admenot.engine.scoring import AppResult
 
 ProgressFn = Callable[[int, int, str], None]
+
+
+class ManualMode(Exception):
+    """Serwisant wybrał tryb ręczny: bez pobierania i analizy (spec trybu ręcznego §2.1)."""
 
 
 class ApkProvider(Protocol):
@@ -74,11 +80,13 @@ class StoredApkProvider:
 
 @dataclass(frozen=True)
 class CachePolicy:
-    """Limit pamięci podręcznej i dwie decyzje, które GUI i CLI podejmują inaczej (spec §3.5)."""
+    """Limit pamięci podręcznej i decyzje, które GUI i CLI podejmują inaczej (spec §3.5)."""
 
     limit_bytes: int
     on_estimate: Callable[[Estimate, CacheUsage], None] = lambda est, use: None
     decide: Callable[[Estimate, CacheUsage], str] = lambda est, use: "skip"  # clear | skip | run
+    # Tryb po szybkim skanie (spec trybu ręcznego §2.1): full | manual; None = bez pytania.
+    choose: Callable[[Estimate | None, CacheUsage | None, int], str] | None = None
 
 
 class _CacheRun:
@@ -140,6 +148,16 @@ class _CacheRun:
             self.off = True
 
 
+def _size(paths: list[Path]) -> int:
+    total = 0
+    for path in paths:
+        try:
+            total += path.stat().st_size
+        except OSError:
+            pass
+    return total
+
+
 class DeviceApkProvider:
     def __init__(
         self,
@@ -166,22 +184,35 @@ class DeviceApkProvider:
         self.deep = deep  # pakiety do głębokiej analizy (na żądanie; nigdy w zwykłym skanie)
         self.deep_analyze = deep_analyze
         self.results = results or ResultStore(self.cache_dir.parent / "apk-reports")
+        self.stats = RunStats()  # pomiar czasu tego przebiegu (apk/timing.py)
+        self.estimate: Estimate | None = None
 
     def _prepare(self, apps: list[AppFacts],
                  flagged: frozenset[str]) -> tuple[_CacheRun | None, bool]:
-        """Szacunek, ewentualne pytanie i stan przycinania. Zwraca (stan, czy pominąć analizę)."""
+        """Szacunek, pytanie o tryb, pytanie o miejsce i stan przycinania.
+
+        Zwraca (stan, czy pominąć analizę); `ManualMode`, gdy serwisant wybrał tryb ręczny.
+        """
         policy = self.policy
         scan = frozenset(f.package for f in apps)
         try:
             use = usage(self.cache_dir, policy.limit_bytes)
         except OSError:
-            return None, False  # spec §6: bez `disk_usage` — bez kontroli, jak dawniej
-        try:
-            est = estimate(self.adb, apps, self.cache_dir)
-        except OSError:
-            est = None  # jak brak szacunku: analiza bez pytania, chroni ją §3.6
-        if est is not None:
+            use = None  # spec §6: bez `disk_usage` — bez kontroli, jak dawniej
+        est = None
+        if use is not None or policy.choose is not None:
+            try:
+                est = estimate(self.adb, apps, self.cache_dir)
+            except OSError:
+                est = None  # jak brak szacunku: analiza bez pytania o miejsce, chroni ją §3.6
+        self.estimate = est
+        if est is not None and use is not None:
             policy.on_estimate(est, use)
+        if policy.choose is not None and policy.choose(est, use, len(apps)) == "manual":
+            raise ManualMode
+        if use is None:
+            return None, False
+        if est is not None:
             try:
                 if not fits(est, self.cache_dir, scan):
                     answer = policy.decide(est, use)
@@ -207,10 +238,17 @@ class DeviceApkProvider:
                 return no_space()
         no_room = False
         try:
+            started = time.monotonic()
             fetched = self.fetch(self.adb, facts.package, self.cache_dir)
+            fetched_at = time.monotonic()
             if deep_run is not None and facts.package in self.deep:
-                return self._deep(facts, fetched, run, deep_run)
-            return self._finish(facts, fetched, run)
+                return self._deep(facts, fetched, run, deep_run)  # głęboka: nie do pomiaru
+            report = self._finish(facts, fetched, run)
+            if report.class_count > 0:
+                self.stats.add(size=_size(fetched.paths), fetch_s=fetched_at - started,
+                               from_cache=fetched.from_cache,
+                               analyze_s=time.monotonic() - fetched_at)
+            return report
         except NoSpace:
             no_room = True
             return no_space()

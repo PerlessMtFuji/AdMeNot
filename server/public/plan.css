@@ -27,4 +27,5 @@ h1 { font-size: 1.5rem; margin: 0 0 4px; }
 .icon { width: 40px; height: 40px; flex: none; border-radius: 10px; }
 .initial { display: grid; place-items: center; background: var(--line); font-weight: 700; }
 footer { margin-top: 18px; color: var(--mut); font-size: .875rem; }
+.note { margin-top: 18px; color: var(--mut); font-size: .95rem; }
 .state { margin-top: 30vh; text-align: center; color: var(--mut); }

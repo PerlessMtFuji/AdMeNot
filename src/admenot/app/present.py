@@ -15,6 +15,7 @@ from typing import Any
 from admenot.engine.actions.planner import Blocked, default_level
 from admenot.engine.apk.analyze import clean_label, scope_notes
 from admenot.engine.apk.cache import CacheUsage, Estimate
+from admenot.engine.apk.timing import Eta
 from admenot.engine.device.info import DeviceInfo
 from admenot.engine.evidence import ladders
 from admenot.engine.facts import AppFacts
@@ -166,6 +167,8 @@ def app_view(r: AppResult, lang: str, sdk: int = 0) -> dict[str, Any]:
         "scope": [{"key": k, "label": scope_label(k, lang)} for k in scope_notes(facts)],
         "trusted": r.trusted, "incomplete": r.incomplete, "is_system": facts.is_system,
         "enabled": facts.enabled,
+        "first_install": (facts.first_install.isoformat(timespec="seconds")
+                          if facts.first_install else None),
         "from_play": facts.from_play, "installer": facts.installer,
         "is_admin": facts.is_device_admin, "default_level": default_level(r, sdk),
         "problems": list(dict.fromkeys(f["text"] for f in findings))[:MAX_PROBLEMS],
@@ -188,6 +191,8 @@ def scan_view(report: ScanReport, lang: str) -> dict[str, Any]:
                                    for s in statuses if s.ok and s.partial]},
         "low_behavior_data": report.low_behavior_data,
         "apk": plain(asdict(report.apk)) if report.apk else None,
+        "apk_mode": report.apk_mode,
+        "on_demand": sorted(report.analyzed_on_demand),
         "apps": [app_view(r, lang, report.device.sdk) for r in results],
         "profiles": {"others": list(report.profiles.others) if report.profiles else [],
                      "known": bool(report.profiles and report.profiles.present is not None)},
@@ -297,6 +302,7 @@ def history_view(journal: Journal, serial: str | None, serials: list[str],
     orders = []
     for o in journal.orders_for(serial):
         actions = journal.actions(o.id)
+        snap = journal.scan(o.id)
         orders.append({
             "id": o.id, "number": o.number,
             "created_at": o.created_at.isoformat(timespec="minutes"),
@@ -306,9 +312,16 @@ def history_view(journal: Journal, serial: str | None, serials: list[str],
             "interrupted": o.id in interrupted,
             "screenshots": journal.screenshot_count(o.id),
             "actions": [action_view(a, lang) for a in actions],
-            "apps": _order_apps(journal.scan(o.id) if actions else None, actions),
+            "apps": _order_apps(snap if actions else None, actions),
+            "manual": (snap or {}).get("apk_mode") in ("manual", "partial"),
         })
     return {"serial": serial, "serials": serials, "devices": devices, "orders": orders}
+
+
+def eta_view(eta: Eta | None) -> dict[str, Any]:
+    if eta is None:
+        return {"eta_s": None, "eta_kind": None, "eta_min_s": None, "eta_max_s": None}
+    return {"eta_s": eta.seconds, "eta_kind": eta.kind, "eta_min_s": eta.low, "eta_max_s": eta.high}
 
 
 def estimate_view(est: Estimate, use: CacheUsage) -> dict[str, int]:

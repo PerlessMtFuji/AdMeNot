@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
@@ -13,6 +13,7 @@ from admenot.engine.allowlist.trust import TrustList, load_default_trust_list
 from admenot.engine.apk.analyze import ApkReport, apply_apk_report
 from admenot.engine.apk.cache import NO_SPACE
 from admenot.engine.apk.providers import ApkProvider, ProgressFn, select_apk_targets
+from admenot.engine.applabels import PhoneLabel
 from admenot.engine.collectors.base import CollectorStatus, run_collectors
 from admenot.engine.collectors.packages import collect_packages
 from admenot.engine.collectors.profiles import ProfileScope, read_profiles
@@ -37,6 +38,9 @@ class ApkStatus:
     stopped_no_space: bool = False  # analiza przerwana: zabrakło miejsca na dysku
 
 
+REPORT_MODES = ("pending", "full", "manual", "partial")
+
+
 @dataclass
 class ScanReport:
     device: DeviceInfo
@@ -48,6 +52,10 @@ class ScanReport:
     usage_window_h: float | None = None
     profiles: ProfileScope | None = None
     versions: dict[str, str] = field(default_factory=dict)
+    # Tryb analizy APK (spec trybu ręcznego §2.3): pending po szybkim skanie, full po pełnej,
+    # manual — wybrany tryb ręczny, partial — ręczny z analizą wybranych aplikacji.
+    apk_mode: str = "pending"
+    analyzed_on_demand: frozenset[str] = frozenset()
 
 
 def score_all(
@@ -145,8 +153,39 @@ def analyze_apks(
         stopped_no_space=any(r.error == NO_SPACE for r in reports.values()),
     )
     results = score_all(facts, ruleset, trust, report.low_behavior_data)
-    return dataclasses.replace(report, results=results, apk=status, apk_reports=reports)
+    if only is None:
+        mode, on_demand = "full", frozenset()
+    elif report.apk_mode in ("full", "pending"):
+        # głęboka analiza przy pełnym lub niezakończonym skanie nie zmienia trybu
+        mode, on_demand = report.apk_mode, report.analyzed_on_demand
+    else:
+        mode = "partial"
+        on_demand = report.analyzed_on_demand | frozenset(t.package for t in targets)
+    return dataclasses.replace(report, results=results, apk=status, apk_reports=reports,
+                               apk_mode=mode, analyzed_on_demand=on_demand)
 
+
+def apply_phone_labels(
+    report: ScanReport,
+    labels: Mapping[str, PhoneLabel],
+    ruleset: RuleSet | None = None,
+    trust: TrustList | None = None,
+) -> ScanReport:
+    """Nazwy z ekranu telefonu (engine/applabels.py) i nowa ocena — DM-LABEL-02 bez analizy APK.
+
+    Pracuje na kopii faktów jak `analyze_apks`; etykieta z APK ma pierwszeństwo.
+    """
+    if not labels:
+        return report
+    ruleset = ruleset or load_default_ruleset()
+    trust = trust or load_default_trust_list()
+    facts = {r.facts.package: copy.deepcopy(r.facts) for r in report.results}
+    for package, phone in labels.items():
+        if package in facts:
+            facts[package].label = facts[package].label or phone.label
+            facts[package].phone_label_padded = phone.padded
+    return dataclasses.replace(report, results=score_all(facts, ruleset, trust,
+                                                         report.low_behavior_data))
 
 def report_to_dict(report: ScanReport, lang: str = "pl") -> dict[str, Any]:
     return {

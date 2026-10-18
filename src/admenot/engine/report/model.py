@@ -97,6 +97,7 @@ class Protocol:
     scope: ScanScope | None = None
     screenshots: list[ProtocolShot] = field(default_factory=list)
     consent: Consent | None = None
+    manual: bool = False  # tryb ręczny: bez nagłówka „czysto” i bez liczby aplikacji bez uwag
 
 
 def _outcome(actions: list[Action], still_active: bool) -> str:
@@ -236,6 +237,13 @@ def build_protocol(journal: Journal, order_id: int, lang: str) -> Protocol:
     snap = journal.scan(order_id)
     verification = journal.verification(order_id) or {}
     scanned = {a["package"]: a for a in (snap or {}).get("apps", [])}
+    manual = (snap or {}).get("apk_mode") in ("manual", "partial")
+    if manual:
+        # Werdykt heurystyk aplikacji wybranej na ślepo był przed serwisantem ukryty: w protokole
+        # bez oceny, problemów i zaleceń z niej (migawka zostaje nietknięta jako dowód).
+        seen = set((snap or {}).get("on_demand") or [])
+        scanned = {p: a if p in seen else {**a, "verdict": None, "problems": {}, "incomplete": False}
+                   for p, a in scanned.items()}
 
     by_package: dict[str, list[Action]] = {}
     for action in journal.actions(order_id):
@@ -247,7 +255,7 @@ def build_protocol(journal: Journal, order_id: int, lang: str) -> Protocol:
     # Aplikacje bez uwag (safe) z oceną niepełną nie są wierszami — trafiają do zakresu skanu.
     untouched = {p: a for p, a in scanned.items() if p not in by_package}
     rows += [_row(package, app, lang, None, "none")
-             for package, app in untouched.items() if app.get("verdict") != "safe"]
+             for package, app in untouched.items() if app.get("verdict") not in (None, "safe")]
 
     device = device_block(snap or {}, order)
     scope, clean = None, None
@@ -255,9 +263,10 @@ def build_protocol(journal: Journal, order_id: int, lang: str) -> Protocol:
         hidden = [a for a in untouched.values() if a.get("verdict") == "safe"]
         incomplete_apps = sum(1 for a in hidden if a.get("incomplete"))
         scope = _scope(snap, incomplete_apps)
-        if "app_count" in snap:
+        if "app_count" in snap and not manual:
             in_rows = len(scanned) - len(hidden)
             clean = snap["app_count"] - in_rows - incomplete_apps
     return Protocol(order.number, order.created_at, order.client_name, device, rows, clean,
                     _recommendations(rows, device, order.created_at, scope), snap is not None,
-                    lang, scope, _screenshots(journal, order_id), consent=_consent(snap))
+                    lang, scope, _screenshots(journal, order_id), consent=_consent(snap),
+                    manual=manual)

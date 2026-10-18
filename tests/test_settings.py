@@ -263,3 +263,13 @@ def test_retention_days_accepts_the_offered_choices(tmp_path, value):
 def test_retention_days_rejects_other_values(tmp_path, value):
     with pytest.raises(ValueError):
         save_settings({"retention_days": value}, tmp_path / "settings.json")
+
+
+def test_apk_mode_default_roundtrip_and_validation(tmp_path):
+    path = tmp_path / "settings.json"
+    assert load_settings(path).apk_mode_default == "ask"
+    assert save_settings({"apk_mode_default": "manual"}, path).apk_mode_default == "manual"
+    with pytest.raises(ValueError):
+        save_settings({"apk_mode_default": "fast"}, path)
+    path.write_text('{"apk_mode_default": 3}', "utf-8")
+    assert load_settings(path).apk_mode_default == "ask"  # zła wartość w pliku = domyślna

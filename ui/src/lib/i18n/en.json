@@ -1,4 +1,23 @@
 {
+  "eta": { "unknown": "time unknown", "under_min": "< 1 min", "min": "~{n} min", "range": "{lo}–{hi} min", "rough": "approximate", "now": "right away" },
+  "apk_mode": {
+    "summary": "{apps} · {size} to download",
+    "summary_cached": "{apps} · {size} to download ({cached} already cached)",
+    "full": "Full analysis", "full_sub": "a verdict for every app",
+    "manual": "Search by hand", "manual_sub": "search, select, remove",
+    "remember": "Remember my choice (change it in Settings)",
+    "stop_to_manual": "Stop and search by hand"
+  },
+  "manual": {
+    "title": "Find the apps to remove",
+    "search": "Search by name or package",
+    "show_system": "Show system apps",
+    "installed": "installed {date}",
+    "analyze_selected": "Analyse selected ({count}) {eta}",
+    "analyze_all": "Analyse everything {eta}",
+    "empty": "Nothing matches the search.",
+    "tag": { "non_play": "from outside Play", "admin": "administrator", "accessibility": "accessibility", "overlay": "overlay", "disabled": "disabled" }
+  },
   "groups": { "malicious": "Malicious", "suspicious": "Suspicious", "review": "To review", "safe": "No issues",
     "empty": "nothing found", "show": "show", "hide": "hide" },
   "bulk": { "select_all": "Select all", "select_all_in": "Select all: {group}",
@@ -233,6 +252,7 @@
     "reminders": "Remind me about support"
   },
   "history": {
+    "manual": "by hand",
     "title": "Order history", "phone": "Phone", "empty": "No orders for this phone.", "none": "No saved orders.",
     "restore": "Restore", "undo_all": "Undo the whole order", "resume": "Finish",
     "delete": "Delete order", "delete_title": "Delete order {number}?", "delete_text": "Its steps, screenshots, report and APK copies will be removed. Changes on the phone can no longer be undone in AdMeNot.", "delete_confirm": "Delete",
@@ -281,6 +301,7 @@
     "history": "Screenshots ({count})"
   },
   "settings": {
+    "apk_mode_default": "APK analysis after the scan", "apk_mode_ask": "Ask", "apk_mode_full": "Always full", "apk_mode_manual": "Always by hand",
     "appearance": "Appearance", "theme": "Theme", "theme_system": "System", "theme_light": "Light", "theme_dark": "Dark", "paths": "Programs and folders",
     "title": "Settings", "lang": "Language", "mode": "Default mode", "mode_simple": "Simple", "mode_expert": "Expert",
     "adb": "Path to adb.exe", "adb_hint": "Empty = adb bundled with the program (or adb from PATH without it)", "check": "Check", "adb_ok": "Works: {version}", "adb_fail": "Does not work: {message}",

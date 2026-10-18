@@ -1,4 +1,4 @@
-"""Odczyt statystyk użycia z D1 (spec kroku H §8): active | phones | verdicts | packages | delete.
+"""Odczyt statystyk użycia z D1 (spec kroku H §8): active | phones | verdicts | packages | missed | delete.
 
 Jak `reports.py`: wrangler z `server/node_modules`, zalogowany autor. Do SQL trafiają tylko
 liczba dni (int) i ID instalacji sprawdzony wzorcem.
@@ -49,6 +49,7 @@ QUERIES = {
         "SUM(json_extract(body, '$.levels.disable')) AS disable, "
         "SUM(json_extract(body, '$.levels.remove')) AS remove, "
         "SUM(json_extract(body, '$.sources.manual')) AS manual, "
+        "SUM(json_extract(body, '$.sources.blind')) AS blind, "
         "SUM(json_extract(body, '$.apps')) AS apps FROM events e "
         f"WHERE (e.type IN ('repair', 'undo') OR (e.type = 'scan' AND {_final('e')})) "
         f"AND e.{_since(d)} GROUP BY type"),
@@ -60,11 +61,21 @@ QUERIES = {
     "left": lambda d: (
         "SELECT json_extract(p.value, '$.package') AS package, json_extract(p.value, '$.verdict') AS verdict, "
         "COUNT(*) AS times FROM events s, json_each(s.body, '$.packages') p "
-        f"WHERE s.type = 'scan' AND {_final('s')} AND s.{_since(d)} AND NOT EXISTS ("
+        f"WHERE s.type = 'scan' AND {_final('s')} AND s.{_since(d)} "
+        "AND COALESCE(json_extract(s.body, '$.apk_mode'), 'full') = 'full' AND NOT EXISTS ("
         "SELECT 1 FROM events r, json_each(r.body, '$.packages') q WHERE r.type = 'repair' "
         "AND r.install = s.install AND json_extract(r.body, '$.session') = json_extract(s.body, '$.session') "
         "AND json_extract(q.value, '$.package') = json_extract(p.value, '$.package')) "
         "GROUP BY package, verdict ORDER BY times DESC LIMIT 100"),
+    "missed": lambda d: (
+        "SELECT json_extract(q.value, '$.package') AS package, COUNT(*) AS times, "
+        "COUNT(DISTINCT r.install) AS installs FROM events r, json_each(r.body, '$.packages') q "
+        f"WHERE r.type = 'repair' AND r.{_since(d)} AND json_extract(q.value, '$.source') = 'blind' "
+        "AND NOT EXISTS (SELECT 1 FROM events s, json_each(s.body, '$.packages') p "
+        "WHERE s.type = 'scan' AND s.install = r.install "
+        "AND json_extract(s.body, '$.session') = json_extract(r.body, '$.session') "
+        "AND json_extract(p.value, '$.package') = json_extract(q.value, '$.package')) "
+        "GROUP BY package ORDER BY times DESC LIMIT 100"),
 }
 
 
@@ -89,7 +100,7 @@ def main(argv: Sequence[str] | None = None, run: Run = subprocess.run) -> int:
         sys.stdout.reconfigure(errors="replace")
     parser = argparse.ArgumentParser(description="Statystyki użycia AdMeNot (D1)")
     sub = parser.add_subparsers(dest="command", required=True)
-    for name, days in (("active", 30), ("phones", 90), ("verdicts", 90), ("packages", 90)):
+    for name, days in (("active", 30), ("phones", 90), ("verdicts", 90), ("packages", 90), ("missed", 90)):
         p = sub.add_parser(name)
         p.add_argument("--days", type=_days, default=days)
     sub.choices["packages"].add_argument("--left", action="store_true",

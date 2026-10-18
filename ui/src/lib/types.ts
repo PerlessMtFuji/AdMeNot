@@ -7,6 +7,8 @@ export type Level = 'silence' | 'disable' | 'remove';
 export type Theme = 'system' | 'light' | 'dark';
 export type Category = 'ads' | 'notif' | 'removal' | 'data' | 'disguise' | 'background' | 'origin';
 export type Severity = 'bad' | 'warn' | 'neutral';
+export type ApkMode = 'pending' | 'full' | 'manual' | 'partial';
+export type ApkModeDefault = 'ask' | 'full' | 'manual';
 
 export interface Settings {
   lang: Lang;
@@ -29,6 +31,7 @@ export interface Settings {
   telemetry_id: string | null;
   telemetry_delete_pending: boolean;
   donate_reminders: boolean;
+  apk_mode_default: ApkModeDefault;
 }
 
 export interface TelemetrySample {
@@ -50,12 +53,21 @@ export interface CacheUsage {
   limit_bytes: number; effective_bytes: number; path: string;
 }
 
-export interface ApkEstimate {
+export interface EtaView {
+  eta_s: number | null;
+  eta_kind: 'measured' | 'rough' | null;
+  eta_min_s: number | null;
+  eta_max_s: number | null;
+}
+
+export interface ApkEstimate extends EtaView {
   to_fetch_bytes: number; total_bytes: number; apps: number; unknown: number; cached: number;
   largest_bytes: number; limit_bytes: number; effective_bytes: number; free_bytes: number;
 }
 
-export interface ApkQuestion extends ApkEstimate { job_id: string; kind: 'no_space' }
+export interface ApkSpaceQuestion extends ApkEstimate { job_id: string; kind: 'no_space' }
+export interface ApkModeQuestion extends Partial<Omit<ApkEstimate, keyof EtaView>>, EtaView { job_id: string; kind: 'mode'; apps: number }
+export type ApkQuestion = ApkSpaceQuestion | ApkModeQuestion;
 
 export interface Symptom {
   category: Category;
@@ -125,6 +137,8 @@ export interface AppView {
   /** false: wyłączona na telefonie (`pm disable-user`) — przed tą naprawą albo wcześniej. */
   enabled: boolean;
   from_play: boolean;
+  /** Data pierwszej instalacji (ISO) z szybkiego skanu; null — telefon jej nie podał. */
+  first_install: string | null;
   installer: string | null;
   is_admin: boolean;
   default_level: Level | null;
@@ -163,6 +177,9 @@ export interface ScanView {
   profiles: { others: number[]; known: boolean };
   usage_window_h: number | null;
   counts: ScanCounts;
+  apk_mode: ApkMode;
+  /** Pakiety przeanalizowane na żądanie (tryb ręczny / częściowy). */
+  on_demand: string[];
 }
 
 export interface PlanApp {
@@ -251,6 +268,7 @@ export interface HistoryOrder {
   client: string | null;
   model: string | null;
   interrupted: boolean;
+  manual: boolean;
   actions: HistoryAction[];
   /** Nazwy i ikony z migawki zlecenia; brak przy zleceniach sprzed migawek. */
   apps?: Record<string, { name: string | null; icon: string | null }>;
@@ -368,6 +386,10 @@ export interface Api {
   watch_devices(on: boolean): R<{ ok: boolean }>;
   start_scan(serial: string, client: string | null): R<{ job_id: string }>;
   deep_analyze(pkg: string): R<{ job_id: string }>;
+  analyze_selected(pkgs: string[]): R<{ job_id: string }>;
+  analyze_all(): R<{ job_id: string }>;
+  stop_apk_to_manual(): R<{ ok: boolean }>;
+  selection_eta(pkgs: string[]): R<EtaView>;
   start_incident(seconds: number): R<{ ok: boolean }>;
   mark_incident(): R<{ ok: boolean }>;
   rerender(): R<{ scan: ScanView | null }>;
@@ -412,10 +434,11 @@ export interface EventMap {
   'scan:stage': { stage: string };
   'scan:device': { device: PhoneCard };
   'scan:done': { scan: ScanView; interrupted: string[]; client: string | null };
-  'apk:progress': { done: number; total: number; package: string; job_id?: string };
-  'apk:estimate': ApkEstimate & { job_id?: string };
+  'apk:progress': { done: number; total: number; package: string; eta_s: number | null; job_id?: string };
+  'apk:estimate': ApkEstimate & { job_id?: string; scope: 'all' | 'part' };  // part: zaznaczone albo jedna aplikacja
   'apk:question': ApkQuestion;
   'apk:done': { scan: ScanView; job_id?: string };
+  'apk:manual': { scan: ScanView; job_id?: string };
   'apk:stopped': { job_id?: string };
   'exec:order': { order: string; plan: PlanView | null };
   'exec:step': StepEvent;

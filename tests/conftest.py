@@ -199,3 +199,14 @@ def signing_key(monkeypatch):
 def _accept_risk(monkeypatch):
     """Istniejące testy CLI nie przechodzą przez ostrzeżenie z pierwszego uruchomienia (krok H §9)."""
     monkeypatch.setenv("ADMENOT_ACCEPT_RISK", "1")
+
+
+@pytest.fixture
+def scan_report(monkeypatch, tmp_path):
+    """Raport szybkiego skanu telefonu z fakephone (bez analizy APK)."""
+    from fakephone import make_cli_phone
+
+    from admenot.engine.session import run_scan
+
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "data"))
+    return run_scan(make_cli_phone())

@@ -21,9 +21,6 @@ kolejność wstawiania = kolejność zmian stanu), a jeden wątek-dyspozytor (`_
 
 from __future__ import annotations
 
-import os
-import subprocess
-import sys
 import threading
 import time
 from collections.abc import Callable, Iterable
@@ -32,16 +29,19 @@ from pathlib import Path
 from queue import Queue
 from typing import Any, Protocol
 
-from admenot.engine.tools import resolve_scrcpy
+from admenot.engine.tools import kill_tree, resolve_scrcpy, scrcpy_env, spawn_scrcpy
 
 FIRST_FRAME = "INFO: Texture:"
+# Po tym błędzie scrcpy 4.1 nie kończy się, tylko wisi (np. telefon przełączony na „Tylko
+# ładowanie”, nagranie 2026-10-18) — bez zabicia podgląd zostałby na zawsze w `starting`.
+START_FAILED = "Server connection failed"
+START_TIMEOUT_S = 30.0  # bez pierwszej klatki po tym czasie start uznajemy za nieudany
 CONTROL_BLOCKED = "INJECT_EVENTS"
 # OPPO/realme/Xiaomi przy monitorowaniu uprawnień: `--stay-awake` nie zmieni ustawienia, ekran gaśnie.
 STAY_AWAKE_BLOCKED = 'Could not change "stay_on_while_plugged_in"'
 _WARNINGS = ((STAY_AWAKE_BLOCKED, "stay_awake_blocked"), (CONTROL_BLOCKED, "control_blocked"))
 EXIT_CLOSED = 0
 EXIT_DISCONNECTED = 2
-_CREATE_NO_WINDOW = 0x08000000
 
 
 class MirrorUnavailable(Exception):
@@ -63,18 +63,11 @@ def args_for(serial: str, title: str) -> list[str]:
 
 
 def _spawn(cmd: list[str], env: dict[str, str]) -> Process:
-    flags = _CREATE_NO_WINDOW if sys.platform == "win32" else 0  # bez konsoli; okno SDL zostaje
-    return subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                            stdin=subprocess.DEVNULL, env=env, creationflags=flags)
+    return spawn_scrcpy(cmd, env)
 
 
 def _kill(proc: Process) -> None:
-    if sys.platform == "win32":
-        # /T: razem z procesami adb uruchomionymi przez scrcpy (serwer na telefonie sprząta sam)
-        subprocess.run(["taskkill", "/PID", str(proc.pid), "/T", "/F"], capture_output=True,
-                       stdin=subprocess.DEVNULL, creationflags=_CREATE_NO_WINDOW, check=False)
-    else:
-        proc.terminate()  # type: ignore[attr-defined]
+    kill_tree(proc)
 
 
 @dataclass
@@ -127,10 +120,7 @@ class Mirror:
             if self._run is not None and self._run.serial == serial:
                 return self._view(self._run)
             self.stop()
-            env = dict(os.environ)
-            adb = self._adb()
-            if adb:
-                env["ADB"] = adb
+            env = scrcpy_env(self._adb())
             try:
                 proc = self._spawn([str(exe), *args_for(serial, title)], env)
             except OSError as exc:
@@ -144,7 +134,16 @@ class Mirror:
             self._thread = threading.Thread(target=self._read, args=(run,), daemon=True,
                                             name="admenot-mirror")
             self._thread.start()
+            watchdog = threading.Timer(START_TIMEOUT_S, self._start_timeout, args=(run,))
+            watchdog.daemon = True
+            watchdog.start()
             return view
+
+    def _start_timeout(self, run: _Run) -> None:
+        with self._lock:
+            if self._current(run) and run.state == "starting":
+                run.last_error = f"ERROR: no picture after {START_TIMEOUT_S:.0f} s"
+                self._kill(run.proc)  # wątek czytający zgłosi `failed` z tym powodem
 
     def stop(self) -> None:
         with self._lock:
@@ -209,6 +208,8 @@ class Mirror:
                 if run.state == "starting" and FIRST_FRAME in line:
                     run.state = "running"
                     self._events.put(("state", self._view(run)))
+                if run.state == "starting" and START_FAILED in line:
+                    self._kill(run.proc)  # sam scrcpy by nie wyszedł (START_FAILED)
                 for marker, code in _WARNINGS:
                     if marker in line and code not in run.warned:
                         run.warned.add(code)

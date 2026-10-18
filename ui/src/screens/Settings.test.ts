@@ -79,6 +79,16 @@ test('action when an app is selected', async () => {
   expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ select_level: 'disable' }] });
 });
 
+test('APK analysis after the scan: “always by hand” is saved', async () => {
+  const { s, bridge } = await renderWith(Settings, 'empty');
+  const group = screen.getByRole('group', { name: 'Analiza APK po skanie' });
+  expect(within(group).getByRole('button', { name: 'Zawsze pełna' }).getAttribute('aria-pressed')).toBe('true');
+  await fireEvent.click(within(group).getByRole('button', { name: 'Zawsze ręcznie' }));
+  await flush();
+  expect(s.settings.apk_mode_default).toBe('manual');
+  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ apk_mode_default: 'manual' }] });
+});
+
 test('settings: APK cache limit, status, clear after repair and clear now', async () => {
   const { ctl, bridge } = await setupCtl('empty');
   render(App, { props: { ctl } });

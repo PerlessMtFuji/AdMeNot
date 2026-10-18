@@ -215,7 +215,8 @@ def apply_apk_report(facts: AppFacts, report: ApkReport) -> None:
         facts.gaps.add("apk")
     has_manifest = report.label is not None or report.label_padded or bool(report.cert_sha256)
     if has_manifest:
-        facts.label = clean_label(report.label)[0]  # raporty z JSON mogą pochodzić z cudzych nagrań
+        # Raporty z JSON mogą pochodzić z cudzych nagrań; bez etykiety w APK zostaje ta z telefonu.
+        facts.label = clean_label(report.label)[0] or facts.label
         facts.label_padded = report.label_padded
         facts.cert_sha256 = tuple(report.cert_sha256) or None
     if report.components is not None:
