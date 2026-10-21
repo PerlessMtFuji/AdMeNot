@@ -14,7 +14,8 @@ import {
   flaggedApps,
   formatUptime,
   groupSteps,
-  guideHighlight,
+  guidePath,
+  guideTerms,
   initial,
   levelTag,
   linkState,
@@ -196,10 +197,20 @@ describe('connect logic', () => {
     expect(connectChecklist('ready')).toEqual(['done', 'done', 'done']);
   });
 
-  test('guideHighlight takes the quoted term or the last menu level', () => {
-    expect(guideHighlight('Stuknij 7× „Numer wersji”')).toBe('Numer wersji');
-    expect(guideHighlight('Tap “Build number” 7 times')).toBe('Build number');
-    expect(guideHighlight('Ustawienia → O telefonie')).toBe('O telefonie');
+  test('guideTerms marks every quoted on-screen name', () => {
+    expect(guideTerms('Stuknij 7 razy „Wersja MIUI” albo „Wersja HyperOS”')).toEqual([
+      { text: 'Stuknij 7 razy ', term: false }, { text: 'Wersja MIUI', term: true },
+      { text: ' albo ', term: false }, { text: 'Wersja HyperOS', term: true },
+    ]);
+    expect(guideTerms('Tap “Build number” 7 times')).toEqual([
+      { text: 'Tap ', term: false }, { text: 'Build number', term: true }, { text: ' 7 times', term: false },
+    ]);
+    expect(guideTerms('Włącz debugowanie USB')).toEqual([{ text: 'Włącz debugowanie USB', term: false }]);
+  });
+
+  test('guidePath splits the menu levels', () => {
+    expect(guidePath('Ustawienia → Opcje programisty → Debugowanie USB'))
+      .toEqual(['Ustawienia', 'Opcje programisty', 'Debugowanie USB']);
   });
 
   test('initial and modelName', () => {

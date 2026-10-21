@@ -158,12 +158,16 @@ export function connectChecklist(link: LinkState): CheckStatus[] {
   return ['on', 'todo', 'todo'];
 }
 
-/** Termin do podświetlenia na miniaturze ekranu: tekst w cudzysłowie albo ostatni poziom menu. */
-export function guideHighlight(text: string): string {
-  const quoted = text.match(/[„“"]([^”"]+)[”"]/);
-  if (quoted) return quoted[1];
-  const parts = text.split('→');
-  return parts[parts.length - 1].trim();
+/** Polecenie kroku instrukcji USB pocięte na zwykły tekst i nazwy z ekranu telefonu (w cudzysłowie). */
+export function guideTerms(text: string): { text: string; term: boolean }[] {
+  return text.split(/[„“"]([^”"]+)[”"]/)
+    .map((part, i) => ({ text: part, term: i % 2 === 1 }))
+    .filter((p) => p.text);
+}
+
+/** Poziomy menu ze ścieżki „Ustawienia → … → cel”. */
+export function guidePath(path: string): string[] {
+  return path.split('→').map((s) => s.trim()).filter(Boolean);
 }
 
 export const SCAN_STEPS = ['identify', 'packages', 'collectors', 'score'] as const;

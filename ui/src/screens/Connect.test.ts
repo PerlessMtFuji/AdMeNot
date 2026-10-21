@@ -14,9 +14,7 @@ describe('Connect', () => {
     const checks = screen.getByRole('list', { name: 'Stan połączenia' }).querySelectorAll('li');
     expect([...checks].map((li) => li.dataset.status)).toEqual(['on', 'todo', 'todo']);
     await fireEvent.click(screen.getByRole('button', { name: 'Xiaomi / Redmi / POCO' }));
-    // Selektor `li`: ten sam termin jest też w miniaturce (podświetlenie) — wystarczy sprawdzić
-    // widoczny krok instrukcji.
-    expect(screen.getByText(/ustawienia zabezpieczeń/, { selector: 'li' })).toBeTruthy();
+    expect(screen.getByText('Debugowanie USB (ustawienia zabezpieczeń)')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Skanuj' })).toBeNull();
   });
 

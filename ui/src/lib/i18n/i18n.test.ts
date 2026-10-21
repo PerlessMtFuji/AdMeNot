@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { USB_GROUPS, USB_STEPS } from '../usb';
+import { USB_GROUPS, USB_STEPS, type UsbGroup } from '../usb';
 import en from './en.json';
 import { CRASH_ERROR_KEYS, ERROR_KEYS, i18n, LEVEL_KEYS, PLURAL_KEYS, SCAN_STAGES, t, tp, UPDATE_ERROR_KEYS } from './index.svelte';
 import pl from './pl.json';
@@ -9,6 +9,10 @@ function flat(obj: Record<string, unknown>, prefix = ''): string[] {
     typeof v === 'object' && v !== null ? flat(v as Record<string, unknown>, `${prefix}${k}.`)
       : [`${prefix}${k}`]);
 }
+
+// `optional` to tylko plakietka (connect.guide_optional), bez własnego tekstu w kroku.
+const usbStepKeys = (g: UsbGroup) => USB_STEPS[g].flatMap((parts, i) =>
+  ['act', ...parts.filter((p) => p !== 'optional')].map((p) => `usb.${g}.s${i + 1}.${p}`));
 
 const sources = import.meta.glob('../../**/*.{svelte,ts}', {
   eager: true, query: '?raw', import: 'default',
@@ -40,11 +44,16 @@ describe('dictionaries', () => {
       ...SCAN_STAGES.map((k) => `scan.stage.${k}`),
       ...LEVEL_KEYS.map((k) => `level.${k}`),
       ...USB_GROUPS.map((g) => `usb.group.${g}`),
-      ...USB_GROUPS.flatMap((g) => Array.from({ length: USB_STEPS[g] }, (_, i) => `usb.${g}.s${i + 1}`)),
+      ...USB_GROUPS.flatMap(usbStepKeys),
       ...['ads', 'notif', 'removal', 'data', 'disguise', 'background', 'origin', 'combo']
         .map((c) => `category.${c}`),
     ];
     expect(wanted.filter((k) => !keys.has(k))).toEqual([]);
+  });
+
+  test('USB guide steps have only the parts declared in USB_STEPS', () => {
+    expect(flat(pl).filter((k) => /^usb\.[a-z]+\.s\d/.test(k)).sort())
+      .toEqual(USB_GROUPS.flatMap(usbStepKeys).sort());
   });
 
   test('every translated error key reaches the error card', () => {

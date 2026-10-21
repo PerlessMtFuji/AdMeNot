@@ -59,6 +59,7 @@
     "guide_show": "Pokaż, jak włączyć debugowanie USB",
     "guide_hide": "Zwiń instrukcję",
     "guide_maker": "Producent",
+    "guide_optional": "opcjonalne",
     "client_label": "Klient (opcjonalnie)",
     "client_placeholder": "np. Anna K.",
     "scan": "Skanuj",
@@ -68,49 +69,49 @@
   "usb": {
     "group": { "samsung": "Samsung", "xiaomi": "Xiaomi / Redmi / POCO", "motorola": "Motorola", "oppo": "Oppo / Realme / OnePlus", "huawei": "Huawei / Honor", "pixel": "Pixel", "other": "Inny" },
     "samsung": {
-      "s1": "Ustawienia → Telefon — informacje → Informacje o oprogramowaniu",
-      "s2": "Stuknij 7× „Numer wersji”",
-      "s3": "Android 14 i nowsze: Ustawienia → Zabezpieczenia i prywatność → wyłącz „Automatyczna blokada”",
-      "s4": "Ustawienia → Opcje programisty → włącz „Debugowanie USB”",
-      "s5": "Podłącz kabel i na telefonie wybierz „Zezwól” (zaznacz „Zawsze zezwalaj”)"
+      "s1": {"act": "Otwórz informacje o oprogramowaniu", "path": "Ustawienia → Telefon — informacje → Informacje o oprogramowaniu"},
+      "s2": {"act": "Stuknij 7 razy „Numer wersji”", "note": "Telefon może poprosić o PIN — potem pokaże „Tryb programisty włączony”."},
+      "s3": {"act": "Wyłącz Automatyczną blokadę", "path": "Ustawienia → Zabezpieczenia i prywatność → Automatyczna blokada", "cond": "Android 14+"},
+      "s4": {"act": "Włącz debugowanie USB", "path": "Ustawienia → Opcje programisty → Debugowanie USB"},
+      "s5": {"act": "Podłącz kabel i stuknij „Zezwól”", "note": "Zaznacz „Zawsze zezwalaj na tym komputerze”."}
     },
     "xiaomi": {
-      "s1": "Ustawienia → O telefonie",
-      "s2": "Stuknij 7× „Wersja MIUI” albo „Wersja HyperOS”",
-      "s3": "Ustawienia → Ustawienia dodatkowe → Opcje programisty → „Debugowanie USB”",
-      "s4": "Włącz też „Debugowanie USB (ustawienia zabezpieczeń)” — potrzebna karta SIM i konto Mi",
-      "s5": "Podłącz kabel i na telefonie zezwól na debugowanie"
+      "s1": {"act": "Otwórz informacje o telefonie", "path": "Ustawienia → O telefonie"},
+      "s2": {"act": "Stuknij 7 razy „Wersja MIUI” albo „Wersja HyperOS”", "note": "Telefon może poprosić o PIN — potem pokaże „Tryb programisty włączony”."},
+      "s3": {"act": "Włącz debugowanie USB", "path": "Ustawienia → Ustawienia dodatkowe → Opcje programisty → Debugowanie USB"},
+      "s4": {"act": "Włącz też drugi przełącznik debugowania", "path": "Ustawienia → Ustawienia dodatkowe → Opcje programisty → Debugowanie USB (ustawienia zabezpieczeń)", "note": "Bez niego skan działa. Potrzebny do klikania w podglądzie ekranu i do części napraw. Wymaga karty SIM i konta Mi."},
+      "s5": {"act": "Podłącz kabel i stuknij „Zezwól”", "note": "Zaznacz „Zawsze zezwalaj na tym komputerze”."}
     },
     "motorola": {
-      "s1": "Ustawienia → Informacje o telefonie",
-      "s2": "Stuknij 7× „Numer kompilacji”",
-      "s3": "Ustawienia → System → Opcje programisty → „Debugowanie USB”",
-      "s4": "Podłącz kabel i na telefonie zezwól na debugowanie"
+      "s1": {"act": "Otwórz informacje o telefonie", "path": "Ustawienia → Informacje o telefonie"},
+      "s2": {"act": "Stuknij 7 razy „Numer kompilacji”", "note": "Telefon może poprosić o PIN — potem pokaże „Tryb programisty włączony”."},
+      "s3": {"act": "Włącz debugowanie USB", "path": "Ustawienia → System → Opcje programisty → Debugowanie USB"},
+      "s4": {"act": "Podłącz kabel i stuknij „Zezwól”", "note": "Zaznacz „Zawsze zezwalaj na tym komputerze”."}
     },
     "oppo": {
-      "s1": "Ustawienia → Informacje o urządzeniu → Wersja",
-      "s2": "Stuknij 7× „Numer wersji”",
-      "s3": "Ustawienia → Ustawienia dodatkowe → Opcje programisty → „Debugowanie USB”",
-      "s4": "Jeśli jest opcja „Wyłącz monitorowanie uprawnień”, włącz ją",
-      "s5": "Podłącz kabel i na telefonie zezwól na debugowanie"
+      "s1": {"act": "Otwórz informacje o wersji", "path": "Ustawienia → Informacje o urządzeniu → Wersja"},
+      "s2": {"act": "Stuknij 7 razy „Numer wersji”", "note": "Telefon może poprosić o PIN — potem pokaże „Tryb programisty włączony”."},
+      "s3": {"act": "Włącz debugowanie USB", "path": "Ustawienia → Ustawienia dodatkowe → Opcje programisty → Debugowanie USB"},
+      "s4": {"act": "Wyłącz monitorowanie uprawnień", "path": "Ustawienia → Ustawienia dodatkowe → Opcje programisty → Wyłącz monitorowanie uprawnień", "note": "Bez tego skan działa. Potrzebne, żeby ekran nie gasł w podglądzie, i do części napraw. Jeśli tej opcji nie ma, pomiń ten krok."},
+      "s5": {"act": "Podłącz kabel i stuknij „Zezwól”", "note": "Zaznacz „Zawsze zezwalaj na tym komputerze”."}
     },
     "huawei": {
-      "s1": "Ustawienia → Informacje o telefonie",
-      "s2": "Stuknij 7× „Numer kompilacji”",
-      "s3": "Ustawienia → System i aktualizacje → Opcje programisty → „Debugowanie USB”",
-      "s4": "Podłącz kabel, wybierz „Przesyłanie plików” i zezwól na debugowanie"
+      "s1": {"act": "Otwórz informacje o telefonie", "path": "Ustawienia → Informacje o telefonie"},
+      "s2": {"act": "Stuknij 7 razy „Numer kompilacji”", "note": "Telefon może poprosić o PIN — potem pokaże „Tryb programisty włączony”."},
+      "s3": {"act": "Włącz debugowanie USB", "path": "Ustawienia → System i aktualizacje → Opcje programisty → Debugowanie USB"},
+      "s4": {"act": "Podłącz kabel i stuknij „Zezwól”", "note": "Jako tryb USB wybierz „Przesyłanie plików”, potem zaznacz „Zawsze zezwalaj na tym komputerze”."}
     },
     "pixel": {
-      "s1": "Ustawienia → Informacje o telefonie",
-      "s2": "Stuknij 7× „Numer kompilacji”",
-      "s3": "Ustawienia → System → Opcje programisty → „Debugowanie USB”",
-      "s4": "Podłącz kabel i na telefonie zezwól na debugowanie"
+      "s1": {"act": "Otwórz informacje o telefonie", "path": "Ustawienia → Informacje o telefonie"},
+      "s2": {"act": "Stuknij 7 razy „Numer kompilacji”", "note": "Telefon może poprosić o PIN — potem pokaże „Tryb programisty włączony”."},
+      "s3": {"act": "Włącz debugowanie USB", "path": "Ustawienia → System → Opcje programisty → Debugowanie USB"},
+      "s4": {"act": "Podłącz kabel i stuknij „Zezwól”", "note": "Zaznacz „Zawsze zezwalaj na tym komputerze”."}
     },
     "other": {
-      "s1": "Ustawienia → Informacje o telefonie (czasem: Oprogramowanie)",
-      "s2": "Stuknij 7× „Numer kompilacji” albo „Numer wersji”",
-      "s3": "Wróć i otwórz „Opcje programisty” → „Debugowanie USB”",
-      "s4": "Podłącz kabel i na telefonie zezwól na debugowanie"
+      "s1": {"act": "Otwórz informacje o telefonie", "path": "Ustawienia → Informacje o telefonie", "note": "Czasem ta pozycja nazywa się „Oprogramowanie”."},
+      "s2": {"act": "Stuknij 7 razy „Numer kompilacji” albo „Numer wersji”", "note": "Telefon może poprosić o PIN — potem pokaże „Tryb programisty włączony”."},
+      "s3": {"act": "Włącz debugowanie USB", "path": "Ustawienia → Opcje programisty → Debugowanie USB", "note": "Opcje programisty bywają też w „System” albo „Ustawienia dodatkowe”."},
+      "s4": {"act": "Podłącz kabel i stuknij „Zezwól”", "note": "Zaznacz „Zawsze zezwalaj na tym komputerze”."}
     }
   },
   "scan": { "title": "Skanuję telefon", "sub": "To potrwa kilkanaście sekund. Nie odłączaj kabla.", "steps": "Etapy skanowania", "stage": { "identify": "Rozpoznaję telefon…", "packages": "Czytam listę aplikacji…", "collectors": "Zbieram dane o zachowaniu aplikacji…", "score": "Oceniam aplikacje…", "apk": "Analizuję pliki APK…" } },

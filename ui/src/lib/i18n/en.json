@@ -59,6 +59,7 @@
     "guide_show": "Show how to turn on USB debugging",
     "guide_hide": "Hide the guide",
     "guide_maker": "Maker",
+    "guide_optional": "optional",
     "client_label": "Client (optional)",
     "client_placeholder": "e.g. Anna K.",
     "scan": "Scan",
@@ -68,49 +69,49 @@
   "usb": {
     "group": { "samsung": "Samsung", "xiaomi": "Xiaomi / Redmi / POCO", "motorola": "Motorola", "oppo": "Oppo / Realme / OnePlus", "huawei": "Huawei / Honor", "pixel": "Pixel", "other": "Other" },
     "samsung": {
-      "s1": "Settings → About phone → Software information",
-      "s2": "Tap “Build number” 7 times",
-      "s3": "Android 14 and later: Settings → Security and privacy → turn off “Auto Blocker”",
-      "s4": "Settings → Developer options → turn on “USB debugging”",
-      "s5": "Connect the cable and tap “Allow” on the phone (tick “Always allow”)"
+      "s1": {"act": "Open software information", "path": "Settings → About phone → Software information"},
+      "s2": {"act": "Tap “Build number” 7 times", "note": "The phone may ask for your PIN, then show “Developer mode turned on”."},
+      "s3": {"act": "Turn off Auto Blocker", "path": "Settings → Security and privacy → Auto Blocker", "cond": "Android 14+"},
+      "s4": {"act": "Turn on USB debugging", "path": "Settings → Developer options → USB debugging"},
+      "s5": {"act": "Connect the cable and tap “Allow”", "note": "Tick “Always allow from this computer”."}
     },
     "xiaomi": {
-      "s1": "Settings → About phone",
-      "s2": "Tap “MIUI version” or “HyperOS version” 7 times",
-      "s3": "Settings → Additional settings → Developer options → “USB debugging”",
-      "s4": "Also turn on “USB debugging (Security settings)” — needs a SIM card and a Mi account",
-      "s5": "Connect the cable and allow debugging on the phone"
+      "s1": {"act": "Open phone information", "path": "Settings → About phone"},
+      "s2": {"act": "Tap “MIUI version” or “HyperOS version” 7 times", "note": "The phone may ask for your PIN, then show “Developer mode turned on”."},
+      "s3": {"act": "Turn on USB debugging", "path": "Settings → Additional settings → Developer options → USB debugging"},
+      "s4": {"act": "Also turn on the second debugging switch", "path": "Settings → Additional settings → Developer options → USB debugging (Security settings)", "note": "Scanning works without it. Needed for clicking in the screen view and for some repairs. Requires a SIM card and a Mi account."},
+      "s5": {"act": "Connect the cable and tap “Allow”", "note": "Tick “Always allow from this computer”."}
     },
     "motorola": {
-      "s1": "Settings → About phone",
-      "s2": "Tap “Build number” 7 times",
-      "s3": "Settings → System → Developer options → “USB debugging”",
-      "s4": "Connect the cable and allow debugging on the phone"
+      "s1": {"act": "Open phone information", "path": "Settings → About phone"},
+      "s2": {"act": "Tap “Build number” 7 times", "note": "The phone may ask for your PIN, then show “Developer mode turned on”."},
+      "s3": {"act": "Turn on USB debugging", "path": "Settings → System → Developer options → USB debugging"},
+      "s4": {"act": "Connect the cable and tap “Allow”", "note": "Tick “Always allow from this computer”."}
     },
     "oppo": {
-      "s1": "Settings → About device → Version",
-      "s2": "Tap “Build number” 7 times",
-      "s3": "Settings → Additional settings → Developer options → “USB debugging”",
-      "s4": "If there is “Disable permission monitoring”, turn it on",
-      "s5": "Connect the cable and allow debugging on the phone"
+      "s1": {"act": "Open version information", "path": "Settings → About device → Version"},
+      "s2": {"act": "Tap “Build number” 7 times", "note": "The phone may ask for your PIN, then show “Developer mode turned on”."},
+      "s3": {"act": "Turn on USB debugging", "path": "Settings → Additional settings → Developer options → USB debugging"},
+      "s4": {"act": "Disable permission monitoring", "path": "Settings → Additional settings → Developer options → Disable permission monitoring", "note": "Scanning works without it. Needed to keep the screen on in the screen view and for some repairs. If the option is not there, skip this step."},
+      "s5": {"act": "Connect the cable and tap “Allow”", "note": "Tick “Always allow from this computer”."}
     },
     "huawei": {
-      "s1": "Settings → About phone",
-      "s2": "Tap “Build number” 7 times",
-      "s3": "Settings → System & updates → Developer options → “USB debugging”",
-      "s4": "Connect the cable, choose “File transfer” and allow debugging"
+      "s1": {"act": "Open phone information", "path": "Settings → About phone"},
+      "s2": {"act": "Tap “Build number” 7 times", "note": "The phone may ask for your PIN, then show “Developer mode turned on”."},
+      "s3": {"act": "Turn on USB debugging", "path": "Settings → System & updates → Developer options → USB debugging"},
+      "s4": {"act": "Connect the cable and tap “Allow”", "note": "Choose “Transfer files” as the USB mode, then tick “Always allow from this computer”."}
     },
     "pixel": {
-      "s1": "Settings → About phone",
-      "s2": "Tap “Build number” 7 times",
-      "s3": "Settings → System → Developer options → “USB debugging”",
-      "s4": "Connect the cable and allow debugging on the phone"
+      "s1": {"act": "Open phone information", "path": "Settings → About phone"},
+      "s2": {"act": "Tap “Build number” 7 times", "note": "The phone may ask for your PIN, then show “Developer mode turned on”."},
+      "s3": {"act": "Turn on USB debugging", "path": "Settings → System → Developer options → USB debugging"},
+      "s4": {"act": "Connect the cable and tap “Allow”", "note": "Tick “Always allow from this computer”."}
     },
     "other": {
-      "s1": "Settings → About phone (sometimes: Software)",
-      "s2": "Tap “Build number” 7 times",
-      "s3": "Go back and open “Developer options” → “USB debugging”",
-      "s4": "Connect the cable and allow debugging on the phone"
+      "s1": {"act": "Open phone information", "path": "Settings → About phone", "note": "Sometimes this item is called “Software”."},
+      "s2": {"act": "Tap “Build number” or “Version number” 7 times", "note": "The phone may ask for your PIN, then show “Developer mode turned on”."},
+      "s3": {"act": "Turn on USB debugging", "path": "Settings → Developer options → USB debugging", "note": "Developer options may also sit under “System” or “Additional settings”."},
+      "s4": {"act": "Connect the cable and tap “Allow”", "note": "Tick “Always allow from this computer”."}
     }
   },
   "scan": { "title": "Scanning the phone", "sub": "This takes a few seconds. Keep the cable connected.", "steps": "Scan stages", "stage": { "identify": "Identifying the phone…", "packages": "Reading the app list…", "collectors": "Collecting app behavior data…", "score": "Rating the apps…", "apk": "Analyzing APK files…" } },

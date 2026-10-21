@@ -2,8 +2,18 @@
 export const USB_GROUPS = ['samsung', 'xiaomi', 'motorola', 'oppo', 'huawei', 'pixel', 'other'] as const;
 export type UsbGroup = (typeof USB_GROUPS)[number];
 
-export const USB_STEPS: Record<UsbGroup, number> = {
-  samsung: 5, xiaomi: 5, motorola: 4, oppo: 5, huawei: 4, pixel: 4, other: 4,
+// Każdy krok ma w i18n usb.<grupa>.s<n>.act; tu są wymienione jego dodatkowe części.
+// `optional` nie ma własnego tekstu — to plakietka connect.guide_optional.
+export type UsbStepPart = 'path' | 'note' | 'cond' | 'optional';
+
+export const USB_STEPS: Record<UsbGroup, UsbStepPart[][]> = {
+  samsung: [['path'], ['note'], ['path', 'cond'], ['path'], ['note']],
+  xiaomi: [['path'], ['note'], ['path'], ['path', 'note', 'optional'], ['note']],
+  motorola: [['path'], ['note'], ['path'], ['note']],
+  oppo: [['path'], ['note'], ['path'], ['path', 'note', 'optional'], ['note']],
+  huawei: [['path'], ['note'], ['path'], ['note']],
+  pixel: [['path'], ['note'], ['path'], ['note']],
+  other: [['path', 'note'], ['note'], ['path', 'note'], ['note']],
 };
 
 export function guessUsbGroup(model: string | null): UsbGroup {
