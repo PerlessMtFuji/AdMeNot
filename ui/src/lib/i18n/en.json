@@ -70,8 +70,9 @@
     "samsung": {
       "s1": "Settings → About phone → Software information",
       "s2": "Tap “Build number” 7 times",
-      "s3": "Settings → Developer options → turn on “USB debugging”",
-      "s4": "Connect the cable and tap “Allow” on the phone (tick “Always allow”)"
+      "s3": "Android 14 and later: Settings → Security and privacy → turn off “Auto Blocker”",
+      "s4": "Settings → Developer options → turn on “USB debugging”",
+      "s5": "Connect the cable and tap “Allow” on the phone (tick “Always allow”)"
     },
     "xiaomi": {
       "s1": "Settings → About phone",

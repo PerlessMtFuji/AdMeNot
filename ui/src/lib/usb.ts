@@ -3,7 +3,7 @@ export const USB_GROUPS = ['samsung', 'xiaomi', 'motorola', 'oppo', 'huawei', 'p
 export type UsbGroup = (typeof USB_GROUPS)[number];
 
 export const USB_STEPS: Record<UsbGroup, number> = {
-  samsung: 4, xiaomi: 5, motorola: 4, oppo: 5, huawei: 4, pixel: 4, other: 4,
+  samsung: 5, xiaomi: 5, motorola: 4, oppo: 5, huawei: 4, pixel: 4, other: 4,
 };
 
 export function guessUsbGroup(model: string | null): UsbGroup {

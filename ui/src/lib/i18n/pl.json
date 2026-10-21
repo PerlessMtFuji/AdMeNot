@@ -70,8 +70,9 @@
     "samsung": {
       "s1": "Ustawienia → Telefon — informacje → Informacje o oprogramowaniu",
       "s2": "Stuknij 7× „Numer wersji”",
-      "s3": "Ustawienia → Opcje programisty → włącz „Debugowanie USB”",
-      "s4": "Podłącz kabel i na telefonie wybierz „Zezwól” (zaznacz „Zawsze zezwalaj”)"
+      "s3": "Android 14 i nowsze: Ustawienia → Zabezpieczenia i prywatność → wyłącz „Automatyczna blokada”",
+      "s4": "Ustawienia → Opcje programisty → włącz „Debugowanie USB”",
+      "s5": "Podłącz kabel i na telefonie wybierz „Zezwól” (zaznacz „Zawsze zezwalaj”)"
     },
     "xiaomi": {
       "s1": "Ustawienia → O telefonie",
