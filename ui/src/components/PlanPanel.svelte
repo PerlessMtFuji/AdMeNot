@@ -8,6 +8,7 @@
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
   import Pill from '../ui/Pill.svelte';
+  import BrowserIcon from './BrowserIcon.svelte';
   import DeviceCard from './DeviceCard.svelte';
   import MirrorControls from './MirrorControls.svelte';
 
@@ -26,12 +27,19 @@
   const undecided = $derived(s.apkQuestion?.kind === 'mode' || modeUndecided({ scan: s.scan,
     setting: s.settings.apk_mode_default, running: s.apk.running, fullChosen: s.apkFullChosen }));
   const entries = $derived(undecided ? [] : planEntries(apps, s.selection));
+  // Poprawki ustawień witryn nie zależą od werdyktów aplikacji, więc plan z samymi poprawkami też da się wykonać.
+  const count = $derived(entries.length + s.fixes.size);
   // Tryb ręczny: licznik „bez uwag” zdradzałby ukryte werdykty.
   const verdictsHidden = $derived(isManual(s.scan) || undecided);
   const safeIncomplete = $derived(apps.filter((a) => a.verdict === 'safe' && a.incomplete).length);
   const details = $derived(s.device
     ? `${s.device.model} · Android ${s.device.android}${s.device.patch ? ` · ${t('phone.patch')} ${s.device.patch}` : ''}`
     : '');
+  // Każda wybrana poprawka witryny jako własny wiersz: witryna albo „wszystkie witryny” z ikoną przeglądarki.
+  const fixRows = $derived((s.scan?.device_checks ?? []).flatMap((c) => c.browsers.flatMap((b) => [
+    ...b.sites.filter((x) => x.fix && s.fixes.has(x.fix)).map((x) => ({ fix: x.fix!, title: x.host, pkg: b.package, name: b.name })),
+    ...(b.all_fix && s.fixes.has(b.all_fix) ? [{ fix: b.all_fix, title: t('checks.all', { browser: b.name }), pkg: b.package, name: b.name }] : []),
+  ])));
   const DOT = { accent: 'bg-accent text-accent', warn: 'bg-warn-strong text-warn-strong', bad: 'bg-bad text-bad' };
 </script>
 
@@ -42,7 +50,7 @@
   <div class="h-px bg-line"></div>
 {/if}
 <span class="lbl">{t('panel.plan')}</span>
-{#if entries.length === 0}<p class="text-mut">{t('panel.empty')}</p>{/if}
+{#if count === 0}<p class="text-mut">{t('panel.empty')}</p>{/if}
 <ul class="well well-list flex flex-col overflow-hidden empty:hidden">
   {#each entries as e (e.package)}
     <li animate:flip={{ duration: ms(DUR.flip) }} transition:enter
@@ -50,6 +58,13 @@
       <span class="glow-dot h-2 w-2 flex-none rounded-full {DOT[LEVEL_TONE[e.level]]}"></span>
       <b class="min-w-0 flex-1 truncate">{e.name}</b>
       <Pill tone={LEVEL_TONE[e.level]}>{t(`choice.${e.level}`)}</Pill>
+    </li>
+  {/each}
+  {#each fixRows as f (f.fix)}
+    <li transition:enter class="flex items-center gap-2.5 px-3.5 py-2.5">
+      <BrowserIcon pkg={f.pkg} name={f.name} size="sm" />
+      <b class="min-w-0 flex-1 truncate" title={f.title}>{f.title}</b>
+      <Pill tone="accent">{t('checks.silence')}</Pill>
     </li>
   {/each}
 </ul>
@@ -67,6 +82,6 @@
   </button>
 {/if}
 <div class="mt-auto text-xs text-mut">{t('plan.undo_hint')}</div>
-<Button variant="primary" size="lg" disabled={entries.length === 0 || s.orderRunning} onclick={() => ctl.openPlan()}>
-  {t('actions.fix', { count: entries.length })}
+<Button variant="primary" size="lg" disabled={count === 0 || s.orderRunning} onclick={() => ctl.openPlan()}>
+  {t('actions.fix', { count })}
 </Button>

@@ -24,7 +24,7 @@ describe('fake bridge', () => {
     expect(seen).toEqual(['scan:device', 'scan:done', 'apk:done']);
     const rerender = await bridge.api.rerender();
     if (!isApiError(rerender)) expect(rerender.scan?.apps.length).toBeGreaterThan(0);
-    await bridge.api.execute({ 'com.wlive.forecast': 'disable' }, [], null);
+    await bridge.api.execute({ 'com.wlive.forecast': 'disable' }, [], null, []);
     await vi.waitFor(() => expect(seen.at(-1)).toBe('exec:done'));
     expect(bridge.calls.map((c) => c.method)).toEqual(
       ['list_devices', 'start_scan', 'rerender', 'execute']);
@@ -51,7 +51,7 @@ describe('fake bridge', () => {
     const bridge = createFakeBridge('empty', { delay: 0 });
     let got = '';
     bridge.on('exec:question', (q) => (got = q.package));
-    bridge.emit('exec:question', { job_id: 'job-9', kind: 'admin_timeout', package: 'p', name: 'P' });
+    bridge.emit('exec:question', { job_id: 'job-9', kind: 'user_timeout', package: 'p', name: 'P' });
     expect(got).toBe('p');
   });
 });

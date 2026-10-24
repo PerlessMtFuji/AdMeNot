@@ -30,22 +30,34 @@ from admenot.app.events import Emitter
 from admenot.app.jobs import Job, JobRunner, Stopped
 from admenot.app.present import (
     app_name,
+    browser_names,
     device_card,
+    device_checks_view,
     device_identity,
     estimate_view,
     eta_view,
+    fix_texts,
     history_view,
     plan_view,
     result_view,
     scan_view,
     step_view,
 )
-from admenot.app.telemetry_events import repair_event, sample, scan_event, undo_event
+from admenot.app.telemetry_events import (
+    repair_event,
+    sample,
+    scan_event,
+    undo_event,
+    undo_targets,
+)
 from admenot.app.updates import UpdateService, update_view
 from admenot.app.watcher import DeviceWatcher
 from admenot.engine import donate, retention, share, welcome
+from admenot.engine.actions.errors import ActionError
 from admenot.engine.actions.executor import ExecOptions, run_order
 from admenot.engine.actions.executor import resume as resume_steps
+from admenot.engine.actions.steps import Step, site_url
+from admenot.engine.actions.steps import open_site as open_site_on_phone
 from admenot.engine.adb.devices import list_devices
 from admenot.engine.adb.sessionlog import SessionLogAdb, session_log_path
 from admenot.engine.adb.transport import AdbError, AdbTransport, RealAdb
@@ -64,6 +76,11 @@ from admenot.engine.apk.timing import (
 from admenot.engine.applabels import LabelFetch, PhoneLabel, list_apps
 from admenot.engine.device.identity import same_device
 from admenot.engine.device.info import DeviceInfo, read_device_info
+from admenot.engine.device_checks import (
+    SITE_NOTIFICATIONS,
+    debugging_appeared,
+    read_site_notifications,
+)
 from admenot.engine.foreground import read_foreground
 from admenot.engine.incident import attribute, load_incident, record, save_incident
 from admenot.engine.journal.db import (
@@ -92,7 +109,13 @@ from admenot.engine.settings import (
     save_service,
     save_settings,
 )
-from admenot.engine.texts import error_text, order_status_label, screenshot_caption
+from admenot.engine.texts import (
+    browser_name,
+    error_text,
+    fix_step_texts,
+    order_status_label,
+    screenshot_caption,
+)
 from admenot.engine.tools import resolve_adb
 from admenot.engine.workflow import (
     OrderInterrupted,
@@ -143,6 +166,15 @@ def _service_view(info: ServiceInfo) -> dict[str, Any]:
             "logo": str(info.logo) if info.logo else None}
 
 
+def _fixes(value: Any) -> tuple[str, ...]:
+    """Wybrane poprawki „Stanu telefonu”: lista napisów (identyfikatory), brak = żadnej."""
+    if value is None:
+        return ()
+    if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+        raise AppError("bad_request", "fixes")
+    return tuple(value)
+
+
 def _api(method: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]:
     @functools.wraps(method)
     def wrapper(self: Api, *args: Any, **kwargs: Any) -> dict[str, Any]:
@@ -188,6 +220,11 @@ class Api:
         # Porzucenie analizy APK i zapis jej wyniku wykluczają się: porzucone zadanie nie podmieni
         # raportu nowego skanu (audyt 2026-10-11, BUG-10).
         self._apk_commit = threading.Lock()
+        self._reopen = threading.Event()  # „Otwórz ponownie na telefonie” (`reopen_screen`)
+        self._skip = threading.Event()  # „Pomiń tę witrynę” w cofaniu (`skip_site`)
+        # Rośnie przy każdym pokazanym planie: odczyt witryn trwający w tym czasie nie podmienia
+        # kontroli, z których zlecenie zostanie wykonane (pokazano plan ze starych).
+        self._plans_shown = 0
         self._admin_timeout = admin_timeout
         self._poll_interval = poll_interval
         self._now = now
@@ -292,11 +329,14 @@ class Api:
                 "black": bool(shot.context.get("black")), "in_report": shot.in_report,
                 "image": data_uri(jpg) or data_uri(png)}
 
-    def _abandon_apk(self) -> None:
+    def _abandon_apk(self, notify: bool = True) -> None:
         with self._apk_commit:
             job = self._jobs.current()
-            if job is not None and job.kind in ("apk", "deep"):
-                self._jobs.abandon(job.id)
+            if job is not None and job.kind in ("apk", "deep") and self._jobs.abandon(job.id) and notify:
+                # Bez `job_id`: UI zna już następne zadanie (cofnięcie, wznowienie) i odrzuciłoby
+                # zdarzenie starego. Porzucone zadanie samo nic nie wyśle, gdy czekało na pytanie.
+                # Nowy skan (notify=False) i tak zastępuje cały stan analizy.
+                self._emit("apk:stopped", {})
 
     def _order_in_progress(self) -> Job | None:
         job = self._jobs.current()
@@ -475,7 +515,7 @@ class Api:
     def start_scan(self, serial: str, client: str | None = None) -> dict[str, Any]:
         if not isinstance(serial, str) or not serial.strip():
             raise AppError("bad_request", "serial")
-        self._abandon_apk()
+        self._abandon_apk(notify=False)
         with self._shots_lock:
             self._open_order.pop(serial.strip(), None)
         adb = self._session(serial.strip())
@@ -606,7 +646,7 @@ class Api:
             updated = analyze_apks(report, provider, progress, only=deep or only or None)
             with self._apk_commit:  # sprawdzenie i zapis atomowo względem `_abandon_apk`
                 job.check()
-                self._report = updated
+                self._report = updated = self._keep_checks(updated)
                 self._emit("apk:done", {"scan": scan_view(updated, self._lang), "job_id": job.id})
         except ManualMode:
             self._publish_manual(job, report, started, record=whole)
@@ -632,6 +672,14 @@ class Api:
                                                           int(time.monotonic() - started), p,
                                                           apk_stage=True, eta=eta))
 
+    def _keep_checks(self, report: ScanReport) -> ScanReport:
+        """Raport z analizy APK powstał z kopii sprzed ewentualnego `recheck_site_notifications`:
+        kontrole zostają te nowsze. Wołać pod `_apk_commit`."""
+        current = self._report
+        if current is None or current.device_checks is report.device_checks:
+            return report
+        return replace(report, device_checks=current.device_checks)
+
     def _learn(self, speeds: Speeds, provider: ApkProvider | None) -> None:
         stats = getattr(provider, "stats", None)
         if stats is None:
@@ -655,7 +703,7 @@ class Api:
             # nowy skan albo wykonanie nie jest już bieżące — wtedy nic nie publikujemy.
             if self._jobs.current() is not job:
                 return
-            published = self._report = replace(report, apk_mode=mode)
+            published = self._report = self._keep_checks(replace(report, apk_mode=mode))
             self._emit("apk:manual", {"scan": scan_view(published, self._lang), "job_id": job.id})
         if not record:
             return
@@ -801,6 +849,33 @@ class Api:
         return {"ok": True}
 
     @_api
+    def recheck_site_notifications(self, when_debugging: bool = False) -> dict[str, Any]:
+        """Ponowny odczyt samej kontroli powiadomień witryn (po zmianie na telefonie), bez skanu.
+
+        `when_debugging`: odpytywanie w tle — pełny odczyt tylko wtedy, gdy na telefonie pojawiło
+        się zdalne debugowanie przeglądarki z podpowiedzią; inaczej `check` = None."""
+        self._require_scan()
+        job = self._order_in_progress()
+        if job is not None:
+            raise AppError("busy", job.kind)
+        adb, report, shown = self._adb, self._report, self._plans_shown
+        if when_debugging:
+            old = next((c for c in report.device_checks if c.id == SITE_NOTIFICATIONS), None)
+            if old is None or not debugging_appeared(adb.tagged("recheck"), old):
+                return {"check": None}
+        labels = {r.facts.package: r.facts.label for r in report.results}
+        check = read_site_notifications(adb.tagged("recheck"), labels)
+        with self._apk_commit:  # nie rozjeżdżamy się z zapisem wyniku analizy APK
+            current = self._report
+            # nowy skan już ma własne kontrole; plan pokazany w trakcie odczytu zostaje przy starych
+            if self._adb is adb and current is not None and self._plans_shown == shown:
+                known = {c.id for c in current.device_checks}
+                checks = [check if c.id == check.id else c for c in current.device_checks]
+                self._report = replace(current, device_checks=checks if check.id in known
+                                       else [*checks, check])
+        return {"check": device_checks_view([check], self._lang, labels)[0]}
+
+    @_api
     def rerender(self) -> dict[str, Any]:
         return {"scan": scan_view(self._report, self._lang) if self._report else None}
 
@@ -903,42 +978,90 @@ class Api:
     def _names(self) -> dict[str, str]:
         if self._report is None:
             return {}
-        return {r.facts.package: app_name(r.facts, r.facts.package) for r in self._report.results}
+        return self._with_browsers(
+            {r.facts.package: app_name(r.facts, r.facts.package) for r in self._report.results},
+            self._report)
 
-    def _options(self, job: Job, manufacturer: str, names: dict[str, str]) -> ExecOptions:
+    @staticmethod
+    def _with_browsers(names: dict[str, str], report: ScanReport | None) -> dict[str, str]:
+        """Przeglądarki, które zlecenie zmienia tylko w ustawieniach witryn, mogą nie być w `names` albo
+        mieć tam sam pakiet (etykieta nieodczytana, przeglądarki zwykle nie analizujemy)."""
+        for package, name in browser_names(report.device_checks if report else []).items():
+            if names.get(package, package) == package:
+                names[package] = browser_name(package, {package: name})
+        return names
+
+    def _site_view(self, journal: Journal, action_id: int, names: dict[str, str]) -> dict[str, Any]:
+        """Przeglądarka i witryna kroku `channel` z dziennika (`site` None = wspólny kanał przeglądarki)."""
+        step = journal.action(action_id).step
+        return {"browser": browser_name(step["package"], names),
+                "site": fix_step_texts(step, self._lang, names)["site"]}
+
+    def _options(self, job: Job, manufacturer: str, names: dict[str, str],
+                 journal: Journal | None = None, order: str | None = None) -> ExecOptions:
+        def waiting_on(event: dict[str, Any]) -> dict[str, Any]:
+            package = event["package"]
+            wait: dict[str, Any] = {"package": package, "name": names.get(package, package),
+                                    "kind": event["step"], "timeout": event["timeout"],
+                                    "action_id": event["action_id"]}
+            if event["step"] == "channel" and journal is not None:  # witryna: z kroku w dzienniku
+                site = self._site_view(journal, event["action_id"], names)
+                wait["browser"] = site["browser"]
+                if site["site"]:
+                    wait["site"] = site["site"]
+            return wait
+
         def on_event(event: dict[str, Any]) -> None:
             kind = event["type"]
             if kind == "step":
                 self._emit("exec:step", step_view(event, self._lang, manufacturer, names))
             elif kind == "undo":
                 self._emit("undo:step", step_view(event, self._lang, manufacturer, names))
-            elif kind == "admin_wait":
-                package = event["package"]
-                self._emit("exec:admin_wait", {"package": package,
-                                               "name": names.get(package, package),
-                                               "timeout": event["timeout"]})
-            elif kind == "admin_done":
-                self._emit("exec:admin_done", {"package": event["package"],
-                                               "status": event["status"]})
+            elif kind == "undo_sites" and journal is not None:  # kolejka witryn, zanim otworzy się pierwsza
+                self._emit("undo:sites", {"order": order, "sites": [
+                    {"action_id": s["action_id"], "package": s["package"],
+                     **self._site_view(journal, s["action_id"], names)} for s in event["sites"]]})
+            elif kind == "user_wait":
+                self._skip.clear()  # liczy się tylko „Pomiń” kliknięte przy tym ekranie
+                self._emit("exec:user_wait", waiting_on(event))
+            elif kind == "user_done":
+                self._emit("exec:user_done", {"package": event["package"], "status": event["status"]})
             elif kind == "verify":
                 self._emit("exec:verify", {})
 
         def on_admin_timeout(package: str) -> str:
-            answer = job.ask("exec:question", {"kind": "admin_timeout", "package": package,
+            answer = job.ask("exec:question", {"kind": "user_timeout", "package": package,
                                                "name": names.get(package, package)})
             return "retry" if answer == "retry" else "skip"
 
+        self._reopen.clear()  # prośba sprzed tego zlecenia nie dotyczy jego kroków
+
+        def reopen() -> bool:
+            if self._reopen.is_set():
+                self._reopen.clear()
+                return True
+            return False
+
+        self._skip.clear()  # tak samo „Pomiń”: dotyczy tylko ekranów tego cofania
+
+        def skip() -> bool:
+            if self._skip.is_set():
+                self._skip.clear()
+                return True
+            return False
+
         return ExecOptions(apk_cache_dir=default_cache_dir(), admin_timeout=self._admin_timeout,
                            poll_interval=self._poll_interval, on_event=on_event,
-                           on_admin_timeout=on_admin_timeout, should_stop=job.should_stop)
+                           on_admin_timeout=on_admin_timeout, should_stop=job.should_stop,
+                           reopen=reopen, skip=skip)
 
     def _run_order(self, job: Job, adb: AdbTransport, journal: Journal, order: Order,
                    manufacturer: str, names: dict[str, str],
                    runner: Runner) -> tuple[OrderResult | None, str | None]:
         """(wynik, przerwanie): przerwanie = None | "stopped" | "disconnected" (telemetria)."""
         try:
-            result = execute_order(adb, journal, order, self._options(job, manufacturer, names),
-                                   runner)
+            result = execute_order(adb, journal, order,
+                                   self._options(job, manufacturer, names, journal), runner)
         except OrderInterrupted as exc:
             self._emit("exec:disconnected", {"order": exc.order.number})
             return None, "disconnected"
@@ -949,32 +1072,40 @@ class Api:
         if donate.succeeded(result):  # także zlecenie dokończone przez resume
             reminder = donate.note_success(self._now())
             self._settings = load_settings()
+        # Zgoda Firefoxa zmieniona przez zdalne debugowanie: UI przypomina o jego wyłączeniu.
+        debugging = any(a.step["kind"] == "site_permission" and a.status == "done"
+                        for a in journal.actions(order.id))
         self._emit("exec:done", {**result_view(result, names, self._lang, manufacturer),
-                                 "donate_reminder": reminder})
+                                 "donate_reminder": reminder, "firefox_debugging": debugging})
         return result, "stopped" if result.stopped else None
 
     @_api
-    def preview_plan(self, requests: dict[str, str],
-                     unlocked: list[str] | None = None) -> dict[str, Any]:
+    def preview_plan(self, requests: dict[str, str], unlocked: list[str] | None = None,
+                     fixes: list[str] | None = None) -> dict[str, Any]:
+        wanted = _fixes(fixes)
         self._require_scan()
-        plan = plan_order(self._adb, self._report, dict(requests), unlocked or ())
+        self._plans_shown += 1
+        plan = plan_order(self._adb, self._report, dict(requests), unlocked or (), fixes=wanted)
         return plan_view(plan, self._lang)
 
     @_api
     def share_plan(self, requests: dict[str, str], unlocked: list[str] | None,
-                   share_id: str) -> dict[str, Any]:
+                   share_id: str, fixes: list[str] | None = None) -> dict[str, Any]:
         """Plan dla klienta (spec plan-qr §5.3): wynik przychodzi zdarzeniem `share:ready|failed`."""
         if not isinstance(share_id, str) or not _SHARE_ID.fullmatch(share_id):
             raise AppError("bad_request", "share_id")
+        wanted = _fixes(fixes)
         self._require_scan()
-        plan = plan_order(self._adb, self._report, dict(requests), unlocked or ())
+        self._plans_shown += 1
+        plan = plan_order(self._adb, self._report, dict(requests), unlocked or (), fixes=wanted)
         if not plan.plans:
             raise AppError("nothing_to_do")
         names = {p: app_name(f, p) for p, f in plan.facts.items()}
         at = self._now()
         common = {"lang": self._lang, "phone": device_card(plan.device, self._match)["name"],
                   "at": at, "names": names, "shop": load_service().name,
-                  "partial": self._report.apk_mode != "full"}
+                  "partial": self._report.apk_mode != "full",
+                  "fix_texts": fix_texts(plan, self._lang)}
         full = share.fit(share.build_payload(plan, **common))
         local = share.local_url(client.base_url(), share.build_payload(plan, icons=False, **common))
         code = full["code"]
@@ -1036,8 +1167,10 @@ class Api:
 
     @_api
     def execute(self, requests: dict[str, str], unlocked: list[str] | None = None,
-                consent: dict[str, Any] | None = None) -> dict[str, Any]:
+                consent: dict[str, Any] | None = None,
+                fixes: list[str] | None = None) -> dict[str, Any]:
         self._require_current()
+        wanted_fixes = _fixes(fixes)
         self._require_scan()
         if consent is not None and not (isinstance(consent, dict) and isinstance(consent.get("code"), str)):
             raise AppError("bad_request", "consent")
@@ -1046,7 +1179,7 @@ class Api:
         wanted, free = dict(requests), list(unlocked or ())
 
         def run(job: Job) -> None:
-            plan = plan_order(adb, report, wanted, free)
+            plan = plan_order(adb, report, wanted, free, fixes=wanted_fixes)
             if not plan.plans:
                 raise AppError("nothing_to_do")
             agreed = None
@@ -1057,7 +1190,7 @@ class Api:
                     raise AppError("plan_changed")
                 agreed = {"code": consent["code"], "shown_at": shown.isoformat(timespec="seconds"),
                           "confirmed_at": self._now().isoformat(timespec="seconds")}
-            names = {p: app_name(f, p) for p, f in plan.facts.items()}
+            names = self._with_browsers({p: app_name(f, p) for p, f in plan.facts.items()}, report)
             with self._journal() as journal:
                 order = start(journal, plan, client, report, match, agreed)
                 self._bind_order(journal, plan.device.serial, order.id)
@@ -1065,13 +1198,14 @@ class Api:
                                           "plan": plan_view(plan, self._lang)})
                 result, interrupted = self._run_order(job, adb, journal, order,
                                                       plan.ctx.manufacturer, names, run_order)
+                actions = journal.actions(order.id)
             verdicts = {r.facts.package: r.verdict for r in report.results}
             session = self._scan_session or ""
             blind = (frozenset(p.package for p in plan.plans) - report.analyzed_on_demand
                      if report.apk_mode in ("manual", "partial") else frozenset())
             telemetry.record("repair", lambda p: repair_event(plan.device, session, plan.plans,
                                                               verdicts, result, interrupted, p,
-                                                              blind=blind))
+                                                              blind=blind, actions=actions))
 
         return {"job_id": self._jobs.start("exec", run)}
 
@@ -1136,22 +1270,34 @@ class Api:
             with self._journal() as journal:
                 try:
                     result = undo_order(adb, journal, order, package=package, action_id=action_id,
-                                        options=self._options(job, manufacturer, names))
+                                        options=self._options(job, manufacturer, names, journal,
+                                                              order.number))
                 except OrderInterrupted as exc:
                     self._emit("exec:disconnected", {"order": exc.order.number})
                     return
+                restored = []
+                for restored_id in result.restored_sites:
+                    row = journal.action(restored_id)
+                    restored.append({
+                        "action_id": restored_id, "package": row.package,
+                        **self._site_view(journal, restored_id, names),
+                        "url": site_url(Step.from_dict(row.step))})
             status = result.order.status
             self._emit("undo:done", {
                 "order": order.number, "status": status,
                 "status_label": order_status_label(status, self._lang),
                 "errors": [error_text(key, self._lang, manufacturer) for _, key in result.errors],
                 "admin_not_restored": result.admin_not_restored,
+                "sites_total": result.sites_total, "sites_restored": result.sites_restored,
+                "restored_sites": restored,
+                "firefox_debugging": result.firefox_debugging,
+                "interrupted": self._interrupted(device),
             })
-            apps = sorted({a.package for a in targeted})
-            failed = sorted({a.package for a, _ in result.errors})
+            apps, failed = undo_targets(targeted, result.errors)
             # Wiek liczony w `build`: ewentualny wyjątek łapie `record`, nie zadanie cofania.
             telemetry.record("undo", lambda p: undo_event(
-                device, apps, failed, (self._now() - order.created_at).days, p))
+                device, apps, failed, (self._now() - order.created_at).days, p,
+                sites=result.sites_total, sites_restored=result.sites_restored))
 
         return {"job_id": self._jobs.start("undo", run)}
 
@@ -1166,6 +1312,46 @@ class Api:
         if job is not None:  # analiza APK albo zlecenie, które może właśnie pobierać kopię
             raise AppError("busy", job.kind)
         return {"freed_bytes": clear_cache(default_cache_dir())}
+
+    @_api
+    def reopen_screen(self) -> dict[str, Any]:
+        """„Otwórz ponownie na telefonie”: ekran, na który czeka zlecenie (kanał witryny, administrator),
+        otwiera się znowu przy następnym sprawdzeniu stanu. Bez zlecenia w toku nic się nie dzieje."""
+        if self._order_in_progress() is None:
+            return {"ok": False}
+        self._reopen.set()
+        return {"ok": True}
+
+    @_api
+    def skip_site(self) -> dict[str, Any]:
+        """„Pomiń” przy witrynie w cofaniu: bieżący ekran kanału przestaje czekać, następny się otwiera.
+        Naprawa ma własne pytanie po upływie czasu, więc poza cofaniem nic się nie dzieje."""
+        job = self._jobs.current()
+        if job is None or job.kind != "undo":
+            return {"ok": False}
+        self._skip.set()
+        return {"ok": True}
+
+    @_api
+    def open_site(self, number: str, action_id: int) -> dict[str, Any]:
+        """Otwiera na telefonie witrynę przywróconego kanału, by zapisała się od nowa. Tylko między
+        zadaniami (telefon nie jest wtedy zajęty ekranem kanału)."""
+        job = self._jobs.current()
+        if job is not None:
+            raise AppError("busy", job.kind)
+        order, adb, _device = self._order_adb(number)
+        with self._journal() as journal:
+            try:
+                row = journal.action(action_id)
+            except KeyError:
+                return {"ok": False}
+        step = Step.from_dict(row.step)
+        if row.order_id != order.id or site_url(step) is None:
+            return {"ok": False}
+        try:
+            return {"ok": open_site_on_phone(adb, step)}
+        except ActionError:
+            return {"ok": False}
 
     @_api
     def stop(self, job_id: str) -> dict[str, Any]:

@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from admenot.engine.actions.context import SECURE_LIST_KEYS, PhoneContext
 from admenot.engine.actions.steps import Step, split_items
 from admenot.engine.allowlist.trust import PackagePatterns
+from admenot.engine.device_checks import DeviceCheck, fix_steps
 from admenot.engine.facts import AppFacts
 from admenot.engine.scoring import AppResult
 
 LEVELS = ("silence", "disable", "remove")
+FIX_LEVEL = "fix"  # poprawki „Stanu telefonu”: poza LEVELS, bo nie są poziomem aplikacji
 POST_NOTIFICATIONS = "android.permission.POST_NOTIFICATIONS"
 SYSTEM_ALERT_WINDOW = "android.permission.SYSTEM_ALERT_WINDOW"
 NOTIF_PERMISSION_MIN_SDK = 33  # od Androida 13 powiadomienia to uprawnienie wykonawcze
@@ -31,8 +34,8 @@ class Blocked:
     package: str
     level: str
     reason: str  # unknown_level | not_installed | protected | active_ime | home_no_alternative
-    #              | context_unknown
-    detail: str = ""  # context_unknown: nierozpoznane odczyty, np. „ime, home”
+    #              | context_unknown | unknown_fix | browser_removed
+    detail: str = ""  # context_unknown: nierozpoznane odczyty, np. „ime, home”; unknown_fix: id poprawki
 
 
 def default_level(result: AppResult, sdk: int = 0) -> str | None:
@@ -135,3 +138,25 @@ def plan_app(
         steps.append(Step("backup", package, {"dir": backup, "version_code": version}))
         steps.append(Step("installed", package, {"installed": "0", "backup_dir": backup}))
     return AppPlan(package, level, steps, warnings)
+
+
+def plan_fixes(fixes: Iterable[str], checks: list[DeviceCheck],
+               requests: Mapping[str, str]) -> list[AppPlan | Blocked]:
+    """Poprawki „Stanu telefonu” jako plany poziomu `fix`: jeden na pakiet, kroki w kolejności
+    identyfikatorów. Nieznana poprawka i poprawka przeglądarki, którą to samo zlecenie wyłącza albo
+    usuwa (kanał i zgody przepadłyby razem z nią), są zablokowane."""
+    steps: dict[str, list[Step]] = {}
+    blocked: dict[str, Blocked] = {}
+    for fix in sorted(set(fixes)):
+        found = fix_steps(fix, checks)
+        if found is None:
+            package = fix.split(":")[1] if fix.count(":") >= 1 else fix
+            blocked.setdefault(fix, Blocked(package, FIX_LEVEL, "unknown_fix", fix))
+            continue
+        package, step = found
+        if requests.get(package) in ("disable", "remove"):
+            blocked.setdefault(package, Blocked(package, FIX_LEVEL, "browser_removed"))
+            continue
+        steps.setdefault(package, []).append(step)
+    return [*(AppPlan(package, FIX_LEVEL, package_steps) for package, package_steps in steps.items()),
+            *blocked.values()]

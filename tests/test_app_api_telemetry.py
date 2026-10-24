@@ -90,6 +90,39 @@ def test_scan_repair_undo_events_with_consent():
     assert SERIAL not in text and "Anna" not in text and order not in text
 
 
+def test_site_fixes_count_executed_steps_and_stay_out_of_undo_apps():
+    chrome, site = "com.android.chrome", "web:https://www.example.com;1"
+    phone = make_cli_phone()
+    phone.channels = {chrome: {site: 3}}
+    phone.on_channel_screen = None  # przełącznik zostaje włączony: krok się nie wykonuje
+    api, rec = make_api(phone, sync=False, admin_timeout=0)
+    api.set_telemetry(True, True)
+    scanned(api, rec)
+    job = api.execute({}, [], None, [f"site:{chrome}:{site}"])["job_id"]
+    rec.wait_for("exec:question")
+    api.answer(job, "skip")
+    rec.wait_for("exec:done")
+    assert api._jobs.wait(5)
+    assert events()[-1]["fixes"] == {"channel": 0, "site_permission": 0}  # zaplanowany, niewykonany
+
+    def switch_off(p, package, channel_id):
+        p.channels[package][channel_id] = 0
+
+    phone.on_channel_screen = switch_off
+    api._admin_timeout = 5  # tym razem przełącznik zostaje wyłączony, zanim minie czas
+    rec.events.clear()
+    api.execute(WLIVE, [], None, [f"site:{chrome}:{site}"])
+    rec.wait_for("exec:done")
+    assert api._jobs.wait(5)
+    assert events()[-1]["fixes"] == {"channel": 1, "site_permission": 0}
+    api.undo(rec.of("exec:order")[-1]["order"])
+    rec.wait_for("undo:done")
+    assert api._jobs.wait(5)
+    undo = events()[-1]
+    assert undo["type"] == "undo" and undo["apps"] == 1
+    assert [p["package"] for p in undo["packages"]] == ["com.wlive.forecast"]
+
+
 def test_packages_only_with_second_consent():
     api, rec = make_api(make_cli_phone())
     api.set_telemetry(True, True)

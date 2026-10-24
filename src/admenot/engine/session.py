@@ -19,6 +19,7 @@ from admenot.engine.collectors.packages import collect_packages
 from admenot.engine.collectors.profiles import ProfileScope, read_profiles
 from admenot.engine.collectors.registry import default_collectors
 from admenot.engine.device.info import DeviceInfo, read_device_info
+from admenot.engine.device_checks import DeviceCheck, read_device_checks
 from admenot.engine.facts import AppFacts
 from admenot.engine.rules.engine import RuleSet, load_default_ruleset
 from admenot.engine.scoring import AppResult, score_app
@@ -56,6 +57,7 @@ class ScanReport:
     # manual — wybrany tryb ręczny, partial — ręczny z analizą wybranych aplikacji.
     apk_mode: str = "pending"
     analyzed_on_demand: frozenset[str] = frozenset()
+    device_checks: list[DeviceCheck] = field(default_factory=list)  # „Stan telefonu”
 
 
 def score_all(
@@ -91,6 +93,7 @@ def run_scan(
     facts = collect_packages(adb, device.local_now)
     stage("collectors")
     statuses = run_collectors(adb, facts, default_collectors(device.local_now, device.uptime_s))
+    device_checks = read_device_checks(adb, {p: f.label for p, f in facts.items()})
 
     if incidents is not None:  # nagranie incydentu (ocena §7.4): brak wpisu = 0 trafień
         for package, f in facts.items():
@@ -101,7 +104,8 @@ def run_scan(
                 or (window is not None and window < LOW_USAGE_WINDOW_H)
                 or any(not statuses[name].ok for name in BEHAVIOR_COLLECTORS if name in statuses))
     report = ScanReport(device, statuses, low_data, score_all(facts, ruleset, trust, low_data),
-                        usage_window_h=window, profiles=profiles, versions=engine_versions())
+                        usage_window_h=window, profiles=profiles, versions=engine_versions(),
+                        device_checks=device_checks)
     if apk is None:
         return report
     stage("apk")
@@ -196,6 +200,7 @@ def report_to_dict(report: ScanReport, lang: str = "pl") -> dict[str, Any]:
         "profiles": asdict(report.profiles) if report.profiles else None,
         "apk": asdict(report.apk) if report.apk else None,
         "versions": report.versions,
+        "device_checks": [asdict(c) for c in report.device_checks],
         "results": [
             {
                 "package": r.facts.package,

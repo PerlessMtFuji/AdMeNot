@@ -12,6 +12,10 @@ _GRANTED = re.compile(r"^([\w.]+): granted=(true|false)")
 _PERM_NAME = re.compile(r"^([\w.]+)")
 _USER = re.compile(r"^User (\d+):")
 _TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+_ENABLED = re.compile(r"\benabled=(\d+)")
+# COMPONENT_ENABLED_STATE_DISABLED_UNTIL_USED: `pm list packages -d` ją wymienia, ale aplikacja
+# jest w launcherze i działa (Samsung tak oznacza preinstalowane, jeszcze nieuruchomione aplikacje)
+DISABLED_UNTIL_USED = 4
 
 
 @dataclass
@@ -31,6 +35,7 @@ class PkgDump:
     installer: str | None = None
     requested: set[str] = field(default_factory=set)
     granted: set[str] = field(default_factory=set)
+    enabled_state: int | None = None  # „enabled=N” profilu 0 (PackageManager.COMPONENT_ENABLED_STATE_*)
 
 
 def parse_pm_list(text: str) -> dict[str, PmEntry]:
@@ -94,6 +99,8 @@ def parse_dumpsys_packages(text: str) -> dict[str, PkgDump]:
             section = None
         if m := _USER.match(line):
             user, section = int(m.group(1)), None
+            if user == 0 and (e := _ENABLED.search(line)):
+                current.enabled_state = int(e.group(1))
         if line in _PERM_SECTIONS:
             section, section_indent = line[:-1], _indent(raw)
             continue

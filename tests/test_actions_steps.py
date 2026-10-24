@@ -180,6 +180,24 @@ def test_disable_and_enable():
     assert phone.apps["com.ad"].enabled
 
 
+def test_disabled_until_used_app_is_enabled_and_can_be_disabled():
+    """Samsung: enabled=4 jest na liście `pm list packages -d`, ale aplikacja działa —
+    wyłączenie musi ją naprawdę wyłączyć, a cofnięcie włączyć."""
+    phone = _phone()
+    phone.apps["com.ad"].enabled, phone.apps["com.ad"].until_used = False, True
+    step = Step("enabled", "com.ad", {"enabled": "0"})
+    assert _apply_and_undo(phone, step) == {"enabled": True}
+    assert phone.apps["com.ad"].enabled
+
+
+def test_reinstall_does_not_disable_a_disabled_until_used_app():
+    phone = _phone()
+    phone.apps["com.ad"].enabled, phone.apps["com.ad"].until_used = False, True
+    step = Step("installed", "com.ad", {"installed": "0", "backup_dir": ""})
+    assert S.probe(phone, step) == {"installed": True, "enabled": True}
+    assert "enabled" not in S.inverse(step, S.probe(phone, step)).params
+
+
 def test_exit_code_zero_with_error_text_is_a_failure():
     phone = _phone()
     phone.fail[C.PM_DISABLE.format(package="com.ad")] = (

@@ -49,7 +49,7 @@ def test_stop_ends_the_admin_wait_without_asking(tmp_path):
     asked, stop = [], []
 
     def on_event(e):
-        if e["type"] == "admin_wait":
+        if e["type"] == "user_wait":
             stop.append(True)
 
     options = ExecOptions(on_event=on_event, should_stop=lambda: bool(stop), admin_timeout=60,

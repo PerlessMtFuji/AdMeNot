@@ -4,6 +4,7 @@
   import { t } from '../lib/i18n/index.svelte';
   import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
+  import Icon from '../ui/Icon.svelte';
 
   let { orders }: { orders: string[] } = $props();
   const ctl = getContext<Controller>('ctl');
@@ -21,6 +22,9 @@
     {#snippet actions()}
       <Button variant="ghost" size="sm" disabled={s.orderRunning} onclick={() => undo(order)}>{t('interrupted.undo')}</Button>
       <Button variant="primary" size="sm" disabled={s.orderRunning} onclick={() => ctl.resume(order)}>{t('interrupted.resume')}</Button>
+      <!-- zlecenie zostaje w Historii; ukrycie dotyczy tylko tego ekranu, do następnego skanu -->
+      <Button variant="ghost" size="sm" label={t('interrupted.hide')} title={t('interrupted.hide')}
+        onclick={() => ctl.hideInterrupted(order)}><Icon name="x" /></Button>
     {/snippet}
   </Banner>
 {/each}

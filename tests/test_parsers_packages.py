@@ -190,3 +190,19 @@ def test_runtime_permissions_of_other_profiles_are_not_profile_0():
     dump = parse_dumpsys_packages(text)["com.x"]
     assert dump.granted == {"android.permission.INTERNET"}
     assert {"android.permission.POST_NOTIFICATIONS", "android.permission.CAMERA"} <= dump.requested
+
+
+def test_enabled_state_is_read_from_profile_0():
+    """Samsung: preinstalowane aplikacje mają enabled=4 (DISABLED_UNTIL_USED) i działają normalnie."""
+    text = (
+        "Packages:\n"
+        "  Package [com.spotify.music] (f00d):\n"
+        "    versionCode=5 minSdk=26 targetSdk=34\n"
+        "    User 0: ceDataInode=1 installed=true hidden=false stopped=true enabled=4 instant=false\n"
+        "    User 10: ceDataInode=2 installed=true enabled=2\n"
+        "  Package [com.old] (f00e):\n"
+        "    versionCode=1 minSdk=21 targetSdk=30\n"
+    )
+    dumps = parse_dumpsys_packages(text)
+    assert dumps["com.spotify.music"].enabled_state == 4
+    assert dumps["com.old"].enabled_state is None

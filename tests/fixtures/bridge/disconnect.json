@@ -486,6 +486,18 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
+      "command": "dumpsys notification --noredact",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "<129 B>",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
       "command": "dumpsys notification --package admenot.none",
       "status": "ok",
       "duration": 0.0,
@@ -979,6 +991,14 @@
            }
           }
          ]
+        }
+       ],
+       "device_checks": [
+        {
+         "id": "site_notifications",
+         "state": "unrecognized",
+         "state_label": "Nie udało się odczytać",
+         "browsers": []
         }
        ],
        "profiles": {
@@ -1479,6 +1499,14 @@
          ]
         }
        ],
+       "device_checks": [
+        {
+         "id": "site_notifications",
+         "state": "unrecognized",
+         "state_label": "Nie udało się odczytać",
+         "browsers": []
+        }
+       ],
        "profiles": {
         "others": [],
         "known": true
@@ -1758,6 +1786,7 @@
       "label": "odebranie zgody na powiadomienia",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -1795,6 +1824,7 @@
       "label": "odebranie zgody na powiadomienia",
       "status": "done",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -1808,6 +1838,7 @@
       "label": "blokada powiadomień pełnoekranowych",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -1845,6 +1876,7 @@
       "label": "blokada powiadomień pełnoekranowych",
       "status": "done",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -1858,6 +1890,7 @@
       "label": "zatrzymanie aplikacji",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -1883,6 +1916,7 @@
       "label": "zatrzymanie aplikacji",
       "status": "done",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -1896,6 +1930,7 @@
       "label": "wyłączenie aplikacji",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2061,6 +2096,8 @@
         "kind": "permission",
         "step_label": "odebranie zgody na powiadomienia",
         "status": "done",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "wykonane",
         "error": null
        },
@@ -2072,6 +2109,8 @@
         "kind": "appop",
         "step_label": "blokada powiadomień pełnoekranowych",
         "status": "done",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "wykonane",
         "error": null
        },
@@ -2083,6 +2122,8 @@
         "kind": "force_stop",
         "step_label": "zatrzymanie aplikacji",
         "status": "done",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "wykonane",
         "error": null
        },
@@ -2094,6 +2135,8 @@
         "kind": "enabled",
         "step_label": "wyłączenie aplikacji",
         "status": "pending",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "oczekuje",
         "error": null
        }
@@ -2232,7 +2275,20 @@
       "label": "wyłączenie aplikacji",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys package com.wlive.forecast",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Domain verification status:\nFailure printing domain verification information\nPackages:\n  Package [com.wlive.forecast] (f00d):\n    versionCode=31 minSdk=26 targetSdk=34\n    User 0: ceDataInode=1 installed=true enabled=3\n      runtime permissions:\n        android.permission.POST_NOTIFICATIONS: granted=false\n",
+      "tag": null
      }
     ],
     [
@@ -2257,6 +2313,7 @@
       "label": "wyłączenie aplikacji",
       "status": "done",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2273,6 +2330,18 @@
       "status": "ok",
       "duration": 0.0,
       "output": "USE_FULL_SCREEN_INTENT: deny\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys package com.wlive.forecast",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Domain verification status:\nFailure printing domain verification information\nPackages:\n  Package [com.wlive.forecast] (f00d):\n    versionCode=31 minSdk=26 targetSdk=34\n    User 0: ceDataInode=1 installed=true enabled=3\n      runtime permissions:\n        android.permission.POST_NOTIFICATIONS: granted=false\n",
       "tag": null
      }
     ],
@@ -2316,7 +2385,8 @@
         "kinds": []
        }
       ],
-      "donate_reminder": true
+      "donate_reminder": true,
+      "firefox_debugging": false
      }
     ],
     [

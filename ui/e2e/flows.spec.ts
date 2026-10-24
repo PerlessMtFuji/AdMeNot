@@ -6,7 +6,7 @@ async function scan(page: Page, scenario: string) {
   await page.getByPlaceholder('np. Anna K.').fill('Anna K.');
   await page.getByRole('button', { name: 'Skanuj' }).click();
   await expect(page.getByRole('complementary', { name: 'Plan naprawy' })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText(/Analiza APK w tle/)).toBeHidden({ timeout: 15_000 });
+  await expect(page.getByText(/Analiza plików aplikacji/)).toBeHidden({ timeout: 15_000 });
 }
 
 test('adware: scan, confirm the plan, fix with the admin step, undo from history', async ({ page }) => {
@@ -178,4 +178,43 @@ test('show the plan to the client: QR, code and consent go with the order', asyn
   await page.getByRole('checkbox', { name: /zapoznał się/ }).check();
   await page.getByRole('button', { name: /^Wykonaj/ }).click();
   await expect(page.getByRole('heading', { name: 'Telefon naprawiony' })).toBeVisible({ timeout: 15_000 });
+});
+
+test('phone state: tick a site, see it in the plan, Firefox waits for remote debugging', async ({ page }) => {
+  await page.goto('/?scenario=adware&checks=populated');
+  await expect(page.getByRole('heading', { name: 'Połączono' })).toBeVisible();
+  await page.getByRole('button', { name: 'Skanuj' }).click();
+  await expect(page.getByText(/Analiza plików aplikacji/)).toBeHidden({ timeout: 15_000 });
+  await expect(page.getByRole('region', { name: 'Stan telefonu' })).toBeVisible();
+  await expect(page.getByText(/Zdalne debugowanie przez USB/)).toBeVisible();
+  const site = page.getByRole('switch', { name: 'Wycisz tanie-bilety.example' });
+  await expect(site).not.toBeChecked();
+  await site.check();
+  await expect(page.getByRole('complementary', { name: 'Plan naprawy' }).getByText('tanie-bilety.example')).toBeVisible();
+  await page.getByRole('button', { name: /Podsumowanie/ }).click();
+  await expect(page.getByRole('list', { name: 'Ustawienia witryn (1)', exact: true })).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Chrome', exact: true }).getByText('tanie-bilety.example')).toBeVisible();
+});
+
+test('phone state in English', async ({ page }) => {
+  await page.goto('/?scenario=adware&checks=populated&lang=en');
+  await page.getByRole('button', { name: 'Scan' }).click();
+  await expect(page.getByRole('region', { name: 'Phone state' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('switch', { name: 'All sites in Samsung Internet' })).toBeVisible();
+});
+
+test('phone state: a site fix on an app from the plan runs as one row with the app level', async ({ page }) => {
+  // Przeglądarka z poprawką witryny i własnym poziomem w jednym zleceniu: bez scalenia ekran wykonania pada.
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/?scenario=adware&checks=app_browser');
+  await page.getByRole('button', { name: 'Skanuj' }).click();
+  await expect(page.getByText(/Analiza plików aplikacji/)).toBeHidden({ timeout: 15_000 });
+  await page.getByRole('switch', { name: 'Wycisz tanie-bilety.example' }).check();
+  await page.getByRole('button', { name: /Podsumowanie/ }).click();
+  await page.getByRole('button', { name: /^Wykonaj/ }).click();
+  await expect(page.getByRole('heading', { name: 'Telefon naprawiony' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('wyłączona · sprawdzone')).toHaveCount(1);
+  await expect(page.getByRole('complementary', { name: 'Zlecenie' }).getByText('com.wlive.forecast')).toHaveCount(1);
+  expect(errors).toEqual([]);
 });

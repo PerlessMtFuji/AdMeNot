@@ -240,3 +240,64 @@ def test_unrecognized_ime_does_not_let_the_active_keyboard_be_disabled():
     ctx = _with_answer(C.DEFAULT_IME, "unsupported format\n")
     assert ctx.ime_package is None
     assert isinstance(_plan("com.spam", "disable", ctx=ctx), Blocked)
+
+
+# --- poprawki „Stanu telefonu” w planie zlecenia ---------------------------------------------
+
+CHROME_A = "site:com.android.chrome:web:https://a.pl;1"
+CHROME_B = "site:com.android.chrome:web:https://b.pl;2"
+
+
+def _fix_report(monkeypatch, tmp_path):
+    from fakephone import make_cli_phone
+
+    from admenot.engine.session import run_scan
+
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    phone = make_cli_phone()
+    phone.channels = {"com.android.chrome": {"web:https://a.pl;1": 3, "web:https://b.pl;2": 3}}
+    return phone, run_scan(phone)
+
+
+def test_plan_order_turns_fixes_into_fix_plans_first(monkeypatch, tmp_path):
+    from admenot.engine.workflow import plan_order
+
+    phone, report = _fix_report(monkeypatch, tmp_path)
+    plan = plan_order(phone, report, {"com.wlive.forecast": "silence"}, fixes=[CHROME_B, CHROME_A])
+    assert plan.fixes == (CHROME_A, CHROME_B)
+    assert [(p.package, p.level) for p in plan.plans] == [
+        ("com.android.chrome", "fix"), ("com.wlive.forecast", "silence")]
+    steps = plan.plans[0].steps
+    assert [(s.kind, s.params["channel_id"]) for s in steps] == [
+        ("channel", "web:https://a.pl;1"), ("channel", "web:https://b.pl;2")]
+
+
+def test_unknown_fix_blocked(monkeypatch, tmp_path):
+    from admenot.engine.workflow import plan_order
+
+    phone, report = _fix_report(monkeypatch, tmp_path)
+    plan = plan_order(phone, report, {}, fixes=["site:com.android.chrome:web:https://zz.pl;9"])
+    assert plan.plans == []
+    (blocked,) = plan.results
+    assert (blocked.package, blocked.level, blocked.reason) == ("com.android.chrome", "fix", "unknown_fix")
+
+
+def test_fixes_for_removed_browser_blocked(monkeypatch, tmp_path):
+    from admenot.engine.workflow import plan_order
+
+    phone, report = _fix_report(monkeypatch, tmp_path)
+    for level in ("disable", "remove"):
+        plan = plan_order(phone, report, {"com.android.chrome": level}, fixes=[CHROME_A, CHROME_B])
+        fix_blocked = [(r.package, r.level, r.reason) for r in plan.results
+                       if isinstance(r, Blocked) and r.level == "fix"]
+        assert fix_blocked == [("com.android.chrome", "fix", "browser_removed")]
+        assert not [p for p in plan.plans if p.level == "fix"]
+
+
+def test_no_fix_is_default(monkeypatch, tmp_path):
+    from admenot.engine.workflow import plan_order, recommended_requests
+
+    phone, report = _fix_report(monkeypatch, tmp_path)
+    assert "com.android.chrome" not in recommended_requests(report)
+    plan = plan_order(phone, report, recommended_requests(report))
+    assert plan.fixes == () and not [p for p in plan.plans if p.level == "fix"]

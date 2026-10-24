@@ -1,5 +1,5 @@
 import type { ShareScenario } from './fakeBridge';
-import type { Api, ApiError, EventMap, EventName } from './types';
+import type { Api, ApiError, DeviceCheck, EventMap, EventName } from './types';
 
 export interface Bridge {
   api: Api;
@@ -38,11 +38,12 @@ function windowEvents(): Bridge['on'] {
 export async function connectBridge(): Promise<Bridge> {
   // W buildzie produkcyjnym stała jest pusta i import atrapy znika z paczki.
   if (import.meta.env.VITE_FAKE_BRIDGE === '1' && !(window as PywebviewWindow).pywebview) {
-    const { createFakeBridge } = await import('./fakeBridge');
+    const { CHECKS_APP_BROWSER, CHECKS_SAMPLE, createFakeBridge } = await import('./fakeBridge');
     const params = new URLSearchParams(location.search);
     return createFakeBridge(params.get('scenario') ?? 'adware', { welcome: params.get('welcome') === '1',
       share: (params.get('share') ?? undefined) as ShareScenario | undefined,
-      lang: params.get('lang') === 'en' ? 'en' : undefined });
+      lang: params.get('lang') === 'en' ? 'en' : undefined,
+      checks: ({ populated: [CHECKS_SAMPLE], app_browser: [CHECKS_APP_BROWSER] } as Record<string, DeviceCheck[]>)[params.get('checks') ?? ''] });
   }
   return { api: await waitForPywebview(), on: windowEvents() };
 }

@@ -318,3 +318,84 @@ def test_manual_protocol_shows_untouched_on_demand_app_with_its_verdict(journal,
     p = build_protocol(journal, make_order(journal, snap, ((BOOST, "remove", ("done",)),)).id, "pl")
     assert {r.package: r.verdict for r in p.rows} == {BOOST: None, GAME: "review"}
     assert Recommendation("review_left", {"apps": GAME}) in p.recommendations
+
+
+CHROME = "com.android.chrome"
+SBROWSER = "com.sec.android.app.sbrowser"
+SITE_A, SITE_B = "site:com.android.chrome:web:https://a.pl;1", "site:com.android.chrome:web:https://b.pl;2"
+
+
+def phone_snapshot(image):
+    snap = snapshot(image)
+    snap["device_checks"] = [{
+        "id": "site_notifications", "state": "review",
+        "browsers": [
+            {"package": CHROME, "name": "Chrome", "mode": "per_site", "read": "ok",
+             "all_fix": None, "rdp_hint": False, "sites": [
+                 {"origin": "https://a.pl", "host": "a.pl", "blocked": False, "active": True, "fix": SITE_A},
+                 {"origin": "https://b.pl", "host": "b.pl", "blocked": False, "active": False, "fix": SITE_B},
+                 {"origin": "https://c.pl", "host": "c.pl", "blocked": True, "active": False, "fix": None}]},
+            {"package": SBROWSER, "name": "Samsung Internet", "mode": "shared", "read": "partial",
+             "all_fix": f"site_all:{SBROWSER}", "rdp_hint": False, "sites": []},
+        ],
+    }]
+    return snap
+
+
+def add_fix(journal, order, package, step_params, status, kind="channel"):
+    aid = journal.add_action(order.id, package, "fix",
+                             {"kind": kind, "package": package, "params": step_params}, "cmd")
+    journal.set_action_status(aid, status)
+
+
+def test_phone_checks_show_fix_outcomes_and_are_not_app_rows(journal, photo):
+    order = make_order(journal, phone_snapshot(photo), acts=())
+    add_fix(journal, order, CHROME, {"channel_id": "web:https://a.pl;1"}, "done")
+    add_fix(journal, order, SBROWSER, {"channel_id": "shared-notifications"}, "failed")
+    p = build_protocol(journal, order.id, "pl")
+    (check,) = p.phone_checks
+    assert [(r.browser, r.domain, r.before, r.outcome) for r in check.rows] == [
+        ("Chrome", "a.pl", "active", "done"),
+        ("Chrome", "b.pl", "allowed", "none"),  # zablokowanej c.pl nie ma w tabeli
+        ("Samsung Internet", None, "shared", "failed"),
+    ]
+    assert not [r for r in p.rows if r.package in (CHROME, SBROWSER)]
+
+
+def test_phone_checks_site_permission_and_undo(journal, photo):
+    snap = phone_snapshot(photo)
+    snap["device_checks"][0]["browsers"] = [{
+        "package": "org.mozilla.firefox", "name": "Firefox", "mode": "rdp", "read": "ok",
+        "all_fix": None, "rdp_hint": False, "sites": [
+            {"origin": "https://a.pl", "host": "a.pl", "blocked": False, "active": False,
+             "fix": "site_perm:org.mozilla.firefox:https://a.pl"}]}]
+    order = make_order(journal, snap, acts=())
+    add_fix(journal, order, "org.mozilla.firefox", {"origin": "https://a.pl"}, "undone",
+            kind="site_permission")
+    (check,) = build_protocol(journal, order.id, "pl").phone_checks
+    assert [(r.domain, r.outcome) for r in check.rows] == [("a.pl", "undone")]
+
+
+def test_unrecognized_browser_is_never_reported_as_no_sites(journal, photo):
+    snap = phone_snapshot(photo)
+    snap["device_checks"][0]["state"] = "unrecognized"
+    snap["device_checks"][0]["browsers"] = [
+        {"package": CHROME, "name": "Chrome", "mode": "per_site", "read": "unrecognized",
+         "sites": [], "all_fix": None, "rdp_hint": False}]
+    (check,) = build_protocol(journal, make_order(journal, snap, acts=()).id, "pl").phone_checks
+    assert [(r.domain, r.before) for r in check.rows] == [(None, "unrecognized")]
+
+
+def test_unsupported_browser_is_reported_as_not_checked(journal, photo):
+    snap = phone_snapshot(photo)
+    snap["device_checks"][0]["browsers"] = [
+        {"package": "com.example.odd", "name": "Odd", "mode": "unknown", "read": "unsupported",
+         "sites": [], "all_fix": None, "rdp_hint": False}]
+    (check,) = build_protocol(journal, make_order(journal, snap, acts=()).id, "pl").phone_checks
+    assert [(r.browser, r.domain, r.before) for r in check.rows] == [("Odd", None, "unsupported")]
+
+
+def test_old_snapshot_without_device_checks_has_no_phone_checks(journal, photo):
+    order = make_order(journal, snapshot(photo))
+    assert build_protocol(journal, order.id, "pl").phone_checks == []
+    assert build_protocol(journal, make_order(journal, None).id, "pl").phone_checks == []

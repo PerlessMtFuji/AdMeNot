@@ -1,19 +1,20 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import { slide } from 'svelte/transition';
-  import AdminPrompt from '../components/AdminPrompt.svelte';
   import AppIcon from '../components/AppIcon.svelte';
+  import { builtInIcon } from '../components/BrowserIcon.svelte';
   import DeviceCard from '../components/DeviceCard.svelte';
   import DonateBanner from '../components/DonateBanner.svelte';
   import MirrorControls from '../components/MirrorControls.svelte';
   import ReportButton from '../components/ReportButton.svelte';
   import ScreenshotStrip from '../components/ScreenshotStrip.svelte';
   import StepTimeline from '../components/StepTimeline.svelte';
+  import UserPrompt from '../components/UserPrompt.svelte';
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
-  import { groupSteps, initial, LEVEL_TONE } from '../lib/logic';
+  import { groupSteps, initial, PLAN_TONE, runnableApps } from '../lib/logic';
   import { DUR, enter, ms, pop } from '../lib/motion';
-  import type { Level, OrderResult } from '../lib/types';
+  import type { OrderResult, PlanLevel } from '../lib/types';
   import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
   import Card from '../ui/Card.svelte';
@@ -26,7 +27,8 @@
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
   const groups = $derived(groupSteps(s.steps));
-  const planned = $derived((s.execPlan?.apps ?? []).filter((a) => !a.blocked));
+  // Przeglądarka z poprawkami i poziomem aplikacji to jeden wiersz (klucz `package` w {#each}).
+  const planned = $derived(runnableApps(s.execPlan));
   const running = $derived(s.phase === 'executing');
   const waiting = $derived(running ? planned.filter((a) => !groups.some((g) => g.package === a.package)) : []);
   const total = $derived(planned.reduce((n, a) => n + a.steps.length, 0) || s.steps.length);
@@ -36,8 +38,10 @@
   const allOk = $derived(s.result !== null && s.result.apps.every((a) => a.outcome === 'ok'));
   const TONE = { ok: 'text-ok', warn: 'text-warn', bad: 'text-bad' };
   const icons = $derived(new Map((s.scan?.apps ?? []).map((a) => [a.package, a.icon])));
+  // przeglądarek zwykle nie analizujemy: bez ikony ze skanu wbudowane logo, jak w sekcji witryn
+  const iconOf = (pkg: string) => icons.get(pkg) ?? builtInIcon(pkg);
 
-  function levelOf(pkg: string): Level | null {
+  function levelOf(pkg: string): PlanLevel | null {
     return planned.find((a) => a.package === pkg)?.level ?? null;
   }
 
@@ -96,8 +100,10 @@
       </header>
     {/if}
 
-    <AdminPrompt />
+    <!-- Czekanie przy cofaniu witryny ma własny ekran (kolejka witryn): czerwony monit „wyłącz” byłby odwrotny -->
+    {#if s.job?.kind !== 'undo'}<UserPrompt />{/if}
     {#if s.verifying}<Banner tone="info" icon="info" title={t('exec.verifying')} />{/if}
+    {#if s.result?.firefox_debugging}<Banner tone="warn" icon="triangle-alert" title={t('exec.firefox_debugging')} />{/if}
     <DonateBanner />
 
     {#each groups as g (g.package)}
@@ -105,13 +111,13 @@
       {@const level = levelOf(g.package)}
       <Card role="article" label={g.name}>
         <div class="flex items-center gap-3 px-5 py-3.5">
-          <AppIcon icon={icons.get(g.package)} class="h-9 w-9"><span class="grid h-9 w-9 flex-none place-items-center rounded-[11px] bg-neutral-soft font-extrabold text-mut shadow-[var(--shadow-well)]" aria-hidden="true">{initial(g.name)}</span></AppIcon>
+          <AppIcon icon={iconOf(g.package)} class="h-9 w-9"><span class="grid h-9 w-9 flex-none place-items-center rounded-[11px] bg-neutral-soft font-extrabold text-mut shadow-[var(--shadow-well)]" aria-hidden="true">{initial(g.name)}</span></AppIcon>
           <b class="min-w-0 flex-1 truncate">{g.name}</b>
           {#if res}
             {@const o = outcome(res)}
             <span class="text-sm font-bold {TONE[o.tone]}" in:enter>{o.text}</span>
           {:else if level}
-            <Pill tone={LEVEL_TONE[level]}>{t(`choice.${level}`)}</Pill>
+            <Pill tone={PLAN_TONE[level]}>{t(`choice.${level}`)}</Pill>
           {/if}
         </div>
         {#if !res || res.outcome !== 'ok'}
@@ -124,9 +130,9 @@
       {@const level = levelOf(res.package)}
       <Card role="article" label={res.name}>
         <div class="flex items-center gap-3 px-5 py-3.5">
-          <AppIcon icon={icons.get(res.package)} class="h-9 w-9"><span class="grid h-9 w-9 flex-none place-items-center rounded-[11px] bg-neutral-soft font-extrabold text-mut shadow-[var(--shadow-well)]" aria-hidden="true">{initial(res.name)}</span></AppIcon>
+          <AppIcon icon={iconOf(res.package)} class="h-9 w-9"><span class="grid h-9 w-9 flex-none place-items-center rounded-[11px] bg-neutral-soft font-extrabold text-mut shadow-[var(--shadow-well)]" aria-hidden="true">{initial(res.name)}</span></AppIcon>
           <b class="min-w-0 flex-1 truncate">{res.name}</b>
-          {#if level}<Pill tone={LEVEL_TONE[level]}>{t(`choice.${level}`)}</Pill>{/if}
+          {#if level}<Pill tone={PLAN_TONE[level]}>{t(`choice.${level}`)}</Pill>{/if}
           <span class="text-sm font-bold {TONE[o.tone]}">{o.text}</span>
         </div>
       </Card>
@@ -134,10 +140,10 @@
     {#each waiting as a (a.package)}
       <Card dim role="article" label={a.name}>
         <div class="flex items-center gap-3 px-5 py-3.5">
-          <AppIcon icon={icons.get(a.package)} class="h-9 w-9"><span class="grid h-9 w-9 flex-none place-items-center rounded-[11px] bg-neutral-soft font-extrabold text-mut shadow-[var(--shadow-well)]" aria-hidden="true">{initial(a.name)}</span></AppIcon>
+          <AppIcon icon={iconOf(a.package)} class="h-9 w-9"><span class="grid h-9 w-9 flex-none place-items-center rounded-[11px] bg-neutral-soft font-extrabold text-mut shadow-[var(--shadow-well)]" aria-hidden="true">{initial(a.name)}</span></AppIcon>
           <b class="min-w-0 flex-1 truncate">{a.name}</b>
           <span class="text-soft">{t('exec.waiting')}</span>
-          <Pill tone={LEVEL_TONE[a.level]}>{t(`choice.${a.level}`)}</Pill>
+          <Pill tone={PLAN_TONE[a.level]}>{t(`choice.${a.level}`)}</Pill>
         </div>
       </Card>
     {/each}

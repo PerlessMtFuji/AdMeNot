@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { flushSync, tick } from 'svelte';
 import { describe, expect, test, vi } from 'vitest';
 import App from '../App.svelte';
+import { CHECKS_SAMPLE } from '../lib/fakeBridge';
 import { t, tp } from '../lib/i18n/index.svelte';
 import { setupCtl } from '../test-utils';
 
@@ -106,7 +107,7 @@ describe('Results', () => {
     s.selection = {};
     await tick();
     const panel = screen.getByRole('complementary', { name: 'Plan naprawy' });
-    expect(within(panel).getByText('Zaznacz aplikacje, które chcesz naprawić.')).toBeTruthy();
+    expect(within(panel).getByText('Zaznacz aplikacje albo witryny, które chcesz naprawić.')).toBeTruthy();
     const fix = within(panel).getByRole('button', { name: 'Podsumowanie (0)' }) as HTMLButtonElement;
     expect(fix.disabled).toBe(true);
   });
@@ -317,7 +318,7 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     expect(screen.getByText(t('summary.profiles_unknown'))).toBeTruthy();
     s.scan = { ...s.scan!, profiles: { others: [], known: true } };
     await tick();
-    expect(screen.queryByRole('region', { name: 'Uwagi do skanu' })).toBeNull();
+    expect(notesLine().textContent).not.toContain(t('notice.short.profiles_unknown')); // zostaje tylko „stan telefonu nie odczytany”
     expect(screen.queryByText(t('summary.profiles_unknown'))).toBeNull();
   });
 
@@ -339,7 +340,8 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     const { s } = await scanned('clean');
     const app = s.scan!.apps[0];
     s.undoTarget = app.package;
-    s.undoResult = { order: 'ZS', status: 'partially_undone', status_label: '', errors: ['Brak kopii aplikacji.'], admin_not_restored: false };
+    s.undoResult = { order: 'ZS', status: 'partially_undone', status_label: '', errors: ['Brak kopii aplikacji.'], admin_not_restored: false,
+      sites_total: 0, sites_restored: 0, restored_sites: [], firefox_debugging: false, interrupted: [] };
     await tick();
     expect(screen.getByText(t('summary.undo_app_failed', { name: app.name }))).toBeTruthy();
     expect(screen.getByText('Brak kopii aplikacji.')).toBeTruthy();
@@ -640,5 +642,55 @@ describe('Results: manual mode (tryb ręczny)', () => {
     s.job = { id: 'j2', kind: 'deep' };
     await tick();
     expect(screen.queryByRole('button', { name: t('apk_mode.stop_to_manual') })).toBeNull();
+  });
+});
+
+describe('Results: phone state', () => {
+  async function scannedWithChecks() {
+    const env = await setupCtl('adware', { checks: [CHECKS_SAMPLE] });
+    render(App, { props: { ctl: env.ctl } });
+    await env.ctl.startScan();
+    await vi.waitFor(() => expect(env.s.job).toBeNull());
+    await tick();
+    return env;
+  }
+
+  test('the section sits above the app list', async () => {
+    await scannedWithChecks();
+    const section = screen.getByRole('region', { name: 'Stan telefonu' });
+    const firstGroup = screen.getByRole('region', { name: 'Szkodliwe' });
+    expect(section.compareDocumentPosition(firstGroup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  test('an unreadable phone state is a notice, not an empty or “all clear” section', async () => {
+    await scanned();
+    expect(screen.queryByRole('region', { name: 'Stan telefonu' })).toBeNull();
+    await fireEvent.click(within(screen.getByRole('region', { name: 'Uwagi do skanu' })).getByRole('button', { name: 'Więcej' }));
+    expect(screen.getByText(/Nie dało się odczytać stanu telefonu/)).toBeTruthy();
+  });
+
+  test('a ticked site makes a runnable plan: the panel counts it and the confirmation lists it', async () => {
+    const { s, bridge } = await scannedWithChecks();
+    const panel = screen.getByRole('complementary', { name: 'Plan naprawy' });
+    const before = Object.keys(s.selection).length;
+    await fireEvent.click(screen.getByRole('switch', { name: 'Wycisz tanie-bilety.example' }));
+    expect(within(panel).getByText('tanie-bilety.example')).toBeTruthy();
+    await fireEvent.click(within(panel).getByRole('button', { name: `Podsumowanie (${before + 1})` }));
+    const confirm = await screen.findByRole('region', { name: 'Plan naprawy' });
+    expect(within(confirm).getByRole('list', { name: 'Ustawienia witryn (1)' })).toBeTruthy();
+    // przeglądarka z ikoną i nazwą, pod nią sam adres witryny — bez zdania z nazwą przeglądarki
+    expect(within(within(confirm).getByRole('list', { name: 'Chrome' })).getByText('tanie-bilety.example')).toBeTruthy();
+    expect(confirm.textContent).not.toContain('Wyłączenie powiadomień');
+    expect(bridge.calls.filter((c) => c.method === 'preview_plan').at(-1)!.args[2]).toEqual([CHECKS_SAMPLE.browsers[0].sites[0].fix]);
+  });
+
+  test('with no apps selected, a ticked site alone enables the summary button', async () => {
+    const { s } = await scannedWithChecks();
+    s.selection = {};
+    await tick();
+    const panel = screen.getByRole('complementary', { name: 'Plan naprawy' });
+    expect((within(panel).getByRole('button', { name: 'Podsumowanie (0)' }) as HTMLButtonElement).disabled).toBe(true);
+    await fireEvent.click(screen.getByRole('switch', { name: 'Wycisz wiadomosci.example' }));
+    expect((within(panel).getByRole('button', { name: 'Podsumowanie (1)' }) as HTMLButtonElement).disabled).toBe(false);
   });
 });

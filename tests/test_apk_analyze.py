@@ -14,7 +14,13 @@ from admenot.engine.apk.analyze import (
     report_to_json,
     scope_notes,
 )
-from admenot.engine.apk.manifest import ICON_MAX_BYTES, ManifestInfo, _read_icon, icon_uri
+from admenot.engine.apk.manifest import (
+    ICON_MAX_BYTES,
+    ManifestInfo,
+    _read_icon,
+    icon_uri,
+    resolved_label,
+)
 from admenot.engine.apk.sdks import load_default_ad_sdks, parse_ad_sdks
 from admenot.engine.facts import AppFacts
 
@@ -328,3 +334,13 @@ def test_splits_with_the_base_signer_are_fine(tmp_path):
                          read_manifest=lambda p: ManifestInfo("com.x", 1, "X", ("aa",)),
                          read_certs=lambda p: ("aa",))
     assert "signers" not in (report.error or "")
+
+
+def test_unresolved_resource_label_is_dropped_so_the_phone_name_stays():
+    # Samsung Health przy limicie pamięci: androguard nie rozwiązał resources.arsc (2026-10-24)
+    assert resolved_label("@7F14245E") is None
+    assert resolved_label("@0x7f14245e") is None
+    assert resolved_label("@string/app_name") is None
+    assert resolved_label("") is None and resolved_label(None) is None
+    assert resolved_label("Samsung Health") == "Samsung Health"
+    assert resolved_label("@Home") == "@Home"  # nazwa z małpą to nadal nazwa

@@ -1,5 +1,5 @@
 import { CATEGORY_ORDER } from './categories';
-import type { AppView, Category, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanView, ScanView, Settings, StepEvent, UpdateView, Verdict } from './types';
+import type { AppView, Category, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, UndoSite, UpdateView, UserWait, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done';
 export type StageState = 'done' | 'now' | 'todo';
@@ -192,16 +192,18 @@ export function notificationsManual(sdk: number | undefined): boolean {
 }
 
 export const LEVEL_TONE: Record<Level, 'accent' | 'warn' | 'bad'> = { silence: 'accent', disable: 'warn', remove: 'bad' };
+/** Poprawki „Stanu telefonu” mają ten sam kolor co wyciszenie: nic nie jest usuwane. */
+export const PLAN_TONE: Record<PlanLevel, 'accent' | 'warn' | 'bad'> = { ...LEVEL_TONE, fix: 'accent' };
 export const VERDICT_TONE: Record<Verdict, 'bad' | 'warn' | 'neutral' | 'ok'> = {
   malicious: 'bad', suspicious: 'warn', review: 'neutral', safe: 'ok',
 };
 
-export type PlanGroupKey = Level | 'blocked';
+export type PlanGroupKey = PlanLevel | 'blocked';
 /** Krok albo ostrzeżenie w grupie; only: nazwy aplikacji, których dotyczy (pusta = wszystkich w grupie). */
 export interface PlanGroupLine { text: string; only: string[] }
 export interface PlanGroup { key: PlanGroupKey; apps: PlanApp[]; steps: PlanGroupLine[]; warnings: PlanGroupLine[] }
 
-const PLAN_GROUPS: PlanGroupKey[] = ['remove', 'disable', 'silence', 'blocked']; // od najmocniejszej zmiany
+const PLAN_GROUPS: PlanGroupKey[] = ['remove', 'disable', 'silence', 'fix', 'blocked']; // od najmocniejszej zmiany
 
 /** Jedna lista dla grupy w kolejności wykonania: krok, którego część aplikacji nie ma, zostaje między
  *  sąsiadami z ich listy (planista układa kroki zawsze w tej samej kolejności). */
@@ -229,6 +231,20 @@ export function planGroups(apps: PlanApp[], lang: string): PlanGroup[] {
     return list.length === 0 ? []
       : [{ key, apps: list, steps: mergeLines(list, (a) => a.steps), warnings: mergeLines(list, (a) => a.warnings) }];
   });
+}
+
+/** Plan wykonania, jeden wiersz na pakiet: przeglądarka z poprawkami ustawień i własnym poziomem ma w
+ *  planie dwa wpisy — liczy się poziom aplikacji (jak w `groupHistory`), kroki obu zostają w kolejności. */
+export function runnableApps(plan: PlanView | null): PlanApp[] {
+  const rows: PlanApp[] = [];
+  for (const a of plan?.apps ?? []) {
+    if (a.blocked) continue;
+    const i = rows.findIndex((r) => r.package === a.package);
+    if (i < 0) { rows.push(a); continue; }
+    const app = rows[i].level === 'fix' ? a : rows[i];
+    rows[i] = { ...app, steps: [...rows[i].steps, ...a.steps], warnings: [...rows[i].warnings, ...a.warnings] };
+  }
+  return rows;
 }
 
 export function planEntries(apps: AppView[], selection: Record<string, Level>):
@@ -273,7 +289,7 @@ export const SCORE_ZONES: { from: number; to: number; verdict: Verdict }[] = [
 export type AppHistoryState = 'done' | 'restored' | 'pending' | 'failed';
 export interface HistoryAppRow {
   package: string;
-  level: Level;
+  level: PlanLevel;
   state: AppHistoryState;
   actions: HistoryAction[];
   backup: boolean;
@@ -285,21 +301,37 @@ export function groupHistory(actions: HistoryAction[]): HistoryAppRow[] {
   for (const a of actions) {
     let row = rows.find((r) => r.package === a.package);
     if (!row) {
-      row = { package: a.package, level: a.level as Level, state: 'done', actions: [], backup: false, canRestore: false };
+      row = { package: a.package, level: a.level as PlanLevel, state: 'done', actions: [], backup: false, canRestore: false };
       rows.push(row);
     }
+    // Poprawki ustawień przeglądarki i jej wyciszenie w jednym zleceniu to jeden wiersz: liczy się poziom aplikacji.
+    if (row.level === 'fix' && a.level !== 'fix') row.level = a.level as PlanLevel;
     row.actions.push(a);
   }
   for (const r of rows) {
-    const statuses = r.actions.map((a) => a.status);
+    // `manual_undo` ma tylko kanał nie do przywrócenia (`channel_gone`): zostaje „done”, więc stan
+    // aplikacji liczą pozostałe kroki, a sama taka poprawka to wciąż „ustawienia witryn zmienione”.
+    const auto = r.actions.filter((a) => !a.manual_undo);
+    const statuses = (auto.length ? auto : r.actions).map((a) => a.status);
     // Po cofnięciu zostają „failed” tylko kroki, które niczego nie zmieniły (np. pominięte).
     const restored = statuses.includes('undone') && !statuses.includes('done') && !statuses.includes('pending');
     r.state = restored ? 'restored'
       : statuses.includes('pending') ? 'pending' : statuses.includes('failed') ? 'failed' : 'done';
     r.backup = r.actions.some((a) => a.kind === 'backup' && a.status === 'done');
-    r.canRestore = statuses.includes('done');
+    // Kanał nie do przywrócenia (`manual_undo`) nie daje nic do cofnięcia; zwykły kanał „done” tak.
+    r.canRestore = r.actions.some((a) => a.status === 'done' && !a.manual_undo);
   }
   return rows;
+}
+
+export type SiteState = 'done' | 'current' | 'waiting' | 'skipped' | 'gone';
+
+/** Stan pozycji kolejki witryn w cofaniu: z kroku `undo:step` tej witryny, potem z bieżącego oczekiwania. */
+export function siteState(site: UndoSite, steps: StepEvent[], wait: UserWait | null): SiteState {
+  const step = steps.find((a) => a.action_id === site.action_id);
+  if (step?.status === 'undone') return 'done';
+  if (step?.status === 'failed') return step.error_key === 'channel_gone' ? 'gone' : 'skipped';
+  return wait?.action_id === site.action_id ? 'current' : 'waiting';
 }
 
 /** Nazwa i ikona aplikacji w historii: z migawki zlecenia, potem z bieżącego skanu, na końcu pakiet. */
@@ -309,9 +341,9 @@ export function historyApp(order: HistoryOrder, pkg: string, scanned: AppView[] 
   return { name: saved?.name || now?.name || pkg, icon: saved?.icon ?? now?.icon ?? null };
 }
 
-export function orderCounts(rows: HistoryAppRow[]): [Level, number][] {
-  const out: [Level, number][] = [];
-  for (const level of ['remove', 'disable', 'silence'] as Level[]) {
+export function orderCounts(rows: HistoryAppRow[]): [PlanLevel, number][] {
+  const out: [PlanLevel, number][] = [];
+  for (const level of ['remove', 'disable', 'silence', 'fix'] as PlanLevel[]) {
     const n = rows.filter((r) => r.level === level).length;
     if (n) out.push([level, n]);
   }
@@ -344,10 +376,10 @@ export type ActedLog = Record<string, { order: string; level: Level }[]>;
 /** Dopisuje aplikacje wykonane w zleceniu (bez zatrzymanych i nieudanych), najnowsze zlecenie na końcu. */
 export function actedAfter(log: ActedLog, plan: PlanView | null, result: OrderResult): ActedLog {
   const next = { ...log };
-  const levels = new Map((plan?.apps ?? []).filter((a) => !a.blocked).map((a) => [a.package, a.level]));
+  const levels = new Map(runnableApps(plan).map((a) => [a.package, a.level]));
   for (const app of result.apps) {
     const level = levels.get(app.package);
-    if (app.outcome !== 'ok' || !level) continue;
+    if (app.outcome !== 'ok' || !level || level === 'fix') continue; // poprawka ustawień to nie poziom aplikacji
     next[app.package] = [...(next[app.package] ?? []), { order: result.order, level }];
   }
   return next;
@@ -413,7 +445,7 @@ export function topReasons(app: AppView, n: number, categoryLabel: (c: Category)
 }
 
 export type NoticeKey = 'low_data' | 'incomplete' | 'profiles' | 'profiles_unknown' | 'notifications_manual'
-  | 'select_level_disable';
+  | 'select_level_disable' | 'checks_unreadable';
 export interface Notice { key: NoticeKey; tone: 'warn' | 'info'; params: Record<string, string | number> }
 
 /** Komunikaty informacyjne nad listą: najpierw ostrzeżenia, potem informacje (spec §3). */
@@ -429,6 +461,7 @@ export function notices(input: { scan: ScanView | null; sdk: number | undefined;
     out.push({ key: 'notifications_manual', tone: 'info', params: {} });
     if (input.selectLevel === 'silence') out.push({ key: 'select_level_disable', tone: 'info', params: {} });
   }
+  if (scan?.device_checks?.some((c) => c.state === 'unrecognized')) out.push({ key: 'checks_unreadable', tone: 'info', params: {} });
   return out;
 }
 
@@ -499,4 +532,15 @@ export function factTags(a: AppView): FactTag[] {
 export function stableEta(shown: number | null, next: number | null): number | null {
   if (next === null || shown === null) return next;
   return next > shown && next - shown < 60 ? shown : next;
+}
+
+/** Poprawki oferowane przez kontrole „Stanu telefonu”: każda witryna z poprawką i „wszystkie witryny” przeglądarki. */
+export function offeredFixes(checks: DeviceCheck[]): string[] {
+  return checks.flatMap((c) => c.browsers.flatMap((b) => [
+    ...(b.all_fix ? [b.all_fix] : []), ...b.sites.flatMap((s) => (s.fix ? [s.fix] : []))]));
+}
+
+/** Kontrole do pokazania w sekcji: nieodczytane (`unrecognized`) idą do linii uwag, nie do sekcji. */
+export function shownChecks(scan: ScanView | null): DeviceCheck[] {
+  return (scan?.device_checks ?? []).filter((c) => c.state !== 'unrecognized');
 }

@@ -33,6 +33,14 @@
       "seconds": 41,
       "apk_stage": false,
       "apk_mode": "pending",
+      "checks": {
+        "site_notifications": "review"
+      },
+      "sites": {
+        "per_site": 2,
+        "shared": 1,
+        "rdp": 0
+      },
       "eta": null,
       "packages": null
     },
@@ -53,6 +61,10 @@
         "silence": 0,
         "disable": 1,
         "remove": 1
+      },
+      "fixes": {
+        "channel": 0,
+        "site_permission": 0
       },
       "sources": {
         "flagged": 2,
@@ -79,6 +91,8 @@
       "apps": 1,
       "failed": 0,
       "age_days": 2,
+      "sites": 2,
+      "sites_restored": 1,
       "packages": null
     }
   ],
@@ -116,6 +130,14 @@
       "seconds": 41,
       "apk_stage": false,
       "apk_mode": "pending",
+      "checks": {
+        "site_notifications": "review"
+      },
+      "sites": {
+        "per_site": 2,
+        "shared": 1,
+        "rdp": 0
+      },
       "eta": null,
       "packages": [
         {
@@ -151,6 +173,10 @@
         "silence": 0,
         "disable": 1,
         "remove": 1
+      },
+      "fixes": {
+        "channel": 0,
+        "site_permission": 0
       },
       "sources": {
         "flagged": 2,
@@ -190,6 +216,8 @@
       "apps": 1,
       "failed": 0,
       "age_days": 2,
+      "sites": 2,
+      "sites_restored": 1,
       "packages": [
         {
           "package": "com.wlive.forecast",

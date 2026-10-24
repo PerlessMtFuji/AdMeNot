@@ -6,6 +6,7 @@ zapisujemy przed wykonaniem; po odłączeniu krok zostaje „pending”.
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Callable, Iterable
 from contextlib import AbstractContextManager
@@ -26,8 +27,12 @@ from admenot.engine.oplock import device_lock
 
 Event = dict[str, Any]
 BLOCKING_KINDS = frozenset({"backup"})  # bez kopii APK nie odinstalowujemy
-VERIFIED_KINDS = frozenset({"appop", "permission", "secure_list", "home", "enabled", "installed"})
+VERIFIED_KINDS = frozenset({"appop", "permission", "secure_list", "home", "enabled", "installed",
+                            "channel", "site_permission"})
 ADMIN_BLOCKED_KINDS = frozenset({"enabled", "installed"})  # blokowane przez aktywnego admina
+SITE_TIMEOUTS_IN_A_ROW = 2  # tyle przekroczeń czasu z rzędu w cofaniu: nikt nie stoi przy telefonie
+
+log = logging.getLogger(__name__)
 
 
 def _ignore(event: Event) -> None:
@@ -52,6 +57,10 @@ class ExecOptions:
     on_event: Callable[[Event], None] = _ignore
     on_admin_timeout: Callable[[str], str] = _skip  # "retry" | "skip"
     should_stop: Callable[[], bool] = _never  # „Wstrzymaj”: sprawdzane przed każdym krokiem
+    # „Otwórz ponownie”: True raz po prośbie serwisanta — ekran oczekującego kroku otwiera się znowu
+    reopen: Callable[[], bool] = _never
+    # „Pomiń”: True raz po prośbie serwisanta — oczekiwanie na bieżącym ekranie kończy się bez zmiany
+    skip: Callable[[], bool] = _never
 
 
 @dataclass
@@ -130,6 +139,7 @@ def _execute(adb: AdbTransport, journal: Journal, row: Action, options: ExecOpti
         return  # przerwane zlecenie: krok zdążył się wykonać, odwrotność jest już zapisana
     if is_destructive(step):
         _precheck(adb, step)
+    fresh = row.prev_state is None
     if row.prev_state is None:
         inverse = S.inverse(step, state)
         # Porównaj-i-ustaw: zapisany już stan (np. przez inny proces) wygrywa z naszą migawką.
@@ -137,6 +147,11 @@ def _execute(adb: AdbTransport, journal: Journal, row: Action, options: ExecOpti
     if step.kind == "admin":
         # Zaległy krok z przerwanego zlecenia: nikt już nie czeka na telefonie — tylko sprawdzamy stan.
         raise ActionError("admin_timeout")
+    if step.kind == "channel":
+        # Jak admin: zaległy krok z przerwanego zlecenia tylko sprawdzamy, ekranu nie otwieramy.
+        if fresh and _wait_for_user(adb, journal, row, step, options) == "done":
+            return
+        raise ActionError("user_timeout")
     S.apply(adb, step, options.apk_cache_dir)
 
 
@@ -170,22 +185,45 @@ def _admin_path(adb: AdbTransport, journal: Journal, row: Action, options: ExecO
     if S.is_applied(step, state):
         journal.set_action_status(admin_id, "failed", "not_admin")  # błąd polityki bez admina
         return False
+    if _wait_for_user(adb, journal, admin_row, step, options) == "done":
+        journal.set_action_status(admin_id, "done")
+        return True
+    journal.set_action_status(admin_id, "failed", "admin_timeout")
+    return False
+
+
+def _wait_for_user(adb: AdbTransport, journal: Journal, row: Action, step: Step,
+                   options: ExecOptions, ask: bool = True) -> str:
+    """Otwiera ekran na telefonie i czeka, aż użytkownik zrobi swoje (spec §7.2): `admin` albo
+    `channel` (w cofaniu: włączenie kanału). Wynik: "done" = stan osiągnięty, "timeout" = czas
+    minął, "skipped" = „Pomiń”, "stopped" = „Wstrzymaj”. `ask=False` (cofanie): po czasie bez
+    pytania o ponowienie. Status wiersza ustawia wołający."""
+    error = "admin_timeout" if step.kind == "admin" else "user_timeout"
+    event = {"action_id": row.id, "package": row.package, "step": step.kind}
+
+    def finish(result: str, key: str | None) -> str:
+        status = "done" if result == "done" else "failed"
+        options.on_event({"type": "user_done", **event, "status": status, "error": key})
+        return result
+
     while True:
         S.apply(adb, step)
-        _emit(options, "admin_wait", admin_row, "running", timeout=options.admin_timeout)
+        options.on_event({"type": "user_wait", **event, "timeout": options.admin_timeout})
         deadline = options.clock() + options.admin_timeout
         while options.clock() < deadline:
+            if options.reopen():  # ktoś zamknął ekran na telefonie: ten sam ekran, ten sam limit czasu
+                S.apply(adb, step)
             if S.is_applied(step, S.probe(adb, step)):
-                journal.set_action_status(admin_id, "done")
-                _emit(options, "admin_done", admin_row, "done")
-                return True
+                return finish("done", None)
             if options.should_stop():
-                break
+                return finish("stopped", error)
+            if options.skip():
+                return finish("skipped", "site_skipped")
             options.sleep(options.poll_interval)
-        if options.should_stop() or options.on_admin_timeout(row.package) != "retry":
-            journal.set_action_status(admin_id, "failed", "admin_timeout")
-            _emit(options, "admin_done", admin_row, "failed", "admin_timeout")
-            return False
+        if options.should_stop():
+            return finish("stopped", error)
+        if not ask or options.on_admin_timeout(row.package) != "retry":
+            return finish("timeout", error)
 
 
 def _finish(journal: Journal, order_id: int) -> None:
@@ -289,6 +327,52 @@ def _confirmed(adb: AdbTransport, inverse: Step, options: ExecOptions) -> bool:
     return S.is_applied(inverse, S.probe(adb, inverse))
 
 
+def inverse_of(row: Action) -> Step | None:
+    """Krok odwrotny wiersza. Wiersze kanału sprzed odwrotności kanału mają tylko stan sprzed
+    naprawy: `importance` > 0 znaczy, że naprawa kanał wyłączyła — odwrotność liczymy w locie."""
+    if row.inverse is not None:
+        return Step.from_dict(row.inverse)
+    importance = (row.prev_state or {}).get("importance")
+    if row.step["kind"] == "channel" and isinstance(importance, int) and importance > 0:
+        step = Step.from_dict(row.step)
+        return Step("channel", step.package, {**step.params, "enabled": "1"})
+    return None
+
+
+@dataclass
+class _UndoRun:
+    """Stan jednego cofania wspólny dla fazy automatycznej i fazy witryn."""
+    adb: AdbTransport
+    journal: Journal
+    options: ExecOptions
+    removed: set[str]  # aplikacje, które to zlecenie odinstalowało
+    installed: dict[str, bool] = field(default_factory=dict)
+    errors: list[tuple[Action, str]] = field(default_factory=list)
+    gone: set[str] = field(default_factory=set)  # aplikacje, których nie udało się przywrócić
+
+    def fail(self, row: Action, key: str) -> None:
+        self.errors.append((row, key))
+        if row.step["kind"] in ADMIN_BLOCKED_KINDS:  # włączenie / instalacja aplikacji
+            self.gone.add(row.package)
+        _emit(self.options, "undo", row, "failed", key)
+
+    def resolve(self, row: Action, error: str | None = None, **extra: Any) -> None:
+        self.journal.set_action_status(row.id, "undone", error)
+        _emit(self.options, "undo", row, "undone", error, **extra)
+
+    def app_missing(self, row: Action, inverse: Step) -> bool:
+        """Aplikacji kroku nie ma na telefonie: krok obsłużony tutaj (True) albo do cofnięcia."""
+        if inverse.kind == "installed" or _is_installed(self.adb, row.package, self.installed):
+            return False
+        if row.package in self.removed:
+            # Sami ją usunęliśmy, a przywrócenie się nie udało: krok czeka na ponowne undo.
+            self.gone.add(row.package)
+            self.fail(row, "skipped")
+        else:
+            self.resolve(row, "app_gone")  # użytkownik sam odinstalował aplikację: nie ma czego cofać
+        return True
+
+
 def _undo(adb: AdbTransport, journal: Journal, order_id: int, package: str | None,
           action_id: int | None, options: ExecOptions) -> list[tuple[Action, str]]:
     everything = journal.actions(order_id)
@@ -299,34 +383,29 @@ def _undo(adb: AdbTransport, journal: Journal, order_id: int, package: str | Non
     # Aplikacje, które to zlecenie odinstalowało: ich brak na telefonie to nasza zmiana.
     removed = {a.package for a in everything if a.status == "done"
                and a.step["kind"] == "installed" and a.step["params"].get("installed") == "0"}
-    errors: list[tuple[Action, str]] = []
-    installed: dict[str, bool] = {}
+    run = _UndoRun(adb, journal, options, removed)
+    errors, installed = run.errors, run.installed
+    stopped = False
+    # Najpierw odwrotności automatyczne (od końca), ekrany kanałów do klikania na sam koniec:
+    # serwisant nie czeka przy telefonie w środku cofania, a przeglądarka zdąży wrócić.
     for row in reversed(rows):
-        if row.status == "undone":
+        if row.status == "undone" or row.step["kind"] == "channel":
             continue
         if row.status == "failed" and (row.prev_state is None or row.inverse is None):
             continue  # krok nie zdążył niczego zmienić albo nie ma czego odwracać
         if options.should_stop():
             options.on_event({"type": "stopped"})
+            stopped = True
             break
         # Krok „failed” z zapisanym stanem mógł się wykonać (np. adb: „error: closed”):
         # odwrotność jest idempotentna, więc bez zmiany na telefonie nic nie zostanie wysłane.
         if row.prev_state is None:  # przerwane zlecenie: krok nie zdążył się zacząć
-            journal.set_action_status(row.id, "undone", "not_started")
-            _emit(options, "undo", row, "undone", "not_started")
+            run.resolve(row, "not_started")
             continue
         try:
             if row.inverse is not None:
                 inverse = Step.from_dict(row.inverse)
-                if inverse.kind != "installed" and not _is_installed(adb, row.package, installed):
-                    if row.package in removed:
-                        # Sami ją usunęliśmy, a przywrócenie się nie udało: krok czeka na ponowne undo.
-                        errors.append((row, "skipped"))
-                        _emit(options, "undo", row, "failed", "skipped")
-                        continue
-                    # Użytkownik sam odinstalował aplikację: nie ma czego cofać.
-                    journal.set_action_status(row.id, "undone", "app_gone")
-                    _emit(options, "undo", row, "undone", "app_gone")
+                if run.app_missing(row, inverse):
                     continue
                 if not S.is_applied(inverse, S.probe(adb, inverse)):
                     _emit(options, "undo", row, "running", **_restore_size(inverse))
@@ -338,14 +417,112 @@ def _undo(adb: AdbTransport, journal: Journal, order_id: int, package: str | Non
         except ActionError as exc:
             if exc.uncertain:
                 raise
-            errors.append((row, exc.key))
-            _emit(options, "undo", row, "failed", exc.key)
+            run.fail(row, exc.key)
             continue
-        journal.set_action_status(row.id, "undone")
-        _emit(options, "undo", row, "undone")
+        run.resolve(row)
+    if not stopped:
+        _undo_sites(run, [r for r in rows if r.step["kind"] == "channel"])
     journal.set_order_status(
         order_id, "partially_undone" if unresolved(journal.actions(order_id)) else "undone")
     return errors
+
+
+def _undo_sites(run: _UndoRun, rows: list[Action]) -> None:
+    """Faza witryn: kanały wyłączone w naprawie włącza serwisant na ekranach otwieranych po kolei
+    (pogrupowanych po przeglądarce). Najpierw odczyt każdego kanału: już włączony, wyłączony przed
+    naprawą albo zniknięty — bez ekranu. Pominięty / przeterminowany krok zostaje „done”."""
+    options = run.options
+    by_package: dict[str, list[Action]] = {}
+    for row in rows:  # dziennik zwraca wiersze w kolejności id
+        by_package.setdefault(row.package, []).append(row)
+    screens: list[tuple[Action, Step]] = []
+    # Kilka wierszy na ten sam kanał (wspólny kanał Samsung Internet): jeden ekran dla wszystkich.
+    same: dict[tuple[str, str], list[Action]] = {}
+    for row in (r for group in by_package.values() for r in group):
+        inverse = inverse_of(row)
+        if row.status == "undone":
+            continue
+        if row.status == "failed" and (row.prev_state is None or inverse is None):
+            continue  # krok nie zdążył niczego zmienić albo nie ma czego odwracać
+        if options.should_stop():
+            options.on_event({"type": "stopped"})
+            return
+        if row.prev_state is None:  # przerwane zlecenie: krok nie zdążył się zacząć
+            run.resolve(row, "not_started")
+            continue
+        if inverse is None:  # kanał był wyłączony przed naprawą: nic nie zmieniliśmy
+            run.resolve(row)
+            continue
+        if row.package in run.gone:  # przeglądarka nie wróciła w fazie automatycznej
+            run.fail(row, "skipped")  # bez przeglądarki ekranu kanału nie otworzymy
+            continue
+        if run.app_missing(row, inverse):
+            continue
+        try:
+            state = S.probe(run.adb, inverse)
+        except ActionError as exc:
+            if exc.uncertain:
+                raise
+            run.fail(row, exc.key)
+            continue
+        if state.get("importance") is None:
+            # Przeglądarka usunęła kanał (np. wyczyszczone dane): zostaje instrukcja ręczna.
+            run.journal.set_action_status(row.id, row.status, "channel_gone")
+            run.fail(row, "channel_gone")
+            continue
+        if S.is_applied(inverse, state):
+            run.resolve(row)  # już włączony (klient sam włączył albo naprawa go nie wyłączyła)
+            continue
+        if row.error == "channel_gone":  # kanał wrócił: nieaktualny błąd z poprzedniego cofania
+            run.journal.set_action_status(row.id, row.status, None)
+        key = (row.package, inverse.params["channel_id"])
+        if key in same:
+            same[key].append(row)
+            continue
+        same[key] = [row]
+        screens.append((row, inverse))
+    if not screens:
+        return
+    options.on_event({"type": "undo_sites",
+                      "sites": [{"action_id": row.id, "package": row.package} for row, _ in screens]})
+    timeouts = 0
+    for row, inverse in screens:
+        if options.should_stop():
+            options.on_event({"type": "stopped"})
+            return
+        _emit(options, "undo", row, "running")
+        try:
+            result = _wait_for_user(run.adb, run.journal, row, inverse, options, ask=False)
+        except ActionError as exc:
+            if exc.uncertain:
+                raise
+            for each in same[(row.package, inverse.params["channel_id"])]:
+                run.fail(each, exc.key)
+            continue
+        if result == "stopped":
+            options.on_event({"type": "stopped"})
+            return
+        for each in same[(row.package, inverse.params["channel_id"])]:
+            if result == "done":
+                # ten sam kanał: odczyt w oczekiwaniu potwierdził włączenie
+                run.resolve(each, via_screen=True)
+            else:
+                run.fail(each, "site_timeout" if result == "timeout" else "site_skipped")
+        if result == "done" and len(screens) == 1:
+            _open_site(run.adb, inverse)  # przy jednej witrynie nic jej potem nie zasłoni
+        timeouts = timeouts + 1 if result == "timeout" else 0
+        if timeouts >= SITE_TIMEOUTS_IN_A_ROW:
+            options.on_event({"type": "stopped"})  # jak „Wstrzymaj”: reszta do włączenia z historii
+            return
+
+
+def _open_site(adb: AdbTransport, step: Step) -> None:
+    """Strona po włączeniu kanału musi się zapisać od nowa (Chrome wypisuje ją przy cofnięciu zgody).
+    Nieudane otwarcie nie jest błędem cofania — kanał już jest włączony."""
+    try:
+        S.open_site(adb, step)
+    except ActionError as exc:
+        log.warning("open site after undo failed: %s %s", exc.key, exc)
 
 
 def verify(adb: AdbTransport, journal: Journal, order_id: int) -> dict[str, list[str]]:

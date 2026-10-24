@@ -10,7 +10,7 @@ async function scan(page: Page) {
   await page.goto('/?scenario=adware');
   await page.getByPlaceholder('np. Anna K.').fill('Anna K.');
   await page.getByRole('button', { name: 'Skanuj' }).click();
-  await expect(page.getByText(/Analiza APK w tle/)).toBeHidden({ timeout: 15_000 });
+  await expect(page.getByText(/Analiza plików aplikacji/)).toBeHidden({ timeout: 15_000 });
   // App.svelte tworzy <main> od nowa przy zmianie widoku ({#key view}); napis o analizie znika chwilę
   // przed przejściem na wyniki, a pomiar starego <main> dawał null (niestabilny test).
   await expect(page.getByRole('heading', { name: /wymagają uwagi/ })).toBeVisible();

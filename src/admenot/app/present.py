@@ -7,16 +7,20 @@ własne napisy.
 from __future__ import annotations
 
 import base64
+from collections.abc import Mapping
 from dataclasses import asdict
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-from admenot.engine.actions.planner import Blocked, default_level
+from admenot.engine.actions.planner import FIX_LEVEL, Blocked, default_level
+from admenot.engine.actions.steps import Step, site_url
 from admenot.engine.apk.analyze import clean_label, scope_notes
 from admenot.engine.apk.cache import CacheUsage, Estimate
 from admenot.engine.apk.timing import Eta
+from admenot.engine.browsers.known import known_browsers
 from admenot.engine.device.info import DeviceInfo
+from admenot.engine.device_checks import DeviceCheck, fix_steps
 from admenot.engine.evidence import ladders
 from admenot.engine.facts import AppFacts
 from admenot.engine.journal.db import Action, Journal, Order
@@ -28,9 +32,12 @@ from admenot.engine.session import ScanReport
 from admenot.engine.share import plan_code
 from admenot.engine.texts import (
     TEXTS,
+    browser_name,
     capability_label,
+    check_state_label,
     confidence_label,
     error_text,
+    fix_step_texts,
     gap_label,
     level_label,
     order_status_label,
@@ -180,6 +187,43 @@ def app_view(r: AppResult, lang: str, sdk: int = 0) -> dict[str, Any]:
     }
 
 
+def browser_names(checks: list[DeviceCheck]) -> dict[str, str]:
+    """Pakiet → nazwa przeglądarki z kontroli „Stan telefonu” (do etykiet kroków i zdarzeń)."""
+    return {b.package: b.name for c in checks for b in c.browsers}
+
+
+def _fix_label(fix: str | None, checks: list[DeviceCheck], lang: str) -> str | None:
+    found = fix_steps(fix, checks) if fix else None
+    if found is None:
+        return None
+    return step_label(found[1].to_dict(), lang, browser_names(checks))
+
+
+def _block_action(package: str) -> bool:
+    """Czy aktywne powiadomienie witryny ma akcję „Blokuj” — tylko wtedy UI każe ją dotknąć."""
+    known = known_browsers().get(package)
+    return bool(known and known.block_action)
+
+
+def device_checks_view(checks: list[DeviceCheck], lang: str,
+                       labels: Mapping[str, str | None] | None = None) -> list[dict[str, Any]]:
+    """labels: nazwy aplikacji znane już po skanie (z ekranu telefonu, z APK) — kontrola czytana przy skanie
+    mogła zostać z samym pakietem zamiast nazwy."""
+    labels = labels or {}
+    return [{
+        "id": c.id, "state": c.state, "state_label": check_state_label(c.state, lang),
+        "browsers": [{
+            "package": b.package, "name": (labels.get(b.package) or b.name) if b.name == b.package else b.name,
+            "mode": b.mode, "read": b.read,
+            "rdp_hint": b.rdp_hint, "all_fix": b.all_fix, "block_action": _block_action(b.package),
+            "all_fix_label": _fix_label(b.all_fix, checks, lang),
+            "sites": [{"host": s.host, "origin": s.origin, "blocked": s.blocked, "active": s.active,
+                       "fix": s.fix, "fix_label": _fix_label(s.fix, checks, lang)}
+                      for s in b.sites],
+        } for b in c.browsers],
+    } for c in checks]
+
+
 def scan_view(report: ScanReport, lang: str) -> dict[str, Any]:
     results = report.results
     statuses = list(report.collectors.values())
@@ -194,6 +238,8 @@ def scan_view(report: ScanReport, lang: str) -> dict[str, Any]:
         "apk_mode": report.apk_mode,
         "on_demand": sorted(report.analyzed_on_demand),
         "apps": [app_view(r, lang, report.device.sdk) for r in results],
+        "device_checks": device_checks_view(report.device_checks, lang,
+                                            {r.facts.package: r.facts.label for r in results}),
         "profiles": {"others": list(report.profiles.others) if report.profiles else [],
                      "known": bool(report.profiles and report.profiles.present is not None)},
         "usage_window_h": report.usage_window_h,
@@ -209,8 +255,11 @@ def scan_view(report: ScanReport, lang: str) -> dict[str, Any]:
 
 def plan_view(plan: OrderPlan, lang: str) -> dict[str, Any]:
     apps = []
+    names = {p: app_name(f, p) for p, f in plan.facts.items()}
     for r in plan.results:
-        base = {"package": r.package, "name": app_name(plan.facts.get(r.package), r.package),
+        # poprawka witryn: nazwa przeglądarki z tabeli, gdy etykiety aplikacji jeszcze nie odczytano
+        name = browser_name(r.package, names) if r.level == FIX_LEVEL else names.get(r.package, r.package)
+        base = {"package": r.package, "name": name,
                 "level": r.level, "level_label": level_label(r.level, lang)}
         if isinstance(r, Blocked):
             apps.append({**base, "blocked": True, "reason": r.reason,
@@ -218,9 +267,27 @@ def plan_view(plan: OrderPlan, lang: str) -> dict[str, Any]:
                          "steps": [], "warnings": []})
         else:
             apps.append({**base, "blocked": False, "reason": None, "reason_text": None,
-                         "steps": [step_label(s.to_dict(), lang) for s in r.steps],
+                         "steps": [step_label(s.to_dict(), lang, names) for s in r.steps],
                          "warnings": [warning_text(w, lang) for w in r.warnings]})
     return {"apps": apps, "runnable": len(plan.plans), "code": plan_code(plan)}
+
+
+def fix_texts(plan: OrderPlan, lang: str) -> list[dict[str, str]]:
+    """Zmiany ustawień telefonu dla klienta (strona planu, spec stanu telefonu): zdanie `t` i, do grupowania
+    pod ikoną przeglądarki, pakiet `p`, nazwa `n` i host `h` (bez `h`: wszystkie witryny)."""
+    names = {p: app_name(f, p) for p, f in plan.facts.items()}
+    out = []
+    for p in plan.plans:
+        if p.level != FIX_LEVEL:
+            continue
+        for s in p.steps:
+            step = s.to_dict()
+            texts = fix_step_texts(step, lang, names)
+            entry = {"t": str(texts["client"]), "p": step["package"], "n": browser_name(step["package"], names)}
+            if texts["site"]:
+                entry["h"] = str(texts["site"])
+            out.append(entry)
+    return out
 
 
 def step_view(event: dict[str, Any], lang: str, manufacturer: str,
@@ -228,9 +295,11 @@ def step_view(event: dict[str, Any], lang: str, manufacturer: str,
     package = event["package"]
     return {
         "action_id": event["action_id"], "package": package, "name": names.get(package, package),
-        "kind": event["step"]["kind"], "label": step_label(event["step"], lang),
+        "kind": event["step"]["kind"], "label": step_label(event["step"], lang, names),
         "status": event["status"],
         "error": error_text(event["error"], lang, manufacturer) if event.get("error") else None,
+        # Surowy klucz błędu: UI rozróżnia po nim stany (np. `channel_gone`), tekst jest do czytania.
+        "error_key": event.get("error"),
         "restore_bytes": event.get("restore_bytes"),
     }
 
@@ -249,11 +318,18 @@ def result_view(result: OrderResult, names: dict[str, str], lang: str,
     }
 
 
-def action_view(a: Action, lang: str) -> dict[str, Any]:
+def action_view(a: Action, lang: str, names: dict[str, str] | None = None) -> dict[str, Any]:
+    # Ścieżka ręczna tylko dla kanału, którego przeglądarka już nie ma (cofanie nie ma co włączać).
+    gone = a.step["kind"] == "channel" and a.error == "channel_gone"
+    manual = fix_step_texts(a.step, lang, names)["manual_undo"] if gone else None
+    # Adres witryny po udanym cofnięciu: strona musi zapisać się od nowa (otwiera ją `Api.open_site`).
+    restored = a.step["kind"] == "channel" and a.status == "undone" and a.error is None
+    url = site_url(Step.from_dict(a.step)) if restored else None
     return {
         "id": a.id, "package": a.package, "level": a.level,
         "level_label": level_label(a.level, lang), "kind": a.step["kind"],
-        "step_label": step_label(a.step, lang), "status": a.status,
+        "step_label": step_label(a.step, lang, names), "status": a.status,
+        "manual_undo": manual, "site_url": url,
         "status_label": TEXTS[lang]["action_status"].get(a.status, a.status),
         "error": error_text(a.error, lang) if a.error else None,
     }
@@ -286,8 +362,19 @@ def _order_apps(snap: dict[str, Any] | None, actions: list[Action]) -> dict[str,
     if snap is None:
         return {}
     saved = {a["package"]: a for a in snap.get("apps", [])}
-    return {p: {"name": saved.get(p, {}).get("label"), "icon": saved.get(p, {}).get("icon")}
+    browsers = {b.get("package"): b.get("name") for c in snap.get("device_checks") or []
+                for b in c.get("browsers") or []}
+    return {p: {"name": saved.get(p, {}).get("label") or _browser_fallback(p, browsers),
+                "icon": saved.get(p, {}).get("icon")}
             for p in dict.fromkeys(a.package for a in actions)}
+
+
+def _browser_fallback(package: str, browsers: dict[str, str | None]) -> str | None:
+    """Przeglądarka, którą zlecenie zmieniało tylko w ustawieniach witryn, nie ma wiersza w migawce."""
+    if package in browsers:
+        return browsers[package] or package
+    name = browser_name(package)
+    return None if name == package else name
 
 
 def history_view(journal: Journal, serial: str | None, serials: list[str],
@@ -303,6 +390,8 @@ def history_view(journal: Journal, serial: str | None, serials: list[str],
     for o in journal.orders_for(serial):
         actions = journal.actions(o.id)
         snap = journal.scan(o.id)
+        apps = _order_apps(snap if actions else None, actions)
+        names = {p: a["name"] for p, a in apps.items() if a["name"]}
         orders.append({
             "id": o.id, "number": o.number,
             "created_at": o.created_at.isoformat(timespec="minutes"),
@@ -311,8 +400,8 @@ def history_view(journal: Journal, serial: str | None, serials: list[str],
             "client": o.client_name, "model": o.device_model,
             "interrupted": o.id in interrupted,
             "screenshots": journal.screenshot_count(o.id),
-            "actions": [action_view(a, lang) for a in actions],
-            "apps": _order_apps(snap if actions else None, actions),
+            "actions": [action_view(a, lang, names) for a in actions],
+            "apps": apps,
             "manual": (snap or {}).get("apk_mode") in ("manual", "partial"),
         })
     return {"serial": serial, "serials": serials, "devices": devices, "orders": orders}

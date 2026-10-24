@@ -3,6 +3,7 @@ import {
   changedVerdicts,
   dayKey,
   groupHistory,
+  siteState,
   orderCounts,
   evidenceGroups,
   facetCounts,
@@ -23,6 +24,10 @@ import {
   modelName,
   planEntries,
   planGroups,
+  runnableApps,
+  actedAfter,
+  offeredFixes,
+  shownChecks,
   scanChecklist,
   signalChips,
   sourceKey,
@@ -45,7 +50,8 @@ import {
   manualRows,
   stableEta,
 } from './logic';
-import type { AppView, Category, Level, PlanApp, StepEvent, Finding, ScanView, Settings, UpdateView } from './types';
+import { CHECKS_SAMPLE } from './fakeBridge';
+import type { AppView, Category, Level, PlanApp, PlanView, StepEvent, Finding, ScanView, Settings, UpdateView } from './types';
 
 function app(pkg: string, verdict: AppView['verdict'], extra: Partial<AppView> = {}): AppView {
   const level = verdict === 'malicious' ? 'remove' : verdict === 'suspicious' ? 'disable' : null;
@@ -274,6 +280,24 @@ test('groupHistory: an app is restored when undo leaves only never-applied faile
   expect([row.state, row.canRestore]).toEqual(['restored', false]);
 });
 
+test('groupHistory: a site channel step left done can be restored', () => {
+  const [row] = groupHistory([{ id: 1, package: 'c', level: 'fix', level_label: '', kind: 'channel', step_label: '',
+    status: 'done', status_label: '', error: null }]);
+  expect(row.canRestore).toBe(true);
+});
+
+test('siteState follows undo steps and the current wait', () => {
+  const site = (action_id: number) => ({ action_id, package: 'c', browser: 'Chrome', site: 'a.example' });
+  const step = (action_id: number, status: 'undone' | 'failed' | 'running', error_key: string | null = null) =>
+    ({ action_id, package: 'c', name: 'Chrome', kind: 'channel', label: '', status, error: error_key ? 'tekst' : null, error_key });
+  const steps = [step(1, 'undone'), step(2, 'failed', 'site_skipped'), step(3, 'failed', 'channel_gone'), step(4, 'running'),
+    step(6, 'failed', 'user_timeout')];
+  const wait = { package: 'c', name: 'Chrome', kind: 'channel' as const, timeout: 180, action_id: 4 };
+  expect([1, 2, 3, 4, 5, 6].map((id) => siteState(site(id), steps, wait)))
+    .toEqual(['done', 'skipped', 'gone', 'current', 'waiting', 'skipped']);
+  expect(siteState(site(4), steps, null)).toBe('waiting');
+});
+
 test('dayKey', () => {
   const now = new Date(2026, 8, 27, 12, 0);
   expect(dayKey('2026-09-27T08:15', now)).toBe('today');
@@ -499,5 +523,62 @@ describe('tryb ręczny', () => {
     expect(stableEta(300, 340)).toBe(300);
     expect(stableEta(300, 380)).toBe(380);
     expect(stableEta(300, null)).toBeNull();
+  });
+});
+
+describe('phone checks', () => {
+  const fixApp = (pkg: string, over: Partial<PlanApp> = {}): PlanApp => ({ package: pkg, name: pkg, level: 'fix',
+    level_label: 'Ustawienia witryn', blocked: false, reason: null, reason_text: null, steps: ['a'], warnings: [], ...over });
+
+  test('plan groups put site fixes after silence and before the skipped ones', () => {
+    const groups = planGroups([fixApp('b.chrome'), fixApp('x', { blocked: true, reason: 'browser_removed', reason_text: '…' }),
+      { ...fixApp('a.app'), level: 'silence' }], 'pl');
+    expect(groups.map((g) => g.key)).toEqual(['silence', 'fix', 'blocked']);
+  });
+
+  test('runnableApps: one row per browser with its app level, the fix steps kept', () => {
+    const plan = { runnable: 3, code: 'K7F3', apps: [
+      fixApp('com.android.chrome', { steps: ['site a'] }),
+      { ...fixApp('com.android.chrome'), level: 'silence', level_label: 'WYCISZ', steps: ['notif'] },
+      fixApp('org.mozilla.firefox', { steps: ['site b'] }),
+      fixApp('x', { blocked: true, reason: 'protected', reason_text: '…' })] } as PlanView;
+    const rows = runnableApps(plan);
+    expect(rows.map((a) => [a.package, a.level, a.steps])).toEqual([
+      ['com.android.chrome', 'silence', ['site a', 'notif']], ['org.mozilla.firefox', 'fix', ['site b']]]);
+    expect(runnableApps(null)).toEqual([]);
+    // Wyciszenie przeglądarki z poprawką liczy się jako wyciszenie (do „Wróć do naprawy”).
+    const result = { order: 'Z', status: 'done', status_label: '', stopped: false,
+      apps: [{ package: 'com.android.chrome', name: 'Chrome', outcome: 'ok' as const, errors: [], kinds: [] }] };
+    expect(actedAfter({}, plan, result)).toEqual({ 'com.android.chrome': [{ order: 'Z', level: 'silence' }] });
+  });
+
+  test('offeredFixes lists every site fix and every all-sites fix', () => {
+    expect(offeredFixes([CHECKS_SAMPLE])).toEqual([
+      CHECKS_SAMPLE.browsers[0].sites[0].fix, CHECKS_SAMPLE.browsers[0].sites[1].fix, CHECKS_SAMPLE.browsers[1].all_fix]);
+  });
+
+  test('an unreadable check becomes a notice, a readable one does not', () => {
+    const scan = (state: 'ok' | 'unrecognized') => ({ collectors: { ok: 8, total: 8, failed: [] }, low_behavior_data: false,
+      profiles: { others: [], known: true }, apps: [],
+      device_checks: [{ id: 'site_notifications', state, state_label: '', browsers: [] }] }) as unknown as ScanView;
+    const base = { sdk: 34, selectLevel: 'silence' as const, missing: [], withGaps: 0 };
+    expect(notices({ ...base, scan: scan('unrecognized') }).map((n) => n.key)).toEqual(['checks_unreadable']);
+    expect(notices({ ...base, scan: scan('ok') })).toEqual([]);
+    expect(shownChecks(scan('unrecognized'))).toEqual([]);
+  });
+
+  test('history: a fix-only order counts as site settings, and a channel step has no automatic restore', () => {
+    const action = (id: number, level: string, kind: string, manual: string | null) => ({ id, package: 'chrome', level, level_label: '', kind,
+      step_label: '', status: 'done', status_label: '', error: null, manual_undo: manual });
+    const rows = groupHistory([action(1, 'fix', 'channel', 'Ustawienia › Powiadomienia')]);
+    expect(orderCounts(rows)).toEqual([['fix', 1]]);
+    expect(rows[0].canRestore).toBe(false);
+    const mixed = groupHistory([action(1, 'fix', 'channel', 'x'), action(2, 'silence', 'notif', null)]);
+    expect(mixed[0].level).toBe('silence');
+    expect(mixed[0].canRestore).toBe(true);
+    // Po cofnięciu kanał zostaje „done” (przywraca się go ręcznie): aplikacja jest przywrócona.
+    const undone = groupHistory([action(1, 'fix', 'channel', 'x'), { ...action(2, 'silence', 'notif', null), status: 'undone' }]);
+    expect(undone[0].state).toBe('restored');
+    expect(undone[0].canRestore).toBe(false);
   });
 });

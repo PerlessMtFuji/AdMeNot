@@ -81,3 +81,14 @@ def test_note_records_a_line_without_adb(tmp_path):
                      "command": "INFO: Texture: 576x1280", "status": "info",
                      "duration": seen[0]["duration"], "output": "", "tag": "scrcpy"}]
     assert "\tinfo\t" in (tmp_path / "l.log").read_text("utf-8")
+
+
+def test_notification_dump_with_content_reaches_the_console_as_size_only(tmp_path):
+    seen = []
+    dump = "android.title=String (Bank)\nandroid.text=String (kod 123456)\n"
+    cmd = "dumpsys notification --noredact"
+    adb = SessionLogAdb(FakeAdb({cmd: dump}, serial="S1"), tmp_path / "l.log", on_command=seen.append)
+    assert adb.tagged("recheck").shell(cmd) == dump  # program dostaje pełny zrzut
+    adb.tagged("console").shell(cmd)  # wpisany ręcznie w konsoli: serwisant widzi wynik
+    assert seen[0]["output"] == f"<{len(dump.encode())} B>"
+    assert seen[1]["output"] == dump

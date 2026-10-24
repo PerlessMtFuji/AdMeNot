@@ -6,7 +6,7 @@ Wspólny dla CLI i GUI. Nic nie drukuje: postęp idzie przez `ExecOptions.on_eve
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from admenot.engine.actions.context import PhoneContext, read_phone_context
@@ -14,12 +14,20 @@ from admenot.engine.actions.errors import ActionError
 from admenot.engine.actions.executor import (
     AppOutcome,
     ExecOptions,
+    inverse_of,
     run_order,
     start_order,
     undo,
     verify,
 )
-from admenot.engine.actions.planner import AppPlan, Blocked, default_level, plan_app
+from admenot.engine.actions.planner import (
+    FIX_LEVEL,
+    AppPlan,
+    Blocked,
+    default_level,
+    plan_app,
+    plan_fixes,
+)
 from admenot.engine.adb.transport import AdbTransport
 from admenot.engine.allowlist.trust import load_protected_list
 from admenot.engine.apk.cache import clear_cache
@@ -43,6 +51,7 @@ class OrderPlan:
     facts: dict[str, AppFacts]
     results: list[AppPlan | Blocked]
     unlocked: frozenset[str] = frozenset()  # chronione pakiety odblokowane przez serwisanta
+    fixes: tuple[str, ...] = ()  # wybrane poprawki „Stanu telefonu” (posortowane)
 
     @property
     def plans(self) -> list[AppPlan]:
@@ -79,6 +88,10 @@ class UndoResult:
     order: Order
     errors: list[tuple[Action, str]]
     admin_not_restored: bool
+    sites_total: int = 0  # kanały witryn wyłączone przez naprawę, objęte tym cofnięciem
+    sites_restored: int = 0  # z nich włączone teraz (reszta: pominięte, czas minął, kanał zniknął)
+    restored_sites: list[int] = field(default_factory=list)  # id kanałów włączonych teraz przez ekran
+    firefox_debugging: bool = False  # cofnięto zgodę przez zdalne debugowanie: przypomnij o wyłączeniu
 
 
 class OrderInterrupted(Exception):
@@ -103,6 +116,7 @@ def plan_order(
     requests: dict[str, str],
     unlocked: Iterable[str] = (),
     ctx: PhoneContext | None = None,
+    fixes: Iterable[str] = (),
 ) -> OrderPlan:
     device = report.device
     ctx = ctx or read_phone_context(adb, device.manufacturer)
@@ -112,12 +126,14 @@ def plan_order(
     root = backups_dir() / device_dir_name(device_key(device))
     free = frozenset(unlocked)
     destroyed = frozenset(p for p, level in requests.items() if level in ("disable", "remove"))
-    results = [plan_app(package, level, facts.get(package), ctx, protected, root, free, destroyed)
-               for package, level in requests.items()]
+    chosen = tuple(sorted(set(fixes)))
+    results = [*plan_fixes(chosen, report.device_checks, requests),
+               *(plan_app(package, level, facts.get(package), ctx, protected, root, free, destroyed)
+                 for package, level in requests.items())]
     used = frozenset(r.package for r in results if isinstance(r, AppPlan)
-                     and r.package in free and (protected.matches(r.package)
+                     and r.level != FIX_LEVEL and r.package in free and (protected.matches(r.package)
                                                 or r.package in ctx.system_launchers))
-    return OrderPlan(device, ctx, facts, results, used)
+    return OrderPlan(device, ctx, facts, results, used, chosen)
 
 
 def start(journal: Journal, plan: OrderPlan, client: str | None,
@@ -128,7 +144,8 @@ def start(journal: Journal, plan: OrderPlan, client: str | None,
     if report is not None and match is not None:
         # Migawka dla protokołu (spec §9.3): telefon, zakres skanu, problemy i decyzje
         # serwisanta z chwili zlecenia.
-        chosen = {p.package: p.level for p in plan.plans}
+        # poprawki „Stanu telefonu” (poziom fix) nie są decyzją o aplikacji: wynik biorą z dziennika
+        chosen = {p.package: p.level for p in plan.plans if p.level != FIX_LEVEL}
         snapshot = scan_snapshot(report, match, chosen)
         if plan.unlocked:  # decyzja operatora zostaje w zleceniu (audyt 2026-10-11, QA-01)
             snapshot["unlocked"] = sorted(plan.unlocked)
@@ -187,11 +204,32 @@ def undo_order(
 ) -> UndoResult:
     # Stan sprzed cofnięcia: krok admina po cofnięciu dostaje „undone”, choć uprawnień nie oddajemy.
     targeted = targeted_actions(journal, order.id, package, action_id)
+    base = options or ExecOptions()
+    screened: set[int] = set()  # kanały włączone przez ekran w tym cofaniu
+
+    def on_event(event: dict) -> None:
+        if event["type"] == "undo" and event.get("via_screen"):
+            screened.add(event["action_id"])
+        base.on_event(event)
+
     try:
-        errors = undo(adb, journal, order.id, package=package, action_id=action_id, options=options)
+        errors = undo(adb, journal, order.id, package=package, action_id=action_id,
+                      options=replace(base, on_event=on_event))
     except ActionError as exc:
         if exc.uncertain:
             raise OrderInterrupted(journal.order(order.id)) from exc
         raise
     admin = any(a.step["kind"] == "admin" and a.status == "done" for a in targeted)
-    return UndoResult(journal.order(order.id), errors, admin)
+    # Witryny do włączenia: kanały „done”, które naprawa naprawdę wyłączyła (wyłączone już
+    # przed naprawą nie liczą się — nie ma czego przywracać).
+    sites = [a.id for a in targeted
+             if a.step["kind"] == "channel" and a.status == "done" and inverse_of(a) is not None]
+    # Zgodę cofa zdalne debugowanie, więc po cofnięciu jest włączone. „undone” z powodem
+    # (app_gone, not_started) niczego na telefonie nie zmieniło.
+    after = {a.id: a for a in journal.actions(order.id)}
+    restored = [i for i in sites if after[i].status == "undone" and after[i].error is None]
+    debugging = any(a.step["kind"] == "site_permission" and a.status != "undone"
+                    and after[a.id].status == "undone" and after[a.id].error is None for a in targeted)
+    return UndoResult(journal.order(order.id), errors, admin, sites_total=len(sites),
+                      sites_restored=len(restored),
+                      restored_sites=[i for i in restored if i in screened], firefox_debugging=debugging)

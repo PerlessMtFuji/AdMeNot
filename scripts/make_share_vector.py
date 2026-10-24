@@ -15,6 +15,7 @@ OUT = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "share_vector
 PAYLOAD = {
     "v": 1, "lang": "pl", "at": "2026-10-11T14:32", "phone": "Redmi Note 13", "code": "7F3K",
     "notif": 0, "shop": "Serwis XYZ",
+    "f": [{"t": "Chrome: wyłączone powiadomienia z witryn"}, {"t": "Firefox: <b>zablokowane</b> powiadomienia z example.org"}],
     "apps": [
         {"n": "Czyszczenie telefonu", "l": "remove", "i": None},
         {"n": "Latarka 🔦", "l": "silence", "i": None},

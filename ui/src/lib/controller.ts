@@ -1,6 +1,6 @@
 import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
-import { actedAfter, changedVerdicts, defaultSelection, isManual, mergeSelection, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
+import { actedAfter, changedVerdicts, defaultSelection, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
 import type { AppState } from './state.svelte';
 import { applyTheme } from './theme';
 import type {
@@ -14,6 +14,7 @@ export class Controller {
   private knownLoaded = false;
   private autoMirrored = new Set<string>();
   private uiErrorSent = false;
+  private rechecking = false;  // odczyt kontroli w tle: następny nie startuje, póki poprzedni trwa
   private etaSeq = 0;  // szacunek dla zaznaczenia: liczy się tylko odpowiedź na ostatnie zapytanie
 
   constructor(readonly state: AppState, readonly bridge: Bridge) {}
@@ -104,6 +105,7 @@ export class Controller {
       s.undoTarget = null;
       s.touched = [];
       s.unlocked = [];
+      s.fixes.clear();
       s.expanded = [];
       s.openGroups = {};
       s.diagnostics = false;
@@ -207,8 +209,8 @@ export class Controller {
       s.share = { ...cur, code: d.code, status: 'failed', reason: d.reason, offline: d.offline };
     });
     on('exec:step', (d) => { s.steps = upsertStep(s.steps, d); });
-    on('exec:admin_wait', (d) => { s.admin = { ...d, since: Date.now() }; });
-    on('exec:admin_done', () => { s.admin = null; });
+    on('exec:user_wait', (d) => { s.userWait = { ...d, since: Date.now() }; });
+    on('exec:user_done', () => { s.userWait = null; });
     on('exec:question', (d) => { s.question = d; });
     on('exec:verify', () => { s.verifying = true; });
     on('exec:stopped', () => { s.stopped = true; });
@@ -217,7 +219,7 @@ export class Controller {
       s.donateBanner = d.donate_reminder === true;
       s.actedLog = actedAfter(s.actedLog, s.execPlan, d);
       s.verifying = false;
-      s.admin = null;
+      s.userWait = null;
       s.question = null;
       s.stopping = false;
       s.interrupted = d.stopped ? [d.order] : s.interrupted.filter((o) => o !== d.order);
@@ -227,7 +229,7 @@ export class Controller {
     on('exec:disconnected', (d) => {
       s.disconnectedOrder = d.order;
       s.interrupted = [d.order];
-      s.admin = null;
+      s.userWait = null;
       s.question = null;
       s.verifying = false;
       s.device = null;
@@ -235,8 +237,18 @@ export class Controller {
       s.phase = 'connect';
     });
     on('undo:step', (d) => { s.undoSteps = upsertStep(s.undoSteps, d); });
+    on('undo:sites', (d) => {
+      s.undoSites = d.sites;
+      // kolejka witryn jest tylko w Historii (np. cofanie aplikacji z listy wyników): tam przechodzimy
+      if (s.screen !== 'history') void this.openHistory(s.device?.serial ?? null);
+    });
     on('undo:done', (d) => {
       s.undoResult = d;
+      // koniec kolejki także po dwóch przekroczeniach czasu z rzędu (reszta pozycji nie dostaje zdarzeń)
+      s.undoSites = null;
+      s.userWait = null;
+      // cofnięte zlecenie bez kroków „w toku” nie jest już przerwane: baner znika
+      if (!d.interrupted.includes(d.order)) s.interrupted = s.interrupted.filter((o) => o !== d.order);
       if (s.undoing && d.errors.length === 0) {
         s.actedLog = withoutUndone(s.actedLog, s.undoing.order, s.undoing.pkg);
         s.undoTarget = null;
@@ -269,12 +281,14 @@ export class Controller {
         if (d.kind === 'apk') this.fullEndedWithoutReport();
       } else if ((d.kind === 'exec' || d.kind === 'resume') && s.phase === 'executing') {
         if (s.order && !s.interrupted.includes(s.order)) s.interrupted = [...s.interrupted, s.order];
-        s.admin = null;
+        s.userWait = null;
         s.question = null;
         s.verifying = false;
         s.stopping = false;
         s.phase = 'connect';
       } else if (d.kind === 'undo') {
+        s.undoSites = null;
+        s.userWait = null;
         void this.refreshHistory();
       }
     });
@@ -322,6 +336,7 @@ export class Controller {
     s.apkEstimate = null;
     s.apkFullEta = null;
     s.apkQuestion = null;
+    s.fixes.clear();
     const r = await this.call(this.api.start_scan(s.serial, s.client.trim() || null));
     if (r) this.setJob(r.job_id, 'scan');
     else s.phase = 'connect';
@@ -358,6 +373,7 @@ export class Controller {
       // (audyt 2026-10-11, PRIV-04), a odblokowane pakiety chronione — do jego planu (QA-01).
       client: '', unlocked: [],
     });
+    this.state.fixes.clear();
   }
 
   /** Z Protokołu z powrotem do Naprawy: ten sam skan, kolejne akcje jako nowe zlecenie. */
@@ -369,6 +385,8 @@ export class Controller {
     if (serial) void this.call(this.api.close_order(serial));
     Object.assign(s, { phase: 'results', screen: 'main', result: null, order: null, execPlan: null, plan: null,
       selection: {}, touched: Object.keys(s.acted), steps: [], lastShot: null, lastShotSerial: null, shotCount: 0 });
+    s.fixes.clear(); // reszta wraca niezaznaczona; zrobione poprawki znikają z listy po ponownym odczycie
+    void this.recheckSiteNotifications();
     void this.refreshSelectionEta();
   }
 
@@ -381,6 +399,39 @@ export class Controller {
   }
 
   // --- wybór akcji i plan ------------------------------------------------------------------------
+
+  /** Zaznacza albo odznacza poprawkę „Stanu telefonu” (identyfikator z `device_checks`). */
+  toggleFix(fix: string): void {
+    const fixes = this.state.fixes;
+    if (!fixes.delete(fix)) fixes.add(fix);
+  }
+
+  /** Odczyt w tle samej kontroli powiadomień witryn (Firefox po włączeniu zdalnego debugowania). Błąd
+   *  jednego odczytu nie trafia na kartę błędu: następny przyjdzie za kilka sekund. Przy otwartym planie
+   *  albo stronie dla klienta nic nie zmienia: wykonane muszą być te poprawki, które pokazano.
+   *  `whenDebugging`: odpytywanie w tle — telefon czyta tylko gniazdo debugowania, pełny odczyt dopiero po
+   *  jego pojawieniu się (`check` = null, gdy nic się nie zmieniło). */
+  async recheckSiteNotifications(whenDebugging = false): Promise<void> {
+    const s = this.state;
+    if (s.orderRunning || !s.scan || s.plan || s.share || this.rechecking) return;
+    this.rechecking = true;
+    let r;
+    try {
+      r = await this.api.recheck_site_notifications(whenDebugging);
+    } catch {
+      return;
+    } finally {
+      this.rechecking = false;
+    }
+    if (isApiError(r) || !r.check || !s.scan || s.plan || s.share) return; // plan otwarty w trakcie odczytu
+    const check = r.check;
+    const known = s.scan.device_checks.some((c) => c.id === check.id);
+    s.scan = { ...s.scan, device_checks: known ? s.scan.device_checks.map((c) => (c.id === check.id ? check : c))
+      : [...s.scan.device_checks, check] };
+    // Poprawka, której telefon już nie oferuje (witryna zniknęła), nie może zostać w planie.
+    const offered = new Set(offeredFixes(s.scan.device_checks));
+    for (const fix of [...s.fixes]) if (!offered.has(fix)) s.fixes.delete(fix);
+  }
 
   setLevel(pkg: string, level: Level | null): void {
     const s = this.state;
@@ -473,7 +524,7 @@ export class Controller {
     const s = this.state;
     s.diagnostics = false;
     this.resetShare();
-    const r = await this.call(this.api.preview_plan({ ...s.selection }, [...s.unlocked]));
+    const r = await this.call(this.api.preview_plan({ ...s.selection }, [...s.unlocked], [...s.fixes]));
     if (r) s.plan = r;
   }
 
@@ -491,7 +542,7 @@ export class Controller {
     s.planChanged = false;
     const id = crypto.randomUUID();
     s.share = { id, code: null, status: 'sending', url: null, mode: null, expires: null, upgraded: false, reason: null };
-    const r = await this.call(this.api.share_plan({ ...s.selection }, [...s.unlocked], id));
+    const r = await this.call(this.api.share_plan({ ...s.selection }, [...s.unlocked], id, [...s.fixes]));
     if (!r) {
       if (s.share?.id === id) s.share = null;
       return;
@@ -527,7 +578,7 @@ export class Controller {
     const s = this.state;
     s.error = null;
     const consent = s.consent && s.share?.code ? { code: s.share.code } : null;
-    const r = await this.call(this.api.execute({ ...s.selection }, [...s.unlocked], consent));
+    const r = await this.call(this.api.execute({ ...s.selection }, [...s.unlocked], consent, [...s.fixes]));
     if (r) this.setJob(r.job_id, 'exec');
     else this.retiredToDialog();
   }
@@ -537,6 +588,28 @@ export class Controller {
     if (!job) return;
     this.state.stopping = true;
     await this.call(this.api.stop(job.id));
+  }
+
+  /** „Otwórz ponownie na telefonie”: ten sam ekran, czas oczekiwania biegnie dalej. */
+  async reopenScreen(): Promise<void> {
+    await this.call(this.api.reopen_screen());
+  }
+
+  /** „Pomiń” przy witrynie w cofaniu: bieżący ekran przestaje czekać, otwiera się następna witryna. */
+  async skipSite(): Promise<void> {
+    await this.call(this.api.skip_site());
+  }
+
+  /** Strona przywróconego kanału na telefonie: zapisuje go od nowa. Niepowodzenie — baner, nie karta błędu. */
+  async openSite(order: string, actionId: number): Promise<void> {
+    const s = this.state;
+    s.openSiteFailed = false;
+    try {
+      const r = await this.api.open_site(order, actionId);
+      s.openSiteFailed = isApiError(r) || !r.ok;
+    } catch {
+      s.openSiteFailed = true;
+    }
   }
 
   async answer(value: 'retry' | 'skip'): Promise<void> {
@@ -560,6 +633,8 @@ export class Controller {
     s.error = null;
     s.undoSteps = [];
     s.undoResult = null;
+    s.undoSites = null;
+    s.openSiteFailed = false;
     s.undoing = actionId === null ? { order, pkg } : null;
     const r = await this.call(this.api.undo(order, actionId, pkg));
     if (r) this.setJob(r.job_id, 'undo');
@@ -716,6 +791,11 @@ export class Controller {
   async refreshHistory(serial: string | null = this.state.history?.serial ?? null): Promise<void> {
     const r = await this.call(this.api.history(serial));
     if (r) this.state.history = r;
+  }
+
+  /** Baner przerwanego zlecenia znika do następnego skanu; zlecenie zostaje w Historii. */
+  hideInterrupted(order: string): void {
+    this.state.interrupted = this.state.interrupted.filter((o) => o !== order);
   }
 
   async deleteOrder(order: string): Promise<void> {

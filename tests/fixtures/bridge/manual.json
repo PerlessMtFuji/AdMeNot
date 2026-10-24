@@ -486,6 +486,18 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
+      "command": "dumpsys notification --noredact",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "<129 B>",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
       "command": "dumpsys notification --package admenot.none",
       "status": "ok",
       "duration": 0.0,
@@ -979,6 +991,14 @@
            }
           }
          ]
+        }
+       ],
+       "device_checks": [
+        {
+         "id": "site_notifications",
+         "state": "unrecognized",
+         "state_label": "Nie udało się odczytać",
+         "browsers": []
         }
        ],
        "profiles": {
@@ -1477,6 +1497,14 @@
            }
           }
          ]
+        }
+       ],
+       "device_checks": [
+        {
+         "id": "site_notifications",
+         "state": "unrecognized",
+         "state_label": "Nie udało się odczytać",
+         "browsers": []
         }
        ],
        "profiles": {
@@ -2023,6 +2051,14 @@
          ]
         }
        ],
+       "device_checks": [
+        {
+         "id": "site_notifications",
+         "state": "unrecognized",
+         "state_label": "Nie udało się odczytać",
+         "browsers": []
+        }
+       ],
        "profiles": {
         "others": [],
         "known": true
@@ -2310,6 +2346,7 @@
       "label": "odebranie zgody na powiadomienia",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2347,6 +2384,7 @@
       "label": "odebranie zgody na powiadomienia",
       "status": "done",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2360,6 +2398,7 @@
       "label": "blokada okien nad innymi aplikacjami",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2397,6 +2436,7 @@
       "label": "blokada okien nad innymi aplikacjami",
       "status": "done",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2410,6 +2450,7 @@
       "label": "blokada powiadomień pełnoekranowych",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2447,6 +2488,7 @@
       "label": "blokada powiadomień pełnoekranowych",
       "status": "done",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2460,6 +2502,7 @@
       "label": "zatrzymanie aplikacji",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2485,6 +2528,7 @@
       "label": "zatrzymanie aplikacji",
       "status": "done",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2498,6 +2542,7 @@
       "label": "kopia APK na komputerze",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2583,6 +2628,7 @@
       "label": "kopia APK na komputerze",
       "status": "done",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2596,6 +2642,7 @@
       "label": "odinstalowanie (użytkownik 0)",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2768,11 +2815,13 @@
      }
     ],
     [
-     "exec:admin_wait",
+     "exec:user_wait",
      {
       "package": "com.clean.pro.boost",
       "name": "com.clean.pro.boost",
-      "timeout": 180.0
+      "kind": "admin",
+      "timeout": 180.0,
+      "action_id": 7
      }
     ],
     [
@@ -2788,7 +2837,7 @@
      }
     ],
     [
-     "exec:admin_done",
+     "exec:user_done",
      {
       "package": "com.clean.pro.boost",
       "status": "done"
@@ -2948,6 +2997,7 @@
       "label": "odinstalowanie (użytkownik 0)",
       "status": "done",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2983,7 +3033,8 @@
         "kinds": []
        }
       ],
-      "donate_reminder": true
+      "donate_reminder": true,
+      "firefox_debugging": false
      }
     ],
     [
@@ -3034,6 +3085,8 @@
         "kind": "permission",
         "step_label": "odebranie zgody na powiadomienia",
         "status": "done",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "wykonane",
         "error": null
        },
@@ -3045,6 +3098,8 @@
         "kind": "appop",
         "step_label": "blokada okien nad innymi aplikacjami",
         "status": "done",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "wykonane",
         "error": null
        },
@@ -3056,6 +3111,8 @@
         "kind": "appop",
         "step_label": "blokada powiadomień pełnoekranowych",
         "status": "done",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "wykonane",
         "error": null
        },
@@ -3067,6 +3124,8 @@
         "kind": "force_stop",
         "step_label": "zatrzymanie aplikacji",
         "status": "done",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "wykonane",
         "error": null
        },
@@ -3078,6 +3137,8 @@
         "kind": "backup",
         "step_label": "kopia APK na komputerze",
         "status": "done",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "wykonane",
         "error": null
        },
@@ -3089,6 +3150,8 @@
         "kind": "installed",
         "step_label": "odinstalowanie (użytkownik 0)",
         "status": "done",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "wykonane",
         "error": null
        },
@@ -3100,6 +3163,8 @@
         "kind": "admin",
         "step_label": "odebranie uprawnień administratora (na telefonie)",
         "status": "done",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "wykonane",
         "error": null
        }

@@ -16,6 +16,7 @@ from admenot.engine.workflow import OrderPlan
 
 AT = datetime(2026, 10, 11, 14, 32)
 BASE = "https://admenot.test"
+_CODE_BEFORE_FIXES = "H2FM"  # kod planu _plan() z commitu 03c4a63, przed poprawkami telefonu
 
 
 def _icon(size: int = 192, fmt: str = "PNG") -> str:
@@ -30,13 +31,14 @@ def _results():
             Blocked("com.google.android.gms", "disable", "protected")]
 
 
-def _plan(sdk: int = 34, serial: str = "R58N123", results=None, icons: bool = True) -> OrderPlan:
+def _plan(sdk: int = 34, serial: str = "R58N123", results=None, icons: bool = True,
+          fixes: tuple[str, ...] = ()) -> OrderPlan:
     device = DeviceInfo(serial, "xiaomi", "Xiaomi", "23129RAA4G", "sapphire", "Redmi Note 13", "14",
                         sdk, None, 0.0, AT)
     ctx = PhoneContext(sdk, "Xiaomi", None, None, {}, frozenset(), {})
     results = _results() if results is None else results
     facts = {r.package: AppFacts(r.package, icon=_icon() if icons else None) for r in results}
-    return OrderPlan(device, ctx, facts, results)
+    return OrderPlan(device, ctx, facts, results, fixes=fixes)
 
 
 NAMES = {"com.clean.pro": "Czyszczenie telefonu", "com.flash.light": "Latarka",
@@ -204,3 +206,37 @@ def test_shrink_icon_turns_any_decoder_failure_into_none(monkeypatch, exc):
         raise exc("dekoder")
     monkeypatch.setattr(share.Image, "open", boom)
     assert share.shrink_icon(_icon()) is None
+
+
+def _with_fixes(*fixes: str) -> OrderPlan:
+    """Plan jak z `plan_order(fixes=...)`: plany poprawek (poziom „fix”) przed planami aplikacji."""
+    fix_plans = [AppPlan("com.android.chrome", "fix", [], []),
+                 Blocked("com.sec.android.app.sbrowser", "fix", "browser_removed")]
+    return _plan(results=[*fix_plans, *_results()], fixes=tuple(sorted(fixes)))
+
+
+def test_code_without_fixes_is_the_code_from_before_the_feature():
+    assert share.plan_code(_plan()) == _CODE_BEFORE_FIXES
+    assert share.plan_code(_with_fixes()) == _CODE_BEFORE_FIXES  # plany poprawek nie wchodzą do apps
+
+
+def test_code_changes_with_the_fix_selection():
+    a, b = "site_all:com.android.chrome", "site:com.android.chrome:ch1"
+    codes = {share.plan_code(_with_fixes(*sel)) for sel in [(), (a,), (b,), (a, b)]}
+    assert len(codes) == 4
+    assert share.plan_code(_with_fixes(a, b)) == share.plan_code(_with_fixes(b, a))
+
+
+def test_payload_lists_fix_texts_and_no_fix_as_app():
+    p = _payload(_with_fixes("site_all:com.android.chrome"), fix_texts=[{"t": "Chrome: wyłączone powiadomienia witryn",
+                                                                         "p": "com.android.chrome", "n": "Chrome"}])
+    assert p["f"] == [{"t": "Chrome: wyłączone powiadomienia witryn", "p": "com.android.chrome", "n": "Chrome"}]
+    assert [a["n"] for a in p["apps"]] == ["Czyszczenie telefonu", "Latarka", "Usługi Google Play"]
+    assert "f" not in _payload()
+    assert "f" not in _payload(_with_fixes(), fix_texts=[])
+
+
+def test_local_url_keeps_fix_texts():
+    p = _payload(_with_fixes("site_all:com.android.chrome"), fix_texts=[{"t": "Chrome", "h": "a.pl"}])
+    url = share.local_url(BASE, p)
+    assert url is not None and share.decode_local(url)["f"] == [{"t": "Chrome", "h": "a.pl"}]

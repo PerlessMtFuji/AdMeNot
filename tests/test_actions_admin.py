@@ -70,7 +70,7 @@ def test_admin_deactivated_on_phone_then_removal_continues(journal, tmp_path):
     assert phone.opened == ["admin"] and clock.sleeps == 3
     admin = [(a.status, a.error) for a in journal.actions(order.id) if a.step["kind"] == "admin"]
     assert admin == [("done", None)]
-    waits = [e for e in events if e["type"] == "admin_wait"]
+    waits = [e for e in events if e["type"] == "user_wait"]
     assert len(waits) == 1 and waits[0]["timeout"] == 180.0 and waits[0]["package"] == "com.adm"
     assert journal.order(order.id).status == "done"
 

@@ -439,6 +439,7 @@ def build_parser() -> argparse.ArgumentParser:
     target = undo.add_mutually_exclusive_group()
     target.add_argument("--app")
     target.add_argument("--action", type=int)
+    undo.add_argument("--admin-timeout", type=float, default=180.0)
     resume = sub.add_parser("resume")
     resume.add_argument("--order", required=True)
     resume.add_argument("--yes", action="store_true")

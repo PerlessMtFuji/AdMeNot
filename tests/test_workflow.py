@@ -1,11 +1,15 @@
 import re
 
 import pytest
-from fakephone import make_cli_phone
+from fakephone import FakeApp, FakePhone, make_cli_phone
+from test_actions_admin import FakeClock
 
 from admenot.engine.actions import commands as C
+from admenot.engine.actions import steps as S
 from admenot.engine.actions.executor import ExecOptions, resume, run_order
 from admenot.engine.actions.planner import Blocked
+from admenot.engine.actions.steps import Step
+from admenot.engine.device_checks import BrowserSites, DeviceCheck, SiteEntry
 from admenot.engine.journal.db import Journal
 from admenot.engine.phones.provider import PhoneProvider
 from admenot.engine.session import run_scan
@@ -240,3 +244,47 @@ def test_backup_dir_of_any_serial_stays_under_the_root(serial, tmp_path):
     assert re.fullmatch(r"[A-Za-z0-9_-]+-[0-9a-f]{12}", name)
     assert (tmp_path / name).resolve().parent == tmp_path.resolve()
     assert device_dir_name(serial) == name and device_dir_name(serial + "x") != name
+
+
+def test_snapshot_chosen_level_ignores_fix_plans(tmp_path):
+    """An app that also carries fix plans keeps its app-list decision (None when it has no app plan)."""
+    both, only_fix, channel = "com.wlive.forecast", "com.clean.pro.boost", "web:https://a.pl;1"
+    phone = make_cli_phone()
+    report = run_scan(phone)
+    sites = [SiteEntry("https://a.pl", "a.pl", False, True, f"site:{p}:{channel}")
+             for p in (both, only_fix)]
+    report.device_checks = [DeviceCheck("site_notifications", "review", [
+        BrowserSites(p, p, "per_site", "ok", [site]) for p, site in zip((both, only_fix), sites)])]
+    plan = plan_order(phone, report, {both: "silence"}, fixes=[s.fix for s in sites])
+    assert sorted(p.level for p in plan.plans) == ["fix", "fix", "silence"]
+    match = PhoneProvider(tmp_path / "missing", tmp_path / "o.json").match(report.device)
+    journal = Journal(tmp_path / "j.db")
+    order = start(journal, plan, None, report, match)
+    snap = journal.scan(order.id)
+    chosen = {a["package"]: a["chosen_level"] for a in snap["apps"]}
+    assert chosen[both] == "silence" and chosen[only_fix] is None
+    assert [c["id"] for c in snap["device_checks"]] == ["site_notifications"]
+
+
+def test_undo_order_counts_sites(tmp_path):
+    chrome = "com.android.chrome"
+    sites = ("web:https://a.pl;1", "web:https://b.pl;2", "web:https://c.pl;3", "web:https://d.pl;4")
+    phone = FakePhone([FakeApp(chrome)])
+    phone.channels = {chrome: dict.fromkeys(sites, 0)}
+    phone.channels[chrome][sites[3]] = 3  # klient sam włączył po naprawie: bez ekranu
+    phone.on_channel_screen = lambda p, pkg, cid: cid == sites[1] and p.channels[pkg].__setitem__(cid, 3)
+    journal = Journal(tmp_path / "j.db")
+    order = journal.create_order(phone.serial, "Test")
+    ids = []
+    for site, importance in zip(sites, (3, 3, 0, 3)):  # trzecia była wyłączona już przed naprawą
+        step = Step("channel", chrome, {"channel_id": site})
+        ids.append(journal.add_action(order.id, chrome, "fix", step.to_dict(), S.command_for(step)))
+        inverse = S.inverse(step, {"importance": importance}) if importance else None
+        journal.record_prev_state(ids[-1], {"importance": importance},
+                                  inverse.to_dict() if inverse else None)
+        journal.set_action_status(ids[-1], "done")
+    clock = FakeClock()
+    result = undo_order(phone, journal, order, options=ExecOptions(clock=clock.clock, sleep=clock.sleep))
+    # już włączona liczy się jako przywrócona, ale nie jest „włączona przez ekran w tym cofaniu”
+    assert (result.sites_total, result.sites_restored, result.restored_sites) == (3, 2, [ids[1]])
+    assert [key for _, key in result.errors] == ["site_timeout"]

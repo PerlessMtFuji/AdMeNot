@@ -24,6 +24,7 @@ from admenot.engine import paths
 from admenot.engine.allowlist.trust import load_default_trust_list, load_protected_list
 from admenot.engine.apk.iocs import load_default_iocs
 from admenot.engine.apk.sdks import load_default_ad_sdks
+from admenot.engine.browsers.known import known_browsers
 from admenot.engine.phones.build import DB_NAME
 from admenot.engine.rules.engine import load_default_ruleset
 from admenot.engine.tools import tools_dir
@@ -86,6 +87,7 @@ CHECKS: tuple[tuple[str, Callable[[], object]], ...] = (
     ("iocs.yaml", load_default_iocs),
     ("trusted.yaml", load_default_trust_list),
     ("protected.yaml", load_protected_list),
+    ("browsers.yaml", known_browsers),
     ("adb.exe", lambda: _file(tools_dir() / "adb.exe")),
     ("scrcpy.exe", lambda: _file(tools_dir() / "scrcpy.exe")),
     ("scrcpy-server", lambda: _file(tools_dir() / "scrcpy-server")),

@@ -6,9 +6,11 @@ import pytest
 from fakephone import make_cli_phone
 
 from admenot.app.present import (
+    action_view,
     app_name,
     app_view,
     device_card,
+    device_checks_view,
     eta_view,
     history_view,
     image_uri,
@@ -176,6 +178,9 @@ def test_plan_step_result_and_history_views(tmp_path):
         "action_id": 3, "package": "com.wlive.forecast", "name": names["com.wlive.forecast"],
         "kind": "enabled", "label": "wyłączenie aplikacji", "status": "failed"}
     assert "zabezpieczeń" in sv["error"]
+    # surowy klucz obok tekstu: UI rozróżnia po nim stan witryny w kolejce cofania (`channel_gone`)
+    assert sv["error_key"] == "security"
+    assert step_view({**event, "status": "done", "error": None}, "pl", "Xiaomi", names)["error_key"] is None
 
     with Journal(tmp_path / "j.db") as journal:
         order = start(journal, plan, "Anna <b>")
@@ -274,6 +279,7 @@ def test_history_orders_name_apps_and_show_icons_from_the_order_snapshot(tmp_pat
         (old,) = history_view(journal, "OLD1", ["OLD1"], "pl")["orders"]
     assert o["apps"] == {"com.wlive.forecast": {"name": "Weather Live", "icon": "data:image/png;base64,AA=="},
                          "com.gone": {"name": None, "icon": None}}
+    assert all(a["manual_undo"] is None for a in o["actions"])
     assert old["apps"] == {}
 
 
@@ -310,3 +316,184 @@ def test_app_view_lists_analysis_scope_for_a_quiet_app():
     facts = AppFacts("com.x", ad_sdks=set(), dynamic_code=True, obfuscation_ratio=0.9)
     view = app_view(AppResult(facts, [], 0, "safe", False, False), "pl")
     assert [s["key"] for s in view["scope"]] == ["obfuscated", "dynamic_code"]
+
+
+CHROME = "com.android.chrome"
+SBROWSER = "com.sec.android.app.sbrowser"
+SB_CHANNEL = "SBROWSER_WEBSITES_NOTIFICATION_CHANNEL"
+SITE = "web:https://www.example.com;1"
+
+
+def _site_phone():
+    phone = make_cli_phone()
+    phone.channels = {CHROME: {SITE: 3, "web:https://b.pl;2": 0}, SBROWSER: {SB_CHANNEL: 3}}
+    phone.active = [(SBROWSER, SB_CHANNEL, "p#https://news.example.org/#1", "news.example.org")]
+    return phone
+
+
+def test_scan_view_lists_device_checks_with_labels():
+    view = scan_view(run_scan(_site_phone()), "pl")
+    json.dumps(view)
+    (check,) = view["device_checks"]
+    assert (check["id"], check["state"], check["state_label"]) == (
+        "site_notifications", "review", "Do sprawdzenia")
+    chrome, sbrowser = check["browsers"]
+    assert {k: chrome[k] for k in ("package", "name", "mode", "read", "rdp_hint", "all_fix")} == {
+        "package": CHROME, "name": "Chrome", "mode": "per_site", "read": "ok", "rdp_hint": False,
+        "all_fix": None}
+    assert chrome["all_fix_label"] is None
+    blocked, enabled = chrome["sites"]  # po hoście: b.pl przed www.example.com
+    assert enabled == {"host": "www.example.com", "origin": "https://www.example.com", "blocked": False,
+                       "active": False, "fix": f"site:{CHROME}:{SITE}",
+                       "fix_label": "Wyłączenie powiadomień: www.example.com (Chrome)"}
+    assert blocked["blocked"] is True and blocked["fix"] is None and blocked["fix_label"] is None
+    assert sbrowser["all_fix"] == f"site_all:{SBROWSER}"
+    # akcję „Blokuj” w aktywnym powiadomieniu ma Samsung Internet, nie Chrome (ani Firefox)
+    assert (chrome["block_action"], sbrowser["block_action"]) == (False, True)
+    assert sbrowser["all_fix_label"] == "Wyłączenie powiadomień wszystkich witryn (Samsung Internet)"
+    assert sbrowser["sites"][0]["host"] == "news.example.org" and sbrowser["sites"][0]["fix"] is None
+    english = scan_view(run_scan(_site_phone()), "en")["device_checks"][0]
+    assert english["state_label"] == "Review"
+    assert english["browsers"][0]["sites"][1]["fix_label"] == (
+        "Turning off notifications: www.example.com (Chrome)")
+
+
+def test_browser_names_come_from_the_table_then_from_labels_known_after_the_scan():
+    from admenot.engine.device_checks import BrowserSites, DeviceCheck
+
+    check = DeviceCheck("site_notifications", "ok", [
+        BrowserSites("com.vivaldi.browser", "Vivaldi", "per_site", "ok", []),
+        BrowserSites("org.example.web", "org.example.web", "per_site", "ok", []),
+        BrowserSites("org.other.web", "org.other.web", "per_site", "ok", [])])
+    view = device_checks_view([check], "pl", {"org.example.web": "Przeglądarka X", "com.vivaldi.browser": "Inna"})
+    assert [b["name"] for b in view[0]["browsers"]] == ["Vivaldi", "Przeglądarka X", "org.other.web"]
+    phone = make_cli_phone()
+    phone.channels = {"com.brave.browser": {"web:https://a.pl;1": 3}}
+    (brave,) = run_scan(phone).device_checks[0].browsers
+    assert brave.name == "Brave"
+
+
+def test_plan_view_shows_fix_plans_with_their_labels():
+    phone = _site_phone()
+    report = run_scan(phone)
+    fixes = [f"site:{CHROME}:{SITE}", f"site_all:{SBROWSER}", "site:com.android.chrome:web:https://gone.pl;9"]
+    plan = plan_order(phone, report, {}, fixes=fixes)
+    view = plan_view(plan, "pl")
+    json.dumps(view)
+    fix, sb, blocked = view["apps"]
+    assert (fix["package"], fix["level"], fix["level_label"]) == (CHROME, "fix", "Ustawienia witryn")
+    assert fix["steps"] == ["Wyłączenie powiadomień: www.example.com (Chrome)"]
+    assert sb["steps"] == ["Wyłączenie powiadomień wszystkich witryn (Samsung Internet)"]
+    assert blocked["blocked"] is True and blocked["reason"] == "unknown_fix"
+    assert blocked["reason_text"] and "unknown_fix" not in blocked["reason_text"]
+    assert view["runnable"] == 2
+    en = plan_view(plan, "en")["apps"][0]
+    assert en["level_label"] == "Site settings"
+
+
+def test_browser_removed_reason_has_texts():
+    phone = _site_phone()
+    plan = plan_order(phone, run_scan(phone), {CHROME: "disable"}, fixes=[f"site:{CHROME}:{SITE}"])
+    blocked = next(a for a in plan_view(plan, "en")["apps"] if a["level"] == "fix")
+    assert blocked["reason"] == "browser_removed" and blocked["reason_text"] != "browser_removed"
+
+
+def test_firefox_site_permission_label():
+    from admenot.engine.texts import step_label
+
+    step = {"kind": "site_permission", "package": "org.mozilla.firefox",
+            "params": {"origin": "https://www.example.com", "permission": "desktop-notification",
+                       "capability": "2"}}
+    assert step_label(step, "pl") == "Blokada powiadomień: www.example.com (Firefox)"
+
+
+def test_channel_label_names_a_popular_browser_before_its_label_is_read():
+    from admenot.engine.texts import step_label
+
+    # etykieta jeszcze nieodczytana: nazwa ze skanu to sam pakiet
+    step = {"kind": "channel", "package": "com.vivaldi.browser",
+            "params": {"channel_id": "web:https://www.example.com;0", "importance": 0}}
+    assert step_label(step, "pl", {"com.vivaldi.browser": "com.vivaldi.browser"}) \
+        == "Wyłączenie powiadomień: www.example.com (Vivaldi)"
+
+
+def test_history_names_a_browser_with_only_fix_actions_and_points_to_manual_undo(tmp_path):
+    with Journal(tmp_path / "j.db") as journal:
+        order = journal.create_order("R58", "SM-A145R", None)
+        journal.save_scan(order.id, {"apps": [], "device_checks": [
+            {"id": "site_notifications", "state": "review", "browsers": [
+                {"package": "org.example.browser", "name": "Przeglądarka X", "mode": "per_site",
+                 "read": "ok", "sites": [], "all_fix": None, "rdp_hint": False}]}]})
+        chrome = {"kind": "channel", "package": CHROME, "params": {"channel_id": SITE}}
+        journal.add_action(order.id, CHROME, "fix", chrome, "cmd")
+        shared = {"kind": "channel", "package": SBROWSER, "params": {"channel_id": SB_CHANNEL}}
+        journal.add_action(order.id, SBROWSER, "fix", shared, "cmd")
+        perm = {"kind": "site_permission", "package": "org.mozilla.firefox",
+                "params": {"origin": "https://www.example.com", "permission": "desktop-notification",
+                           "capability": "2"}}
+        journal.add_action(order.id, "org.mozilla.firefox", "fix", perm, "cmd")
+        journal.add_action(order.id, "org.example.browser", "fix",
+                           {**chrome, "package": "org.example.browser"}, "cmd")
+        (o,) = history_view(journal, "R58", ["R58"], "pl")["orders"]
+    assert {p: a["name"] for p, a in o["apps"].items()} == {
+        CHROME: "Chrome", SBROWSER: "Samsung Internet", "org.mozilla.firefox": "Firefox",
+        "org.example.browser": "Przeglądarka X"}
+    by = {a["package"]: a for a in o["actions"]}
+    assert by[CHROME]["level_label"] == "Ustawienia witryn"
+    assert by[CHROME]["step_label"] == "Wyłączenie powiadomień: www.example.com (Chrome)"
+    assert all(a["manual_undo"] is None for a in o["actions"])  # cofnięcie automatyczne
+    assert by["org.example.browser"]["step_label"].endswith("(Przeglądarka X)")
+
+
+def test_manual_undo_only_for_gone_channel(tmp_path):
+    with Journal(tmp_path / "j.db") as journal:
+        order = journal.create_order("R58", "SM-A145R", None)
+        chrome = {"kind": "channel", "package": CHROME, "params": {"channel_id": SITE}}
+        shared = {"kind": "channel", "package": SBROWSER, "params": {"channel_id": SB_CHANNEL}}
+        perm = {"kind": "site_permission", "package": "org.mozilla.firefox",
+                "params": {"origin": "https://www.example.com", "permission": "desktop-notification",
+                           "capability": "2"}}
+        ids = {}
+        for name, package, step in (("site", CHROME, chrome), ("shared", SBROWSER, shared),
+                                    ("perm", "org.mozilla.firefox", perm)):
+            ids[name] = journal.add_action(order.id, package, "fix", step, "cmd")
+            journal.set_action_status(ids[name], "done", "channel_gone")
+        plain_id = journal.add_action(order.id, CHROME, "fix", chrome, "cmd")
+        journal.set_action_status(plain_id, "done")
+        by = {a.id: action_view(a, "pl") for a in journal.actions(order.id)}
+    assert by[plain_id]["manual_undo"] is None
+    assert by[ids["site"]]["manual_undo"] == "Ustawienia → Aplikacje → Chrome → Powiadomienia → www.example.com"
+    assert by[ids["shared"]]["manual_undo"] == "Ustawienia → Aplikacje → Samsung Internet → Powiadomienia"
+    assert by[ids["perm"]]["manual_undo"] is None
+    assert "usunęła ten kanał" in by[ids["site"]]["error"]
+
+
+def test_action_view_site_url_only_when_undone(tmp_path):
+    with Journal(tmp_path / "j.db") as journal:
+        order = journal.create_order("R58", "SM-A145R", None)
+        chrome = {"kind": "channel", "package": CHROME, "params": {"channel_id": SITE}}
+        shared = {"kind": "channel", "package": SBROWSER, "params": {"channel_id": SB_CHANNEL}}
+        rows = {}
+        for name, package, step, status in (
+                ("undone", CHROME, chrome, "undone"), ("done", CHROME, chrome, "done"),
+                ("shared", SBROWSER, shared, "undone"),
+                ("other", CHROME, {"kind": "enabled", "package": CHROME, "params": {"enabled": "0"}},
+                 "undone")):
+            rows[name] = journal.add_action(order.id, package, "fix", step, "cmd")
+            journal.set_action_status(rows[name], status)
+        rows["skipped"] = journal.add_action(order.id, CHROME, "fix", chrome, "cmd")
+        journal.set_action_status(rows["skipped"], "undone", "site_skipped")  # błąd przy statusie „undone”
+        by = {n: action_view(journal.action(i), "pl")["site_url"] for n, i in rows.items()}
+    assert by == {"undone": "https://www.example.com", "done": None, "shared": None, "other": None,
+                  "skipped": None}
+
+
+def test_cli_and_gui_texts_cover_fix_reasons_levels_and_errors():
+    from admenot.engine.texts import TEXTS
+
+    for lang in ("pl", "en"):
+        texts = TEXTS[lang]
+        assert {"unknown_fix", "browser_removed"} <= set(texts["reasons"])  # CLI: texts["reasons"][reason]
+        assert "fix" in texts["levels"]
+        assert {"user_timeout", "rdp_unavailable", "rdp_failed", "browser_removed",
+                "unknown_fix"} <= set(texts["errors"])

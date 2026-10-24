@@ -12,6 +12,7 @@ from admenot.engine import donate
 from admenot.engine.actions.context import read_phone_context
 from admenot.engine.actions.executor import ExecOptions, resume, run_order
 from admenot.engine.actions.planner import LEVELS, AppPlan, Blocked
+from admenot.engine.actions.steps import Step, site_url
 from admenot.engine.adb.sessionlog import SessionLogAdb, session_log_path
 from admenot.engine.adb.transport import AdbTransport
 from admenot.engine.apk.analyze import clean_label
@@ -28,7 +29,14 @@ from admenot.engine.paths import incident_path, journal_path, logs_dir
 from admenot.engine.phones.provider import PhoneProvider
 from admenot.engine.session import ScanReport, run_scan
 from admenot.engine.settings import load_settings
-from admenot.engine.texts import TEXTS, error_text, step_label
+from admenot.engine.texts import (
+    TEXTS,
+    browser_name,
+    error_text,
+    fix_step_texts,
+    site_resubscribe,
+    step_label,
+)
 from admenot.engine.workflow import (
     OrderInterrupted,
     Runner,
@@ -51,6 +59,7 @@ MSG: dict[str, dict[str, str]] = {
         "bad_app": "Zły format --app: {value} (oczekiwane PAKIET=silence|disable|remove).",
         "admin_wait": "Potrzebny jeden ruch na telefonie: na otwartym ekranie stuknij "
                       "„Dezaktywuj” przy {package}. Czekam do {minutes:.0f} min…",
+        "site_wait": "Włącz na telefonie powiadomienia witryny {site} ({browser}) — czekam {minutes:.0f} min…",
         "admin_retry": "Nie odebrano uprawnień administratora {package}. "
                        "Spróbować ponownie? [t/N] ",
         "ok": "✓ {name}",
@@ -87,6 +96,8 @@ MSG: dict[str, dict[str, str]] = {
         "bad_app": "Bad --app value: {value} (expected PACKAGE=silence|disable|remove).",
         "admin_wait": "One tap needed on the phone: on the open screen tap “Deactivate” "
                       "for {package}. Waiting up to {minutes:.0f} min…",
+        "site_wait": "Turn on notifications from {site} ({browser}) on the phone — waiting up to "
+                     "{minutes:.0f} min…",
         "admin_retry": "Device admin rights of {package} were not removed. Try again? [y/N] ",
         "ok": "✓ {name}",
         "still_active": "⚠ {name}: still active ({kinds})",
@@ -142,12 +153,19 @@ def _device_name(report: ScanReport) -> str:
     return d.market_name or f"{d.brand} {d.model}".strip()
 
 
-def _printer(lang: str, manufacturer: str) -> Callable[[dict[str, Any]], None]:
+def _printer(lang: str, manufacturer: str,
+             journal: Journal | None = None) -> Callable[[dict[str, Any]], None]:
     marks = {"done": "✓", "failed": "✗", "skipped": "–", "undone": "↺"}
 
     def show(event: dict[str, Any]) -> None:
-        if event["type"] == "admin_wait":
+        if event["type"] == "user_wait" and event["step"] == "admin":
             print(_m(lang, "admin_wait", package=event["package"], minutes=event["timeout"] / 60))
+            return
+        if event["type"] == "user_wait" and event["step"] == "channel" and journal is not None:
+            texts = fix_step_texts(journal.action(event["action_id"]).step, lang)
+            # wspólny kanał przeglądarki nie ma witryny: nazwa przeglądarki wystarczy
+            print(_m(lang, "site_wait", site=texts["site"] or browser_name(event["package"]),
+                     browser=browser_name(event["package"]), minutes=event["timeout"] / 60))
             return
         if event["type"] not in ("step", "undo"):
             return
@@ -161,7 +179,7 @@ def _printer(lang: str, manufacturer: str) -> Callable[[dict[str, Any]], None]:
 
 
 def _options(args: argparse.Namespace, lang: str, manufacturer: str,
-             ask: Callable[[str], str] | None) -> ExecOptions:
+             ask: Callable[[str], str] | None, journal: Journal | None = None) -> ExecOptions:
     def on_admin_timeout(package: str) -> str:
         if getattr(args, "yes", False):
             return "skip"
@@ -171,7 +189,7 @@ def _options(args: argparse.Namespace, lang: str, manufacturer: str,
     return ExecOptions(
         apk_cache_dir=default_cache_dir(),
         admin_timeout=getattr(args, "admin_timeout", 180.0),
-        on_event=_printer(lang, manufacturer),
+        on_event=_printer(lang, manufacturer, journal),
         on_admin_timeout=on_admin_timeout,
     )
 
@@ -330,8 +348,11 @@ def cmd_undo(args: argparse.Namespace, host: AdbTransport, lang: str,
             return 6
         manufacturer = device.manufacturer
         try:
+            # Bez pytania o ponowienie: po limicie czasu witryna zostaje do włączenia z historii.
+            options = ExecOptions(admin_timeout=getattr(args, "admin_timeout", 180.0),
+                                  on_event=_printer(lang, manufacturer, journal))
             result = undo_order(adb, journal, order, package=args.app, action_id=args.action,
-                                options=ExecOptions(on_event=_printer(lang, manufacturer)))
+                                options=options)
         except OrderInterrupted:
             print(_m(lang, "disconnected", number=order.number), file=sys.stderr)
             return 3
@@ -340,6 +361,10 @@ def cmd_undo(args: argparse.Namespace, host: AdbTransport, lang: str,
             return 4
         if result.admin_not_restored:
             print(_m(lang, "admin_not_restored"))
+        for action_id in result.restored_sites:  # strona musi zapisać się od nowa
+            url = site_url(Step.from_dict(journal.action(action_id).step))
+            if url:
+                print(site_resubscribe(url, lang))
         status = TEXTS[lang]["order_status"][result.order.status]
         print(_m(lang, "undone", number=order.number, status=status))
         return 5 if result.errors else 0

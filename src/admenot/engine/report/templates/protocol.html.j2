@@ -87,6 +87,27 @@
 </section>
 {% endif %}
 
+{% if phone %}
+<section class="phone">
+  <h2>{{ t.phone_title }}</h2>
+  <p class="note">{{ t.phone.note }}</p>
+  {% for c in phone %}
+  {% if c.empty %}<p>{{ c.empty }}</p>{% endif %}
+  {% if c.unrecognized %}<p class="gap">{{ c.unrecognized }}</p>{% endif %}
+  {% if c.rows %}
+  <table>
+    <thead><tr><th>{{ t.phone.col_browser }}</th><th>{{ t.phone.col_site }}</th><th>{{ t.phone.col_state }}</th><th>{{ t.phone.col_result }}</th></tr></thead>
+    <tbody>
+    {% for r in c.rows %}
+      <tr><td>{{ r.browser }}</td><td class="mono">{{ r.domain }}</td><td>{{ r.before }}</td><td class="act {{ r.outcome }}">{{ r.result }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  {% endfor %}
+</section>
+{% endif %}
+
 {# Zalecenia i podpis razem: podpis nigdy nie zostaje sam na ostatniej stronie. #}
 <section class="closing">
 <h2>{{ t.recommendations_title }}</h2>

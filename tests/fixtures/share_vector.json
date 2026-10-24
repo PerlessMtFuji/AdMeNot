@@ -1,6 +1,6 @@
 {
   "key": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
-  "blob": "AWRlZmdoaWprbG1ubyWLEyx62EZZYUeTobtu8aATyrAdymN5+rhxukcSTdFTCKQCUuFk0CvDcA9QQ8slLDhjTZ1KJbLXAvxv+o6P7+xIVu2uFlhfpZggqB0NhFXY9IpJKg937RkQbXNK1aIg3DYFm/tHlBciDkxRi2l+7j4HGIWKpmne+gEGEFAf8Hk4widGRRQ2d3VLrLKh1kTiaEfd6U9Z7Ejk7bDwT1Z/K9acGfxNPW7eBCl/vGlZjF22aS2ZChYHh0GWsHhT08Mqst9TfuKGGUFgCgQZHPFbmRu1zOCy8KnnEJmUOqdCxAW86jD5M0ZyWMH6f7bW+LQyJEqe8KkWqZaPTt+MSw==",
+  "blob": "AWRlZmdoaWprbG1ubyWKESh72EZYYce2oUkgQ+UP2OZoCWt+Q1mYUFv1fngp/QE29iFzQiGhuwQ8Epy23WJEhyZ5jlL0wC6baRbnd6+X//IsuN/2vW/qDFJGC297Ep+jEX3orNgaaNqyMzxoOQ/d6TYYgNZPs+mDF7FBoxFA8z25CxtpV5yigkbJmEC4MsjyZ/dtHOLsrjvMEgCXC1Xb2W37hnxpDDgXe8uhcdBVbaSJGglNNKoNN1hOS8dmi328iG6cTBtSNymNkNn3UwysO/6+P1sN3t+gmy9+tR3Fl/DZoeOiwW/M1t7AZbBKOGFp4hCZzwYdhmhG3jPMQo32MIHb87gnIAP5APXUT5rsb2JtlBX3CJj10ydTOl3H/40RErf483hCKQlVcxrbj7XJ3l/DJ3Hk0KP1Ns7TCNXeLmOztAfz5OtaJRybpQ7Rf2frmLim",
   "payload": {
     "v": 1,
     "lang": "pl",
@@ -9,6 +9,14 @@
     "code": "7F3K",
     "notif": 0,
     "shop": "Serwis XYZ",
+    "f": [
+      {
+        "t": "Chrome: wyłączone powiadomienia z witryn"
+      },
+      {
+        "t": "Firefox: <b>zablokowane</b> powiadomienia z example.org"
+      }
+    ],
     "apps": [
       {
         "n": "Czyszczenie telefonu",
@@ -33,7 +41,7 @@
       }
     ]
   },
-  "local_fragment": "l.XZDPSgMxEIdfJcxJIYXNrigE60XQgyLiH1CLh3R3ug1mMyFJq92yF5_BuzffxPfxEZxioeBt5vt9MwyzhiVoJcEZ34KG4ECCyVyVRXk4UsVIqTt1oKuSeZiTR45usOmsuKKMQlXMa2o2-OisuuDOU7Yz0IWENKfA_Bbjq03i4fFpszuEBHqyBs_Jab9Kfd2jtygyOpyRX7DjOIrY0RJhkH_mpckmvhjx8_nxtTWSdejrnXJsu1akWI_fBJ8ZI8WxcRjznto_2Y40Npmp243cp-_3RWvFOVHrUFw7s_pnSpjye4bn4Rc",
+  "local_fragment": "l.ZVHNSsNAEH6VZU8KqXZbUQhtL0I9KCL-gD_0sEmm6dLNzrK7bZqUXAq-gXdvPol9Hx_BSRUKepv5fuabYdZ8yWMRcS1NzmNuNY-4DFT1ur3Tjuh2hLgXJ3G_R7idoQGibiErFLvGAEz0CU8xa-Gzcf-SOoNBTXncjbifoSX8DlypPHt8eiaWmJc1bwPOZw4LiFlZbTefr2lNs5nFUskMCwVGSVazUgVXGd5EP5axcjDFVcwGyaiWicY5ltLA4DgZ_bPCShZWwxG6nDcTOspav8s2bXZd-TqtSQosgKahZkHLaaIcFLiEXWSrvJJBurlkX-9vH78KrzSYdC8ZqCJn3qXDFaMbnEM3lBpcOBCHo19Lpjytu7c8-O1mkSt2gZhrYDdaVn-UEU_oL82k-QY",
   "local_payload": {
     "v": 1,
     "lang": "pl",
@@ -42,6 +50,14 @@
     "code": "7F3K",
     "notif": 0,
     "shop": "Serwis XYZ",
+    "f": [
+      {
+        "t": "Chrome: wyłączone powiadomienia z witryn"
+      },
+      {
+        "t": "Firefox: <b>zablokowane</b> powiadomienia z example.org"
+      }
+    ],
     "apps": [
       {
         "n": "Czyszczenie telefonu",

@@ -8,6 +8,7 @@
   import AppCard from '../components/AppCard.svelte';
   import EvidencePanel from '../components/EvidencePanel.svelte';
   import ExpertTable from '../components/ExpertTable.svelte';
+  import DeviceChecks from '../components/DeviceChecks.svelte';
   import DiagnosticsPanel from '../components/DiagnosticsPanel.svelte';
   import InterruptedBanner from '../components/InterruptedBanner.svelte';
   import ManualList from '../components/ManualList.svelte';
@@ -130,7 +131,7 @@
       {/if}
     </header>
 
-    {#if s.apk.running && flagged.length > 0 && !verdictsHidden}<ApkProgress />{/if}
+    {#if !manual && !choosing && (undecided || s.apk.running)}<ApkProgress calm={flagged.length === 0 || verdictsHidden} />{/if}
     <ApkSpace />
     {#if s.interrupted.length}<InterruptedBanner orders={s.interrupted} />{/if}
     {#if undoName && s.job?.kind === 'undo'}
@@ -143,13 +144,14 @@
       </Banner>
     {/if}
     <NoticeLine items={noteItems} details={noteDetails} />
+    <DeviceChecks />
 
     {#if choosing}
       <ApkModeChoice />
     {:else if manual}
       <ManualList />
     {:else if undecided || (flagged.length === 0 && s.apk.running)}
-      <div in:enter><ApkProgress hero /></div>
+      <!-- W toku i nic jeszcze nie oznaczono: zamiast przedwczesnego „czysto” sama karta postępu u góry. -->
     {:else if flagged.length === 0}
       <div class="grid place-items-center gap-2 py-10 text-center" in:enter>
         {#if anyIncomplete}

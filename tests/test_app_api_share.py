@@ -206,3 +206,69 @@ def test_execute_without_consent_stores_nothing():
     with Journal(journal_path()) as journal:
         (order,) = journal.orders_for(SERIAL)
         assert "consent" not in journal.scan(order.id)
+
+
+CHROME = "com.android.chrome"
+SITE = "web:https://www.example.com;1"
+FIX = f"site:{CHROME}:{SITE}"
+
+
+def _chrome_scanned(lang="pl", **kw):
+    phone = make_cli_phone()
+    phone.channels = {CHROME: {SITE: 3}}
+    api, rec = make_api(phone, lang=lang, share_upload=Uploader(), share_retry_s=0.01,
+                        share_retry_window_s=0.5, **kw)
+    api.start_scan(SERIAL, "Anna")
+    rec.wait_for("apk:done")
+    assert api._jobs.wait(5)
+    rec.events.clear()
+    return api, rec
+
+
+@pytest.mark.parametrize("lang,sentence", [
+    ("pl", "Wyłączenie powiadomień witryny www.example.com w Chrome"),
+    ("en", "Turning off notifications from www.example.com in Chrome")])
+def test_share_carries_fix_sentences_in_the_plan_language(lang, sentence):
+    api, rec = _chrome_scanned(lang)
+    api.share_plan(WLIVE, [], "ui-f", [FIX])
+    ready = rec.wait_for("share:ready")
+    up = api._share_upload
+    payload = share.decrypt(up.blobs[0], ready["url"].rsplit(".", 1)[1])
+    assert payload["f"] == [{"t": sentence, "p": CHROME, "n": "Chrome", "h": "www.example.com"}]
+    assert [a["n"] for a in payload["apps"]] == ["com.wlive.forecast"]
+
+
+def test_fixes_change_the_check_code_and_consent_for_other_fixes_is_plan_changed():
+    api, rec = _chrome_scanned()
+    plain = api.preview_plan(WLIVE, [])["code"]
+    with_fix = api.preview_plan(WLIVE, [], [FIX])["code"]
+    assert plain != with_fix
+    api.share_plan(WLIVE, [], "ui-c", [FIX])
+    rec.wait_for("share:ready")
+    api.execute(WLIVE, [], {"code": with_fix}, [])  # kod pokazany dla planu z poprawką
+    assert rec.wait_for("job:error")["key"] == "plan_changed"
+    assert "exec:order" not in rec.names() and api.history()["orders"] == []
+
+
+def test_consent_for_the_shown_plan_with_the_same_fixes_runs_the_order():
+    phone = make_cli_phone()
+    phone.channels = {CHROME: {SITE: 3}}
+
+    def switch_off(p, package, channel_id):
+        p.channels[package][channel_id] = 0
+
+    phone.on_channel_screen = switch_off
+    api, rec = make_api(phone, share_upload=Uploader(), share_retry_s=0.01, share_retry_window_s=0.5)
+    api.start_scan(SERIAL, "Anna")
+    rec.wait_for("apk:done")
+    assert api._jobs.wait(5)
+    api.share_plan(WLIVE, [], "ui-q", [FIX])
+    code = rec.wait_for("share:ready")["code"]
+    api.execute(WLIVE, [], {"code": code}, [FIX])
+    done = rec.wait_for("exec:done")
+    assert "job:error" not in rec.names()
+    assert {a["package"]: a["outcome"] for a in done["apps"]} == {CHROME: "ok", "com.wlive.forecast": "ok"}
+    assert phone.channels[CHROME][SITE] == 0
+    with Journal(journal_path()) as journal:
+        (order,) = journal.orders_for(SERIAL)
+        assert journal.scan(order.id)["consent"]["code"] == code

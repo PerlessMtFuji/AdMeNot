@@ -1,7 +1,8 @@
 """Log techniczny sesji (spec §7.5): polecenia ADB, status i czas — bez wyjścia poleceń.
 
 GUI dostaje każde polecenie na żywo (`on_command`, z wyjściem obciętym do OUTPUT_LIMIT) dla
-konsoli ADB. Polecenia wpisane w konsoli mają `tag="console"` i prefiks `console:` w logu.
+konsoli ADB — bez wyjścia zrzutu powiadomień z treścią (`--noredact`), o ile serwisant nie wpisał
+go sam. Polecenia wpisane w konsoli mają `tag="console"` i prefiks `console:` w logu.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from admenot.engine.adb.transport import AdbError, AdbTransport
 
 _LOCK = threading.Lock()  # kolektory wołają adb z wielu wątków naraz
 OUTPUT_LIMIT = 4096
+_PRIVATE = "--noredact"  # zrzut powiadomień z tytułami i treścią
 
 OnCommand = Callable[[dict[str, Any]], None]
 
@@ -83,6 +85,8 @@ class SessionLogAdb:
         with _LOCK, self.path.open("a", encoding="utf-8") as fh:
             fh.write(line)
         if self.on_command is not None:
+            if _PRIVATE in what and status == "ok" and self.tag != "console":  # treść powiadomień klienta
+                output = f"<{len(output.encode())} B>"
             self.on_command({"time": stamp, "serial": self.serial, "command": what,
                              "status": status, "duration": round(duration, 2),
                              "output": output[:OUTPUT_LIMIT], "tag": self.tag})

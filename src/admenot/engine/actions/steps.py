@@ -14,11 +14,19 @@ from admenot.engine.actions.backup import backup_apks, is_complete
 from admenot.engine.actions.errors import ActionError, classify, from_adb, looks_failed
 from admenot.engine.adb.transport import AdbError, AdbTransport
 from admenot.engine.apk.fetch import is_package_name
+from admenot.engine.browsers.firefox_rdp import (
+    RdpError,
+    notification_permissions,
+    set_notification_permission,
+    tcp_connect,
+)
+from admenot.engine.browsers.known import known_browsers
 from admenot.engine.collectors.packages import PM_DISABLED
 from admenot.engine.collectors.system import DEVICE_POLICY, NOTIF_MANAGER, RESOLVE_HOME
 from admenot.engine.parsers.appops import parse_appops
-from admenot.engine.parsers.common import parse_package_list
-from admenot.engine.parsers.packages import parse_dumpsys_packages
+from admenot.engine.parsers.common import UnrecognizedOutput, parse_package_list
+from admenot.engine.parsers.packages import DISABLED_UNTIL_USED, parse_dumpsys_packages
+from admenot.engine.parsers.site_notifications import parse_notification_dump, site_origin
 from admenot.engine.parsers.system import (
     parse_allowed_listeners,
     parse_device_admins,
@@ -36,6 +44,10 @@ _APPOP_MODE = re.compile(r"^[a-z_]{1,32}$", re.ASCII)
 _OP = re.compile(r"^[A-Z_]{1,64}$", re.ASCII)
 _PERMISSION = re.compile(r"^[A-Za-z][\w.]{0,200}$", re.ASCII)
 _FLAGS = frozenset({"0", "1"})
+_SITE_PERMISSION = "desktop-notification"
+_CAPABILITIES = frozenset({"0", "1", "2"})
+# Kroki, po których czekamy na dotknięcie użytkownika na telefonie (ADB tylko otwiera ekran).
+USER_WAIT_KINDS = frozenset({"admin", "channel"})
 
 
 def valid_component(value: str) -> str:
@@ -57,18 +69,25 @@ def _components(v: Any) -> bool:
     return isinstance(v, str) and all(_COMPONENT.match(c) for c in split_items(v))
 
 
+def _origin(v: Any) -> bool:
+    # Ten sam kształt co w identyfikatorze kanału witryny; origin trafia do JS Firefoxa (SEC-01).
+    return isinstance(v, str) and site_origin(f"web:{v};0") == v
+
+
 _PARAMS: dict[str, dict[str, Callable[[Any], bool]]] = {
     "appop": {"op": _text(_OP), "mode": _text(_APPOP_MODE)},
     "permission": {"permission": _text(_PERMISSION), "granted": _flag_value},
     "secure_list": {"key": lambda v: v in SECURE_LIST_KEYS, "op": lambda v: v in ("add", "remove"),
                     "components": _components},
     "home": {"component": _text(_COMPONENT)},
+    "site_permission": {"origin": _origin, "permission": lambda v: v == _SITE_PERMISSION,
+                        "capability": lambda v: v in _CAPABILITIES},
     "enabled": {"enabled": _flag_value},
     "installed": {"installed": _flag_value, "backup_dir": lambda v: isinstance(v, str)},
     "backup": {"dir": lambda v: isinstance(v, str) and v != "",
                "version_code": lambda v: v is None or (isinstance(v, str) and (v == "" or v.isdigit()))},
 }
-_OPTIONAL = {"installed": {"enabled": _flag_value}}
+_OPTIONAL = {"installed": {"enabled": _flag_value}, "channel": {"enabled": _flag_value}}
 
 
 def check_step(step: Step) -> None:
@@ -82,6 +101,20 @@ def check_step(step: Step) -> None:
     for key, ok in _OPTIONAL.get(step.kind, {}).items():
         if key in step.params and not ok(step.params[key]):
             raise ActionError("unrecognized", f"{step.kind} {key}: {str(step.params[key])[:120]!r}")
+    _check_browser_step(step)
+
+
+def _check_browser_step(step: Step) -> None:
+    """Kroki przeglądarkowe zależą od pakietu, a `_PARAMS` widzi tylko wartość parametru."""
+    browser = known_browsers().get(step.package)
+    if step.kind == "channel":
+        channel = step.params.get("channel_id")
+        ok = isinstance(channel, str) and "\n" not in channel and (
+            site_origin(channel) is not None or (browser is not None and channel == browser.shared_channel))
+        if not ok:
+            raise ActionError("unrecognized", f"channel {str(channel)[:120]!r} of {step.package}")
+    elif step.kind == "site_permission" and (browser is None or browser.rdp_socket is None):
+        raise ActionError("unrecognized", f"site_permission for {step.package}")
 
 
 @dataclass
@@ -312,9 +345,17 @@ class _Home(_Simple):
         return Step("home", step.package, {"component": previous}) if previous else None
 
 
+def is_enabled(adb: AdbTransport, package: str) -> bool:
+    """`pm list packages -d` wymienia też DISABLED_UNTIL_USED — taka aplikacja działa."""
+    if package not in package_list(adb, PM_DISABLED):
+        return True
+    dump = parse_dumpsys_packages(read(adb, C.DUMPSYS_PACKAGE.format(package=package), 30)).get(package)
+    return dump is not None and dump.enabled_state == DISABLED_UNTIL_USED
+
+
 class _Enabled(_Simple):
     def probe(self, adb: AdbTransport, step: Step) -> State:
-        return {"enabled": step.package not in package_list(adb, PM_DISABLED)}
+        return {"enabled": is_enabled(adb, step.package)}
 
     def applied(self, step: Step, state: State) -> bool:
         return _flag(state["enabled"]) == step.params["enabled"]
@@ -375,7 +416,7 @@ class _Installed:
         installed = step.package in listed  # filtr pm to podciąg — liczy się dokładna nazwa
         state: State = {"installed": installed}
         if installed:  # ponowna instalacja włącza aplikację — zapamiętujemy, czy była wyłączona
-            state["enabled"] = step.package not in package_list(adb, PM_DISABLED)
+            state["enabled"] = is_enabled(adb, step.package)
         return state
 
     def applied(self, step: Step, state: State) -> bool:
@@ -441,6 +482,93 @@ class _Admin:
         return None
 
 
+class _Channel:
+    """Kanał powiadomień witryny (Chrome: jeden na witrynę; Samsung Internet, Firefox: wspólny).
+    Jak `admin`: ADB tylko otwiera ekran kanału, decyduje przełącznik na telefonie. Kanał, który
+    zniknął, też jest celem. Wyłączenie całej przeglądarki nie rusza kanału witryny — to nie to samo.
+    Cofnięcie to ten sam ekran z odwrotnym celem (`enabled` = „1”: kanał ma być włączony)."""
+
+    def probe(self, adb: AdbTransport, step: Step) -> State:
+        try:
+            dump = parse_notification_dump(read(adb, C.NOTIFICATIONS_FULL, 30))
+        except UnrecognizedOutput as exc:
+            raise ActionError("unrecognized", f"{C.NOTIFICATIONS_FULL}: {exc}") from exc
+        for channel in dump.channels.get(step.package, []):
+            if channel.id == step.params["channel_id"]:
+                return {"importance": channel.importance}
+        return {"importance": None}
+
+    def applied(self, step: Step, state: State) -> bool:
+        importance = state["importance"]
+        if step.params.get("enabled") == "1":
+            return importance is not None and importance > 0
+        return importance in (None, 0)
+
+    def command(self, step: Step) -> str:
+        return C.CHANNEL_SETTINGS.format(package=step.package, channel=C.quoted(step.params["channel_id"]))
+
+    def apply(self, adb: AdbTransport, step: Step, cache: Path | None) -> None:
+        run_checked(adb, self.command(step))
+
+    def inverse(self, step: Step, state: State) -> Step | None:
+        return Step("channel", step.package, {**step.params, "enabled": "1"})
+
+
+def site_url(step: Step) -> str | None:
+    """Adres witryny z kanału `web:<origin>;<numer>` (origin kończy się na ostatnim „;”).
+    Wspólny kanał przeglądarki i inne rodzaje kroków nie mają witryny."""
+    channel = step.params.get("channel_id")
+    if step.kind != "channel" or not isinstance(channel, str) or not channel.startswith("web:"):
+        return None
+    origin = channel[len("web:"):].rpartition(";")[0]
+    return origin if origin.startswith(("https://", "http://")) else None
+
+
+def open_site(adb: AdbTransport, step: Step) -> bool:
+    """Otwiera witrynę kanału w jego przeglądarce; `False`, gdy krok nie ma witryny."""
+    url = site_url(step)
+    if url is None:
+        return False
+    check_step(step)  # polecenie wstawia pakiet bez cudzysłowu: wiersz z dziennika sprawdzamy
+    run_checked(adb, C.OPEN_SITE.format(url=C.quoted(url), package=step.package))
+    return True
+
+
+class _SitePermission:
+    """Zgoda Firefoxa na powiadomienia witryny przez zdalne debugowanie (0 = brak wpisu)."""
+
+    def probe(self, adb: AdbTransport, step: Step) -> State:
+        perms = self._rdp(lambda: notification_permissions(adb, connect=_rdp_connect(adb)))
+        return {"capability": perms.get(step.params["origin"], 0)}
+
+    def applied(self, step: Step, state: State) -> bool:
+        return state["capability"] == int(step.params["capability"])
+
+    def command(self, step: Step) -> str:
+        return f"firefox {step.params['permission']} {step.params['origin']} -> {step.params['capability']}"
+
+    def apply(self, adb: AdbTransport, step: Step, cache: Path | None) -> None:
+        self._rdp(lambda: set_notification_permission(
+            adb, step.params["origin"], int(step.params["capability"]), connect=_rdp_connect(adb)))
+
+    @staticmethod
+    def _rdp(call: Callable[[], Any]) -> Any:
+        try:
+            return call()
+        except RdpError as exc:  # gniazdo znika, gdy użytkownik wyłączy debugowanie: to nie „niepewne”
+            raise ActionError(exc.key, exc.message) from exc
+        except AdbError as exc:
+            raise from_adb(exc) from exc
+
+    def inverse(self, step: Step, state: State) -> Step | None:
+        return Step("site_permission", step.package,
+                    {**step.params, "capability": str(state["capability"])})
+
+
+def _rdp_connect(adb: AdbTransport) -> Callable[[int], Any]:
+    return getattr(adb, "rdp_connect", tcp_connect)
+
+
 HANDLERS: dict[str, StepHandler] = {
     "force_stop": _ForceStop(),
     "appop": _AppOp(),
@@ -451,6 +579,8 @@ HANDLERS: dict[str, StepHandler] = {
     "backup": _Backup(),
     "installed": _Installed(),
     "admin": _Admin(),
+    "channel": _Channel(),
+    "site_permission": _SitePermission(),
 }
 
 

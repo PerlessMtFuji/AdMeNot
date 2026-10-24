@@ -1,10 +1,10 @@
 import { expect, type Page, test } from '@playwright/test';
 
-async function scan(page: Page, scenario = 'adware') {
-  await page.goto(`/?scenario=${scenario}`);
+async function scan(page: Page, scenario = 'adware', query = '') {
+  await page.goto(`/?scenario=${scenario}${query}`);
   await page.getByPlaceholder('np. Anna K.').fill('Anna K.');
   await page.getByRole('button', { name: 'Skanuj' }).click();
-  await expect(page.getByText(/Analiza APK w tle/)).toBeHidden({ timeout: 15_000 });
+  await expect(page.getByText(/Analiza plików aplikacji/)).toBeHidden({ timeout: 15_000 });
 }
 
 async function inject(page: Page, fn: (env: any) => void) {
@@ -66,6 +66,13 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(page).toHaveScreenshot(`plan-confirm-${theme}.png`);
     });
 
+    test('results: phone state with site notification fixes', async ({ page }) => {
+      await scan(page, 'adware', '&checks=populated');
+      await page.getByRole('switch', { name: 'Wycisz tanie-bilety.example' }).check();
+      await expect(page.getByRole('complementary', { name: 'Plan naprawy' }).getByText('tanie-bilety.example')).toBeVisible();
+      await expect(page).toHaveScreenshot(`results-phone-state-${theme}.png`);
+    });
+
     test('execute: admin prompt and done', async ({ page }) => {
       await page.goto('/?scenario=empty');
       await inject(page, () => {
@@ -74,7 +81,7 @@ for (const theme of ['light', 'dark'] as const) {
         ctl.state.order = 'ZS/2026/0926/01';
         bridge.emit('exec:step', { action_id: 1, package: 'com.clean.pro.boost', name: 'Cleaner Pro',
           kind: 'installed', label: 'odinstalowanie (użytkownik 0)', status: 'running', error: null });
-        bridge.emit('exec:admin_wait', { package: 'com.clean.pro.boost', name: 'Cleaner Pro', timeout: 180 });
+        bridge.emit('exec:user_wait', { package: 'com.clean.pro.boost', name: 'Cleaner Pro', kind: 'admin', timeout: 180, action_id: 1 });
       });
       await expect(page.getByText('Potrzebny jeden ruch na telefonie')).toBeVisible();
       await expect(page).toHaveScreenshot(`execute-admin-${theme}.png`,
@@ -84,6 +91,35 @@ for (const theme of ['light', 'dark'] as const) {
       await page.getByRole('button', { name: /^Wykonaj/ }).click();
       await expect(page.getByRole('heading', { name: 'Telefon naprawiony' })).toBeVisible({ timeout: 15_000 });
       await expect(page).toHaveScreenshot(`execute-done-${theme}.png`);
+    });
+
+    test('history: undo with the site queue', async ({ page }) => {
+      await page.goto('/?scenario=empty');
+      await inject(page, () => {
+        const { ctl, bridge } = (window as any).__admenot;
+        const chrome = 'com.android.chrome';
+        const step = (id: number, host: string) => ({ id, package: chrome, level: 'fix', level_label: 'Ustawienia witryn',
+          kind: 'channel', step_label: `Wyłączenie powiadomień: ${host} (Chrome)`, status: 'done', status_label: 'wykonane',
+          error: null, manual_undo: null, site_url: null });
+        ctl.state.history = { serial: 'R58T00TEST', serials: ['R58T00TEST'],
+          devices: [{ serial: 'R58T00TEST', name: 'Samsung Galaxy A14', model: 'SM-A145R', image: '' }],
+          orders: [{ id: 1, number: 'ZS/2026/1011/01', created_at: '2026-10-11T09:20', status: 'done', status_label: 'wykonane',
+            client: 'Anna K.', model: 'SM-A145R', interrupted: false, manual: false, screenshots: 0,
+            actions: [step(4, 'win-prize.top'), step(5, 'news-daily.click'), { ...step(6, ''), package: 'com.sec.android.app.sbrowser',
+              step_label: 'Wyłączenie powiadomień wszystkich witryn (Samsung Internet)' }] }] };
+        ctl.state.screen = 'history';
+        ctl.state.job = { id: 'job-9', kind: 'undo' };
+        bridge.emit('undo:sites', { order: 'ZS/2026/1011/01', sites: [
+          { action_id: 4, package: chrome, browser: 'Chrome', site: 'win-prize.top' },
+          { action_id: 5, package: chrome, browser: 'Chrome', site: 'news-daily.click' },
+          { action_id: 6, package: 'com.sec.android.app.sbrowser', browser: 'Samsung Internet', site: null }] });
+        bridge.emit('undo:step', { action_id: 4, package: chrome, name: 'Chrome', kind: 'channel',
+          label: 'Wyłączenie powiadomień: win-prize.top (Chrome)', status: 'undone', error: null, error_key: null });
+        bridge.emit('exec:user_wait', { package: chrome, name: 'Chrome', kind: 'channel', browser: 'Chrome',
+          site: 'news-daily.click', timeout: 180, action_id: 5 });
+      });
+      await expect(page.getByText('Przywracanie powiadomień witryn')).toBeVisible();
+      await expect(page).toHaveScreenshot(`history-undo-sites-${theme}.png`, { mask: [page.locator('li[aria-current] .mono')] });
     });
 
     test('history and settings', async ({ page }) => {

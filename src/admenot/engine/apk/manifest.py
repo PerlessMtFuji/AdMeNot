@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,6 +14,8 @@ from admenot.engine.apk.components import Component, parse_components
 # adaptacyjne, wektory) pomijamy — wtedy UI zostaje przy inicjale.
 ICON_MAX_BYTES = 512 * 1024
 _ICON_DPIS = (480, 640, 65536)
+# Odwołanie do zasobu zamiast tekstu: androguard zwraca je, gdy nie rozwiąże resources.arsc (np. brak pamięci).
+_UNRESOLVED = re.compile(r"^@(0x)?[0-9A-Fa-f]{8}$|^@\w+/")
 
 
 def icon_mime(data: bytes) -> str | None:
@@ -30,6 +33,11 @@ def icon_uri(data: bytes) -> str | None:
     if mime is None or len(data) > ICON_MAX_BYTES:
         return None
     return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
+
+
+def resolved_label(raw: str | None) -> str | None:
+    """Nazwa z manifestu albo None, gdy to nierozwiązane odwołanie (wtedy zostaje nazwa z telefonu)."""
+    return None if not raw or _UNRESOLVED.match(raw) else raw
 
 
 def _entry_size(apk, path: str) -> int | None:  # apk: androguard.core.apk.APK
@@ -113,18 +121,21 @@ def read_manifest(base_apk: Path) -> ManifestInfo:
     from androguard.core.apk import APK
 
     apk = APK(str(base_apk))
+    # Najpierw to, bez czego nie ma oceny: sparsowane resources.arsc zostaje w pamięci, a ogromne
+    # (Samsung Health: 175 MB) zjada limit procesu i certyfikat padał na MemoryError (2026-10-24).
+    version_code = _long_version_code(apk)
+    certs = tuple(sorted(c.sha256.hex() for c in apk.get_certificates()))
+    package = apk.get_package() or ""
     try:
-        label = apk.get_app_name() or None
+        label = resolved_label(apk.get_app_name())
     except Exception:  # noqa: BLE001 — uszkodzone resources.arsc nie może zabić analizy; etykieta nie jest krytyczna
         label = None
     try:
         icon = _read_icon(apk)
     except Exception:  # noqa: BLE001 — jak etykieta: ikona jest tylko ozdobą
         icon = None
-    version_code = _long_version_code(apk)
-    certs = tuple(sorted(c.sha256.hex() for c in apk.get_certificates()))
     try:
         components = parse_components(apk.get_android_manifest_xml(), lambda ref: _resource_xml(apk, ref))
     except Exception:  # noqa: BLE001 — nietypowy manifest: mapa komponentów „nieznana”, nie pusta
         components = None
-    return ManifestInfo(apk.get_package() or "", version_code, label, certs, icon, components)
+    return ManifestInfo(package, version_code, label, certs, icon, components)

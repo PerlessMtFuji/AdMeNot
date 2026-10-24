@@ -120,7 +120,7 @@ describe('plan and execution', () => {
     await fireEvent.input(input, { target: { value: 'com.sec.android.app.launcher' } });
     await fireEvent.click(confirm);
     expect(bridge.calls.at(-1)).toMatchObject({ method: 'preview_plan', args: [expect.anything(),
-      ['com.sec.android.app.launcher']] });
+      ['com.sec.android.app.launcher'], []] });
   });
 
   test('the summary groups apps by action: apps with icons, then steps in execution order', async () => {
@@ -166,13 +166,13 @@ describe('plan and execution', () => {
     s.job = { id: 'job-4', kind: 'exec' };
     bridge.emit('exec:step', { action_id: 1, package: 'p', name: 'Cleaner', kind: 'enabled',
       label: 'wyłączenie aplikacji', status: 'running', error: null });
-    bridge.emit('exec:admin_wait', { package: 'p', name: 'Cleaner', timeout: 180 });
+    bridge.emit('exec:user_wait', { package: 'p', name: 'Cleaner', kind: 'admin', timeout: 180, action_id: 1 });
     await tick();
     expect(screen.getByText('Potrzebny jeden ruch na telefonie')).toBeTruthy();
     expect(screen.getByText(/Stuknij „Dezaktywuj” przy Cleaner/)).toBeTruthy();
     expect(screen.getByText(/Czekam jeszcze 3:00|Czekam jeszcze 2:5\d/)).toBeTruthy();
     expect(screen.getByText('Dezaktywuj')).toBeTruthy();
-    bridge.emit('exec:question', { job_id: 'job-4', kind: 'admin_timeout', package: 'p', name: 'Cleaner' });
+    bridge.emit('exec:question', { job_id: 'job-4', kind: 'user_timeout', package: 'p', name: 'Cleaner' });
     await tick();
     await fireEvent.click(screen.getByRole('button', { name: 'Pomiń' }));
     expect(bridge.calls.at(-1)).toEqual({ method: 'answer', args: ['job-4', 'skip'] });
@@ -261,6 +261,33 @@ describe('plan and execution', () => {
     expect(bridge.calls.at(-1)).toEqual({ method: 'resume', args: ['ZS/2026/0926/02'] });
   });
 
+  test('a browser with site fixes and its own level is one row with the app level', async () => {
+    const { bridge } = await app('empty');
+    const row = (level: 'fix' | 'silence', steps: string[]) => ({ package: 'com.android.chrome', name: 'Chrome', level,
+      level_label: '', blocked: false, reason: null, reason_text: null, steps, warnings: [] });
+    const other = { ...row('silence', ['n']), package: 'b', name: 'Druga' };
+    bridge.emit('exec:order', { order: 'ZS/2026/0926/07', plan: { runnable: 3, code: 'K7F3',
+      apps: [row('fix', ['Wyłączenie powiadomień: a.pl (Chrome)']), row('silence', ['odebranie zgody']), other] } });
+    await tick();
+    // Bez scalenia: dwa wiersze z tym samym kluczem `package` (each_key_duplicate) i pigułka „Ustawienia witryn”.
+    const waiting = screen.getAllByRole('article', { name: 'Chrome' });
+    expect(waiting).toHaveLength(1);
+    expect(waiting[0].textContent).toContain('Wycisz');
+    expect(waiting[0].textContent).not.toContain('Ustawienia witryn');
+    expect(screen.getByText('krok 1 z 3')).toBeTruthy();
+    bridge.emit('exec:step', { action_id: 1, package: 'com.android.chrome', name: 'Chrome', kind: 'channel',
+      label: 'Wyłączenie powiadomień: a.pl (Chrome)', status: 'done', error: null });
+    bridge.emit('exec:done', { order: 'ZS/2026/0926/07', status: 'done', status_label: 'wykonane', stopped: false,
+      apps: [{ package: 'com.android.chrome', name: 'Chrome', outcome: 'ok', errors: [], kinds: [] },
+        { package: 'b', name: 'Druga', outcome: 'ok', errors: [], kinds: [] }] });
+    await tick();
+    const card = screen.getByRole('article', { name: 'Chrome' });
+    expect(card.textContent).toContain('wyciszona · sprawdzone');
+    expect(within(screen.getByRole('complementary')).getAllByText('Chrome')).toHaveLength(1);
+    // przeglądarka bez ikony ze skanu: wbudowane logo zamiast inicjału
+    expect(card.querySelector('img')?.getAttribute('src')).toContain('chrome');
+  });
+
   test('progress counts finished steps of the plan', async () => {
     const { bridge } = await app('empty');
     const plan = { package: 'a', name: 'Pierwsza', level: 'disable' as const, level_label: 'WYŁĄCZ', blocked: false,
@@ -272,5 +299,76 @@ describe('plan and execution', () => {
     expect(screen.getByRole('heading', { name: 'Naprawiam telefon…' })).toBeTruthy();
     expect(screen.getByText('krok 2 z 4')).toBeTruthy();
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('25');
+  });
+});
+
+describe('waiting for the user on the phone', () => {
+  async function executing() {
+    const env = await app('empty');
+    env.s.phase = 'executing';
+    env.s.order = 'ZS/2026/0926/01';
+    env.s.job = { id: 'job-4', kind: 'exec' };
+    return env;
+  }
+
+  test('a channel step names the site and the browser', async () => {
+    const { bridge } = await executing();
+    bridge.emit('exec:user_wait', { package: 'com.android.chrome', name: 'Chrome', kind: 'channel',
+      site: 'tanie-bilety.example', browser: 'Chrome', timeout: 180, action_id: 1 });
+    await tick();
+    expect(screen.getByText('Na telefonie wyłącz przełącznik powiadomień dla tanie-bilety.example (Chrome)')).toBeTruthy();
+    expect(screen.queryByText('Dezaktywuj')).toBeNull();
+    expect(screen.queryByText(/Stuknij „Dezaktywuj”/)).toBeNull();
+  });
+
+  test('the waiting screen can be opened on the phone again', async () => {
+    const { bridge } = await executing();
+    bridge.emit('exec:user_wait', { package: 'com.android.chrome', name: 'Chrome', kind: 'channel',
+      site: 'tanie-bilety.example', browser: 'Chrome', timeout: 180, action_id: 1 });
+    await tick();
+    await fireEvent.click(screen.getByRole('button', { name: 'Otwórz ponownie na telefonie' }));
+    expect(bridge.calls.filter((c) => c.method === 'reopen_screen')).toHaveLength(1);
+  });
+
+  test('a shared channel has no single site: the browser alone is named', async () => {
+    const { bridge } = await executing();
+    bridge.emit('exec:user_wait', { package: 'com.sec.android.app.sbrowser', name: 'Samsung Internet', kind: 'channel',
+      browser: 'Samsung Internet', timeout: 180, action_id: 1 });
+    await tick();
+    expect(screen.getByText('Na telefonie wyłącz przełącznik powiadomień wszystkich witryn (Samsung Internet)')).toBeTruthy();
+  });
+
+  test('after a timeout on a channel step the question is about the switch, not about an administrator', async () => {
+    const { bridge } = await executing();
+    bridge.emit('exec:user_wait', { package: 'com.android.chrome', name: 'Chrome', kind: 'channel',
+      site: 'tanie-bilety.example', browser: 'Chrome', timeout: 180, action_id: 1 });
+    bridge.emit('exec:question', { job_id: 'job-4', kind: 'user_timeout', package: 'com.android.chrome', name: 'Chrome' });
+    await tick();
+    expect(screen.getByText(/Przełącznik powiadomień dla tanie-bilety\.example \(Chrome\)/)).toBeTruthy();
+    expect(screen.queryByText(/administratorem urządzenia/)).toBeNull();
+    await fireEvent.click(screen.getByRole('button', { name: 'Pomiń' }));
+    expect(bridge.calls.at(-1)).toEqual({ method: 'answer', args: ['job-4', 'skip'] });
+  });
+
+  test('a channel wait during an undo does not show the turn-off prompt', async () => {
+    const { s, bridge } = await executing();
+    s.job = { id: 'job-5', kind: 'undo' };
+    bridge.emit('exec:user_wait', { package: 'com.android.chrome', name: 'Chrome', kind: 'channel',
+      site: 'tanie-bilety.example', browser: 'Chrome', timeout: 180, action_id: 1 });
+    await tick();
+    expect(screen.queryByText(/Na telefonie wyłącz przełącznik powiadomień/)).toBeNull();
+    expect(screen.queryByText('Potrzebny jeden ruch na telefonie')).toBeNull();
+  });
+
+  test('after a Firefox fix the done screen reminds to turn remote debugging off', async () => {
+    const { bridge } = await executing();
+    const result = { order: 'ZS/2026/0926/01', status: 'done', status_label: 'wykonane', stopped: false,
+      apps: [{ package: 'org.mozilla.firefox', name: 'Firefox', outcome: 'ok' as const, errors: [], kinds: [] }] };
+    bridge.emit('exec:done', { ...result, firefox_debugging: false });
+    await tick();
+    expect(screen.queryByText('Wyłącz w Firefoxie zdalne debugowanie przez USB')).toBeNull();
+    bridge.emit('exec:done', { ...result, firefox_debugging: true });
+    await tick();
+    expect(screen.getByText('Wyłącz w Firefoxie zdalne debugowanie przez USB')).toBeTruthy();
   });
 });

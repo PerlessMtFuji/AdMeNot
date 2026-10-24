@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import json
 import re
 import shlex
 from collections.abc import Callable
@@ -21,6 +22,7 @@ from admenot.engine.collectors.components import HOME_QUERY
 from admenot.engine.collectors.packages import PM_DISABLED, PM_SYSTEM
 from admenot.engine.collectors.profiles import PM_USERS
 from admenot.engine.collectors.system import DEVICE_POLICY, NOTIF_MANAGER, RESOLVE_HOME
+from admenot.engine.device_checks import BROWSER_QUERY, BROWSER_QUERY_PLAIN
 
 POST = "android.permission.POST_NOTIFICATIONS"
 LISTENERS = "enabled_notification_listeners"
@@ -29,7 +31,10 @@ GEARHEAD = ("com.google.android.projection.gearhead/com.google.android.gearhead.
             "SharedNotificationListenerManager$ListenerService")
 APK_DIR = "/data/app/~~fake==/{package}-1"
 FSI_MIN_SDK = 34
-_HOME_HEADER = "priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n"
+FIREFOX_SOCKET = "org.mozilla.firefox/firefox-debugger-socket"
+_CHANNEL_SCREEN = re.compile(
+    re.escape(C.CHANNEL_SETTINGS).replace(r"\{package\}", r"(\S+)").replace(r"\{channel\}", r"(.*)"))
+_HOME_HEADER ="priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n"
 
 
 @dataclass
@@ -38,6 +43,7 @@ class FakeApp:
     system: bool = False
     installed: bool = True
     enabled: bool = True
+    until_used: bool = False  # wyłączona = enabled=4 (DISABLED_UNTIL_USED), nie 3
     version_code: int = 1
     apks: tuple[str, ...] = ("base.apk",)
     appops: dict[str, str] = field(default_factory=dict)  # op → tryb; brak wpisu = "default"
@@ -90,6 +96,7 @@ class FakePhone:
         host: dict[str, str | AdbError] | None = None,
         sha256sum: bool = False,
         listener_cmd: bool = True,
+        firefox_debugging: bool = False,
     ) -> None:
         self.serial: str | None = serial
         self.sdk = sdk
@@ -112,6 +119,14 @@ class FakePhone:
         self.opened: list[str] = []
         self.calls: list[str] = []
         self.screen: bytes = png_bytes()
+        self.firefox_debugging = firefox_debugging  # gniazdo zdalnego debugowania Firefoxa istnieje
+        self.forwards: dict[int, str] = {}  # port hosta → gniazdo abstrakcyjne
+        self.channels: dict[str, dict[str, int]] = {}  # pakiet → {id kanału: importance}
+        self.channel_groups: dict[str, list[str]] = {}  # pakiet → id grup kanałów (Chromium: „sites”)
+        self.browsers: list[str] = []  # pakiety otwierające dowolny link http
+        self.active: list[tuple[str, str, str, str | None]] = []  # (pakiet, kanał, tag, subText)
+        self.firefox_perms: dict[str, int] = {}  # origin → capability (1 zezwól, 2 zablokuj)
+        self.on_channel_screen: Callable[[FakePhone, str, str], None] | None = None
 
     def with_serial(self, serial: str) -> FakePhone:
         self.serial = serial
@@ -144,6 +159,8 @@ class FakePhone:
             return self._pull(args[1], Path(args[2]))
         if args[0] in ("install", "install-multiple"):
             return self._install([Path(a) for a in args[1:] if not a.startswith("-")])
+        if args[0] == "forward" and " ".join(args) not in self.host:
+            return self._forward(args[1:])
         return self._answer(self.host, " ".join(args))
 
     def run_bytes(self, args: list[str], timeout: float = 20.0) -> bytes:
@@ -183,13 +200,22 @@ class FakePhone:
             return self._list(a for a in self._present() if not a.enabled)
         if command == RESOLVE_HOME:
             return _HOME_HEADER + (self.home or "android/com.android.internal.app.ResolverActivity") + "\n"
+        if command in (BROWSER_QUERY, BROWSER_QUERY_PLAIN):
+            found = "".join(f"{_HOME_HEADER}  {p}/.Browser\n" for p in self.browsers)
+            return found or "No activities found\n"
         if command == HOME_QUERY:
             found = "".join(f"{_HOME_HEADER}  {c}\n" for c in self._home_candidates())
             return found or "No activities found\n"
+        if command == "cat /proc/net/unix":
+            return self._proc_net_unix()
         if command == DEVICE_POLICY:
             return self._device_policy()
         if command == NOTIF_MANAGER:
             return self._notification_manager()
+        if command == C.NOTIFICATIONS_FULL and command not in self.static:
+            return self._notification_dump()
+        if m := re.fullmatch(_CHANNEL_SCREEN, command):
+            return self._open_channel(m[1], m[2].replace("'\"'\"'", "'"))
         if command in (C.ADMIN_SETTINGS, C.SECURITY_SETTINGS):
             return self._open(command)
         if re.fullmatch(r"am force-stop \S+", command):
@@ -226,6 +252,28 @@ class FakePhone:
         if self.sha256sum and command.startswith("sha256sum "):
             return self._sha256(shlex.split(command)[1:])
         return None
+
+    def _proc_net_unix(self) -> str:
+        rows = ["Num       RefCount Protocol Flags    Type St Inode Path",
+                "0000000000000000: 00000002 00000000 00010000 0001 01 12345 /dev/socket/zygote"]
+        if self.firefox_debugging:
+            rows.append(f"0000000000000000: 00000002 00000000 00010000 0001 01 23456 @{FIREFOX_SOCKET}")
+        return "\n".join(rows) + "\n"
+
+    def _forward(self, args: list[str]) -> str:
+        if len(args) == 2 and args[0] == "--remove":
+            port = int(args[1].removeprefix("tcp:"))
+            if port not in self.forwards:
+                raise AdbError("command_failed", f"listener 'tcp:{port}' not found")
+            del self.forwards[port]
+            return ""
+        if len(args) == 2 and args[0] == "tcp:0" and args[1].startswith("localabstract:"):
+            port = 40000 + len(self.forwards)
+            while port in self.forwards:
+                port += 1
+            self.forwards[port] = args[1].removeprefix("localabstract:")
+            return f"{port}\n"
+        raise AdbError("command_failed", f"FakePhone: unsupported forward {' '.join(args)!r}")
 
     def _sha256(self, remotes: list[str]) -> str:
         lines = []
@@ -293,7 +341,7 @@ class FakePhone:
                 "Packages:\n"
                 f"  Package [{package}] (f00d):\n"
                 f"    versionCode={app.version_code} minSdk=26 targetSdk=34\n"
-                f"    User 0: ceDataInode=1 installed=true enabled={0 if app.enabled else 3}\n"
+                f"    User 0: ceDataInode=1 installed=true enabled={0 if app.enabled else 4 if app.until_used else 3}\n"
                 "      runtime permissions:\n" + perms)
 
     def _home_candidates(self) -> list[str]:
@@ -312,7 +360,7 @@ class FakePhone:
 
     def _set_enabled(self, package: str, enabled: bool) -> str:
         app = self._app(package)
-        app.enabled = enabled
+        app.enabled, app.until_used = enabled, False
         if not enabled:
             self._forget_home(package)
         return f"Package {package} new state: {'enabled' if enabled else 'disabled-user'}\n"
@@ -349,6 +397,39 @@ class FakePhone:
         if self.on_admin_screen:
             self.on_admin_screen(self)
         return "Starting: Intent { cmp=com.android.settings/.Settings }\n"
+
+    def _notification_dump(self) -> str:
+        """`dumpsys notification --noredact` w formacie z nagrań (tests/data/site_notifications)."""
+        lines = ["Current Notification Manager state:", "  Notification List:"]
+        for package, channel, tag, sub_text in self.active:
+            lines.append(f"    NotificationRecord(0x1: pkg={package} user=UserHandle{{0}} id=1 tag={tag or 'null'} "
+                         f"importance=3 key=0|{package}|1|{tag}|10100: Notification(channel={channel} "
+                         "shortcut=null flags=0x10)")
+            lines.append("      uid=10100 userId=0")
+            if sub_text is not None:
+                lines.append(f"        android.subText=String ({sub_text})")
+        lines += ["", " Notification Preferences:", "    per-package config:", "PackagePreferences:"]
+        for package, channels in self.channels.items():
+            lines.append(f"      AppSettings: {package} (10113)")
+            for channel_id, importance in channels.items():
+                lines.append(f"        NotificationChannel{{mId='{channel_id}', mName={channel_id}, "
+                             f"mDescription=, mImportance={importance}, mBypassDnd=false}}")
+            for group in self.channel_groups.get(package, []):
+                lines.append(f"        NotificationChannelGroup{{mId='{group}', mName={group}, mDescription=, "
+                             "mBlocked=false, mChannels=[], mUserLockedFields=0}")
+        return "\n".join(lines) + "\n"
+
+    def _open_channel(self, package: str, channel_id: str) -> str:
+        self.opened.append(C.CHANNEL_SETTINGS.format(package=package, channel=C.quoted(channel_id)))
+        if self.on_channel_screen:
+            self.on_channel_screen(self, package, channel_id)
+        return "Starting: Intent { act=android.settings.CHANNEL_NOTIFICATION_SETTINGS }\n"
+
+    def rdp_connect(self, port: int) -> FakeRdp:
+        """Połączenie z przekierowanym portem: bez gniazda Firefoxa nikt nie nasłuchuje."""
+        if not self.firefox_debugging:
+            raise ConnectionRefusedError(f"nothing listens on {port}")
+        return FakeRdp(perms=self.firefox_perms).connect(port)
 
     def _pm_path(self, package: str) -> str:
         app = self._app(package)
@@ -389,6 +470,120 @@ class FakePhone:
         app = self.apps[packages.pop()]
         app.installed, app.enabled = True, True
         return "Success\n"
+
+
+class FakeRdp:
+    """Fałszywy serwer RDP Firefoxa: `connect(port)` zwraca strumień (ten sam obiekt).
+
+    Odpowiada powitaniem, deskryptorem procesu, celem i `evaluationResult`. Skrypty z szablonów
+    firefox_rdp liczy na słowniku `perms` (origin → capability); inny skrypt to wyjątek JS.
+    `results` (kolejka gotowych wyników) ma pierwszeństwo przed `perms`.
+    """
+
+    def __init__(self, results: list[str] | None = None, *, perms: dict[str, int] | None = None,
+                 chunk: int | None = None, closes_at: str | None = None,
+                 exception: str | None = None, long_string: bool = False) -> None:
+        self.results = list(results) if results is not None else None
+        self.perms = perms if perms is not None else {}
+        self.chunk = chunk  # tyle bajtów najwyżej na jedno recv()
+        self.closes_at = closes_at  # "connect" | "eval": połączenie znika bez odpowiedzi
+        self.exception = exception  # evaluationResult z hasException
+        self.long_string = long_string  # wynik jako longString z aktorem substring
+        self.port: int | None = None
+        self.sent: list[dict] = []
+        self.scripts: list[str] = []
+        self.closed = False
+        self._out = b""
+        self._in = b""
+        self._long = ""
+
+    def connect(self, port: int) -> FakeRdp:
+        self.port = port
+        if self.closes_at != "connect":
+            self._reply({"from": "root", "applicationType": "browser", "traits": {}})
+        return self
+
+    def settimeout(self, timeout: float) -> None:
+        pass
+
+    def close(self) -> None:
+        self.closed = True
+
+    def sendall(self, data: bytes) -> None:
+        self._in += data
+        while b":" in self._in:
+            head, rest = self._in.split(b":", 1)
+            if len(rest) < int(head):
+                return
+            self._in = rest[int(head):]
+            packet = json.loads(rest[:int(head)])
+            self.sent.append(packet)
+            self._handle(packet)
+
+    def recv(self, size: int) -> bytes:
+        if not self._out:
+            if self.closes_at:
+                return b""
+            raise TimeoutError("FakeRdp: nothing to read")
+        n = min(size, self.chunk or size)
+        data, self._out = self._out[:n], self._out[n:]
+        return data
+
+    def _reply(self, packet: dict) -> None:
+        raw = json.dumps(packet).encode()
+        self._out += str(len(raw)).encode() + b":" + raw
+
+    def _handle(self, packet: dict) -> None:
+        to, kind = packet["to"], packet["type"]
+        if to == "root" and kind == "getProcess":
+            self._reply({"from": "root", "processDescriptor": {"actor": "proc1", "id": 0}})
+        elif to == "proc1" and kind == "getTarget":
+            self._reply({"from": "proc1", "process": {"actor": "target1", "consoleActor": "console1"}})
+        elif to == "console1" and kind == "evaluateJSAsync":
+            self.scripts.append(packet["text"])
+            if self.closes_at == "eval":
+                return
+            self._reply({"from": "console1", "resultID": "1-0"})
+            self._reply({"from": "console1", "type": "evaluationResult", "resultID": "1-0",
+                         "input": packet["text"], **self._evaluate(packet["text"])})
+        elif to == "long1" and kind == "substring":
+            self._reply({"from": "long1", "substring": self._long[packet["start"]:packet["end"]]})
+        else:
+            self._reply({"from": to, "error": "unrecognizedPacketType", "message": kind})
+
+    def _evaluate(self, text: str) -> dict:
+        if self.exception is not None:
+            return {"hasException": True, "exceptionMessage": self.exception}
+        if self.results is not None:
+            result = self.results.pop(0)
+        else:
+            try:
+                result = self._run_template(text)
+            except ValueError as exc:
+                return {"hasException": True, "exceptionMessage": str(exc)}
+        if self.long_string:
+            self._long = result
+            return {"hasException": False, "result": {
+                "type": "longString", "initial": result[:10], "length": len(result), "actor": "long1"}}
+        return {"hasException": False, "result": result}
+
+    def _run_template(self, text: str) -> str:
+        from admenot.engine.browsers import firefox_rdp as R
+
+        if text == R.READ_JS:
+            return json.dumps([[o, c] for o, c in self.perms.items()])
+        for template, store in ((R.ADD_JS, True), (R.REMOVE_JS, False)):
+            head, rest = template.split("{origin}")
+            pattern = re.escape(head) + r'(?P<origin>".*")' + re.escape(rest).replace(
+                r"\{capability\}", r"(?P<cap>[12])")
+            if m := re.fullmatch(pattern, text, re.DOTALL):
+                origin = json.loads(m["origin"])
+                if store:
+                    self.perms[origin] = int(m["cap"])
+                else:
+                    self.perms.pop(origin, None)
+                return "true"
+        raise ValueError(f"ReferenceError: unexpected script {text[:80]!r}")
 
 
 def make_cli_phone() -> FakePhone:

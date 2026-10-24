@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import vector from "../../tests/fixtures/share_vector.json";
-import { TEXTS, canInflate, decodeLocal, decryptShare, effect, groups, initial, parseFragment, render } from "../public/plan.js";
+import { TEXTS, browserIcon, canInflate, decodeLocal, decryptShare, effect, fixGroups, fixTexts, groups, initial, parseFragment, render } from "../public/plan.js";
 
 const bytes = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 
@@ -81,6 +81,39 @@ describe("plan.js", () => {
     expect(Object.keys(TEXTS.en).sort()).toEqual(Object.keys(TEXTS.pl).sort());
   });
 
+  it("lista zmian w ustawieniach telefonu: teksty z f, nic bez f ani przy złym kształcie", () => {
+    expect(fixTexts(vector.payload as any)).toEqual(vector.payload.f.map((x: { t: string }) => x.t));
+    const base = { v: 1, lang: "pl", at: "", phone: "", code: "", notif: 0, apps: [] };
+    expect(fixTexts(base)).toEqual([]);
+    expect(fixTexts({ ...base, f: [{ t: "a" }, { t: 5 }, null, {}, { t: "" }] } as any)).toEqual(["a"]);
+    expect(fixTexts({ ...base, f: "x" } as any)).toEqual([]);
+  });
+
+  it("zmiany pogrupowane wg przeglądarki: alfabetycznie, bez powtórzeń, bez hosta = wszystkie witryny", () => {
+    const base = { v: 1, lang: "pl", at: "", phone: "", code: "", notif: 0, apps: [] };
+    const f = [
+      { t: "x", p: "com.opera.browser", n: "Opera", h: "m.facebook.com" },
+      { t: "x", p: "com.sec.android.app.sbrowser", n: "Samsung Internet" },
+      { t: "x", p: "com.opera.browser", n: "Opera", h: "a.pl" },
+      { t: "x", p: "com.brave.browser", n: "Brave", h: "a.pl" },
+      { t: "x", p: "com.opera.browser", n: "Opera", h: "a.pl" },
+    ];
+    expect(fixGroups({ ...base, f }, TEXTS.pl, "pl")).toEqual([
+      { pkg: "com.brave.browser", name: "Brave", sites: ["a.pl"] },
+      { pkg: "com.opera.browser", name: "Opera", sites: ["m.facebook.com", "a.pl"] },
+      { pkg: "com.sec.android.app.sbrowser", name: "Samsung Internet", sites: ["wszystkie witryny"] },
+    ]);
+    // plan ze starszej wersji programu (same zdania) — strona pokazuje zdania
+    expect(fixGroups(vector.payload as any, TEXTS.pl, "pl")).toBeNull();
+    expect(fixGroups(base, TEXTS.pl, "pl")).toBeNull();
+  });
+
+  it("ikona tylko dla znanej przeglądarki", () => {
+    expect(browserIcon("com.vivaldi.browser")).toBe("/img/browsers/vivaldi.webp");
+    expect(browserIcon("com.example.browser")).toBeNull();
+    expect(browserIcon("constructor")).toBeNull();
+  });
+
   it("pokazuje zdanie o niepełnej analizie tylko z m=1", () => {
     // Testy idą w workerd bez DOM-u: wystarcza atrapa tylko tego, czego używa render.
     class Node { className = ""; textContent = ""; dir = ""; alt = ""; src = ""; children: Node[] = [];
@@ -105,5 +138,11 @@ describe("plan.js", () => {
     expect(node.querySelector("p.note")?.textContent).toBe(TEXTS.pl.manual_note);
     render(root, plan, "server");
     expect(node.querySelector("p.note")).toBeNull();
+    // lista zmian w ustawieniach: tylko z f, tekst przez textContent
+    expect(node.querySelector("ul.fixes")).toBeNull();
+    render(root, { ...plan, f: [{ t: "Chrome: <b>x</b>" }, { t: "Firefox" }] }, "server");
+    const section = node.children.find((c) => c.className === "group fixes");
+    expect(section?.children[0].textContent).toBe(TEXTS.pl.fixes_title);
+    expect(node.querySelector("ul.fixes")?.children.map((li) => li.textContent)).toEqual(["Chrome: <b>x</b>", "Firefox"]);
   });
 });

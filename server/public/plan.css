@@ -24,6 +24,10 @@ h1 { font-size: 1.5rem; margin: 0 0 4px; }
 .apps { list-style: none; margin: 0; padding: 0; }
 .app { display: flex; gap: 12px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
 .app b { min-width: 0; overflow-wrap: anywhere; }
+.app > div { min-width: 0; }
+.sites { list-style: none; margin: 2px 0 0; padding: 0; color: var(--mut); overflow-wrap: anywhere; }
+ul.fixes { list-style: none; margin: 0; padding: 0; }
+ul.fixes li { padding: 8px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
 .icon { width: 40px; height: 40px; flex: none; border-radius: 10px; }
 .initial { display: grid; place-items: center; background: var(--line); font-weight: 700; }
 footer { margin-top: 18px; color: var(--mut); font-size: .875rem; }

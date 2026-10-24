@@ -2,9 +2,10 @@
   import { getContext } from 'svelte';
   import OrderCard from '../components/OrderCard.svelte';
   import PhoneThumb from '../components/PhoneThumb.svelte';
+  import SiteQueue from '../components/SiteQueue.svelte';
   import StepTimeline from '../components/StepTimeline.svelte';
   import type { Controller } from '../lib/controller';
-  import { i18n, t } from '../lib/i18n/index.svelte';
+  import { i18n, t, tp } from '../lib/i18n/index.svelte';
   import { dayKey, groupHistory, historyApp, modelName } from '../lib/logic';
   import { enter, stagger } from '../lib/motion';
   import type { HistoryOrder } from '../lib/types';
@@ -50,6 +51,7 @@
       <Card>
         <div class="flex items-center gap-2 px-4 py-3 font-semibold"><Spinner />{t('history.undoing')}</div>
         {#if s.undoSteps.length}<StepTimeline steps={s.undoSteps} />{/if}
+        {#if s.undoSites?.length}<SiteQueue />{/if}
       </Card>
     {/if}
     {#if s.undoResult}
@@ -57,12 +59,29 @@
       <Banner tone={r.errors.length ? 'warn' : 'ok'} icon={r.errors.length ? 'triangle-alert' : 'check'}
         title="{r.order}: {r.status_label}">
         {#if r.admin_not_restored}<p>{t('history.admin_note')}</p>{/if}
+        {#if r.sites_total > 0}
+          <p>{tp('history.sites_restored', r.sites_total, { restored: r.sites_restored })}</p>
+          {#if r.sites_restored < r.sites_total}<p>{t('history.sites_rest')}</p>{/if}
+        {/if}
         {#if r.errors.length}
           <p>{t('history.undo_errors')}</p>
           <ul class="list-disc pl-5">{#each r.errors as e, i (i)}<li>{e}</li>{/each}</ul>
         {/if}
       </Banner>
+      {@const reopen = r.restored_sites.filter((x) => x.url)}
+      {#if reopen.length}
+        <!-- strona po przywróceniu zgody musi zapisać telefon od nowa: otwiera ją serwisant -->
+        <Banner tone="info" icon="bell-ring" title={t('history.sites_resubscribe')}>
+          {#snippet actions()}
+            {#each reopen as x (x.action_id)}
+              <Button variant="ghost" size="sm" disabled={s.job !== null} onclick={() => ctl.openSite(r.order, x.action_id)}>🌐 {x.browser} · {x.site ?? t('undo.site_all')}</Button>
+            {/each}
+          {/snippet}
+        </Banner>
+      {/if}
+      {#if r.firefox_debugging}<Banner tone="warn" icon="triangle-alert" title={t('exec.firefox_debugging')} />{/if}
     {/if}
+    {#if s.openSiteFailed}<Banner tone="warn" icon="triangle-alert" title={t('history.open_site_failed')} />{/if}
     {#each interrupted as o (o.id)}
       <Banner tone="warn" icon="triangle-alert"
         title={t('history.banner', { when: `${day(o.created_at).toLowerCase()}, ${o.created_at.slice(11, 16)}` })}>
@@ -87,9 +106,10 @@
               <span class="text-xs text-soft">{o.created_at.slice(11, 16)}</span>
             </div>
             <span class="absolute top-4 -left-[21px] h-3.5 w-3.5 rounded-full border-2 {dot(o)}" aria-hidden="true"></span>
-            <OrderCard order={o} {scanned} disabled={s.orderRunning}
+            <OrderCard order={o} {scanned} disabled={s.orderRunning} openDisabled={s.job !== null}
               onrestore={(pkg) => ctl.undo(o.number, null, pkg)}
               onrestoreStep={(id) => ctl.undo(o.number, id)}
+              onopenSite={(id) => ctl.openSite(o.number, id)}
               onundoAll={() => ctl.undo(o.number)}
               ondelete={() => ctl.deleteOrder(o.number)} />
           </li>

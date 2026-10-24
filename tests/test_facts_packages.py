@@ -95,3 +95,12 @@ def test_package_list_without_any_system_package_is_implausible():
 def test_missing_dumpsys_entry_is_a_packages_gap():
     facts = collect_packages(_adb(AdbError("timeout", "slow")), NOW)
     assert all(f.gaps == {"packages"} for f in facts.values())
+
+
+@pytest.mark.parametrize(("state", "enabled"), [(4, True), (3, False), (2, False), (None, False)])
+def test_disabled_until_used_counts_as_enabled(state, enabled):
+    """`pm list packages -d` wymienia też enabled=4 (Samsung: preinstalowane aplikacje,
+    które działają i są w launcherze) — wyłączona jest tylko 2/3 albo stan nieznany."""
+    user = f"    User 0: ceDataInode=1 installed=true enabled={state}\n" if state is not None else ""
+    dump = DUMP + "  Package [com.b] (2):\n    versionCode=1 minSdk=21 targetSdk=30\n" + user
+    assert collect_packages(_adb(dump), NOW)["com.b"].enabled is enabled

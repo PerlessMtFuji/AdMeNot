@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 import { setupCtl } from '../test-utils';
 import { Controller } from './controller';
-import { createFakeBridge } from './fakeBridge';
+import { CHECKS_SAMPLE, createFakeBridge } from './fakeBridge';
 import { i18n } from './i18n/index.svelte';
 import { actedAfter, actedLevels, needsWelcome, withoutUndone } from './logic';
 import { AppState } from './state.svelte';
@@ -126,10 +126,27 @@ describe('controller with the adware scenario', () => {
     ctl.backToRepair();
     s.undoTarget = 'com.clean.pro.boost';
     s.undoing = { order: s.actedLog['com.clean.pro.boost'][0].order, pkg: 'com.clean.pro.boost' };
-    bridge.emit('undo:done', { order: 'X', status: 'partially_undone', status_label: '', errors: ['Brak kopii'], admin_not_restored: false });
+    bridge.emit('undo:done', { order: 'X', status: 'partially_undone', status_label: '', errors: ['Brak kopii'], admin_not_restored: false,
+      sites_total: 0, sites_restored: 0, restored_sites: [], firefox_debugging: false, interrupted: [] });
     expect(s.acted['com.clean.pro.boost']).toBe('remove');
     expect(s.undoTarget).toBe('com.clean.pro.boost');
     expect(s.undoResult?.errors).toEqual(['Brak kopii']);
+  });
+
+  test('an undone interrupted order leaves the banner; one still pending stays; hiding is local', async () => {
+    const { ctl, bridge } = setup('adware');
+    await ctl.init();
+    const s = ctl.state;
+    s.interrupted = ['ZS/1', 'ZS/2', 'ZS/3'];
+    const done = { status: 'partially_undone', status_label: '', errors: [], admin_not_restored: false,
+      sites_total: 0, sites_restored: 0, restored_sites: [], firefox_debugging: false };
+    bridge.emit('undo:done', { ...done, order: 'ZS/1', interrupted: ['ZS/2', 'ZS/3'] });
+    expect(s.interrupted).toEqual(['ZS/2', 'ZS/3']);
+    bridge.emit('undo:done', { ...done, order: 'ZS/2', interrupted: ['ZS/2', 'ZS/3'] }); // cofnięto tylko część
+    expect(s.interrupted).toEqual(['ZS/2', 'ZS/3']);
+    ctl.hideInterrupted('ZS/3');
+    expect(s.interrupted).toEqual(['ZS/2']);
+    expect(bridge.calls.some((c) => c.method === 'delete_order')).toBe(false);
   });
 
   test('two orders: undo goes to the newest one and falls back to the earlier level', () => {
@@ -242,9 +259,9 @@ describe('controller edge cases', () => {
   test('events: question, admin wait, job errors, console cap, close request', async () => {
     const { ctl, s, bridge } = setup('empty');
     await ctl.init();
-    bridge.emit('exec:admin_wait', { package: 'p', name: 'P', timeout: 180 });
-    expect(s.admin?.name).toBe('P');
-    bridge.emit('exec:question', { job_id: 'job-3', kind: 'admin_timeout', package: 'p', name: 'P' });
+    bridge.emit('exec:user_wait', { package: 'p', name: 'P', kind: 'admin', timeout: 180, action_id: 1 });
+    expect(s.userWait?.name).toBe('P');
+    bridge.emit('exec:question', { job_id: 'job-3', kind: 'user_timeout', package: 'p', name: 'P' });
     await ctl.answer('skip');
     expect(s.question).toBeNull();
     expect(bridge.calls.at(-1)).toEqual({ method: 'answer', args: ['job-3', 'skip'] });
@@ -329,6 +346,20 @@ describe('controller edge cases', () => {
     expect(s.phase).toBe('done');
     await vi.waitFor(() =>
       expect(bridge.calls.filter((c) => c.method === 'history').length).toBe(before + 1));
+  });
+
+  test('undo:done clears the site queue', async () => {
+    const { ctl, s, bridge } = setup('empty');
+    await ctl.init();
+    const sites = [{ action_id: 4, package: 'com.android.chrome', browser: 'Chrome', site: 'a.example' }];
+    bridge.emit('undo:sites', { order: 'ZS/1', sites });
+    expect(s.undoSites).toEqual(sites);
+    bridge.emit('undo:done', { order: 'ZS/1', status: 'undone', status_label: '', errors: [], admin_not_restored: false,
+      sites_total: 1, sites_restored: 1, restored_sites: [], firefox_debugging: false, interrupted: [] });
+    expect(s.undoSites).toBeNull();
+    bridge.emit('undo:sites', { order: 'ZS/1', sites });
+    await ctl.undo('ZS/1'); // nowe cofanie zaczyna bez starej kolejki
+    expect(s.undoSites).toBeNull();
   });
 
   test('a job that ended before its id arrived does not stay busy', async () => {
@@ -960,5 +991,100 @@ describe('tryb ręczny', () => {
     await ctl.chooseApkMode('full', false);
     expect(s.selection['com.clean.pro.boost']).toBe('disable');
     expect('com.wlive.forecast' in s.selection).toBe(false);
+  });
+});
+
+describe('phone checks and site fixes', () => {
+  const scanned = async () => {
+    const bridge = createFakeBridge('adware', { delay: 0, checks: [CHECKS_SAMPLE] });
+    const ctl = new Controller(new AppState(), bridge);
+    await ctl.init();
+    await ctl.startScan();
+    await vi.waitFor(() => expect(ctl.state.job).toBeNull());
+    return { bridge, ctl, s: ctl.state };
+  };
+  const CHROME_FIX = CHECKS_SAMPLE.browsers[0].sites[0].fix!;
+
+  test('the scan brings the checks, with no fix selected', async () => {
+    const { s } = await scanned();
+    expect(s.scan!.device_checks[0].browsers.map((b) => b.name)).toEqual(['Chrome', 'Samsung Internet', 'Firefox']);
+    expect(s.fixes.size).toBe(0);
+  });
+
+  test('selected fixes go to preview_plan, share_plan and execute', async () => {
+    const { ctl, s, bridge } = await scanned();
+    ctl.toggleFix(CHROME_FIX);
+    await ctl.openPlan();
+    expect(bridge.calls.filter((c) => c.method === 'preview_plan').at(-1)!.args[2]).toEqual([CHROME_FIX]);
+    expect(s.plan!.apps.some((a) => a.level === 'fix')).toBe(true);
+    await ctl.sharePlan();
+    expect(bridge.calls.find((c) => c.method === 'share_plan')!.args[3]).toEqual([CHROME_FIX]);
+    await ctl.execute();
+    expect(bridge.calls.find((c) => c.method === 'execute')!.args[3]).toEqual([CHROME_FIX]);
+  });
+
+  test('toggling twice leaves nothing selected; a new scan clears the selection', async () => {
+    const { ctl, s } = await scanned();
+    ctl.toggleFix(CHROME_FIX);
+    ctl.toggleFix(CHROME_FIX);
+    expect(s.fixes.size).toBe(0);
+    ctl.toggleFix(CHROME_FIX);
+    await ctl.startScan();
+    expect(s.fixes.size).toBe(0);
+  });
+
+  test('a re-read replaces the check and drops a fix the phone no longer offers', async () => {
+    const { ctl, s, bridge } = await scanned();
+    ctl.toggleFix(CHROME_FIX);
+    const [chrome, ...rest] = CHECKS_SAMPLE.browsers;
+    bridge.setChecks([{ ...CHECKS_SAMPLE, browsers: [{ ...chrome, sites: chrome.sites.slice(1) }, ...rest] }]);
+    await ctl.recheckSiteNotifications();
+    expect(s.scan!.device_checks[0].browsers[0].sites.map((x) => x.host)).toEqual(['wiadomosci.example', 'sklep.example']);
+    expect(s.fixes.size).toBe(0);
+  });
+
+  test('back to repair re-reads the sites: a silenced site leaves the list', async () => {
+    const { ctl, s, bridge } = await scanned();
+    ctl.toggleFix(CHROME_FIX);
+    s.result = { order: 'Z', status: 'done', status_label: '', stopped: false, apps: [] };
+    s.phase = 'done';
+    const [chrome, ...rest] = CHECKS_SAMPLE.browsers;
+    bridge.setChecks([{ ...CHECKS_SAMPLE, browsers: [{ ...chrome, sites: chrome.sites.slice(1) }, ...rest] }]);
+    ctl.backToRepair();
+    expect(s.fixes.size).toBe(0);
+    await vi.waitFor(() => expect(s.scan!.device_checks[0].browsers[0].sites.map((x) => x.host))
+      .toEqual(['wiadomosci.example', 'sklep.example']));
+  });
+
+  test('a failed re-read leaves the scan and the error card alone', async () => {
+    const { ctl, s, bridge } = await scanned();
+    const before = s.scan!.device_checks;
+    bridge.failNext('recheck_site_notifications', 'busy');
+    await ctl.recheckSiteNotifications();
+    expect(s.error).toBeNull();
+    expect(s.scan!.device_checks).toEqual(before);
+  });
+
+  test('background recheck without a change keeps the checks', async () => {
+    const { ctl, s, bridge } = await scanned();
+    const before = s.scan!.device_checks;
+    await ctl.recheckSiteNotifications(true); // atrapa: bez zmiany na telefonie `check` = null
+    expect(bridge.calls.at(-1)).toEqual({ method: 'recheck_site_notifications', args: [true] });
+    expect(s.scan!.device_checks).toBe(before);
+  });
+
+  test('user wait events: a channel step names the site and the browser, user_done clears it', async () => {
+    const { s, bridge } = await scanned();
+    bridge.emit('exec:user_wait', { package: 'com.android.chrome', name: 'Chrome', kind: 'channel',
+      site: 'tanie-bilety.example', browser: 'Chrome', timeout: 180, action_id: 1 });
+    expect(s.userWait).toMatchObject({ kind: 'channel', site: 'tanie-bilety.example', browser: 'Chrome' });
+    bridge.emit('exec:user_done', { package: 'com.android.chrome', status: 'done' });
+    expect(s.userWait).toBeNull();
+  });
+
+  test('exec:done carries the Firefox debugging reminder into the result', async () => {
+    const { s, bridge } = await scanned();
+    bridge.emit('exec:done', { order: 'ZS/1', status: 'done', status_label: '', stopped: false, apps: [], firefox_debugging: true });
+    expect(s.result?.firefox_debugging).toBe(true);
   });
 });

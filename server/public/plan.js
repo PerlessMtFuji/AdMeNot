@@ -24,6 +24,9 @@ export const TEXTS = {
     disable_title: "Do wyłączenia",
     silence_title: "Do wyciszenia",
     blocked_title: "Bez zmian",
+    fixes_title: "Zmiany w ustawieniach telefonu",
+    fixes_desc: "Te strony nie będą mogły wysyłać powiadomień.",
+    all_sites: "wszystkie witryny",
     footer_server: "Ten plan zobaczy tylko osoba z tym kodem QR. Wygasa godzinę po utworzeniu.",
     footer_local: "Ten plan nie był wysyłany na serwer — cała lista jest zapisana w kodzie QR.",
     manual_note: "Telefon nie został przeanalizowany w całości — aplikacje do zmiany wskazał serwisant.",
@@ -52,6 +55,9 @@ export const TEXTS = {
     disable_title: "To be turned off",
     silence_title: "To be silenced",
     blocked_title: "No change",
+    fixes_title: "Changes to the phone's settings",
+    fixes_desc: "These sites will no longer be able to send notifications.",
+    all_sites: "all sites",
     footer_server: "Only someone with this QR code can see this plan. It expires an hour after it was created.",
     footer_local: "This plan was not sent to a server — the whole list is stored in the QR code.",
     manual_note: "The phone was not analysed in full — the technician chose the apps to change.",
@@ -139,6 +145,53 @@ export function groups(apps, notif, t, lang) {
   }).filter((g) => g !== null);
 }
 
+/** Zdania o zmianach w ustawieniach telefonu (`f`); wpis o złym kształcie jest pomijany. */
+export function fixTexts(p) {
+  return Array.isArray(p.f) ? p.f.map((x) => x && x.t).filter((t) => typeof t === "string" && t) : [];
+}
+
+// Ikony popularnych przeglądarek (img/browsers/SOURCES.md); reszta dostaje inicjał.
+const BROWSER_ICONS = {
+  "com.android.chrome": "chrome", "com.chrome.beta": "chrome", "com.chrome.dev": "chrome", "com.chrome.canary": "chrome",
+  "com.sec.android.app.sbrowser": "samsung", "com.sec.android.app.sbrowser.beta": "samsung",
+  "org.mozilla.firefox": "firefox", "org.mozilla.firefox_beta": "firefox", "org.mozilla.fenix": "firefox",
+  "com.microsoft.emmx": "edge", "com.microsoft.emmx.beta": "edge",
+  "com.opera.browser": "opera", "com.opera.browser.beta": "opera", "com.opera.mini.native": "opera",
+  "com.brave.browser": "brave", "com.brave.browser_beta": "brave",
+  "com.vivaldi.browser": "vivaldi", "com.vivaldi.browser.snapshot": "vivaldi",
+  "com.yandex.browser": "yandex", "com.yandex.browser.lite": "yandex",
+};
+
+export function browserIcon(pkg) {
+  return Object.hasOwn(BROWSER_ICONS, pkg) ? `/img/browsers/${BROWSER_ICONS[pkg]}.webp` : null;
+}
+
+/** Zmiany pogrupowane wg przeglądarki (p, n, h z `f`), alfabetycznie; witryny w kolejności planu, bez `h` = wszystkie.
+ *  null, gdy któremuś wpisowi brakuje przeglądarki (plan ze starszej wersji programu) — wtedy same zdania. */
+export function fixGroups(p, t, lang) {
+  const entries = Array.isArray(p.f) ? p.f.filter((x) => x && typeof x.t === "string" && x.t) : [];
+  if (!entries.length || !entries.every((x) => typeof x.p === "string" && typeof x.n === "string" && x.n)) return null;
+  const byPackage = new Map();
+  for (const x of entries) {
+    const g = byPackage.get(x.p) ?? { pkg: x.p, name: x.n, sites: [] };
+    const site = typeof x.h === "string" && x.h ? x.h : t.all_sites;
+    if (!g.sites.includes(site)) g.sites.push(site);
+    byPackage.set(x.p, g);
+  }
+  const order = new Intl.Collator(lang);
+  return [...byPackage.values()].sort((a, b) => order.compare(a.name, b.name));
+}
+
+function icon(src, name) {
+  if (src) {
+    const img = el("img", "icon");
+    img.alt = "";
+    img.src = src;
+    return img;
+  }
+  return el("span", "icon initial", initial(name));
+}
+
 function el(tag, cls, text) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -164,14 +217,7 @@ export function render(root, p, mode) {
     const list = el("ul", "apps");
     for (const a of g.apps) {
       const li = el("li", "app");
-      if (typeof a.i === "string" && ICON.test(a.i)) {
-        const img = el("img", "icon");
-        img.alt = "";
-        img.src = a.i;
-        li.append(img);
-      } else {
-        li.append(el("span", "icon initial", initial(a.n)));
-      }
+      li.append(icon(typeof a.i === "string" && ICON.test(a.i) ? a.i : null, a.n));
       const name = el("b", null, a.n);
       name.dir = "auto"; // nazwy po arabsku czy hebrajsku nie mieszają kierunku z tekstem strony
       li.append(name);
@@ -180,6 +226,31 @@ export function render(root, p, mode) {
     section.append(el("h2", null, g.title), el("p", "desc", g.text), list);
     return section;
   });
+  const browsers = fixGroups(p, t, lang);
+  const fixes = fixTexts(p);
+  if (browsers) {
+    const list = el("ul", "apps");
+    for (const b of browsers) {
+      const li = el("li", "app");
+      const body = el("div");
+      const name = el("b", null, b.name);
+      name.dir = "auto";
+      const sites = el("ul", "sites");
+      for (const site of b.sites) sites.append(el("li", null, site));
+      body.append(name, sites);
+      li.append(icon(browserIcon(b.pkg), b.name), body);
+      list.append(li);
+    }
+    const section = el("section", "group fixes");
+    section.append(el("h2", null, t.fixes_title), el("p", "desc", t.fixes_desc), list);
+    sections.push(section);
+  } else if (fixes.length) {
+    const list = el("ul", "fixes");
+    for (const text of fixes) list.append(el("li", null, text));
+    const section = el("section", "group fixes");
+    section.append(el("h2", null, t.fixes_title), list);
+    sections.push(section);
+  }
   const note = p.m === 1 ? [el("p", "note", t.manual_note)] : [];
   root.replaceChildren(head, ...sections, ...note,
     el("footer", null, mode === "server" ? t.footer_server : t.footer_local));

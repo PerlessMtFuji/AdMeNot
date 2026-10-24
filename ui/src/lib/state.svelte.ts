@@ -1,7 +1,8 @@
+import { SvelteSet } from 'svelte/reactivity';
 import { actedLevels, type ActedLog, type OpenGroups, type Phase } from './logic';
 import type {
   ApiErrorBody, ApkEstimate, ApkQuestion, Category, ConsoleEntry, DeviceEntry, EtaView, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
-  PlanView, Question, ReportResult, ScanView, Settings, ShareState, ShotsView, ShotView, StepEvent, UndoDone, UpdateView, Verdict, WhoView,
+  PlanView, Question, ReportResult, ScanView, Settings, ShareState, ShotsView, ShotView, StepEvent, UndoDone, UndoSite, UpdateView, UserWait, Verdict, WhoView,
 } from './types';
 
 export type Screen = 'main' | 'history' | 'settings';
@@ -39,6 +40,8 @@ export class AppState {
   selection = $state<Record<string, Level>>({});
   touched = $state<string[]>([]);
   unlocked = $state<string[]>([]);
+  /** Zaznaczone poprawki „Stanu telefonu” (identyfikatory z `device_checks`); nic nie jest zaznaczone z góry. */
+  fixes = new SvelteSet<string>();
   verdictFilter = $state<Verdict | 'all'>('all');
   query = $state('');
   categoryFilter = $state<Category[]>([]);
@@ -61,7 +64,8 @@ export class AppState {
   order = $state<string | null>(null);
   execPlan = $state<PlanView | null>(null);
   steps = $state<StepEvent[]>([]);
-  admin = $state<{ package: string; name: string; timeout: number; since: number } | null>(null);
+  /** Program czeka na ruch serwisanta na telefonie (administrator urządzenia albo przełącznik powiadomień). */
+  userWait = $state<(UserWait & { since: number }) | null>(null);
   question = $state<Question | null>(null);
   verifying = $state(false);
   stopping = $state(false);
@@ -81,6 +85,10 @@ export class AppState {
   history = $state<HistoryView | null>(null);
   undoSteps = $state<StepEvent[]>([]);
   undoResult = $state<UndoDone | null>(null);
+  /** Kolejka witryn bieżącego cofania (`undo:sites`); null — cofanie nie ma ekranów witryn. */
+  undoSites = $state<UndoSite[] | null>(null);
+  /** Nie udało się otworzyć strony na telefonie (`open_site`): baner ostrzeżenia w historii. */
+  openSiteFailed = $state(false);
   reportBusy = $state<string | null>(null);
   reports = $state<Record<string, ReportResult>>({});
   mirror = $state<{ available: boolean; serial: string | null; state: MirrorState; reason: string | null; blocked: boolean; awakeBlocked: boolean }>(

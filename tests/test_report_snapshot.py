@@ -115,3 +115,17 @@ def test_full_snapshot_is_unchanged(scan_report, tmp_path):
     snap = scan_snapshot(scan_report, _match(scan_report, tmp_path), {})
     assert snap["apk_mode"] == "pending"
     assert any(a["verdict"] != "safe" for a in snap["apps"])
+
+
+def test_snapshot_carries_device_checks(scan_report, tmp_path):
+    from admenot.engine.device_checks import BrowserSites, DeviceCheck, SiteEntry
+    site = SiteEntry("https://a.pl", "a.pl", False, True, "site:com.android.chrome:web:https://a.pl;1")
+    check = DeviceCheck("site_notifications", "review",
+                        [BrowserSites("com.android.chrome", "Chrome", "per_site", "ok", [site])])
+    report = dataclasses.replace(scan_report, device_checks=[check])
+    snap = scan_snapshot(report, _match(report, tmp_path), {})
+    assert json.loads(json.dumps(snap)) == snap
+    assert snap["device_checks"] == [dataclasses.asdict(check)]
+    plain = scan_snapshot(dataclasses.replace(scan_report, device_checks=[]),
+                          _match(scan_report, tmp_path), {})
+    assert plain["device_checks"] == []

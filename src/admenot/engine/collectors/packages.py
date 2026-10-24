@@ -7,7 +7,11 @@ from datetime import datetime
 from admenot.engine.adb.transport import AdbError, AdbTransport
 from admenot.engine.facts import AppFacts
 from admenot.engine.parsers.common import parse_package_list
-from admenot.engine.parsers.packages import parse_dumpsys_packages, parse_pm_list
+from admenot.engine.parsers.packages import (
+    DISABLED_UNTIL_USED,
+    parse_dumpsys_packages,
+    parse_pm_list,
+)
 
 PM_LIST = "pm list packages -f -i -U --user 0"
 PM_SYSTEM = "pm list packages -s --user 0"
@@ -39,7 +43,8 @@ def collect_packages(adb: AdbTransport, now: datetime) -> dict[str, AppFacts]:
             installer=entry.installer or (dump.installer if dump else None),
             uid=entry.uid,
             is_system=package in system,
-            enabled=package not in disabled,
+            enabled=package not in disabled
+            or (dump is not None and dump.enabled_state == DISABLED_UNTIL_USED),
         )
         if dump:
             f.version_code = dump.version_code

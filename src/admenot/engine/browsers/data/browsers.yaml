@@ -1,0 +1,37 @@
+# Przeglądarki, które trzymają powiadomienia witryn we wspólnym kanale Androida.
+# origin_from: skąd w aktywnym powiadomieniu czytać witrynę ("tag" albo "subtext").
+# rdp_socket: gniazdo zdalnego debugowania (tylko Firefox).
+# block_action: aktywne powiadomienie witryny ma akcję „Blokuj” (Firefox jej nie ma).
+browsers:
+  - package: com.sec.android.app.sbrowser
+    name: Samsung Internet
+    shared_channel: SBROWSER_WEBSITES_NOTIFICATION_CHANNEL
+    origin_from: tag
+    block_action: true
+  - package: org.mozilla.firefox
+    name: Firefox
+    shared_channel: mozac.feature.webnotifications.generic.channel
+    origin_from: subtext
+    rdp_socket: org.mozilla.firefox/firefox-debugger-socket
+
+# Przeglądarki bez powiadomień witryn: nie ma czego sprawdzać, więc nie dostają wiersza „sprawdź ręcznie”.
+# Sprawdzone na Galaxy A13 (2026-10-24): żadna strona nie dostała w nich zgody na powiadomienia.
+without_site_notifications:
+  - com.opera.mini.native  # Opera Mini
+  - com.mi.globalbrowser  # Mi Przeglądarka
+
+# Nazwy popularnych przeglądarek: kontrola czyta stan przy skanie, zanim znane są nazwy z ekranu telefonu
+# i z analizy APK — bez tej tabeli serwisant widziałby sam pakiet.
+names:
+  com.android.chrome: Chrome
+  com.chrome.beta: Chrome Beta
+  com.microsoft.emmx: Edge
+  com.opera.browser: Opera
+  com.opera.gx: Opera GX
+  com.brave.browser: Brave
+  com.vivaldi.browser: Vivaldi
+  com.yandex.browser: Yandex Browser
+  com.kiwibrowser.browser: Kiwi Browser
+  com.duckduckgo.mobile.android: DuckDuckGo
+  org.mozilla.firefox_beta: Firefox Beta
+  org.mozilla.focus: Firefox Focus

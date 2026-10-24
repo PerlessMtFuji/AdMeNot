@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from admenot.engine import paths
+from admenot.engine.actions.planner import FIX_LEVEL
 from admenot.engine.journal.db import MAX_REPORT_SCREENSHOTS, Action, Journal, Order, unresolved
 
 PATCH_MAX_AGE_DAYS = 365
@@ -80,6 +81,21 @@ class Consent:
 
 
 @dataclass(frozen=True)
+class PhoneCheckRow:
+    browser: str
+    domain: str | None  # None = wszystkie witryny przeglądarki (wspólny kanał) albo nieodczytane
+    before: str  # active | allowed | shared | unrecognized
+    outcome: str  # done | failed | interrupted | undone | partially_undone | none
+
+
+@dataclass(frozen=True)
+class PhoneCheck:
+    id: str
+    state: str  # ok | review | unrecognized
+    rows: list[PhoneCheckRow]
+
+
+@dataclass(frozen=True)
 class Protocol:
     number: str
     created_at: datetime
@@ -94,6 +110,7 @@ class Protocol:
     screenshots: list[ProtocolShot] = field(default_factory=list)
     consent: Consent | None = None
     manual: bool = False  # tryb ręczny: bez nagłówka „czysto” i bez liczby aplikacji bez uwag
+    phone_checks: list[PhoneCheck] = field(default_factory=list)  # „Stan telefonu”
 
 
 def _outcome(actions: list[Action], still_active: bool) -> str:
@@ -203,6 +220,59 @@ def _recommendations(rows: list[AppRow], device: DeviceBlock, created_at: dateti
     return recs
 
 
+def _fix_key(action: Action) -> tuple[str, str] | None:
+    """(pakiet, klucz) poprawki, którą wykonuje krok: id kanału albo origin zgody Firefoksa."""
+    params = action.step.get("params") or {}
+    if action.step.get("kind") == "channel":
+        return action.package, str(params.get("channel_id") or "")
+    if action.step.get("kind") == "site_permission":
+        return action.package, str(params.get("origin") or "")
+    return None
+
+
+def _fix_outcomes(actions: list[Action]) -> dict[tuple[str, str], str]:
+    grouped: dict[tuple[str, str], list[Action]] = {}
+    for action in actions:
+        if action.level == FIX_LEVEL and (key := _fix_key(action)):
+            grouped.setdefault(key, []).append(action)
+    return {key: _outcome(group, False) for key, group in grouped.items()}
+
+
+def _site_key(fix: str | None) -> str:
+    """Klucz kroku z id poprawki: `site:<pkg>:<kanał>` i `site_perm:<pkg>:<origin>`."""
+    parts = (fix or "").split(":", 2)
+    return parts[2] if len(parts) == 3 else ""
+
+
+def _browser_rows(b: dict[str, Any], outcomes: dict[tuple[str, str], str]) -> list[PhoneCheckRow]:
+    package, name = b.get("package") or "", b.get("name") or b.get("package") or ""
+    if b.get("read") in ("unrecognized", "unsupported"):  # nieodczytana albo nieobsługiwana: nie sprawdzono
+        return [PhoneCheckRow(name, None, b["read"], "none")]
+    rows, site_keys = [], set()
+    for site in b.get("sites") or []:
+        key = _site_key(site.get("fix"))
+        site_keys.add(key)
+        outcome = outcomes.get((package, key), "none")
+        if site.get("blocked") and outcome == "none":
+            continue  # wyłączone jeszcze przed zleceniem: nic do pokazania
+        rows.append(PhoneCheckRow(name, site.get("host"),
+                                  "active" if site.get("active") else "allowed", outcome))
+    if b.get("read") == "partial" or b.get("all_fix"):  # wspólny kanał: krok nie należy do witryny
+        shared = next((o for (pkg, key), o in outcomes.items()
+                       if pkg == package and key not in site_keys), "none")
+        rows.append(PhoneCheckRow(name, None, "shared", shared))
+    return rows
+
+
+def _phone_checks(snap: dict[str, Any] | None, actions: list[Action]) -> list[PhoneCheck]:
+    """Kontrole „Stanu telefonu” z migawki + wynik poprawek z dziennika. Stara migawka bez klucza
+    daje pustą listę (sekcji nie ma)."""
+    outcomes = _fix_outcomes(actions)
+    return [PhoneCheck(raw.get("id") or "", raw.get("state") or "unrecognized",
+                       [row for b in raw.get("browsers") or [] for row in _browser_rows(b, outcomes)])
+            for raw in (snap or {}).get("device_checks") or []]
+
+
 def _screenshots(journal: Journal, order_id: int) -> list[ProtocolShot]:
     chosen = [s for s in journal.screenshots(order_id) if s.in_report][-MAX_REPORT_SCREENSHOTS:]
     shots = []
@@ -226,9 +296,11 @@ def build_protocol(journal: Journal, order_id: int, lang: str) -> Protocol:
         scanned = {p: a if p in seen else {**a, "verdict": None, "problems": {}, "incomplete": False}
                    for p, a in scanned.items()}
 
+    all_actions = journal.actions(order_id)
     by_package: dict[str, list[Action]] = {}
-    for action in journal.actions(order_id):
-        by_package.setdefault(action.package, []).append(action)
+    for action in all_actions:
+        if action.level != FIX_LEVEL:  # poprawki telefonu to nie wiersze aplikacji
+            by_package.setdefault(action.package, []).append(action)
 
     rows = [_row(package, scanned.get(package), lang, actions[0].level,
                  _outcome(actions, package in verification))
@@ -250,4 +322,4 @@ def build_protocol(journal: Journal, order_id: int, lang: str) -> Protocol:
     return Protocol(order.number, order.created_at, order.client_name, device, rows, clean,
                     _recommendations(rows, device, order.created_at, scope), snap is not None,
                     lang, scope, _screenshots(journal, order_id), consent=_consent(snap),
-                    manual=manual)
+                    manual=manual, phone_checks=_phone_checks(snap, all_actions))

@@ -1,6 +1,6 @@
 // Atrapa mostu: odtwarza scenariusze nagrane z prawdziwego Api (scripts/record_bridge_fixtures.py).
 import type { Bridge } from './bridge';
-import type { Api, CrashSummary, EventMap, EventName, Lang, ScanView, ServiceInfo, Settings, ShotView, TelemetrySample, UpdateView } from './types';
+import type { Api, CrashSummary, DeviceCheck, EventMap, EventName, Lang, PlanView, ScanView, ServiceInfo, Settings, ShotView, TelemetrySample, UpdateView } from './types';
 // Wynik `telemetry_events.sample()` z Pythona (Task 7 planu kroku H) — ten sam kształt co prawdziwe zdarzenia.
 import SAMPLE from './telemetrySample.json';
 
@@ -33,17 +33,53 @@ export type FakeBridge = Bridge & {
   setCrashes(reports: CrashSummary[], startup: string[]): void;
   failNextCrashSend(key: string): void;
   failNext(method: string, key: string): void;  // następne wywołanie `method` zwraca błąd `key`
+  setChecks(checks: DeviceCheck[]): void;  // co zwróci następny `recheck_site_notifications` (i kolejne skany)
   calls: { method: string; args: unknown[] }[];
   emit<K extends EventName>(name: K, detail: EventMap[K]): void;
 };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+const CHROME = 'com.android.chrome';
+const SAMSUNG = 'com.sec.android.app.sbrowser';
+const FIREFOX = 'org.mozilla.firefox';
+
+/** Kontrole „Stanu telefonu” z wypełnionymi przeglądarkami: nagrane scenariusze mają telefon, którego nie rozpoznano. */
+export const CHECKS_SAMPLE: DeviceCheck = {
+  id: 'site_notifications', state: 'review', state_label: 'Do sprawdzenia',
+  browsers: [
+    { package: CHROME, name: 'Chrome', mode: 'per_site', read: 'ok', rdp_hint: false, block_action: false,
+      all_fix: null, all_fix_label: null,
+      sites: [
+        { host: 'tanie-bilety.example', origin: 'https://tanie-bilety.example', blocked: false, active: true,
+          fix: `site:${CHROME}:web:https://tanie-bilety.example;0`, fix_label: 'Wyłączenie powiadomień: tanie-bilety.example (Chrome)' },
+        { host: 'wiadomosci.example', origin: 'https://wiadomosci.example', blocked: false, active: false,
+          fix: `site:${CHROME}:web:https://wiadomosci.example;0`, fix_label: 'Wyłączenie powiadomień: wiadomosci.example (Chrome)' },
+        { host: 'sklep.example', origin: 'https://sklep.example', blocked: true, active: false, fix: null, fix_label: null },
+      ] },
+    { package: SAMSUNG, name: 'Samsung Internet', mode: 'shared', read: 'partial', rdp_hint: false, block_action: true,
+      all_fix: `site_all:${SAMSUNG}`, all_fix_label: 'Wyłączenie powiadomień wszystkich witryn (Samsung Internet)',
+      sites: [{ host: 'reklamy.example', origin: 'https://reklamy.example', blocked: false, active: true, fix: null, fix_label: null }] },
+    { package: FIREFOX, name: 'Firefox', mode: 'shared', read: 'partial', rdp_hint: true, block_action: false,
+      all_fix: null, all_fix_label: null, sites: [] },
+  ],
+};
+
+/** Przeglądarka, która jest też aplikacją z planu naprawy (adware): poprawka i poziom aplikacji w jednym zleceniu. */
+export const CHECKS_APP_BROWSER: DeviceCheck = {
+  id: 'site_notifications', state: 'review', state_label: 'Do sprawdzenia',
+  browsers: [{ package: 'com.wlive.forecast', name: 'Forecast', mode: 'per_site', read: 'ok', rdp_hint: false,
+    block_action: false, all_fix: null, all_fix_label: null,
+    sites: [{ host: 'tanie-bilety.example', origin: 'https://tanie-bilety.example', blocked: false, active: true,
+      fix: 'site:com.wlive.forecast:web:https://tanie-bilety.example;0',
+      fix_label: 'Wyłączenie powiadomień: tanie-bilety.example (Forecast)' }] }],
+};
+
 /** Wysyłka planu dla klienta (spec plan-qr §6.4): serwer od razu, kod lokalny i potem serwer, plan za długi. */
 export type ShareScenario = 'server' | 'local' | 'too_long';
 
 export function createFakeBridge(name: string,
-  options: { delay?: number; welcome?: boolean; share?: ShareScenario; lang?: Lang } = {}): FakeBridge {
+  options: { delay?: number; welcome?: boolean; share?: ShareScenario; lang?: Lang; checks?: DeviceCheck[] } = {}): FakeBridge {
   const data = scenarios[name];
   if (!data) throw new Error(`unknown scenario: ${name}`);
   const delay = options.delay ?? 15;
@@ -67,12 +103,19 @@ export function createFakeBridge(name: string,
   let crashStartup: string[] = [];
   let failSend: string | null = null;
   const failures = new Map<string, string>();
+  let checks: DeviceCheck[] | null = options.checks ? structuredClone(options.checks) : null;
+  let checksChanged = false; // odpytywanie w tle (`whenDebugging`) dostaje odczyt tylko po zmianie
   let planCode = 'K7F3'; // kod ostatniego podglądu planu: udostępnienie liczy ten sam plan
   const SHOT_IMAGE = 'data:image/svg+xml,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="200"><rect width="90" height="200" rx="8" fill="#1f2937"/>'
     + '<rect x="8" y="40" width="74" height="90" rx="6" fill="#f59e0b"/></svg>');
 
   const dispatch = (event: string, detail: unknown) => {
+    if (checks && (event === 'scan:done' || event === 'apk:done' || event === 'apk:manual')) {
+      // Kopia: nagrania są wspólne dla wszystkich atrap w procesie, więc ich zdarzeń nie wolno zmieniać.
+      const scan = (detail as { scan: ScanView }).scan;
+      detail = { ...(detail as object), scan: { ...scan, device_checks: structuredClone(checks) } };
+    }
     if (event === 'update:state') update = structuredClone(detail as UpdateView);
     if (event === 'scan:done' || event === 'apk:done' || event === 'apk:manual') lastScan = (detail as { scan: ScanView }).scan;
     target.dispatchEvent(new CustomEvent(event, { detail: structuredClone(detail) }));
@@ -155,6 +198,10 @@ export function createFakeBridge(name: string,
       }
       case 'cancel_share':
         return { ok: true };
+      case 'recheck_site_notifications':
+        if (args[0] === true && !checksChanged) return { check: null };
+        checksChanged = false;
+        return { check: structuredClone(checks?.[0] ?? lastScan?.device_checks[0]) };
       case 'deep_analyze':
         return { job_id: 'job-deep' };
       case 'clear_apk_cache':
@@ -225,6 +272,9 @@ export function createFakeBridge(name: string,
         return { ok: true, output: `(atrapa) ${String(args[0])}\n` };
       case 'watch_devices':
       case 'stop':
+      case 'reopen_screen':
+      case 'skip_site':
+      case 'open_site':
       case 'answer':
       case 'quit':
         return { ok: true };
@@ -258,6 +308,27 @@ export function createFakeBridge(name: string,
     }
   };
 
+  // Nagrany podgląd planu nie zna poprawek: dopisuje plany `fix` (jeden na przeglądarkę), jak prawdziwy planista.
+  const withFixRows = (plan: PlanView, fixes: unknown): PlanView => {
+    const wanted = Array.isArray(fixes) ? (fixes as string[]) : [];
+    if (!wanted.length) return plan;
+    const labels = new Map<string, string>();
+    const names = new Map<string, string>();
+    for (const b of (checks ?? lastScan?.device_checks ?? []).flatMap((c) => c.browsers)) {
+      names.set(b.package, b.name);
+      if (b.all_fix && b.all_fix_label) labels.set(b.all_fix, b.all_fix_label);
+      for (const s of b.sites) if (s.fix && s.fix_label) labels.set(s.fix, s.fix_label);
+    }
+    const byPackage = new Map<string, string[]>();
+    for (const fix of [...wanted].sort()) {
+      const pkg = fix.split(':')[1];
+      byPackage.set(pkg, [...(byPackage.get(pkg) ?? []), labels.get(fix) ?? fix]);
+    }
+    const rows = [...byPackage].map(([pkg, steps]) => ({ package: pkg, name: names.get(pkg) ?? pkg, level: 'fix' as const,
+      level_label: 'Ustawienia witryn', blocked: false, reason: null, reason_text: null, steps, warnings: [] }));
+    return { ...plan, apps: [...plan.apps, ...rows], runnable: plan.runnable + rows.length, code: `${plan.code}F` };
+  };
+
   const invoke = (method: string, args: unknown[]): unknown => {
     calls.push({ method, args });
     const failure = failures.get(method);
@@ -268,8 +339,15 @@ export function createFakeBridge(name: string,
     const queue = queues.get(method);
     if (!queue || queue.length === 0) return fallback(method, args);
     const call = queue.length > 1 ? queue.shift()! : queue[0];
-    replay(call.events);
-    if (method === 'preview_plan') planCode = (call.result as { code?: string }).code ?? planCode;
+    // Zlecenie wykonuje ten sam plan co podgląd: z poprawkami (bez ich kroków — tych nagranie nie ma).
+    replay(method !== 'execute' ? call.events : call.events.map(([event, detail]) => (event === 'exec:order'
+      ? [event, { ...(detail as object), plan: withFixRows(structuredClone((detail as { plan: PlanView }).plan), args[3]) }]
+      : [event, detail]) as [string, unknown]));
+    if (method === 'preview_plan') {
+      const plan = withFixRows(structuredClone(call.result) as PlanView, args[2]);
+      planCode = plan.code ?? planCode;
+      return plan;
+    }
     return structuredClone(call.result);
   };
 
@@ -289,5 +367,6 @@ export function createFakeBridge(name: string,
     setCrashes: (reports, startup) => { crashes = [...reports]; crashStartup = [...startup]; },
     failNextCrashSend: (key) => { failSend = key; },
     failNext: (method, key) => { failures.set(method, key); },
+    setChecks: (next) => { checks = structuredClone(next); checksChanged = true; },
   };
 }

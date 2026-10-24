@@ -6,8 +6,9 @@ from datetime import UTC, datetime, timedelta, timezone
 from conftest import SERIAL
 
 from admenot.app import telemetry_events as ev
-from admenot.engine.actions.planner import AppPlan
+from admenot.engine.actions.planner import FIX_LEVEL, AppPlan
 from admenot.engine.apk.timing import Eta
+from admenot.engine.journal.db import Action
 from admenot.engine.session import run_scan
 from admenot.engine.workflow import AppStatus, OrderResult
 
@@ -96,6 +97,29 @@ def test_undo_event(synthetic_adb):
     assert e["packages"] == [{"package": "a.b", "ok": True}, {"package": "c.d", "ok": False}]
 
 
+def test_undo_targets_leave_out_fix_only_browsers():
+    # przeglądarka z samą poprawką ustawień to nie „aplikacja” i jej pakiet nie trafia do telemetrii
+    targeted = [_action(1, "com.example.browser", FIX_LEVEL, "channel", "done"),
+                _action(2, "com.wlive.forecast", "disable", "enabled", "done"),
+                _action(3, "com.android.chrome", FIX_LEVEL, "channel", "done"),
+                _action(4, "com.android.chrome", "silence", "permission", "done")]
+    errors = [(targeted[0], "not_restored"), (targeted[1], "not_restored")]
+    assert ev.undo_targets(targeted, errors) == (["com.android.chrome", "com.wlive.forecast"],
+                                                 ["com.wlive.forecast"])
+
+
+def test_undo_targets_do_not_fail_an_app_for_skipped_or_timed_out_sites():
+    # niewłączone witryny liczą się w `sites`/`sites_restored`, nie jako błąd aplikacji
+    targeted = [_action(1, "com.android.chrome", "silence", "channel", "done"),
+                _action(2, "com.android.chrome", "silence", "channel", "done"),
+                _action(3, "com.wlive.forecast", "disable", "enabled", "done")]
+    errors = [(targeted[0], "site_skipped"), (targeted[1], "site_timeout"),
+              (targeted[2], "site_timeout"), (targeted[2], "not_restored")]
+    assert ev.undo_targets(targeted, errors) == (["com.android.chrome", "com.wlive.forecast"],
+                                                 ["com.wlive.forecast"])
+    assert ev.undo_targets(targeted[:2], errors[:2]) == (["com.android.chrome"], [])
+
+
 def test_sample_uses_the_same_shapes():
     s = ev.sample()
     assert [e["type"] for e in s["basic"]] == ["start", "scan", "repair", "undo"]
@@ -155,3 +179,72 @@ def test_ui_sample_json_matches_sample_and_shows_a_quick_scan():
     scan = next(e for e in ev.sample()["basic"] if e["type"] == "scan")
     assert scan["apk_stage"] is False and scan["apk_mode"] == "pending" and scan["eta"] is None
     assert scan["apk"] is None
+
+
+def _site_phone():
+    from fakephone import make_cli_phone
+
+    phone = make_cli_phone()
+    phone.channels = {"com.android.chrome": {"web:https://www.example.com;1": 3,
+                                              "web:https://b.example.org;2": 0},
+                      "com.sec.android.app.sbrowser": {"SBROWSER_WEBSITES_NOTIFICATION_CHANNEL": 3}}
+    phone.active = [("com.sec.android.app.sbrowser", "SBROWSER_WEBSITES_NOTIFICATION_CHANNEL",
+                     "p#https://news.example.net/#1", "news.example.net")]
+    return phone
+
+
+def test_scan_event_reports_check_state_and_site_counts_without_domains():
+    e = ev.scan_event(run_scan(_site_phone()), "ab12cd34", 5, packages=True)
+    assert e["checks"] == {"site_notifications": "review"}
+    assert e["sites"] == {"per_site": 2, "shared": 1, "rdp": 0}
+    assert "example" not in json.dumps(e) and "sbrowser" not in json.dumps(e)
+
+
+def _action(aid, package, level, kind, status):
+    return Action(aid, 1, package, level, {"kind": kind, "package": package, "params": {}}, "cmd",
+                  {}, None, status, datetime(2026, 10, 10, tzinfo=UTC), None)
+
+
+def test_repair_event_counts_fix_steps_and_keeps_them_out_of_app_stats():
+    from admenot.engine.actions.steps import Step
+
+    site = "web:https://www.example.com;1"
+    plans = [AppPlan("com.android.chrome", FIX_LEVEL,
+                     [Step("channel", "com.android.chrome", {"channel_id": site}),
+                      Step("channel", "com.android.chrome", {"channel_id": "web:https://b.pl;2"})]),
+             AppPlan("org.mozilla.firefox", FIX_LEVEL,
+                     [Step("site_permission", "org.mozilla.firefox",
+                           {"origin": "https://www.example.com", "permission": "desktop-notification",
+                            "capability": "2"})]),
+             AppPlan("com.wlive.forecast", "disable", [])]
+    # Liczą się kroki wykonane („wykonanych” w spec), nie zaplanowane: pominięty kanał nie wchodzi.
+    actions = [_action(1, "com.android.chrome", FIX_LEVEL, "channel", "done"),
+               _action(2, "com.android.chrome", FIX_LEVEL, "channel", "failed"),
+               _action(3, "org.mozilla.firefox", FIX_LEVEL, "site_permission", "done"),
+               _action(4, "com.wlive.forecast", "disable", "enabled", "done")]
+    body = ev.repair_event(ev._SAMPLE_DEVICE, "ab12cd34", plans, {}, None, None, True, actions=actions)
+    assert body["fixes"] == {"channel": 1, "site_permission": 1}
+    assert ev.repair_event(ev._SAMPLE_DEVICE, "s", plans, {}, None, None, False)["fixes"] == {
+        "channel": 0, "site_permission": 0}  # przerwane przed pierwszym krokiem: nic nie wykonano
+    assert body["levels"] == {"silence": 0, "disable": 1, "remove": 0}
+    assert sum(body["sources"].values()) == 1
+    assert [p["package"] for p in body["packages"]] == ["com.wlive.forecast"]
+    assert "example" not in json.dumps(body)
+    assert ev.repair_event(ev._SAMPLE_DEVICE, "s", [], {}, None, None, False)["fixes"] == {
+        "channel": 0, "site_permission": 0}
+
+
+def test_undo_event_counts_sites(synthetic_adb):
+    device = run_scan(synthetic_adb).device
+    e = ev.undo_event(device, ["a.b"], [], 1, packages=False, sites=3, sites_restored=2)
+    assert (e["sites"], e["sites_restored"]) == (3, 2)
+    e = ev.undo_event(device, ["a.b"], [], 1, packages=False)
+    assert (e["sites"], e["sites_restored"]) == (0, 0)
+
+
+def test_repair_event_does_not_count_a_browser_with_only_a_site_fix_as_a_failed_app():
+    plans = [AppPlan("com.a", "silence", []), AppPlan("com.android.chrome", FIX_LEVEL, [])]
+    result = OrderResult(order=None, stopped=False, apps=[
+        AppStatus("com.a", "ok"), AppStatus("com.android.chrome", "failed", errors=["user_timeout"])])
+    body = ev.repair_event(ev._SAMPLE_DEVICE, "s", plans, {}, result, None, False)
+    assert body["levels"]["silence"] == 1 and body["failed"] == 0 and body["errors"] == []

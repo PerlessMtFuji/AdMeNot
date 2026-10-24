@@ -9,19 +9,22 @@
   import Icon from '../ui/Icon.svelte';
   import Pill from '../ui/Pill.svelte';
   import AppIcon from './AppIcon.svelte';
+  import { builtInIcon } from './BrowserIcon.svelte';
   import ReportButton from './ReportButton.svelte';
   import ScreenshotStrip from './ScreenshotStrip.svelte';
 
-  type Props = { order: HistoryOrder; scanned?: AppView[]; disabled: boolean;
+  // `openDisabled`: otwarcie strony zajmuje telefon, więc czeka na koniec każdego zadania, nie tylko zlecenia.
+  type Props = { order: HistoryOrder; scanned?: AppView[]; disabled: boolean; openDisabled: boolean;
     onrestore: (pkg: string) => void; onrestoreStep: (actionId: number) => void; onundoAll: () => void;
-    ondelete: () => void };
-  let { order, scanned = [], disabled, onrestore, onrestoreStep, onundoAll, ondelete }: Props = $props();
+    onopenSite: (actionId: number) => void; ondelete: () => void };
+  let { order, scanned = [], disabled, openDisabled, onrestore, onrestoreStep, onundoAll, onopenSite, ondelete }: Props = $props();
   let confirming = $state(false);
   let open = $state<string[]>([]);
   let shotsOpen = $state(false);
   const rows = $derived(groupHistory(order.actions));
   const undone = $derived(order.status === 'undone');
-  const canUndo = $derived(order.actions.some((a) => a.status === 'done' || a.status === 'pending'));
+  // Krok z `manual_undo` (kanał nie do przywrócenia) zostaje „done” po cofnięciu: sam nie daje nic do cofnięcia.
+  const canUndo = $derived(order.actions.some((a) => (a.status === 'done' && !a.manual_undo) || a.status === 'pending'));
   const nameOf = (pkg: string) => historyApp(order, pkg, scanned).name;
   const title = $derived.by(() => {
     if (order.interrupted) return t('history.interrupted_title', { names: rows.map((r) => nameOf(r.package)).join(', ') });
@@ -69,7 +72,8 @@
     {@const app = historyApp(order, r.package, scanned)}
     <div class="group border-t border-line/70">
       <div class="flex items-center gap-3 px-5 py-2.5 transition-colors duration-150 hover:bg-surface-2">
-        <AppIcon icon={app.icon} class="h-8 w-8">
+        <!-- przeglądarek zwykle nie analizujemy: bez zapisanej ikony wbudowane logo -->
+        <AppIcon icon={app.icon ?? builtInIcon(r.package)} class="h-8 w-8">
           <span class="grid h-8 w-8 flex-none place-items-center rounded-lg bg-neutral-soft text-xs font-extrabold text-mut shadow-[var(--shadow-well)]" aria-hidden="true">{initial(app.name)}</span>
         </AppIcon>
         <span class="flex min-w-0 flex-col">
@@ -93,7 +97,14 @@
           {#each r.actions as a (a.id)}
             <li class="flex gap-2 py-0.5 text-sm text-mut">
               <span class="min-w-0 flex-1">{a.step_label} — {a.status_label}{a.error ? `: ${a.error}` : ''}</span>
-              {#if a.status === 'done'}
+              {#if a.status === 'done' && a.manual_undo}
+                <span class="max-w-[55%] text-right text-soft">{a.manual_undo}</span>
+              {:else if a.status === 'done' && a.kind === 'channel'}
+                <!-- włączenie na telefonie: cofanie tego jednego kroku otwiera ekran kanału -->
+                <button type="button" class="font-semibold text-accent" {disabled} onclick={() => onrestoreStep(a.id)}>📱 {t('history.enable_on_phone')}</button>
+              {:else if a.status === 'undone' && a.kind === 'channel' && a.site_url}
+                <button type="button" class="font-semibold text-accent" disabled={openDisabled} onclick={() => onopenSite(a.id)}>🌐 {t('history.open_site')}</button>
+              {:else if a.status === 'done'}
                 <button type="button" class="font-semibold text-accent" {disabled} onclick={() => onrestoreStep(a.id)}>↶ {t('history.restore')}</button>
               {/if}
             </li>

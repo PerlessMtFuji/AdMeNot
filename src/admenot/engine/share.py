@@ -15,6 +15,7 @@ import json
 import os
 import warnings
 import zlib
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
@@ -22,7 +23,7 @@ from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from PIL import Image
 
-from admenot.engine.actions.planner import NOTIF_PERMISSION_MIN_SDK, Blocked
+from admenot.engine.actions.planner import FIX_LEVEL, NOTIF_PERMISSION_MIN_SDK, Blocked
 from admenot.engine.apk.analyze import safe_icon
 from admenot.engine.workflow import OrderPlan
 
@@ -44,9 +45,12 @@ def notif_blocked(plan: OrderPlan) -> bool:
 
 
 def plan_code(plan: OrderPlan) -> str:
-    apps = sorted([r.package, r.level, isinstance(r, Blocked)] for r in plan.results)
-    canon = json.dumps({"serial": plan.device.serial, "notif": notif_blocked(plan), "apps": apps},
-                       sort_keys=True, separators=(",", ":"))
+    # Plany poprawek (poziom „fix”) niesie `plan.fixes`; w apps zmieniałyby kod planów bez poprawek.
+    apps = sorted([r.package, r.level, isinstance(r, Blocked)] for r in plan.results if r.level != FIX_LEVEL)
+    parts: dict[str, Any] = {"serial": plan.device.serial, "notif": notif_blocked(plan), "apps": apps}
+    if plan.fixes:  # tylko niepuste: kody planów bez poprawek zostają takie jak przed ich wprowadzeniem
+        parts["fixes"] = sorted(plan.fixes)
+    canon = json.dumps(parts, sort_keys=True, separators=(",", ":"))
     bits = int.from_bytes(hashlib.sha256(canon.encode("utf-8")).digest()[:3], "big") >> 4
     return "".join(CODE_ALPHABET[(bits >> shift) & 31] for shift in (15, 10, 5, 0))
 
@@ -74,9 +78,14 @@ def shrink_icon(uri: str | None) -> str | None:
 
 def build_payload(plan: OrderPlan, *, lang: str, phone: str, at: datetime,
                   names: dict[str, str], shop: str | None = None,
-                  icons: bool = True, partial: bool = False) -> dict[str, Any]:
+                  icons: bool = True, partial: bool = False,
+                  fix_texts: Sequence[dict[str, str]] = ()) -> dict[str, Any]:
+    """`fix_texts`: gotowe wpisy o zmianach w ustawieniach telefonu (zdanie `t`, przeglądarka `p`/`n`, host `h`;
+    liczy je wywołujący z `present`)."""
     apps: list[dict[str, Any]] = []
     for r in plan.results:
+        if r.level == FIX_LEVEL:  # poprawka, nie aplikacja: bez pakietu przeglądarki na stronie klienta
+            continue
         app: dict[str, Any] = {"n": names.get(r.package) or r.package, "l": r.level}
         if isinstance(r, Blocked):
             app["b"] = 1
@@ -89,6 +98,8 @@ def build_payload(plan: OrderPlan, *, lang: str, phone: str, at: datetime,
                                "notif": 1 if notif_blocked(plan) else 0, "apps": apps}
     if shop:
         payload["shop"] = shop
+    if fix_texts:
+        payload["f"] = [dict(entry) for entry in fix_texts]
     if partial:  # tryb ręczny albo analiza niedokończona (spec trybu ręcznego §5.1)
         payload["m"] = 1
     return payload

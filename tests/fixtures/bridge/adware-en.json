@@ -486,6 +486,18 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
+      "command": "dumpsys notification --noredact",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "<129 B>",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
       "command": "dumpsys notification --package admenot.none",
       "status": "ok",
       "duration": 0.0,
@@ -979,6 +991,14 @@
            }
           }
          ]
+        }
+       ],
+       "device_checks": [
+        {
+         "id": "site_notifications",
+         "state": "unrecognized",
+         "state_label": "Could not be read",
+         "browsers": []
         }
        ],
        "profiles": {
@@ -1479,6 +1499,14 @@
          ]
         }
        ],
+       "device_checks": [
+        {
+         "id": "site_notifications",
+         "state": "unrecognized",
+         "state_label": "Could not be read",
+         "browsers": []
+        }
+       ],
        "profiles": {
         "others": [],
         "known": true
@@ -1800,6 +1828,7 @@
       "label": "revoke notification permission",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -1837,6 +1866,7 @@
       "label": "revoke notification permission",
       "status": "done",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -1850,6 +1880,7 @@
       "label": "block drawing over other apps",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -1887,6 +1918,7 @@
       "label": "block drawing over other apps",
       "status": "done",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -1900,6 +1932,7 @@
       "label": "block full-screen notifications",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -1937,6 +1970,7 @@
       "label": "block full-screen notifications",
       "status": "done",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -1950,6 +1984,7 @@
       "label": "force-stop the app",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -1975,6 +2010,7 @@
       "label": "force-stop the app",
       "status": "done",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -1988,6 +2024,7 @@
       "label": "APK backup on this computer",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2073,6 +2110,7 @@
       "label": "APK backup on this computer",
       "status": "done",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2086,6 +2124,7 @@
       "label": "uninstall (user 0)",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2258,11 +2297,13 @@
      }
     ],
     [
-     "exec:admin_wait",
+     "exec:user_wait",
      {
       "package": "com.clean.pro.boost",
       "name": "com.clean.pro.boost",
-      "timeout": 180.0
+      "kind": "admin",
+      "timeout": 180.0,
+      "action_id": 11
      }
     ],
     [
@@ -2278,7 +2319,7 @@
      }
     ],
     [
-     "exec:admin_done",
+     "exec:user_done",
      {
       "package": "com.clean.pro.boost",
       "status": "done"
@@ -2438,6 +2479,7 @@
       "label": "uninstall (user 0)",
       "status": "done",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2451,6 +2493,7 @@
       "label": "revoke notification permission",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2488,6 +2531,7 @@
       "label": "revoke notification permission",
       "status": "done",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2501,6 +2545,7 @@
       "label": "block full-screen notifications",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2538,6 +2583,7 @@
       "label": "block full-screen notifications",
       "status": "done",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2551,6 +2597,7 @@
       "label": "force-stop the app",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2576,6 +2623,7 @@
       "label": "force-stop the app",
       "status": "done",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2589,6 +2637,7 @@
       "label": "disable the app",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2710,6 +2759,7 @@
       "label": "disable the app",
       "status": "done",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -2726,6 +2776,18 @@
       "status": "ok",
       "duration": 0.0,
       "output": "USE_FULL_SCREEN_INTENT: deny\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys package com.wlive.forecast",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Domain verification status:\nFailure printing domain verification information\nPackages:\n  Package [com.wlive.forecast] (f00d):\n    versionCode=31 minSdk=26 targetSdk=34\n    User 0: ceDataInode=1 installed=true enabled=3\n      runtime permissions:\n        android.permission.POST_NOTIFICATIONS: granted=false\n",
       "tag": null
      }
     ],
@@ -2788,7 +2850,8 @@
         "kinds": []
        }
       ],
-      "donate_reminder": true
+      "donate_reminder": true,
+      "firefox_debugging": false
      }
     ],
     [
@@ -2839,6 +2902,8 @@
         "kind": "permission",
         "step_label": "revoke notification permission",
         "status": "done",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "done",
         "error": null
        },
@@ -2850,6 +2915,8 @@
         "kind": "appop",
         "step_label": "block drawing over other apps",
         "status": "done",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "done",
         "error": null
        },
@@ -2861,6 +2928,8 @@
         "kind": "appop",
         "step_label": "block full-screen notifications",
         "status": "done",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "done",
         "error": null
        },
@@ -2872,6 +2941,8 @@
         "kind": "force_stop",
         "step_label": "force-stop the app",
         "status": "done",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "done",
         "error": null
        },
@@ -2883,6 +2954,8 @@
         "kind": "backup",
         "step_label": "APK backup on this computer",
         "status": "done",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "done",
         "error": null
        },
@@ -2894,6 +2967,8 @@
         "kind": "installed",
         "step_label": "uninstall (user 0)",
         "status": "done",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "done",
         "error": null
        },
@@ -2905,6 +2980,8 @@
         "kind": "permission",
         "step_label": "revoke notification permission",
         "status": "done",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "done",
         "error": null
        },
@@ -2916,6 +2993,8 @@
         "kind": "appop",
         "step_label": "block full-screen notifications",
         "status": "done",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "done",
         "error": null
        },
@@ -2927,6 +3006,8 @@
         "kind": "force_stop",
         "step_label": "force-stop the app",
         "status": "done",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "done",
         "error": null
        },
@@ -2938,6 +3019,8 @@
         "kind": "enabled",
         "step_label": "disable the app",
         "status": "done",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "done",
         "error": null
        },
@@ -2949,6 +3032,8 @@
         "kind": "admin",
         "step_label": "remove device admin rights (on the phone)",
         "status": "done",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "done",
         "error": null
        }
@@ -3086,7 +3171,32 @@
       "label": "remove device admin rights (on the phone)",
       "status": "undone",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys package com.wlive.forecast",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Domain verification status:\nFailure printing domain verification information\nPackages:\n  Package [com.wlive.forecast] (f00d):\n    versionCode=31 minSdk=26 targetSdk=34\n    User 0: ceDataInode=1 installed=true enabled=3\n      runtime permissions:\n        android.permission.POST_NOTIFICATIONS: granted=false\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys package com.wlive.forecast",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Domain verification status:\nFailure printing domain verification information\nPackages:\n  Package [com.wlive.forecast] (f00d):\n    versionCode=31 minSdk=26 targetSdk=34\n    User 0: ceDataInode=1 installed=true enabled=3\n      runtime permissions:\n        android.permission.POST_NOTIFICATIONS: granted=false\n",
+      "tag": null
      }
     ],
     [
@@ -3135,6 +3245,7 @@
       "label": "disable the app",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -3172,6 +3283,7 @@
       "label": "disable the app",
       "status": "undone",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -3185,6 +3297,7 @@
       "label": "force-stop the app",
       "status": "undone",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -3210,6 +3323,7 @@
       "label": "block full-screen notifications",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -3247,6 +3361,7 @@
       "label": "block full-screen notifications",
       "status": "undone",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -3272,6 +3387,7 @@
       "label": "revoke notification permission",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -3309,6 +3425,7 @@
       "label": "revoke notification permission",
       "status": "undone",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -3334,6 +3451,7 @@
       "label": "uninstall (user 0)",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": 82
      }
     ],
@@ -3407,6 +3525,7 @@
       "label": "uninstall (user 0)",
       "status": "undone",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -3420,6 +3539,7 @@
       "label": "APK backup on this computer",
       "status": "undone",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -3433,6 +3553,7 @@
       "label": "force-stop the app",
       "status": "undone",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -3458,6 +3579,7 @@
       "label": "block full-screen notifications",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -3495,6 +3617,7 @@
       "label": "block full-screen notifications",
       "status": "undone",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -3520,6 +3643,7 @@
       "label": "block drawing over other apps",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -3557,6 +3681,7 @@
       "label": "block drawing over other apps",
       "status": "undone",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -3582,6 +3707,7 @@
       "label": "revoke notification permission",
       "status": "running",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -3619,6 +3745,7 @@
       "label": "revoke notification permission",
       "status": "undone",
       "error": null,
+      "error_key": null,
       "restore_bytes": null
      }
     ],
@@ -3629,7 +3756,12 @@
       "status": "undone",
       "status_label": "undone",
       "errors": [],
-      "admin_not_restored": true
+      "admin_not_restored": true,
+      "sites_total": 0,
+      "sites_restored": 0,
+      "restored_sites": [],
+      "firefox_debugging": false,
+      "interrupted": []
      }
     ],
     [
@@ -3680,6 +3812,8 @@
         "kind": "permission",
         "step_label": "revoke notification permission",
         "status": "undone",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "undone",
         "error": null
        },
@@ -3691,6 +3825,8 @@
         "kind": "appop",
         "step_label": "block drawing over other apps",
         "status": "undone",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "undone",
         "error": null
        },
@@ -3702,6 +3838,8 @@
         "kind": "appop",
         "step_label": "block full-screen notifications",
         "status": "undone",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "undone",
         "error": null
        },
@@ -3713,6 +3851,8 @@
         "kind": "force_stop",
         "step_label": "force-stop the app",
         "status": "undone",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "undone",
         "error": null
        },
@@ -3724,6 +3864,8 @@
         "kind": "backup",
         "step_label": "APK backup on this computer",
         "status": "undone",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "undone",
         "error": null
        },
@@ -3735,6 +3877,8 @@
         "kind": "installed",
         "step_label": "uninstall (user 0)",
         "status": "undone",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "undone",
         "error": null
        },
@@ -3746,6 +3890,8 @@
         "kind": "permission",
         "step_label": "revoke notification permission",
         "status": "undone",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "undone",
         "error": null
        },
@@ -3757,6 +3903,8 @@
         "kind": "appop",
         "step_label": "block full-screen notifications",
         "status": "undone",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "undone",
         "error": null
        },
@@ -3768,6 +3916,8 @@
         "kind": "force_stop",
         "step_label": "force-stop the app",
         "status": "undone",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "undone",
         "error": null
        },
@@ -3779,6 +3929,8 @@
         "kind": "enabled",
         "step_label": "disable the app",
         "status": "undone",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "undone",
         "error": null
        },
@@ -3790,6 +3942,8 @@
         "kind": "admin",
         "step_label": "remove device admin rights (on the phone)",
         "status": "undone",
+        "manual_undo": null,
+        "site_url": null,
         "status_label": "undone",
         "error": null
        }

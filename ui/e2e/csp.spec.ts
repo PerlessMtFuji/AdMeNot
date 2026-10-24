@@ -8,7 +8,7 @@ test('built page carries a CSP and runs a whole scan without violations', async 
   expect(csp).toContain("script-src 'self'");
   await page.getByPlaceholder('np. Anna K.').fill('Anna K.');
   await page.getByRole('button', { name: 'Skanuj' }).click();
-  await expect(page.getByText(/Analiza APK w tle/)).toBeHidden({ timeout: 15_000 });
+  await expect(page.getByText(/Analiza plików aplikacji/)).toBeHidden({ timeout: 15_000 });
   await page.getByRole('button', { name: 'Ekspert' }).click();
   expect(violations).toEqual([]);
 });

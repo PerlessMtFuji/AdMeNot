@@ -33,5 +33,14 @@ PM_UNINSTALL = "pm uninstall --user 0 {package}"
 PM_INSTALL_EXISTING = "cmd package install-existing --user 0 {package}"
 ADMIN_SETTINGS = "am start -n 'com.android.settings/.Settings$DeviceAdminSettingsActivity'"
 SECURITY_SETTINGS = "am start -a android.settings.SECURITY_SETTINGS"
+# Pełny zrzut (--noredact): bez niego nazwy kanałów i napisy powiadomień są zasłonięte.
+NOTIFICATIONS_FULL = "dumpsys notification --noredact"
+# Ekran jednego kanału powiadomień; decyduje dotknięcie przełącznika na telefonie (jak ekran administratorów).
+# --activity-clear-task: bez tego kolejny kanał tylko wyciąga na wierzch otwarte już zadanie Ustawień
+# z poprzednim kanałem (Samsung A13, 2026-10-24) — telefon zostaje na ekranie, który już wyłączono.
+CHANNEL_SETTINGS = ("am start --activity-clear-task -a android.settings.CHANNEL_NOTIFICATION_SETTINGS "
+                    "--es android.provider.extra.APP_PACKAGE {package} "
+                    "--es android.provider.extra.CHANNEL_ID '{channel}'")
+OPEN_SITE = "am start -a android.intent.action.VIEW -d '{url}' -p {package}"
 GETPROP_SDK = "getprop ro.build.version.sdk"
 INSTALL_TIMEOUT = 300.0

@@ -6,7 +6,7 @@
     "full": "Full analysis", "full_sub": "a verdict for every app",
     "manual": "Search by hand", "manual_sub": "search, select, remove",
     "remember": "Remember my choice (change it in Settings)",
-    "stop_to_manual": "Stop and search by hand"
+    "stop_to_manual": "Stop — I'll review by hand"
   },
   "manual": {
     "title": "Find the apps to remove",
@@ -31,20 +31,39 @@
     "confirm": "Select", "apply": "Apply" },
   "common": { "cancel": "Cancel", "close": "Close", "back": "Back", "save": "Save", "saved": "Saved" },
   "category": { "ads": "Ads", "notif": "Notification spam", "removal": "Hard to remove", "data": "Access to data", "disguise": "Impersonation", "background": "Runs in background", "origin": "Origin", "combo": "Signal combination" },
-  "choice": { "silence": "Silence", "disable": "Disable", "remove": "Remove" },
+  "checks": {
+    "title": "Phone state",
+    "site_notifications": "Site notifications",
+    "intro": "Sites someone allowed to send notifications. Such “ads” look like they come from an app, but they come from the browser.",
+    "to_fix": { "one": "{count} to silence", "few": "{count} to silence", "many": "{count} to silence", "other": "{count} to silence" },
+    "picked": { "one": "{count} selected", "few": "{count} selected", "many": "{count} selected", "other": "{count} selected" },
+    "ok_sub": "no site can send notifications",
+    "active": "notification on screen", "can_send": "can send notifications", "none": "No sites with notifications.",
+    "silence": "Silence", "silence_site": "Silence {host}", "silence_all": "Silence all",
+    "on_screen": "On screen now:",
+    "active_no_fix": "To silence a single site, expand its notification on the phone and tap “Block”.",
+    "all": "All sites in {browser}",
+    "all_sub": "This browser does not show the list of sites — from the computer they can only be silenced all at once.",
+    "done": "Already off:", "unreadable": "Could not be read:",
+    "rdp_off": "When done, turn off “Remote debugging via USB” in Firefox",
+    "unsupported": "The program cannot check this browser’s notifications. Check on the phone: Settings → Apps → {browser} → Notifications.",
+    "unsupported_pill": "check manually",
+    "rdp": "Without debugging only sites with a notification on screen are visible. To see and silence each one, turn this on on the phone: Firefox → Settings → Remote debugging via USB. I will read them as soon as you do."
+  },
+  "choice": { "silence": "Silence", "disable": "Disable", "remove": "Remove", "fix": "Site settings" },
   "results": {
     "title": { "one": "{count} app needs attention", "few": "{count} apps need attention", "many": "{count} apps need attention", "other": "{count} apps need attention" },
     "safe": { "one": "{count} app without issues", "few": "{count} apps without issues", "many": "{count} apps without issues", "other": "{count} apps without issues" },
     "mode": "View mode", "action_for": "Action for {name}",
     "clean_title": "No signs of a threat", "clean_title_incomplete": "No signs of a threat — incomplete assessment", "clean_sub": "Within the scope of this scan · apps checked: {count}",
-    "apk_title": "Checking app files…", "apk_sub": "No signs of a threat so far. The result may change after the analysis.",
+    "apk_title": "Checking app files…", "apk_card": "App file analysis", "apk_count": "{done} of {total}", "apk_sub": "No signs of a threat so far. The result may change after the analysis.",
     "safe_show": "Show the list", "safe_hide": "Hide the list",
     "incomplete": "Incomplete assessment", "disabled": "Disabled on the phone", "why": "Why?",
     "safe_incomplete": { "one": "incl. {count} with an incomplete assessment", "few": "incl. {count} with an incomplete assessment", "many": "incl. {count} with an incomplete assessment", "other": "incl. {count} with an incomplete assessment" }
   },
   "panel": {
     "apps": { "one": "{count} app", "few": "{count} apps", "many": "{count} apps", "other": "{count} apps" },
-    "plan": "Repair plan", "empty": "Select the apps you want to fix."
+    "plan": "Repair plan", "empty": "Select the apps or sites you want to fix."
   },
   "rail": { "label": "Menu", "new_order": "New order", "back_to_order": "Back to the order" },
   "header": { "find_source": "Find the ad source", "find_source_recording": "Find the ad source — recording in progress", "simple": "Simple", "expert": "Expert", "history": "History", "settings": "Settings" },
@@ -143,6 +162,7 @@
     "incomplete": "Incomplete assessment — could not read: {names}. Apps affected: {count}. “Without issues” here only means “no signs in the data that was read”.",
     "notifications_manual": "Android 12 and older: app notifications cannot be turned off from the computer — only by hand on the phone (Settings › Apps › the app › Notifications). “Silence” stops the app and takes away e.g. the home screen role, notification access and drawing over other apps.",
     "select_level_disable": "The default action from settings (“Silence”) is replaced with “Disable” on this phone.",
+    "checks_unreadable": "Could not read the phone state (site notifications in browsers). An empty list does not mean there is nothing there — check by hand in the browser settings.",
     "undo_app": "Undo: {name}",
     "undoing_app": "Undoing changes: {name}…",
     "undo_app_failed": "Could not undo the changes: {name}",
@@ -156,7 +176,8 @@
       "profiles": "Other user profiles were not checked.",
       "profiles_unknown": "Could not read the list of user profiles.",
       "notifications_manual": "Android 12: notifications can only be turned off on the phone.",
-      "select_level_disable": "The default “Silence” is replaced with “Disable” here."
+      "select_level_disable": "The default “Silence” is replaced with “Disable” here.",
+      "checks_unreadable": "Phone state: not read."
     }
   },
   "level": { "silence": "SILENCE", "disable": "DISABLE", "remove": "REMOVE", "review": "CHECK", "none": "—" },
@@ -179,7 +200,7 @@
     "deep": "Deep analysis", "deep_hint": "Looks in the app code for possible paths to sensitive calls. Takes up to a few minutes.", "limits": "Assessment limits", "incomplete_data": "Little data about the app's behavior", "confidence": "Confidence"
   },
   "actions": { "console": "ADB console", "fix": "Summary ({count})", "rescan": "Scan again" },
-  "plan": { "title": "Repair plan", "confirm_title": "What I will do on the phone", "blocked": "Skipped", "unlock": "Unlock", "unlock_prompt": "This is a system app — changing it can break phone features. To unlock it, type the package name: {package}", "unlock_label": "Package name to unlock", "undo_hint": "You can undo changes in History. Removing an app deletes its data — undo restores the app itself.", "run": "Run ({count})", "nothing": "Nothing to run — all apps are blocked.", "share": "Show the client", "share_hint": "The list will be encrypted and stored on the AdMeNot server for an hour. Only this code can read it.", "share_qr": "QR code with the repair plan for the client", "share_code": "Check code", "share_zoom": "Enlarge code", "share_valid": "Valid until {time}", "share_local": "No connection to the server. The code works without icons. We will keep trying to send the full plan in the background.", "share_upgraded": "Code updated, now with icons. The list has not changed (code {code}).", "share_too_long": "No connection to the server, and the plan is too long for a code without internet.", "share_local_server": "The AdMeNot server did not accept the plan. The code works without icons. We will keep trying to send the full plan in the background.", "share_too_long_server": "The AdMeNot server did not accept the plan, and the plan is too long for a code without internet.", "groups": { "remove": "To remove", "disable": "To turn off", "silence": "To silence", "blocked": "Skipped" }, "steps": "Steps", "only": "only: {names}", "share_error": "The code for the client could not be prepared.", "consent": "The client has seen the scope of the repair (code {code})", "changed": "The plan has changed since it was shown to the client. Show the client the new code." },
+  "plan": { "title": "Repair plan", "confirm_title": "What I will do on the phone", "blocked": "Skipped", "unlock": "Unlock", "unlock_prompt": "This is a system app — changing it can break phone features. To unlock it, type the package name: {package}", "unlock_label": "Package name to unlock", "undo_hint": "You can undo changes in History. Removing an app deletes its data — undo restores the app itself.", "run": "Run ({count})", "nothing": "Nothing to run — all apps are blocked.", "share": "Show the client", "share_hint": "The list will be encrypted and stored on the AdMeNot server for an hour. Only this code can read it.", "share_qr": "QR code with the repair plan for the client", "share_code": "Check code", "share_zoom": "Enlarge code", "share_valid": "Valid until {time}", "share_local": "No connection to the server. The code works without icons. We will keep trying to send the full plan in the background.", "share_upgraded": "Code updated, now with icons. The list has not changed (code {code}).", "share_too_long": "No connection to the server, and the plan is too long for a code without internet.", "share_local_server": "The AdMeNot server did not accept the plan. The code works without icons. We will keep trying to send the full plan in the background.", "share_too_long_server": "The AdMeNot server did not accept the plan, and the plan is too long for a code without internet.", "groups": { "remove": "To remove", "disable": "To turn off", "silence": "To silence", "fix": "Site settings", "blocked": "Skipped" }, "steps": "Steps", "only": "only: {names}", "all_sites": "all sites", "share_error": "The code for the client could not be prepared.", "consent": "The client has seen the scope of the repair (code {code})", "changed": "The plan has changed since it was shown to the client. Show the client the new code." },
   "exec": {
     "title": "Fixing the phone…", "step": "step {done} of {total}", "panel": "Order",
     "done_title": "Phone fixed", "done_warn": "Repair finished with remarks",
@@ -189,21 +210,32 @@
     "state": { "queued": "waiting", "running": "in progress", "ok": "done", "still_active": "still active", "failed": "failed", "stopped": "paused" },
     "waiting": "Queued", "stop": "Pause", "stopping": "Pausing after the current step…",
     "verifying": "Checking that the changes hold…", "stopped": "Order paused. You can finish or undo it.",
+    "firefox_debugging": "Turn off remote debugging over USB in Firefox",
     "resume": "Finish", "undo_all": "Undo the whole order", "new_scan": "New scan", "back_to_repair": "Back to repair",
     "apps": { "one": "{count} app", "few": "{count} apps", "many": "{count} apps", "other": "{count} apps" },
     "steps": { "one": "{count} step", "few": "{count} steps", "many": "{count} steps", "other": "{count} steps" }
   },
   "result": { "ok": "Done", "still_active": "Still active — the change did not hold ({kinds})", "failed": "Error", "stopped": "Paused",
-    "ok_level": { "silence": "silenced · verified", "disable": "disabled · verified", "remove": "removed · verified" } },
+    "ok_level": { "silence": "silenced · verified", "disable": "disabled · verified", "remove": "removed · verified", "fix": "changed · verified" } },
   "admin": {
     "phone_title": "Device admin apps", "deactivate": "Deactivate",
     "title": "One tap needed on the phone",
     "text": "The device admin screen is open on the phone. Tap “Deactivate” next to {name} — I will do the rest.",
     "left": "Waiting {time} more"
   },
-  "question": { "admin": { "title": "Admin rights were not removed", "text": "{name} is still a device admin. Try again?", "retry": "Retry", "skip": "Skip" } },
+  "user": {
+    "phone_title": "Site notifications",
+    "channel": "On the phone, turn off the notifications switch for {site} ({browser})",
+    "channel_all": "On the phone, turn off the notifications switch for all sites ({browser})",
+    "reopen": "Open again on the phone"
+  },
+  "question": {
+    "admin": { "title": "Admin rights were not removed", "text": "{name} is still a device admin. Try again?", "retry": "Retry", "skip": "Skip" },
+    "channel": { "title": "Notifications were not turned off on the phone", "text": "The notifications switch for {site} ({browser}) is still on. Try again?",
+      "text_all": "The notifications switch for all sites ({browser}) is still on. Try again?" }
+  },
   "interrupted": {
-    "text": "Interrupted order {order}", "resume": "Finish", "undo": "Undo",
+    "text": "Interrupted order {order}", "resume": "Finish", "undo": "Undo", "hide": "Hide",
     "disconnected": "The phone was disconnected during order {order}. Reconnect and scan it, then finish or undo the order."
   },
   "welcome": {
@@ -265,17 +297,33 @@
     "today": "Today", "yesterday": "Yesterday", "and": "and",
     "undone_suffix": " — undone",
     "interrupted_title": "Interrupted: {names}",
-    "level_done": { "silence": "silenced", "disable": "disabled", "remove": "removed" },
+    "level_done": { "silence": "silenced", "disable": "disabled", "remove": "removed", "fix": "site settings changed" },
     "restored": "restored", "pending": "waiting to be finished", "failed": "failed",
     "backup": "backup on the computer", "steps": "Steps",
     "other_serial": "Other serial number…", "serial_placeholder": "Serial number", "show": "Show",
     "restoring": "Installing the app from the backup on this computer ({size}) — this can take up to a minute. Keep the phone connected.",
     "undoing": "Undoing changes…",
+    "enable_on_phone": "Turn on on the phone",
+    "sites_restored": { "one": "Turned on {restored} of {count} site.", "few": "Turned on {restored} of {count} sites.", "many": "Turned on {restored} of {count} sites.", "other": "Turned on {restored} of {count} sites." },
+    "sites_rest": "Turn the rest on from the order history.",
+    "open_site": "Open the site on the phone",
+    "sites_resubscribe": "Permission is back, but the site has to subscribe the phone again — open it (sometimes you need to click “Subscribe” or “Allow” there).",
+    "open_site_failed": "Couldn't open the site on the phone.",
     "did": {
       "remove": { "one": "removed {count} app", "few": "removed {count} apps", "many": "removed {count} apps", "other": "removed {count} apps" },
       "disable": { "one": "disabled {count} app", "few": "disabled {count} apps", "many": "disabled {count} apps", "other": "disabled {count} apps" },
-      "silence": { "one": "silenced {count} app", "few": "silenced {count} apps", "many": "silenced {count} apps", "other": "silenced {count} apps" }
+      "silence": { "one": "silenced {count} app", "few": "silenced {count} apps", "many": "silenced {count} apps", "other": "silenced {count} apps" },
+      "fix": { "one": "changed site settings in {count} browser", "few": "changed site settings in {count} browsers", "many": "changed site settings in {count} browsers", "other": "changed site settings in {count} browsers" }
     }
+  },
+  "undo": {
+    "sites_title": "Restoring site notifications",
+    "sites_sub": "Turn the switches on one by one on the phone — the next one opens by itself.",
+    "site_all": "all sites",
+    "site_hint": "Turn on “Show notifications”.",
+    "skip": "Skip",
+    "state": { "done": "turned on", "waiting": "waiting", "skipped": "skipped", "gone": "can't be restored" },
+    "done_collapsed": { "one": "✓ {count} turned on", "few": "✓ {count} turned on", "many": "✓ {count} turned on", "other": "✓ {count} turned on" }
   },
   "mirror": {
     "start": "Screen view",

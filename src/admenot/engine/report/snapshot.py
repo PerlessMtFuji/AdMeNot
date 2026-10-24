@@ -119,6 +119,7 @@ def scan_snapshot(report: ScanReport, match: PhoneMatch,
         "app_count": len(report.results),
         "apk_mode": report.apk_mode,
         "on_demand": sorted(on_demand),
+        "device_checks": [asdict(c) for c in report.device_checks],  # „Stan telefonu” z chwili zlecenia
         "apps": [_app(r, report.apk_reports.get(r.facts.package), chosen.get(r.facts.package), d.sdk)
                  for r in report.results if kept(r)],
     }

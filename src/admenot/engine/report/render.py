@@ -13,7 +13,7 @@ from jinja2 import Environment, PackageLoader, StrictUndefined
 
 from admenot.engine.apk.analyze import safe_icon
 from admenot.engine.phones.provider import SILHOUETTE
-from admenot.engine.report.model import FLAGGED, AppRow, Protocol, ScanScope
+from admenot.engine.report.model import FLAGGED, AppRow, PhoneCheck, Protocol, ScanScope
 from admenot.engine.report.texts import TEXTS
 from admenot.engine.settings import LOGO_TYPES, ServiceInfo
 from admenot.engine.texts import gap_label, screenshot_caption, verdict_label
@@ -125,6 +125,24 @@ def _headline(protocol: Protocol, t: dict[str, Any]) -> str | None:
     return t["clean"].format(count=protocol.clean_count)
 
 
+def _phone(check: PhoneCheck, t: dict[str, Any]) -> dict[str, Any]:
+    p = t["phone"]
+    return {
+        "empty": p["empty"] if check.state == "ok" and not check.rows else None,
+        "unrecognized": (p["unrecognized"]
+                         if check.state == "unrecognized" and not check.rows else None),
+        "rows": [{
+            "browser": row.browser,
+            "domain": row.domain or (p["unreadable"] if row.before == "unrecognized"
+                                     else p["unsupported"] if row.before == "unsupported"
+                                     else p["all_sites"]),
+            "before": p["before"].get(row.before, row.before),
+            "result": p["outcomes"].get(row.outcome, row.outcome),
+            "outcome": row.outcome,
+        } for row in check.rows],
+    }
+
+
 def render_html(protocol: Protocol, service: ServiceInfo, generated_at: datetime) -> str:
     lang = protocol.lang
     t = TEXTS[lang]
@@ -139,6 +157,7 @@ def render_html(protocol: Protocol, service: ServiceInfo, generated_at: datetime
         date=protocol.created_at.strftime(t["date_format"]),
         headline=_headline(protocol, t),
         scope=scope_lines(protocol.scope, t, sum(1 for r in protocol.rows if r.incomplete)),
+        phone=[_phone(c, t) for c in protocol.phone_checks],
         recommendations=[t["recommendations"][r.key].format(**r.params)
                          for r in protocol.recommendations],
         generated=t["generated"].format(date=generated_at.strftime(t["datetime_format"])),

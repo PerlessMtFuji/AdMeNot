@@ -5,13 +5,16 @@ Używają ich CLI i GUI; komunikaty samego CLI (pytania, podpowiedzi poleceń) z
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from admenot.engine.actions.errors import hint_key
+from admenot.engine.browsers.known import browser_names, known_browsers
+from admenot.engine.parsers.site_notifications import site_origin
 
 TEXTS: dict[str, dict[str, dict[str, str]]] = {
     "pl": {
-        "levels": {"silence": "WYCISZ", "disable": "WYŁĄCZ", "remove": "USUŃ"},
+        "levels": {"silence": "WYCISZ", "disable": "WYŁĄCZ", "remove": "USUŃ", "fix": "Ustawienia witryn"},
         "steps": {
             "force_stop": "zatrzymanie aplikacji",
             "appop": "appops {op} → {mode}",
@@ -30,6 +33,9 @@ TEXTS: dict[str, dict[str, dict[str, str]]] = {
             "installed:0": "odinstalowanie (użytkownik 0)",
             "installed:1": "przywrócenie aplikacji",
             "admin": "odebranie uprawnień administratora (na telefonie)",
+            "channel": "Wyłączenie powiadomień: {site} ({browser})",
+            "channel:all": "Wyłączenie powiadomień wszystkich witryn ({browser})",
+            "site_permission": "Blokada powiadomień: {site} ({browser})",
         },
         "reasons": {
             "protected": "aplikacja chroniona (tryb ekspercki: --unlock {package})",
@@ -39,6 +45,9 @@ TEXTS: dict[str, dict[str, dict[str, str]]] = {
             "unknown_level": "nieznany poziom (silence | disable | remove)",
             "context_unknown": "nie rozpoznano odpowiedzi telefonu ({detail}) — bez tego nie "
                                "wyłączam ani nie usuwam; możesz wyciszyć",
+            "unknown_fix": "tej zmiany ustawień nie ma już w stanie telefonu ({detail}) — zrób nowy skan",
+            "browser_removed": "to zlecenie wyłącza albo usuwa tę przeglądarkę — jej ustawień "
+                               "witryn nie zmieniam osobno",
         },
         "warnings": {
             "home_not_switched": "ekran główny zostaje bez zmian (brak launchera systemowego)",
@@ -67,6 +76,17 @@ TEXTS: dict[str, dict[str, dict[str, str]]] = {
             "not_started": "krok nie zdążył się zacząć",
             "app_gone": "aplikacji nie ma już na telefonie — nie ma czego cofać",
             "admin_timeout": "nie odebrano uprawnień administratora na czas",
+            "user_timeout": "nie zmieniono ustawienia na telefonie na czas — powiadomienia "
+                            "zostają włączone",
+            "site_skipped": "pominięto — włączysz ją później z historii zlecenia",
+            "site_timeout": "nie włączono na czas — włączysz ją później z historii zlecenia",
+            "channel_gone": "przeglądarka usunęła ten kanał — włącz powiadomienia witryny ręcznie "
+                            "w ustawieniach przeglądarki",
+            "rdp_unavailable": "Firefox nie odpowiada na zdalne debugowanie — włącz je w Firefoksie "
+                               "(Ustawienia → Zdalne debugowanie przez USB) i spróbuj w nowym planie",
+            "rdp_failed": "Firefox odpowiedział w nieoczekiwany sposób — ustawienia witryny nie zmieniono",
+            "browser_removed": "przeglądarka jest w tym zleceniu wyłączana albo usuwana",
+            "unknown_fix": "tej zmiany ustawień nie ma już w stanie telefonu",
             "not_admin": "system odmówił, choć aplikacja nie jest administratorem",
             "disconnected": "telefon odłączony",
             "offline": "telefon offline",
@@ -80,7 +100,7 @@ TEXTS: dict[str, dict[str, dict[str, str]]] = {
                           "undone": "cofnięte"},
     },
     "en": {
-        "levels": {"silence": "SILENCE", "disable": "DISABLE", "remove": "REMOVE"},
+        "levels": {"silence": "SILENCE", "disable": "DISABLE", "remove": "REMOVE", "fix": "Site settings"},
         "steps": {
             "force_stop": "force-stop the app",
             "appop": "appops {op} → {mode}",
@@ -99,6 +119,9 @@ TEXTS: dict[str, dict[str, dict[str, str]]] = {
             "installed:0": "uninstall (user 0)",
             "installed:1": "restore the app",
             "admin": "remove device admin rights (on the phone)",
+            "channel": "Turning off notifications: {site} ({browser})",
+            "channel:all": "Turning off notifications for all sites ({browser})",
+            "site_permission": "Blocking notifications: {site} ({browser})",
         },
         "reasons": {
             "protected": "protected app (expert mode: --unlock {package})",
@@ -108,6 +131,10 @@ TEXTS: dict[str, dict[str, dict[str, str]]] = {
             "unknown_level": "unknown level (silence | disable | remove)",
             "context_unknown": "unrecognized phone response ({detail}) — not disabling or "
                                "removing without it; you can silence",
+            "unknown_fix": "this settings change is no longer in the phone state ({detail}) — "
+                           "scan again",
+            "browser_removed": "this order disables or removes this browser — its site settings "
+                               "are not changed separately",
         },
         "warnings": {
             "home_not_switched": "home screen stays as is (no system launcher)",
@@ -136,6 +163,17 @@ TEXTS: dict[str, dict[str, dict[str, str]]] = {
             "not_started": "step had not started",
             "app_gone": "the app is no longer on the phone — nothing to undo",
             "admin_timeout": "device admin rights were not removed in time",
+            "user_timeout": "the setting was not changed on the phone in time — notifications "
+                            "stay on",
+            "site_skipped": "skipped — turn it on later from the order history",
+            "site_timeout": "not turned on in time — turn it on later from the order history",
+            "channel_gone": "the browser removed this channel — turn the site's notifications on "
+                            "manually in the browser settings",
+            "rdp_unavailable": "Firefox does not answer remote debugging — turn it on in Firefox "
+                               "(Settings → Remote debugging via USB) and try in a new plan",
+            "rdp_failed": "Firefox answered unexpectedly — the site setting was not changed",
+            "browser_removed": "the browser is disabled or removed in this order",
+            "unknown_fix": "this settings change is no longer in the phone state",
             "not_admin": "the system refused although the app is not a device admin",
             "disconnected": "phone disconnected",
             "offline": "phone offline",
@@ -200,6 +238,42 @@ CONFIDENCE_LABELS = {
 }
 
 
+CLIENT_FIX_TEXTS = {
+    "pl": {"channel": "Wyłączenie powiadomień witryny {site} w {browser}",
+           "channel:all": "Wyłączenie powiadomień wszystkich witryn w {browser}",
+           "site_permission": "Blokada powiadomień witryny {site} w {browser}"},
+    "en": {"channel": "Turning off notifications from {site} in {browser}",
+           "channel:all": "Turning off notifications from all sites in {browser}",
+           "site_permission": "Blocking notifications from {site} in {browser}"},
+}
+
+MANUAL_UNDO = {
+    "pl": {"channel": "Ustawienia → Aplikacje → {browser} → Powiadomienia → {site}",
+           "channel:all": "Ustawienia → Aplikacje → {browser} → Powiadomienia"},
+    "en": {"channel": "Settings → Apps → {browser} → Notifications → {site}",
+           "channel:all": "Settings → Apps → {browser} → Notifications"},
+}
+
+SITE_RESUBSCRIBE = {
+    "pl": "Powiadomienia wrócą, gdy strona zapisze się od nowa — otwórz ją na telefonie: {url}",
+    "en": "Notifications come back once the site subscribes again — open it on the phone: {url}",
+}
+
+
+def site_resubscribe(url: str, lang: str) -> str:
+    return SITE_RESUBSCRIBE[lang].format(url=url)
+
+
+CHECK_STATE_LABELS = {
+    "pl": {"ok": "W porządku", "review": "Do sprawdzenia", "unrecognized": "Nie udało się odczytać"},
+    "en": {"ok": "OK", "review": "Review", "unrecognized": "Could not be read"},
+}
+
+
+def check_state_label(state: str, lang: str) -> str:
+    return CHECK_STATE_LABELS[lang].get(state, state)
+
+
 def capability_label(key: str, lang: str) -> str:
     return CAPABILITY_LABELS[lang].get(key, key)
 
@@ -216,9 +290,47 @@ def confidence_label(level: str, lang: str) -> str:
     return CONFIDENCE_LABELS[lang].get(level, level)
 
 
-def step_label(step: dict[str, Any], lang: str) -> str:
+def browser_name(package: str, names: Mapping[str, str] | None = None) -> str:
+    """Nazwa przeglądarki: tabela znanych, nazwy popularnych, potem nazwy ze skanu, na końcu sam pakiet.
+    Nazwa ze skanu bywa samym pakietem (etykieta jeszcze nieodczytana), więc popularne mają pierwszeństwo."""
+    known = known_browsers().get(package)
+    if known:
+        return known.name
+    return browser_names().get(package) or (names or {}).get(package) or package
+
+
+def _site_of(step: dict[str, Any]) -> tuple[str, str | None]:
+    """(klucz tekstu, host witryny albo None dla wspólnego kanału przeglądarki)."""
+    params = step.get("params") or {}
+    if step["kind"] == "site_permission":
+        return "site_permission", _host(str(params.get("origin") or ""))
+    channel = str(params.get("channel_id") or "")
+    browser = known_browsers().get(step["package"])
+    if browser and channel == browser.shared_channel:
+        return "channel:all", None
+    origin = site_origin(channel)
+    return "channel", _host(origin) if origin else channel
+
+
+def _host(origin: str) -> str:
+    return origin.split("://", 1)[-1]
+
+
+def fix_step_texts(step: dict[str, Any], lang: str, names: Mapping[str, str] | None = None) -> dict[str, str | None]:
+    """Teksty kroku poprawki witryny: etykieta, zdanie dla klienta i miejsce ręcznego cofnięcia."""
+    key, site = _site_of(step)
+    values = {"site": site or "", "browser": browser_name(step["package"], names)}
+    return {"site": site, "label": TEXTS[lang]["steps"][key].format(**values),
+            "client": CLIENT_FIX_TEXTS[lang][key].format(**values),
+            # ścieżka ręczna, gdy cofanie nie znajdzie kanału (przeglądarka go usunęła)
+            "manual_undo": (MANUAL_UNDO[lang][key].format(**values) if step["kind"] == "channel" else None)}
+
+
+def step_label(step: dict[str, Any], lang: str, names: Mapping[str, str] | None = None) -> str:
     labels = TEXTS[lang]["steps"]
     kind, params = step["kind"], step.get("params") or {}
+    if kind in ("channel", "site_permission"):
+        return str(fix_step_texts(step, lang, names)["label"])
     if kind == "appop":
         template = labels.get(f"appop:{params['op']}", labels["appop"])
     elif kind == "secure_list":

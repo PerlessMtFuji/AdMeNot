@@ -53,6 +53,32 @@ describe("POST /api/v1/telemetry", () => {
     expect((await post([scan(), repair()])).status).toBe(200);
   });
 
+  it("zapisuje stan sprawdzeń i liczby witryn oraz napraw; brak pól → null", async () => {
+    const withChecks = scan({ checks: { site_notifications: "review" }, sites: { per_site: 2, shared: 1, rdp: 0 } });
+    const withFixes = { ...repair(), fixes: { channel: 1, site_permission: 2 } };
+    expect((await post([withChecks, withFixes, scan(), repair()])).status).toBe(200);
+    const [s, r, oldScan, oldRepair] = (await rows()).map((x) => JSON.parse(x.body));
+    expect(s.checks).toEqual({ site_notifications: "review" });
+    expect(s.sites).toEqual({ per_site: 2, shared: 1, rdp: 0 });
+    expect(r.fixes).toEqual({ channel: 1, site_permission: 2 });
+    expect([oldScan.checks, oldScan.sites, oldRepair.fixes]).toEqual([null, null, null]);
+  });
+
+  it.each([
+    ["nieznany stan", scan({ checks: { site_notifications: "fix" } })],
+    ["dodatkowy klucz w checks", scan({ checks: { site_notifications: "ok", other: "ok" } })],
+    ["pusty checks", scan({ checks: {} })],
+    ["domena w sites", scan({ sites: { per_site: 1, shared: 0, rdp: 0, "example.com": 1 } })],
+    ["napis zamiast liczby w sites", scan({ sites: { per_site: "example.com", shared: 0, rdp: 0 } })],
+    ["brak klucza w sites", scan({ sites: { per_site: 1, shared: 0 } })],
+    ["dodatkowy klucz w fixes", { ...repair(), fixes: { channel: 1, site_permission: 0, "com.android.chrome": 1 } }],
+    ["napis w fixes", { ...repair(), fixes: { channel: "x", site_permission: 0 } }],
+    ["ujemna liczba w fixes", { ...repair(), fixes: { channel: -1, site_permission: 0 } }],
+  ])("400: %s", async (_name, event) => {
+    expect((await post([event])).status).toBe(400);
+    expect(await rows()).toEqual([]);
+  });
+
   it("odrzuca nieznany tryb i zły szacunek", async () => {
     expect((await post([scan({ apk_mode: "fast" })])).status).toBe(400);
     expect((await post([scan({ eta: { kind: "exact", seconds: 1 } })])).status).toBe(400);
@@ -87,6 +113,20 @@ describe("POST /api/v1/telemetry", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, stored: 4 });
     expect((await rows()).map((r) => r.type)).toEqual(["start", "scan", "repair", "undo"]);
+  });
+
+  it("undo: liczby witryn opcjonalne, domyślnie 0", async () => {
+    await post([undo()]);
+    expect(JSON.parse((await rows())[0].body)).toMatchObject({ sites: 0, sites_restored: 0 });
+  });
+
+  it("undo: liczby witryn przepisane", async () => {
+    await post([{ ...undo(), sites: 3, sites_restored: 2 }]);
+    expect(JSON.parse((await rows())[0].body)).toMatchObject({ sites: 3, sites_restored: 2 });
+  });
+
+  it("undo: sites nie będące liczbą odrzucone", async () => {
+    expect((await post([{ ...undo(), sites: "x" }])).status).toBe(400);
   });
 
   it("zapisuje tylko znane pola", async () => {

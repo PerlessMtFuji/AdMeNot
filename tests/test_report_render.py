@@ -8,6 +8,8 @@ from admenot.engine.report.model import (
     AppRow,
     Consent,
     DeviceBlock,
+    PhoneCheck,
+    PhoneCheckRow,
     Protocol,
     Recommendation,
     ScanScope,
@@ -316,3 +318,45 @@ def test_manual_protocol_has_note_and_no_clean_headline():
 def test_protocol_without_manual_has_no_note():
     html = render_html(make_protocol(), ServiceInfo(), GENERATED)
     assert TEXTS["pl"]["manual_note"] not in html
+
+
+def _phone_check(state="review", rows=None):
+    rows = [PhoneCheckRow("Chrome", "a.pl", "active", "done"),
+            PhoneCheckRow("Samsung Internet", None, "shared", "failed")] if rows is None else rows
+    return PhoneCheck("site_notifications", state, rows)
+
+
+def test_phone_section_lists_rows_with_results():
+    html = render_html(make_protocol(phone_checks=[_phone_check()]), ServiceInfo(), GENERATED)
+    for text in ("Stan telefonu", "Przeglądarka", "Witryna", "Stan przed naprawą", "Chrome", "a.pl",
+                 "wysyła powiadomienia", "Wyłączono powiadomienia", "Samsung Internet",
+                 "wszystkie witryny tej przeglądarki", "Nie powiodło się"):
+        assert text in html, text
+    en = render_html(make_protocol(lang="en", phone_checks=[_phone_check()]), ServiceInfo(), GENERATED)
+    assert "Phone settings" in en and "Notifications turned off" in en and "Failed" in en
+
+
+def test_no_checks_no_phone_section():
+    html = render_html(make_protocol(), ServiceInfo(), GENERATED)
+    assert "Stan telefonu" not in html
+
+
+def test_phone_section_without_rows_says_ok_or_unreadable():
+    ok = render_html(make_protocol(phone_checks=[_phone_check("ok", [])]), ServiceInfo(), GENERATED)
+    assert TEXTS["pl"]["phone"]["empty"] in ok
+    bad = render_html(make_protocol(phone_checks=[_phone_check("unrecognized", [])]),
+                      ServiceInfo(), GENERATED)
+    assert TEXTS["pl"]["phone"]["unrecognized"] in bad and TEXTS["pl"]["phone"]["empty"] not in bad
+
+
+def test_unsupported_browser_row_says_not_checked():
+    html = render_html(make_protocol(phone_checks=[_phone_check(rows=[PhoneCheckRow("Odd", None, "unsupported", "none")])]),
+                       ServiceInfo(), GENERATED)
+    assert "tej przeglądarki program nie umie sprawdzić" in html and "nie sprawdzono" in html
+    assert "wszystkie witryny tej przeglądarki" not in html
+
+
+def test_phone_text_is_escaped():
+    check = _phone_check(rows=[PhoneCheckRow("Chrome", "<b>x</b>.pl", "allowed", "none")])
+    html = render_html(make_protocol(phone_checks=[check]), ServiceInfo(), GENERATED)
+    assert "<b>x</b>" not in html and "&lt;b&gt;x" in html

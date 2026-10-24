@@ -3,7 +3,10 @@ import { tick } from 'svelte';
 import { expect, test, vi } from 'vitest';
 import App from '../App.svelte';
 import { groupHistory } from '../lib/logic';
-import type { HistoryView } from '../lib/types';
+import type { HistoryAction, HistoryView, UndoDone } from '../lib/types';
+import { Controller } from '../lib/controller';
+import { createFakeBridge } from '../lib/fakeBridge';
+import { AppState } from '../lib/state.svelte';
 import { setupCtl } from '../test-utils';
 
 async function openHistory(scenario = 'adware') {
@@ -156,4 +159,203 @@ test('history: an order made in manual mode is tagged', async () => {
   s.history = view({ interrupted: false, status: 'done', status_label: 'wykonane', manual: true });
   await tick();
   expect(within(screen.getByRole('article', { name: 'ZS/2026/0926/05' })).getByText('tryb ręczny')).toBeTruthy();
+});
+
+test('history: a channel fix cannot be undone from here and says where to turn it back on', async () => {
+  const { ctl, s } = await setupCtl('empty');
+  render(App, { props: { ctl } });
+  const manual = 'Na telefonie: Chrome → Ustawienia → Powiadomienia → tanie-bilety.example';
+  s.history = view({ interrupted: false, status: 'done', status_label: 'wykonane', actions: [
+    { id: 4, package: 'com.android.chrome', level: 'fix', level_label: 'Ustawienia witryn', kind: 'channel',
+      step_label: 'Wyłączenie powiadomień: tanie-bilety.example (Chrome)', status: 'done', status_label: 'wykonane',
+      error: null, manual_undo: manual }] });
+  s.screen = 'history';
+  await tick();
+  const card = screen.getByRole('article', { name: 'ZS/2026/0926/05' });
+  expect(card.textContent).toContain('Zmieniono ustawienia witryn w 1 przeglądarce');
+  expect(within(card).queryByRole('button', { name: /^Przywróć/ })).toBeNull();
+  await fireEvent.click(within(card).getByRole('button', { name: 'Kroki' }));
+  expect(within(card).getByText(manual)).toBeTruthy();
+  expect(within(card).queryByRole('button', { name: /Przywróć/ })).toBeNull();
+});
+
+test('history: an order with only a channel fix left offers no undo of the whole order', async () => {
+  const { ctl, s } = await setupCtl('empty');
+  render(App, { props: { ctl } });
+  s.history = view({ interrupted: false, status: 'partially_undone', status_label: 'częściowo cofnięte', actions: [
+    { id: 4, package: 'com.android.chrome', level: 'fix', level_label: 'Ustawienia witryn', kind: 'channel',
+      step_label: 'Wyłączenie powiadomień: tanie-bilety.example (Chrome)', status: 'done', status_label: 'wykonane',
+      error: null, manual_undo: 'Na telefonie: Chrome → Ustawienia → Powiadomienia' }] });
+  s.screen = 'history';
+  await tick();
+  const card = screen.getByRole('article', { name: 'ZS/2026/0926/05' });
+  expect(within(card).queryByRole('button', { name: 'Cofnij całe zlecenie' })).toBeNull();
+});
+
+const ORDER = 'ZS/2026/0926/05';
+const CHROME = 'com.android.chrome';
+
+function channel(id: number, over: Partial<HistoryAction> = {}): HistoryAction {
+  return { id, package: CHROME, level: 'fix', level_label: 'Ustawienia witryn', kind: 'channel',
+    step_label: `Wyłączenie powiadomień: s${id}.example (Chrome)`, status: 'done', status_label: 'wykonane',
+    error: null, manual_undo: null, site_url: null, ...over };
+}
+
+async function channelHistory(actions: HistoryAction[]) {
+  const env = await setupCtl('empty');
+  render(App, { props: { ctl: env.ctl } });
+  env.s.history = view({ interrupted: false, status: 'done', status_label: 'wykonane', actions });
+  env.s.screen = 'history';
+  await tick();
+  const card = screen.getByRole('article', { name: ORDER });
+  await fireEvent.click(within(card).getByRole('button', { name: 'Kroki' }));
+  return { ...env, card };
+}
+
+function undoDone(over: Partial<UndoDone> = {}): UndoDone {
+  return { order: ORDER, status: 'undone', status_label: 'cofnięte', errors: [], admin_not_restored: false,
+    sites_total: 0, sites_restored: 0, restored_sites: [], firefox_debugging: false, interrupted: [], ...over };
+}
+
+test('channel step done shows enable-on-phone button that undoes only that step', async () => {
+  const { bridge, card } = await channelHistory([channel(4)]);
+  expect(within(card).getAllByRole('button', { name: /^Przywróć/ })).toHaveLength(1); // cała przeglądarka też
+  await fireEvent.click(within(card).getByRole('button', { name: '📱 Włącz na telefonie' }));
+  expect(bridge.calls.at(-1)).toEqual({ method: 'undo', args: [ORDER, 4, null] });
+});
+
+test('browser row without a saved icon shows the built-in logo', async () => {
+  const { card } = await channelHistory([channel(4)]);
+  expect(card.querySelector('img[data-app-icon]')?.getAttribute('src')).toMatch(/chrome/);
+});
+
+test('gone channel shows the manual path instead of the button', async () => {
+  const manual = 'Na telefonie: Chrome → Ustawienia → Powiadomienia → s4.example';
+  const { card } = await channelHistory([channel(4, { error: 'kanał zniknął', manual_undo: manual })]);
+  expect(within(card).getByText(manual)).toBeTruthy();
+  expect(within(card).queryByRole('button', { name: '📱 Włącz na telefonie' })).toBeNull();
+});
+
+test('undone channel step shows open-site button', async () => {
+  const { bridge, card } = await channelHistory([
+    channel(4, { status: 'undone', status_label: 'cofnięte', site_url: 'https://s4.example' }),
+    channel(5, { status: 'undone', status_label: 'cofnięte' })]);
+  const buttons = within(card).getAllByRole('button', { name: '🌐 Otwórz stronę na telefonie' });
+  expect(buttons).toHaveLength(1);
+  await fireEvent.click(buttons[0]);
+  expect(bridge.calls.at(-1)).toEqual({ method: 'open_site', args: [ORDER, 4] });
+});
+
+test('open-site buttons wait for any running job, not only orders', async () => {
+  const { s } = await channelHistory([
+    channel(4, { status: 'undone', status_label: 'cofnięte', site_url: 'https://s4.example' })]);
+  s.undoResult = undoDone({ sites_total: 1, sites_restored: 1, restored_sites: [
+    { action_id: 4, package: CHROME, browser: 'Chrome', site: 's4.example', url: 'https://s4.example' }] });
+  s.job = { id: 'job-scan', kind: 'scan' }; // telefon zajęty zadaniem, które nie jest zleceniem
+  await tick();
+  const step = screen.getByRole('button', { name: '🌐 Otwórz stronę na telefonie' }) as HTMLButtonElement;
+  const banner = screen.getByRole('button', { name: '🌐 Chrome · s4.example' }) as HTMLButtonElement;
+  expect([step.disabled, banner.disabled]).toEqual([true, true]);
+  s.job = null;
+  await tick();
+  expect([step.disabled, banner.disabled]).toEqual([false, false]);
+});
+
+test('undo of an app from the results goes to history when sites need the phone', async () => {
+  const fake = createFakeBridge('empty', { delay: 0 });
+  // nagrane scenariusze nie mają cofania z witrynami: `undo` tylko zwraca zadanie, zdarzenia wysyła test
+  const api = new Proxy(fake.api, { get: (target, method: string) =>
+    method === 'undo' ? async () => ({ job_id: 'job-u' }) : (target as unknown as Record<string, unknown>)[method] });
+  const ctl = new Controller(new AppState(), { ...fake, api });
+  await ctl.init();
+  render(App, { props: { ctl } });
+  const s = ctl.state;
+  s.actedLog = { [CHROME]: [{ order: ORDER, level: 'disable' }] };
+  await ctl.undoApp(CHROME);
+  expect(s.job).toEqual({ id: 'job-u', kind: 'undo' });
+  expect(s.screen).toBe('main');
+  fake.emit('undo:sites', { order: ORDER, sites: [{ action_id: 4, package: CHROME, browser: 'Chrome', site: 's4.example' }] });
+  fake.emit('exec:user_wait', { package: CHROME, name: 'Chrome', kind: 'channel', browser: 'Chrome', site: 's4.example',
+    timeout: 180, action_id: 4 });
+  await vi.waitFor(() => expect(s.screen).toBe('history'));
+  await tick();
+  expect(screen.getByText('Cofam zmiany…')).toBeTruthy();
+  const queue = screen.getByRole('region', { name: 'Przywracanie powiadomień witryn' });
+  expect(within(queue).getByRole('listitem').getAttribute('aria-current')).toBe('step');
+  expect(queue.textContent).toContain('Chrome · s4.example');
+});
+
+test('open site failure shows a warning banner', async () => {
+  const { s, bridge, card } = await channelHistory([
+    channel(4, { status: 'undone', status_label: 'cofnięte', site_url: 'https://s4.example' })]);
+  bridge.failNext('open_site', 'busy');
+  await fireEvent.click(within(card).getByRole('button', { name: '🌐 Otwórz stronę na telefonie' }));
+  await vi.waitFor(() => expect(screen.getByText('Nie udało się otworzyć strony na telefonie.')).toBeTruthy());
+  expect(s.error).toBeNull(); // ostrzeżenie w banerze, nie karta błędu
+});
+
+test('undo of a whole order with sites lists the queue and expands the current site', async () => {
+  const { s, bridge } = await channelHistory([channel(4), channel(5), channel(6)]);
+  s.job = { id: 'job-9', kind: 'undo' };
+  bridge.emit('undo:sites', { order: ORDER, sites: [
+    { action_id: 4, package: CHROME, browser: 'Chrome', site: 's4.example' },
+    { action_id: 5, package: CHROME, browser: 'Chrome', site: 's5.example' },
+    { action_id: 6, package: 'com.sec.android.app.sbrowser', browser: 'Samsung Internet', site: null }] });
+  bridge.emit('undo:step', { action_id: 4, package: CHROME, name: 'Chrome', kind: 'channel', label: '', status: 'undone',
+    error: null, error_key: null });
+  bridge.emit('exec:user_wait', { package: CHROME, name: 'Chrome', kind: 'channel', browser: 'Chrome', site: 's5.example',
+    timeout: 180, action_id: 5 });
+  await tick();
+  const queue = screen.getByRole('region', { name: 'Przywracanie powiadomień witryn' });
+  expect(queue.textContent).toContain('Włączaj kolejno przełączniki na telefonie — program sam przejdzie dalej.');
+  const items = within(queue).getAllByRole('listitem');
+  expect(items.map((li) => li.getAttribute('aria-current'))).toEqual([null, 'step', null]);
+  expect(items[0].textContent).toContain('Chrome · s4.example');
+  expect(items[0].textContent).toContain('włączona');
+  expect(items.map((li) => li.querySelector('img[data-app-icon]')?.getAttribute('src'))).toEqual([
+    expect.stringMatching(/chrome/), expect.stringMatching(/chrome/), expect.stringMatching(/samsung/)]);
+  expect(items[1].textContent).toContain('Chrome · s5.example');
+  expect(items[1].textContent).toContain('Włącz „Pokazuj powiadomienia”.');
+  expect(items[1].textContent).toContain('3:00');
+  expect(items[2].textContent).toContain('Samsung Internet · wszystkie witryny');
+  expect(items[2].textContent).toContain('czeka');
+  await fireEvent.click(within(items[1]).getByRole('button', { name: 'Otwórz ponownie na telefonie' }));
+  expect(bridge.calls.at(-1)).toEqual({ method: 'reopen_screen', args: [] });
+});
+
+test('undo banner counts restored sites', async () => {
+  const { ctl, s } = await setupCtl('empty');
+  render(App, { props: { ctl } });
+  s.screen = 'history';
+  s.undoResult = undoDone({ status: 'partially_undone', status_label: 'częściowo cofnięte', sites_total: 3, sites_restored: 2 });
+  await tick();
+  expect(screen.getByText('Włączono 2 z 3 witryn.')).toBeTruthy();
+  expect(screen.getByText('Pozostałe włączysz z historii zlecenia.')).toBeTruthy();
+  expect(screen.queryByText('Wyłącz w Firefoxie zdalne debugowanie przez USB')).toBeNull();
+  s.undoResult = undoDone({ sites_total: 1, sites_restored: 1, firefox_debugging: true });
+  await tick();
+  expect(screen.getByText('Włączono 1 z 1 witryny.')).toBeTruthy();
+  expect(screen.queryByText('Pozostałe włączysz z historii zlecenia.')).toBeNull();
+  expect(screen.getByText('Wyłącz w Firefoxie zdalne debugowanie przez USB')).toBeTruthy();
+  s.undoResult = undoDone();
+  await tick();
+  expect(screen.queryByText(/Włączono/)).toBeNull();
+});
+
+test('undo banner lists restored sites with open buttons', async () => {
+  const { ctl, s, bridge } = await setupCtl('empty');
+  render(App, { props: { ctl } });
+  s.screen = 'history';
+  s.undoResult = undoDone({ sites_total: 2, sites_restored: 2, restored_sites: [
+    { action_id: 4, package: CHROME, browser: 'Chrome', site: 's4.example', url: 'https://s4.example' },
+    { action_id: 5, package: CHROME, browser: 'Chrome', site: 's5.example', url: null }] });
+  await tick();
+  expect(screen.getByText(/strona musi zapisać telefon od nowa/)).toBeTruthy();
+  expect(screen.queryByRole('button', { name: '🌐 Chrome · s5.example' })).toBeNull();
+  await fireEvent.click(screen.getByRole('button', { name: '🌐 Chrome · s4.example' }));
+  expect(bridge.calls.at(-1)).toEqual({ method: 'open_site', args: [ORDER, 4] });
+  s.undoResult = undoDone({ sites_total: 1, sites_restored: 1, restored_sites: [
+    { action_id: 5, package: CHROME, browser: 'Chrome', site: 's5.example', url: null }] });
+  await tick();
+  expect(screen.queryByText(/strona musi zapisać telefon od nowa/)).toBeNull();
 });

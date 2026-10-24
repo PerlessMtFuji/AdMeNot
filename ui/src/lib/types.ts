@@ -152,6 +152,43 @@ export interface AppView {
   capabilities: { key: string; label: string; levels: CapabilityLevels }[];
 }
 
+export type CheckState = 'ok' | 'review' | 'unrecognized';
+/** unknown: przeglądarka, której powiadomień program nie umie odczytać (read: 'unsupported'). */
+export type BrowserMode = 'per_site' | 'shared' | 'rdp' | 'unknown';
+
+export interface CheckSite {
+  host: string;
+  origin: string;
+  blocked: boolean;
+  /** Ma teraz powiadomienie na ekranie telefonu. */
+  active: boolean;
+  /** Identyfikator poprawki; null — tej witryny nie da się wyciszyć z komputera. */
+  fix: string | null;
+  fix_label: string | null;
+}
+
+export interface CheckBrowser {
+  package: string;
+  name: string;
+  mode: BrowserMode;
+  read: 'ok' | 'partial' | 'unrecognized' | 'unsupported';
+  /** Firefox bez zdalnego debugowania: lista witryn pojawi się po jego włączeniu. */
+  rdp_hint: boolean;
+  /** Aktywne powiadomienie witryny ma akcję „Blokuj” (Samsung Internet): instrukcja dla witryny bez poprawki. */
+  block_action: boolean;
+  all_fix: string | null;
+  all_fix_label: string | null;
+  sites: CheckSite[];
+}
+
+/** Kontrola „Stan telefonu” (etap 1: powiadomienia witryn w przeglądarkach). */
+export interface DeviceCheck {
+  id: string;
+  state: CheckState;
+  state_label: string;
+  browsers: CheckBrowser[];
+}
+
 export interface ScanCounts {
   malicious: number;
   suspicious: number;
@@ -174,6 +211,7 @@ export interface ScanView {
   low_behavior_data: boolean;
   apk: { requested: number; analyzed: number; failed: Record<string, string>; stopped_no_space: boolean } | null;
   apps: AppView[];
+  device_checks: DeviceCheck[];
   profiles: { others: number[]; known: boolean };
   usage_window_h: number | null;
   counts: ScanCounts;
@@ -182,10 +220,13 @@ export interface ScanView {
   on_demand: string[];
 }
 
+/** `fix`: poprawki „Stanu telefonu” (ustawienia witryn w przeglądarce), nie poziom aplikacji. */
+export type PlanLevel = Level | 'fix';
+
 export interface PlanApp {
   package: string;
   name: string;
-  level: Level;
+  level: PlanLevel;
   level_label: string;
   blocked: boolean;
   reason: string | null;
@@ -225,6 +266,8 @@ export interface StepEvent {
   label: string;
   status: StepStatus;
   error: string | null;
+  /** Surowy klucz błędu (np. `channel_gone`): po nim UI rozróżnia stany, `error` jest do czytania. */
+  error_key?: string | null;
   restore_bytes?: number | null; // cofnięcie usunięcia: instalacja z kopii (UI: „to potrwa”)
 }
 
@@ -237,6 +280,8 @@ export interface OrderResult {
   stopped: boolean;
   apps: { package: string; name: string; outcome: Outcome; errors: string[]; kinds: string[] }[];
   donate_reminder?: boolean; // brak w starszych nagraniach scenariuszy
+  /** Zlecenie zmieniło zgody Firefoxa przez zdalne debugowanie: trzeba je potem wyłączyć. */
+  firefox_debugging?: boolean;
 }
 
 export interface UndoDone {
@@ -245,6 +290,28 @@ export interface UndoDone {
   status_label: string;
   errors: string[];
   admin_not_restored: boolean;
+  /** Witryny, które cofanie miało włączyć na telefonie, i ile z nich włączono (reszta: z historii). */
+  sites_total: number;
+  sites_restored: number;
+  /** Włączone witryny; z `url` strona musi zapisać telefon od nowa (przycisk „otwórz”). */
+  restored_sites: RestoredSite[];
+  /** Cofnięto zgodę Firefoksa przez zdalne debugowanie: przypomnienie o jego wyłączeniu. */
+  firefox_debugging: boolean;
+  /** Przerwane zlecenia telefonu po cofnięciu: zlecenie bez kroków „w toku” znika z banera. */
+  interrupted: string[];
+}
+
+/** Pozycja kolejki witryn w cofaniu (`undo:sites`): wiersz, który otworzy ekran na telefonie. */
+export interface UndoSite {
+  action_id: number;
+  package: string;
+  browser: string;
+  /** Host witryny; null — wspólny kanał wszystkich witryn przeglądarki. */
+  site: string | null;
+}
+
+export interface RestoredSite extends UndoSite {
+  url: string | null;
 }
 
 export interface HistoryAction {
@@ -257,6 +324,10 @@ export interface HistoryAction {
   status: string;
   status_label: string;
   error: string | null;
+  /** Kanał nie do przywrócenia (`channel_gone`): gdzie na telefonie samemu włączyć powiadomienia; null — nie dotyczy. */
+  manual_undo?: string | null;
+  /** Adres strony kanału po udanym cofnięciu (otwiera ją `open_site`); null — nie dotyczy. */
+  site_url?: string | null;
 }
 
 export interface HistoryOrder {
@@ -294,9 +365,21 @@ export interface ConsoleEntry {
 
 export interface Question {
   job_id: string;
-  kind: 'admin_timeout';
+  kind: 'user_timeout';
   package: string;
   name: string;
+}
+
+/** Krok, w którym program czeka na ruch serwisanta na telefonie. */
+export interface UserWait {
+  package: string;
+  name: string;
+  kind: 'admin' | 'channel';
+  /** Tylko `channel` dla jednej witryny: host; brak przy kanale wspólnym całej przeglądarki. */
+  site?: string;
+  browser?: string;
+  timeout: number;
+  action_id: number;
 }
 
 export interface ServiceInfo {
@@ -393,13 +476,18 @@ export interface Api {
   start_incident(seconds: number): R<{ ok: boolean }>;
   mark_incident(): R<{ ok: boolean }>;
   rerender(): R<{ scan: ScanView | null }>;
-  preview_plan(requests: Record<string, Level>, unlocked: string[]): R<PlanView>;
-  share_plan(requests: Record<string, Level>, unlocked: string[], shareId: string): R<{ share_id: string; code: string }>;
+  preview_plan(requests: Record<string, Level>, unlocked: string[], fixes: string[]): R<PlanView>;
+  share_plan(requests: Record<string, Level>, unlocked: string[], shareId: string, fixes: string[]): R<{ share_id: string; code: string }>;
+  recheck_site_notifications(whenDebugging?: boolean): R<{ check: DeviceCheck | null }>;
   cancel_share(shareId: string): R<{ ok: boolean }>;
-  execute(requests: Record<string, Level>, unlocked: string[], consent: { code: string } | null): R<{ job_id: string }>;
+  execute(requests: Record<string, Level>, unlocked: string[], consent: { code: string } | null, fixes: string[]): R<{ job_id: string }>;
   resume(order: string): R<{ job_id: string }>;
   undo(order: string, actionId: number | null, pkg: string | null): R<{ job_id: string }>;
   stop(jobId: string): R<{ ok: boolean }>;
+  /** Ekran oczekującego kroku (kanał witryny, administrator) otwiera się na telefonie jeszcze raz. */
+  reopen_screen(): R<{ ok: boolean }>;
+  skip_site(): R<{ ok: boolean }>;
+  open_site(number: string, action_id: number): R<{ ok: boolean }>;
   answer(jobId: string, value: string): R<{ ok: boolean }>;
   history(serial: string | null): R<HistoryView>;
   delete_order(order: string): R<{ deleted: string }>;
@@ -442,14 +530,15 @@ export interface EventMap {
   'apk:stopped': { job_id?: string };
   'exec:order': { order: string; plan: PlanView | null };
   'exec:step': StepEvent;
-  'exec:admin_wait': { package: string; name: string; timeout: number };
-  'exec:admin_done': { package: string; status: string };
+  'exec:user_wait': UserWait;
+  'exec:user_done': { package: string; status: string };
   'exec:question': Question;
   'exec:verify': Record<string, never>;
   'exec:stopped': { order: string };
   'exec:done': OrderResult;
   'exec:disconnected': { order: string };
   'undo:step': StepEvent;
+  'undo:sites': { order: string; sites: UndoSite[] };
   'undo:done': UndoDone;
   'adb:command': ConsoleEntry;
   'job:error': JobError;

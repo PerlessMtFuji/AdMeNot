@@ -1,8 +1,11 @@
 import pytest
 from conftest import SERIAL
-from fakephone import LISTENERS, POST, make_cli_phone
+from fakephone import LISTENERS, POST, FakeApp, make_cli_phone
 
 from admenot.cli.main import main
+from admenot.engine.actions import commands as C
+from admenot.engine.actions import steps as S
+from admenot.engine.actions.steps import Step
 from admenot.engine.adb.fake import FakeAdb
 from admenot.engine.journal.db import Journal
 from admenot.engine.paths import journal_path
@@ -43,6 +46,60 @@ def test_undo_single_app(capsys):
     assert phone.apps["com.wlive.forecast"].enabled
     assert phone.secure[LISTENERS] == ""  # WhatsApp nadal wyciszony
     assert "częściowo cofnięte" in capsys.readouterr().out
+
+
+CHROME = "com.android.chrome"
+SITE = "web:https://www.example.com;1"
+OPEN_URL = C.OPEN_SITE.format(url="https://www.example.com", package=CHROME)
+
+
+def _site_order(phone):
+    """Zlecenie z wyłączonym kanałem witryny, zapisane jak przez naprawę."""
+    phone.apps[CHROME] = FakeApp(CHROME)
+    phone.channels = {CHROME: {SITE: 0}}
+    phone.static[OPEN_URL] = "Starting: Intent { act=android.intent.action.VIEW }\n"
+    step = Step("channel", CHROME, {"channel_id": SITE})
+    with Journal(journal_path()) as j:
+        order = j.create_order(SERIAL, "Test")
+        action_id = j.add_action(order.id, CHROME, "fix", step.to_dict(), S.command_for(step))
+        j.record_prev_state(action_id, {"importance": 3},
+                            Step("channel", CHROME, {"channel_id": SITE, "enabled": "1"}).to_dict())
+        j.set_action_status(action_id, "done")
+        return order
+
+
+def test_undo_site_waits_then_says_the_site_must_resubscribe(capsys):
+    phone = make_cli_phone()
+    order = _site_order(phone)
+    phone.on_channel_screen = lambda p, package, channel_id: p.channels[package].__setitem__(channel_id, 3)
+    assert main(["undo", "--order", order.number], host=phone) == 0
+    out = capsys.readouterr().out
+    assert "Włącz na telefonie powiadomienia witryny www.example.com (Chrome) — czekam 3 min" in out
+    assert "↺ com.android.chrome" in out
+    assert ("Powiadomienia wrócą, gdy strona zapisze się od nowa — otwórz ją na telefonie: "
+            "https://www.example.com") in out
+    assert phone.channels[CHROME][SITE] == 3
+
+
+def test_undo_site_ends_on_timeout_without_asking(capsys):
+    phone = make_cli_phone()
+    order = _site_order(phone)
+    assert main(["undo", "--order", order.number, "--admin-timeout", "0"], host=phone) == 5
+    out = capsys.readouterr().out
+    assert "✗ com.android.chrome" in out and "nie włączono na czas" in out
+    assert "zapisze się od nowa" not in out
+    assert phone.channels[CHROME][SITE] == 0
+
+
+def test_resume_channel_wait_does_not_print_the_undo_instruction(capsys):
+    phone = make_cli_phone()
+    order = _site_order(phone)
+    with Journal(journal_path()) as j:  # naprawa przerwana przed kanałem: krok czeka na wykonanie
+        (row,) = j.actions(order.id)
+        j.set_action_status(row.id, "pending")
+    phone.channels[CHROME][SITE] = 3  # telefon jeszcze nie ma wyłączonego kanału
+    assert main(["resume", "--order", order.number, "--yes", "--admin-timeout", "0"], host=phone) == 5
+    assert "Włącz na telefonie powiadomienia" not in capsys.readouterr().out
 
 
 def test_undo_unknown_order(capsys):

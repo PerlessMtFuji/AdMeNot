@@ -6,6 +6,7 @@
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
   import AppIcon from './AppIcon.svelte';
+  import BrowserIcon from './BrowserIcon.svelte';
   import ShareQr from './ShareQr.svelte';
 
   const ctl = getContext<Controller>('ctl');
@@ -14,7 +15,12 @@
   // Grupy wg akcji, jak strona planu dla klienta: wspólne kroki raz pod nagłówkiem, przy aplikacji tylko reszta.
   const groups = $derived(s.plan ? planGroups(s.plan.apps, s.settings.lang) : []);
   const icons = $derived(new Map((s.scan?.apps ?? []).map((a) => [a.package, a.icon])));
-  const DOT: Record<PlanGroupKey, string> = { remove: 'bg-bad', disable: 'bg-warn', silence: 'bg-accent', blocked: 'bg-soft' };
+  // Poprawki witryn: pod przeglądarką same adresy (jak w panelu planu), zamiast zdań z nazwą przeglądarki w każdym.
+  const fixHosts = $derived(new Map((s.scan?.device_checks ?? []).flatMap((c) => c.browsers).map((b) => [b.package, [
+    ...b.sites.filter((x) => x.fix && s.fixes.has(x.fix)).map((x) => x.host),
+    ...(b.all_fix && s.fixes.has(b.all_fix) ? [t('plan.all_sites')] : []),
+  ]])));
+  const DOT: Record<PlanGroupKey, string> = { remove: 'bg-bad', disable: 'bg-warn', silence: 'bg-accent', fix: 'bg-accent', blocked: 'bg-soft' };
   // Odblokowanie pakietu chronionego to świadoma decyzja: trzeba przepisać jego nazwę
   // (audyt 2026-10-11, QA-01), jak `--unlock PAKIET` w CLI.
   let confirming = $state<string | null>(null);
@@ -36,16 +42,28 @@
     <h2 class="text-lg font-bold">{t('plan.confirm_title')}</h2>
     <div class="scroll-fade -mr-2 flex min-h-0 flex-col gap-2.5 overflow-auto pr-2">
       {#each groups as g (g.key)}
-        {@const title = `${t(`plan.groups.${g.key}`)} (${g.apps.length})`}
+        <!-- poprawki liczymy w krokach (witryna po witrynie), nie w przeglądarkach -->
+        {@const count = g.key === 'fix' ? g.apps.reduce((n, a) => n + a.steps.length, 0) : g.apps.length}
+        {@const title = `${t(`plan.groups.${g.key}`)} (${count})`}
         <div class="well flex-none p-3.5 {g.key === 'blocked' ? 'opacity-60' : ''}">
           <h3 class="flex items-center gap-2 font-bold"><span class="h-2.5 w-2.5 flex-none rounded-full {DOT[g.key]}"></span>{title}</h3>
           <ul aria-label={title} class="mt-2 flex flex-col gap-1.5">
             {#each g.apps as a (a.package)}
               <li>
                 <div class="flex items-center gap-2.5">
-                  <AppIcon icon={icons.get(a.package)} class="h-7 w-7"><span class="grid h-7 w-7 flex-none place-items-center rounded-[9px] bg-neutral-soft text-sm font-extrabold text-mut" aria-hidden="true">{initial(a.name)}</span></AppIcon>
+                  {#if g.key === 'fix'}
+                    <BrowserIcon pkg={a.package} name={a.name} />
+                  {:else}
+                    <AppIcon icon={icons.get(a.package)} class="h-7 w-7"><span class="grid h-7 w-7 flex-none place-items-center rounded-[9px] bg-neutral-soft text-sm font-extrabold text-mut" aria-hidden="true">{initial(a.name)}</span></AppIcon>
+                  {/if}
                   <b class="min-w-0 flex-1 truncate">{a.name}</b>
                 </div>
+                {#if g.key === 'fix'}
+                  {@const hosts = fixHosts.get(a.package)?.length ? fixHosts.get(a.package)! : a.steps}
+                  <ul aria-label={a.name} class="mt-0.5 flex flex-col pl-[38px] text-sm text-mut">
+                    {#each hosts as host (host)}<li class="truncate" title={host}>{host}</li>{/each}
+                  </ul>
+                {/if}
                 {#if a.blocked}
                   <p class="mt-1 text-sm text-bad">{a.reason_text}</p>
                   {#if a.reason === 'protected' && expert}
@@ -68,7 +86,7 @@
               </li>
             {/each}
           </ul>
-          {#if g.steps.length}
+          {#if g.steps.length && g.key !== 'fix'}
             <!-- kroki całej grupy w kolejności wykonania; krok nie dla wszystkich ma dopisek z nazwami -->
             <ul aria-label="{t('plan.steps')}: {title}" class="mt-2.5 flex flex-col gap-0.5 border-t border-line pt-2 text-sm text-mut">
               {#each g.steps as step (step.text)}

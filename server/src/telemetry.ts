@@ -40,6 +40,11 @@ function counts(v: unknown, keys: readonly string[]): Obj {
   return out;
 }
 
+// Pole opcjonalne: brak (starszy program) → null; obecne → ścisła walidacja.
+function optional(v: unknown, check: (v: unknown) => Obj): Obj | null {
+  return v === null || v === undefined ? null : check(v);
+}
+
 function device(v: unknown): Obj {
   need(isObj(v) && Object.keys(v as Obj).every((k) => ["manufacturer", "model", "android"].includes(k)));
   const d = v as Obj;
@@ -58,6 +63,15 @@ function packages(v: unknown, item: (p: Obj) => Obj): Obj[] | null {
 
 const VERDICTS = ["malicious", "suspicious", "review"] as const;
 const LEVELS = ["silence", "disable", "remove"] as const;
+// Sprawdzenia stanu telefonu: dokładnie jeden znany identyfikator, bez domen i pakietów przeglądarek.
+const CHECK_STATES = ["ok", "review", "unrecognized"] as const;
+const SITE_MODES = ["per_site", "shared", "rdp"] as const;
+const FIX_KINDS = ["channel", "site_permission"] as const;
+
+function checks(v: unknown): Obj {
+  need(isObj(v) && Object.keys(v as Obj).length === 1 && oneOf((v as Obj).site_notifications, CHECK_STATES));
+  return { site_notifications: (v as Obj).site_notifications };
+}
 
 function body(e: Obj): Obj {
   switch (e.type) {
@@ -79,6 +93,7 @@ function body(e: Obj): Obj {
         device: device(e.device), session: e.session, apps: e.apps, verdicts: counts(e.verdicts, VERDICTS),
         low_behavior_data: e.low_behavior_data, apk, seconds: e.seconds, apk_stage: e.apk_stage,
         apk_mode: e.apk_mode ?? null, eta,
+        checks: optional(e.checks, checks), sites: optional(e.sites, (v) => counts(v, SITE_MODES)),
         packages: packages(e.packages, (p) => {
           need(oneOf(p.verdict, VERDICTS) && int(p.score, 1000) && oneOf(p.confidence, ["low", "medium", "high"])
             && typeof p.system === "boolean");
@@ -95,7 +110,7 @@ function body(e: Obj): Obj {
       return {
         device: device(e.device), session: e.session, levels: counts(e.levels, LEVELS),
         sources: counts(e.sources, SOURCES), failed: e.failed, errors: e.errors,
-        interrupted: e.interrupted,
+        interrupted: e.interrupted, fixes: optional(e.fixes, (v) => counts(v, FIX_KINDS)),
         packages: packages(e.packages, (p) => {
           need(oneOf(p.source, ["flagged", "manual", "blind"]) && oneOf(p.level, LEVELS)
             && (p.ok === null || typeof p.ok === "boolean"));
@@ -105,8 +120,12 @@ function body(e: Obj): Obj {
     }
     case "undo":
       need(int(e.apps) && int(e.failed) && int(e.age_days));
+      // Starsze wersje programu nie wysyłają liczb witryn.
+      need((e.sites === undefined || int(e.sites)) && (e.sites_restored === undefined || int(e.sites_restored)));
       return {
         device: device(e.device), apps: e.apps, failed: e.failed, age_days: e.age_days,
+        sites: e.sites === undefined ? 0 : e.sites,
+        sites_restored: e.sites_restored === undefined ? 0 : e.sites_restored,
         packages: packages(e.packages, (p) => {
           need(typeof p.ok === "boolean");
           return { ok: p.ok };

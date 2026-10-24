@@ -3,8 +3,9 @@ import { createRawSnippet, type Component, type Snippet } from 'svelte';
 import { Controller } from './lib/controller';
 import { createFakeBridge, type ShareScenario } from './lib/fakeBridge';
 import { AppState } from './lib/state.svelte';
+import type { DeviceCheck } from './lib/types';
 
-type BridgeOptions = { welcome?: boolean; share?: ShareScenario };
+type BridgeOptions = { welcome?: boolean; share?: ShareScenario; checks?: DeviceCheck[] };
 
 export async function setupCtl(scenario = 'empty', options: BridgeOptions = {}) {
   const bridge = createFakeBridge(scenario, { delay: 0, ...options });
