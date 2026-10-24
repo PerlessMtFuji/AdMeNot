@@ -4,7 +4,7 @@
       "install": "00000000-0000-4000-8000-000000000000",
       "type": "start",
       "t": "2026-10-10T14:00:00Z",
-      "app": "0.9.3",
+      "app": "0.9.5",
       "os": "Windows 10.0.26100",
       "lang": "pl",
       "mode": "simple"
@@ -13,7 +13,7 @@
       "install": "00000000-0000-4000-8000-000000000000",
       "type": "scan",
       "t": "2026-10-10T14:00:00Z",
-      "app": "0.9.3",
+      "app": "0.9.5",
       "os": "Windows 10.0.26100",
       "lang": "pl",
       "device": {
@@ -33,6 +33,7 @@
       "seconds": 41,
       "apk_stage": false,
       "apk_mode": "pending",
+      "eta": null,
       "checks": {
         "site_notifications": "review"
       },
@@ -41,14 +42,13 @@
         "shared": 1,
         "rdp": 0
       },
-      "eta": null,
       "packages": null
     },
     {
       "install": "00000000-0000-4000-8000-000000000000",
       "type": "repair",
       "t": "2026-10-10T14:00:00Z",
-      "app": "0.9.3",
+      "app": "0.9.5",
       "os": "Windows 10.0.26100",
       "lang": "pl",
       "device": {
@@ -62,14 +62,14 @@
         "disable": 1,
         "remove": 1
       },
-      "fixes": {
-        "channel": 0,
-        "site_permission": 0
-      },
       "sources": {
         "flagged": 2,
         "manual": 0,
         "blind": 0
+      },
+      "fixes": {
+        "channel": 0,
+        "site_permission": 0
       },
       "failed": 0,
       "errors": [],
@@ -80,7 +80,7 @@
       "install": "00000000-0000-4000-8000-000000000000",
       "type": "undo",
       "t": "2026-10-10T14:00:00Z",
-      "app": "0.9.3",
+      "app": "0.9.5",
       "os": "Windows 10.0.26100",
       "lang": "pl",
       "device": {
@@ -101,7 +101,7 @@
       "install": "00000000-0000-4000-8000-000000000000",
       "type": "start",
       "t": "2026-10-10T14:00:00Z",
-      "app": "0.9.3",
+      "app": "0.9.5",
       "os": "Windows 10.0.26100",
       "lang": "pl",
       "mode": "simple"
@@ -110,7 +110,7 @@
       "install": "00000000-0000-4000-8000-000000000000",
       "type": "scan",
       "t": "2026-10-10T14:00:00Z",
-      "app": "0.9.3",
+      "app": "0.9.5",
       "os": "Windows 10.0.26100",
       "lang": "pl",
       "device": {
@@ -130,6 +130,7 @@
       "seconds": 41,
       "apk_stage": false,
       "apk_mode": "pending",
+      "eta": null,
       "checks": {
         "site_notifications": "review"
       },
@@ -138,7 +139,6 @@
         "shared": 1,
         "rdp": 0
       },
-      "eta": null,
       "packages": [
         {
           "package": "com.clean.pro.boost",
@@ -160,7 +160,7 @@
       "install": "00000000-0000-4000-8000-000000000000",
       "type": "repair",
       "t": "2026-10-10T14:00:00Z",
-      "app": "0.9.3",
+      "app": "0.9.5",
       "os": "Windows 10.0.26100",
       "lang": "pl",
       "device": {
@@ -174,14 +174,14 @@
         "disable": 1,
         "remove": 1
       },
-      "fixes": {
-        "channel": 0,
-        "site_permission": 0
-      },
       "sources": {
         "flagged": 2,
         "manual": 0,
         "blind": 0
+      },
+      "fixes": {
+        "channel": 0,
+        "site_permission": 0
       },
       "failed": 0,
       "errors": [],
@@ -205,7 +205,7 @@
       "install": "00000000-0000-4000-8000-000000000000",
       "type": "undo",
       "t": "2026-10-10T14:00:00Z",
-      "app": "0.9.3",
+      "app": "0.9.5",
       "os": "Windows 10.0.26100",
       "lang": "pl",
       "device": {
