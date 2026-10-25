@@ -124,7 +124,8 @@ def test_delete_refuses_foreign_dir(tmp_path):
     dev = device_dir_name("ABC123")
     for bad in ("../x", "..", "", "x", f"{dev}/..", f"{dev}/20261025-120000/pliki",
                 f"{dev}\\20261025-120000", "/etc/20261025-120000", "C:/x/20261025-120000",
-                f"{dev}/99999999-000000"):
+                f"{dev}/99999999-000000", f"{dev}/20261025-120000\n", f"{dev}\n/20261025-120000",
+                f"{dev}/２０２６１０２５-120000"):
         with pytest.raises(ValueError):
             store.delete(bad)
     assert victim.exists() and copy.path.exists()
@@ -182,3 +183,41 @@ def test_state_resume_and_totals(tmp_path):
     assert again.get_meta("missing", 7) == 7
     assert again.used_local() == {"sdcard/f0", "sdcard/f1", "sdcard/f2"}
     again.close()
+
+
+def test_delete_failure_keeps_meta_and_retry_succeeds(monkeypatch):
+    copy = _copy(now=NOW - timedelta(days=8))
+    (copy.files_dir / "a.txt").write_text("x", encoding="utf-8")
+    copy_id = copy.read_meta().id
+    real_rmtree = store.shutil.rmtree
+    calls = {"n": 0}
+
+    def flaky(path, *args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise PermissionError("zablokowany plik")
+        return real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(store.shutil, "rmtree", flaky)
+    assert store.purge_expired(NOW, lambda serial: False) == []
+    assert copy.meta_path.is_file()
+    assert [m.id for m in store.list_copies()] == [copy_id]
+    assert store.purge_expired(NOW, lambda serial: False) == [copy_id]
+    assert not copy.path.exists()
+
+
+def test_create_copy_failure_leaves_no_orphan(monkeypatch):
+    def boom(self, meta):
+        raise OSError("dysk pełny")
+
+    monkeypatch.setattr(store.CopyDir, "write_meta", boom)
+    with pytest.raises(OSError):
+        _copy()
+    assert list((transfers_dir() / device_dir_name("ABC123")).iterdir()) == []
+
+
+def test_extend_broken_meta_is_value_error():
+    copy = _copy()
+    copy.meta_path.write_text("{", encoding="utf-8")
+    with pytest.raises(ValueError):
+        store.extend(f"{device_dir_name('ABC123')}/20261025-120000")

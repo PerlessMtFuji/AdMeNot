@@ -25,8 +25,8 @@ from admenot.engine.paths import device_dir_name, transfers_dir
 KEEP_DAYS = 7
 META = "meta.json"
 _STAMP_FORMAT = "%Y%m%d-%H%M%S"
-_STAMP = re.compile(r"^\d{8}-\d{6}$")
-_SAFE_PART = re.compile(r"^[A-Za-z0-9_-]+$")
+_STAMP = re.compile(r"[0-9]{8}-[0-9]{6}")
+_SAFE_PART = re.compile(r"[A-Za-z0-9_-]+")
 
 Status = Literal["in_progress", "complete", "incomplete"]
 
@@ -120,13 +120,17 @@ def create_copy(serial: str, device: DeviceInfo, client: str | None, now: dateti
             continue
         break
     copy = CopyDir(path)
-    copy.files_dir.mkdir()
-    copy.phone_dir.mkdir()
-    copy.apps_dir.mkdir()
-    copy.write_meta(CopyMeta(
-        id=f"{parent.name}/{stamp}", serial=serial, manufacturer=device.manufacturer,
-        model=device.model, android=device.android_release, imei=device.imei, client=client,
-        created=stamp_time, expires=stamp_time + timedelta(days=KEEP_DAYS), status="in_progress"))
+    try:
+        copy.files_dir.mkdir()
+        copy.phone_dir.mkdir()
+        copy.apps_dir.mkdir()
+        copy.write_meta(CopyMeta(
+            id=f"{parent.name}/{stamp}", serial=serial, manufacturer=device.manufacturer,
+            model=device.model, android=device.android_release, imei=device.imei, client=client,
+            created=stamp_time, expires=stamp_time + timedelta(days=KEEP_DAYS), status="in_progress"))
+    except BaseException:
+        shutil.rmtree(path, ignore_errors=True)  # nie zostawiamy katalogu bez meta.json
+        raise
     return copy
 
 
@@ -140,7 +144,7 @@ def _copy_dirs() -> list[CopyDir]:
         return []
     for device in devices:
         with contextlib.suppress(OSError):
-            found.extend(CopyDir(c) for c in device.iterdir() if _STAMP.match(c.name) and c.is_dir())
+            found.extend(CopyDir(c) for c in device.iterdir() if _STAMP.fullmatch(c.name) and c.is_dir())
     return sorted(found, key=lambda c: (c.path.name, c.path.parent.name), reverse=True)
 
 
@@ -173,7 +177,7 @@ def list_copies() -> list[CopyMeta]:
 def _resolve(copy_id: str) -> CopyDir:
     """Katalog kopii z identyfikatora; każdy inny kształt niż `<telefon>/<RRRRMMDD-GGMMSS>` to ValueError."""
     parts = copy_id.split("/")
-    if len(parts) != 2 or not _SAFE_PART.match(parts[0]) or not _STAMP.match(parts[1]):
+    if len(parts) != 2 or not _SAFE_PART.fullmatch(parts[0]) or not _STAMP.fullmatch(parts[1]):
         raise ValueError(f"niepoprawny identyfikator kopii: {copy_id!r}")
     root = transfers_dir().resolve()
     path = (root / parts[0] / parts[1]).resolve()
@@ -187,7 +191,10 @@ def _resolve(copy_id: str) -> CopyDir:
 def extend(copy_id: str) -> CopyMeta:
     """Przedłuża o kolejne `KEEP_DAYS` dni od dotychczasowego terminu (bez limitu)."""
     copy = _resolve(copy_id)
-    meta = copy.read_meta()
+    try:
+        meta = copy.read_meta()
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise ValueError(f"nieczytelny meta.json kopii: {copy_id!r}") from exc
     meta.expires += timedelta(days=KEEP_DAYS)
     copy.write_meta(meta)
     meta.id = copy_id
@@ -195,7 +202,18 @@ def extend(copy_id: str) -> CopyMeta:
 
 
 def delete(copy_id: str) -> None:
-    shutil.rmtree(_resolve(copy_id).path)
+    """Najpierw dane, na końcu `meta.json` i pusty katalog. Błąd w połowie (np. zablokowany plik)
+    zostawia `meta.json`, więc kopia nadal jest widoczna i następne usunięcie ją dokończy."""
+    path = _resolve(copy_id).path
+    for child in list(path.iterdir()):
+        if child.name == META:
+            continue
+        if child.is_dir() and not child.is_symlink():
+            shutil.rmtree(child)
+        else:
+            child.unlink()
+    (path / META).unlink()
+    path.rmdir()
 
 
 def purge_expired(now: datetime, busy: Callable[[str], bool]) -> list[str]:
