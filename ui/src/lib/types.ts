@@ -444,6 +444,92 @@ export interface ApiError {
 
 export type JobError = ApiErrorBody & { job_id: string; kind: string };
 
+// --- przenoszenie danych: kopia starego telefonu (present.inventory_view / copy_view / backup_result_view)
+
+export type TransferCategory = 'media' | 'downloads' | 'whatsapp';
+
+export interface InventoryApp {
+  package: string;
+  label: string;
+  verdict: Verdict;
+  default_on: boolean;
+  bytes: number | null; // nieznany przed kopią
+}
+
+export interface InventoryView {
+  /** null: telefon nie pozwolił odczytać (np. Xiaomi bez „Debugowanie USB (ustawienia zabezpieczeń)”). */
+  contacts: number | null;
+  sms: number | null;
+  mms: number | null;
+  mms_bytes: number;
+  calls: number | null;
+  categories: Record<TransferCategory, { files: number; bytes: number }>;
+  /** Folder `""` to luźne pliki w głównym folderze telefonu. */
+  others: { name: string; files: number; bytes: number }[];
+  apps: InventoryApp[];
+  /** Szkodliwe — nie kopiujemy ich APK. */
+  skipped_apps: { package: string; label: string }[];
+  whatsapp_backup: string | null;
+  storage: { used: number; total: number } | null;
+  free_pc: number;
+  unreadable: number;
+}
+
+/** Wybór wysyłany do `start_backup` (Selection z silnika). */
+export interface TransferSelection {
+  contacts: boolean;
+  sms: boolean;
+  mms: boolean;
+  calls: boolean;
+  categories: TransferCategory[];
+  others: string[];
+  apps: string[];
+  verify_hash?: boolean;
+}
+
+export interface CopyView {
+  id: string;
+  model: string;
+  manufacturer: string;
+  client: string | null;
+  created: string;
+  expires: string;
+  days_left: number;
+  status: 'in_progress' | 'complete' | 'incomplete';
+  bytes: number;
+  counts: Record<string, number>;
+}
+
+export type TransferStage = 'telephony' | 'files' | 'apps' | 'verify';
+
+export interface TransferProgress {
+  stage: TransferStage;
+  done_files: number;
+  total_files: number;
+  done_bytes: number;
+  total_bytes: number;
+  current: string;
+}
+
+export interface TelephonyResult {
+  status: 'ok' | 'unavailable' | 'failed';
+  count: number;
+  /** np. `addresses_missing:3,attachments_missing:1`; starsze widoki go nie mają. */
+  error?: string | null;
+}
+
+export interface BackupResultView {
+  status: 'complete' | 'incomplete' | 'stopped';
+  copy_id: string;
+  telephony: Record<string, TelephonyResult>;
+  files_done: number;
+  files_failed: number;
+  apps_done: number;
+  apps_failed: number;
+  bytes: number;
+  seconds: number;
+}
+
 type R<T> = Promise<T | ApiError>;
 
 export interface CrashSummary { id: string; kind: 'error' | 'ui' | 'thread' | 'exit'; created: string; type: string; sent_id: string | null }
@@ -515,6 +601,12 @@ export interface Api {
   send_crash(id: string, include_adb: boolean, comment: string): R<{ sent_id: string }>;
   discard_crash(id: string): R<Record<string, never>>;
   quit(): R<{ ok: boolean; closing_after_step?: boolean }>;
+  transfer_inventory(serial: string, client: string | null): R<{ job_id: string }>;
+  transfer_whatsapp(): R<{ whatsapp_backup: string | null }>;
+  start_backup(selection: TransferSelection): R<{ job_id: string }>;
+  transfers(): R<{ copies: CopyView[] }>;
+  extend_transfer(copyId: string): R<{ copy: CopyView }>;
+  delete_transfer(copyId: string): R<{ deleted: string }>;
 }
 
 export interface EventMap {
@@ -553,6 +645,10 @@ export interface EventMap {
   'mirror:warning': { serial: string; code: 'control_blocked' | 'stay_awake_blocked' };
   'incident:state': { recording: boolean; seconds: number };
   'incident:done': IncidentDone;
+  'transfer:inventory': { inventory: InventoryView; resumable: CopyView | null; client: string | null };
+  'transfer:progress': TransferProgress;
+  'transfer:waiting': Record<string, never>;
+  'transfer:done': { result: BackupResultView; copy: CopyView };
 }
 
 export type EventName = keyof EventMap;

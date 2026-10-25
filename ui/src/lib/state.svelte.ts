@@ -1,12 +1,31 @@
 import { SvelteSet } from 'svelte/reactivity';
 import { actedLevels, type ActedLog, type OpenGroups, type Phase } from './logic';
 import type {
-  ApiErrorBody, ApkEstimate, ApkQuestion, Category, ConsoleEntry, DeviceEntry, EtaView, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
+  ApiErrorBody, ApkEstimate, BackupResultView, CopyView, InventoryView, TransferProgress, TransferSelection, ApkQuestion, Category, ConsoleEntry, DeviceEntry, EtaView, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
   PlanView, Question, ReportResult, ScanView, Settings, ShareState, ShotsView, ShotView, StepEvent, UndoDone, UndoSite, UpdateView, UserWait, Verdict, WhoView,
 } from './types';
 
 export type Screen = 'main' | 'history' | 'settings';
 const ORDER_KINDS = ['exec', 'resume', 'undo'];
+
+export const EMPTY_TRANSFER_SELECTION: TransferSelection = {
+  contacts: false, sms: false, mms: false, calls: false, categories: [], others: [], apps: [],
+};
+
+/** Przenoszenie danych: inwentarz starego telefonu, wybór, postęp kopii i kopie na komputerze. */
+export interface TransferState {
+  inventory: InventoryView | null;
+  /** Niedokończona kopia tego telefonu (start_backup ją wznowi). */
+  resumable: CopyView | null;
+  selection: TransferSelection;
+  progress: TransferProgress | null;
+  /** Telefon odłączony w trakcie kopii — most czeka na ponowne podłączenie. */
+  waiting: boolean;
+  result: BackupResultView | null;
+  /** Kopia z `transfer:done` (ile dni do usunięcia). */
+  copy: CopyView | null;
+  copies: CopyView[];
+}
 
 export class AppState {
   phase = $state<Phase>('connect');
@@ -121,6 +140,8 @@ export class AppState {
   crashSent = $state<string | null>(null);
   crashError = $state<ApiErrorBody | null>(null);
   fatalCrash = $state<string | null>(null);
+  transfer = $state<TransferState>({ inventory: null, resumable: null, selection: { ...EMPTY_TRANSFER_SELECTION },
+    progress: null, waiting: false, result: null, copy: null, copies: [] });
 
   get orderRunning(): boolean {
     return this.job !== null && ORDER_KINDS.includes(this.job.kind);

@@ -1,6 +1,6 @@
 // Atrapa mostu: odtwarza scenariusze nagrane z prawdziwego Api (scripts/record_bridge_fixtures.py).
 import type { Bridge } from './bridge';
-import type { Api, CrashSummary, DeviceCheck, EventMap, EventName, Lang, PlanView, ScanView, ServiceInfo, Settings, ShotView, TelemetrySample, UpdateView } from './types';
+import type { Api, CopyView, CrashSummary, DeviceCheck, EventMap, EventName, Lang, PlanView, ScanView, ServiceInfo, Settings, ShotView, TelemetrySample, UpdateView } from './types';
 // Wynik `telemetry_events.sample()` z Pythona (Task 7 planu kroku H) — ten sam kształt co prawdziwe zdarzenia.
 import SAMPLE from './telemetrySample.json';
 
@@ -34,6 +34,7 @@ export type FakeBridge = Bridge & {
   failNextCrashSend(key: string): void;
   failNext(method: string, key: string): void;  // następne wywołanie `method` zwraca błąd `key`
   setChecks(checks: DeviceCheck[]): void;  // co zwróci następny `recheck_site_notifications` (i kolejne skany)
+  setCopies(copies: CopyView[]): void;  // kopie danych na komputerze (`transfers` bez nagrania w scenariuszu)
   calls: { method: string; args: unknown[] }[];
   emit<K extends EventName>(name: K, detail: EventMap[K]): void;
 };
@@ -105,6 +106,7 @@ export function createFakeBridge(name: string,
   const failures = new Map<string, string>();
   let checks: DeviceCheck[] | null = options.checks ? structuredClone(options.checks) : null;
   let checksChanged = false; // odpytywanie w tle (`whenDebugging`) dostaje odczyt tylko po zmianie
+  let copies: CopyView[] = [];
   let planCode = 'K7F3'; // kod ostatniego podglądu planu: udostępnienie liczy ten sam plan
   const SHOT_IMAGE = 'data:image/svg+xml,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="200"><rect width="90" height="200" rx="8" fill="#1f2937"/>'
@@ -136,6 +138,24 @@ export function createFakeBridge(name: string,
 
   const fallback = (method: string, args: unknown[]): unknown => {
     switch (method) {
+      case 'transfers':
+        return { copies: structuredClone(copies) };
+      case 'extend_transfer': {
+        const copy = copies.find((c) => c.id === args[0]);
+        if (!copy) return { error: { key: 'bad_request', message: 'copy_id' } };
+        // jak most: +7 dni od obecnej daty wygaśnięcia, czas lokalny bez strefy
+        const d = new Date(copy.expires);
+        d.setDate(d.getDate() + 7);
+        const p = (n: number) => String(n).padStart(2, '0');
+        const expires = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+        Object.assign(copy, { expires, days_left: copy.days_left + 7 });
+        return { copy: structuredClone(copy) };
+      }
+      case 'delete_transfer':
+        copies = copies.filter((c) => c.id !== args[0]);
+        return { deleted: String(args[0]) };
+      case 'transfer_whatsapp':
+        return { whatsapp_backup: '2026-09-26T14:29:00' };
       case 'delete_order':
         return { deleted: String(args[0]) };
       case 'get_settings':
@@ -368,5 +388,6 @@ export function createFakeBridge(name: string,
     failNextCrashSend: (key) => { failSend = key; },
     failNext: (method, key) => { failures.set(method, key); },
     setChecks: (next) => { checks = structuredClone(next); checksChanged = true; },
+    setCopies: (next) => { copies = structuredClone(next); },
   };
 }

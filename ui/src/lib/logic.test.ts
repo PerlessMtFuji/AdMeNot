@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'vitest';
+import type { InventoryView } from './types';
 import {
+  backupOutcome,
   changedVerdicts,
+  defaultTransferSelection,
+  transferStages,
+  transferTotals,
+  whatsappStale,
   dayKey,
   groupHistory,
   siteState,
@@ -580,5 +586,69 @@ describe('phone checks', () => {
     const undone = groupHistory([action(1, 'fix', 'channel', 'x'), { ...action(2, 'silence', 'notif', null), status: 'undone' }]);
     expect(undone[0].state).toBe('restored');
     expect(undone[0].canRestore).toBe(false);
+  });
+});
+
+describe('data transfer', () => {
+  const inv = (over: Partial<InventoryView> = {}): InventoryView => ({
+    contacts: 2, sms: 5, mms: 1, mms_bytes: 3000, calls: 4,
+    categories: { media: { files: 2, bytes: 5000 }, downloads: { files: 0, bytes: 0 }, whatsapp: { files: 1, bytes: 800 } },
+    others: [{ name: '', files: 1, bytes: 10 }, { name: 'Music', files: 1, bytes: 400 }],
+    apps: [
+      { package: 'a.ok', label: 'A', verdict: 'safe', default_on: true, bytes: null },
+      { package: 'b.sus', label: 'B', verdict: 'suspicious', default_on: false, bytes: null },
+    ],
+    skipped_apps: [{ package: 'c.bad', label: 'C' }],
+    whatsapp_backup: null, storage: null, free_pc: 10 ** 12, unreadable: 0, ...over,
+  });
+
+  test('default selection: everything readable, no other folders, suspicious apps off', () => {
+    expect(defaultTransferSelection(inv())).toEqual({
+      contacts: true, sms: true, mms: true, calls: true, categories: ['media', 'whatsapp'], others: [], apps: ['a.ok'],
+    });
+  });
+
+  test('unreadable or empty phone data starts unticked', () => {
+    const sel = defaultTransferSelection(inv({ sms: null, mms: 0, contacts: null }));
+    expect([sel.contacts, sel.sms, sel.mms, sel.calls]).toEqual([false, false, false, true]);
+  });
+
+  test('totals sum the selected bytes and count the ticked rows', () => {
+    const data = inv();
+    const sel = defaultTransferSelection(data);
+    // kontakty, SMS i MMS, połączenia, zdjęcia, WhatsApp, aplikacje
+    expect(transferTotals(data, sel)).toEqual({ bytes: 3000 + 5000 + 800, categories: 6, etaMin: 1 });
+    const more = { ...sel, mms: false, sms: false, others: ['Music', ''], apps: [] };
+    expect(transferTotals(data, more)).toEqual({ bytes: 5000 + 800 + 410, categories: 5, etaMin: 1 });
+  });
+
+  test('ETA assumes 25 MB/s and never drops below a minute', () => {
+    const big = inv({ categories: { media: { files: 1, bytes: 25 * 1024 ** 2 * 60 * 10 }, downloads: { files: 0, bytes: 0 },
+      whatsapp: { files: 0, bytes: 0 } } });
+    expect(transferTotals(big, defaultTransferSelection(big)).etaMin).toBe(10);
+  });
+
+  test('transfer stages follow the transfer phases', () => {
+    expect(transferStages('transfer_choose')).toEqual(['done', 'now', 'todo', 'todo', 'todo']);
+    expect(transferStages('transfer_backup')).toEqual(['done', 'now', 'todo', 'todo', 'todo']);
+    expect(transferStages('transfer_done')).toEqual(['done', 'done', 'now', 'todo', 'todo']);
+  });
+
+  test('a WhatsApp chat backup older than an hour (or missing) needs a fresh one', () => {
+    const now = new Date('2026-10-25T14:00:00');
+    expect(whatsappStale(null, now)).toBe(true);
+    expect(whatsappStale('2026-10-25T12:30:00', now)).toBe(true);
+    expect(whatsappStale('2026-10-25T13:30:00', now)).toBe(false);
+  });
+
+  test('backup verdict: only a complete copy with all phone data is clean', () => {
+    const r = (status: 'complete' | 'incomplete' | 'stopped', sms: 'ok' | 'unavailable' | 'failed' = 'ok') => ({
+      status, copy_id: 'x', files_done: 1, files_failed: 0, apps_done: 0, apps_failed: 0, bytes: 1, seconds: 1,
+      telephony: { contacts: { status: 'ok' as const, count: 1 }, sms: { status: sms, count: 0 } } });
+    expect(backupOutcome(r('complete'))).toBe('ok');
+    expect(backupOutcome(r('complete', 'unavailable'))).toBe('warn');
+    expect(backupOutcome(r('complete', 'failed'))).toBe('warn');
+    expect(backupOutcome(r('incomplete'))).toBe('warn');
+    expect(backupOutcome(r('stopped'))).toBe('stopped');
   });
 });

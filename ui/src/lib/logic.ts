@@ -1,7 +1,8 @@
 import { CATEGORY_ORDER } from './categories';
-import type { AppView, Category, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, UndoSite, UpdateView, UserWait, Verdict } from './types';
+import type { AppView, BackupResultView, Category, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferSelection, InventoryView, UndoSite, UpdateView, UserWait, Verdict } from './types';
 
-export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done';
+export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done'
+  | 'transfer_choose' | 'transfer_backup' | 'transfer_done';
 export type StageState = 'done' | 'now' | 'todo';
 
 export function defaultSelection(apps: AppView[]): Record<string, Level> {
@@ -101,6 +102,8 @@ export function stageStates(phase: Phase, scanStage: string | null, reported = f
       return ['done', 'done', 'done', 'now', 'todo'];
     case 'done':
       return ['done', 'done', 'done', 'done', reported ? 'done' : 'now'];
+    default: // przenoszenie danych ma własne etapy (transferStages)
+      return ['now', 'todo', 'todo', 'todo', 'todo'];
   }
 }
 
@@ -543,4 +546,60 @@ export function offeredFixes(checks: DeviceCheck[]): string[] {
 /** Kontrole do pokazania w sekcji: nieodczytane (`unrecognized`) idą do linii uwag, nie do sekcji. */
 export function shownChecks(scan: ScanView | null): DeviceCheck[] {
   return (scan?.device_checks ?? []).filter((c) => c.state !== 'unrecognized');
+}
+
+// --- przenoszenie danych ---------------------------------------------------------------------
+
+export const TRANSFER_CATEGORIES: readonly TransferCategory[] = ['media', 'downloads', 'whatsapp'];
+const TRANSFER_RATE = 25 * 1024 ** 2; // B/s — zgrubnie, kopia przez USB 2.0 / adb pull
+const readable = (n: number | null): boolean => n !== null && n > 0;
+
+/** Wszystko, co telefon dał odczytać, poza innymi folderami i aplikacjami odznaczonymi przez silnik (podejrzane). */
+export function defaultTransferSelection(inv: InventoryView): TransferSelection {
+  return {
+    contacts: readable(inv.contacts), sms: readable(inv.sms), mms: readable(inv.mms), calls: readable(inv.calls),
+    categories: TRANSFER_CATEGORIES.filter((c) => (inv.categories[c]?.files ?? 0) > 0),
+    others: [],
+    apps: inv.apps.filter((a) => a.default_on).map((a) => a.package),
+  };
+}
+
+/** Rozmiar zaznaczonych danych, liczba zaznaczonych wierszy ekranu (SMS i MMS to jeden) i czas w minutach. */
+export function transferTotals(inv: InventoryView, sel: TransferSelection): { bytes: number; categories: number; etaMin: number } {
+  const others = new Set(sel.others);
+  const apps = new Set(sel.apps);
+  const bytes = (sel.mms ? inv.mms_bytes : 0)
+    + sel.categories.reduce((n, c) => n + (inv.categories[c]?.bytes ?? 0), 0)
+    + inv.others.filter((o) => others.has(o.name)).reduce((n, o) => n + o.bytes, 0)
+    + inv.apps.filter((a) => apps.has(a.package)).reduce((n, a) => n + (a.bytes ?? 0), 0);
+  const categories = [sel.contacts, sel.sms || sel.mms, sel.calls].filter(Boolean).length + sel.categories.length
+    + (sel.others.length ? 1 : 0) + (sel.apps.length ? 1 : 0);
+  return { bytes, categories, etaMin: Math.max(1, Math.round(bytes / TRANSFER_RATE / 60)) };
+}
+
+/** Etapy przenoszenia: stary telefon, kopia, nowy telefon, wgrywanie, protokół. */
+export function transferStages(phase: Phase): StageState[] {
+  switch (phase) {
+    case 'transfer_choose':
+    case 'transfer_backup':
+      return ['done', 'now', 'todo', 'todo', 'todo'];
+    case 'transfer_done':
+      return ['done', 'done', 'now', 'todo', 'todo'];
+    default:
+      return ['now', 'todo', 'todo', 'todo', 'todo'];
+  }
+}
+
+export const isTransferPhase = (phase: Phase): boolean => phase.startsWith('transfer_');
+
+/** Kopia czatów WhatsApp starsza niż godzina (albo jej brak): serwisant powinien zrobić nową na telefonie. */
+export function whatsappStale(iso: string | null, now: Date): boolean {
+  return iso === null || now.getTime() - new Date(iso).getTime() > 3_600_000;
+}
+
+/** Zielone „gotowe i sprawdzone” tylko dla pełnej kopii ze wszystkimi danymi telefonu. */
+export function backupOutcome(r: BackupResultView): 'ok' | 'warn' | 'stopped' {
+  if (r.status === 'stopped') return 'stopped';
+  if (r.status !== 'complete' || Object.values(r.telephony).some((c) => c.status !== 'ok')) return 'warn';
+  return 'ok';
 }

@@ -1,10 +1,10 @@
 import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
-import { actedAfter, changedVerdicts, defaultSelection, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
-import type { AppState } from './state.svelte';
+import { actedAfter, changedVerdicts, defaultSelection, defaultTransferSelection, TRANSFER_CATEGORIES, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
+import { EMPTY_TRANSFER_SELECTION, type AppState } from './state.svelte';
 import { applyTheme } from './theme';
 import type {
-  ApiError, AppView, CacheUsage, EtaView, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, TelemetrySample, Theme, Verdict,
+  ApiError, AppView, CacheUsage, TransferCategory, EtaView, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, TelemetrySample, Theme, Verdict,
 } from './types';
 
 const CONSOLE_LIMIT = 500;
@@ -286,12 +286,22 @@ export class Controller {
         s.verifying = false;
         s.stopping = false;
         s.phase = 'connect';
+      } else if (d.kind === 'transfer_scan' && s.phase === 'transfer_choose') {
+        this.resetTransfer();
+        s.device = null;
+        s.phase = 'connect';
+      } else if (d.kind === 'backup' && s.phase === 'transfer_backup') {
+        // Kopia zostaje niedokończona: „Rozpocznij kopię” na ekranie wyboru ją wznowi.
+        s.transfer.waiting = false;
+        s.stopping = false;
+        s.phase = 'transfer_choose';
       } else if (d.kind === 'undo') {
         s.undoSites = null;
         s.userWait = null;
         void this.refreshHistory();
       }
     });
+    this.subscribeTransfer();
     on('job:end', (d) => {
       this.ended.add(d.job_id);
       if (d.kind === 'update') s.updateProgress = null;
@@ -641,6 +651,139 @@ export class Controller {
     else s.undoing = s.undoTarget = null;
   }
 
+  // --- przenoszenie danych: kopia starego telefonu --------------------------------------------------
+
+  private subscribeTransfer(): void {
+    const on = this.bridge.on;
+    const s = this.state;
+    on('transfer:inventory', (d) => {
+      if (s.phase !== 'transfer_choose') return; // serwisant już wyszedł z przenoszenia
+      s.transfer.inventory = d.inventory;
+      s.transfer.resumable = d.resumable;
+      s.transfer.selection = defaultTransferSelection(d.inventory);
+      s.phase = 'transfer_choose';
+    });
+    on('transfer:progress', (d) => {
+      s.transfer.progress = d;
+      s.transfer.waiting = false;
+    });
+    on('transfer:waiting', () => { s.transfer.waiting = true; });
+    on('transfer:done', (d) => {
+      s.transfer.result = d.result;
+      s.transfer.copy = d.copy;
+      s.transfer.waiting = false;
+      s.stopping = false;
+      s.phase = 'transfer_done';
+    });
+  }
+
+  private resetTransfer(): void {
+    const tr = this.state.transfer;
+    Object.assign(tr, { inventory: null, resumable: null, selection: { ...EMPTY_TRANSFER_SELECTION }, progress: null,
+      waiting: false, result: null, copy: null });
+  }
+
+  /** „Przenieś dane” na ekranie Połącz: inwentarz wybranego telefonu, potem ekran wyboru. */
+  async startTransfer(): Promise<void> {
+    const s = this.state;
+    if (!s.serial) return;
+    this.resetTransfer();
+    Object.assign(s, { error: null, device: null, screen: 'main', phase: 'transfer_choose', stopping: false });
+    const r = await this.call(this.api.transfer_inventory(s.serial, s.client.trim() || null));
+    if (r) this.setJob(r.job_id, 'transfer_scan');
+    else s.phase = 'connect';
+  }
+
+  /** Wiersz ekranu wyboru: kontakty, SMS i MMS (razem), połączenia, kategorie plików, inne foldery, aplikacje. */
+  toggleTransfer(key: string): void {
+    const tr = this.state.transfer;
+    const inv = tr.inventory;
+    const sel = { ...tr.selection };
+    if (key === 'contacts' || key === 'calls') {
+      sel[key] = !sel[key];
+    } else if (key === 'sms') {
+      const on = !(sel.sms || sel.mms);
+      sel.sms = on && (inv?.sms ?? 0) > 0;
+      sel.mms = on && (inv?.mms ?? 0) > 0;
+    } else if (key === 'others') {
+      sel.others = sel.others.length ? [] : (inv?.others ?? []).map((o) => o.name);
+    } else if (key === 'apps') {
+      sel.apps = sel.apps.length ? [] : (inv?.apps ?? []).filter((a) => a.default_on).map((a) => a.package);
+    } else if ((TRANSFER_CATEGORIES as readonly string[]).includes(key)) {
+      const cat = key as TransferCategory;
+      sel.categories = sel.categories.includes(cat) ? sel.categories.filter((c) => c !== cat)
+        : TRANSFER_CATEGORIES.filter((c) => c === cat || sel.categories.includes(c));
+    } else {
+      return;
+    }
+    tr.selection = sel;
+  }
+
+  toggleTransferApp(pkg: string): void {
+    const sel = this.state.transfer.selection;
+    this.state.transfer.selection = { ...sel, apps: sel.apps.includes(pkg) ? sel.apps.filter((p) => p !== pkg) : [...sel.apps, pkg] };
+  }
+
+  toggleTransferOther(name: string): void {
+    const sel = this.state.transfer.selection;
+    this.state.transfer.selection = { ...sel,
+      others: sel.others.includes(name) ? sel.others.filter((o) => o !== name) : [...sel.others, name] };
+  }
+
+  /** „Sprawdź ponownie”: serwisant właśnie zrobił kopię czatów WhatsApp na telefonie. */
+  async recheckWhatsapp(): Promise<void> {
+    const r = await this.call(this.api.transfer_whatsapp());
+    const inv = this.state.transfer.inventory;
+    if (r && inv) this.state.transfer.inventory = { ...inv, whatsapp_backup: r.whatsapp_backup };
+  }
+
+  /** Kopia zaznaczonych danych; niedokończona kopia tego telefonu jest wznawiana przez most (z bieżącym wyborem). */
+  async startBackup(): Promise<void> {
+    const s = this.state;
+    const sel = s.transfer.selection;
+    s.error = null;
+    const r = await this.call(this.api.start_backup({
+      contacts: sel.contacts, sms: sel.sms, mms: sel.mms, calls: sel.calls,
+      categories: [...sel.categories], others: [...sel.others], apps: [...sel.apps],
+    }));
+    if (!r) return;
+    Object.assign(s.transfer, { progress: null, waiting: false, result: null, copy: null });
+    s.stopping = false;
+    s.phase = 'transfer_backup';
+    this.setJob(r.job_id, 'backup');
+  }
+
+  /** „Przerwij” (także w czasie czekania na telefon): kopia kończy się `transfer:done` ze statusem „stopped”. */
+  async stopBackup(): Promise<void> {
+    const job = this.state.job;
+    if (job?.kind !== 'backup') return;
+    this.state.stopping = true;
+    await this.call(this.api.stop(job.id));
+  }
+
+  /** Z przenoszenia z powrotem na ekran Połącz (odczyt inwentarza w toku jest przerywany). */
+  leaveTransfer(): void {
+    const s = this.state;
+    if (s.job?.kind === 'transfer_scan') void this.call(this.api.stop(s.job.id));
+    this.resetTransfer();
+    Object.assign(s, { phase: 'connect', screen: 'main', device: null, stopping: false });
+  }
+
+  async loadTransfers(): Promise<void> {
+    const r = await this.call(this.api.transfers());
+    if (r) this.state.transfer.copies = r.copies;
+  }
+
+  async extendTransfer(id: string): Promise<void> {
+    const r = await this.call(this.api.extend_transfer(id));
+    if (r) this.state.transfer.copies = this.state.transfer.copies.map((c) => (c.id === id ? r.copy : c));
+  }
+
+  async deleteTransfer(id: string): Promise<void> {
+    const r = await this.call(this.api.delete_transfer(id));
+    if (r) this.state.transfer.copies = this.state.transfer.copies.filter((c) => c.id !== id);
+  }
+
   // --- aktualizacje ------------------------------------------------------------------------------
 
   /** Błąd `retired` przy zmianach na telefonie otwiera okno instalacji (jeśli jest co instalować). */
@@ -785,6 +928,7 @@ export class Controller {
     const s = this.state;
     s.screen = 'history';
     s.undoResult = null;
+    void this.loadTransfers();
     await this.refreshHistory(serial ?? s.history?.serial ?? s.device?.serial ?? null);
   }
 

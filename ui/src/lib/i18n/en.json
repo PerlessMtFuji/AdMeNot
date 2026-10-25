@@ -474,6 +474,166 @@
     "pdf_failed": "Could not create the PDF. Opened the HTML report: {html}",
     "pdf_locked": "File {pdf} is open in another program — close it and try again. Opened the HTML report: {html}"
   },
+  "transfer": {
+    "stage": {
+      "old_phone": "Old phone",
+      "copy": "Copy",
+      "new_phone": "New phone",
+      "upload": "Upload",
+      "report": "Report"
+    },
+    "start": "Transfer data",
+    "mode": "data transfer",
+    "reading": "Checking what is on the phone…",
+    "reading_sub": "Counting files, messages and apps. Nothing is changed on this phone.",
+    "title": "What should be copied from the old phone?",
+    "sub": "The selected data goes to this computer, then to the new phone. Nothing is changed on this phone.",
+    "group": {
+      "phone": "Phone",
+      "files": "Files",
+      "apps": "Apps"
+    },
+    "row": {
+      "contacts": "Contacts",
+      "contacts_note": "The new phone opens an import — you pick the Google account.",
+      "sms": "SMS and MMS",
+      "sms_note": "Including MMS attachments. RCS chats (“chat” in Google Messages) can't be copied over USB.",
+      "calls": "Call history",
+      "media": "Photos and videos",
+      "media_note": "Camera, screenshots, Pictures, Movies",
+      "downloads": "Downloads and documents",
+      "downloads_note": "Download, Documents",
+      "whatsapp": "WhatsApp",
+      "whatsapp_note": "chats and media",
+      "others": "Other folders",
+      "root": "Files in the main folder",
+      "apps": "Apps",
+      "apps_note": "Only the apps, without their data and sign-ins."
+    },
+    "unavailable": "unavailable",
+    "unreadable": "The phone did not allow reading this data.",
+    "xiaomi_hint": "On Xiaomi, Redmi and POCO phones, turn on “USB debugging (Security settings)” in Developer options, then choose “Transfer data” again.",
+    "whatsapp_old_title": "The WhatsApp chat backup is older than an hour",
+    "whatsapp_none_title": "There is no WhatsApp chat backup on the phone",
+    "whatsapp_old": "Last chat backup on the phone: {when}. To get the latest messages, on the phone open WhatsApp → Settings → Chats → Chat backup → Back up.",
+    "whatsapp_none": "To copy the messages, on the phone open WhatsApp → Settings → Chats → Chat backup → Back up.",
+    "recheck": "Check again",
+    "apps_copy": "{count} to copy",
+    "apps_skipped": {
+      "one": "{count} skipped: harmful",
+      "few": "{count} skipped: harmful",
+      "many": "{count} skipped: harmful",
+      "other": "{count} skipped: harmful"
+    },
+    "apps_suspicious": {
+      "one": "{count} suspicious — unticked",
+      "few": "{count} suspicious — unticked",
+      "many": "{count} suspicious — unticked",
+      "other": "{count} suspicious — unticked"
+    },
+    "suspicious": "suspicious",
+    "show_list": "Show list",
+    "hide_list": "Hide list",
+    "files": {
+      "one": "{count} file",
+      "few": "{count} files",
+      "many": "{count} files",
+      "other": "{count} files"
+    },
+    "messages": {
+      "one": "{count} message",
+      "few": "{count} messages",
+      "many": "{count} messages",
+      "other": "{count} messages"
+    },
+    "folders": {
+      "one": "{count} folder",
+      "few": "{count} folders",
+      "many": "{count} folders",
+      "other": "{count} folders"
+    },
+    "categories": {
+      "one": "{count} category",
+      "few": "{count} categories",
+      "many": "{count} categories",
+      "other": "{count} categories"
+    },
+    "panel": "Copy on this computer",
+    "size": "Size",
+    "eta": "Estimated time",
+    "eta_value": "about {min} min",
+    "free": "Free disk space",
+    "no_space": "Not enough disk space on this computer for this copy.",
+    "privacy": "The copy contains the customer's private data. It is deleted automatically after 7 days — change that in History.",
+    "begin": "Start copy",
+    "resume_title": "Resume the interrupted copy from {when}",
+    "resume_text": "Files already copied stay — the program finishes the rest.",
+    "resume": "Resume",
+    "copying": "Copying data from the old phone",
+    "copying_sub": "Keep the phone connected. If the cable disconnects, the copy waits and then continues.",
+    "phase": {
+      "telephony": "Contacts, messages and calls",
+      "files": "Files",
+      "apps": "Apps",
+      "verify": "Checking the copy"
+    },
+    "stage_label": "Stage: {stage}",
+    "progress_label": "Copy progress",
+    "progress_files": {
+      "one": "{done} of {count} file",
+      "few": "{done} of {count} files",
+      "many": "{done} of {count} files",
+      "other": "{done} of {count} files"
+    },
+    "progress_size": "{done} of {total}",
+    "starting": "Preparing the copy…",
+    "waiting": "Phone disconnected — reconnect it and the copy will continue",
+    "stop": "Stop",
+    "stopping": "Stopping…",
+    "done_heading": "Copy of the old phone",
+    "done_ok": "Copy ready and verified — you can disconnect the old phone",
+    "done_warn": "Copy ready, but not everything could be copied",
+    "done_warn_text": "The data marked below is not in the copy.",
+    "done_stopped": "Copy stopped",
+    "done_stopped_text": "Copied files stay on this computer. To finish, connect this phone and choose “Transfer data”.",
+    "sum": {
+      "contacts": "Contacts",
+      "sms": "SMS",
+      "mms": "MMS",
+      "calls": "Calls",
+      "files": "Files",
+      "apps": "Apps",
+      "size": "Size",
+      "failed": "failed: {count}",
+      "tel_failed": "failed",
+      "addresses_missing": "without addresses: {count}",
+      "attachments_missing": "without attachments: {count}"
+    },
+    "expires": {
+      "one": "The copy is deleted from this computer in {count} day — change that in History.",
+      "few": "The copy is deleted from this computer in {count} days — change that in History.",
+      "many": "The copy is deleted from this computer in {count} days — change that in History.",
+      "other": "The copy is deleted from this computer in {count} days — change that in History."
+    },
+    "finish": "Finish",
+    "copies_title": "Data copies on this computer",
+    "days_left": {
+      "one": "{count} day left",
+      "few": "{count} days left",
+      "many": "{count} days left",
+      "other": "{count} days left"
+    },
+    "extend": "Extend",
+    "delete": "Delete now",
+    "delete_title": "Delete the copy {name}?",
+    "delete_text": "The customer's data in this copy is removed from this computer. This can't be undone.",
+    "delete_confirm": "Delete",
+    "status": {
+      "in_progress": "unfinished",
+      "incomplete": "incomplete",
+      "complete": "complete"
+    }
+  },
   "error": {
     "retired": "This version of AdMeNot is withdrawn — changes to phones are blocked until you update.",
     "fatal": "An unexpected interface error occurred.", "restart": "Back to start", "log": "Details in the log: {path}",
@@ -505,6 +665,11 @@
     "unknown_crash": "This report no longer exists.",
     "shot_limit": "You can choose at most 8 screenshots for the report.",
     "device_busy": "Another AdMeNot window or the CLI is running an order on this phone. Wait until it finishes.",
-    "data_too_new": "The program data comes from a newer version of AdMeNot — update the program."
+    "data_too_new": "The program data comes from a newer version of AdMeNot — update the program.",
+    "transfer_no_inventory": "The phone from the copy screen is no longer connected. Connect it and choose “Transfer data” again.",
+    "transfer_disk_full": "Not enough disk space on this computer. Free up space and start the copy again — files already copied stay.",
+    "transfer_wrong_device": "A different phone is connected than the one being copied. Connect the right phone and start the copy again.",
+    "transfer_too_many_disconnects": "The phone disconnected too often. Check the cable and start the copy again — files already copied stay.",
+    "transfer_failed": "The copy failed. Files already copied stay — start the copy again."
   }
 }

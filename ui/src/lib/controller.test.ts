@@ -1088,3 +1088,162 @@ describe('phone checks and site fixes', () => {
     expect(s.result?.firefox_debugging).toBe(true);
   });
 });
+
+describe('data transfer', () => {
+  async function chosen() {
+    const env = setup('transfer');
+    await env.ctl.init();
+    env.s.client = 'Anna K.';
+    await env.ctl.startTransfer();
+    await vi.waitFor(() => expect(env.s.transfer.inventory).not.toBeNull());
+    return env;
+  }
+
+  test('startTransfer reads the inventory for the picked phone and opens the copy screen', async () => {
+    const { s, bridge } = await chosen();
+    expect(bridge.calls.find((c) => c.method === 'transfer_inventory')?.args).toEqual(['R58T00TEST', 'Anna K.']);
+    expect(s.phase).toBe('transfer_choose');
+    expect(s.device?.serial).toBe('R58T00TEST');
+    expect(s.transfer.selection).toEqual({ contacts: true, sms: true, mms: false, calls: true,
+      categories: ['media', 'downloads', 'whatsapp'], others: [], apps: ['com.wlive.forecast', 'com.whatsapp'] });
+    await vi.waitFor(() => expect(s.job).toBeNull());
+  });
+
+  test('toggles change the selection', async () => {
+    const { ctl, s } = await chosen();
+    ctl.toggleTransfer('downloads');
+    expect(s.transfer.selection.categories).toEqual(['media', 'whatsapp']);
+    ctl.toggleTransfer('sms');
+    expect([s.transfer.selection.sms, s.transfer.selection.mms]).toEqual([false, false]);
+    ctl.toggleTransfer('sms');
+    expect([s.transfer.selection.sms, s.transfer.selection.mms]).toEqual([true, false]); // MMS: telefon ich nie podał
+    ctl.toggleTransferOther('Music');
+    ctl.toggleTransferOther('');
+    expect(s.transfer.selection.others).toEqual(['Music', '']);
+    ctl.toggleTransfer('others');
+    expect(s.transfer.selection.others).toEqual([]);
+    ctl.toggleTransfer('others');
+    expect(s.transfer.selection.others).toEqual(['', 'Music']);
+    ctl.toggleTransferApp('com.wlive.forecast');
+    expect(s.transfer.selection.apps).toEqual(['com.whatsapp']);
+    ctl.toggleTransfer('apps');
+    expect(s.transfer.selection.apps).toEqual([]);
+    ctl.toggleTransfer('apps');
+    expect(s.transfer.selection.apps).toEqual(['com.wlive.forecast', 'com.whatsapp']);
+  });
+
+  test('startBackup sends the engine selection and the done event shows the result', async () => {
+    const { ctl, s, bridge } = await chosen();
+    ctl.toggleTransferApp('com.wlive.forecast');
+    ctl.toggleTransferOther('Music');
+    await ctl.startBackup();
+    expect(s.phase).toBe('transfer_backup');
+    const sent = bridge.calls.find((c) => c.method === 'start_backup')?.args[0] as Record<string, unknown>;
+    expect(Object.keys(sent).sort()).toEqual(['apps', 'calls', 'categories', 'contacts', 'mms', 'others', 'sms']);
+    expect(sent).toEqual({ contacts: true, sms: true, mms: false, calls: true,
+      categories: ['media', 'downloads', 'whatsapp'], others: ['Music'], apps: ['com.whatsapp'] });
+    await vi.waitFor(() => expect(s.phase).toBe('transfer_done'));
+    expect(s.transfer.result?.status).toBe('complete');
+    expect(s.transfer.copy?.days_left).toBe(7);
+    expect(s.transfer.progress?.stage).toBe('apps');
+  });
+
+  test('waiting for the phone, then progress clears the notice', async () => {
+    const { s, bridge } = await chosen();
+    s.phase = 'transfer_backup';
+    bridge.emit('transfer:waiting', {});
+    expect(s.transfer.waiting).toBe(true);
+    bridge.emit('transfer:progress', { stage: 'files', done_files: 1, total_files: 2, done_bytes: 1, total_bytes: 2, current: 'DCIM/a.jpg' });
+    expect(s.transfer.waiting).toBe(false);
+    expect(s.transfer.progress?.current).toBe('DCIM/a.jpg');
+  });
+
+  test('stopping asks the bridge to stop the backup job and ends as a stopped copy', async () => {
+    const { ctl, s, bridge } = await chosen();
+    s.phase = 'transfer_backup';
+    ctl.setJob('job-9', 'backup');
+    s.transfer.waiting = true;
+    await ctl.stopBackup();
+    expect(s.stopping).toBe(true);
+    expect(bridge.calls.at(-1)).toEqual({ method: 'stop', args: ['job-9'] });
+    bridge.emit('transfer:done', { result: { status: 'stopped', copy_id: 'x', telephony: {}, files_done: 0, files_failed: 0,
+      apps_done: 0, apps_failed: 0, bytes: 0, seconds: 1 }, copy: { id: 'x', model: 'M', manufacturer: 'm', client: null,
+      created: '2026-10-25T10:00:00', expires: '2026-11-01T10:00:00', days_left: 7, status: 'in_progress', bytes: 0, counts: {} } });
+    expect(s.phase).toBe('transfer_done');
+    expect(s.stopping).toBe(false);
+    expect(s.transfer.waiting).toBe(false);
+    expect(s.transfer.result?.status).toBe('stopped');
+  });
+
+  test('a backup job error lands on the error card and returns to the choice', async () => {
+    const { s, bridge } = await chosen();
+    s.phase = 'transfer_backup';
+    s.transfer.waiting = true;
+    bridge.emit('job:error', { job_id: 'job-2', kind: 'backup', key: 'transfer_disk_full', message: '' });
+    expect(s.error?.key).toBe('transfer_disk_full');
+    expect(s.phase).toBe('transfer_choose');
+    expect(s.transfer.waiting).toBe(false);
+  });
+
+  test('an inventory error returns to connect', async () => {
+    const { ctl, s, bridge } = setup('transfer');
+    await ctl.init();
+    s.phase = 'transfer_choose';
+    bridge.emit('job:error', { job_id: 'job-1', kind: 'transfer_scan', key: 'timeout', message: '' });
+    expect(s.phase).toBe('connect');
+    expect(s.error?.key).toBe('timeout');
+  });
+
+  test('start_backup refused without an inventory stays on the choice with the error', async () => {
+    const { ctl, s, bridge } = await chosen();
+    bridge.failNext('start_backup', 'transfer_no_inventory');
+    await ctl.startBackup();
+    expect(s.phase).toBe('transfer_choose');
+    expect(s.error?.key).toBe('transfer_no_inventory');
+  });
+
+  test('re-checking the WhatsApp backup updates the inventory', async () => {
+    const { ctl, s } = await chosen();
+    expect(s.transfer.inventory?.whatsapp_backup).toBeNull();
+    await ctl.recheckWhatsapp();
+    expect(s.transfer.inventory?.whatsapp_backup).toBe('2026-09-26T14:29:00');
+  });
+
+  test('copies: load, extend, delete', async () => {
+    const { ctl, s, bridge } = setup('empty');
+    await ctl.init();
+    bridge.setCopies([{ id: 'S/1', model: 'M', manufacturer: 'm', client: 'Anna', created: '2026-10-25T10:00:00',
+      expires: '2026-11-01T10:00:00', days_left: 7, status: 'complete', bytes: 10, counts: {} }]);
+    await ctl.loadTransfers();
+    expect(s.transfer.copies).toHaveLength(1);
+    await ctl.extendTransfer('S/1');
+    expect(s.transfer.copies[0].days_left).toBe(14);
+    expect(s.transfer.copies[0].expires).toBe('2026-11-08T10:00:00');
+    await ctl.deleteTransfer('S/1');
+    expect(s.transfer.copies).toEqual([]);
+  });
+
+  test('a refused delete (copy in use) keeps the copy and shows the error', async () => {
+    const { ctl, s, bridge } = setup('transfer');
+    await ctl.init();
+    s.transfer.copies = [{ id: 'S/1' } as never];
+    bridge.failNext('delete_transfer', 'busy');
+    await ctl.deleteTransfer('S/1');
+    expect(s.transfer.copies).toHaveLength(1);
+    expect(s.error?.key).toBe('busy');
+  });
+
+  test('opening the history loads the copies', async () => {
+    const { ctl, bridge } = setup('transfer');
+    await ctl.init();
+    await ctl.openHistory();
+    expect(bridge.calls.some((c) => c.method === 'transfers')).toBe(true);
+  });
+
+  test('leaving the transfer goes back to connect', async () => {
+    const { ctl, s } = await chosen();
+    ctl.leaveTransfer();
+    expect(s.phase).toBe('connect');
+    expect(s.transfer.inventory).toBeNull();
+  });
+});

@@ -4,6 +4,7 @@
   import PhoneThumb from '../components/PhoneThumb.svelte';
   import SiteQueue from '../components/SiteQueue.svelte';
   import StepTimeline from '../components/StepTimeline.svelte';
+  import TransferCopies from '../components/TransferCopies.svelte';
   import type { Controller } from '../lib/controller';
   import { i18n, t, tp } from '../lib/i18n/index.svelte';
   import { dayKey, groupHistory, historyApp, modelName } from '../lib/logic';
@@ -92,6 +93,8 @@
         {/snippet}
       </Banner>
     {/each}
+
+    <TransferCopies />
 
     {#if !h || !h.serial}
       <p class="text-mut">{t('history.none')}</p>

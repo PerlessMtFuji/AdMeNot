@@ -71,6 +71,7 @@
           <input class="field flex-1 rounded-xl px-3.5 py-2.5" bind:value={s.client}
             placeholder={t('connect.client_placeholder')} aria-label={t('connect.client_label')} maxlength="80" />
           <Button type="submit" variant="primary" size="lg" disabled={!s.serial}>{t('connect.scan')}</Button>
+          <Button variant="secondary" size="lg" disabled={!s.serial} onclick={() => ctl.startTransfer()}>{t('transfer.start')}</Button>
         </form>
       </div>
     {:else}

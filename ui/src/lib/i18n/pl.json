@@ -474,6 +474,166 @@
     "pdf_failed": "Nie udało się utworzyć PDF. Otwarto protokół HTML: {html}",
     "pdf_locked": "Plik {pdf} jest otwarty w innym programie — zamknij go i spróbuj ponownie. Otwarto protokół HTML: {html}"
   },
+  "transfer": {
+    "stage": {
+      "old_phone": "Stary telefon",
+      "copy": "Kopia",
+      "new_phone": "Nowy telefon",
+      "upload": "Wgrywanie",
+      "report": "Protokół"
+    },
+    "start": "Przenieś dane",
+    "mode": "przenoszenie danych",
+    "reading": "Sprawdzam, co jest na telefonie…",
+    "reading_sub": "Liczę pliki, wiadomości i aplikacje. Na tym telefonie niczego nie zmieniam.",
+    "title": "Co skopiować ze starego telefonu?",
+    "sub": "Zaznaczone dane trafią na komputer, a potem na nowy telefon. Na tym telefonie niczego nie zmieniam.",
+    "group": {
+      "phone": "Telefon",
+      "files": "Pliki",
+      "apps": "Aplikacje"
+    },
+    "row": {
+      "contacts": "Kontakty",
+      "contacts_note": "Na nowym telefonie otworzy się import — wybierzesz konto Google.",
+      "sms": "SMS i MMS",
+      "sms_note": "Razem z załącznikami MMS. Czatów RCS („czat” w Wiadomościach Google) nie da się skopiować przez USB.",
+      "calls": "Historia połączeń",
+      "media": "Zdjęcia i filmy",
+      "media_note": "Aparat, zrzuty ekranu, Pictures, Movies",
+      "downloads": "Pobrane i dokumenty",
+      "downloads_note": "Download, Documents",
+      "whatsapp": "WhatsApp",
+      "whatsapp_note": "czaty i media",
+      "others": "Inne foldery",
+      "root": "Pliki w folderze głównym",
+      "apps": "Aplikacje",
+      "apps_note": "Same aplikacje, bez ich danych i logowań."
+    },
+    "unavailable": "niedostępne",
+    "unreadable": "Telefon nie pozwolił odczytać tych danych.",
+    "xiaomi_hint": "Na telefonach Xiaomi, Redmi i POCO włącz w Opcjach programisty „Debugowanie USB (ustawienia zabezpieczeń)”, a potem wybierz „Przenieś dane” jeszcze raz.",
+    "whatsapp_old_title": "Kopia czatów WhatsApp jest starsza niż godzina",
+    "whatsapp_none_title": "Na telefonie nie ma kopii czatów WhatsApp",
+    "whatsapp_old": "Ostatnia kopia czatów na telefonie: {when}. Żeby mieć najnowsze wiadomości, na telefonie otwórz WhatsApp → Ustawienia → Czaty → Kopia zapasowa → Utwórz kopię.",
+    "whatsapp_none": "Żeby skopiować wiadomości, na telefonie otwórz WhatsApp → Ustawienia → Czaty → Kopia zapasowa → Utwórz kopię.",
+    "recheck": "Sprawdź ponownie",
+    "apps_copy": "{count} do skopiowania",
+    "apps_skipped": {
+      "one": "{count} pominięta: szkodliwa",
+      "few": "{count} pominięte: szkodliwe",
+      "many": "{count} pominiętych: szkodliwych",
+      "other": "{count} pominiętej: szkodliwej"
+    },
+    "apps_suspicious": {
+      "one": "{count} podejrzana — odznaczona",
+      "few": "{count} podejrzane — odznaczone",
+      "many": "{count} podejrzanych — odznaczonych",
+      "other": "{count} podejrzanej — odznaczonej"
+    },
+    "suspicious": "podejrzana",
+    "show_list": "Pokaż listę",
+    "hide_list": "Zwiń listę",
+    "files": {
+      "one": "{count} plik",
+      "few": "{count} pliki",
+      "many": "{count} plików",
+      "other": "{count} pliku"
+    },
+    "messages": {
+      "one": "{count} wiadomość",
+      "few": "{count} wiadomości",
+      "many": "{count} wiadomości",
+      "other": "{count} wiadomości"
+    },
+    "folders": {
+      "one": "{count} folder",
+      "few": "{count} foldery",
+      "many": "{count} folderów",
+      "other": "{count} folderu"
+    },
+    "categories": {
+      "one": "{count} kategoria",
+      "few": "{count} kategorie",
+      "many": "{count} kategorii",
+      "other": "{count} kategorii"
+    },
+    "panel": "Kopia na komputerze",
+    "size": "Rozmiar",
+    "eta": "Szacowany czas",
+    "eta_value": "ok. {min} min",
+    "free": "Wolne miejsce na dysku",
+    "no_space": "Za mało miejsca na dysku komputera na tę kopię.",
+    "privacy": "Kopia zawiera prywatne dane klienta. Usunę ją automatycznie po 7 dniach — wcześniej lub później zmienisz to w Historii.",
+    "begin": "Rozpocznij kopię",
+    "resume_title": "Wznów przerwaną kopię z {when}",
+    "resume_text": "Skopiowane już pliki zostają — program dokończy resztę.",
+    "resume": "Wznów",
+    "copying": "Kopiuję dane ze starego telefonu",
+    "copying_sub": "Nie odłączaj telefonu. Gdy kabel się rozłączy, kopia poczeka i będzie kontynuowana.",
+    "phase": {
+      "telephony": "Kontakty, wiadomości i połączenia",
+      "files": "Pliki",
+      "apps": "Aplikacje",
+      "verify": "Sprawdzanie kopii"
+    },
+    "stage_label": "Etap: {stage}",
+    "progress_label": "Postęp kopii",
+    "progress_files": {
+      "one": "{done} z {count} pliku",
+      "few": "{done} z {count} plików",
+      "many": "{done} z {count} plików",
+      "other": "{done} z {count} pliku"
+    },
+    "progress_size": "{done} z {total}",
+    "starting": "Przygotowuję kopię…",
+    "waiting": "Telefon odłączony — podłącz ponownie, kopia będzie kontynuowana",
+    "stop": "Przerwij",
+    "stopping": "Przerywam…",
+    "done_heading": "Kopia starego telefonu",
+    "done_ok": "Kopia gotowa i sprawdzona — możesz odłączyć stary telefon",
+    "done_warn": "Kopia gotowa, ale nie wszystko udało się skopiować",
+    "done_warn_text": "Dane oznaczone poniżej nie trafiły do kopii.",
+    "done_stopped": "Kopia przerwana",
+    "done_stopped_text": "Skopiowane pliki zostają na komputerze. Żeby dokończyć, podłącz ten telefon i wybierz „Przenieś dane”.",
+    "sum": {
+      "contacts": "Kontakty",
+      "sms": "SMS",
+      "mms": "MMS",
+      "calls": "Połączenia",
+      "files": "Pliki",
+      "apps": "Aplikacje",
+      "size": "Rozmiar",
+      "failed": "nieudane: {count}",
+      "tel_failed": "nie udało się",
+      "addresses_missing": "bez adresów: {count}",
+      "attachments_missing": "bez załączników: {count}"
+    },
+    "expires": {
+      "one": "Kopia zostanie usunięta z komputera za {count} dzień — zmienisz to w Historii.",
+      "few": "Kopia zostanie usunięta z komputera za {count} dni — zmienisz to w Historii.",
+      "many": "Kopia zostanie usunięta z komputera za {count} dni — zmienisz to w Historii.",
+      "other": "Kopia zostanie usunięta z komputera za {count} dnia — zmienisz to w Historii."
+    },
+    "finish": "Zakończ",
+    "copies_title": "Kopie danych na komputerze",
+    "days_left": {
+      "one": "został {count} dzień",
+      "few": "zostały {count} dni",
+      "many": "zostało {count} dni",
+      "other": "zostało {count} dnia"
+    },
+    "extend": "Przedłuż",
+    "delete": "Usuń teraz",
+    "delete_title": "Usunąć kopię {name}?",
+    "delete_text": "Dane klienta z tej kopii znikną z komputera. Tego nie da się cofnąć.",
+    "delete_confirm": "Usuń",
+    "status": {
+      "in_progress": "niedokończona",
+      "incomplete": "niepełna",
+      "complete": "pełna"
+    }
+  },
   "error": {
     "retired": "Ta wersja AdMeNot jest wycofana — zmiany na telefonach są zablokowane do czasu aktualizacji.",
     "fatal": "Wystąpił nieoczekiwany błąd interfejsu.", "restart": "Wróć do początku", "log": "Szczegóły w logu: {path}",
@@ -505,6 +665,11 @@
     "unknown_crash": "Tego raportu już nie ma.",
     "shot_limit": "Do protokołu można wybrać najwyżej 8 zrzutów.",
     "device_busy": "Inne okno AdMeNot albo CLI wykonuje teraz zlecenie na tym telefonie. Poczekaj, aż skończy.",
-    "data_too_new": "Dane programu pochodzą z nowszej wersji AdMeNot — zaktualizuj program."
+    "data_too_new": "Dane programu pochodzą z nowszej wersji AdMeNot — zaktualizuj program.",
+    "transfer_no_inventory": "Telefonu z ekranu kopii nie ma już przy komputerze. Podłącz go i wybierz „Przenieś dane” jeszcze raz.",
+    "transfer_disk_full": "Za mało miejsca na dysku komputera. Zwolnij miejsce i rozpocznij kopię jeszcze raz — skopiowane pliki zostaną.",
+    "transfer_wrong_device": "Podłączono inny telefon niż ten, z którego robiona jest kopia. Podłącz właściwy telefon i rozpocznij kopię jeszcze raz.",
+    "transfer_too_many_disconnects": "Telefon zbyt często się rozłączał. Sprawdź kabel i rozpocznij kopię jeszcze raz — skopiowane pliki zostaną.",
+    "transfer_failed": "Kopia nie powiodła się. Skopiowane pliki zostają — rozpocznij kopię jeszcze raz."
   }
 }
