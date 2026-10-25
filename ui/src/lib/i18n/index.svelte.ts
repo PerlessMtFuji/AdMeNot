@@ -11,7 +11,9 @@ export const ERROR_KEYS = ['adb_missing', 'unauthorized', 'offline', 'disconnect
   'nothing_to_resume', 'nothing_to_do', 'no_target', 'bad_request', 'logo_missing', 'logo_type',
   'logo_size', 'internal', 'mirror_missing', 'mirror_failed', 'unknown_screenshot', 'shot_limit',
   'data_too_new', 'retired', 'unknown_crash', 'device_busy', 'plan_changed',
-  'transfer_no_inventory', 'transfer_disk_full', 'transfer_wrong_device', 'transfer_too_many_disconnects', 'transfer_failed'] as const;
+  'transfer_no_inventory', 'transfer_disk_full', 'transfer_wrong_device', 'transfer_too_many_disconnects', 'transfer_failed',
+  'transfer_in_use'] as const;
+
 // Błędy okna aktualizacji (klucze `update.error.*`).
 export const UPDATE_ERROR_KEYS = ['update_download', 'update_corrupt', 'update_launch_failed', 'busy',
   'update_none', 'internal'] as const;
@@ -24,7 +26,9 @@ export const PLURAL_KEYS = ['results.title', 'results.safe', 'expert.days', 'pan
   'exec.apps', 'exec.steps', 'history.did.remove', 'history.did.disable', 'history.did.silence',
   'shot.count', 'apk_cache.estimate', 'checks.to_fix', 'checks.picked', 'history.sites_restored',
   'undo.done_collapsed', 'transfer.apps_skipped', 'transfer.apps_suspicious', 'transfer.files', 'transfer.messages',
-  'transfer.folders', 'transfer.categories', 'transfer.progress_files', 'transfer.expires', 'transfer.days_left'] as const;
+  'transfer.folders', 'transfer.categories', 'transfer.progress_files', 'transfer.expires', 'transfer.days_left',
+  'transfer.unreadable_files'] as const;
+
 
 class I18n {
   lang = $state<Lang>('pl');

@@ -512,7 +512,14 @@
     },
     "unavailable": "niedostępne",
     "unreadable": "Telefon nie pozwolił odczytać tych danych.",
-    "xiaomi_hint": "Na telefonach Xiaomi, Redmi i POCO włącz w Opcjach programisty „Debugowanie USB (ustawienia zabezpieczeń)”, a potem wybierz „Przenieś dane” jeszcze raz.",
+    "xiaomi_hint": "Na telefonach Xiaomi, Redmi i POCO włącz w Opcjach programisty „Debugowanie USB (ustawienia zabezpieczeń)”, a potem wybierz „Przenieś dane” jeszcze raz. Jeśli kopia jest już zrobiona, zaznacz tylko brakujące dane, np. SMS i kontakty — reszty nie trzeba kopiować od nowa.",
+    "unreadable_files": {
+      "one": "{count} pliku lub folderu nie dało się odczytać — nie trafi do kopii",
+      "few": "{count} plików lub folderów nie dało się odczytać — nie trafią do kopii",
+      "many": "{count} plików lub folderów nie dało się odczytać — nie trafią do kopii",
+      "other": "{count} pliku lub folderu nie dało się odczytać — nie trafią do kopii"
+    },
+    "unreadable_files_text": "Telefon nie pozwolił ich odczytać (np. uszkodzona nazwa albo brak dostępu). Pozostałe dane kopiują się normalnie.",
     "whatsapp_old_title": "Kopia czatów WhatsApp jest starsza niż godzina",
     "whatsapp_none_title": "Na telefonie nie ma kopii czatów WhatsApp",
     "whatsapp_old": "Ostatnia kopia czatów na telefonie: {when}. Żeby mieć najnowsze wiadomości, na telefonie otwórz WhatsApp → Ustawienia → Czaty → Kopia zapasowa → Utwórz kopię.",
@@ -670,6 +677,8 @@
     "transfer_disk_full": "Za mało miejsca na dysku komputera. Zwolnij miejsce i rozpocznij kopię jeszcze raz — skopiowane pliki zostaną.",
     "transfer_wrong_device": "Podłączono inny telefon niż ten, z którego robiona jest kopia. Podłącz właściwy telefon i rozpocznij kopię jeszcze raz.",
     "transfer_too_many_disconnects": "Telefon zbyt często się rozłączał. Sprawdź kabel i rozpocznij kopię jeszcze raz — skopiowane pliki zostaną.",
-    "transfer_failed": "Kopia nie powiodła się. Skopiowane pliki zostają — rozpocznij kopię jeszcze raz."
+    "transfer_failed": "Kopia nie powiodła się. Skopiowane pliki zostają — rozpocznij kopię jeszcze raz.",
+    "transfer_in_use": "Plik tej kopii jest otwarty w innym programie (np. w Eksploratorze albo w przeglądarce zdjęć). Zamknij go i spróbuj ponownie."
+
   }
 }

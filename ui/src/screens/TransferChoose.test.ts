@@ -115,4 +115,28 @@ describe('TransferChoose', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Wznów' }));
     expect(bridge.calls.some((c) => c.method === 'start_backup')).toBe(true);
   });
+
+  test('resuming needs free space only for the part not copied yet', async () => {
+    // wybór ~3 GB; 2 GB już na dysku (wolne miejsce zmalało właśnie o nie), wolne 1,5 GB
+    const { s } = await show({ free_pc: 1500 * MB });
+
+    expect((screen.getByRole('button', { name: /Rozpocznij kopię/ }) as HTMLButtonElement).disabled).toBe(true);
+    s.transfer.resumable = { id: 'S/1', model: 'SM-A145R', manufacturer: 'samsung', client: null, created: '2026-10-24T14:20:00',
+      expires: '2026-10-31T14:20:00', days_left: 6, status: 'in_progress', bytes: 2000 * MB, counts: { files: 14000 } };
+    await tick();
+    expect(screen.queryByText('Za mało miejsca na dysku komputera na tę kopię.')).toBeNull();
+    expect((screen.getByRole('button', { name: 'Wznów' }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole('button', { name: /Rozpocznij kopię/ }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  test('files the scan could not read are announced before the copy', async () => {
+    await show({ unreadable: 3 });
+    expect(screen.getByText('3 plików lub folderów nie dało się odczytać — nie trafią do kopii')).toBeTruthy();
+  });
+
+  test('no unreadable notice when the scan read everything', async () => {
+    await show();
+    expect(screen.queryByText(/nie dało się odczytać/)).toBeNull();
+  });
 });
+

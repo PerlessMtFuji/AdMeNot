@@ -6,8 +6,10 @@ import {
   defaultTransferSelection,
   isXiaomi,
   resumeSelection,
+  transferNeed,
   transferStages,
   transferTotals,
+
   whatsappStale,
   dayKey,
   groupHistory,
@@ -618,8 +620,8 @@ describe('data transfer', () => {
   test('totals sum the selected bytes and count the ticked rows', () => {
     const data = inv();
     const sel = defaultTransferSelection(data);
-    // kontakty, SMS i MMS, połączenia, zdjęcia, WhatsApp, aplikacje
-    expect(transferTotals(data, sel)).toEqual({ bytes: 3000 + 5000 + 800, categories: 6, etaMin: 1 });
+    // kontakty, SMS i MMS, połączenia, zdjęcia, WhatsApp, aplikacje; MMS na dysku × 2,4 (jak w silniku)
+    expect(transferTotals(data, sel)).toEqual({ bytes: 3000 * 2.4 + 5000 + 800, categories: 6, etaMin: 1 });
     const more = { ...sel, mms: false, sms: false, others: ['Music', ''], apps: [] };
     expect(transferTotals(data, more)).toEqual({ bytes: 5000 + 800 + 410, categories: 5, etaMin: 1 });
   });
@@ -669,5 +671,14 @@ describe('data transfer', () => {
     expect(backupOutcome(r('complete', 'failed'))).toBe('warn');
     expect(backupOutcome(r('incomplete'))).toBe('warn');
     expect(backupOutcome(r('stopped'))).toBe('stopped');
+    // pliki, których skan nie odczytał, nie trafiły do kopii — nie zielone
+    expect(backupOutcome(r('complete'), 2)).toBe('warn');
+    expect(backupOutcome(r('stopped'), 2)).toBe('stopped');
+  });
+
+  test('resuming needs space only for what is not copied yet', () => {
+    expect(transferNeed(10_000, null)).toBe(10_000);
+    expect(transferNeed(10_000, { bytes: 7_000 })).toBe(3_000);
+    expect(transferNeed(10_000, { bytes: 12_000 })).toBe(0);
   });
 });

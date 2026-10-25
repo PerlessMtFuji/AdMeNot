@@ -584,11 +584,15 @@ export function isXiaomi(device: { manufacturer?: string; brand?: string } | nul
   return /xiaomi|redmi|poco/i.test(`${device?.manufacturer ?? ''} ${device?.brand ?? ''}`);
 }
 
-/** Rozmiar zaznaczonych danych, liczba zaznaczonych wierszy ekranu (SMS i MMS to jeden) i czas w minutach. */
+/** MMS na dysku: załączniki jako pliki + te same dane w base64 w mms.xml (jak `MMS_FACTOR` w silniku). */
+export const MMS_FACTOR = 2.4;
+
+/** Rozmiar zaznaczonych danych, liczba zaznaczonych wierszy ekranu (SMS i MMS to jeden) i czas w minutach.
+ *  Aplikacje liczą się tylko z rozmiarem z inwentarza — dziś go nie ma (`bytes: null`), więc ich nie wliczamy. */
 export function transferTotals(inv: InventoryView, sel: TransferSelection): { bytes: number; categories: number; etaMin: number } {
   const others = new Set(sel.others);
   const apps = new Set(sel.apps);
-  const bytes = (sel.mms ? inv.mms_bytes : 0)
+  const bytes = (sel.mms ? Math.round(inv.mms_bytes * MMS_FACTOR) : 0)
     + sel.categories.reduce((n, c) => n + (inv.categories[c]?.bytes ?? 0), 0)
     + inv.others.filter((o) => others.has(o.name)).reduce((n, o) => n + o.bytes, 0)
     + inv.apps.filter((a) => apps.has(a.package)).reduce((n, a) => n + (a.bytes ?? 0), 0);
@@ -617,9 +621,16 @@ export function whatsappStale(iso: string | null, now: Date): boolean {
   return iso === null || now.getTime() - new Date(iso).getTime() > 3_600_000;
 }
 
-/** Zielone „gotowe i sprawdzone” tylko dla pełnej kopii ze wszystkimi danymi telefonu. */
-export function backupOutcome(r: BackupResultView): 'ok' | 'warn' | 'stopped' {
+/** Zielone „gotowe i sprawdzone” tylko dla pełnej kopii ze wszystkimi danymi telefonu i bez plików,
+ *  których skan nie odczytał (`unreadable` z `copy.counts`). */
+export function backupOutcome(r: BackupResultView, unreadable = 0): 'ok' | 'warn' | 'stopped' {
   if (r.status === 'stopped') return 'stopped';
-  if (r.status !== 'complete' || Object.values(r.telephony).some((c) => c.status !== 'ok')) return 'warn';
+  if (r.status !== 'complete' || unreadable > 0 || Object.values(r.telephony).some((c) => c.status !== 'ok')) return 'warn';
   return 'ok';
+}
+
+/** Ile miejsca potrzeba jeszcze na kopię: przy wznowieniu tylko reszta (skopiowane już leży na dysku,
+ *  a wolne miejsce zmalało właśnie o nie). Prawdziwą strażą jest sprawdzanie przed każdą paczką w silniku. */
+export function transferNeed(selectedBytes: number, resumable: { bytes: number } | null): number {
+  return Math.max(0, selectedBytes - (resumable?.bytes ?? 0));
 }

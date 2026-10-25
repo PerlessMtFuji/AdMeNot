@@ -11,7 +11,7 @@
   import DeviceCard from '../components/DeviceCard.svelte';
   import type { Controller } from '../lib/controller';
   import { i18n, t, tp } from '../lib/i18n/index.svelte';
-  import { formatSize, isXiaomi, modelName, transferTotals, whatsappStale } from '../lib/logic';
+  import { formatSize, isXiaomi, modelName, transferNeed, transferTotals, whatsappStale } from '../lib/logic';
   import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
@@ -31,7 +31,8 @@
   const name = $derived(s.device?.name ?? entry?.name ?? modelName(entry?.model ?? null));
   const crumb = $derived([s.client.trim(), name, t('transfer.mode')].filter(Boolean).join(' · '));
   const nothing = $derived(!totals || totals.categories === 0);
-  const noSpace = $derived(!!inv && !!totals && totals.bytes > inv.free_pc);
+  // Przy wznowieniu wolne miejsce zmalało już o skopiowaną część — porównujemy tylko resztę.
+  const noSpace = $derived(!!inv && !!totals && transferNeed(totals.bytes, s.transfer.resumable) > inv.free_pc);
   const blocked = $derived(nothing || noSpace || s.job !== null);
   const serial = $derived(s.device?.serial ?? s.serial ?? '');
   let listOpen = $state(false);
@@ -121,6 +122,12 @@
       {/if}
 
       <span class="lbl mt-2">{t('transfer.group.files')}</span>
+      {#if inv.unreadable > 0}
+        <Banner tone="warn" icon="triangle-alert" title={tp('transfer.unreadable_files', inv.unreadable, { count: num(inv.unreadable) })}>
+          {t('transfer.unreadable_files_text')}
+        </Banner>
+      {/if}
+
       {@render row(fileRow('media', ImageIcon, t('transfer.row.media_note')))}
       {@render row(fileRow('downloads', Download, t('transfer.row.downloads_note')))}
       {@render row(fileRow('whatsapp', MessageCircle, t('transfer.row.whatsapp_note')), waOld ? whatsapp : undefined)}

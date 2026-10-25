@@ -17,7 +17,8 @@
   const tr = $derived(s.transfer);
   const p = $derived(tr.progress);
   const done = $derived(s.phase === 'transfer_done' ? tr.result : null);
-  const outcome = $derived(done ? backupOutcome(done) : null);
+  const unreadableFiles = $derived(tr.copy?.counts.unreadable ?? 0);
+  const outcome = $derived(done ? backupOutcome(done, unreadableFiles) : null);
   const entry = $derived(s.devices.find((d) => d.serial === s.serial) ?? null);
   const name = $derived(s.device?.name ?? entry?.name ?? modelName(entry?.model ?? null));
   const crumb = $derived([s.client.trim(), name, t('transfer.mode')].filter(Boolean).join(' · '));
@@ -91,6 +92,12 @@
       {:else if unavailable}
         <Banner tone="warn" icon="info" title={t('transfer.unreadable')} />
       {/if}
+      {#if unreadableFiles > 0}
+        <Banner tone="warn" icon="info" title={tp('transfer.unreadable_files', unreadableFiles, { count: num(unreadableFiles) })}>
+          {t('transfer.unreadable_files_text')}
+        </Banner>
+      {/if}
+
       <Card>
         <dl class="flex flex-col gap-1.5 px-5 py-4 text-sm">
           {#each telephony as [key, r] (key)}

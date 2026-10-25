@@ -86,4 +86,33 @@ describe('TransferBackup', () => {
     expect(screen.queryByText('Kopia gotowa i sprawdzona — możesz odłączyć stary telefon')).toBeNull();
     expect(screen.getByText('Kopia przerwana')).toBeTruthy();
   });
+
+  test('files the scan could not read turn a complete copy into a warning', async () => {
+    const { s } = await show('transfer_done');
+    s.transfer.result = result();
+    s.transfer.copy = { ...COPY, counts: { files: 5, unreadable: 1 } };
+    await tick();
+    expect(screen.queryByText('Kopia gotowa i sprawdzona — możesz odłączyć stary telefon')).toBeNull();
+    expect(screen.getByText('Kopia gotowa, ale nie wszystko udało się skopiować')).toBeTruthy();
+    expect(screen.getByText('1 pliku lub folderu nie dało się odczytać — nie trafi do kopii')).toBeTruthy();
+  });
+
+  test('the Xiaomi hint does not send the technician to copy everything again', async () => {
+    const { s } = await show('transfer_done');
+    s.device = { manufacturer: 'Xiaomi' } as never;
+    s.transfer.result = result({ telephony: { sms: { status: 'unavailable', count: 0 } } });
+    s.transfer.copy = COPY;
+    await tick();
+    expect(screen.getByText(/zaznacz tylko brakujące dane/)).toBeTruthy();
+  });
+
+  test('progress after reconnecting hides the disconnected banner', async () => {
+    const { bridge } = await show();
+    bridge.emit('transfer:waiting', {});
+    await tick();
+    bridge.emit('transfer:progress', { stage: 'telephony', done_files: 0, total_files: 0, done_bytes: 0, total_bytes: 0, current: '' });
+    await tick();
+    expect(screen.queryByText(/Telefon odłączony/)).toBeNull();
+  });
 });
+
