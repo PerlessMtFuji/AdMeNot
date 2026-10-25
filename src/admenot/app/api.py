@@ -30,7 +30,9 @@ from admenot.app.events import Emitter
 from admenot.app.jobs import Job, JobRunner, Stopped
 from admenot.app.present import (
     app_name,
+    backup_result_view,
     browser_names,
+    copy_view,
     device_card,
     device_checks_view,
     device_identity,
@@ -38,6 +40,7 @@ from admenot.app.present import (
     eta_view,
     fix_texts,
     history_view,
+    inventory_view,
     plan_view,
     result_view,
     scan_view,
@@ -47,6 +50,7 @@ from admenot.app.telemetry_events import (
     repair_event,
     sample,
     scan_event,
+    transfer_backup_event,
     undo_event,
     undo_targets,
 )
@@ -117,6 +121,23 @@ from admenot.engine.texts import (
     screenshot_caption,
 )
 from admenot.engine.tools import resolve_adb
+from admenot.engine.transfer import store
+from admenot.engine.transfer.backup import (
+    BackupError,
+    BackupResult,
+    Progress,
+    Selection,
+    run_backup,
+)
+from admenot.engine.transfer.guard import ReadOnlyAdb
+from admenot.engine.transfer.inventory import (
+    FILE_CATEGORIES,
+    Inventory,
+    build_inventory,
+    whatsapp_backup_time,
+)
+from admenot.engine.transfer.puller import Puller, RealPuller
+from admenot.engine.transfer.telephony import Stopped as TransferStopped
 from admenot.engine.workflow import (
     OrderInterrupted,
     OrderResult,
@@ -133,6 +154,7 @@ from admenot.net.client import BackendError
 
 HostFactory = Callable[[str | None], AdbTransport]
 ApkFactory = Callable[..., ApkProvider]
+PullerFactory = Callable[[str | None, str, SessionLogAdb], Puller]
 
 ADMIN_TIMEOUT = 180.0
 # Dwa scrcpy naraz wgrywają ten sam /data/local/tmp/scrcpy-server.jar: nazwy aplikacji czekają,
@@ -148,10 +170,20 @@ SHARE_RETRY_S = 15.0  # ponawianie wysyłki planu bez sieci (spec plan-qr §5.3)
 SHARE_RETRY_WINDOW_S = 120.0
 _SHARE_ID = re.compile(r"[A-Za-z0-9-]{1,64}")
 SHOWN_MAX = 200  # pamiętane kody kontrolne pokazane klientom w tej sesji; najstarsze odpadają
+TRANSFER_PURGE_S = 24 * 3600.0  # kopie danych po terminie: sprawdzane też w trakcie pracy okna
+TRANSFER_PROGRESS_S = 0.5  # dławienie zdarzeń `transfer:progress`
+TRANSFER_QUIT_WAIT = 10.0  # zamknięcie okna czeka tyle na zatrzymanie kopii
 
 
 def _real_host(adb_path: str | None) -> AdbTransport:
     return RealAdb(adb_path=adb_path)
+
+
+def _real_puller(adb_path: str | None, serial: str, log: SessionLogAdb) -> Puller:
+    path = resolve_adb(adb_path).path
+    if path is None:
+        raise AdbError("adb_missing", "adb")
+    return RealPuller(path, serial, log)
 
 
 def _startfile(path: Path) -> None:
@@ -173,6 +205,25 @@ def _fixes(value: Any) -> tuple[str, ...]:
     if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
         raise AppError("bad_request", "fixes")
     return tuple(value)
+
+
+def _selection(value: Any) -> Selection:
+    """Wybór z ekranu kopii: flagi telefonii, listy kategorii / folderów / pakietów."""
+    if not isinstance(value, dict):
+        raise AppError("bad_request", "selection")
+    flags = {k: value.get(k) for k in ("contacts", "sms", "mms", "calls")}
+    verify = value.get("verify_hash", False)
+    if not all(isinstance(v, bool) for v in (*flags.values(), verify)):
+        raise AppError("bad_request", "selection")
+    lists: dict[str, frozenset[str]] = {}
+    for key in ("categories", "others", "apps"):
+        items = value.get(key)
+        if not isinstance(items, list) or not all(isinstance(i, str) for i in items):
+            raise AppError("bad_request", "selection")
+        lists[key] = frozenset(items)
+    if not lists["categories"] <= set(FILE_CATEGORIES):
+        raise AppError("bad_request", "selection")
+    return Selection(**flags, **lists, verify_hash=verify)
 
 
 def _api(method: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]:
@@ -209,6 +260,8 @@ class Api:
         share_upload: Callable[[bytes], tuple[str, str]] = client.create_share,
         share_retry_s: float = SHARE_RETRY_S,
         share_retry_window_s: float = SHARE_RETRY_WINDOW_S,
+        puller_factory: PullerFactory = _real_puller,
+        transfer_purge_s: float | None = TRANSFER_PURGE_S,
     ) -> None:
         self._emitter = emitter
         self._host_factory = host_factory
@@ -263,8 +316,18 @@ class Api:
         self._share_lock = threading.Lock()
         self._share_cancel: tuple[str, threading.Event] | None = None  # (share_id, sygnał przerwania)
         self._shown: dict[str, datetime] = {}  # kod kontrolny → kiedy pokazany klientowi
+        self._puller_factory = puller_factory
+        # Ostatni inwentarz kopii danych: (telefon, inwentarz, klient) — z niego startuje kopia.
+        self._transfer: tuple[DeviceInfo, Inventory, str | None] | None = None
+        self._backup_serial: str | None = None  # telefon, którego kopia właśnie trwa
+        self._purge_stop = threading.Event()
         self._clean_screenshots()
         self._purge_old_data()
+        # Zegar dobowy: okno bywa otwarte dniami, a kopie po 7 dniach mają zniknąć. Testy
+        # (`sync_jobs`) go nie uruchamiają — każdy `Api` zostawiałby wątek do końca procesu.
+        if transfer_purge_s and not sync_jobs:
+            threading.Thread(target=self._purge_loop, args=(transfer_purge_s,), daemon=True,
+                             name="admenot-transfer-purge").start()
         self._mirror = mirror_factory(
             lambda view: self._emit("mirror:state", view),
             lambda view: self._emit("mirror:warning", view),
@@ -315,6 +378,27 @@ class Api:
             retention.prune_logs(logs_dir(), now)
         except Exception as exc:  # noqa: BLE001 — sprzątanie nie może zablokować startu okna
             log_exception(exc)
+        self._purge_transfers()
+
+    def _purge_transfers(self) -> None:
+        """Kopie danych po terminie (7 dni od utworzenia, chyba że przedłużone)."""
+        try:
+            store.purge_expired(self._now(), self._transfer_busy)
+        except Exception as exc:  # noqa: BLE001 — sprzątanie nie może zablokować okna
+            log_exception(exc)
+
+    def _purge_loop(self, every: float) -> None:
+        while not self._purge_stop.wait(every):
+            self._purge_transfers()
+
+    def _transfer_busy(self, serial: str) -> bool:
+        """Czy trwa kopia tego telefonu. Zadanie kopii, które jeszcze nie zapisało telefonu,
+        blokuje każdą kopię (ostrożnie: nie usuwamy tego, co może się właśnie wznawiać)."""
+        job = self._jobs.current()
+        if job is None or job.kind != "backup":
+            return False
+        busy = self._backup_serial
+        return busy is None or busy == serial
 
     def _bind_order(self, journal: Journal, serial: str, order_id: int) -> None:
         with self._shots_lock:
@@ -1361,6 +1445,145 @@ class Api:
     def answer(self, job_id: str, value: str) -> dict[str, Any]:
         return {"ok": self._jobs.answer(job_id, value)}
 
+    # --- przenoszenie danych: kopia starego telefonu ---------------------------------------------
+
+    @_api
+    def transfer_inventory(self, serial: str, client: str | None = None) -> dict[str, Any]:
+        """Co da się skopiować ze starego telefonu: skan aplikacji (bez analizy APK) i inwentarz.
+
+        Stan skanu naprawy (`_report`, `_adb`) zostaje nietknięty — to osobny przebieg."""
+        if not isinstance(serial, str) or not serial.strip():
+            raise AppError("bad_request", "serial")
+        if client is not None and not isinstance(client, str):
+            raise AppError("bad_request", "client")
+        self._abandon_apk(notify=False)
+        adb = self._session(serial.strip())
+        name = (client or "").strip() or None
+        crash.note_names([name])
+
+        def run(job: Job) -> None:
+            device = read_device_info(adb)
+            crash.note_device(device.serial, device.manufacturer, device.model, device.android_release)
+            match = self._provider.match(device)
+            self._remember(device, match)
+            self._emit("scan:device", {"device": device_card(device, match)})
+            report = run_scan(adb, device=device)
+            job.check()
+            try:
+                inventory = build_inventory(ReadOnlyAdb(adb), report, job.should_stop)
+            except TransferStopped:
+                raise Stopped from None
+            job.check()
+            self._transfer = (device, inventory, name)
+            resumable = store.find_resumable(device.serial)
+            self._emit("transfer:inventory", {
+                "inventory": inventory_view(inventory, self._lang),
+                "resumable": copy_view(resumable.read_meta(), self._now()) if resumable else None,
+                "client": name})
+
+        return {"job_id": self._jobs.start("transfer_scan", run)}
+
+    def _transfer_state(self) -> tuple[DeviceInfo, Inventory, str | None]:
+        """Inwentarz bieżącego telefonu; bez niego (albo gdy tego telefonu już nie ma) — odmowa."""
+        state = self._transfer
+        if state is None:
+            raise AppError("transfer_no_inventory")
+        ready = {e.serial for e in list_devices(self._host) if e.state == "device"}
+        if state[0].serial not in ready:
+            raise AppError("transfer_no_inventory", state[0].serial)
+        return state
+
+    @_api
+    def transfer_whatsapp(self) -> dict[str, Any]:
+        """Ponowny odczyt czasu kopii czatów WhatsApp (serwisant zrobił ją właśnie na telefonie)."""
+        device, inventory, _client = self._transfer_state()
+        when = whatsapp_backup_time(ReadOnlyAdb(self._session(device.serial)))
+        inventory.whatsapp_backup = when
+        return {"whatsapp_backup": when.isoformat(timespec="seconds") if when else None}
+
+    @_api
+    def start_backup(self, selection: dict[str, Any]) -> dict[str, Any]:
+        """Kopia wybranych danych na komputer. Niedokończona kopia tego telefonu jest wznawiana."""
+        chosen = _selection(selection)
+        device, inventory, client = self._transfer_state()
+        serial = device.serial
+        self._abandon_apk()
+        adb = self._session(serial)
+        raw = self._host.with_serial(serial)  # odpytywanie `get-state` bez wpisu w logu co sekundę
+
+        def run(job: Job) -> None:
+            self._backup_serial = serial
+            try:
+                with device_lock(journal_path(), serial):
+                    result, copy = self._run_backup(job, adb, raw, device, inventory, client, chosen)
+            except BackupError as exc:
+                raise AppError(f"transfer_{exc.key}") from None
+            finally:
+                self._backup_serial = None
+            self._emit("transfer:done", {"result": backup_result_view(result),
+                                         "copy": copy_view(copy.read_meta(), self._now())})
+            telemetry.record("transfer_backup",
+                             lambda _packages: transfer_backup_event(device, result, chosen))
+
+        return {"job_id": self._jobs.start("backup", run)}
+
+    def _run_backup(self, job: Job, adb: SessionLogAdb, raw: AdbTransport, device: DeviceInfo,
+                    inventory: Inventory, client: str | None,
+                    chosen: Selection) -> tuple[BackupResult, store.CopyDir]:
+        copy = store.find_resumable(device.serial) or store.create_copy(
+            device.serial, device, client, self._now())
+        puller = self._puller_factory(self._settings.adb_path, device.serial, adb.tagged("pull"))
+        last: dict[str, Any] = {"at": None, "stage": None}
+
+        def progress(p: Progress) -> None:
+            now = time.monotonic()
+            if (last["stage"] == p.stage and last["at"] is not None
+                    and now - last["at"] < TRANSFER_PROGRESS_S):
+                return
+            last["at"], last["stage"] = now, p.stage
+            self._emit("transfer:progress", asdict(p))
+
+        def wait_device() -> None:
+            waiting = False
+            while True:
+                job.check()
+                try:
+                    if raw.run(["get-state"]).strip() == "device":
+                        return
+                except AdbError:
+                    pass
+                if not waiting:
+                    waiting = True
+                    self._emit("transfer:waiting", {})
+                time.sleep(self._poll_interval)
+
+        # Surowy transport (z logiem sesji), nie `ReadOnlyAdb`: silnik opakowuje go sam.
+        result = run_backup(adb, puller, device, copy, inventory, chosen, on_progress=progress,
+                            should_stop=job.should_stop, wait_device=wait_device)
+        return result, copy
+
+    @_api
+    def transfers(self) -> dict[str, Any]:
+        self._purge_transfers()
+        now = self._now()
+        return {"copies": [copy_view(m, now) for m in store.list_copies()]}
+
+    @_api
+    def extend_transfer(self, copy_id: str) -> dict[str, Any]:
+        if not isinstance(copy_id, str):
+            raise AppError("bad_request", "copy_id")
+        return {"copy": copy_view(store.extend(copy_id), self._now())}
+
+    @_api
+    def delete_transfer(self, copy_id: str) -> dict[str, Any]:
+        if not isinstance(copy_id, str):
+            raise AppError("bad_request", "copy_id")
+        meta = next((m for m in store.list_copies() if m.id == copy_id), None)
+        if meta is not None and self._transfer_busy(meta.serial):
+            raise AppError("busy", "backup")
+        store.delete(copy_id)
+        return {"deleted": copy_id}
+
     # --- aktualizacje ---------------------------------------------------------------------------
 
     @_api
@@ -1594,6 +1817,12 @@ class Api:
         self._pick_file_fn = pick_file
 
     def _shutdown(self) -> None:
+        self._purge_stop.set()
+        job = self._jobs.current()
+        if job is not None and job.kind in ("backup", "transfer_scan"):
+            # Kopia zatrzymana porządnie (zabity `adb pull`, stan zapisany) — wznowi się później.
+            self._jobs.stop(job.id)
+            job.done.wait(TRANSFER_QUIT_WAIT)
         self._updates.stop()
         self._mirror.stop()
         self._watcher.stop()

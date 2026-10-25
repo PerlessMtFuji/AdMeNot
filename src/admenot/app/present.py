@@ -7,6 +7,7 @@ własne napisy.
 from __future__ import annotations
 
 import base64
+import math
 from collections.abc import Mapping
 from dataclasses import asdict
 from datetime import date, datetime
@@ -16,7 +17,7 @@ from typing import Any
 from admenot.engine.actions.planner import FIX_LEVEL, Blocked, default_level
 from admenot.engine.actions.steps import Step, site_url
 from admenot.engine.apk.analyze import clean_label, scope_notes
-from admenot.engine.apk.cache import CacheUsage, Estimate
+from admenot.engine.apk.cache import CacheUsage, Estimate, free_bytes
 from admenot.engine.apk.timing import Eta
 from admenot.engine.browsers.known import known_browsers
 from admenot.engine.device.info import DeviceInfo
@@ -24,6 +25,7 @@ from admenot.engine.device_checks import DeviceCheck, fix_steps
 from admenot.engine.evidence import ladders
 from admenot.engine.facts import AppFacts
 from admenot.engine.journal.db import Action, Journal, Order
+from admenot.engine.paths import transfers_dir
 from admenot.engine.phones.provider import SILHOUETTE, PhoneMatch
 from admenot.engine.report.model import device_block
 from admenot.engine.rules.model import CATEGORIES, Finding
@@ -47,6 +49,9 @@ from admenot.engine.texts import (
     verdict_label,
     warning_text,
 )
+from admenot.engine.transfer.backup import BackupResult
+from admenot.engine.transfer.inventory import FILE_CATEGORIES, Inventory
+from admenot.engine.transfer.store import CopyMeta
 from admenot.engine.workflow import OrderPlan, OrderResult
 
 MAX_PROBLEMS = 3
@@ -418,3 +423,55 @@ def estimate_view(est: Estimate, use: CacheUsage) -> dict[str, int]:
             "unknown": est.unknown, "cached": est.cached, "largest_bytes": est.largest_bytes,
             "limit_bytes": use.limit_bytes, "effective_bytes": use.effective_bytes,
             "free_bytes": use.free_bytes}
+
+
+# --- przenoszenie danych (kopia starego telefonu) ----------------------------------------------
+
+def _free_pc() -> int:
+    """Wolne miejsce na dysku z kopiami (jedyny odczyt spoza inwentarza; brak odczytu = 0)."""
+    try:
+        return free_bytes(transfers_dir())
+    except OSError:
+        return 0
+
+
+def inventory_view(inv: Inventory, lang: str) -> dict[str, Any]:
+    """Ekran wyboru kopii. Folder `""` w `others` to luźne pliki w głównym folderze — nazwę
+    pokazuje UI. `bytes` aplikacji nie znamy przed kopią (None). `lang`: jak w innych widokach;
+    nazwy aplikacji pochodzą z telefonu, więc tu nic nie tłumaczymy."""
+    del lang
+    categories = {c: {"files": 0, "bytes": 0} for c in FILE_CATEGORIES}
+    for f in inv.files:
+        if f.category in categories:
+            categories[f.category]["files"] += 1
+            categories[f.category]["bytes"] += f.size
+    return {
+        "contacts": inv.contacts, "sms": inv.sms, "mms": inv.mms, "mms_bytes": inv.mms_bytes,
+        "calls": inv.calls, "categories": categories,
+        "others": [{"name": name, "files": n, "bytes": size}
+                   for name, (n, size) in sorted(inv.others.items())],
+        "apps": [{"package": a.package, "label": a.label, "verdict": a.verdict,
+                  "default_on": a.default_on, "bytes": None} for a in inv.apps],
+        "skipped_apps": [{"package": a.package, "label": a.label} for a in inv.skipped_apps],
+        "whatsapp_backup": (inv.whatsapp_backup.isoformat(timespec="seconds")
+                            if inv.whatsapp_backup else None),
+        "storage": {"used": inv.storage[0], "total": inv.storage[1]} if inv.storage else None,
+        "free_pc": _free_pc(),
+        "unreadable": inv.unreadable,
+    }
+
+
+def copy_view(meta: CopyMeta, now: datetime) -> dict[str, Any]:
+    """`days_left`: pełne dni do usunięcia, zaokrąglone w górę (0 = po terminie). `now` z zegara
+    `Api` (w testach stały), bo widok sam nie czyta czasu."""
+    left = (meta.expires - now).total_seconds()
+    return {"id": meta.id, "model": meta.model, "manufacturer": meta.manufacturer,
+            "client": meta.client, "created": meta.created.isoformat(timespec="seconds"),
+            "expires": meta.expires.isoformat(timespec="seconds"),
+            "days_left": max(0, math.ceil(left / 86_400)), "status": meta.status,
+            "bytes": meta.bytes, "counts": dict(meta.counts)}
+
+
+def backup_result_view(r: BackupResult) -> dict[str, Any]:
+    return {**{k: v for k, v in asdict(r).items() if k != "telephony"},
+            "telephony": {k: {"status": v.status, "count": v.count} for k, v in r.telephony.items()}}

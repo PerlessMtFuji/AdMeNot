@@ -264,6 +264,7 @@
       "scan": "Po skanie: producent, model i wersja Androida telefonu, liczba aplikacji w każdej ocenie, czas skanu, wynik analizy APK.",
       "repair": "Po naprawie: ile aplikacji wyciszono, wyłączono i usunięto, ile z nich oznaczył program, ile się nie udało i kody błędów.",
       "undo": "Po cofnięciu: ile aplikacji cofnięto i ile dni minęło od naprawy.",
+      "transfer_backup": "Po kopii danych starego telefonu: producent, model i wersja Androida telefonu, wynik, czas, rozmiar w MB, liczba skopiowanych i nieudanych plików oraz aplikacji, które rodzaje danych wybrano — bez nazw folderów, plików i aplikacji.",
       "packages": "Z drugą zgodą: nazwy pakietów oznaczonych przez program i zaznaczonych przez Ciebie, z oceną i Twoją decyzją.",
       "never": "Nigdy: numer seryjny, IMEI, nazwa klienta, numer zlecenia, dane serwisu, zrzuty ekranu, nazwy aplikacji uznanych za bezpieczne i nieruszanych."
     },

@@ -27,6 +27,8 @@ sys.path.insert(0, str(ROOT / "tests"))  # conftest.py, fakephone.py, apphelpers
 from apphelpers import Disk, make_api, policy_factory
 from conftest import SERIAL
 from fakephone import make_cli_phone
+from faketransfer import FakeStoragePhone, TransferPhone
+from telephony_fixtures import install_telephony
 
 from admenot.engine.apk import cache as C
 from admenot.engine.report.pdf import PdfError
@@ -61,10 +63,10 @@ def _sort_adb_runs(events: list[list[Any]]) -> list[list[Any]]:
 class Recorder:
     """Woła metody `Api` i zbiera parę (wynik, zdarzenia) dla każdego wywołania."""
 
-    def __init__(self, phone: Any, lang: str = "pl", apk_mode: str = "full") -> None:
+    def __init__(self, phone: Any, lang: str = "pl", apk_mode: str = "full", **kw: Any) -> None:
         # apphelpers.make_api pina język i tryb APK (save_settings) i czas na NOW zanim zbuduje `Api`.
         self.api, self.emitter = make_api(phone, sync=True, lang=lang, apk_mode=apk_mode,
-                                          poll_interval=0.0)
+                                          poll_interval=0.0, **kw)
         if apk_mode != "full":
             # `NoApk` z make_api pomija `CachePolicy`, więc trybu ręcznego by nie było.
             self.api._apk_factory = policy_factory([])
@@ -125,12 +127,18 @@ def _isolated(lang: str = "pl") -> Iterator[str]:
 
 
 def _scenario(name: str, steps: Callable[[Recorder, Any], None], lang: str = "pl",
-              apk_mode: str = "full") -> dict[str, Any]:
+              apk_mode: str = "full",
+              phone_factory: Callable[[Path], Any] | None = None) -> dict[str, Any]:
     # Dysk na sztywno: szacunek i pytanie o miejsce nie mogą zależeć od komputera nagrywającego.
     with _isolated(lang) as tmp, mock.patch.object(C, "disk_usage",
                                                    lambda path: Disk(500 * C.GB, 0, 500 * C.GB)):
-        phone = make_cli_phone()
-        recorder = Recorder(phone, lang, apk_mode=apk_mode)
+        kw: dict[str, Any] = {}
+        if phone_factory is None:
+            phone = make_cli_phone()
+        else:
+            phone = phone_factory(Path(tmp))
+            kw["puller_factory"] = lambda adb_path, serial, log: phone
+        recorder = Recorder(phone, lang, apk_mode=apk_mode, **kw)
         steps(recorder, phone)
         return _normalize({"name": name, "calls": recorder.calls}, tmp)
 
@@ -195,6 +203,59 @@ def _report(r: Recorder, phone: Any) -> None:
     r.call("history", None)
 
 
+TRANSFER_MTIME = 1_700_000_000
+TRANSFER_FILES = {
+    "DCIM/Camera/IMG_0001.jpg": b"A" * 3000,
+    "DCIM/Camera/IMG_0002.jpg": b"B" * 2000,
+    "Download/faktura.pdf": b"%PDF" + b"c" * 500,
+    "WhatsApp/Media/WhatsApp Images/IMG-1.jpg": b"W" * 800,
+    "Music/song.mp3": b"M" * 400,
+    "notes.txt": b"loose file",
+}
+TRANSFER_SELECTION = {"contacts": True, "sms": True, "mms": False, "calls": True,
+                      "categories": ["media", "downloads", "whatsapp"], "others": ["Music"],
+                      "apps": ["com.whatsapp"]}
+
+
+def _transfer_phone(tmp: Path) -> TransferPhone:
+    root = tmp / "old-phone"
+    for rel, data in TRANSFER_FILES.items():
+        path = root / "sdcard" / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        os.utime(path, (TRANSFER_MTIME, TRANSFER_MTIME))
+    install_telephony(root, mms=False)
+    storage = FakeStoragePhone(root, serial=SERIAL)
+    storage.apps = {"com.whatsapp": {"base.apk": b"PK-whatsapp"}}
+    return TransferPhone(make_cli_phone(), storage)
+
+
+def _transfer(r: Recorder, phone: Any) -> None:
+    r.call("list_devices")
+    r.call("transfers")
+    r.call("transfer_inventory", SERIAL, CLIENT)
+    r.call("start_backup", TRANSFER_SELECTION)
+    r.call("transfers")
+
+
+def _stable_transfer(data: dict[str, Any]) -> dict[str, Any]:
+    """`transfer:progress` jest dławiony co 0,5 s, więc ich liczba zależy od szybkości komputera:
+    zostaje pierwsze zdarzenie każdego etapu w wywołaniu (to wysyła się zawsze). Czas kopii -> 0."""
+    for call in data["calls"]:
+        seen: set[str] = set()
+        events = []
+        for name, detail in call["events"]:
+            if name == "transfer:progress":
+                if detail["stage"] in seen:
+                    continue
+                seen.add(detail["stage"])
+            if name == "transfer:done":
+                detail["result"]["seconds"] = 0
+            events.append([name, detail])
+        call["events"] = events
+    return data
+
+
 def _devices_only(output: str) -> Callable[[Recorder, Any], None]:
     def steps(r: Recorder, phone: Any) -> None:
         phone.host["devices -l"] = output
@@ -237,6 +298,8 @@ def record_all() -> dict[str, dict[str, Any]]:
         "manual": _scenario("manual", _manual, apk_mode="manual"),
         "disconnect": _scenario("disconnect", _disconnect),
         "report": _scenario("report", _report),
+        "transfer": _stable_transfer(_scenario("transfer", _transfer,
+                                               phone_factory=_transfer_phone)),
         "unauthorized": _scenario("unauthorized", _devices_only(unauthorized)),
         "many": _scenario("many", _devices_only(many)),
         "empty": _scenario("empty", _devices_only("List of devices attached\n\n")),

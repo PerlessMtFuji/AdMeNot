@@ -28,6 +28,12 @@ const blindRepair = () => common("repair", {
 });
 const undo = () => common("undo", { device: DEVICE, apps: 1, failed: 0, age_days: 2, packages: null });
 const start = () => common("start", { mode: "simple" });
+const CATEGORIES = { contacts: true, sms: true, mms: false, calls: true, media: true, downloads: false,
+  whatsapp: true, others: false, apps: true };
+const transfer = (extra: Record<string, unknown> = {}) => common("transfer_backup", {
+  device: DEVICE, status: "complete", seconds: 2710, bytes_mb: 38400, files: 5230, files_failed: 0,
+  apps: 12, apps_failed: 0, categories: CATEGORIES, ...extra,
+});
 
 async function post(events: unknown[], raw?: string): Promise<Response> {
   return exports.default.fetch(new Request(BASE + "/api/v1/telemetry", {
@@ -113,6 +119,29 @@ describe("POST /api/v1/telemetry", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, stored: 4 });
     expect((await rows()).map((r) => r.type)).toEqual(["start", "scan", "repair", "undo"]);
+  });
+
+  it("transfer_backup: przyjęte i zapisane same liczby oraz flagi", async () => {
+    const res = await post([transfer(), transfer({ status: "stopped", bytes_mb: 600_000 })]);
+    expect(res.status).toBe(200);
+    const [first, second] = (await rows()).map((r) => JSON.parse(r.body));
+    expect(first).toMatchObject({ type: "transfer_backup", status: "complete", files: 5230, categories: CATEGORIES });
+    expect(second).toMatchObject({ status: "stopped", bytes_mb: 600_000 });
+  });
+
+  it.each([
+    ["dodatkowe pole path", transfer({ path: "DCIM/Camera" })],
+    ["nieznany status", transfer({ status: "x" })],
+    ["nazwa folderu w categories", transfer({ categories: { ...CATEGORIES, Music: true } })],
+    ["liczba zamiast flagi", transfer({ categories: { ...CATEGORIES, sms: 1 } })],
+    ["brak flagi", transfer({ categories: { contacts: true } })],
+    ["ujemna liczba plików", transfer({ files: -1 })],
+    ["seconds ponad dobę", transfer({ seconds: 86_401 })],
+    ["bytes_mb ponad limit", transfer({ bytes_mb: 10_000_001 })],
+    ["brak urządzenia", transfer({ device: undefined })],
+  ])("transfer_backup 400: %s", async (_name, event) => {
+    expect((await post([event])).status).toBe(400);
+    expect(await rows()).toEqual([]);
   });
 
   it("undo: liczby witryn opcjonalne, domyślnie 0", async () => {

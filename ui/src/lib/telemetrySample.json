@@ -94,6 +94,37 @@
       "sites": 2,
       "sites_restored": 1,
       "packages": null
+    },
+    {
+      "install": "00000000-0000-4000-8000-000000000000",
+      "type": "transfer_backup",
+      "t": "2026-10-10T14:00:00Z",
+      "app": "0.9.5",
+      "os": "Windows 10.0.26100",
+      "lang": "pl",
+      "device": {
+        "manufacturer": "OPPO",
+        "model": "CPH2483",
+        "android": "14"
+      },
+      "status": "complete",
+      "seconds": 2710,
+      "bytes_mb": 38400,
+      "files": 5230,
+      "files_failed": 0,
+      "apps": 12,
+      "apps_failed": 0,
+      "categories": {
+        "contacts": true,
+        "sms": true,
+        "mms": false,
+        "calls": true,
+        "media": true,
+        "downloads": false,
+        "whatsapp": true,
+        "others": false,
+        "apps": true
+      }
     }
   ],
   "packages": [
@@ -224,6 +255,37 @@
           "ok": true
         }
       ]
+    },
+    {
+      "install": "00000000-0000-4000-8000-000000000000",
+      "type": "transfer_backup",
+      "t": "2026-10-10T14:00:00Z",
+      "app": "0.9.5",
+      "os": "Windows 10.0.26100",
+      "lang": "pl",
+      "device": {
+        "manufacturer": "OPPO",
+        "model": "CPH2483",
+        "android": "14"
+      },
+      "status": "complete",
+      "seconds": 2710,
+      "bytes_mb": 38400,
+      "files": 5230,
+      "files_failed": 0,
+      "apps": 12,
+      "apps_failed": 0,
+      "categories": {
+        "contacts": true,
+        "sms": true,
+        "mms": false,
+        "calls": true,
+        "media": true,
+        "downloads": false,
+        "whatsapp": true,
+        "others": false,
+        "apps": true
+      }
     }
   ]
 }

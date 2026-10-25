@@ -241,6 +241,9 @@ class FakeStoragePhone:
         local.write_bytes(apk)
         return f"{remote}: 1 file pulled\n"
 
+    def has_apk(self, remote: str) -> bool:
+        return self._apk(remote) is not None
+
     # ---- Puller ---------------------------------------------------------------------------
     def pull(self, remotes: list[str], target: Path, should_stop: Callable[[], bool],
              tick: Callable[[], None]) -> PullResult:
@@ -280,3 +283,54 @@ class FakeStoragePhone:
                     return PullResult(1, lines, True)
         lines.append(f"{count} files pulled, 0 skipped.")
         return PullResult(1 if any(x.startswith("adb: error") for x in lines) else 0, lines, False)
+
+
+_STORAGE_TOOLS = {"find", "stat", "ls", "df", "content", "sha256sum"}
+
+
+class TransferPhone:
+    """Telefon do testów mostu kopii: skan aplikacji z `FakePhone` (pakiety, ustawienia), pamięć,
+    providery, APK i `pull` z `FakeStoragePhone`. Jest też `Puller` (puller_factory → ta atrapa)."""
+
+    def __init__(self, cli, storage: FakeStoragePhone) -> None:
+        self.cli = cli
+        self.storage = storage
+
+    @property
+    def serial(self) -> str | None:
+        return self.cli.serial
+
+    def with_serial(self, serial: str) -> TransferPhone:
+        self.cli.with_serial(serial)
+        self.storage.with_serial(serial)
+        return self
+
+    def _storage_cmd(self, command: str) -> bool:
+        argv = shlex.split(command)
+        if argv[:2] == ["pm", "path"] and len(argv) == 3:
+            return argv[2] in self.storage.apps
+        return bool(argv) and argv[0] in _STORAGE_TOOLS
+
+    def shell(self, command: str, timeout: float = 20.0) -> str:
+        if self._storage_cmd(command):
+            return self.storage.shell(command, timeout)
+        return self.cli.shell(command, timeout)
+
+    def run(self, args: list[str], timeout: float = 20.0) -> str:
+        if args == ["get-state"]:
+            return self.storage.run(args, timeout)
+        if len(args) == 3 and args[:2] == ["shell", "-T"] and self._storage_cmd(args[2]):
+            return self.storage.run(args, timeout)
+        if len(args) == 3 and args[0] == "pull" and self.storage.has_apk(args[1]):
+            return self.storage.run(args, timeout)
+        return self.cli.run(args, timeout)
+
+    def run_bytes(self, args: list[str], timeout: float = 20.0) -> bytes:
+        cmd = args[-1] if args and args[0] in ("shell", "exec-out") else ""
+        if cmd and self._storage_cmd(cmd):
+            return self.storage.run_bytes(args, timeout)
+        return self.cli.run_bytes(args, timeout)
+
+    def pull(self, remotes: list[str], target: Path, should_stop: Callable[[], bool],
+             tick: Callable[[], None]) -> PullResult:
+        return self.storage.pull(remotes, target, should_stop, tick)

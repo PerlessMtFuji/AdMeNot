@@ -122,9 +122,11 @@ def test_undo_targets_do_not_fail_an_app_for_skipped_or_timed_out_sites():
 
 def test_sample_uses_the_same_shapes():
     s = ev.sample()
-    assert [e["type"] for e in s["basic"]] == ["start", "scan", "repair", "undo"]
-    assert all(e["packages"] is None for e in s["basic"] if e["type"] != "start")
-    assert all(e["packages"] for e in s["packages"] if e["type"] != "start")
+    assert [e["type"] for e in s["basic"]] == ["start", "scan", "repair", "undo", "transfer_backup"]
+    no_packages = ("start", "transfer_backup")  # zdarzenia bez listy pakietów
+    assert all(e["packages"] is None for e in s["basic"] if e["type"] not in no_packages)
+    assert all(e["packages"] for e in s["packages"] if e["type"] not in no_packages)
+    assert all("packages" not in e for e in s["basic"] + s["packages"] if e["type"] in no_packages)
     assert all(e["install"] == ev.SAMPLE_INSTALL for e in s["basic"] + s["packages"])
 
 
@@ -248,3 +250,45 @@ def test_repair_event_does_not_count_a_browser_with_only_a_site_fix_as_a_failed_
         AppStatus("com.a", "ok"), AppStatus("com.android.chrome", "failed", errors=["user_timeout"])])
     body = ev.repair_event(ev._SAMPLE_DEVICE, "s", plans, {}, result, None, False)
     assert body["levels"]["silence"] == 1 and body["failed"] == 0 and body["errors"] == []
+
+
+def _backup_result(**kw):
+    from admenot.engine.transfer.backup import BackupResult
+    from admenot.engine.transfer.telephony import CategoryResult
+
+    opts = {"status": "incomplete", "copy_id": "R58T00TEST_ab12/20261025-120000",
+            "telephony": {"sms": CategoryResult("ok", 3)}, "files_done": 10, "files_failed": 2,
+            "apps_done": 1, "apps_failed": 1, "bytes": 2_600_000, "seconds": 75}
+    opts.update(kw)
+    return BackupResult(**opts)
+
+
+def _selection(**kw):
+    from admenot.engine.transfer.backup import Selection
+
+    opts = {"contacts": False, "sms": True, "mms": False, "calls": False,
+            "categories": frozenset({"media"}), "others": frozenset({"Music", ""}),
+            "apps": frozenset({"com.whatsapp"})}
+    opts.update(kw)
+    return Selection(**opts)
+
+
+def test_transfer_backup_event_has_only_numbers_and_flags():
+    body = ev.transfer_backup_event(ev._SAMPLE_DEVICE, _backup_result(), _selection())
+    assert body == {
+        "device": {"manufacturer": "OPPO", "model": "CPH2483", "android": "14"},
+        "status": "incomplete", "seconds": 75, "bytes_mb": 3, "files": 10, "files_failed": 2,
+        "apps": 1, "apps_failed": 1,
+        "categories": {"contacts": False, "sms": True, "mms": False, "calls": False, "media": True,
+                       "downloads": False, "whatsapp": False, "others": True, "apps": True}}
+    text = json.dumps(body)
+    assert "Music" not in text and "com.whatsapp" not in text and "R58T00TEST" not in text
+
+
+def test_transfer_backup_event_fits_server_limits():
+    body = ev.transfer_backup_event(
+        ev._SAMPLE_DEVICE, _backup_result(seconds=10**7, bytes=10**20, files_done=10**9),
+        _selection(others=frozenset(), apps=frozenset()))
+    assert body["seconds"] == 86_400 and body["bytes_mb"] == ev.MAX_MB
+    assert body["files"] == ev.MAX_COUNT
+    assert body["categories"]["others"] is False and body["categories"]["apps"] is False

@@ -1,0 +1,216 @@
+"""Most GUI ↔ kopia danych starego telefonu (przenoszenie danych, Etap 1)."""
+
+from __future__ import annotations
+
+import json
+import os
+import threading
+from datetime import timedelta
+from pathlib import Path
+
+import pytest
+from apphelpers import NOW, Disk, make_api
+from conftest import SERIAL
+from fakephone import make_cli_phone
+from faketransfer import FakeStoragePhone, TransferPhone
+from telephony_fixtures import install_telephony
+
+from admenot.engine.device.info import DeviceInfo
+from admenot.engine.paths import telemetry_path
+from admenot.engine.transfer import backup as backup_mod
+from admenot.engine.transfer import store
+
+MTIME = 1_700_000_000
+FILES = {
+    "DCIM/Camera/a.jpg": b"A" * 300,
+    "DCIM/Camera/b.jpg": b"B" * 200,
+    "Download/c.pdf": b"%PDF" + b"c" * 50,
+    "Music/song.mp3": b"M" * 40,
+    "notes.txt": b"loose file",
+}
+SELECTION = {"contacts": True, "sms": True, "mms": False, "calls": True,
+             "categories": ["media", "downloads"], "others": ["Music", ""], "apps": ["com.whatsapp"]}
+
+
+@pytest.fixture(autouse=True)
+def env(monkeypatch, tmp_path):
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "data"))
+    monkeypatch.setenv("ADMENOT_ASSETS", str(tmp_path / "no-assets"))
+
+
+def _phone(tmp_path: Path) -> TransferPhone:
+    root = tmp_path / "phone"
+    for rel, data in FILES.items():
+        path = root / "sdcard" / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        os.utime(path, (MTIME, MTIME))
+    install_telephony(root, mms=False)
+    storage = FakeStoragePhone(root, serial=SERIAL)
+    storage.apps = {"com.whatsapp": {"base.apk": b"PK-whatsapp"}}
+    return TransferPhone(make_cli_phone(), storage)
+
+
+def _api(phone: TransferPhone, **kw):
+    return make_api(phone, puller_factory=lambda adb_path, serial, log: phone, **kw)
+
+
+def _device() -> DeviceInfo:
+    return DeviceInfo(serial=SERIAL, brand="samsung", manufacturer="samsung", model="SM-A145R",
+                      device="a14", market_name=None, android_release="14", sdk=34,
+                      security_patch=None, uptime_s=1.0, local_now=NOW)
+
+
+def _inventoried(tmp_path, **kw):
+    phone = _phone(tmp_path)
+    api, rec = _api(phone, **kw)
+    assert "error" not in api.transfer_inventory(SERIAL, "Anna K.")
+    return api, rec, phone
+
+
+def test_transfer_inventory_emits_view(tmp_path):
+    _, rec, _ = _inventoried(tmp_path)
+    assert rec.of("scan:device")[0]["device"]["serial"] == SERIAL
+    event = rec.of("transfer:inventory")[0]
+    inv = event["inventory"]
+    assert event["resumable"] is None and event["client"] == "Anna K."
+    assert (inv["contacts"], inv["sms"], inv["calls"]) == (2, 2, 1)
+    assert inv["categories"]["media"] == {"files": 2, "bytes": 500}
+    assert inv["categories"]["downloads"] == {"files": 1, "bytes": len(FILES["Download/c.pdf"])}
+    assert inv["categories"]["whatsapp"] == {"files": 0, "bytes": 0}
+    assert inv["others"] == [{"name": "", "files": 1, "bytes": len(FILES["notes.txt"])},
+                             {"name": "Music", "files": 1, "bytes": 40}]
+    assert {a["package"] for a in inv["apps"]} == {"com.whatsapp", "com.wlive.forecast"}
+    assert all(a["bytes"] is None for a in inv["apps"])
+    assert inv["skipped_apps"] == [{"package": "com.clean.pro.boost", "label": "com.clean.pro.boost"}]
+    assert inv["storage"]["total"] > inv["storage"]["used"] > 0
+    assert isinstance(inv["free_pc"], int) and inv["unreadable"] == 0
+
+
+def test_start_backup_without_inventory_is_refused(tmp_path):
+    api, _ = _api(_phone(tmp_path))
+    assert api.start_backup(SELECTION)["error"]["key"] == "transfer_no_inventory"
+
+
+def test_start_backup_rejects_bad_selection(tmp_path):
+    api, _, _ = _inventoried(tmp_path)
+    assert api.start_backup({**SELECTION, "categories": ["Music"]})["error"]["key"] == "bad_request"
+    assert api.start_backup({**SELECTION, "sms": "yes"})["error"]["key"] == "bad_request"
+
+
+def test_start_backup_completes_and_lists(tmp_path):
+    api, rec, _ = _inventoried(tmp_path)
+    assert "job_id" in api.start_backup(SELECTION)
+    done = rec.of("transfer:done")[0]
+    assert done["result"]["status"] == "complete"
+    assert done["result"]["files_done"] == 5 and done["result"]["apps_done"] == 1
+    assert done["result"]["telephony"]["contacts"] == {"status": "ok", "count": 2}
+    assert done["copy"]["status"] == "complete" and done["copy"]["client"] == "Anna K."
+    assert rec.of("transfer:progress")
+    copies = api.transfers()["copies"]
+    assert len(copies) == 1
+    assert copies[0]["days_left"] == 7 and copies[0]["id"] == done["copy"]["id"]
+    assert copies[0]["counts"]["files"] == 5
+
+
+def test_backup_error_maps_to_job_error(tmp_path, monkeypatch):
+    api, rec, _ = _inventoried(tmp_path)
+    monkeypatch.setattr(backup_mod.shutil, "disk_usage", lambda path: Disk(10, 10, 0))
+    api.start_backup(SELECTION)
+    assert rec.of("job:error")[0]["key"] == "transfer_disk_full"
+    assert not rec.of("transfer:done")
+    assert api.transfers()["copies"][0]["status"] == "in_progress"
+
+
+def test_inventory_offers_resume(tmp_path):
+    copy = store.create_copy(SERIAL, _device(), "Anna K.", NOW)
+    api, rec, _ = _inventoried(tmp_path)
+    resumable = rec.of("transfer:inventory")[0]["resumable"]
+    assert resumable is not None and resumable["id"] == copy.read_meta().id
+    assert resumable["status"] == "in_progress"
+    api.start_backup(SELECTION)  # wznawia tę kopię zamiast zakładać nową
+    copies = api.transfers()["copies"]
+    assert [c["id"] for c in copies] == [resumable["id"]] and copies[0]["status"] == "complete"
+
+
+def test_extend_transfer(tmp_path):
+    copy = store.create_copy(SERIAL, _device(), None, NOW)
+    api, _ = _api(_phone(tmp_path))
+    copy_id = copy.read_meta().id
+    view = api.extend_transfer(copy_id)["copy"]
+    assert view["days_left"] == 14
+    assert view["expires"] == (NOW + timedelta(days=14)).isoformat(timespec="seconds")
+    assert api.extend_transfer("../x")["error"]["key"] == "bad_request"
+
+
+def test_delete_transfer(tmp_path):
+    copy = store.create_copy(SERIAL, _device(), None, NOW)
+    api, _ = _api(_phone(tmp_path))
+    copy_id = copy.read_meta().id
+    assert api.delete_transfer(copy_id) == {"deleted": copy_id}
+    assert api.transfers()["copies"] == []
+    assert api.delete_transfer(copy_id)["error"]["key"] == "bad_request"
+
+
+def test_delete_transfer_busy(tmp_path):
+    api, rec, phone = _inventoried(tmp_path, sync=False)
+    assert api._jobs.wait(5)
+    entered, release = threading.Event(), threading.Event()
+
+    def hold(remotes):
+        entered.set()
+        release.wait(5)
+
+    phone.storage.before_pull = hold
+    api.start_backup(SELECTION)
+    try:
+        assert entered.wait(5)
+        copy_id = api.transfers()["copies"][0]["id"]
+        assert api.delete_transfer(copy_id)["error"]["key"] == "busy"
+    finally:
+        release.set()
+    rec.wait_for("transfer:done")
+    assert api._jobs.wait(5)
+    assert api.delete_transfer(copy_id) == {"deleted": copy_id}
+
+
+def test_purge_on_start(tmp_path):
+    old = store.create_copy(SERIAL, _device(), None, NOW - timedelta(days=8))
+    fresh = store.create_copy(SERIAL, _device(), None, NOW - timedelta(days=1))
+    api, _ = _api(_phone(tmp_path))
+    assert not old.path.exists() and fresh.path.exists()
+    assert [c["id"] for c in api.transfers()["copies"]] == [fresh.read_meta().id]
+
+
+def test_transfer_whatsapp(tmp_path):
+    api, _, phone = _inventoried(tmp_path)
+    assert api.transfer_whatsapp() == {"whatsapp_backup": None}
+    db = phone.storage.root / "sdcard" / "WhatsApp" / "Databases" / "msgstore.db.crypt14"
+    db.parent.mkdir(parents=True)
+    db.write_bytes(b"x")
+    os.utime(db, (MTIME, MTIME))
+    from datetime import datetime
+    expected = datetime.fromtimestamp(MTIME).isoformat(timespec="seconds")
+    assert api.transfer_whatsapp() == {"whatsapp_backup": expected}
+
+
+def test_transfer_telemetry_has_no_paths(tmp_path):
+    api, _, _ = _inventoried(tmp_path)
+    api.set_telemetry(True, True)
+    api.start_backup(SELECTION)
+    events = [json.loads(x) for x in telemetry_path().read_text("utf-8").splitlines()]
+    event = next(e for e in events if e["type"] == "transfer_backup")
+    assert event["status"] == "complete" and event["files"] == 5 and event["apps"] == 1
+    assert event["categories"] == {"contacts": True, "sms": True, "mms": False, "calls": True,
+                                   "media": True, "downloads": True, "whatsapp": False,
+                                   "others": True, "apps": True}
+    text = json.dumps(event)
+    for name in ("DCIM", "Music", "Camera", "a.jpg", "notes.txt", "Download", "com.whatsapp",
+                 "Anna", SERIAL):
+        assert name not in text, name
+
+
+def test_transfer_telemetry_off_without_consent(tmp_path):
+    api, _, _ = _inventoried(tmp_path)
+    api.start_backup(SELECTION)
+    assert not telemetry_path().exists()

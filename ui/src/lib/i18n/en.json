@@ -264,6 +264,7 @@
       "scan": "After a scan: phone manufacturer, model and Android version, number of apps per rating, scan time, APK analysis result.",
       "repair": "After a repair: how many apps were silenced, disabled and removed, how many the program flagged, how many failed and the error codes.",
       "undo": "After an undo: how many apps were restored and how many days after the repair.",
+      "transfer_backup": "After copying an old phone's data: phone manufacturer, model and Android version, outcome, duration, size in MB, number of copied and failed files and apps, which kinds of data were selected — no folder, file or app names.",
       "packages": "With the second consent: package names of apps the program flagged or you selected, with the rating and your decision.",
       "never": "Never: serial number, IMEI, customer name, order number, shop details, screenshots, names of apps rated safe and left untouched."
     },

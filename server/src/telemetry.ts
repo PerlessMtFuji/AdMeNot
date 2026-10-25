@@ -68,6 +68,26 @@ const CHECK_STATES = ["ok", "review", "unrecognized"] as const;
 const SITE_MODES = ["per_site", "shared", "rdp"] as const;
 const FIX_KINDS = ["channel", "site_permission"] as const;
 
+// Kopia starego telefonu: tylko liczby i flagi wybranych rodzajów danych — bez nazw folderów,
+// plików i pakietów, więc każde pole spoza listy odrzuca zdarzenie.
+const COMMON = ["install", "type", "t", "app", "os", "lang"] as const;
+const TRANSFER_FIELDS = ["device", "status", "seconds", "bytes_mb", "files", "files_failed", "apps",
+  "apps_failed", "categories"] as const;
+const TRANSFER_CATEGORIES = ["contacts", "sms", "mms", "calls", "media", "downloads", "whatsapp", "others",
+  "apps"] as const;
+const MAX_MB = 10_000_000; // 10 TB w MB (telemetry_events.MAX_MB)
+
+// Obiekt z dokładnie tymi kluczami (wartości logiczne).
+function flags(v: unknown, keys: readonly string[]): Obj {
+  need(isObj(v) && Object.keys(v as Obj).every((k) => keys.includes(k)));
+  const out: Obj = {};
+  for (const k of keys) {
+    need(typeof (v as Obj)[k] === "boolean");
+    out[k] = (v as Obj)[k];
+  }
+  return out;
+}
+
 function checks(v: unknown): Obj {
   need(isObj(v) && Object.keys(v as Obj).length === 1 && oneOf((v as Obj).site_notifications, CHECK_STATES));
   return { site_notifications: (v as Obj).site_notifications };
@@ -130,6 +150,16 @@ function body(e: Obj): Obj {
           need(typeof p.ok === "boolean");
           return { ok: p.ok };
         }),
+      };
+    case "transfer_backup":
+      need(Object.keys(e).every((k) => (COMMON as readonly string[]).includes(k)
+        || (TRANSFER_FIELDS as readonly string[]).includes(k)));
+      need(oneOf(e.status, ["complete", "incomplete", "stopped"]) && int(e.seconds, 86_400)
+        && int(e.bytes_mb, MAX_MB) && int(e.files) && int(e.files_failed) && int(e.apps) && int(e.apps_failed));
+      return {
+        device: device(e.device), status: e.status, seconds: e.seconds, bytes_mb: e.bytes_mb,
+        files: e.files, files_failed: e.files_failed, apps: e.apps, apps_failed: e.apps_failed,
+        categories: flags(e.categories, TRANSFER_CATEGORIES),
       };
     default:
       throw new Invalid();

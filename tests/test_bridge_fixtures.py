@@ -17,7 +17,7 @@ def _module():
 def test_bridge_fixtures_are_up_to_date():
     fresh = _module().record_all()
     assert set(fresh) == {"adware", "adware-en", "clean", "manual", "disconnect", "report",
-                          "unauthorized", "many", "empty"}
+                          "transfer", "unauthorized", "many", "empty"}
     for name, data in fresh.items():
         path = OUT / f"{name}.json"
         assert path.exists(), f"brak {path} — uruchom: python scripts/record_bridge_fixtures.py"
@@ -47,3 +47,15 @@ def test_manual_scenario_goes_manual_then_partial():
     done = next(d for c in data["calls"] for n, d in c["events"] if n == "apk:done")
     assert done["scan"]["on_demand"] == ["com.clean.pro.boost"]
     assert "exec:done" in [n for c in data["calls"] for n, _ in c["events"]]
+
+
+def test_transfer_scenario_inventories_copies_and_lists():
+    data = _module().record_all()["transfer"]
+    assert [c["method"] for c in data["calls"]] == ["list_devices", "transfers", "transfer_inventory",
+                                                    "start_backup", "transfers"]
+    events = [name for c in data["calls"] for name, _ in c["events"]]
+    for name in ("scan:device", "transfer:inventory", "transfer:progress", "transfer:done"):
+        assert name in events, name
+    done = next(d for c in data["calls"] for n, d in c["events"] if n == "transfer:done")
+    assert done["result"]["status"] == "complete"
+    assert data["calls"][-1]["result"]["copies"][0]["id"] == done["copy"]["id"]
