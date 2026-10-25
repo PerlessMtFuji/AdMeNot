@@ -114,6 +114,10 @@ class FakeStoragePhone:
         prune_paths: set[str] = set()
         prune_names: set[str] = set()
         j = 0
+        maxdepth: int | None = None
+        if expr[:1] == ["-maxdepth"]:
+            maxdepth = int(expr[1])
+            j = 2
         match_name: str | None = None
         while j < len(expr) and expr[j] in ("-path", "-name"):
             if expr[j] == "-name" and expr[j + 2] == "-type":  # filtr nazwy, bez -prune
@@ -131,6 +135,8 @@ class FakeStoragePhone:
             for dirpath, dirnames, filenames in os.walk(base):
                 rel = os.path.relpath(dirpath, base).replace(os.sep, "/")
                 rdir = remote if rel == "." else f"{remote.rstrip('/')}/{rel}"
+                if maxdepth is not None and (0 if rel == "." else rel.count("/") + 1) + 1 >= maxdepth:
+                    dirnames[:] = []
                 dirnames[:] = [d for d in dirnames
                                if d not in prune_names and f"{rdir}/{d}" not in prune_paths]
                 for name in filenames:

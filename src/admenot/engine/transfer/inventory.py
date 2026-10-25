@@ -18,7 +18,7 @@ from admenot.engine.session import ScanReport
 
 from .guard import q
 from .mms import mms_stats
-from .telephony import ContentQueryError, Stopped, count_rows
+from .telephony import _CONNECTION_KINDS, ContentQueryError, Stopped, count_rows
 from .winpath import REMOTE_BASE, remote_rel
 
 FILE_CATEGORIES: dict[str, tuple[str, ...]] = {
@@ -39,7 +39,8 @@ _WA_DB_DIRS = (
     f"{REMOTE_BASE}/Android/media/com.whatsapp/WhatsApp/Databases",
     f"{REMOTE_BASE}/WhatsApp/Databases",
 )
-_CONNECTION_KINDS = {"offline", "no_device", "unauthorized", "adb_missing"}
+# Błąd połączenia albo przekroczenie czasu przechodzi wyżej (kopia czeka na telefon / pokazuje błąd).
+_PROPAGATE_KINDS = _CONNECTION_KINDS | {"timeout"}
 
 
 @dataclass(frozen=True)
@@ -72,7 +73,7 @@ class Inventory:
     skipped_apps: list[AppEntry]
     whatsapp_backup: datetime | None
     storage: tuple[int, int] | None  # (zajęte, razem) w bajtach
-    unreadable: int
+    unreadable: int  # nieczytelne nazwy plików + całe korzenie, których nie udało się przeskanować
 
 
 def _check(should_stop: Callable[[], bool]) -> None:
@@ -80,12 +81,12 @@ def _check(should_stop: Callable[[], bool]) -> None:
         raise Stopped()
 
 
-def _ls(adb: AdbTransport, path: str) -> set[str] | None:
-    """Nazwy w katalogu albo None, gdy katalogu nie ma / nie da się go odczytać."""
+def _ls(adb: AdbTransport, path: str, required: bool = False) -> set[str] | None:
+    """Nazwy w katalogu albo None, gdy katalogu nie ma / nie da się go odczytać (chyba że `required`)."""
     try:
         out = adb.shell(f"ls -1 {q(path)}")
     except AdbError as exc:
-        if exc.kind in _CONNECTION_KINDS:
+        if required or exc.kind in _PROPAGATE_KINDS:
             raise
         return None
     return {line for line in out.split("\n") if line}
@@ -102,8 +103,13 @@ def _find(adb: AdbTransport, roots: list[str]) -> str:
 def scan_files(
     adb: AdbTransport, should_stop: Callable[[], bool]
 ) -> tuple[list[RemoteFile], dict[str, tuple[int, int]], int]:
-    """Pliki do skopiowania, podsumowanie folderów spoza znanych kategorii i liczba nieczytelnych nazw."""
-    top = _ls(adb, REMOTE_BASE) or set()
+    """Pliki do skopiowania, podsumowanie folderów spoza znanych kategorii i liczba nieczytelnych.
+
+    `others`: folder -> (pliki, bajty); klucz "" = luźne pliki w głównym folderze telefonu.
+    Trzeci element (`unreadable`) to nieczytelne nazwy plus całe korzenie, które zawiodły przy
+    skanowaniu osobno (po błędzie wspólnego `find`). Błąd odczytu samego /sdcard przechodzi wyżej.
+    """
+    top = _ls(adb, REMOTE_BASE, required=True) or set()
     # korzeń -> kategoria; korzenie znanych kategorii istnieją tylko, jeśli widać je w katalogu nadrzędnym
     roots: dict[str, str] = {}
     listings: dict[str, set[str] | None] = {REMOTE_BASE: top}
@@ -115,29 +121,35 @@ def scan_files(
             if name in (listings[parent] or ()):
                 roots[f"{parent}/{name}"] = cat
     known_tops = {rel.split("/")[0] for rels in FILE_CATEGORIES.values() for rel in rels}
-    for name in sorted(top):
+    # Luźne pliki w głównym folderze (nie katalogi) trafiają do wpisu „other:” (pusta nazwa folderu).
+    loose_out = adb.shell(f"find -H {q(REMOTE_BASE)} -maxdepth 1 -type f "
+                          f"-exec stat -c {q('%s|%Y|%n')} {{}} +", timeout=120)
+    loose_names = {ln.split("|", 2)[2].rsplit("/", 1)[-1] for ln in loose_out.split("\n")
+                   if ln.count("|") >= 2}
+    for name in sorted(top - loose_names):
         if name in known_tops or name in EXCLUDED_TOP or name.startswith("."):
             continue
         roots[f"{REMOTE_BASE}/{name}"] = f"other:{name}"
     _check(should_stop)
-    if not roots:
+    if not roots and not loose_names:
         return [], {}, 0
 
     # Do find idą tylko korzenie niezagnieżdżone w innych.
     outer = [r for r in roots if not any(o != r and r.startswith(o + "/") for o in roots)]
     unreadable = 0
+    outputs = [loose_out]
     try:
-        outputs = [_find(adb, outer)]
+        outputs.append(_find(adb, outer) if outer else "")
     except AdbError as exc:
-        if exc.kind in _CONNECTION_KINDS:
+        if exc.kind in _PROPAGATE_KINDS:
             raise
-        outputs = []
+        outputs = [loose_out]
         for root in outer:
             _check(should_stop)
             try:
                 outputs.append(_find(adb, [root]))
             except AdbError as exc2:
-                if exc2.kind in _CONNECTION_KINDS:
+                if exc2.kind in _PROPAGATE_KINDS:
                     raise
                 unreadable += 1
     _check(should_stop)
@@ -164,8 +176,11 @@ def scan_files(
             continue
         root = next((r for r in by_len if path.startswith(r + "/")), None)
         if root is None:
-            continue
-        category = roots[root]
+            if path.rsplit("/", 1)[0] != REMOTE_BASE or path.rsplit("/", 1)[1].startswith("."):
+                continue
+            category = "other:"
+        else:
+            category = roots[root]
         files.append(RemoteFile(path, size, mtime, category))
         if category.startswith("other:"):
             n, total = others.get(category[6:], (0, 0))
@@ -182,7 +197,7 @@ def whatsapp_backup_time(adb: AdbTransport) -> datetime | None:
         try:
             out = adb.shell(cmd)
         except AdbError as exc:
-            if exc.kind in _CONNECTION_KINDS:
+            if exc.kind in _PROPAGATE_KINDS:
                 raise
             continue
         for line in out.split("\n"):
@@ -228,7 +243,7 @@ def _storage(adb: AdbTransport) -> tuple[int, int] | None:
         last = [ln for ln in out.splitlines() if ln.strip()][-1].split()
         return int(last[2]) * 1024, int(last[1]) * 1024
     except AdbError as exc:
-        if exc.kind in _CONNECTION_KINDS:
+        if exc.kind in _PROPAGATE_KINDS:
             raise
     except (IndexError, ValueError):
         pass

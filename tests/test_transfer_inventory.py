@@ -110,3 +110,55 @@ def test_build_inventory_unavailable_sms(tmp_path):
     assert [f.remote for f in inv.files] == ["/sdcard/DCIM/a.jpg"]
     assert inv.storage == (50_000_000 * 1024, 120_000_000 * 1024)
     assert [a.package for a in inv.apps] == ["ok"]
+
+
+def test_loose_files_in_main_folder_go_to_empty_other(tmp_path):
+    root = tmp_path / "phone"
+    _put(root, "notes.txt", b"abc")
+    _put(root, ".hidden", b"z")
+    _put(root, "Music/c.mp3", b"12")
+    _, adb = _ro(tmp_path)
+    files, others, _ = scan_files(adb, lambda: False)
+    assert {f.remote: f.category for f in files} == {
+        "/sdcard/notes.txt": "other:", "/sdcard/Music/c.mp3": "other:Music"}
+    assert others == {"": (1, 3), "Music": (1, 2)}
+
+
+def test_unreadable_sdcard_listing_raises(tmp_path):
+    import pytest
+
+    from admenot.engine.adb.transport import AdbError
+
+    phone, adb = _ro(tmp_path)
+    orig = phone._ls
+
+    def boom(args):
+        if args[1] == "/sdcard":
+            raise AdbError("command_failed", "ls: /sdcard: Permission denied")
+        return orig(args)
+
+    phone._ls = boom
+    with pytest.raises(AdbError):
+        scan_files(adb, lambda: False)
+
+
+def test_find_timeout_propagates_without_per_root_retry(tmp_path):
+    import pytest
+
+    from admenot.engine.adb.transport import AdbError
+
+    root = tmp_path / "phone"
+    _put(root, "DCIM/a.jpg")
+    phone, adb = _ro(tmp_path)
+    orig = phone._find
+
+    def slow(args):
+        if "-maxdepth" not in args:
+            raise AdbError("timeout", "find (>600s)")
+        return orig(args)
+
+    phone._find = slow
+    with pytest.raises(AdbError) as ei:
+        scan_files(adb, lambda: False)
+    assert ei.value.kind == "timeout"
+    assert sum(c.startswith("find") and "-maxdepth" not in c for c in phone.commands) == 1
