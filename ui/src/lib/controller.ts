@@ -1,6 +1,6 @@
 import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
-import { actedAfter, changedVerdicts, defaultSelection, resumeSelection, TRANSFER_CATEGORIES, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
+import { actedAfter, changedVerdicts, defaultSelection, resumableCopy, resumeSelection, TRANSFER_CATEGORIES, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
 import { EMPTY_TRANSFER_SELECTION, type AppState } from './state.svelte';
 import { applyTheme } from './theme';
 import type {
@@ -773,16 +773,14 @@ export class Controller {
     Object.assign(s, { phase: 'connect', screen: 'main', device: null, stopping: false });
   }
 
-  /** Po błędzie kopii jest ona niedokończona: baner „Wznów” dostaje najnowszą niedokończoną kopię tego modelu
+  /** Po błędzie kopii jest ona niedokończona: baner „Wznów” dostaje najnowszą niedokończoną kopię tego telefonu
    *  (most wznowi właśnie ją — `find_resumable`). Bez trafienia zostaje dotychczasowa. */
   private async refreshResumable(): Promise<void> {
     const s = this.state;
     const r = await this.call(this.api.transfers());
     if (!r) return;
     s.transfer.copies = r.copies;
-    const dev = s.device;
-    const copy = r.copies.find((c) => c.status === 'in_progress' && !!dev && c.model === dev.model
-      && c.manufacturer === dev.manufacturer);
+    const copy = resumableCopy(r.copies, s.device?.serial ?? s.serial);
     if (copy && s.phase === 'transfer_choose') s.transfer.resumable = copy;
   }
 

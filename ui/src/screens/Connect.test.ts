@@ -32,6 +32,31 @@ describe('Connect', () => {
     expect(screen.getByText('R58T00TEST')).toBeTruthy();
   });
 
+  test('a phone with an interrupted data copy is offered resuming it right after connecting', async () => {
+    const env = await setupCtl('clean');
+    const copy = { id: 'R58T00TEST-x/20261025-193539', serial: 'R58T00TEST', model: 'SM-A145R', manufacturer: 'samsung',
+      client: null, created: '2026-10-25T19:35:39', expires: '2026-11-01T19:35:39', days_left: 7,
+      status: 'in_progress' as const, bytes: 0, counts: {} };
+    env.bridge.setCopies([{ ...copy, id: 'OTHER/1', serial: 'OTHER' }]);
+    env.s.devices = [{ serial: 'R58T00TEST', state: 'device', model: 'SM_A145R', name: null, imei: null }];
+    render(Connect, { context: new Map([['ctl', env.ctl]]) });
+    await flush();
+    expect(screen.queryByText(/Wznów przerwaną kopię/)).toBeNull();  // kopia innego egzemplarza
+    env.bridge.setCopies([copy]);
+    await env.ctl.loadTransfers();
+    await tick();
+    expect(screen.getByText(/Wznów przerwaną kopię z 25 paź/)).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Wznów' }));
+    expect(env.bridge.calls.some((c) => c.method === 'transfer_inventory')).toBe(true);
+  });
+
+  test('the connect screen reloads the copies, so a finished copy no longer offers resuming', async () => {
+    const env = await setupCtl('clean');
+    render(Connect, { context: new Map([['ctl', env.ctl]]) });
+    await flush();
+    expect(env.bridge.calls.some((c) => c.method === 'transfers')).toBe(true);
+  });
+
   test('unauthorized phone asks for the permission on the phone', async () => {
     const { container } = await renderWith(Connect, 'unauthorized');
     expect(screen.getByRole('heading', { name: 'Potwierdź na telefonie' })).toBeTruthy();

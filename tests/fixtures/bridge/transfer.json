@@ -950,6 +950,7 @@
       },
       "copy": {
        "id": "R58T00TEST-90fae0b8e3f0/20260926-143000",
+       "serial": "R58T00TEST",
        "model": "SM-A145R",
        "manufacturer": "samsung",
        "client": "Anna K.",
@@ -1007,6 +1008,7 @@
     "copies": [
      {
       "id": "R58T00TEST-90fae0b8e3f0/20260926-143000",
+      "serial": "R58T00TEST",
       "model": "SM-A145R",
       "manufacturer": "samsung",
       "client": "Anna K.",

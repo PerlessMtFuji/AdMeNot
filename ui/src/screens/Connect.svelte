@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getContext } from 'svelte';
+  import { getContext, onMount } from 'svelte';
   import ConnectChecklist from '../components/ConnectChecklist.svelte';
   import DeviceCard from '../components/DeviceCard.svelte';
   import InterruptedBanner from '../components/InterruptedBanner.svelte';
@@ -7,8 +7,8 @@
   import PhoneStage from '../components/PhoneStage.svelte';
   import UsbGuide from '../components/UsbGuide.svelte';
   import type { Controller } from '../lib/controller';
-  import { t } from '../lib/i18n/index.svelte';
-  import { connectChecklist, linkState, modelName } from '../lib/logic';
+  import { i18n, t } from '../lib/i18n/index.svelte';
+  import { connectChecklist, linkState, modelName, resumableCopy } from '../lib/logic';
   import { enter } from '../lib/motion';
   import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
@@ -22,6 +22,13 @@
     : link === 'unauthorized' ? 'auth' : link === 'offline' ? 'offline' : 'wait');
   const checks = $derived(connectChecklist(link));
   const known = $derived(pending !== null && s.knownSerials.includes(pending.serial));
+  // Przerwana kopia danych (np. zamknięty program): propozycja wznowienia od razu po podłączeniu tego telefonu.
+  const resumable = $derived(link === 'ready' || link === 'many' ? resumableCopy(s.transfer.copies, s.serial) : null);
+  const when = (iso: string) => new Date(iso).toLocaleString(i18n.lang === 'pl' ? 'pl-PL' : 'en-GB',
+    { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+  // Za każdym powrotem na ten ekran: kopia mogła się w międzyczasie skończyć albo przerwać.
+  onMount(() => { void ctl.loadTransfers(); });
 </script>
 
 <main class="flex min-w-0 flex-1 gap-7 scroll-fade overflow-auto px-7 py-7">
@@ -40,6 +47,14 @@
 
   <div class="flex min-w-0 flex-1 flex-col gap-4">
     {#if s.interrupted.length}<InterruptedBanner orders={s.interrupted} />{/if}
+    {#if resumable}
+      <Banner tone="info" icon="rotate-ccw" title={t('transfer.resume_title', { when: when(resumable.created) })}>
+        {t('transfer.resume_text')}
+        {#snippet actions()}
+          <Button variant="primary" size="sm" onclick={() => ctl.startTransfer()}>{t('transfer.resume')}</Button>
+        {/snippet}
+      </Banner>
+    {/if}
     {#if link === 'adb_missing'}
       <Banner tone="bad" icon="triangle-alert" title={t('connect.adb_missing')}>
         {#snippet actions()}<Button onclick={() => ctl.openSettings()}>{t('connect.open_settings')}</Button>{/snippet}

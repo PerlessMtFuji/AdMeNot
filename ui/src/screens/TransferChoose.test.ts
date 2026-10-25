@@ -109,7 +109,7 @@ describe('TransferChoose', () => {
 
   test('a resumable copy offers to resume it', async () => {
     const { s, bridge } = await show();
-    s.transfer.resumable = { id: 'S/1', model: 'SM-A145R', manufacturer: 'samsung', client: null, created: '2026-10-24T14:20:00',
+    s.transfer.resumable = { id: 'S/1', serial: 'R58T00TEST', model: 'SM-A145R', manufacturer: 'samsung', client: null, created: '2026-10-24T14:20:00',
       expires: '2026-10-31T14:20:00', days_left: 6, status: 'in_progress', bytes: 0, counts: {} };
     await tick();
     await fireEvent.click(screen.getByRole('button', { name: 'Wznów' }));
@@ -121,7 +121,7 @@ describe('TransferChoose', () => {
     const { s } = await show({ free_pc: 1500 * MB });
 
     expect((screen.getByRole('button', { name: /Rozpocznij kopię/ }) as HTMLButtonElement).disabled).toBe(true);
-    s.transfer.resumable = { id: 'S/1', model: 'SM-A145R', manufacturer: 'samsung', client: null, created: '2026-10-24T14:20:00',
+    s.transfer.resumable = { id: 'S/1', serial: 'R58T00TEST', model: 'SM-A145R', manufacturer: 'samsung', client: null, created: '2026-10-24T14:20:00',
       expires: '2026-10-31T14:20:00', days_left: 6, status: 'in_progress', bytes: 2000 * MB, counts: { files: 14000 } };
     await tick();
     expect(screen.queryByText('Za mało miejsca na dysku komputera na tę kopię.')).toBeNull();

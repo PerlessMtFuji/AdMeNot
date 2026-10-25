@@ -5,6 +5,7 @@ import {
   changedVerdicts,
   defaultTransferSelection,
   isXiaomi,
+  resumableCopy,
   resumeSelection,
   transferNeed,
   transferStages,
@@ -640,6 +641,17 @@ describe('data transfer', () => {
       categories: ['downloads', 'media'], others: ['Music', 'Gone'], apps: ['b.sus', 'x.removed'] })).toEqual({
       contacts: false, sms: true, mms: false, calls: true, categories: ['media'], others: ['Music'], apps: ['b.sus'] });
     expect(resumeSelection(inv({ sms: null }), { sms: true }).sms).toBe(false);
+  });
+
+  test('the copy to resume is the newest unfinished one of this very phone, not just the same model', () => {
+    const copy = (id: string, serial: string, status: 'in_progress' | 'complete' | 'incomplete') =>
+      ({ id, serial, model: 'SM-A137F', status }) as never;
+    const copies = [copy('A/3', 'A', 'complete'), copy('B/2', 'B', 'in_progress'), copy('A/2', 'A', 'in_progress'),
+      copy('A/1', 'A', 'in_progress')];
+    expect(resumableCopy(copies, 'A')?.id).toBe('A/2');
+    expect(resumableCopy(copies, 'C')).toBeNull();
+    expect(resumableCopy(copies, null)).toBeNull();
+    expect(resumableCopy([copy('A/1', 'A', 'incomplete')], 'A')).toBeNull();
   });
 
   test('Xiaomi, Redmi and POCO phones are recognised by maker or brand', () => {

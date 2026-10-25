@@ -488,6 +488,7 @@ export interface TransferSelection {
 
 export interface CopyView {
   id: string;
+  serial: string;
   model: string;
   manufacturer: string;
   client: string | null;

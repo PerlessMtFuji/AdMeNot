@@ -1167,7 +1167,7 @@ describe('data transfer', () => {
     expect(s.stopping).toBe(true);
     expect(bridge.calls.at(-1)).toEqual({ method: 'stop', args: ['job-9'] });
     bridge.emit('transfer:done', { result: { status: 'stopped', copy_id: 'x', telephony: {}, files_done: 0, files_failed: 0,
-      apps_done: 0, apps_failed: 0, bytes: 0, seconds: 1 }, copy: { id: 'x', model: 'M', manufacturer: 'm', client: null,
+      apps_done: 0, apps_failed: 0, bytes: 0, seconds: 1 }, copy: { id: 'x', serial: 'S', model: 'M', manufacturer: 'm', client: null,
       created: '2026-10-25T10:00:00', expires: '2026-11-01T10:00:00', days_left: 7, status: 'in_progress', bytes: 0, counts: {} } });
     expect(s.phase).toBe('transfer_done');
     expect(s.stopping).toBe(false);
@@ -1212,7 +1212,7 @@ describe('data transfer', () => {
   test('copies: load, extend, delete', async () => {
     const { ctl, s, bridge } = setup('empty');
     await ctl.init();
-    bridge.setCopies([{ id: 'S/1', model: 'M', manufacturer: 'm', client: 'Anna', created: '2026-10-25T10:00:00',
+    bridge.setCopies([{ id: 'S/1', serial: 'S', model: 'M', manufacturer: 'm', client: 'Anna', created: '2026-10-25T10:00:00',
       expires: '2026-11-01T10:00:00', days_left: 7, status: 'complete', bytes: 10, counts: {} }]);
     await ctl.loadTransfers();
     expect(s.transfer.copies).toHaveLength(1);
@@ -1249,7 +1249,7 @@ describe('data transfer', () => {
 });
 
 describe('data transfer — resuming', () => {
-  const RESUMABLE = { id: 'R58T00TEST-x/20260925-100000', model: 'SM-A145R', manufacturer: 'samsung', client: 'Anna K.',
+  const RESUMABLE = { id: 'R58T00TEST-x/20260925-100000', serial: 'R58T00TEST', model: 'SM-A145R', manufacturer: 'samsung', client: 'Anna K.',
     created: '2026-09-25T10:00:00', expires: '2026-10-02T10:00:00', days_left: 6, status: 'in_progress' as const, bytes: 0,
     counts: {} };
 
@@ -1285,7 +1285,8 @@ describe('data transfer — resuming', () => {
     await ctl.init();
     s.phase = 'transfer_backup';
     s.device = { serial: 'R58T00TEST', manufacturer: 'samsung', model: 'SM-A145R' } as never;
-    bridge.setCopies([{ ...RESUMABLE, id: 'OTHER/20260925-100000', model: 'Pixel 7', manufacturer: 'Google' }, RESUMABLE]);
+    // ten sam model, inny egzemplarz: wznowić można tylko kopię tego telefonu
+    bridge.setCopies([{ ...RESUMABLE, id: 'OTHER/20260925-100000', serial: 'OTHER' }, RESUMABLE]);
     bridge.emit('job:error', { job_id: 'job-2', kind: 'backup', key: 'transfer_disk_full', message: '' });
     await vi.waitFor(() => expect(s.transfer.resumable?.id).toBe(RESUMABLE.id));
     expect(s.phase).toBe('transfer_choose');

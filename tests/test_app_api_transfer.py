@@ -111,6 +111,7 @@ def test_start_backup_completes_and_lists(tmp_path):
     copies = api.transfers()["copies"]
     assert len(copies) == 1
     assert copies[0]["days_left"] == 7 and copies[0]["id"] == done["copy"]["id"]
+    assert copies[0]["serial"] == SERIAL  # baner „Wznów” na ekranie Połącz trafia w ten telefon
     assert copies[0]["counts"]["files"] == 5
     # wybór zapisany w kopii wraca w widoku — wznowienie zaczyna od niego
     assert copies[0]["selection"]["others"] == ["", "Music"]

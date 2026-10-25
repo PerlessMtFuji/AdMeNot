@@ -466,7 +466,7 @@ def copy_view(meta: CopyMeta, now: datetime) -> dict[str, Any]:
     `Api` (w testach stały), bo widok sam nie czyta czasu. `selection`: wybór zapisany w kopii —
     wznowienie przerwanej kopii zaczyna od niego (pusty słownik = kopia bez wyboru)."""
     left = (meta.expires - now).total_seconds()
-    return {"id": meta.id, "model": meta.model, "manufacturer": meta.manufacturer,
+    return {"id": meta.id, "serial": meta.serial, "model": meta.model, "manufacturer": meta.manufacturer,
             "client": meta.client, "created": meta.created.isoformat(timespec="seconds"),
             "expires": meta.expires.isoformat(timespec="seconds"),
             "days_left": max(0, math.ceil(left / 86_400)), "status": meta.status,

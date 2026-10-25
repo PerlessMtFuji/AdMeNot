@@ -1,5 +1,5 @@
 import { CATEGORY_ORDER } from './categories';
-import type { AppView, BackupResultView, Category, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferSelection, InventoryView, UndoSite, UpdateView, UserWait, Verdict } from './types';
+import type { AppView, BackupResultView, Category, CopyView, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferSelection, InventoryView, UndoSite, UpdateView, UserWait, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done'
   | 'transfer_choose' | 'transfer_backup' | 'transfer_done';
@@ -627,6 +627,12 @@ export function backupOutcome(r: BackupResultView, unreadable = 0): 'ok' | 'warn
   if (r.status === 'stopped') return 'stopped';
   if (r.status !== 'complete' || unreadable > 0 || Object.values(r.telephony).some((c) => c.status !== 'ok')) return 'warn';
   return 'ok';
+}
+
+/** Kopia do wznowienia: najnowsza niedokończona tego egzemplarza (numer seryjny, nie model), jak `find_resumable`
+ *  w mostku. `copies` przychodzą najnowsze pierwsze. */
+export function resumableCopy(copies: CopyView[], serial: string | null): CopyView | null {
+  return (serial && copies.find((c) => c.status === 'in_progress' && c.serial === serial)) || null;
 }
 
 /** Ile miejsca potrzeba jeszcze na kopię: przy wznowieniu tylko reszta (skopiowane już leży na dysku,

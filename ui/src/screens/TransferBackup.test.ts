@@ -5,7 +5,7 @@ import type { BackupResultView, CopyView } from '../lib/types';
 import { setupCtl } from '../test-utils';
 import TransferBackup from './TransferBackup.svelte';
 
-const COPY: CopyView = { id: 'S/1', model: 'SM-A145R', manufacturer: 'samsung', client: 'Anna K.', created: '2026-10-25T14:30:00',
+const COPY: CopyView = { id: 'S/1', serial: 'R58T00TEST', model: 'SM-A145R', manufacturer: 'samsung', client: 'Anna K.', created: '2026-10-25T14:30:00',
   expires: '2026-11-01T14:30:00', days_left: 7, status: 'complete', bytes: 6715, counts: {} };
 
 function result(over: Partial<BackupResultView> = {}): BackupResultView {
