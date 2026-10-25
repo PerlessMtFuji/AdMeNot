@@ -26,6 +26,11 @@ def backups_dir() -> Path:
     return Path(custom) if custom else data_dir() / "backups"
 
 
+def transfers_dir() -> Path:
+    """Kopie danych starych telefonów (przenoszenie danych), każda w `<telefon>/<RRRRMMDD-GGMMSS>`."""
+    return data_dir() / "transfers"
+
+
 def device_dir_name(serial: str) -> str:
     """Nazwa katalogu telefonu: czytelny początek numeru + skrót całego numeru.
 
