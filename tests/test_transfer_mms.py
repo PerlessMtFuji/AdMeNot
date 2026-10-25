@@ -191,3 +191,18 @@ def test_export_through_orchestrator_lists_mms_key(tmp_path):
     assert set(res) == {"contacts", "sms", "calls", "mms"}
     assert res["mms"] == CategoryResult("ok", 3)
     assert (tmp_path / "out" / "raw" / "mms_addr.json").is_file()
+
+
+def test_failed_address_query_is_reported_and_retried(tmp_path):
+    phone = _phone(tmp_path)
+    out = tmp_path / "out"
+    addr = tmp_path / "phone" / "providers" / "content_mms_503_addr.txt"
+    saved = addr.read_text("utf-8")
+    addr.unlink()
+    res = _export(phone, out)
+    assert res == CategoryResult("failed", 3, "addresses_missing:1")
+    assert "503" not in (out / "raw" / "mms_addr.json").read_text("utf-8")
+    addr.write_text(saved, "utf-8", newline="")
+    assert _export(phone, out) == CategoryResult("ok", 3)
+    assert sum("mms/503/addr" in c for c in phone.commands) == 2
+    assert sum("mms/501/addr" in c for c in phone.commands) == 1

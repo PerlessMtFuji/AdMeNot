@@ -128,6 +128,15 @@ def test_sms_permission_denied_marks_unavailable(tmp_path):
     assert not (out / "sms.xml").exists()
 
 
+def test_sms_body_containing_exception_is_data_not_error(tmp_path):
+    from faketransfer import write_provider
+    phone = _phone(tmp_path)
+    rows = [{**SMS[0], "body": "java.lang.NullPointerException w treści SMS"}]
+    write_provider(tmp_path / "phone", "content://sms", rows, SMS_COLS[1])
+    res = _export(phone, tmp_path / "out", contacts=False, calls=False)
+    assert res["sms"] == CategoryResult("ok", 1)
+
+
 def test_missing_provider_is_failed_not_unavailable(tmp_path):
     phone = _phone(tmp_path)
     (tmp_path / "phone" / "providers" / "content_call_log_calls.txt").unlink()
