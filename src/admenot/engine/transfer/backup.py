@@ -22,11 +22,12 @@ import errno
 import hashlib
 import os
 import shutil
+import sqlite3
 import time
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
@@ -40,7 +41,7 @@ from .guard import ApkReadAdb, ReadOnlyAdb, UnsafeCommand, q
 from .inventory import Inventory
 from .puller import Puller
 from .state import FileRow, State
-from .store import CopyDir
+from .store import KEEP_DAYS, CopyDir
 from .telephony import _CONNECTION_KINDS, CategoryResult, Stopped, export_telephony
 from .winpath import PathPlanner
 
@@ -129,24 +130,27 @@ Failed = list[tuple[FileRow, Path, str]]  # (wiersz, plik lokalny, klucz powodu)
 def run_backup(adb: AdbTransport, puller: Puller, device: DeviceInfo, copy: CopyDir, inventory: Inventory,
                selection: Selection, *, on_progress: Callable[[Progress], None],
                should_stop: Callable[[], bool], wait_device: Callable[[], None],
-               free_bytes: Callable[[Path], int] = _disk_free) -> BackupResult:
+               free_bytes: Callable[[Path], int] = _disk_free,
+               now: datetime | None = None) -> BackupResult:
     """Kopiuje wybrane dane do `copy`, wznawiając jej stan.
 
     `adb` to surowy transport (nie `ReadOnlyAdb`): silnik sam opakowuje go w `ReadOnlyAdb`, a na
     kopię APK w `ApkReadAdb` — przez gotowy `ReadOnlyAdb` kopia aplikacji by się nie udała.
     `BackupError` i `stopped` zostawiają kopię `in_progress` (do wznowienia); koniec to `complete`
-    albo `incomplete` (zapisane w `meta.json`).
+    albo `incomplete` (zapisane w `meta.json`). Wznowienie z terminem krótszym niż dzień od `now`
+    dostaje `KEEP_DAYS` dni od wznowienia.
     """
     return _Backup(adb, puller, device, copy, inventory, selection, on_progress, should_stop,
-                   wait_device, free_bytes).run()
+                   wait_device, free_bytes, now or datetime.now()).run()
 
 
 class _Backup:
     def __init__(self, adb: AdbTransport, puller: Puller, device: DeviceInfo, copy: CopyDir,
                  inventory: Inventory, selection: Selection, on_progress: Callable[[Progress], None],
                  should_stop: Callable[[], bool], wait_device: Callable[[], None],
-                 free_bytes: Callable[[Path], int]) -> None:
+                 free_bytes: Callable[[Path], int], now: datetime) -> None:
         self.raw = adb
+        self.now = now
         self.adb = ReadOnlyAdb(adb)
         self.puller, self.device, self.copy, self.inventory = puller, device, copy, inventory
         self.sel = selection
@@ -158,11 +162,28 @@ class _Backup:
 
     # ---- przebieg -----------------------------------------------------------------------
     def run(self) -> BackupResult:
+        """Pełny dysk — także przy zapisie `meta.json` przed startem i w SQLite (`database or disk
+        is full`) — to `disk_full`, nie błąd programu."""
+        try:
+            return self._run()
+        except OSError as exc:
+            if exc.errno == errno.ENOSPC:
+                raise BackupError("disk_full") from exc
+            raise
+        except sqlite3.OperationalError as exc:
+            if _has(str(exc), ("disk is full",)):
+                raise BackupError("disk_full") from exc
+            raise
+
+    def _run(self) -> BackupResult:
         meta = self.copy.read_meta()
         if meta.serial != self.device.serial:
             raise BackupError("wrong_device")
         meta.status = "in_progress"  # ponowne uruchomienie, które się urwie, zostaje do wznowienia
         meta.selection = self.sel.to_json()
+        if meta.expires < self.now + timedelta(days=1):
+            # wznowienie kopii tuż przed (albo po) terminie: po zakończeniu nie znika od razu
+            meta.expires = max(meta.expires, self.now + timedelta(days=KEEP_DAYS))
         self.copy.write_meta(meta)
         t0 = time.monotonic()
         state = State(self.copy.state_path)
@@ -174,11 +195,12 @@ class _Backup:
                 self._transfer(state)
                 apps = self._apps(state)
             except _Stop:
-                return self._result(state, "stopped", tel, self._saved_apps(state), t0)
+                result = self._result(state, "stopped", tel, self._saved_apps(state), t0)
+                self._save_partial(state, t0, result)
+                return result
             return self._finalize(state, tel, apps, t0)
-        except OSError as exc:
-            if exc.errno == errno.ENOSPC:
-                raise BackupError("disk_full") from exc
+        except (BackupError, OSError, sqlite3.Error):
+            self._save_partial(state, t0)
             raise
         finally:
             state.close()
@@ -346,7 +368,10 @@ class _Backup:
                 self.done_files += 1
                 self.done_bytes += f.size
             else:
-                loc.unlink(missing_ok=True)
+                try:
+                    loc.unlink(missing_ok=True)
+                except OSError:  # zablokowany (np. antywirus): zostaje `pending`, następny pull go nadpisze
+                    pass
         state.commit()
 
     def _handle_failures(self, state: State, failed: Failed) -> None:
@@ -544,19 +569,47 @@ class _Backup:
                     and all(v.status == "ok" for v in tel.values())
                     and all(a.get("status") != "failed" for a in apps.values()))
         result = self._result(state, "complete" if complete else "incomplete", tel, apps, t0)
+        meta = self.copy.read_meta()
+        meta.status = result.status  # type: ignore[assignment]  # tu tylko complete/incomplete
+        meta.counts = self._counts(rows, result, tel, apps)
+        meta.bytes = result.bytes
+        self.copy.write_meta(meta)
+        return result
+
+    def _counts(self, rows: list[FileRow], result: BackupResult, tel: dict[str, CategoryResult],
+                apps: dict[str, dict[str, Any]]) -> dict[str, int]:
+        """Liczniki do `meta.counts`. `unreadable` — pliki i foldery, których skan nie odczytał
+        (nie trafiły do kopii, choć kopia może być „kompletna”)."""
+        cnt = Counter(r.status for r in rows)
         counts = {"files": result.files_done, "files_failed": result.files_failed,
                   "files_skipped": cnt.get("skipped", 0), "apps": result.apps_done,
                   "apps_failed": result.apps_failed,
                   "apps_skipped": sum(1 for a in apps.values() if a.get("status") == "skipped"),
+                  "unreadable": self.inventory.unreadable,
                   **{k: v.count for k, v in tel.items()}}
         if self.sel.verify_hash:
             counts["size_only"] = sum(1 for r in rows if r.status == "done" and not r.sha256)
-        meta = self.copy.read_meta()
-        meta.status = result.status  # type: ignore[assignment]  # tu tylko complete/incomplete
-        meta.counts = counts
-        meta.bytes = result.bytes
-        self.copy.write_meta(meta)
-        return result
+        return counts
+
+    def _saved_tel(self, state: State) -> dict[str, CategoryResult]:
+        saved = state.get_meta("telephony", {})
+        return {k: CategoryResult(**saved[k]) for k in TELEPHONY if getattr(self.sel, k) and k in saved}
+
+    def _save_partial(self, state: State, t0: float, result: BackupResult | None = None) -> None:
+        """Przerwana kopia (zatrzymanie, `BackupError`, błąd dysku) zostaje `in_progress`, ale
+        bajty i liczniki tego, co już skopiowano, trafiają do `meta.json` — Historia nie pokazuje
+        0 B. Najlepsza próba: pełny dysk przy zapisie nie zasłania pierwotnej przyczyny."""
+        try:
+            if result is None:
+                result = self._result(state, "stopped", self._saved_tel(state),
+                                      self._saved_apps(state), t0)
+            meta = self.copy.read_meta()
+            meta.counts = self._counts(list(state.all_files().values()), result, result.telephony,
+                                       self._saved_apps(state))
+            meta.bytes = result.bytes
+            self.copy.write_meta(meta)
+        except (OSError, ValueError, KeyError, TypeError, sqlite3.Error):
+            pass
 
 
 def _inflight(chunk: list[FileRow], locals_: list[Path]) -> int:

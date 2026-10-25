@@ -79,6 +79,7 @@ from admenot.engine.apk.timing import (
     save_speeds,
 )
 from admenot.engine.applabels import LabelFetch, PhoneLabel, list_apps
+from admenot.engine.clientpaths import client_paths
 from admenot.engine.device.identity import same_device
 from admenot.engine.device.info import DeviceInfo, read_device_info
 from admenot.engine.device_checks import (
@@ -242,7 +243,7 @@ def _transfer_errors(kind: str) -> Iterator[None]:
     except Exception as exc:  # noqa: BLE001 — każdy inny błąd kopii pod jednym kluczem
         extra: dict[str, Any] = {}
         try:
-            extra["log"] = str(log_exception(exc))
+            extra["log"] = str(log_exception(exc, scrub=client_paths))  # bez nazw plików klienta
         except OSError:
             extra["log_failed"] = True
         crash_id = crash.capture(exc, message=f"{type(exc).__name__}: {exc}", context={"job": kind})
@@ -1560,9 +1561,10 @@ class Api:
         copy = store.find_resumable(device.serial) or store.create_copy(
             device.serial, device, client, self._now())
         puller = self._puller_factory(self._settings.adb_path, device.serial, adb.tagged("pull"))
-        last: dict[str, Any] = {"at": None, "stage": None}
+        last: dict[str, Any] = {"at": None, "stage": None, "p": None}
 
         def progress(p: Progress) -> None:
+            last["p"] = p
             now = time.monotonic()
             if (last["stage"] == p.stage and last["at"] is not None
                     and now - last["at"] < TRANSFER_PROGRESS_S):
@@ -1577,6 +1579,10 @@ class Api:
             while not job.should_stop():
                 try:
                     if raw.run(["get-state"]).strip() == "device":
+                        if waiting and last["p"] is not None:
+                            # telefon wrócił: UI chowa „Telefon odłączony” od razu, nie dopiero
+                            # przy następnym postępie (eksport telefonii trwa minuty)
+                            self._emit("transfer:progress", asdict(last["p"]))
                         return
                 except AdbError:
                     pass
@@ -1587,7 +1593,8 @@ class Api:
 
         # Surowy transport (z logiem sesji), nie `ReadOnlyAdb`: silnik opakowuje go sam.
         result = run_backup(adb, puller, device, copy, inventory, chosen, on_progress=progress,
-                            should_stop=job.should_stop, wait_device=wait_device)
+                            should_stop=job.should_stop, wait_device=wait_device, now=self._now())
+
         return result, copy
 
     @_api
@@ -1600,7 +1607,11 @@ class Api:
     def extend_transfer(self, copy_id: str) -> dict[str, Any]:
         if not isinstance(copy_id, str):
             raise AppError("bad_request", "copy_id")
-        return {"copy": copy_view(store.extend(copy_id), self._now())}
+        try:
+            meta = store.extend(copy_id)
+        except OSError:  # meta.json zablokowany przez inny program; ścieżka nie idzie do raportu
+            raise AppError("transfer_in_use") from None
+        return {"copy": copy_view(meta, self._now())}
 
     @_api
     def delete_transfer(self, copy_id: str) -> dict[str, Any]:
@@ -1609,7 +1620,10 @@ class Api:
         meta = next((m for m in store.list_copies() if m.id == copy_id), None)
         if meta is not None and self._transfer_busy(meta.serial):
             raise AppError("busy", "backup")
-        store.delete(copy_id)
+        try:
+            store.delete(copy_id)
+        except OSError:  # plik kopii otwarty w innym programie; ścieżka nie idzie do raportu
+            raise AppError("transfer_in_use") from None
         return {"deleted": copy_id}
 
     # --- aktualizacje ---------------------------------------------------------------------------

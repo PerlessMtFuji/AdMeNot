@@ -5,7 +5,8 @@ import errno
 import hashlib
 import json
 import os
-from datetime import datetime
+import sqlite3
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -634,3 +635,95 @@ def test_stop_during_telephony(tmp_path):
     assert phone.pull_calls == 0
     assert copy.read_meta().status == "in_progress"
     assert not (copy.phone_dir / "sms.xml").exists()
+
+
+def test_stop_mid_chunk_with_locked_partial_file_does_not_crash(tmp_path, monkeypatch):
+    """Niedokończony plik zablokowany (np. antywirus): zostaje `pending`, kopia kończy się `stopped`."""
+    phone = _phone(tmp_path)
+    copy = _copy()
+    partial = copy.files_dir / "DCIM" / "Camera" / "b.jpg"
+
+    def leave_partial(remotes):
+        partial.parent.mkdir(parents=True, exist_ok=True)
+        partial.write_bytes(b"B" * 10)
+
+    phone.before_pull = leave_partial
+    real_unlink = Path.unlink
+
+    def unlink(self, missing_ok=False):
+        if self == partial:
+            raise PermissionError(13, "Permission denied", str(self))
+        return real_unlink(self, missing_ok=missing_ok)
+
+    monkeypatch.setattr(Path, "unlink", unlink)
+    res = _run(phone, copy, _inventory(phone), _sel(), should_stop=lambda: len(phone.pulled) >= 1)
+    assert res.status == "stopped"
+    rows = _rows(copy)
+    assert rows["/sdcard/DCIM/Camera/a.jpg"].status == "done"
+    assert rows["/sdcard/DCIM/Camera/b.jpg"].status == "pending"
+
+
+def test_stop_and_disk_full_record_bytes_and_counts_in_meta(tmp_path):
+    """Przerwana kopia zostaje do wznowienia, ale `meta.json` ma już bajty i liczniki zrobionego."""
+    phone = _phone(tmp_path)
+    copy = _copy()
+    inv = _inventory(phone)
+    res = _run(phone, copy, inv, _sel(sms=True), should_stop=lambda: len(phone.pulled) >= 2)
+    assert res.status == "stopped" and res.bytes == 500
+    meta = copy.read_meta()
+    assert meta.status == "in_progress" and meta.bytes == 500
+    assert meta.counts["files"] == 2 and meta.counts["sms"] == 2
+
+    copy2 = store.create_copy("FAKE", _device(), None, NOW.replace(minute=5))
+    calls = {"n": 0}
+
+    def free(path):  # pierwsza paczka (DCIM/Camera) się mieści, następna (Download) już nie
+        calls["n"] += 1
+        return 10 ** 12 if calls["n"] == 1 else 0
+
+    with pytest.raises(BackupError):
+        _run(phone, copy2, inv, _sel(), free_bytes=free)
+    meta = copy2.read_meta()
+    assert meta.status == "in_progress" and meta.bytes == 500 and meta.counts["files"] == 2
+
+
+def test_unreadable_count_lands_in_meta(tmp_path):
+    phone = _phone(tmp_path)
+    copy = _copy()
+    inv = _inventory(phone)
+    inv.unreadable = 3
+    assert _run(phone, copy, inv, _sel()).status == "complete"
+    assert copy.read_meta().counts["unreadable"] == 3
+
+
+def test_resume_after_expiry_keeps_the_copy_for_keep_days(tmp_path):
+    phone = _phone(tmp_path)
+    copy = store.create_copy("FAKE", _device(), None, NOW - timedelta(days=7, hours=1))
+    _run(phone, copy, _inventory(phone), _sel(), now=NOW)
+    assert copy.read_meta().expires == NOW + timedelta(days=store.KEEP_DAYS)
+    fresh = _copy()  # termin daleko: bez zmian
+    before = fresh.read_meta().expires
+    _run(phone, fresh, _inventory(phone), _sel(), now=NOW + timedelta(days=2))
+    assert fresh.read_meta().expires == before
+
+
+def test_enospc_writing_meta_before_start_is_disk_full(tmp_path, monkeypatch):
+    phone = _phone(tmp_path)
+    copy = _copy()
+    monkeypatch.setattr(store.CopyDir, "write_meta", _no_space)
+    with pytest.raises(BackupError) as err:
+        _run(phone, copy, _inventory(phone), _sel())
+    assert err.value.key == "disk_full"
+
+
+def test_sqlite_disk_full_is_disk_full(tmp_path, monkeypatch):
+    phone = _phone(tmp_path)
+    copy = _copy()
+
+    def full(*args, **kwargs):
+        raise sqlite3.OperationalError("database or disk is full")
+
+    monkeypatch.setattr(State, "commit", full)
+    with pytest.raises(BackupError) as err:
+        _run(phone, copy, _inventory(phone), _sel())
+    assert err.value.key == "disk_full"

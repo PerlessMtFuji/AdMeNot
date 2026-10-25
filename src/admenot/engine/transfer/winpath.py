@@ -23,7 +23,8 @@ _RESERVED = {
 
 REMOTE_BASE = "/sdcard"
 _REMOTE_ALIASES = (REMOTE_BASE, "/storage/emulated/0")
-LONG_DIR = "_dlugie_sciezki"
+LONG_DIR = "_long_paths"  # nazwa niezależna od języka (jak files/phone/apps)
+
 
 
 def sanitize_component(name: str) -> str:

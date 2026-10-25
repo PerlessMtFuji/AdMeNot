@@ -242,6 +242,10 @@ def test_wait_device_emits_waiting_once_and_resumes(tmp_path):
     api.start_backup(SELECTION)
     assert len(rec.of("transfer:waiting")) == 1
     assert rec.of("transfer:done")[0]["result"]["status"] == "complete"
+    # telefon wrócił: od razu postęp (UI chowa „Telefon odłączony”), mimo dławienia zdarzeń
+    after = [(n, d) for n, d in rec.events if n.startswith("transfer:")]
+    i = [n for n, _ in after].index("transfer:waiting")
+    assert after[i + 1][0] == "transfer:progress" and after[i + 1][1]["stage"] == "files"
 
 
 def test_stop_while_waiting_for_phone_finishes_as_stopped(tmp_path):
@@ -257,6 +261,9 @@ def test_stop_while_waiting_for_phone_finishes_as_stopped(tmp_path):
     assert len(rec.of("transfer:waiting")) == 1
     done = rec.of("transfer:done")[0]
     assert done["result"]["status"] == "stopped" and done["copy"]["status"] == "in_progress"
+    # przerwana kopia: Historia i wznowienie widzą, ile już skopiowano
+    assert done["copy"]["bytes"] == done["result"]["bytes"] > 0
+    assert done["copy"]["counts"]["files"] == done["result"]["files_done"] >= 1
     assert not rec.of("job:error")
     events = [json.loads(x) for x in telemetry_path().read_text("utf-8").splitlines()]
     assert [e["status"] for e in events if e["type"] == "transfer_backup"] == ["stopped"]
@@ -286,6 +293,27 @@ def test_unexpected_backup_error_has_fixed_key_and_no_file_names(tmp_path, monke
     assert report["context"]["job"] == "backup" and "<path>" in report["error"]["message"]
     for name in ("DCIM", "Camera", "a.jpg"):
         assert name not in text, name
+    log = Path(error["log"]).read_text("utf-8")  # lokalny app-*.log też bez nazw plików klienta
+    assert "RuntimeError" in log and "<path>" in log
+    for name in ("Camera", "a.jpg"):
+        assert name not in log, name
+
+
+def test_delete_and_extend_of_locked_copy_have_a_friendly_key(tmp_path, monkeypatch):
+    copy = store.create_copy(SERIAL, _device(), None, NOW)
+    api, _ = _api(_phone(tmp_path))
+    copy_id = copy.read_meta().id
+    locked = str(copy.files_dir / "DCIM" / "urlop.jpg")
+
+    def deny(*args, **kwargs):
+        raise PermissionError(13, "Permission denied", locked)
+
+    monkeypatch.setattr(store.shutil, "rmtree", deny)
+    error = api.delete_transfer(copy_id)["error"]
+    assert error["key"] == "transfer_in_use" and "urlop" not in json.dumps(error)
+    monkeypatch.setattr(store.CopyDir, "write_meta", deny)
+    error = api.extend_transfer(copy_id)["error"]
+    assert error["key"] == "transfer_in_use" and "urlop" not in json.dumps(error)
 
 
 def test_purge_on_start(tmp_path):

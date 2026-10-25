@@ -43,6 +43,7 @@ def test_long_path_is_shortened_keeping_extension():
     pl = PathPlanner(60)
     remote = "/sdcard/" + "bardzo_dluga_nazwa/" * 5 + "plik.jpg"
     rel = pl.local_rel(remote, 6)
-    assert rel.startswith("_dlugie_sciezki/")
+    assert rel.startswith("_long_paths/")
+
     assert rel.endswith(".jpg")
     assert pl.renamed[remote] == rel

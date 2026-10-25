@@ -965,6 +965,7 @@
         "apps": 1,
         "apps_failed": 0,
         "apps_skipped": 0,
+        "unreadable": 0,
         "contacts": 2,
         "sms": 2,
         "calls": 1
@@ -1021,6 +1022,7 @@
        "apps": 1,
        "apps_failed": 0,
        "apps_skipped": 0,
+       "unreadable": 0,
        "contacts": 2,
        "sms": 2,
        "calls": 1
