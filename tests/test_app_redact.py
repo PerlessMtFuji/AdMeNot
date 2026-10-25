@@ -95,7 +95,7 @@ def test_client_paths_on_phone_are_collapsed():
     assert r("find -H '/sdcard/Music' '/sdcard/WhatsApp Business' -type f") == \
         "find -H '/sdcard/<path>' '/sdcard/<path>' -type f"
     assert r("stat: /storage/emulated/0/Download/faktura.pdf: No such file") == \
-        "stat: /storage/emulated/0/<path> No such file"
+        "stat: /storage/emulated/0/<path>: No such file"
     assert r("ls -1 /sdcard") == "ls -1 /sdcard"  # sam korzeń to nie dane klienta
     assert r("pull:host:pull -a -Z /sdcard/DCIM/Moje zdj.jpg /sdcard/b.jpg D:/kopia/files") == \
         "pull:host:pull -a -Z <paths>"
@@ -107,8 +107,37 @@ def test_client_paths_in_copy_folder_are_collapsed():
     out = r(raw)
     assert "DCIM" not in out and "Moje" not in out and "R58-ab" not in out
     assert out.endswith(r"\AdMeNot\transfers/<path>'")
-    assert r(r"D:\data\admenot\transfers\R58-ab\x\files\a.jpg failed") == \
-        r"D:\data\admenot\transfers/<path> failed"
+    # bez cudzysłowu — do końca linii (nazwa może mieć spacje), nie do pierwszej spacji
+    assert r(r"D:\data\admenot\transfers\R58-ab\x\files\a b.jpg failed") == \
+        r"D:\data\admenot\transfers/<path>"
+
+
+def test_real_oserror_with_doubled_backslashes_keeps_no_names():
+    """`str(OSError)` pokazuje repr ścieżki — z podwojonymi ukośnikami wstecznymi."""
+    path = r"C:\Users\Jan\AppData\Local\AdMeNot\transfers\R58-ab\20261025-120000\files\DCIM\Camera\urlop.jpg"
+    text = str(PermissionError(13, "Permission denied", path))
+    assert "\\\\" in text  # naprawdę podwojone
+    out = r(text, home=r"C:\Users\Jan", user="Jan")
+    for leak in ("urlop", "Camera", "DCIM", "R58-ab", "Jan"):
+        assert leak not in out, out
+    assert out.endswith("AdMeNot\\\\transfers/<path>'")
+    # inny profil (bez `home`) i nazwa z apostrofem — repr w cudzysłowie
+    other = str(OSError(5, "I/O error", r"C:\Users\Ola Nowak\AdMeNot\transfers\x\files\Jan's trip.jpg"))
+    out = r(other)
+    assert "Ola" not in out and "trip" not in out and "Jan" not in out, out
+
+
+def test_phone_paths_with_apostrophe_or_spaces_unquoted_keep_no_tail():
+    out = r("adb: error: failed to stat remote object '/sdcard/DCIM/Jan's trip.jpg': No such file")
+    assert out == "adb: error: failed to stat remote object '/sdcard/<path>': No such file"
+    out = r("adb: error: remote object /sdcard/DCIM/Wakacje w Zakopanem.jpg does not exist")
+    assert out == "adb: error: remote object /sdcard/<path> does not exist"
+    out = r("remote object /sdcard/DCIM/Wakacje w Zakopanem.jpg")
+    assert "Zakopanem" not in out
+    # polecenie z `q()`: apostrof w nazwie, kolejne argumenty i opcje zostają czytelne
+    out = r("stat -c '%s|%Y|%n' '/sdcard/Jan'\"'\"'s.jpg' '/sdcard/b c.jpg'")
+    assert out == "stat -c '%s|%Y|%n' '/sdcard/<path>' '/sdcard/<path>'"
+    assert r("find -H /sdcard/Music -type f") == "find -H /sdcard/<path> -type f"
 
 
 def test_adb_line_collapses_client_paths():

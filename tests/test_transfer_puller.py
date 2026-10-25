@@ -57,7 +57,7 @@ def test_real_puller_passes_pull_args_and_logs(tmp_path):
     result = RealPuller(adb, "S1", log).pull(["/sdcard/a", "/sdcard/b"], tmp_path, lambda: False, lambda: None)  # type: ignore[arg-type]
     assert result.rc == 0
     assert result.lines == [f"-s S1 pull -a -Z /sdcard/a /sdcard/b {tmp_path}"]
-    assert log.notes == [f"host:pull -a -Z /sdcard/a /sdcard/b {tmp_path}"]
+    assert log.notes == ["host:pull -a -Z <2 files>"]  # bez nazw plików klienta i folderu docelowego
 
 
 def test_real_puller_stops_process_when_callback_raises(tmp_path):

@@ -3,6 +3,7 @@
 GUI dostaje każde polecenie na żywo (`on_command`, z wyjściem obciętym do OUTPUT_LIMIT) dla
 konsoli ADB — bez wyjścia zrzutu powiadomień z treścią (`--noredact`), o ile serwisant nie wpisał
 go sam. Polecenia wpisane w konsoli mają `tag="console"` i prefiks `console:` w logu.
+W pliku logu ścieżki plików klienta (`/sdcard/…`, katalog kopii) są zwinięte (`client_paths`).
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from admenot.engine.adb.transport import AdbError, AdbTransport
+from admenot.engine.clientpaths import client_paths
 
 _LOCK = threading.Lock()  # kolektory wołają adb z wielu wątków naraz
 OUTPUT_LIMIT = 4096
@@ -85,7 +87,9 @@ class SessionLogAdb:
         duration = time.perf_counter() - start
         stamp = self._now().isoformat(timespec="seconds")
         shown = f"{self.tag}:{what}" if self.tag else what
-        line = f"{stamp}\t{self.serial}\t{status}\t{duration:.2f}s\t{shown}\n"
+        # Plik logu (trzymany dłużej niż kopia danych) bez nazw plików i folderów klienta;
+        # konsola na żywo (`on_command`) dostaje polecenie bez zmian.
+        line = f"{stamp}\t{self.serial}\t{status}\t{duration:.2f}s\t{client_paths(shown)}\n"
         with _LOCK, self.path.open("a", encoding="utf-8") as fh:
             fh.write(line)
         if self.on_command is not None:

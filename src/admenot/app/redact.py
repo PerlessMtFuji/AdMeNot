@@ -13,6 +13,8 @@ import re
 from collections.abc import Iterable
 from pathlib import Path
 
+from admenot.engine.clientpaths import client_paths  # pliki klienta (przenoszenie danych)
+
 ADB_LINE_LIMIT = 300
 _MIN_SERIAL = 4
 _COMMON_USERS = frozenset({"admin", "administrator", "user", "owner", "pc", "użytkownik"})
@@ -24,26 +26,12 @@ _DOTTED_PHONE = re.compile(r"\d{3}\.\d{3}\.\d{3,4}")
 _EMAIL = re.compile(r"[^\s@<>\"'(),;]+@[^\s@<>\"'(),;]+\.\w+")
 # Cały segment profilu, także ze spacją („Anna Kowalska”), gdy po nim jest separator ścieżki;
 # bez separatora — do białego znaku.
+# Separator `[\\/]+` — także podwojone ukośniki z `str(OSError)` (repr ścieżki).
 _ANY_PROFILE = re.compile(
-    r"[A-Za-z]:[\\/]Users[\\/](?:[^\\/\"'\r\n]+(?=[\\/])|[^\\/\s\"']+)", re.IGNORECASE)
+    r"[A-Za-z]:[\\/]+Users[\\/]+(?:[^\\/\"'\r\n]+(?=[\\/])|[^\\/\s\"']+)", re.IGNORECASE)
 _UNC = re.compile(r"(?<![\w\\])\\\\[^\\/\s\"']+[\\/][^\\/\s\"']+")
 _ACCOUNT = re.compile(r"(Account\s*\{\s*name=)[^,}\r\n]+", re.IGNORECASE)
 _MIN_NAME_PART = 4
-# Pliki klienta (przenoszenie danych): ścieżki pamięci telefonu i katalogu kopii na komputerze.
-# Najpierw w cudzysłowie (nazwy ze spacjami, `q()` w poleceniach, `str(OSError)`), potem bez.
-_CLIENT_ROOT = (r"(?:/sdcard|/storage/(?:emulated/\d+|self/primary|[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4})"
-                r"|[\\/]AdMeNot[\\/]transfers)")
-_CLIENT_QUOTED = re.compile(rf"(['\"])([^'\"\r\n]*?{_CLIENT_ROOT})[\\/][^'\"\r\n]*\1",
-                            re.IGNORECASE)
-_CLIENT_BARE = re.compile(rf"({_CLIENT_ROOT})[\\/][^\s'\"]*", re.IGNORECASE)
-_PULL = re.compile(r"(host:pull -a -Z) .*")  # lista plików kopii (bez cudzysłowów, ze spacjami)
-
-
-def client_paths(text: str) -> str:
-    """`/sdcard/DCIM/a.jpg` → `/sdcard/<path>`; tak samo `/storage/…` i katalog kopii."""
-    text = _PULL.sub(r"\1 <paths>", text)
-    text = _CLIENT_QUOTED.sub(r"\1\2/<path>\1", text)
-    return _CLIENT_BARE.sub(r"\1/<path>", text)
 
 
 def _phone(match: re.Match[str]) -> str:
@@ -72,7 +60,8 @@ def redact(text: str, serials: Iterable[str] = (), home: str | None = None,
     home = str(Path.home()) if home is None else home
     user = os.environ.get("USERNAME", "") if user is None else user
     if home:
-        for variant in sorted({home, home.replace("\\", "/")}, key=len, reverse=True):
+        variants = {home, home.replace("\\", "/"), home.replace("\\", "\\\\")}
+        for variant in sorted(variants, key=len, reverse=True):
             text = re.sub(re.escape(variant), "%USERPROFILE%", text, flags=re.IGNORECASE)
     text = _ANY_PROFILE.sub("%USERPROFILE%", text)  # krótkie nazwy 8.3 (JANKOW~1) i cudze profile
     text = client_paths(text)

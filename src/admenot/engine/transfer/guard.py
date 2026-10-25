@@ -78,11 +78,17 @@ def assert_read_only(cmd: str) -> None:
         if len(words) < 2 or words[1] != "query":
             raise UnsafeCommand("Dozwolone jest wyłącznie 'content query' (i odczyt załącznika MMS)")
     if words[0] == "find":
-        for i, w in enumerate(words):
-            if w in _FIND_FORBIDDEN:
-                raise UnsafeCommand(f"Niedozwolona akcja find: {w}")
-            if w == "-exec" and (i + 1 >= len(words) or words[i + 1] not in _FIND_EXEC_ALLOWED):
-                raise UnsafeCommand("find -exec dozwolone tylko dla stat/sha256sum/md5sum")
+        # Także po `shlex.split`: powłoka zdejmuje cudzysłowy, więc `'-delete'` to wciąż `-delete`.
+        try:
+            tokens = shlex.split(cmd)
+        except ValueError:
+            raise UnsafeCommand(f"Nieczytelne polecenie find: {cmd[:120]}") from None
+        for seq in (words, tokens):
+            for i, w in enumerate(seq):
+                if w in _FIND_FORBIDDEN:
+                    raise UnsafeCommand(f"Niedozwolona akcja find: {w}")
+                if w == "-exec" and (i + 1 >= len(seq) or seq[i + 1] not in _FIND_EXEC_ALLOWED):
+                    raise UnsafeCommand("find -exec dozwolone tylko dla stat/sha256sum/md5sum")
 
 
 def q(path: str) -> str:

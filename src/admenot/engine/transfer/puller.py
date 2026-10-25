@@ -15,7 +15,6 @@ from admenot.engine.adb.transport import AdbError
 
 _CREATE_NO_WINDOW = 0x08000000
 TICK_SECONDS = 0.5
-_LOG_REMOTES = 3  # w logu sesji tylko początek listy — paczka ma ich tysiące
 _JOIN = 2.0
 _JOIN_STOPPED = 0.3
 
@@ -57,10 +56,8 @@ class RealPuller:
     def pull(self, remotes: list[str], target: Path, should_stop: Callable[[], bool],
              tick: Callable[[], None]) -> PullResult:
         args = ["pull", "-a", "-Z", *remotes, str(target)]
-        if self.log is not None:
-            shown = " ".join(remotes[:_LOG_REMOTES])
-            more = f" … (+{len(remotes) - _LOG_REMOTES})" if len(remotes) > _LOG_REMOTES else ""
-            self.log.note(f"host:pull -a -Z {shown}{more} {target}")
+        if self.log is not None:  # w logu sesji tylko liczba plików — bez nazw plików klienta
+            self.log.note(f"host:pull -a -Z <{len(remotes)} files>")
         flags = _CREATE_NO_WINDOW if sys.platform == "win32" else 0
         try:
             proc = subprocess.Popen([self.adb_path, "-s", self.serial, *args], stdin=subprocess.DEVNULL,

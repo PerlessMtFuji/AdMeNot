@@ -47,6 +47,9 @@ def test_allowed_reads():
     "content delete --uri content://sms", "content insert --uri content://sms",
     "ls; rm x", "ls $(rm x)", "ls `rm x`", "getprop > /sdcard/x", "ls && reboot",
     "ls 'unclosed", 'ls "$HOME"',
+    # akcja w cudzysłowie — powłoka zdejmie cudzysłowy, więc to nadal akcja find
+    "find /sdcard '-delete'", 'find /sdcard "-delete"', "find /sdcard '-exec' rm {} +",
+    "find /sdcard -exec 'rm' {} +", "find /sdcard '-fprint' /sdcard/x",
 ])
 def test_blocked(bad):
     with pytest.raises(UnsafeCommand):

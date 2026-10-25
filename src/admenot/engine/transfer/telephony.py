@@ -13,6 +13,7 @@ Wyjście `content query` zawiera dane klienta — `SessionLogAdb` nie pokazuje g
 
 from __future__ import annotations
 
+import logging
 import os
 import re
 import time
@@ -25,8 +26,11 @@ from pathlib import Path
 from typing import Literal
 
 from admenot.engine.adb.transport import AdbError, AdbTransport
+from admenot.engine.clientpaths import client_paths
 
 from .guard import q
+
+log = logging.getLogger(__name__)
 
 # Błędy połączenia nie są błędem kategorii — przechodzą wyżej (kopia czeka na telefon).
 _CONNECTION_KINDS = {"offline", "no_device", "unauthorized", "adb_missing"}
@@ -56,10 +60,15 @@ def is_denied(text: str) -> bool:
 
 
 def failure_result(exc: Exception) -> CategoryResult:
-    """Wynik kategorii po błędzie: odmowa uprawnień = `unavailable`, reszta = `failed`."""
+    """Wynik kategorii po błędzie: odmowa uprawnień = `unavailable`, reszta = `failed`.
+
+    `error` to klucz (`permission_denied` / `query_failed`), nie tekst — trafia do widoku
+    i statystyk. Szczegół (pierwsza linia komunikatu, bez ścieżek klienta) tylko w lokalnym logu."""
     if isinstance(exc, ContentQueryError) and exc.denied:
         return CategoryResult("unavailable", 0, "permission_denied")
-    return CategoryResult("failed", 0, str(exc)[:300])
+    detail = client_paths(str(exc).strip().split("\n", 1)[0])[:200]
+    log.warning("telephony query failed: %s: %s", type(exc).__name__, detail)
+    return CategoryResult("failed", 0, "query_failed")
 
 
 # --------------------------------------------------------------------------------------
@@ -96,7 +105,7 @@ def parse_content_rows(text: str, columns: list[str]) -> list[dict[str, str | No
 def _parse_row(body: str, columns: list[str], k: int) -> dict[str, str | None]:
     first = columns[0] + "="
     if not body.startswith(first):
-        raise ContentQueryError(f"Nieoczekiwany format wiersza {k}: {body[:200]}")
+        raise ContentQueryError(f"Nieoczekiwany format wiersza {k}")  # bez treści (dane klienta)
     p = len(first)
     vals: dict[str, str | None] = {}
     for i, col in enumerate(columns):

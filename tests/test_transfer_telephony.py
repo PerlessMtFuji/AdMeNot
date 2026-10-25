@@ -141,8 +141,18 @@ def test_missing_provider_is_failed_not_unavailable(tmp_path):
     phone = _phone(tmp_path)
     (tmp_path / "phone" / "providers" / "content_call_log_calls.txt").unlink()
     res = _export(phone, tmp_path / "out")
-    assert res["calls"].status == "failed"
+    assert res["calls"] == CategoryResult("failed", 0, "query_failed")  # klucz, nie tekst
     assert res["sms"].status == "ok"
+
+
+def test_failure_result_is_a_key_and_detail_goes_to_local_log_only(caplog):
+    from admenot.engine.transfer.telephony import ContentQueryError, failure_result
+    exc = ContentQueryError("Error while accessing provider '/sdcard/Kontakty Jana.vcf'\nRow: 0 body=tajne")
+    with caplog.at_level("WARNING"):
+        res = failure_result(exc)
+    assert res == CategoryResult("failed", 0, "query_failed")
+    assert "Error while accessing provider" in caplog.text
+    assert "Jana" not in caplog.text and "tajne" not in caplog.text
 
 
 def test_sms_projection_falls_back_to_fewer_columns(tmp_path):
