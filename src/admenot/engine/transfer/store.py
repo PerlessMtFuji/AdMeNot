@@ -1,8 +1,8 @@
 """Katalog kopii danych telefonu: `meta.json`, stan wznawiania i usuwanie po 7 dniach.
 
-Układ: `<transfers>/<device_dir_name(serial)>/<RRRRMMDD-GGMMSS>/` z `meta.json`, `stan.sqlite`
-oraz katalogami `pliki`, `telefon`, `aplikacje`. Identyfikator kopii to `<telefon>/<znacznik>`
-z ukośnikiem na każdym systemie. Kopię usuwamy tylko wtedy, gdy ma dokładnie ten kształt
+Układ: `<transfers>/<device_dir_name(serial)>/<RRRRMMDD-GGMMSS>/` z `meta.json`, `state.sqlite`,
+`manifest.csv`, `log.txt` oraz katalogami `files`, `phone`, `apps` (nazwy niezależne od języka).
+Identyfikator kopii to `<telefon>/<znacznik>` z ukośnikiem na każdym systemie. Kopię usuwamy tylko wtedy, gdy ma dokładnie ten kształt
 (jak `retention` dla kopii APK) — identyfikator nie może wyprowadzić poza katalog kopii.
 """
 
@@ -81,19 +81,19 @@ class CopyDir:
 
     @property
     def state_path(self) -> Path:
-        return self.path / "stan.sqlite"
+        return self.path / "state.sqlite"
 
     @property
     def files_dir(self) -> Path:
-        return self.path / "pliki"
+        return self.path / "files"
 
     @property
     def phone_dir(self) -> Path:
-        return self.path / "telefon"
+        return self.path / "phone"
 
     @property
     def apps_dir(self) -> Path:
-        return self.path / "aplikacje"
+        return self.path / "apps"
 
     def read_meta(self) -> CopyMeta:
         return CopyMeta.from_json(json.loads(self.meta_path.read_text(encoding="utf-8")))

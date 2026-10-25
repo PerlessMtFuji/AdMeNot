@@ -41,6 +41,8 @@ def test_create_copy_layout():
     assert meta.imei == "356938035643809"
     assert meta.client == "Jan Kowalski"
     assert copy.files_dir.is_dir() and copy.phone_dir.is_dir() and copy.apps_dir.is_dir()
+    assert sorted(p.name for p in copy.path.iterdir()) == ["apps", "files", "meta.json", "phone"]
+    assert copy.state_path.name == "state.sqlite"
 
 
 def test_create_copy_same_second_never_overwrites():
@@ -165,7 +167,7 @@ def _row(remote: str, size: int = 10, status: str = "pending") -> FileRow:
 
 
 def test_state_resume_and_totals(tmp_path):
-    path = tmp_path / "stan.sqlite"
+    path = tmp_path / "state.sqlite"
     st = State(path)
     for i in range(3):
         st.insert(_row(f"/sdcard/f{i}", size=100 + i))
