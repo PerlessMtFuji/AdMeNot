@@ -58,3 +58,27 @@ def test_real_puller_passes_pull_args_and_logs(tmp_path):
     assert result.rc == 0
     assert result.lines == [f"-s S1 pull -a -Z /sdcard/a /sdcard/b {tmp_path}"]
     assert log.notes == [f"host:pull -a -Z /sdcard/a /sdcard/b {tmp_path}"]
+
+
+def test_real_puller_stops_process_when_callback_raises(tmp_path):
+    import pytest
+    marker = tmp_path / "alive.txt"
+    adb = _fake_adb(tmp_path, f"import time\nwhile True:\n    open(r'{marker}', 'a').write('x')\n    time.sleep(0.1)\n")
+
+    def boom():
+        raise RuntimeError("ui gone")
+
+    with pytest.raises(RuntimeError):
+        RealPuller(adb, "S1", None).pull(["/sdcard/a"], tmp_path, boom, lambda: None)
+    time.sleep(0.3)
+    size = marker.stat().st_size
+    time.sleep(0.5)
+    assert marker.stat().st_size == size  # nic już nie pisze
+
+
+def test_real_puller_missing_adb(tmp_path):
+    import pytest
+
+    from admenot.engine.adb.transport import AdbError
+    with pytest.raises(AdbError):
+        RealPuller(str(tmp_path / "nope"), "S1", None).pull(["/sdcard/a"], tmp_path, lambda: False, lambda: None)

@@ -11,11 +11,27 @@ from pathlib import Path
 from typing import Protocol
 
 from admenot.engine.adb.sessionlog import SessionLogAdb
+from admenot.engine.adb.transport import AdbError
 
 _CREATE_NO_WINDOW = 0x08000000
 TICK_SECONDS = 0.5
 _LOG_REMOTES = 3  # w logu sesji tylko początek listy — paczka ma ich tysiące
 _JOIN = 2.0
+_JOIN_STOPPED = 0.3
+
+
+def _kill_tree(proc: subprocess.Popen[bytes]) -> None:
+    """Zatrzymuje proces razem z potomkami (na Windows `taskkill /T`), by nic nie pisało dalej."""
+    if sys.platform == "win32":
+        subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True,
+                       stdin=subprocess.DEVNULL, creationflags=_CREATE_NO_WINDOW, check=False)
+    else:
+        proc.terminate()
+    try:
+        proc.wait(timeout=_JOIN)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
 
 
 @dataclass(frozen=True)
@@ -46,8 +62,11 @@ class RealPuller:
             more = f" … (+{len(remotes) - _LOG_REMOTES})" if len(remotes) > _LOG_REMOTES else ""
             self.log.note(f"host:pull -a -Z {shown}{more} {target}")
         flags = _CREATE_NO_WINDOW if sys.platform == "win32" else 0
-        proc = subprocess.Popen([self.adb_path, "-s", self.serial, *args], stdin=subprocess.DEVNULL,
-                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, creationflags=flags)
+        try:
+            proc = subprocess.Popen([self.adb_path, "-s", self.serial, *args], stdin=subprocess.DEVNULL,
+                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, creationflags=flags)
+        except OSError as exc:
+            raise AdbError("adb_missing", str(exc)) from exc
         lines: list[str] = []
         lock = threading.Lock()
 
@@ -62,21 +81,19 @@ class RealPuller:
         reader = threading.Thread(target=read, daemon=True)
         reader.start()
         stopped = False
-        while True:
-            try:
-                proc.wait(timeout=TICK_SECONDS)
-                break
-            except subprocess.TimeoutExpired:
-                tick()
-                if should_stop():
-                    stopped = True
-                    proc.terminate()
-                    try:
-                        proc.wait(timeout=_JOIN)
-                    except subprocess.TimeoutExpired:
-                        proc.kill()
-                        proc.wait()
+        try:
+            while True:
+                try:
+                    proc.wait(timeout=TICK_SECONDS)
                     break
-        reader.join(_JOIN)
+                except subprocess.TimeoutExpired:
+                    tick()
+                    if should_stop():
+                        stopped = True
+                        break
+        finally:
+            if proc.poll() is None:  # także gdy tick()/should_stop() rzuciły wyjątek
+                _kill_tree(proc)
+        reader.join(_JOIN_STOPPED if stopped else _JOIN)
         with lock:
             return PullResult(proc.returncode, list(lines), stopped)
