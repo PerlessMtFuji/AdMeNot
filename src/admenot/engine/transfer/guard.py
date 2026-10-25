@@ -2,13 +2,15 @@
 
 Allowlista poleceń + odrzucanie metaznaków powłoki poza fragmentami w apostrofach.
 `ReadOnlyAdb` opakowuje transport tak, że nic innego niż odczyt się nie przedostanie —
-także `adb push`/`install`/`shell` bez `-T` czy `exec-out`.
+także `adb push`/`install`/`shell` bez `-T` czy `exec-out`. `ApkReadAdb` to ten sam strażnik
+z jednym wyjątkiem na kopię APK jednego pakietu: `pm path <pakiet>` i `adb pull` jego plików `.apk`.
 """
 
 from __future__ import annotations
 
 import re
 import shlex
+from pathlib import PurePosixPath
 
 from admenot.engine.adb.transport import AdbTransport
 
@@ -17,6 +19,7 @@ _FIND_EXEC_ALLOWED = {"stat", "sha256sum", "md5sum"}
 _FIND_FORBIDDEN = {"-delete", "-fprint", "-fprint0", "-fprintf", "-fls", "-ok", "-okdir", "-execdir"}
 _META = set(";|&<>`$\n\r\\(){}*?[]~!#")
 _MMS_PART_URI = re.compile(r"content://mms/part/[0-9]{1,18}")
+_PACKAGE = re.compile(r"[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+")
 
 
 class UnsafeCommand(Exception):
@@ -131,3 +134,38 @@ class ReadOnlyAdb:
             raise UnsafeCommand(f"Polecenie hosta spoza allowlisty: {' '.join(args)[:120]}")
         assert_read_only(cmd)
         return self.inner.run_bytes(args, timeout=timeout)
+
+
+class ApkReadAdb:
+    """`ReadOnlyAdb` + dokładnie to, czego potrzebuje `backup_apks` dla jednego pakietu:
+    `pm path <pakiet>` (odczyt ścieżek) i `pull <ścieżka bezwzględna .apk> <plik lokalny>`."""
+
+    def __init__(self, inner: AdbTransport, package: str) -> None:
+        if not _PACKAGE.fullmatch(package):
+            raise UnsafeCommand(f"Niepoprawna nazwa pakietu: {package[:120]}")
+        self.inner = inner
+        self.ro = ReadOnlyAdb(inner)
+        self.package = package
+
+    @property
+    def serial(self) -> str | None:
+        return self.inner.serial
+
+    def with_serial(self, serial: str) -> ApkReadAdb:
+        return ApkReadAdb(self.inner.with_serial(serial), self.package)
+
+    def shell(self, command: str, timeout: float = 20.0) -> str:
+        if command == f"pm path {self.package}":
+            return self.inner.shell(command, timeout=timeout)
+        return self.ro.shell(command, timeout=timeout)
+
+    def run(self, args: list[str], timeout: float = 20.0) -> str:
+        if len(args) == 3 and args[0] == "pull":
+            remote = PurePosixPath(args[1])
+            if remote.is_absolute() and remote.suffix == ".apk" and ".." not in remote.parts:
+                return self.inner.run(args, timeout=timeout)
+            raise UnsafeCommand(f"Niedozwolone pobranie: {args[1][:120]}")
+        return self.ro.run(args, timeout=timeout)
+
+    def run_bytes(self, args: list[str], timeout: float = 20.0) -> bytes:
+        return self.ro.run_bytes(args, timeout=timeout)

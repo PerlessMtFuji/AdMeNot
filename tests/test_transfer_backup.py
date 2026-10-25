@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import errno
 import hashlib
 import json
 import os
@@ -12,7 +13,9 @@ from faketransfer import FakeStoragePhone
 from telephony_fixtures import install_telephony
 
 from admenot.engine.actions.backup import COMPLETE
+from admenot.engine.adb.transport import AdbError
 from admenot.engine.device.info import DeviceInfo
+from admenot.engine.transfer import backup as backup_mod
 from admenot.engine.transfer import store
 from admenot.engine.transfer.backup import BackupError, Progress, Selection, run_backup
 from admenot.engine.transfer.guard import ReadOnlyAdb, assert_read_only
@@ -357,3 +360,277 @@ def test_app_failure_makes_copy_incomplete(tmp_path):
     assert res.status == "incomplete"
     assert (res.apps_done, res.apps_failed) == (0, 1)
     assert copy.read_meta().status == "incomplete"
+
+
+# ---- poprawki z przeglądu (runda 1) -----------------------------------------------------------
+
+def _pull_leaves_partial(phone: FakeStoragePhone, remote: str) -> None:
+    """`pull` tego pliku zostawia ucięty plik, a telefon zostaje online (to nie rozłączenie)."""
+    original = phone.pull
+
+    def pull(remotes, target, should_stop, tick):
+        if remotes == [remote]:
+            phone.fail_after_files = len(phone.pulled)
+        res = original(remotes, target, should_stop, tick)
+        phone.fail_after_files = None
+        phone.online = True
+        return res
+
+    phone.pull = pull
+
+
+def _no_wait():
+    raise AssertionError("not a disconnect")
+
+
+def test_stat_timeout_is_an_attempt_not_vanished(tmp_path):
+    phone = _phone(tmp_path)
+    copy = _copy()
+    inv = _inventory(phone)
+    _pull_leaves_partial(phone, "/sdcard/Download/c.pdf")
+
+    def on_shell(command):
+        if command.startswith("stat "):
+            raise AdbError("timeout", "stat (>120s)")
+
+    phone.on_shell = on_shell
+    res = _run(phone, copy, inv, _sel(), wait_device=_no_wait)
+    row = _rows(copy)["/sdcard/Download/c.pdf"]
+    assert (row.status, row.attempts, row.error) == ("error", 3, "pull_failed")
+    assert res.status == "incomplete"
+
+
+def test_sha256sum_missing_falls_back_to_size_and_is_recorded(tmp_path):
+    phone = _phone(tmp_path)
+    copy = _copy()
+    inv = _inventory(phone)
+
+    def on_shell(command):
+        if command.startswith("sha256sum "):
+            raise AdbError("command_failed", "/system/bin/sh: sha256sum: inaccessible or not found")
+
+    phone.on_shell = on_shell
+    res = _run(phone, copy, inv, _sel(verify_hash=True))
+    assert res.status == "complete"
+    assert copy.read_meta().counts["size_only"] == 3
+    assert all(r["sha256"] == "" for r in _manifest(copy))
+
+
+def test_sha256sum_other_error_charges_attempts_per_file(tmp_path):
+    phone = _phone(tmp_path)
+    copy = _copy()
+    inv = _inventory(phone)
+
+    def on_shell(command):
+        if command.startswith("sha256sum ") and "c.pdf" in command:
+            raise AdbError("timeout", "sha256sum (>3600s)")
+
+    phone.on_shell = on_shell
+    res = _run(phone, copy, inv, _sel(verify_hash=True), wait_device=_no_wait)
+    rows = _rows(copy)
+    assert (rows["/sdcard/Download/c.pdf"].status, rows["/sdcard/Download/c.pdf"].error) == (
+        "error", "hash_unavailable")
+    assert rows["/sdcard/DCIM/Camera/a.jpg"].sha256 == hashlib.sha256(FILES["DCIM/Camera/a.jpg"]).hexdigest()
+    assert res.status == "incomplete"
+    assert copy.read_meta().counts["size_only"] == 0
+
+
+def test_hash_mismatch_is_repulled(tmp_path):
+    phone = _phone(tmp_path)
+    copy = _copy()
+    inv = _inventory(phone)
+    calls = {"n": 0}
+    original = phone.pull
+
+    def pull(remotes, target, should_stop, tick):
+        res = original(remotes, target, should_stop, tick)
+        if remotes == ["/sdcard/Download/c.pdf"] and calls["n"] == 0:
+            calls["n"] += 1
+            local = copy.files_dir / "Download" / "c.pdf"
+            data = bytearray(local.read_bytes())
+            data[0] ^= 0xFF  # ta sama długość, inna treść
+            local.write_bytes(bytes(data))
+        return res
+
+    phone.pull = pull
+    res = _run(phone, copy, inv, _sel(verify_hash=True))
+    assert res.status == "complete"
+    row = _rows(copy)["/sdcard/Download/c.pdf"]
+    assert (row.status, row.attempts) == ("done", 1)
+    assert (copy.files_dir / "Download" / "c.pdf").read_bytes() == FILES["Download/c.pdf"]
+
+
+def test_hash_mismatch_three_times_reason_in_manifest(tmp_path):
+    phone = _phone(tmp_path)
+    copy = _copy()
+    inv = _inventory(phone)
+    original = phone.pull
+
+    def pull(remotes, target, should_stop, tick):
+        res = original(remotes, target, should_stop, tick)
+        local = copy.files_dir / "Download" / "c.pdf"
+        if "/sdcard/Download/c.pdf" in remotes and local.exists():
+            local.write_bytes(b"X" * local.stat().st_size)
+        return res
+
+    phone.pull = pull
+    res = _run(phone, copy, inv, _sel(verify_hash=True), wait_device=_no_wait)
+    assert res.status == "incomplete"
+    rows = {r["remote"]: r for r in _manifest(copy)}
+    assert (rows["/sdcard/Download/c.pdf"]["status"], rows["/sdcard/Download/c.pdf"]["reason"]) == (
+        "error", "hash_mismatch")
+    assert rows["/sdcard/DCIM/Camera/a.jpg"]["reason"] == ""
+
+
+def test_disk_full_before_telephony(tmp_path):
+    phone = _phone(tmp_path)
+    copy = _copy()
+    inv = _inventory(phone)
+    issued = len(phone.commands)
+    with pytest.raises(BackupError) as err:
+        _run(phone, copy, inv, _sel(sms=True, categories=frozenset()), free_bytes=lambda p: 0)
+    assert err.value.key == "disk_full"
+    assert len(phone.commands) == issued  # nic nie eksportowano
+    assert copy.read_meta().status == "in_progress"
+
+
+def test_disk_full_before_apk(tmp_path):
+    phone = _phone(tmp_path)
+    phone.apps = {"com.example.app": {"base.apk": b"base"}}
+    copy = _copy()
+    inv = _inventory(phone, [AppEntry("com.example.app", "Example", 1, "safe", True)])
+    with pytest.raises(BackupError) as err:
+        _run(phone, copy, inv, _sel(categories=frozenset(), apps=frozenset({"com.example.app"})),
+             free_bytes=lambda p: 0)
+    assert err.value.key == "disk_full"
+    assert not any(c.startswith("pm path") for c in phone.commands)
+
+
+def _no_space(*args, **kwargs):
+    raise OSError(errno.ENOSPC, "No space left on device")
+
+
+def test_enospc_during_apk_copy_is_disk_full(tmp_path, monkeypatch):
+    monkeypatch.setattr(backup_mod, "backup_apks", _no_space)
+    phone = _phone(tmp_path)
+    copy = _copy()
+    inv = _inventory(phone, [AppEntry("com.example.app", "Example", 1, "safe", True)])
+    with pytest.raises(BackupError) as err:
+        _run(phone, copy, inv, _sel(categories=frozenset(), apps=frozenset({"com.example.app"})))
+    assert err.value.key == "disk_full"
+    assert copy.read_meta().status == "in_progress"
+
+
+def test_enospc_during_telephony_is_disk_full(tmp_path, monkeypatch):
+    monkeypatch.setattr(backup_mod, "export_telephony", _no_space)
+    phone = _phone(tmp_path)
+    copy = _copy()
+    with pytest.raises(BackupError) as err:
+        _run(phone, copy, _inventory(phone), _sel(sms=True))
+    assert err.value.key == "disk_full"
+
+
+def test_second_run_after_disk_full_completes(tmp_path):
+    phone = _phone(tmp_path)
+    copy = _copy()
+    inv = _inventory(phone)
+    with pytest.raises(BackupError):
+        _run(phone, copy, inv, _sel(), free_bytes=lambda p: 0)
+    res = _run(phone, copy, inv, _sel())
+    assert res.status == "complete"
+    assert copy.read_meta().status == "complete"
+    assert len(_local_files(copy)) == 3
+
+
+def test_too_many_disconnects_keeps_done_rows(tmp_path):
+    phone = _phone(tmp_path)
+    phone.fail_after_files = 0
+    copy = _copy()
+    waits: list[int] = []
+
+    def wait_device():
+        waits.append(1)
+        phone.reconnect()
+        if len(waits) == 20:  # następna paczka [a, b]: a przejdzie, b urwie się po raz 21.
+            phone.fail_after_files = len(phone.pulled) + 1
+
+    with pytest.raises(BackupError) as err:
+        _run(phone, copy, _inventory(phone), _sel(), wait_device=wait_device)
+    assert err.value.key == "too_many_disconnects"
+    assert phone.pulled == ["/sdcard/DCIM/Camera/a.jpg"]
+    assert _rows(copy)["/sdcard/DCIM/Camera/a.jpg"].status == "done"
+
+
+def test_selected_app_missing_from_inventory_is_counted(tmp_path):
+    phone = _phone(tmp_path)
+    copy = _copy()
+    res = _run(phone, copy, _inventory(phone), _sel(categories=frozenset(), apps=frozenset({"com.evil.app"})))
+    assert (res.apps_done, res.apps_failed) == (0, 0)
+    assert copy.read_meta().counts["apps_skipped"] == 1
+
+
+def test_file_gone_between_runs_is_vanished_not_unselected(tmp_path):
+    phone = _phone(tmp_path)
+    copy = _copy()
+    inv = _inventory(phone)
+    _run(phone, copy, inv, _sel(), should_stop=lambda: len(phone.pulled) >= 2)
+    phone.local("/sdcard/Download/c.pdf").unlink()
+    res = _run(phone, copy, _inventory(phone), _sel())
+    assert res.status == "complete"
+    rows = {r["remote"]: r for r in _manifest(copy)}
+    assert (rows["/sdcard/Download/c.pdf"]["status"], rows["/sdcard/Download/c.pdf"]["reason"]) == (
+        "skipped", "vanished")
+
+
+def test_unselected_on_resume_is_not_selected(tmp_path):
+    phone = _phone(tmp_path)
+    copy = _copy()
+    inv = _inventory(phone)
+    _run(phone, copy, inv, _sel(), should_stop=lambda: len(phone.pulled) >= 2)
+    res = _run(phone, copy, inv, _sel(categories=frozenset({"media"})))
+    assert res.status == "complete"
+    rows = {r["remote"]: r for r in _manifest(copy)}
+    assert (rows["/sdcard/Download/c.pdf"]["status"], rows["/sdcard/Download/c.pdf"]["reason"]) == (
+        "skipped", "not_selected")
+    assert copy.read_meta().selection["categories"] == ["media"]
+
+
+def test_rerun_resets_status_to_in_progress(tmp_path):
+    phone = _phone(tmp_path)
+    copy = _copy()
+    inv = _inventory(phone)
+    _pull_leaves_partial(phone, "/sdcard/Download/c.pdf")
+    assert _run(phone, copy, inv, _sel(), wait_device=_no_wait).status == "incomplete"
+    assert copy.read_meta().status == "incomplete"
+    with pytest.raises(BackupError):
+        _run(phone, copy, inv, _sel(categories=frozenset({"downloads"})), free_bytes=lambda p: 0)
+    meta = copy.read_meta()
+    assert meta.status == "in_progress"
+    assert meta.selection["categories"] == ["downloads"]
+
+
+def test_vanished_file_not_in_total(tmp_path):
+    phone = _phone(tmp_path)
+    copy = _copy()
+    inv = _inventory(phone)
+    phone.before_pull = lambda remotes: phone.local("/sdcard/Download/c.pdf").unlink(missing_ok=True)
+    progress: list[Progress] = []
+    _run(phone, copy, inv, _sel(), on_progress=progress.append)
+    assert (progress[-1].done_files, progress[-1].total_files) == (2, 2)
+    assert progress[-1].total_bytes == progress[-1].done_bytes
+
+
+def test_stop_during_telephony(tmp_path):
+    phone = _phone(tmp_path)
+    copy = _copy()
+    asked = {"n": 0}
+
+    def should_stop():
+        asked["n"] += 1
+        return asked["n"] > 1  # pierwsze pytanie przed eksportem, kolejne już w export_telephony
+
+    res = _run(phone, copy, _inventory(phone), _sel(contacts=True, sms=True), should_stop=should_stop)
+    assert res.status == "stopped"
+    assert phone.pull_calls == 0
+    assert copy.read_meta().status == "in_progress"
+    assert not (copy.phone_dir / "sms.xml").exists()

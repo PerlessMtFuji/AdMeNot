@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import pytest
 
-from admenot.engine.transfer.guard import ReadOnlyAdb, UnsafeCommand, assert_read_only, q
+from admenot.engine.transfer.guard import (
+    ApkReadAdb,
+    ReadOnlyAdb,
+    UnsafeCommand,
+    assert_read_only,
+    q,
+)
 
 
 class Recorder:
@@ -105,3 +111,51 @@ def test_readonly_adb_serial_mirrors_inner():
     assert adb.serial == "A"
     other = adb.with_serial("B")
     assert isinstance(other, ReadOnlyAdb) and other.serial == "B"
+
+
+def test_apk_read_adb_allows_pm_path_and_apk_pull_of_its_package():
+    inner = Recorder()
+    adb = ApkReadAdb(inner, "com.example.app")
+    adb.shell("pm path com.example.app")
+    adb.run(["pull", "/data/app/~~x==/com.example.app-1/base.apk", "C:/tmp/base.apk"])
+    adb.shell("sha256sum /data/app/x/base.apk")
+    adb.run(["get-state"])
+    assert inner.calls == [
+        ("shell", "pm path com.example.app"),
+        ("run", ["pull", "/data/app/~~x==/com.example.app-1/base.apk", "C:/tmp/base.apk"]),
+        ("shell", "sha256sum /data/app/x/base.apk"),
+        ("run", ["get-state"]),
+    ]
+
+
+@pytest.mark.parametrize("command", [
+    "pm path com.other.app",
+    "pm path com.example.app; rm -rf /sdcard",
+    "pm uninstall com.example.app",
+    "pm path com.example.app2",
+])
+def test_apk_read_adb_rejects_other_pm(command):
+    inner = Recorder()
+    with pytest.raises(UnsafeCommand):
+        ApkReadAdb(inner, "com.example.app").shell(command)
+    assert inner.calls == []
+
+
+@pytest.mark.parametrize("args", [
+    ["pull", "/sdcard/DCIM/a.jpg", "x"],
+    ["pull", "relative/base.apk", "x"],
+    ["pull", "/data/app/../../sdcard/base.apk", "x"],
+    ["push", "evil.apk", "/data/local/tmp/base.apk"],
+    ["install", "base.apk"],
+])
+def test_apk_read_adb_rejects_other_host_commands(args):
+    inner = Recorder()
+    with pytest.raises(UnsafeCommand):
+        ApkReadAdb(inner, "com.example.app").run(args)
+    assert inner.calls == []
+
+
+def test_apk_read_adb_rejects_bad_package_name():
+    with pytest.raises(UnsafeCommand):
+        ApkReadAdb(Recorder(), "com.x; reboot")
+

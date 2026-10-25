@@ -11,7 +11,8 @@ Emuluje z katalogu `root` (wzór: skrypt `adb-backup/tests/fake_adb.py`):
   pod `APK_DIR` — tyle, ile potrzebuje `backup_apks`.
 
 Haki testowe: `before_pull(remotes)` wołane na początku każdego `pull` (np. zmiana albo usunięcie
-pliku w trakcie kopii), `pull_calls` = liczba wywołań `pull`.
+pliku w trakcie kopii), `pull_calls` = liczba wywołań `pull`, `on_shell(command)` wołane przed
+każdym poleceniem shell (może rzucić `AdbError`, np. przekroczenie czasu `stat`).
 
 Awarie: `fail_after_files` (po tylu pobranych plikach pull urywa się w środku pliku, a telefon
 przechodzi w stan `offline` do `reconnect()`), `deny_uris` (odmowa dostępu do providera),
@@ -62,6 +63,7 @@ class FakeStoragePhone:
         self.pulled: list[str] = []  # zdalne ścieżki plików pobranych `pull`
         self.pull_calls = 0
         self.before_pull: Callable[[list[str]], None] | None = None
+        self.on_shell: Callable[[str], None] | None = None
         self.apps: dict[str, dict[str, bytes]] = {}
 
     # ---- stan ---------------------------------------------------------------------------
@@ -106,6 +108,8 @@ class FakeStoragePhone:
         if not self.online:
             raise AdbError("offline", "device offline")
         self.commands.append(command)
+        if self.on_shell is not None:
+            self.on_shell(command)
         argv = shlex.split(command)
         if argv[:2] == ["pm", "path"] and len(argv) == 3:
             return self._pm_path(argv[2])

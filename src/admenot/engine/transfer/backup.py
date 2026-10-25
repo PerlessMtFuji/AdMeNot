@@ -7,17 +7,18 @@ Port `BackupEngine` ze skryptu adb-backup. Gwarancje:
 * plik jest „zrobiony” dopiero, gdy rozmiar na dysku zgadza się z telefonem (opcjonalnie też
   SHA-256 z `sha256sum` na telefonie);
 * rozłączenie nie jest błędem pliku: czekamy na telefon (`wait_device`) i ponawiamy, do 20 razy;
-* plik zmieniony na telefonie w trakcie kopii pobieramy ponownie, zniknięty pomijamy, a po
-  3 nieudanych próbach oznaczamy jako błąd.
+* plik zmieniony na telefonie w trakcie kopii pobieramy ponownie; pomijamy tylko plik, którego
+  na pewno już nie ma (`No such file`); po 3 nieudanych próbach — błąd.
 
-Na telefon idą wyłącznie odczyty: wszystko przechodzi przez `ReadOnlyAdb`, a kopia APK dostaje
-tylko dodatkowo `pm path <pakiet>` i `pull` plików `.apk` tego pakietu (`_ApkReadAdb`). Dlatego
-`adb` to surowy transport (nie `ReadOnlyAdb` — przez niego kopia APK by się nie udała).
+Na telefon idą wyłącznie odczyty: wszystko przechodzi przez `guard.ReadOnlyAdb`, a kopia APK przez
+`guard.ApkReadAdb` (dodatkowo tylko `pm path <pakiet>` i `pull` plików `.apk` tego pakietu).
+Błędy w stanie i w `manifest.csv` to klucze, nie tekst.
 """
 
 from __future__ import annotations
 
 import csv
+import errno
 import hashlib
 import os
 import shutil
@@ -26,7 +27,7 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Any, Literal
 
 from admenot.engine.actions.backup import backup_apks, is_complete
@@ -35,8 +36,8 @@ from admenot.engine.adb.transport import AdbError, AdbTransport
 from admenot.engine.apk.cache import NoSpace
 from admenot.engine.device.info import DeviceInfo
 
-from .guard import ReadOnlyAdb, UnsafeCommand, q
-from .inventory import Inventory, RemoteFile
+from .guard import ApkReadAdb, ReadOnlyAdb, UnsafeCommand, q
+from .inventory import Inventory
 from .puller import Puller
 from .state import FileRow, State
 from .store import CopyDir
@@ -49,10 +50,13 @@ CMD_MAX_CHARS = 24_000  # linia poleceń Windows ma limit 32 767 znaków
 DEVICE_CMD_MAX = 48_000  # limit długości polecenia `adb shell`
 MAX_ATTEMPTS = 3
 MAX_DISCONNECTS = 20
-SPACE_MARGIN = 64 * 1024 ** 2  # zapas na dysku ponad rozmiar paczki
+SPACE_MARGIN = 64 * 1024 ** 2  # zapas na dysku ponad rozmiar paczki / eksportu / APK
+MMS_FACTOR = 2.4  # załączniki jako pliki + te same dane w base64 w mms.xml
 MANIFEST = "manifest.csv"
 APK_TMP = ".apk-tmp"  # pobrane APK przed sprawdzeniem; usuwany po etapie aplikacji
 TELEPHONY = ("contacts", "sms", "mms", "calls")
+_GONE = ("no such file", "does not exist")  # `stat`/`sha256sum`: pliku na pewno nie ma
+_NO_TOOL = ("not found", "inaccessible")  # `sha256sum` niedostępne na telefonie
 
 Stage = Literal["telephony", "files", "apps", "verify"]
 
@@ -114,44 +118,25 @@ def _disk_free(path: Path) -> int:
     return shutil.disk_usage(path).free
 
 
-class _ApkReadAdb:
-    """`ReadOnlyAdb` + dokładnie to, czego potrzebuje `backup_apks` dla jednego pakietu."""
+def _has(text: str, needles: tuple[str, ...]) -> bool:
+    low = text.lower()
+    return any(n in low for n in needles)
 
-    def __init__(self, raw: AdbTransport, package: str) -> None:
-        self.raw = raw
-        self.ro = ReadOnlyAdb(raw)
-        self.package = package
 
-    @property
-    def serial(self) -> str | None:
-        return self.raw.serial
-
-    def with_serial(self, serial: str) -> _ApkReadAdb:
-        return _ApkReadAdb(self.raw.with_serial(serial), self.package)
-
-    def shell(self, command: str, timeout: float = 20.0) -> str:
-        if command == f"pm path {self.package}":
-            return self.raw.shell(command, timeout=timeout)
-        return self.ro.shell(command, timeout=timeout)
-
-    def run(self, args: list[str], timeout: float = 20.0) -> str:
-        if len(args) == 3 and args[0] == "pull":
-            remote = PurePosixPath(args[1])
-            if remote.is_absolute() and remote.suffix == ".apk" and ".." not in remote.parts:
-                return self.raw.run(args, timeout=timeout)
-            raise UnsafeCommand(f"Niedozwolone pobranie: {args[1][:120]}")
-        return self.ro.run(args, timeout=timeout)
-
-    def run_bytes(self, args: list[str], timeout: float = 20.0) -> bytes:
-        return self.ro.run_bytes(args, timeout=timeout)
+Failed = list[tuple[FileRow, Path, str]]  # (wiersz, plik lokalny, klucz powodu)
 
 
 def run_backup(adb: AdbTransport, puller: Puller, device: DeviceInfo, copy: CopyDir, inventory: Inventory,
                selection: Selection, *, on_progress: Callable[[Progress], None],
                should_stop: Callable[[], bool], wait_device: Callable[[], None],
                free_bytes: Callable[[Path], int] = _disk_free) -> BackupResult:
-    """Kopiuje wybrane dane do `copy`, wznawiając jej stan. `BackupError` i `stopped` zostawiają
-    kopię `in_progress`; koniec to `complete` albo `incomplete` (zapisane w `meta.json`)."""
+    """Kopiuje wybrane dane do `copy`, wznawiając jej stan.
+
+    `adb` to surowy transport (nie `ReadOnlyAdb`): silnik sam opakowuje go w `ReadOnlyAdb`, a na
+    kopię APK w `ApkReadAdb` — przez gotowy `ReadOnlyAdb` kopia aplikacji by się nie udała.
+    `BackupError` i `stopped` zostawiają kopię `in_progress` (do wznowienia); koniec to `complete`
+    albo `incomplete` (zapisane w `meta.json`).
+    """
     return _Backup(adb, puller, device, copy, inventory, selection, on_progress, should_stop,
                    wait_device, free_bytes).run()
 
@@ -176,24 +161,25 @@ class _Backup:
         meta = self.copy.read_meta()
         if meta.serial != self.device.serial:
             raise BackupError("wrong_device")
-        if not meta.selection:
-            meta.selection = self.sel.to_json()
-            self.copy.write_meta(meta)
+        meta.status = "in_progress"  # ponowne uruchomienie, które się urwie, zostaje do wznowienia
+        meta.selection = self.sel.to_json()
+        self.copy.write_meta(meta)
         t0 = time.monotonic()
         state = State(self.copy.state_path)
         try:
             tel: dict[str, CategoryResult] = {}
-            apps: dict[str, dict[str, Any]] = {}
             try:
                 tel = self._telephony(state)
                 self._reconcile(state)
                 self._transfer(state)
                 apps = self._apps(state)
             except _Stop:
-                saved = state.get_meta("apps", {})
-                apps = {p: saved[p] for p in sorted(self.sel.apps) if p in saved}
-                return self._result(state, "stopped", tel, apps, t0)
+                return self._result(state, "stopped", tel, self._saved_apps(state), t0)
             return self._finalize(state, tel, apps, t0)
+        except OSError as exc:
+            if exc.errno == errno.ENOSPC:
+                raise BackupError("disk_full") from exc
+            raise
         finally:
             state.close()
 
@@ -204,6 +190,10 @@ class _Backup:
     def _check_stop(self) -> None:
         if self.should_stop():
             raise _Stop()
+
+    def _need(self, nbytes: int) -> None:
+        if self.free_bytes(self.copy.path) < nbytes + SPACE_MARGIN:
+            raise BackupError("disk_full")
 
     def _online(self) -> bool:
         try:
@@ -226,6 +216,7 @@ class _Backup:
         todo = [k for k in wanted if k not in saved or saved[k].status != "ok"]
         if todo:
             self._progress("telephony")
+            self._need(int(self.inventory.mms_bytes * MMS_FACTOR) if "mms" in todo else 0)
             while True:
                 self._check_stop()
                 try:
@@ -245,23 +236,24 @@ class _Backup:
         return {k: saved[k] for k in wanted if k in saved}
 
     # ---- uzgadnianie stanu ----------------------------------------------------------------
-    def _selected(self, f: RemoteFile) -> bool:
-        if f.category.startswith("other:"):
-            return f.category[len("other:"):] in self.sel.others
-        return f.category in self.sel.categories
+    def _wanted(self, category: str) -> bool:
+        if category.startswith("other:"):
+            return category[len("other:"):] in self.sel.others
+        return category in self.sel.categories
 
     def _local(self, rel: str) -> Path:
         return self.copy.files_dir.joinpath(*rel.split("/"))
 
     def _reconcile(self, state: State) -> None:
         """Wybrane pliki z inwentarza do stanu. Zrobione i niezmienione (rozmiar, czas, plik na
-        dysku) zostają; reszta wraca do kolejki. Niewybrane i niezrobione → `skipped`."""
+        dysku) zostają; reszta wraca do kolejki. Niezrobione spoza inwentarza → `skipped`:
+        `vanished`, gdy ich kategoria nadal jest wybrana, inaczej `not_selected`."""
         existing = state.all_files()
         planner = PathPlanner(taken={r.local_rel.casefold(): r.remote for r in existing.values()})
         base_len = len(str(self.copy.files_dir))
         seen: set[str] = set()
         for f in self.inventory.files:
-            if not self._selected(f) or f.remote in seen:
+            if not self._wanted(f.category) or f.remote in seen:
                 continue
             seen.add(f.remote)
             row = existing.get(f.remote)
@@ -270,17 +262,18 @@ class _Backup:
                 state.insert(FileRow(f.remote, f.category, f.size, f.mtime, rel, f.remote in planner.renamed,
                                      "pending", 0))
                 continue
-            if row.status == "done" and (row.size, row.mtime) == (f.size, f.mtime) and self._has(row):
+            if row.status == "done" and (row.size, row.mtime) == (f.size, f.mtime) and self._on_disk(row):
                 state.update(f.remote, root=f.category)
             else:
                 state.update(f.remote, root=f.category, size=f.size, mtime=f.mtime, status="pending",
                              attempts=0, error=None, sha256=None)
         for remote, row in existing.items():
             if remote not in seen and row.status != "done":
-                state.update(remote, status="skipped", error="not_selected")
+                state.update(remote, status="skipped",
+                             error="vanished" if self._wanted(row.root) else "not_selected")
         state.commit()
 
-    def _has(self, row: FileRow) -> bool:
+    def _on_disk(self, row: FileRow) -> bool:
         try:
             return self._local(row.local_rel).stat().st_size == row.size
         except OSError:
@@ -296,9 +289,7 @@ class _Backup:
         while pend := state.pending():
             for chunk in _chunks(pend):
                 self._check_stop()
-                need = sum(f.size for f in chunk) + SPACE_MARGIN
-                if self.free_bytes(self.copy.path) < need:
-                    raise BackupError("disk_full")
+                self._need(sum(f.size for f in chunk))
                 self._pull_chunk(state, chunk)
 
     def _pull_chunk(self, state: State, chunk: list[FileRow]) -> None:
@@ -317,13 +308,16 @@ class _Backup:
             raise _Stop()
 
         ok: list[tuple[FileRow, Path]] = []
-        failed: list[tuple[FileRow, Path]] = []
+        failed: Failed = []
         for f, loc in zip(chunk, locals_, strict=True):
             try:
                 size = loc.stat().st_size
             except OSError:
                 size = -1
-            (ok if size == f.size else failed).append((f, loc))
+            if size == f.size:
+                ok.append((f, loc))
+            else:
+                failed.append((f, loc, "pull_failed"))
         sums: dict[str, str] = {}
         if self.sel.verify_hash and self.hash_ok and ok:
             self._progress("verify", current)
@@ -333,10 +327,10 @@ class _Backup:
             state.update(f.remote, status="done", error=None, sha256=sums.get(f.remote))
             self.done_files += 1
             self.done_bytes += f.size
+        state.commit()  # przed czekaniem na telefon / `too_many_disconnects` — zrobione zostają
         if failed:
-            msg = next((ln for ln in res.lines if "error" in ln.lower()), res.lines[-1] if res.lines else "")
-            self._handle_failures(state, failed, msg or f"adb pull rc {res.rc}")
-        state.commit()
+            self._handle_failures(state, failed)
+            state.commit()
         self._progress("files", current)
 
     def _salvage(self, state: State, chunk: list[FileRow], locals_: list[Path]) -> None:
@@ -355,8 +349,8 @@ class _Backup:
                 loc.unlink(missing_ok=True)
         state.commit()
 
-    def _handle_failures(self, state: State, failed: list[tuple[FileRow, Path]], msg: str) -> None:
-        for f, loc in failed:
+    def _handle_failures(self, state: State, failed: Failed) -> None:
+        for f, loc, _ in failed:
             try:
                 if loc.stat().st_size != f.size:
                     loc.unlink()
@@ -366,27 +360,32 @@ class _Backup:
             self._disconnected()
             return
         try:
-            current = self._restat([f.remote for f, _ in failed])
+            current, gone = self._restat([f.remote for f, _, _ in failed])
         except AdbError:  # błąd połączenia tuż po sprawdzeniu stanu
             self._disconnected()
             return
-        for f, _ in failed:
+        for f, _, reason in failed:
             attempts = f.attempts + 1
             now = current.get(f.remote)
-            if now is None:
+            if f.remote in gone:
                 state.update(f.remote, status="skipped", error="vanished")
-            elif now != (f.size, f.mtime):
+                self.total_files -= 1
+                self.total_bytes -= f.size
+            elif now is not None and now != (f.size, f.mtime):
                 self.total_bytes += now[0] - f.size
                 state.update(f.remote, size=now[0], mtime=now[1], attempts=attempts, error="changed",
                              status="error" if attempts >= MAX_ATTEMPTS else "pending")
-            else:
-                state.update(f.remote, attempts=attempts, error=msg[:300],
+            else:  # bez zmian albo `stat` się nie udał (np. przekroczenie czasu) — zwykła próba
+                state.update(f.remote, attempts=attempts, error=reason,
                              status="error" if attempts >= MAX_ATTEMPTS else "pending")
 
-    def _restat(self, remotes: list[str]) -> dict[str, tuple[int, int]]:
-        """Aktualny (rozmiar, mtime) z telefonu; brak wpisu = pliku nie ma. `stat` kończy się błędem,
-        gdy brakuje choć jednego pliku — wtedy pytamy o każdy osobno. Błąd połączenia idzie wyżej."""
-        res: dict[str, tuple[int, int]] = {}
+    def _restat(self, remotes: list[str]) -> tuple[dict[str, tuple[int, int]], set[str]]:
+        """(aktualny rozmiar i mtime, pliki, których na pewno nie ma). `stat` kończy się błędem,
+        gdy brakuje choć jednego pliku — wtedy pytamy o każdy osobno. Plik bez odpowiedzi i bez
+        `No such file` (przekroczenie czasu, brak dostępu) nie trafia do żadnego z wyników.
+        Błąd połączenia idzie wyżej."""
+        stats: dict[str, tuple[int, int]] = {}
+        gone: set[str] = set()
         for batch in _cmd_batches(remotes):
             try:
                 out = self.adb.shell("stat -c " + q("%s|%Y|%n") + " " + " ".join(q(r) for r in batch),
@@ -396,65 +395,105 @@ class _Backup:
                     raise
                 if len(batch) > 1:
                     for remote in batch:
-                        res.update(self._restat([remote]))
+                        s, g = self._restat([remote])
+                        stats.update(s)
+                        gone |= g
+                elif exc.kind == "command_failed" and _has(exc.message, _GONE):
+                    gone.add(batch[0])
                 continue
             for line in out.split("\n"):
                 bits = line.split("|", 2)
                 if len(bits) == 3 and bits[0].isdigit() and bits[1].lstrip("-").isdigit():
-                    res[bits[2]] = (int(bits[0]), int(bits[1]))
-        return res
+                    stats[bits[2]] = (int(bits[0]), int(bits[1]))
+        return stats, gone
 
     def _verify(self, ok: list[tuple[FileRow, Path]]
-                ) -> tuple[list[tuple[FileRow, Path]], list[tuple[FileRow, Path]], dict[str, str]]:
-        """(zgodne, niezgodne, sumy). Brak `sha256sum` na telefonie → dalej tylko rozmiar.
-        Rozłączenie albo przekroczenie czasu → żaden plik paczki nie jest zaliczony (ponowimy)."""
-        remote: dict[str, str] = {}
-        for batch in _cmd_batches([f.remote for f, _ in ok]):
-            try:
-                out = self.adb.shell("sha256sum " + " ".join(q(r) for r in batch), timeout=3600)
-            except AdbError as exc:
-                if exc.kind in _CONNECTION_KINDS or exc.kind == "timeout":
-                    return [], ok, {}
-                self.hash_ok = False
-                return ok, [], {}
-            for line in out.split("\n"):
-                if len(line) > 66 and line[64:66] == "  ":
-                    remote[line[66:]] = line[:64].lower()
-        good, bad, sums = [], [], {}
+                ) -> tuple[list[tuple[FileRow, Path]], Failed, dict[str, str]]:
+        """(zgodne, niezaliczone z powodem, sumy). Brak `sha256sum` na telefonie → dalej tylko
+        rozmiar (liczba takich plików trafia do `meta.counts["size_only"]`). Inny błąd paczki → po
+        jednym pliku; plik bez sumy zużywa próbę. Rozłączenie → nic z paczki nie jest zaliczone."""
+        remote = self._remote_hashes([f.remote for f, _ in ok])
+        if remote is None:
+            return [], [(f, loc, "hash_unavailable") for f, loc in ok], {}
+        if not self.hash_ok:
+            return ok, [], {}
+        good: list[tuple[FileRow, Path]] = []
+        bad: Failed = []
+        sums: dict[str, str] = {}
         for f, loc in ok:
+            if f.remote not in remote:
+                bad.append((f, loc, "hash_unavailable"))
+                continue
             with loc.open("rb") as fh:
                 digest = hashlib.file_digest(fh, "sha256").hexdigest()
-            if remote.get(f.remote) == digest:
+            if remote[f.remote] == digest:
                 good.append((f, loc))
                 sums[f.remote] = digest
             else:
-                bad.append((f, loc))
+                bad.append((f, loc, "hash_mismatch"))
         return good, bad, sums
+
+    def _remote_hashes(self, remotes: list[str]) -> dict[str, str] | None:
+        """Sumy z telefonu; None = rozłączenie. Brak narzędzia ustawia `hash_ok = False`."""
+        res: dict[str, str] = {}
+        for batch in _cmd_batches(remotes):
+            try:
+                out = self.adb.shell("sha256sum " + " ".join(q(r) for r in batch), timeout=3600)
+            except AdbError as exc:
+                if exc.kind in _CONNECTION_KINDS:
+                    return None
+                if exc.kind == "command_failed" and _has(exc.message, _NO_TOOL):
+                    self.hash_ok = False
+                    return res
+                if len(batch) > 1:
+                    for one in batch:
+                        sub = self._remote_hashes([one])
+                        if sub is None:
+                            return None
+                        if not self.hash_ok:
+                            return res
+                        res.update(sub)
+                continue
+            for line in out.split("\n"):
+                if len(line) > 66 and line[64:66] == "  ":
+                    res[line[66:]] = line[:64].lower()
+        return res
 
     # ---- aplikacje ------------------------------------------------------------------------
     def _apps(self, state: State) -> dict[str, dict[str, Any]]:
         """Wybrane aplikacje z inwentarza (złośliwych tam nie ma). Zrobione wcześniej i nadal
-        kompletne na dysku pomijamy bez pytania telefonu."""
+        kompletne na dysku pomijamy bez pytania telefonu. Wybrany pakiet spoza inwentarza →
+        `skipped` (`not_in_inventory`), widoczny w `meta.counts`."""
         saved: dict[str, dict[str, Any]] = state.get_meta("apps", {})
-        entries = [a for a in self.inventory.apps if a.package in self.sel.apps]
+        entries = {a.package: a for a in self.inventory.apps if a.package in self.sel.apps}
         tmp = self.copy.path / APK_TMP
-        for entry in entries:
-            self._check_stop()
-            target = self.copy.apps_dir / entry.package / (
-                str(entry.version_code) if entry.version_code is not None else "unknown")
-            prev = saved.get(entry.package)
-            if prev and prev.get("status") == "done" and is_complete(target, entry.package):
+        for package in sorted(self.sel.apps):
+            entry = entries.get(package)
+            if entry is None:
+                saved[package] = {"status": "skipped", "error": "not_in_inventory"}
+                state.set_meta("apps", saved)
                 continue
-            self._progress("apps", entry.package)
-            saved[entry.package] = self._app(entry.package, entry.version_code, target, tmp)
+            self._check_stop()
+            target = self.copy.apps_dir / package / (
+                str(entry.version_code) if entry.version_code is not None else "unknown")
+            prev = saved.get(package)
+            if prev and prev.get("status") == "done" and is_complete(target, package):
+                continue
+            self._progress("apps", package)
+            self._need(0)
+            saved[package] = self._app(package, entry.version_code, target, tmp)
             state.set_meta("apps", saved)
         shutil.rmtree(tmp, ignore_errors=True)
-        return {a.package: saved[a.package] for a in entries}
+        return self._saved_apps(state)
+
+    def _saved_apps(self, state: State) -> dict[str, dict[str, Any]]:
+        saved = state.get_meta("apps", {})
+        return {p: saved[p] for p in sorted(self.sel.apps) if p in saved}
 
     def _app(self, package: str, version_code: int | None, target: Path, tmp: Path) -> dict[str, Any]:
         while True:
             try:
-                paths = backup_apks(_ApkReadAdb(self.raw, package), package, version_code, target, tmp)
+                paths = backup_apks(ApkReadAdb(self.raw, package), package, version_code, target, tmp)
                 return {"status": "done", "bytes": sum(p.stat().st_size for p in paths)}
             except NoSpace:
                 raise BackupError("disk_full") from None
@@ -462,7 +501,11 @@ class _Backup:
                 if exc.kind not in _CONNECTION_KINDS:
                     return {"status": "failed", "error": exc.kind}
                 self._disconnected()
-            except (ActionError, UnsafeCommand, ValueError, OSError) as exc:
+            except OSError as exc:
+                if exc.errno == errno.ENOSPC:
+                    raise BackupError("disk_full") from exc
+                return {"status": "failed", "error": "OSError"}
+            except (ActionError, UnsafeCommand, ValueError) as exc:
                 return {"status": "failed", "error": type(exc).__name__}
 
     # ---- wynik ----------------------------------------------------------------------------
@@ -475,37 +518,41 @@ class _Backup:
             status=status, copy_id=f"{self.copy.path.parent.name}/{self.copy.path.name}", telephony=tel,
             files_done=cnt.get("done", 0), files_failed=cnt.get("error", 0),
             apps_done=sum(1 for a in apps.values() if a.get("status") == "done"),
-            apps_failed=sum(1 for a in apps.values() if a.get("status") != "done"),
+            apps_failed=sum(1 for a in apps.values() if a.get("status") == "failed"),
             bytes=files_bytes + app_bytes, seconds=round(time.monotonic() - t0))
 
     def _finalize(self, state: State, tel: dict[str, CategoryResult], apps: dict[str, dict[str, Any]],
                   t0: float) -> BackupResult:
         """`manifest.csv` (Excel: `;`, UTF-8 z BOM) i `meta.json`. Kompletna = nic w kolejce, żadnego
-        błędu pliku, każda wybrana kategoria telefonii `ok` i każda wybrana aplikacja skopiowana.
-        Plik, który zniknął z telefonu (`skipped`), kompletności nie psuje — nie ma czego kopiować."""
+        błędu pliku, każda wybrana kategoria telefonii `ok` i żadna wybrana aplikacja nieudana.
+        Plik, którego na pewno nie ma już na telefonie (`vanished`), kompletności nie psuje."""
         rows = sorted(state.all_files().values(), key=lambda r: r.remote)
         manifest = self.copy.path / MANIFEST
         tmp = manifest.with_name(MANIFEST + ".tmp")
         with tmp.open("w", encoding="utf-8-sig", newline="") as fh:
             w = csv.writer(fh, delimiter=";")
-            w.writerow(["status", "remote", "local_rel", "size", "mtime", "sha256"])
+            w.writerow(["status", "remote", "local_rel", "size", "mtime", "sha256", "reason"])
             for r in rows:
                 w.writerow([r.status, r.remote, f"{self.copy.files_dir.name}/{r.local_rel}", r.size,
                             datetime.fromtimestamp(r.mtime).isoformat(sep=" ") if r.mtime > 0 else "",
-                            r.sha256 or ""])
+                            r.sha256 or "", r.error if r.status != "done" and r.error else ""])
         os.replace(tmp, manifest)
 
         cnt = Counter(r.status for r in rows)
         complete = (cnt.get("pending", 0) == 0 and cnt.get("error", 0) == 0
                     and all(v.status == "ok" for v in tel.values())
-                    and all(a.get("status") == "done" for a in apps.values()))
+                    and all(a.get("status") != "failed" for a in apps.values()))
         result = self._result(state, "complete" if complete else "incomplete", tel, apps, t0)
+        counts = {"files": result.files_done, "files_failed": result.files_failed,
+                  "files_skipped": cnt.get("skipped", 0), "apps": result.apps_done,
+                  "apps_failed": result.apps_failed,
+                  "apps_skipped": sum(1 for a in apps.values() if a.get("status") == "skipped"),
+                  **{k: v.count for k, v in tel.items()}}
+        if self.sel.verify_hash:
+            counts["size_only"] = sum(1 for r in rows if r.status == "done" and not r.sha256)
         meta = self.copy.read_meta()
         meta.status = result.status  # type: ignore[assignment]  # tu tylko complete/incomplete
-        meta.counts = {"files": result.files_done, "files_failed": result.files_failed,
-                       "files_skipped": cnt.get("skipped", 0), "apps": result.apps_done,
-                       "apps_failed": result.apps_failed,
-                       **{k: v.count for k, v in tel.items()}}
+        meta.counts = counts
         meta.bytes = result.bytes
         self.copy.write_meta(meta)
         return result
