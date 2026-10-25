@@ -1,6 +1,6 @@
 """Wycinanie danych z raportów błędów (spec raportów błędów §4): czyste funkcje tekst → tekst.
 
-Kolejność: ścieżka profilu i UNC → numery seryjne → nazwiska klientów → konta Androida → IMEI →
+Kolejność: ścieżka profilu → ścieżki plików klienta (telefon, kopia danych) → UNC → numery seryjne → nazwiska klientów → konta Androida → IMEI →
 telefony → e-maile → nazwa konta. Nazwy pakietów zostają (w tracebacku to kod programu; log ADB
 wysyłamy tylko za zgodą). Wzorce nie wyłapią każdej danej osobowej — dlatego raport ma podgląd
 przed wysłaniem (audyt 2026-10-11, PRIV-02).
@@ -29,6 +29,21 @@ _ANY_PROFILE = re.compile(
 _UNC = re.compile(r"(?<![\w\\])\\\\[^\\/\s\"']+[\\/][^\\/\s\"']+")
 _ACCOUNT = re.compile(r"(Account\s*\{\s*name=)[^,}\r\n]+", re.IGNORECASE)
 _MIN_NAME_PART = 4
+# Pliki klienta (przenoszenie danych): ścieżki pamięci telefonu i katalogu kopii na komputerze.
+# Najpierw w cudzysłowie (nazwy ze spacjami, `q()` w poleceniach, `str(OSError)`), potem bez.
+_CLIENT_ROOT = (r"(?:/sdcard|/storage/(?:emulated/\d+|self/primary|[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4})"
+                r"|[\\/]AdMeNot[\\/]transfers)")
+_CLIENT_QUOTED = re.compile(rf"(['\"])([^'\"\r\n]*?{_CLIENT_ROOT})[\\/][^'\"\r\n]*\1",
+                            re.IGNORECASE)
+_CLIENT_BARE = re.compile(rf"({_CLIENT_ROOT})[\\/][^\s'\"]*", re.IGNORECASE)
+_PULL = re.compile(r"(host:pull -a -Z) .*")  # lista plików kopii (bez cudzysłowów, ze spacjami)
+
+
+def client_paths(text: str) -> str:
+    """`/sdcard/DCIM/a.jpg` → `/sdcard/<path>`; tak samo `/storage/…` i katalog kopii."""
+    text = _PULL.sub(r"\1 <paths>", text)
+    text = _CLIENT_QUOTED.sub(r"\1\2/<path>\1", text)
+    return _CLIENT_BARE.sub(r"\1/<path>", text)
 
 
 def _phone(match: re.Match[str]) -> str:
@@ -60,6 +75,7 @@ def redact(text: str, serials: Iterable[str] = (), home: str | None = None,
         for variant in sorted({home, home.replace("\\", "/")}, key=len, reverse=True):
             text = re.sub(re.escape(variant), "%USERPROFILE%", text, flags=re.IGNORECASE)
     text = _ANY_PROFILE.sub("%USERPROFILE%", text)  # krótkie nazwy 8.3 (JANKOW~1) i cudze profile
+    text = client_paths(text)
     text = _UNC.sub("<unc>", text)
     for serial in sorted({s for s in serials if len(s) >= _MIN_SERIAL}, key=len, reverse=True):
         text = text.replace(serial, "<serial>")

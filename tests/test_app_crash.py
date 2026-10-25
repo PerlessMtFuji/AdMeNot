@@ -408,3 +408,23 @@ def test_client_names_of_the_session_are_cut_from_reports():
     crash.note_names(["Anna Kowalska", None, "  "])
     data = load(crash.capture(boom("order for Anna Kowalska; account kowalska"), now=lambda: NOW))
     assert "kowalska" not in json.dumps(data).lower() and "<name>" in data["error"]["message"]
+
+
+def test_report_has_no_client_file_names():
+    log = logs_dir() / "2026-10-09.log"
+    log.parent.mkdir(parents=True)
+    log.write_text("2026-10-09T14:00:00\tR58T00TEST\tok\t0.1s\tpull:host:pull -a -Z "
+                   "/sdcard/DCIM/Camera/urlop.jpg C:/x\n"
+                   "2026-10-09T14:00:01\tR58T00TEST\tok\t0.1s\tfind -H '/sdcard/Music' -type f\n",
+                   "utf-8")
+    # Komunikat zbudowany przed `raise`: linia źródła w tracebacku nie może zawierać nazw.
+    message = (f"cannot open '{logs_dir().parent / 'transfers' / 'R58-ab' / 'files' / 'urlop.jpg'}'"
+               " and /sdcard/Music/song.mp3")
+    try:
+        raise OSError(message)
+    except OSError as exc:
+        data = load(crash.capture(exc, now=lambda: NOW))
+    text = json.dumps(data)
+    for name in ("urlop", "Music", "song.mp3", "DCIM", "R58-ab"):
+        assert name not in text, name
+    assert "<path>" in data["error"]["message"] and "<paths>" in data["adb_tail"][0]

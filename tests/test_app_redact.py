@@ -89,3 +89,29 @@ def test_other_profile_with_a_space_is_removed_whole():
 def test_unc_paths():
     assert redact(r"open \\fileserver\klienci\Kowalski\a.txt", home="", user="") == (
         r"open <unc>\Kowalski\a.txt")
+
+
+def test_client_paths_on_phone_are_collapsed():
+    assert r("find -H '/sdcard/Music' '/sdcard/WhatsApp Business' -type f") == \
+        "find -H '/sdcard/<path>' '/sdcard/<path>' -type f"
+    assert r("stat: /storage/emulated/0/Download/faktura.pdf: No such file") == \
+        "stat: /storage/emulated/0/<path> No such file"
+    assert r("ls -1 /sdcard") == "ls -1 /sdcard"  # sam korzeń to nie dane klienta
+    assert r("pull:host:pull -a -Z /sdcard/DCIM/Moje zdj.jpg /sdcard/b.jpg D:/kopia/files") == \
+        "pull:host:pull -a -Z <paths>"
+
+
+def test_client_paths_in_copy_folder_are_collapsed():
+    raw = (r"[WinError 32] used: 'C:\Users\Jan Kowalski\AppData\Local\AdMeNot\transfers"
+           r"\R58-ab\20261025-120000\files\DCIM\Moje zdj.jpg'")
+    out = r(raw)
+    assert "DCIM" not in out and "Moje" not in out and "R58-ab" not in out
+    assert out.endswith(r"\AdMeNot\transfers/<path>'")
+    assert r(r"D:\data\admenot\transfers\R58-ab\x\files\a.jpg failed") == \
+        r"D:\data\admenot\transfers/<path> failed"
+
+
+def test_adb_line_collapses_client_paths():
+    line = "2026-10-25T12:00:00\tR58T00TEST\tok\t0.1s\tfind -H '/sdcard/Music' -type f\n"
+    assert adb_line(line, ["R58T00TEST"], home=HOME, user="x") == \
+        "12:00:00\tok\t0.1s\tfind -H '/sdcard/<path>' -type f"

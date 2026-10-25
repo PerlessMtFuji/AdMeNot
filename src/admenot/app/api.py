@@ -9,6 +9,7 @@ Protokół i dane serwisu nie dotykają telefonu, więc idą bez JobRunner (pywe
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import os
 import re
@@ -17,7 +18,7 @@ import sys
 import threading
 import time
 import webbrowser
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import asdict, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -95,7 +96,7 @@ from admenot.engine.journal.db import (
     ScreenshotLimit,
 )
 from admenot.engine.mirror import Mirror, MirrorUnavailable
-from admenot.engine.oplock import device_lock
+from admenot.engine.oplock import DeviceBusy, device_lock
 from admenot.engine.paths import incident_path, journal_path, logs_dir, screenshot_files
 from admenot.engine.phones.provider import PhoneMatch, PhoneProvider
 from admenot.engine.report.files import UnknownOrder, write_report
@@ -172,7 +173,7 @@ _SHARE_ID = re.compile(r"[A-Za-z0-9-]{1,64}")
 SHOWN_MAX = 200  # pamiętane kody kontrolne pokazane klientom w tej sesji; najstarsze odpadają
 TRANSFER_PURGE_S = 24 * 3600.0  # kopie danych po terminie: sprawdzane też w trakcie pracy okna
 TRANSFER_PROGRESS_S = 0.5  # dławienie zdarzeń `transfer:progress`
-TRANSFER_QUIT_WAIT = 10.0  # zamknięcie okna czeka tyle na zatrzymanie kopii
+TRANSFER_KINDS = frozenset({"transfer_scan", "backup"})
 
 
 def _real_host(adb_path: str | None) -> AdbTransport:
@@ -224,6 +225,30 @@ def _selection(value: Any) -> Selection:
     if not lists["categories"] <= set(FILE_CATEGORIES):
         raise AppError("bad_request", "selection")
     return Selection(**flags, **lists, verify_hash=verify)
+
+
+@contextlib.contextmanager
+def _transfer_errors(kind: str) -> Iterator[None]:
+    """Błędy zadań kopii danych. Znane przechodzą jak zwykle (`BackupError` → `transfer_<klucz>`);
+    każdy inny to `transfer_failed`: pełny wyjątek tylko w lokalnym logu, a raport błędu dostaje typ
+    i komunikat po `redact` (ścieżki z telefonu i z kopii zwinięte) — nazwy plików klienta nie
+    wychodzą z komputera."""
+    try:
+        yield
+    except BackupError as exc:
+        raise AppError(f"transfer_{exc.key}") from None
+    except (AppError, AdbError, DeviceBusy, Stopped):
+        raise
+    except Exception as exc:  # noqa: BLE001 — każdy inny błąd kopii pod jednym kluczem
+        extra: dict[str, Any] = {}
+        try:
+            extra["log"] = str(log_exception(exc))
+        except OSError:
+            extra["log_failed"] = True
+        crash_id = crash.capture(exc, message=f"{type(exc).__name__}: {exc}", context={"job": kind})
+        if crash_id:
+            extra["crash"] = crash_id
+        raise AppError("transfer_failed", type(exc).__name__, **extra) from None
 
 
 def _api(method: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]:
@@ -1462,6 +1487,10 @@ class Api:
         crash.note_names([name])
 
         def run(job: Job) -> None:
+            with _transfer_errors("transfer_scan"):
+                scan(job)
+
+        def scan(job: Job) -> None:
             device = read_device_info(adb)
             crash.note_device(device.serial, device.manufacturer, device.model, device.android_release)
             match = self._provider.match(device)
@@ -1514,10 +1543,8 @@ class Api:
         def run(job: Job) -> None:
             self._backup_serial = serial
             try:
-                with device_lock(journal_path(), serial):
+                with _transfer_errors("backup"), device_lock(journal_path(), serial):
                     result, copy = self._run_backup(job, adb, raw, device, inventory, client, chosen)
-            except BackupError as exc:
-                raise AppError(f"transfer_{exc.key}") from None
             finally:
                 self._backup_serial = None
             self._emit("transfer:done", {"result": backup_result_view(result),
@@ -1544,9 +1571,10 @@ class Api:
             self._emit("transfer:progress", asdict(p))
 
         def wait_device() -> None:
+            # Zatrzymanie w czasie czekania: wracamy, a silnik sam kończy przebieg wynikiem
+            # „stopped” (jak zatrzymanie w trakcie kopii) — z `transfer:done` i statystyką.
             waiting = False
-            while True:
-                job.check()
+            while not job.should_stop():
                 try:
                     if raw.run(["get-state"]).strip() == "device":
                         return
@@ -1816,13 +1844,15 @@ class Api:
         self._close_fn = close
         self._pick_file_fn = pick_file
 
+    def _transfer_job(self) -> Job | None:
+        job = self._jobs.current()
+        return job if job is not None and job.kind in TRANSFER_KINDS else None
+
     def _shutdown(self) -> None:
         self._purge_stop.set()
-        job = self._jobs.current()
-        if job is not None and job.kind in ("backup", "transfer_scan"):
-            # Kopia zatrzymana porządnie (zabity `adb pull`, stan zapisany) — wznowi się później.
-            self._jobs.stop(job.id)
-            job.done.wait(TRANSFER_QUIT_WAIT)
+        job = self._transfer_job()
+        if job is not None:
+            self._jobs.stop(job.id)  # bez czekania: `_shutdown` bywa wołane z wątku GUI
         self._updates.stop()
         self._mirror.stop()
         self._watcher.stop()
@@ -1840,12 +1870,21 @@ class Api:
             threading.Thread(target=self._emit, args=("app:close_requested", {"kind": job.kind}),
                              daemon=True).start()
             return False
+        job = self._transfer_job()
+        if job is not None:
+            # Kopia się wznowi, więc nie pytamy — tylko zatrzymujemy ją porządnie (zabity `adb pull`,
+            # stan zapisany) i zamykamy okno po jej końcu. Nigdy nie czekamy na wątku GUI: zdarzenia
+            # zadania (`run_js`) czekają na ten sam wątek.
+            self._jobs.stop(job.id)
+            threading.Thread(target=self._close_after, args=(job,), daemon=True,
+                             name="admenot-quit").start()
+            return False
         self._shutdown()
         return True
 
     @_api
     def quit(self) -> dict[str, Any]:
-        job = self._order_in_progress()
+        job = self._order_in_progress() or self._transfer_job()
         if job is not None:
             self._jobs.stop(job.id)
             if not job.done.wait(QUIT_WAIT):

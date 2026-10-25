@@ -492,6 +492,7 @@ class _Backup:
 
     def _app(self, package: str, version_code: int | None, target: Path, tmp: Path) -> dict[str, Any]:
         while True:
+            self._check_stop()  # przerwanie w czasie czekania na telefon: bez kolejnych prób
             try:
                 paths = backup_apks(ApkReadAdb(self.raw, package), package, version_code, target, tmp)
                 return {"status": "done", "bytes": sum(p.stat().st_size for p in paths)}

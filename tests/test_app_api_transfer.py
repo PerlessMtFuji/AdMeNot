@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import time
 from datetime import timedelta
 from pathlib import Path
 
@@ -16,7 +17,7 @@ from faketransfer import FakeStoragePhone, TransferPhone
 from telephony_fixtures import install_telephony
 
 from admenot.engine.device.info import DeviceInfo
-from admenot.engine.paths import telemetry_path
+from admenot.engine.paths import crashes_dir, telemetry_path
 from admenot.engine.transfer import backup as backup_mod
 from admenot.engine.transfer import store
 
@@ -152,8 +153,9 @@ def test_delete_transfer(tmp_path):
     assert api.delete_transfer(copy_id)["error"]["key"] == "bad_request"
 
 
-def test_delete_transfer_busy(tmp_path):
-    api, rec, phone = _inventoried(tmp_path, sync=False)
+def _held_backup(tmp_path):
+    """Kopia w toku (sync=False) zatrzymana w pierwszym `pull` do `release.set()`."""
+    api, rec, phone = _inventoried(tmp_path, sync=False, transfer_purge_s=None)
     assert api._jobs.wait(5)
     entered, release = threading.Event(), threading.Event()
 
@@ -163,8 +165,13 @@ def test_delete_transfer_busy(tmp_path):
 
     phone.storage.before_pull = hold
     api.start_backup(SELECTION)
+    assert entered.wait(5)
+    return api, rec, release
+
+
+def test_delete_transfer_busy(tmp_path):
+    api, rec, release = _held_backup(tmp_path)
     try:
-        assert entered.wait(5)
         copy_id = api.transfers()["copies"][0]["id"]
         assert api.delete_transfer(copy_id)["error"]["key"] == "busy"
     finally:
@@ -172,6 +179,110 @@ def test_delete_transfer_busy(tmp_path):
     rec.wait_for("transfer:done")
     assert api._jobs.wait(5)
     assert api.delete_transfer(copy_id) == {"deleted": copy_id}
+
+
+def test_purge_skips_copy_of_busy_phone(tmp_path):
+    api, rec, release = _held_backup(tmp_path)
+    try:
+        old = store.create_copy(SERIAL, _device(), None, NOW - timedelta(days=8))
+        api.transfers()
+        assert old.path.exists()  # telefon zajęty kopią: nic z jego kopii nie znika
+    finally:
+        release.set()
+    rec.wait_for("transfer:done")
+    assert api._jobs.wait(5)
+    api.transfers()
+    assert not old.path.exists()
+
+
+def test_closing_window_during_backup_does_not_wait(tmp_path):
+    api, rec, release = _held_backup(tmp_path)
+    closed = threading.Event()
+    api._attach(pick_folder=lambda: None, close=closed.set)
+    started = time.monotonic()
+    try:
+        assert api._on_closing() is False  # wątek GUI wraca od razu
+        assert time.monotonic() - started < 1.0
+        assert not closed.is_set()
+    finally:
+        release.set()
+    assert closed.wait(5)  # okno zamyka się samo po porządnym zatrzymaniu kopii
+    assert rec.wait_for("transfer:done")["result"]["status"] == "stopped"
+    assert api.transfers()["copies"][0]["status"] == "in_progress"
+    assert api._on_closing() is True
+
+
+def _offline_after_first_file(phone, on_offline):
+    """Pull urywa się po pierwszym pliku; każde `get-state` bez telefonu woła `on_offline(n)`."""
+    phone.storage.fail_after_files = 1
+    real = phone.storage.run
+    calls = {"n": 0}
+
+    def run(args, timeout=20.0):
+        if args == ["get-state"] and not phone.storage.online:
+            calls["n"] += 1
+            on_offline(calls["n"])
+        return real(args, timeout)
+
+    phone.storage.run = run
+
+
+def test_wait_device_emits_waiting_once_and_resumes(tmp_path):
+    api, rec, phone = _inventoried(tmp_path, poll_interval=0.0)
+
+    def back_after_three(n):
+        if n >= 4:
+            phone.storage.fail_after_files = None
+            phone.storage.reconnect()
+
+    _offline_after_first_file(phone, back_after_three)
+    api.start_backup(SELECTION)
+    assert len(rec.of("transfer:waiting")) == 1
+    assert rec.of("transfer:done")[0]["result"]["status"] == "complete"
+
+
+def test_stop_while_waiting_for_phone_finishes_as_stopped(tmp_path):
+    api, rec, phone = _inventoried(tmp_path, poll_interval=0.0)
+    api.set_telemetry(True, False)
+
+    def stop(n):
+        if n >= 3:
+            api.stop(api._jobs.current().id)
+
+    _offline_after_first_file(phone, stop)
+    api.start_backup(SELECTION)
+    assert len(rec.of("transfer:waiting")) == 1
+    done = rec.of("transfer:done")[0]
+    assert done["result"]["status"] == "stopped" and done["copy"]["status"] == "in_progress"
+    assert not rec.of("job:error")
+    events = [json.loads(x) for x in telemetry_path().read_text("utf-8").splitlines()]
+    assert [e["status"] for e in events if e["type"] == "transfer_backup"] == ["stopped"]
+
+
+def test_start_backup_refused_when_phone_is_gone(tmp_path):
+    api, _, phone = _inventoried(tmp_path)
+    phone.cli.host["devices -l"] = "List of devices attached\n\n"
+    assert api.start_backup(SELECTION)["error"]["key"] == "transfer_no_inventory"
+    assert api.transfer_whatsapp()["error"]["key"] == "transfer_no_inventory"
+
+
+def test_unexpected_backup_error_has_fixed_key_and_no_file_names(tmp_path, monkeypatch):
+    api, rec, _ = _inventoried(tmp_path)
+
+    def broken(*args, **kwargs):
+        message = "cannot read '/sdcard/DCIM/Camera/a.jpg' into " + str(
+            store.transfers_dir() / "x" / "files" / "DCIM" / "a.jpg")
+        raise RuntimeError(message)
+
+    monkeypatch.setattr("admenot.app.api.run_backup", broken)
+    api.start_backup(SELECTION)
+    error = rec.of("job:error")[0]
+    assert error["key"] == "transfer_failed" and error["message"] == "RuntimeError"
+    report = json.loads((crashes_dir() / f"{error['crash']}.json").read_text("utf-8"))
+    text = json.dumps(report)
+    assert report["context"]["job"] == "backup" and "<path>" in report["error"]["message"]
+    for name in ("DCIM", "Camera", "a.jpg"):
+        assert name not in text, name
 
 
 def test_purge_on_start(tmp_path):
