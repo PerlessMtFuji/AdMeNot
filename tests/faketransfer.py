@@ -6,7 +6,12 @@ Emuluje z katalogu `root` (wzór: skrypt `adb-backup/tests/fake_adb.py`):
   URI z `://` i `/` zamienionymi na `_` (patrz `provider_file`); treść jest gotowym wyjściem
   `content query` (`Row: 0 _id=1, …`),
 * załączniki MMS: `content read --uri content://mms/part/N` -> bajty z `root/mms_parts/N`,
-* `adb pull` (jako `Puller`): kopiuje z `root/sdcard`, zachowując czas modyfikacji.
+* `adb pull` (jako `Puller`): kopiuje z `root/sdcard`, zachowując czas modyfikacji,
+* aplikacje (`apps`: pakiet -> {nazwa APK: bajty}): `pm path`, `sha256sum` i `adb pull` pliku APK
+  pod `APK_DIR` — tyle, ile potrzebuje `backup_apks`.
+
+Haki testowe: `before_pull(remotes)` wołane na początku każdego `pull` (np. zmiana albo usunięcie
+pliku w trakcie kopii), `pull_calls` = liczba wywołań `pull`.
 
 Awarie: `fail_after_files` (po tylu pobranych plikach pull urywa się w środku pliku, a telefon
 przechodzi w stan `offline` do `reconnect()`), `deny_uris` (odmowa dostępu do providera),
@@ -26,6 +31,7 @@ from admenot.engine.adb.transport import AdbError
 from admenot.engine.transfer.puller import PullResult
 
 _MMS_PREFIX = "content://mms/part/"
+APK_DIR = "/data/app/~~fake==/{package}-1"
 
 
 def provider_file(root: Path, uri: str) -> Path:
@@ -54,6 +60,9 @@ class FakeStoragePhone:
         self.free_kb = 70_000_000
         self.commands: list[str] = []  # polecenia shell w kolejności wywołań
         self.pulled: list[str] = []  # zdalne ścieżki plików pobranych `pull`
+        self.pull_calls = 0
+        self.before_pull: Callable[[list[str]], None] | None = None
+        self.apps: dict[str, dict[str, bytes]] = {}
 
     # ---- stan ---------------------------------------------------------------------------
     def get_state(self) -> str:
@@ -81,6 +90,8 @@ class FakeStoragePhone:
             return "device\n"
         if len(args) == 3 and args[:2] == ["shell", "-T"]:
             return self._shell(args[2]).decode("utf-8")
+        if len(args) == 3 and args[0] == "pull":
+            return self._pull_apk(args[1], Path(args[2]))
         raise AdbError("command_failed", f"fake: unsupported {args}")
 
     def run_bytes(self, args: list[str], timeout: float = 20.0) -> bytes:
@@ -96,6 +107,8 @@ class FakeStoragePhone:
             raise AdbError("offline", "device offline")
         self.commands.append(command)
         argv = shlex.split(command)
+        if argv[:2] == ["pm", "path"] and len(argv) == 3:
+            return self._pm_path(argv[2])
         handler = {"find": self._find, "stat": self._stat, "df": self._df,
                    "sha256sum": self._sha256, "content": self._content, "ls": self._ls}.get(argv[0])
         if handler is None:
@@ -174,6 +187,9 @@ class FakeStoragePhone:
     def _sha256(self, args: list[str]) -> bytes:
         lines = []
         for remote in args:
+            if (apk := self._apk(remote)) is not None:
+                lines.append(f"{hashlib.sha256(apk).hexdigest()}  {remote}")
+                continue
             path = self.local(remote)
             if not path.is_file():
                 raise AdbError("command_failed", f"sha256sum: {remote}: No such file or directory")
@@ -198,9 +214,35 @@ class FakeStoragePhone:
                                              f"java.io.FileNotFoundException: No entry for {args[2]}")
         return part.read_bytes()
 
+    # ---- aplikacje ------------------------------------------------------------------------
+    def _apk(self, remote: str) -> bytes | None:
+        for package, files in self.apps.items():
+            prefix = APK_DIR.format(package=package) + "/"
+            if remote.startswith(prefix) and remote[len(prefix):] in files:
+                return files[remote[len(prefix):]]
+        return None
+
+    def _pm_path(self, package: str) -> bytes:
+        if package not in self.apps:
+            raise AdbError("command_failed", f"Error: Unknown package: {package}")
+        return "".join(f"package:{APK_DIR.format(package=package)}/{n}\n"
+                       for n in self.apps[package]).encode("utf-8")
+
+    def _pull_apk(self, remote: str, local: Path) -> str:
+        if not self.online:
+            raise AdbError("offline", "device offline")
+        apk = self._apk(remote)
+        if apk is None:
+            raise AdbError("command_failed", f"remote object '{remote}' does not exist")
+        local.write_bytes(apk)
+        return f"{remote}: 1 file pulled\n"
+
     # ---- Puller ---------------------------------------------------------------------------
     def pull(self, remotes: list[str], target: Path, should_stop: Callable[[], bool],
              tick: Callable[[], None]) -> PullResult:
+        self.pull_calls += 1
+        if self.before_pull is not None:
+            self.before_pull(remotes)
         lines: list[str] = []
         if not self.online:
             return PullResult(1, ["adb: error: device offline"], False)
