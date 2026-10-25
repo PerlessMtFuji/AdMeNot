@@ -15,6 +15,7 @@ przechodzi w stan `offline` do `reconnect()`), `deny_uris` (odmowa dostępu do p
 
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import os
 import shlex
@@ -96,7 +97,7 @@ class FakeStoragePhone:
         self.commands.append(command)
         argv = shlex.split(command)
         handler = {"find": self._find, "stat": self._stat, "df": self._df,
-                   "sha256sum": self._sha256, "content": self._content}.get(argv[0])
+                   "sha256sum": self._sha256, "content": self._content, "ls": self._ls}.get(argv[0])
         if handler is None:
             raise AdbError("command_failed", f"{argv[0]}: inaccessible or not found")
         return handler(argv[1:])
@@ -113,7 +114,12 @@ class FakeStoragePhone:
         prune_paths: set[str] = set()
         prune_names: set[str] = set()
         j = 0
+        match_name: str | None = None
         while j < len(expr) and expr[j] in ("-path", "-name"):
+            if expr[j] == "-name" and expr[j + 2] == "-type":  # filtr nazwy, bez -prune
+                match_name = expr[j + 1]
+                j += 2
+                break
             (prune_paths if expr[j] == "-path" else prune_names).add(expr[j + 1])
             j += 4  # -path X -prune -o
         assert expr[j:j + 6] == ["-type", "f", "-exec", "stat", "-c", "%s|%Y|%n"], expr[j:]
@@ -128,11 +134,18 @@ class FakeStoragePhone:
                 dirnames[:] = [d for d in dirnames
                                if d not in prune_names and f"{rdir}/{d}" not in prune_paths]
                 for name in filenames:
-                    if name in prune_names:
+                    if name in prune_names or (match_name and not fnmatch.fnmatchcase(name, match_name)):
                         continue
                     st = os.stat(os.path.join(dirpath, name))
                     out.append(f"{st.st_size}|{int(st.st_mtime)}|{rdir}/{name}")
         return ("\n".join(sorted(out)) + "\n").encode("utf-8") if out else b""
+
+    def _ls(self, args: list[str]) -> bytes:
+        assert args[0] == "-1" and len(args) == 2, args
+        base = self.local(args[1])
+        if not base.is_dir():
+            raise AdbError("command_failed", f"ls: {args[1]}: No such file or directory")
+        return "".join(f"{p.name}\n" for p in sorted(base.iterdir())).encode("utf-8")
 
     def _stat(self, args: list[str]) -> bytes:
         assert args[0] == "-c" and args[1] == "%s|%Y|%n", args
