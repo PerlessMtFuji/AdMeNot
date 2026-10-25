@@ -11,7 +11,7 @@
   import DeviceCard from '../components/DeviceCard.svelte';
   import type { Controller } from '../lib/controller';
   import { i18n, t, tp } from '../lib/i18n/index.svelte';
-  import { formatSize, modelName, transferTotals, whatsappStale } from '../lib/logic';
+  import { formatSize, isXiaomi, modelName, transferTotals, whatsappStale } from '../lib/logic';
   import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
@@ -31,6 +31,9 @@
   const name = $derived(s.device?.name ?? entry?.name ?? modelName(entry?.model ?? null));
   const crumb = $derived([s.client.trim(), name, t('transfer.mode')].filter(Boolean).join(' · '));
   const nothing = $derived(!totals || totals.categories === 0);
+  const noSpace = $derived(!!inv && !!totals && totals.bytes > inv.free_pc);
+  const blocked = $derived(nothing || noSpace || s.job !== null);
+  const serial = $derived(s.device?.serial ?? s.serial ?? '');
   let listOpen = $state(false);
 
   const num = (n: number) => new Intl.NumberFormat(i18n.lang === 'pl' ? 'pl-PL' : 'en-US').format(n);
@@ -102,7 +105,7 @@
         <Banner tone="info" icon="rotate-ccw" title={t('transfer.resume_title', { when: when(r.created) })}>
           {t('transfer.resume_text')}
           {#snippet actions()}
-            <Button variant="primary" size="sm" disabled={nothing || s.job !== null} onclick={() => ctl.startBackup()}>{t('transfer.resume')}</Button>
+            <Button variant="primary" size="sm" disabled={blocked} onclick={() => ctl.startBackup()}>{t('transfer.resume')}</Button>
           {/snippet}
         </Banner>
       {/if}
@@ -110,7 +113,11 @@
       <span class="lbl mt-1">{t('transfer.group.phone')}</span>
       {#each phoneRows as r (r.key)}{@render row(r)}{/each}
       {#if phoneUnreadable}
-        <Banner tone="warn" icon="triangle-alert" title={t('transfer.unreadable')}>{t('transfer.xiaomi_hint')}</Banner>
+        {#if isXiaomi(s.device)}
+          <Banner tone="warn" icon="triangle-alert" title={t('transfer.unreadable')}>{t('transfer.xiaomi_hint')}</Banner>
+        {:else}
+          <Banner tone="warn" icon="triangle-alert" title={t('transfer.unreadable')} />
+        {/if}
       {/if}
 
       <span class="lbl mt-2">{t('transfer.group.files')}</span>
@@ -128,7 +135,7 @@
   </main>
 
   <SidePanel label={t('transfer.panel')}>
-    <DeviceCard compact name={name} serial={s.serial ?? ''} imei={s.device?.imei ?? entry?.imei} image={s.device?.image ?? null}
+    <DeviceCard compact name={name} {serial} imei={s.device?.imei ?? entry?.imei} image={s.device?.image ?? null}
       details={s.device ? `${s.device.model} · Android ${s.device.android}` : modelName(entry?.model ?? null)} connected />
     {#if inv && totals}
       <span class="lbl mt-2">{t('transfer.panel')}</span>
@@ -137,11 +144,11 @@
         <div class="flex justify-between gap-3"><dt class="text-mut">{t('transfer.eta')}</dt><dd class="font-bold">{t('transfer.eta_value', { min: totals.etaMin })}</dd></div>
         <div class="flex justify-between gap-3"><dt class="text-mut">{t('transfer.free')}</dt><dd class="font-bold">{size(inv.free_pc)}</dd></div>
       </dl>
-      {#if totals.bytes > inv.free_pc}<Banner tone="warn" icon="triangle-alert" title={t('transfer.no_space')} />{/if}
+      {#if noSpace}<Banner tone="warn" icon="triangle-alert" title={t('transfer.no_space')} />{/if}
       <div class="flex items-start gap-2.5 rounded-xl bg-neutral-soft p-3 text-sm text-mut">
         <span class="mt-0.5 flex-none text-soft"><Icon name="lock" size={15} /></span><span>{t('transfer.privacy')}</span>
       </div>
-      <Button variant="primary" size="lg" class="flex-col !gap-0" disabled={nothing || s.job !== null} onclick={() => ctl.startBackup()}>
+      <Button variant="primary" size="lg" class="flex-col !gap-0" disabled={blocked} onclick={() => ctl.startBackup()}>
         {t('transfer.begin')}
         <small class="text-xs font-semibold opacity-85">{tp('transfer.categories', totals.categories)} · {size(totals.bytes)}</small>
       </Button>

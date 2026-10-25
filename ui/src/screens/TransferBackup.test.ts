@@ -68,6 +68,16 @@ describe('TransferBackup', () => {
     expect(screen.getByText(/bez adresów: 3/)).toBeTruthy();
   });
 
+  test('unavailable data on another brand: plain notice, no Xiaomi hint', async () => {
+    const { s } = await show('transfer_done');
+    s.device = { manufacturer: 'samsung', brand: 'samsung' } as never;
+    s.transfer.result = result({ telephony: { sms: { status: 'unavailable', count: 0 } } });
+    s.transfer.copy = COPY;
+    await tick();
+    expect(screen.getByText('Telefon nie pozwolił odczytać tych danych.')).toBeTruthy();
+    expect(screen.queryByText(/Debugowanie USB/)).toBeNull();
+  });
+
   test('a stopped copy says so and can be resumed later', async () => {
     const { s } = await show('transfer_done');
     s.transfer.result = result({ status: 'stopped' });

@@ -4,6 +4,8 @@ import {
   backupOutcome,
   changedVerdicts,
   defaultTransferSelection,
+  isXiaomi,
+  resumeSelection,
   transferStages,
   transferTotals,
   whatsappStale,
@@ -626,6 +628,23 @@ describe('data transfer', () => {
     const big = inv({ categories: { media: { files: 1, bytes: 25 * 1024 ** 2 * 60 * 10 }, downloads: { files: 0, bytes: 0 },
       whatsapp: { files: 0, bytes: 0 } } });
     expect(transferTotals(big, defaultTransferSelection(big)).etaMin).toBe(10);
+  });
+
+  test('a resumed copy starts from its stored selection, narrowed to what the phone still has', () => {
+    const data = inv();
+    expect(resumeSelection(data, undefined)).toEqual(defaultTransferSelection(data));
+    expect(resumeSelection(data, {})).toEqual(defaultTransferSelection(data));
+    expect(resumeSelection(data, { contacts: false, sms: true, mms: false, calls: true,
+      categories: ['downloads', 'media'], others: ['Music', 'Gone'], apps: ['b.sus', 'x.removed'] })).toEqual({
+      contacts: false, sms: true, mms: false, calls: true, categories: ['media'], others: ['Music'], apps: ['b.sus'] });
+    expect(resumeSelection(inv({ sms: null }), { sms: true }).sms).toBe(false);
+  });
+
+  test('Xiaomi, Redmi and POCO phones are recognised by maker or brand', () => {
+    expect(isXiaomi({ manufacturer: 'Xiaomi' })).toBe(true);
+    expect(isXiaomi({ manufacturer: 'unknown', brand: 'POCO' })).toBe(true);
+    expect(isXiaomi({ manufacturer: 'samsung', brand: 'samsung' })).toBe(false);
+    expect(isXiaomi(null)).toBe(false);
   });
 
   test('transfer stages follow the transfer phases', () => {

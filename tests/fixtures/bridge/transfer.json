@@ -933,15 +933,18 @@
        "telephony": {
         "contacts": {
          "status": "ok",
-         "count": 2
+         "count": 2,
+         "error": null
         },
         "sms": {
          "status": "ok",
-         "count": 2
+         "count": 2,
+         "error": null
         },
         "calls": {
          "status": "ok",
-         "count": 1
+         "count": 1,
+         "error": null
         }
        }
       },
@@ -965,6 +968,24 @@
         "contacts": 2,
         "sms": 2,
         "calls": 1
+       },
+       "selection": {
+        "contacts": true,
+        "sms": true,
+        "mms": false,
+        "calls": true,
+        "categories": [
+         "downloads",
+         "media",
+         "whatsapp"
+        ],
+        "others": [
+         "Music"
+        ],
+        "apps": [
+         "com.whatsapp"
+        ],
+        "verify_hash": false
        }
       }
      }
@@ -1003,6 +1024,24 @@
        "contacts": 2,
        "sms": 2,
        "calls": 1
+      },
+      "selection": {
+       "contacts": true,
+       "sms": true,
+       "mms": false,
+       "calls": true,
+       "categories": [
+        "downloads",
+        "media",
+        "whatsapp"
+       ],
+       "others": [
+        "Music"
+       ],
+       "apps": [
+        "com.whatsapp"
+       ],
+       "verify_hash": false
       }
      }
     ]

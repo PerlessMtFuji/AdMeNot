@@ -3,7 +3,7 @@
   import DeviceCard from '../components/DeviceCard.svelte';
   import type { Controller } from '../lib/controller';
   import { i18n, t, tp } from '../lib/i18n/index.svelte';
-  import { backupOutcome, formatSize, modelName } from '../lib/logic';
+  import { backupOutcome, formatSize, isXiaomi, modelName } from '../lib/logic';
   import type { TelephonyResult } from '../lib/types';
   import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
@@ -86,8 +86,10 @@
       {:else}
         <Banner tone="warn" icon="triangle-alert" title={t('transfer.done_warn')}>{t('transfer.done_warn_text')}</Banner>
       {/if}
-      {#if unavailable}
+      {#if unavailable && isXiaomi(s.device)}
         <Banner tone="warn" icon="info" title={t('transfer.unreadable')}>{t('transfer.xiaomi_hint')}</Banner>
+      {:else if unavailable}
+        <Banner tone="warn" icon="info" title={t('transfer.unreadable')} />
       {/if}
       <Card>
         <dl class="flex flex-col gap-1.5 px-5 py-4 text-sm">
@@ -116,7 +118,7 @@
   </main>
 
   <SidePanel label={t('phone.subject')}>
-    <DeviceCard compact name={name} serial={s.serial ?? ''} imei={s.device?.imei ?? entry?.imei} image={s.device?.image ?? null}
+    <DeviceCard compact name={name} serial={s.device?.serial ?? s.serial ?? ''} imei={s.device?.imei ?? entry?.imei} image={s.device?.image ?? null}
       details={s.device ? `${s.device.model} · Android ${s.device.android}` : modelName(entry?.model ?? null)} connected={!tr.waiting} />
   </SidePanel>
 </div>

@@ -105,13 +105,16 @@ def test_start_backup_completes_and_lists(tmp_path):
     done = rec.of("transfer:done")[0]
     assert done["result"]["status"] == "complete"
     assert done["result"]["files_done"] == 5 and done["result"]["apps_done"] == 1
-    assert done["result"]["telephony"]["contacts"] == {"status": "ok", "count": 2}
+    assert done["result"]["telephony"]["contacts"] == {"status": "ok", "count": 2, "error": None}
     assert done["copy"]["status"] == "complete" and done["copy"]["client"] == "Anna K."
     assert rec.of("transfer:progress")
     copies = api.transfers()["copies"]
     assert len(copies) == 1
     assert copies[0]["days_left"] == 7 and copies[0]["id"] == done["copy"]["id"]
     assert copies[0]["counts"]["files"] == 5
+    # wybór zapisany w kopii wraca w widoku — wznowienie zaczyna od niego
+    assert copies[0]["selection"]["others"] == ["", "Music"]
+    assert copies[0]["selection"]["apps"] == ["com.whatsapp"] and copies[0]["selection"]["mms"] is False
 
 
 def test_backup_error_maps_to_job_error(tmp_path, monkeypatch):
@@ -325,3 +328,12 @@ def test_transfer_telemetry_off_without_consent(tmp_path):
     api, _, _ = _inventoried(tmp_path)
     api.start_backup(SELECTION)
     assert not telemetry_path().exists()
+
+
+def test_backup_result_view_keeps_telephony_error():
+    from admenot.app.present import backup_result_view
+    from admenot.engine.transfer.backup import BackupResult
+    from admenot.engine.transfer.telephony import CategoryResult
+
+    r = BackupResult("incomplete", "S/1", {"mms": CategoryResult("failed", 4, "addresses_missing:3")}, 0, 0, 0, 0, 0, 1)
+    assert backup_result_view(r)["telephony"]["mms"] == {"status": "failed", "count": 4, "error": "addresses_missing:3"}

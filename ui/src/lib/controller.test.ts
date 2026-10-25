@@ -1247,3 +1247,47 @@ describe('data transfer', () => {
     expect(s.transfer.inventory).toBeNull();
   });
 });
+
+describe('data transfer — resuming', () => {
+  const RESUMABLE = { id: 'R58T00TEST-x/20260925-100000', model: 'SM-A145R', manufacturer: 'samsung', client: 'Anna K.',
+    created: '2026-09-25T10:00:00', expires: '2026-10-02T10:00:00', days_left: 6, status: 'in_progress' as const, bytes: 0,
+    counts: {} };
+
+  test('the inventory of a phone with an interrupted copy starts from that copy\'s selection', async () => {
+    const { ctl, s, bridge } = setup('transfer');
+    await ctl.init();
+    s.phase = 'transfer_choose';
+    const event = (await import('../../../tests/fixtures/bridge/transfer.json')).default.calls
+      .find((c) => c.method === 'transfer_inventory')!.events.find(([name]) => name === 'transfer:inventory')![1] as never;
+    bridge.emit('transfer:inventory', { ...(event as object), resumable: { ...RESUMABLE, selection: {
+      contacts: true, sms: false, mms: false, calls: false, categories: ['media'], others: ['Music', 'Gone'],
+      apps: ['com.whatsapp'], verify_hash: false } as never } } as never);
+    expect(s.transfer.selection).toEqual({ contacts: true, sms: false, mms: false, calls: false, categories: ['media'],
+      others: ['Music'], apps: ['com.whatsapp'] });
+    await ctl.startBackup();
+    expect(bridge.calls.find((c) => c.method === 'start_backup')?.args[0]).toEqual({ contacts: true, sms: false, mms: false,
+      calls: false, categories: ['media'], others: ['Music'], apps: ['com.whatsapp'] });
+  });
+
+  test('re-ticking apps selects every app when none is on by default', async () => {
+    const { ctl, s } = setup('transfer');
+    await ctl.init();
+    s.transfer.inventory = { apps: [{ package: 'a', label: 'A', verdict: 'suspicious', default_on: false, bytes: null }],
+      others: [] } as never;
+    ctl.toggleTransfer('apps');
+    expect(s.transfer.selection.apps).toEqual(['a']);
+    ctl.toggleTransfer('apps');
+    expect(s.transfer.selection.apps).toEqual([]);
+  });
+
+  test('after a backup error the interrupted copy is offered for resuming', async () => {
+    const { ctl, s, bridge } = setup('empty');
+    await ctl.init();
+    s.phase = 'transfer_backup';
+    s.device = { serial: 'R58T00TEST', manufacturer: 'samsung', model: 'SM-A145R' } as never;
+    bridge.setCopies([{ ...RESUMABLE, id: 'OTHER/20260925-100000', model: 'Pixel 7', manufacturer: 'Google' }, RESUMABLE]);
+    bridge.emit('job:error', { job_id: 'job-2', kind: 'backup', key: 'transfer_disk_full', message: '' });
+    await vi.waitFor(() => expect(s.transfer.resumable?.id).toBe(RESUMABLE.id));
+    expect(s.phase).toBe('transfer_choose');
+  });
+});

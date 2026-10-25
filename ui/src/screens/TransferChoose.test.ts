@@ -74,10 +74,37 @@ describe('TransferChoose', () => {
     expect(screen.getByRole('button', { name: 'Sprawdź ponownie' })).toBeTruthy();
   });
 
-  test('unreadable messages are unticked with the Xiaomi hint', async () => {
-    await show({ sms: null, mms: null });
+  test('unreadable messages are unticked with the Xiaomi hint on a Xiaomi phone', async () => {
+    const { s } = await show({ sms: null, mms: null });
+    s.device = { serial: 'R58T00TEST', manufacturer: 'Xiaomi', brand: 'Redmi' } as never;
+    await tick();
     expect((screen.getByRole('checkbox', { name: /SMS i MMS/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('Telefon nie pozwolił odczytać tych danych.')).toBeTruthy();
     expect(screen.getByText(/Debugowanie USB \(ustawienia zabezpieczeń\)/)).toBeTruthy();
+  });
+
+  test('other brands get the plain unreadable notice without the Xiaomi hint', async () => {
+    const { s } = await show({ sms: null, mms: null });
+    s.device = { serial: 'R58T00TEST', manufacturer: 'samsung', brand: 'samsung' } as never;
+    await tick();
+    expect(screen.getByText('Telefon nie pozwolił odczytać tych danych.')).toBeTruthy();
+    expect(screen.queryByText(/Debugowanie USB \(ustawienia zabezpieczeń\)/)).toBeNull();
+  });
+
+  test('a selection bigger than the free disk space cannot start', async () => {
+    await show({ free_pc: 100 * MB });
+    expect(screen.getByText('Za mało miejsca na dysku komputera na tę kopię.')).toBeTruthy();
+    expect((screen.getByRole('button', { name: /Rozpocznij kopię/ }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  test('the side panel shows the serial of the phone being copied', async () => {
+    const { s } = await show();
+    s.serial = 'OTHER123';
+    s.device = { serial: 'R58T00TEST', name: 'samsung SM-A145R', model: 'SM-A145R', android: '14', image: '' } as never;
+    await tick();
+    const panel = within(screen.getByRole('complementary'));
+    expect(panel.getByText('R58T00TEST')).toBeTruthy();
+    expect(panel.queryByText('OTHER123')).toBeNull();
   });
 
   test('a resumable copy offers to resume it', async () => {

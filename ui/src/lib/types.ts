@@ -484,7 +484,6 @@ export interface TransferSelection {
   categories: TransferCategory[];
   others: string[];
   apps: string[];
-  verify_hash?: boolean;
 }
 
 export interface CopyView {
@@ -498,6 +497,8 @@ export interface CopyView {
   status: 'in_progress' | 'complete' | 'incomplete';
   bytes: number;
   counts: Record<string, number>;
+  /** Wybór zapisany w kopii (pusty, gdy kopia jeszcze nie ruszyła); wznowienie zaczyna od niego. */
+  selection?: Partial<TransferSelection>;
 }
 
 export type TransferStage = 'telephony' | 'files' | 'apps' | 'verify';

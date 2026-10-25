@@ -564,6 +564,26 @@ export function defaultTransferSelection(inv: InventoryView): TransferSelection 
   };
 }
 
+/** Wybór przerwanej kopii (wznowienie dokłada do niej i nadpisuje jej wybór), zawężony do tego, co telefon
+ *  ma teraz; kopia bez zapisanego wyboru — wybór domyślny. */
+export function resumeSelection(inv: InventoryView, stored: Partial<TransferSelection> | undefined): TransferSelection {
+  if (!stored || !Object.keys(stored).length) return defaultTransferSelection(inv);
+  const others = new Set(inv.others.map((o) => o.name));
+  const apps = new Set(inv.apps.map((a) => a.package));
+  return {
+    contacts: !!stored.contacts && readable(inv.contacts), sms: !!stored.sms && readable(inv.sms),
+    mms: !!stored.mms && readable(inv.mms), calls: !!stored.calls && readable(inv.calls),
+    categories: TRANSFER_CATEGORIES.filter((c) => (stored.categories ?? []).includes(c) && (inv.categories[c]?.files ?? 0) > 0),
+    others: (stored.others ?? []).filter((o) => others.has(o)),
+    apps: (stored.apps ?? []).filter((p) => apps.has(p)),
+  };
+}
+
+/** Xiaomi, Redmi i POCO ukrywają odczyt SMS-ów i kontaktów za osobnym przełącznikiem w opcjach programisty. */
+export function isXiaomi(device: { manufacturer?: string; brand?: string } | null | undefined): boolean {
+  return /xiaomi|redmi|poco/i.test(`${device?.manufacturer ?? ''} ${device?.brand ?? ''}`);
+}
+
 /** Rozmiar zaznaczonych danych, liczba zaznaczonych wierszy ekranu (SMS i MMS to jeden) i czas w minutach. */
 export function transferTotals(inv: InventoryView, sel: TransferSelection): { bytes: number; categories: number; etaMin: number } {
   const others = new Set(sel.others);

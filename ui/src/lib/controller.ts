@@ -1,6 +1,6 @@
 import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
-import { actedAfter, changedVerdicts, defaultSelection, defaultTransferSelection, TRANSFER_CATEGORIES, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
+import { actedAfter, changedVerdicts, defaultSelection, resumeSelection, TRANSFER_CATEGORIES, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
 import { EMPTY_TRANSFER_SELECTION, type AppState } from './state.svelte';
 import { applyTheme } from './theme';
 import type {
@@ -295,6 +295,7 @@ export class Controller {
         s.transfer.waiting = false;
         s.stopping = false;
         s.phase = 'transfer_choose';
+        void this.refreshResumable();
       } else if (d.kind === 'undo') {
         s.undoSites = null;
         s.userWait = null;
@@ -660,7 +661,7 @@ export class Controller {
       if (s.phase !== 'transfer_choose') return; // serwisant już wyszedł z przenoszenia
       s.transfer.inventory = d.inventory;
       s.transfer.resumable = d.resumable;
-      s.transfer.selection = defaultTransferSelection(d.inventory);
+      s.transfer.selection = resumeSelection(d.inventory, d.resumable?.selection);
       s.phase = 'transfer_choose';
     });
     on('transfer:progress', (d) => {
@@ -708,7 +709,10 @@ export class Controller {
     } else if (key === 'others') {
       sel.others = sel.others.length ? [] : (inv?.others ?? []).map((o) => o.name);
     } else if (key === 'apps') {
-      sel.apps = sel.apps.length ? [] : (inv?.apps ?? []).filter((a) => a.default_on).map((a) => a.package);
+      // ponowne zaznaczenie: domyślne aplikacje, a gdy żadna nie jest domyślna — wszystkie (wiersz zawsze coś robi)
+      const all = inv?.apps ?? [];
+      const defaults = all.filter((a) => a.default_on);
+      sel.apps = sel.apps.length ? [] : (defaults.length ? defaults : all).map((a) => a.package);
     } else if ((TRANSFER_CATEGORIES as readonly string[]).includes(key)) {
       const cat = key as TransferCategory;
       sel.categories = sel.categories.includes(cat) ? sel.categories.filter((c) => c !== cat)
@@ -767,6 +771,19 @@ export class Controller {
     if (s.job?.kind === 'transfer_scan') void this.call(this.api.stop(s.job.id));
     this.resetTransfer();
     Object.assign(s, { phase: 'connect', screen: 'main', device: null, stopping: false });
+  }
+
+  /** Po błędzie kopii jest ona niedokończona: baner „Wznów” dostaje najnowszą niedokończoną kopię tego modelu
+   *  (most wznowi właśnie ją — `find_resumable`). Bez trafienia zostaje dotychczasowa. */
+  private async refreshResumable(): Promise<void> {
+    const s = this.state;
+    const r = await this.call(this.api.transfers());
+    if (!r) return;
+    s.transfer.copies = r.copies;
+    const dev = s.device;
+    const copy = r.copies.find((c) => c.status === 'in_progress' && !!dev && c.model === dev.model
+      && c.manufacturer === dev.manufacturer);
+    if (copy && s.phase === 'transfer_choose') s.transfer.resumable = copy;
   }
 
   async loadTransfers(): Promise<void> {

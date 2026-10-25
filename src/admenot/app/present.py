@@ -463,15 +463,17 @@ def inventory_view(inv: Inventory, lang: str) -> dict[str, Any]:
 
 def copy_view(meta: CopyMeta, now: datetime) -> dict[str, Any]:
     """`days_left`: pełne dni do usunięcia, zaokrąglone w górę (0 = po terminie). `now` z zegara
-    `Api` (w testach stały), bo widok sam nie czyta czasu."""
+    `Api` (w testach stały), bo widok sam nie czyta czasu. `selection`: wybór zapisany w kopii —
+    wznowienie przerwanej kopii zaczyna od niego (pusty słownik = kopia bez wyboru)."""
     left = (meta.expires - now).total_seconds()
     return {"id": meta.id, "model": meta.model, "manufacturer": meta.manufacturer,
             "client": meta.client, "created": meta.created.isoformat(timespec="seconds"),
             "expires": meta.expires.isoformat(timespec="seconds"),
             "days_left": max(0, math.ceil(left / 86_400)), "status": meta.status,
-            "bytes": meta.bytes, "counts": dict(meta.counts)}
+            "bytes": meta.bytes, "counts": dict(meta.counts), "selection": dict(meta.selection)}
 
 
 def backup_result_view(r: BackupResult) -> dict[str, Any]:
     return {**{k: v for k, v in asdict(r).items() if k != "telephony"},
-            "telephony": {k: {"status": v.status, "count": v.count} for k, v in r.telephony.items()}}
+            "telephony": {k: {"status": v.status, "count": v.count, "error": v.error}
+                          for k, v in r.telephony.items()}}
