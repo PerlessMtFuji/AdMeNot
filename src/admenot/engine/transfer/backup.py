@@ -524,7 +524,8 @@ class _Backup:
             except NoSpace:
                 raise BackupError("disk_full") from None
             except AdbError as exc:
-                if exc.kind not in _CONNECTION_KINDS:
+                # Kabel wyrwany w trakcie `pull` daje `command_failed`, więc pytamy o telefon.
+                if exc.kind not in _CONNECTION_KINDS and self._online():
                     return {"status": "failed", "error": exc.kind}
                 self._disconnected()
             except OSError as exc:

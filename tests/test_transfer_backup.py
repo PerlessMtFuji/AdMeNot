@@ -363,6 +363,36 @@ def test_app_failure_makes_copy_incomplete(tmp_path):
     assert copy.read_meta().status == "incomplete"
 
 
+def test_apk_pull_cut_by_disconnect_waits_and_retries(tmp_path, monkeypatch):
+    """Wyrwany kabel w trakcie `adb pull` APK daje `command_failed`, nie błąd połączenia
+    (próba na Samsungu A13) — telefon offline znaczy rozłączenie, nie nieudaną aplikację."""
+    phone = _phone(tmp_path)
+    phone.apps = {"com.example.app": {"base.apk": b"base-bytes"}}
+    original = backup_mod.backup_apks
+    calls: list[int] = []
+
+    def cut_once(*args, **kwargs):
+        calls.append(1)
+        if len(calls) == 1:
+            phone.online = False
+            raise AdbError("command_failed", "adb: error: failed to read copy response")
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(backup_mod, "backup_apks", cut_once)
+    waits: list[int] = []
+
+    def wait_device():
+        waits.append(1)
+        phone.reconnect()
+
+    copy = _copy()
+    res = _run(phone, copy, _inventory(phone, [AppEntry("com.example.app", "Example", 42, "safe", True)]),
+               _sel(categories=frozenset(), apps=frozenset({"com.example.app"})), wait_device=wait_device)
+    assert res.status == "complete"
+    assert (res.apps_done, res.apps_failed) == (1, 0)
+    assert len(waits) == 1
+
+
 # ---- poprawki z przeglądu (runda 1) -----------------------------------------------------------
 
 def _pull_leaves_partial(phone: FakeStoragePhone, remote: str) -> None:
