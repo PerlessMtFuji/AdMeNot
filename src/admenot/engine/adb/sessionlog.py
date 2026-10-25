@@ -7,6 +7,7 @@ go sam. Polecenia wpisane w konsoli mają `tag="console"` i prefiks `console:` w
 
 from __future__ import annotations
 
+import re
 import threading
 import time
 from collections.abc import Callable
@@ -19,6 +20,9 @@ from admenot.engine.adb.transport import AdbError, AdbTransport
 _LOCK = threading.Lock()  # kolektory wołają adb z wielu wątków naraz
 OUTPUT_LIMIT = 4096
 _PRIVATE = "--noredact"  # zrzut powiadomień z tytułami i treścią
+# Dane klienta z providerów (kontakty, SMS, połączenia, MMS) — `content query` / `content read`,
+# także w postaci `host:shell -T …` i `host:exec-out …`.
+_CONTENT = re.compile(r"^(?:host:(?:shell -T |exec-out ))?content (?:query|read)(?:\s|$)")
 
 OnCommand = Callable[[dict[str, Any]], None]
 
@@ -87,6 +91,8 @@ class SessionLogAdb:
         if self.on_command is not None:
             if _PRIVATE in what and status == "ok" and self.tag != "console":  # treść powiadomień klienta
                 output = f"<{len(output.encode())} B>"
+            elif _CONTENT.match(what) and status == "ok" and self.tag != "console":
+                output = ""  # kontakty i wiadomości klienta nie trafiają do konsoli
             self.on_command({"time": stamp, "serial": self.serial, "command": what,
                              "status": status, "duration": round(duration, 2),
                              "output": output[:OUTPUT_LIMIT], "tag": self.tag})

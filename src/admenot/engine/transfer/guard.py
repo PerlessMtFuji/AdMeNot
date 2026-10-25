@@ -93,8 +93,15 @@ def _shell_T_command(args: list[str]) -> str | None:
     return None
 
 
+def _read_command(args: list[str]) -> str | None:
+    """Polecenie z `shell -T <cmd>` albo `exec-out <cmd>` (binarny odczyt bez zmiany końców linii)."""
+    if len(args) == 2 and args[0] == "exec-out":
+        return args[1]
+    return _shell_T_command(args)
+
+
 class ReadOnlyAdb:
-    """`AdbTransport` przepuszczający tylko odczyt: `shell`, `shell -T`, `get-state`."""
+    """`AdbTransport` przepuszczający tylko odczyt: `shell`, `shell -T`, `get-state`; binarnie także `exec-out`."""
 
     def __init__(self, inner: AdbTransport) -> None:
         self.inner = inner
@@ -119,7 +126,7 @@ class ReadOnlyAdb:
         return self.inner.run(args, timeout=timeout)
 
     def run_bytes(self, args: list[str], timeout: float = 20.0) -> bytes:
-        cmd = _shell_T_command(args)
+        cmd = _read_command(args)
         if cmd is None:
             raise UnsafeCommand(f"Polecenie hosta spoza allowlisty: {' '.join(args)[:120]}")
         assert_read_only(cmd)

@@ -32,6 +32,16 @@ def provider_file(root: Path, uri: str) -> Path:
     return root / "providers" / (uri.replace("://", "_").replace("/", "_") + ".txt")
 
 
+def write_provider(root: Path, uri: str, rows: list[dict[str, str | None]], cols: list[str]) -> None:
+    """Zapisuje wyjście `content query` dla `uri` w postaci, w jakiej zwraca je telefon."""
+    path = provider_file(root, uri)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = [f"Row: {i} " + ", ".join(f"{c}={'NULL' if r.get(c) is None else r[c]}" for c in cols)
+             for i, r in enumerate(rows)]
+    text = "\n".join(lines) + "\n" if lines else "No result found.\n"
+    path.write_text(text, encoding="utf-8", newline="")
+
+
 class FakeStoragePhone:
     def __init__(self, root: Path, serial: str = "FAKE") -> None:
         self.root = root
@@ -75,6 +85,8 @@ class FakeStoragePhone:
     def run_bytes(self, args: list[str], timeout: float = 20.0) -> bytes:
         if len(args) == 3 and args[:2] == ["shell", "-T"]:
             return self._shell(args[2])
+        if len(args) == 2 and args[0] == "exec-out":
+            return self._shell(args[1])
         raise AdbError("command_failed", f"fake: unsupported {args}")
 
     # ---- polecenia shell ----------------------------------------------------------------

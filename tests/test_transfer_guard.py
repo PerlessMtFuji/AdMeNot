@@ -76,6 +76,17 @@ def test_readonly_adb_allows_shell_T_read():
     assert [c[0] for c in inner.calls] == ["run_bytes", "run", "run", "shell"]
 
 
+def test_readonly_adb_run_bytes_allows_exec_out_read_only():
+    inner = Recorder()
+    adb = ReadOnlyAdb(inner)
+    assert adb.run_bytes(["exec-out", "content read --uri content://mms/part/7"]) == b"ok"
+    with pytest.raises(UnsafeCommand):
+        adb.run_bytes(["exec-out", "rm x"])
+    with pytest.raises(UnsafeCommand):
+        adb.run_bytes(["exec-out", "ls", "extra"])
+    assert [c[0] for c in inner.calls] == ["run_bytes"]
+
+
 def test_readonly_adb_rejects_other_host_and_unsafe_shell():
     adb = ReadOnlyAdb(Recorder())
     for args in (["shell", "ls"], ["exec-out", "ls"], ["install", "a.apk"], ["shell", "-T", "rm x"]):
