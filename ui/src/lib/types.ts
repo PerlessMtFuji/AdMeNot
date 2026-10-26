@@ -511,6 +511,9 @@ export interface TransferProgress {
   done_bytes: number;
   total_bytes: number;
   current: string;
+  /** Aplikacje już obsłużone (także nieudane) i wybrane; starsze mosty ich nie wysyłają. */
+  done_apps?: number;
+  total_apps?: number;
 }
 
 export interface TelephonyResult {

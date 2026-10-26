@@ -5,7 +5,9 @@ import {
   changedVerdicts,
   defaultTransferSelection,
   isXiaomi,
+  APK_ESTIMATE,
   resumableCopy,
+  transferProgress,
   resumeSelection,
   transferNeed,
   transferStages,
@@ -61,6 +63,8 @@ import {
   manualRows,
   stableEta,
 } from './logic';
+
+const MB = 1024 ** 2;
 import { CHECKS_SAMPLE } from './fakeBridge';
 import type { AppView, Category, Level, PlanApp, PlanView, StepEvent, Finding, ScanView, Settings, UpdateView } from './types';
 
@@ -641,6 +645,20 @@ describe('data transfer', () => {
       categories: ['downloads', 'media'], others: ['Music', 'Gone'], apps: ['b.sus', 'x.removed'] })).toEqual({
       contacts: false, sms: true, mms: false, calls: true, categories: ['media'], others: ['Music'], apps: ['b.sus'] });
     expect(resumeSelection(inv({ sms: null }), { sms: true }).sms).toBe(false);
+  });
+
+  test('copy progress counts apps with an estimated size, so copied files alone do not fill the bar', () => {
+    const p = (done_files: number, done_bytes: number, done_apps: number, total_apps: number) =>
+      ({ stage: 'files', done_files, total_files: 10, done_bytes, total_bytes: 1000 * MB, current: '', done_apps, total_apps }) as const;
+    expect(transferProgress(null)).toBe(0);
+    expect(transferProgress(p(5, 500 * MB, 0, 0))).toBeCloseTo(0.5);
+    expect(transferProgress(p(10, 1000 * MB, 0, 10))).toBeCloseTo(1000 / (1000 + 10 * APK_ESTIMATE / MB));
+    expect(transferProgress(p(10, 1000 * MB, 10, 10))).toBe(1);
+    // same aplikacje, bez plików: liczba aplikacji
+    expect(transferProgress({ ...p(0, 0, 3, 4), total_files: 0, total_bytes: 0 })).toBeCloseTo(0.75);
+    // starszy most bez liczników aplikacji
+    expect(transferProgress({ stage: 'files', done_files: 2, total_files: 4, done_bytes: 0, total_bytes: 0, current: '' } as never))
+      .toBeCloseTo(0.5);
   });
 
   test('the copy to resume is the newest unfinished one of this very phone, not just the same model', () => {

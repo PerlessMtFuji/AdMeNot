@@ -353,6 +353,20 @@ def test_apps_copied_with_complete_marker(tmp_path):
             assert_read_only(command)
 
 
+def test_progress_counts_apps(tmp_path):
+    """Pliki kończą się przed aplikacjami: bez licznika aplikacji ekran pokazuje „wszystko”, a kopia trwa."""
+    phone = _phone(tmp_path)
+    phone.apps = {"com.example.app": {"base.apk": b"base-bytes"}}
+    apps = [AppEntry("com.example.app", "Example", 42, "safe", True), AppEntry("com.gone.app", "Gone", 1, "safe", True)]
+    seen: list[Progress] = []
+    _run(phone, _copy(), _inventory(phone, apps), _sel(apps=frozenset({"com.example.app", "com.gone.app"})),
+         on_progress=seen.append)
+    assert seen[0].total_apps == 2 and seen[0].done_apps == 0
+    files_end = [p for p in seen if p.stage == "files"][-1]
+    assert files_end.done_files == files_end.total_files and files_end.done_apps == 0
+    assert (seen[-1].done_apps, seen[-1].total_apps) == (2, 2)  # nieudana też jest już obsłużona
+
+
 def test_app_failure_makes_copy_incomplete(tmp_path):
     phone = _phone(tmp_path)  # pakietu nie ma na telefonie: `pm path` zwraca błąd
     copy = _copy()

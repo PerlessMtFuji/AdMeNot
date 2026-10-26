@@ -3,7 +3,7 @@
   import DeviceCard from '../components/DeviceCard.svelte';
   import type { Controller } from '../lib/controller';
   import { i18n, t, tp } from '../lib/i18n/index.svelte';
-  import { backupOutcome, formatSize, isXiaomi, modelName } from '../lib/logic';
+  import { backupOutcome, formatSize, isXiaomi, modelName, transferProgress } from '../lib/logic';
   import type { TelephonyResult } from '../lib/types';
   import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
@@ -22,13 +22,17 @@
   const entry = $derived(s.devices.find((d) => d.serial === s.serial) ?? null);
   const name = $derived(s.device?.name ?? entry?.name ?? modelName(entry?.model ?? null));
   const crumb = $derived([s.client.trim(), name, t('transfer.mode')].filter(Boolean).join(' · '));
-  const value = $derived(!p ? 0 : p.total_bytes > 0 ? p.done_bytes / p.total_bytes
-    : p.total_files > 0 ? p.done_files / p.total_files : 0);
+  const num = (n: number) => new Intl.NumberFormat(i18n.lang === 'pl' ? 'pl-PL' : 'en-US').format(n);
+  const value = $derived(transferProgress(p));
+  // „10 z 10 plików · 4 z 35 aplikacji”: pliki kończą się przed aplikacjami, sama liczba plików myli
+  const counts = $derived(!p ? [] : [
+    ...(p.total_files > 0 ? [tp('transfer.progress_files', p.total_files, { done: num(p.done_files), count: num(p.total_files) })] : []),
+    ...(p.total_apps ? [tp('transfer.progress_apps', p.total_apps, { done: num(p.done_apps ?? 0), count: num(p.total_apps) })] : []),
+  ]);
   const TELEPHONY = ['contacts', 'sms', 'mms', 'calls'] as const;
   const telephony = $derived(done ? TELEPHONY.filter((k) => k in done.telephony).map((k) => [k, done.telephony[k]] as const) : []);
   const unavailable = $derived(telephony.some(([, r]) => r.status === 'unavailable'));
 
-  const num = (n: number) => new Intl.NumberFormat(i18n.lang === 'pl' ? 'pl-PL' : 'en-US').format(n);
   const size = (bytes: number) => formatSize(bytes, i18n.lang);
 
   /** `addresses_missing:3,attachments_missing:1` → czytelne braki; nieznane fragmenty pomijamy. */
@@ -65,10 +69,10 @@
             {p ? t('transfer.stage_label', { stage: t(`transfer.phase.${p.stage}`) }) : t('transfer.starting')}
           </div>
           <Progress {value} label={t('transfer.progress_label')} />
-          {#if p && p.total_files > 0}
+          {#if p && counts.length}
             <div class="flex flex-wrap justify-between gap-2 text-sm text-mut">
-              <span>{tp('transfer.progress_files', p.total_files, { done: num(p.done_files), count: num(p.total_files) })}</span>
-              <span>{t('transfer.progress_size', { done: size(p.done_bytes), total: size(p.total_bytes) })}</span>
+              <span>{counts.join(' · ')}</span>
+              {#if p.total_bytes > 0}<span>{t('transfer.progress_size', { done: size(p.done_bytes), total: size(p.total_bytes) })}</span>{/if}
             </div>
           {/if}
           {#if p?.current}<div class="mono truncate text-xs text-soft" title={p.current}>{p.current}</div>{/if}

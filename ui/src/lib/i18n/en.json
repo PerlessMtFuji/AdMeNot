@@ -592,6 +592,12 @@
       "many": "{done} of {count} files",
       "other": "{done} of {count} files"
     },
+    "progress_apps": {
+      "one": "{done} of {count} app",
+      "few": "{done} of {count} apps",
+      "many": "{done} of {count} apps",
+      "other": "{done} of {count} apps"
+    },
     "progress_size": "{done} of {total}",
     "starting": "Preparing the copy…",
     "waiting": "Phone disconnected — reconnect it and the copy will continue",

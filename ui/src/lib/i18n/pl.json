@@ -592,6 +592,12 @@
       "many": "{done} z {count} plików",
       "other": "{done} z {count} pliku"
     },
+    "progress_apps": {
+      "one": "{done} z {count} aplikacji",
+      "few": "{done} z {count} aplikacji",
+      "many": "{done} z {count} aplikacji",
+      "other": "{done} z {count} aplikacji"
+    },
     "progress_size": "{done} z {total}",
     "starting": "Przygotowuję kopię…",
     "waiting": "Telefon odłączony — podłącz ponownie, kopia będzie kontynuowana",

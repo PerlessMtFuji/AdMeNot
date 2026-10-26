@@ -761,7 +761,9 @@
       "total_files": 0,
       "done_bytes": 0,
       "total_bytes": 0,
-      "current": ""
+      "current": "",
+      "done_apps": 0,
+      "total_apps": 1
      }
     ],
     [
@@ -844,7 +846,9 @@
       "total_files": 5,
       "done_bytes": 0,
       "total_bytes": 6704,
-      "current": ""
+      "current": "",
+      "done_apps": 0,
+      "total_apps": 1
      }
     ],
     [
@@ -855,7 +859,9 @@
       "total_files": 5,
       "done_bytes": 6704,
       "total_bytes": 6704,
-      "current": "com.whatsapp"
+      "current": "com.whatsapp",
+      "done_apps": 0,
+      "total_apps": 1
      }
     ],
     [

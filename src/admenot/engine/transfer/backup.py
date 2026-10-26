@@ -88,6 +88,8 @@ class Progress:
     done_bytes: int
     total_bytes: int
     current: str  # ścieżka względna — tylko do UI, nigdy do telemetrii
+    done_apps: int = 0  # obsłużone (skopiowane, nieudane, pominięte) — pliki kończą się przed aplikacjami
+    total_apps: int = 0
 
 
 @dataclass(frozen=True)
@@ -159,6 +161,7 @@ class _Backup:
         self.disconnects = 0
         self.hash_ok = True
         self.total_files = self.total_bytes = self.done_files = self.done_bytes = 0
+        self.done_apps, self.total_apps = 0, len(selection.apps)
 
     # ---- przebieg -----------------------------------------------------------------------
     def run(self) -> BackupResult:
@@ -207,7 +210,7 @@ class _Backup:
 
     def _progress(self, stage: Stage, current: str = "", inflight: int = 0) -> None:
         self.on_progress(Progress(stage, self.done_files, self.total_files, self.done_bytes + inflight,
-                                  self.total_bytes, current))
+                                  self.total_bytes, current, self.done_apps, self.total_apps))
 
     def _check_stop(self) -> None:
         if self.should_stop():
@@ -497,17 +500,20 @@ class _Backup:
             if entry is None:
                 saved[package] = {"status": "skipped", "error": "not_in_inventory"}
                 state.set_meta("apps", saved)
+                self.done_apps += 1
                 continue
             self._check_stop()
             target = self.copy.apps_dir / package / (
                 str(entry.version_code) if entry.version_code is not None else "unknown")
             prev = saved.get(package)
-            if prev and prev.get("status") == "done" and is_complete(target, package):
-                continue
-            self._progress("apps", package)
-            self._need(0)
-            saved[package] = self._app(package, entry.version_code, target, tmp)
-            state.set_meta("apps", saved)
+            if not (prev and prev.get("status") == "done" and is_complete(target, package)):
+                self._progress("apps", package)
+                self._need(0)
+                saved[package] = self._app(package, entry.version_code, target, tmp)
+                state.set_meta("apps", saved)
+            self.done_apps += 1
+        if self.sel.apps:
+            self._progress("apps")
         shutil.rmtree(tmp, ignore_errors=True)
         return self._saved_apps(state)
 

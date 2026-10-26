@@ -25,12 +25,24 @@ async function show(phase: 'transfer_backup' | 'transfer_done' = 'transfer_backu
 describe('TransferBackup', () => {
   test('progress shows files, size, stage and the current file', async () => {
     const { bridge } = await show();
-    bridge.emit('transfer:progress', { stage: 'files', done_files: 3, total_files: 10, done_bytes: 30, total_bytes: 100, current: 'DCIM/Camera/a.jpg' });
+    bridge.emit('transfer:progress', { stage: 'files', done_files: 3, total_files: 10, done_bytes: 30, total_bytes: 100,
+      current: 'DCIM/Camera/a.jpg', done_apps: 0, total_apps: 0 });
     await tick();
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('30');
     expect(screen.getByText(/3 z 10 plików/)).toBeTruthy();
+    expect(screen.queryByText(/aplikacji/)).toBeNull();
     expect(screen.getByText('DCIM/Camera/a.jpg')).toBeTruthy();
     expect(screen.getByText(/Pliki/)).toBeTruthy();
+  });
+
+  test('with apps selected, all files copied is not the end: apps are counted and the bar is not full', async () => {
+    const { bridge } = await show();
+    bridge.emit('transfer:progress', { stage: 'apps', done_files: 10, total_files: 10, done_bytes: 100, total_bytes: 100,
+      current: 'com.example', done_apps: 4, total_apps: 35 });
+    await tick();
+    expect(screen.getByText(/10 z 10 plików/)).toBeTruthy();
+    expect(screen.getByText(/4 z 35 aplikacji/)).toBeTruthy();
+    expect(Number(screen.getByRole('progressbar').getAttribute('aria-valuenow'))).toBeLessThan(100);
   });
 
   test('transfer:waiting shows the reconnect banner', async () => {

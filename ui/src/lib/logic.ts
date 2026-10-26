@@ -1,5 +1,5 @@
 import { CATEGORY_ORDER } from './categories';
-import type { AppView, BackupResultView, Category, CopyView, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferSelection, InventoryView, UndoSite, UpdateView, UserWait, Verdict } from './types';
+import type { AppView, BackupResultView, Category, CopyView, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferProgress, TransferSelection, InventoryView, UndoSite, UpdateView, UserWait, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done'
   | 'transfer_choose' | 'transfer_backup' | 'transfer_done';
@@ -599,6 +599,22 @@ export function transferTotals(inv: InventoryView, sel: TransferSelection): { by
   const categories = [sel.contacts, sel.sms || sel.mms, sel.calls].filter(Boolean).length + sel.categories.length
     + (sel.others.length ? 1 : 0) + (sel.apps.length ? 1 : 0);
   return { bytes, categories, etaMin: Math.max(1, Math.round(bytes / TRANSFER_RATE / 60)) };
+}
+
+/** Szacowany rozmiar kopii jednej aplikacji (base + splity) — inwentarz nie zna rozmiarów aplikacji, a bez nich
+ *  pasek dochodzi do 100% na plikach, choć APK jeszcze się kopiują. Próba 2026-10-25: 35 aplikacji, 3,3 GB. */
+export const APK_ESTIMATE = 100 * 1024 ** 2;
+
+/** Postęp kopii 0–1: bajty plików plus aplikacje po `APK_ESTIMATE`; bez bajtów — liczba plików i aplikacji. */
+export function transferProgress(p: TransferProgress | null): number {
+  if (!p) return 0;
+  const doneApps = p.done_apps ?? 0;
+  const totalApps = p.total_apps ?? 0;
+  if (p.total_bytes > 0) {
+    return (p.done_bytes + doneApps * APK_ESTIMATE) / (p.total_bytes + totalApps * APK_ESTIMATE);
+  }
+  const total = p.total_files + totalApps;
+  return total > 0 ? (p.done_files + doneApps) / total : 0;
 }
 
 /** Etapy przenoszenia: stary telefon, kopia, nowy telefon, wgrywanie, protokół. */
