@@ -1269,6 +1269,39 @@ describe('data transfer — resuming', () => {
       calls: false, categories: ['media'], others: ['Music'], apps: ['com.whatsapp'] });
   });
 
+  test('"Resume" on the connect screen continues the copy straight after reading the phone', async () => {
+    const { ctl, s, bridge } = setup('transfer');
+    await ctl.init();
+    // słuchacz po kontrolerze: telefon ma przerwaną kopię (nagranie jej nie ma)
+    bridge.on('transfer:inventory', () => {
+      s.transfer.resumable = RESUMABLE;
+      s.transfer.selection = { ...s.transfer.selection, sms: false, apps: [] };
+    });
+    await ctl.startTransfer(true);
+    await vi.waitFor(() => expect(bridge.calls.some((c) => c.method === 'start_backup')).toBe(true));
+    expect(bridge.calls.find((c) => c.method === 'start_backup')?.args[0]).toMatchObject({ sms: false, apps: [] });
+  });
+
+  test('"Resume" stays on the choose screen when the copy cannot go on (gone, no space)', async () => {
+    const { ctl, s, bridge } = setup('transfer');
+    await ctl.init();
+    await ctl.startTransfer(true);  // nagranie: kopii do wznowienia już nie ma
+    await vi.waitFor(() => expect(s.job).toBeNull());
+    expect(s.phase).toBe('transfer_choose');
+    bridge.on('transfer:inventory', (d) => {
+      s.transfer.resumable = RESUMABLE;
+      s.transfer.inventory = { ...d.inventory, free_pc: 0 };
+    });
+    await ctl.startTransfer(true);
+    await vi.waitFor(() => expect(s.job).toBeNull());
+    expect(s.phase).toBe('transfer_choose');
+    expect(bridge.calls.some((c) => c.method === 'start_backup')).toBe(false);
+    // zwykłe „Przenieś dane” nigdy nie rusza samo
+    await ctl.startTransfer();
+    await vi.waitFor(() => expect(s.job).toBeNull());
+    expect(bridge.calls.some((c) => c.method === 'start_backup')).toBe(false);
+  });
+
   test('re-ticking apps selects every app when none is on by default', async () => {
     const { ctl, s } = setup('transfer');
     await ctl.init();

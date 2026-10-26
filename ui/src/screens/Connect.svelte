@@ -51,7 +51,7 @@
       <Banner tone="info" icon="rotate-ccw" title={t('transfer.resume_title', { when: when(resumable.created) })}>
         {t('transfer.resume_text')}
         {#snippet actions()}
-          <Button variant="primary" size="sm" onclick={() => ctl.startTransfer()}>{t('transfer.resume')}</Button>
+          <Button variant="primary" size="sm" onclick={() => ctl.startTransfer(true)}>{t('transfer.resume')}</Button>
         {/snippet}
       </Banner>
     {/if}

@@ -1,6 +1,6 @@
 import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
-import { actedAfter, changedVerdicts, defaultSelection, resumableCopy, resumeSelection, TRANSFER_CATEGORIES, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
+import { actedAfter, changedVerdicts, defaultSelection, resumableCopy, resumeSelection, TRANSFER_CATEGORIES, transferNeed, transferTotals, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
 import { EMPTY_TRANSFER_SELECTION, type AppState } from './state.svelte';
 import { applyTheme } from './theme';
 import type {
@@ -13,6 +13,7 @@ export class Controller {
   private ended = new Set<string>();
   private knownLoaded = false;
   private autoMirrored = new Set<string>();
+  private resumeAfterScan = false;  // „Wznów” z ekranu Połącz: po odczycie telefonu kopia rusza sama
   private uiErrorSent = false;
   private rechecking = false;  // odczyt kontroli w tle: następny nie startuje, póki poprzedni trwa
   private etaSeq = 0;  // szacunek dla zaznaczenia: liczy się tylko odpowiedź na ostatnie zapytanie
@@ -307,6 +308,7 @@ export class Controller {
       this.ended.add(d.job_id);
       if (d.kind === 'update') s.updateProgress = null;
       if (s.job?.id === d.job_id) s.job = null;
+      if (d.kind === 'transfer_scan') this.continueResume();
     });
     on('update:state', (d) => { s.update = d; });
     // Wątek telemetrii usunął dane z serwera po cofnięciu zgody — baner „czeka na połączenie” znika.
@@ -684,15 +686,30 @@ export class Controller {
       waiting: false, result: null, copy: null });
   }
 
-  /** „Przenieś dane” na ekranie Połącz: inwentarz wybranego telefonu, potem ekran wyboru. */
-  async startTransfer(): Promise<void> {
+  /** „Przenieś dane” na ekranie Połącz: inwentarz wybranego telefonu, potem ekran wyboru. `resume` („Wznów”
+   *  z banera): po inwentarzu kopia rusza od razu z zapisanym wyborem — patrz `continueResume`. */
+  async startTransfer(resume = false): Promise<void> {
     const s = this.state;
     if (!s.serial) return;
     this.resetTransfer();
+    this.resumeAfterScan = resume;
     Object.assign(s, { error: null, device: null, screen: 'main', phase: 'transfer_choose', stopping: false });
     const r = await this.call(this.api.transfer_inventory(s.serial, s.client.trim() || null));
     if (r) this.setJob(r.job_id, 'transfer_scan');
     else s.phase = 'connect';
+  }
+
+  /** Koniec odczytu po „Wznów”: kopia rusza, jeśli most znalazł ją do wznowienia, jest co kopiować i starczy
+   *  miejsca. W przeciwnym razie zostaje ekran wyboru — tam baner i ostrzeżenia mówią, co dalej. */
+  private continueResume(): void {
+    const s = this.state;
+    const tr = s.transfer;
+    const resume = this.resumeAfterScan;
+    this.resumeAfterScan = false;
+    if (!resume || s.phase !== 'transfer_choose' || !tr.inventory || !tr.resumable) return;
+    const totals = transferTotals(tr.inventory, tr.selection);
+    if (totals.categories === 0 || transferNeed(totals.bytes, tr.resumable) > tr.inventory.free_pc) return;
+    void this.startBackup();
   }
 
   /** Wiersz ekranu wyboru: kontakty, SMS i MMS (razem), połączenia, kategorie plików, inne foldery, aplikacje. */

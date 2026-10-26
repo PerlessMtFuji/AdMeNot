@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { renderWith, setupCtl } from '../test-utils';
 import Connect from './Connect.svelte';
 
@@ -46,8 +46,9 @@ describe('Connect', () => {
     await env.ctl.loadTransfers();
     await tick();
     expect(screen.getByText(/Wznów przerwaną kopię z 25 paź/)).toBeTruthy();
+    const start = vi.spyOn(env.ctl, 'startTransfer');
     await fireEvent.click(screen.getByRole('button', { name: 'Wznów' }));
-    expect(env.bridge.calls.some((c) => c.method === 'transfer_inventory')).toBe(true);
+    expect(start).toHaveBeenCalledWith(true);  // wznowienie, nie nowy wybór danych
   });
 
   test('the connect screen reloads the copies, so a finished copy no longer offers resuming', async () => {
