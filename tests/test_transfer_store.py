@@ -67,6 +67,21 @@ def test_meta_roundtrip_without_imei_and_client():
     assert not list(copy.path.glob("*.tmp"))
 
 
+def test_verdicts_roundtrip():
+    from admenot.engine.transfer.inventory import AppEntry
+    copy = _copy()
+    copy.write_verdicts([AppEntry("com.a", "A", 5, "safe", True), AppEntry("com.b", "B", None, "malicious", False)])
+    assert copy.verdicts_path.name == store.VERDICTS
+    assert copy.read_verdicts() == {"com.a": (5, "safe"), "com.b": (None, "malicious")}
+
+
+def test_read_verdicts_missing_is_none():
+    copy = _copy()
+    assert copy.read_verdicts() is None
+    copy.verdicts_path.write_text("{not json", encoding="utf-8")
+    assert copy.read_verdicts() is None
+
+
 def test_find_resumable_newest_in_progress():
     old = _copy(now=NOW)
     mid = _copy(now=NOW + timedelta(hours=1))

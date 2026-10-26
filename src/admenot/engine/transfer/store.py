@@ -17,13 +17,17 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from admenot.engine.device.info import DeviceInfo
 from admenot.engine.paths import device_dir_name, transfers_dir
 
+if TYPE_CHECKING:
+    from .inventory import AppEntry
+
 KEEP_DAYS = 7
 META = "meta.json"
+VERDICTS = "verdicts.json"
 _STAMP_FORMAT = "%Y%m%d-%H%M%S"
 _STAMP = re.compile(r"[0-9]{8}-[0-9]{6}")
 _SAFE_PART = re.compile(r"[A-Za-z0-9_-]+")
@@ -103,6 +107,29 @@ class CopyDir:
         tmp = self.meta_path.with_name(META + ".tmp")
         tmp.write_text(json.dumps(meta.to_json(), ensure_ascii=False, indent=2), encoding="utf-8")
         os.replace(tmp, self.meta_path)
+
+    @property
+    def verdicts_path(self) -> Path:
+        return self.path / VERDICTS
+
+    def write_verdicts(self, entries: list[AppEntry]) -> None:
+        """Werdykty aplikacji starego telefonu (także pominiętych); atomowo jak `write_meta`."""
+        data = [{"package": e.package, "version_code": e.version_code, "verdict": e.verdict} for e in entries]
+        tmp = self.verdicts_path.with_name(VERDICTS + ".tmp")
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        os.replace(tmp, self.verdicts_path)
+
+    def read_verdicts(self) -> dict[str, tuple[int | None, str]] | None:
+        """Pakiet -> (versionCode, werdykt); `None`, gdy pliku brak (kopia sprzed zmiany) albo jest nieczytelny."""
+        try:
+            data = json.loads(self.verdicts_path.read_text(encoding="utf-8"))
+            result: dict[str, tuple[int | None, str]] = {}
+            for item in data:
+                code = item["version_code"]
+                result[str(item["package"])] = (None if code is None else int(code), str(item["verdict"]))
+            return result
+        except (OSError, ValueError, KeyError, TypeError):
+            return None
 
 
 def create_copy(serial: str, device: DeviceInfo, client: str | None, now: datetime) -> CopyDir:

@@ -353,6 +353,15 @@ def test_apps_copied_with_complete_marker(tmp_path):
             assert_read_only(command)
 
 
+def test_backup_writes_verdicts_including_skipped(tmp_path):
+    phone = _phone(tmp_path)
+    inv = _inventory(phone, [AppEntry("com.safe.app", "Safe", 3, "safe", True)])
+    inv.skipped_apps.append(AppEntry("com.bad.app", "Bad", None, "malicious", False))
+    copy = _copy()
+    _run(phone, copy, inv, _sel(categories=frozenset()))
+    assert copy.read_verdicts() == {"com.safe.app": (3, "safe"), "com.bad.app": (None, "malicious")}
+
+
 def test_progress_counts_apps(tmp_path):
     """Pliki kończą się przed aplikacjami: bez licznika aplikacji ekran pokazuje „wszystko”, a kopia trwa."""
     phone = _phone(tmp_path)

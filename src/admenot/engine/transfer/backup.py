@@ -188,6 +188,7 @@ class _Backup:
             # wznowienie kopii tuż przed (albo po) terminie: po zakończeniu nie znika od razu
             meta.expires = max(meta.expires, self.now + timedelta(days=KEEP_DAYS))
         self.copy.write_meta(meta)
+        self.copy.write_verdicts(self.inventory.apps + self.inventory.skipped_apps)
         t0 = time.monotonic()
         state = State(self.copy.state_path)
         try:
