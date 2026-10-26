@@ -145,6 +145,7 @@ class ReadOnlyAdb:
 
 
 _APPEND_CMDS = {"stat", "sha256sum", "df", "ls", "getprop", "mkdir", "content"}
+STAT_TAIL = " 2>&1 || true"  # błędy `stat` na stdout, zawsze kod 0 (adb gubi stdout przy kodzie ≠ 0)
 _SCAN_VOLUME = ["content", "call", "--uri", "content://media", "--method", "scan_volume",
                 "--arg", "external_primary"]
 
@@ -160,8 +161,19 @@ def assert_append_only(cmd: str) -> None:
     """Rzuca UnsafeCommand, jeśli polecenie na NOWYM telefonie mogłoby coś usunąć, przenieść lub zmienić.
 
     Dozwolone: odczyty (`stat`, `sha256sum`, `df`, `ls`, `getprop`), `mkdir -p` pod `/sdcard/`
-    i dokładnie jedno `content call` (skan mediów po wgraniu).
+    i dokładnie jedno `content call` (skan mediów po wgraniu). Jedyny dozwolony operator powłoki to
+    stały przyrostek `STAT_TAIL` po `stat` (wynik z liniami błędów i kod 0 — `stat` paczkami w planie).
     """
+    if cmd.endswith(STAT_TAIL):
+        rest = cmd[: -len(STAT_TAIL)]
+        if not rest.startswith("stat "):
+            raise UnsafeCommand(f"Przyrostek dozwolony tylko po 'stat': {cmd[:120]}")
+        _assert_append_only_plain(rest)
+        return
+    _assert_append_only_plain(cmd)
+
+
+def _assert_append_only_plain(cmd: str) -> None:
     words = _unquoted_view(cmd).split()
     if not words or words[0] not in _APPEND_CMDS:
         raise UnsafeCommand(f"Polecenie spoza allowlisty: {cmd[:120]}")

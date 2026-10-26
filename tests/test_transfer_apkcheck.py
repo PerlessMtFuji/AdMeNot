@@ -227,3 +227,12 @@ def test_installed_certs_skips_unreadable_old_apk(tmp_path, monkeypatch):
 
     monkeypatch.setattr(apkcheck, "read_manifest", fake)
     assert apkcheck._installed_certs(copy, PKG) == {CERT_A}
+
+
+def test_missing_file_left_out(tmp_path, monkeypatch):
+    copy = _copy(tmp_path)
+    monkeypatch.setattr(apkcheck, "_analyze_file", lambda r, p: _report())
+    present = _file(tmp_path, "b.apk")
+    gone = ("/sdcard/Download/gone.apk", tmp_path / "gone.apk")
+    checks = load_or_check(copy, [gone, present])
+    assert [c.remote for c in checks] == [present[0]]

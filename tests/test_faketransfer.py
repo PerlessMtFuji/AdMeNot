@@ -139,3 +139,16 @@ def test_fake_push_after_offline_writes_nothing_and_rejects_unsafe_target(tmp_pa
     assert not (tmp_path / "phone" / "sdcard" / "X" / "b.bin").exists()
     with pytest.raises(UnsafeCommand):
         phone.push([src], "/sdcard/../x/", lambda: False, lambda: None)
+
+
+def test_fake_stat_tail_reports_errors_as_lines(tmp_path):
+    from admenot.engine.transfer.guard import STAT_TAIL
+    phone = _phone(tmp_path)
+    phone.deny_stat_prefixes = {"/sdcard/DCIM/b"}
+    with pytest.raises(AdbError):
+        phone.shell("stat -c '%s|%Y|%n' /sdcard/DCIM/a.jpg /sdcard/nope")
+    out = phone.shell("stat -c '%s|%Y|%n' /sdcard/DCIM/a.jpg /sdcard/nope /sdcard/DCIM/b.jpg" + STAT_TAIL)
+    lines = out.splitlines()
+    assert lines[0].startswith("5|") and lines[0].endswith("|/sdcard/DCIM/a.jpg")
+    assert lines[1:] == ["stat: '/sdcard/nope': No such file or directory",
+                         "stat: '/sdcard/DCIM/b.jpg': Permission denied"]

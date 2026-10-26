@@ -147,13 +147,20 @@ def _sha256(path: Path) -> str:
 
 
 def load_or_check(copy: CopyDir, files: list[tuple[str, Path]]) -> list[ApkCheck]:
-    """Wynik w `<copy>/apk_checks.json` (z SHA-256 pliku); niezmienione pliki nie są analizowane ponownie."""
+    """Wynik w `<copy>/apk_checks.json` (z SHA-256 pliku); niezmienione pliki nie są analizowane ponownie.
+    Pliku nieczytelnego (np. usuniętego z kopii przez antywirus) nie ma w wyniku."""
     path = copy.path / CHECKS_FILE
     try:
         cached = {e["remote"]: e for e in json.loads(path.read_text(encoding="utf-8"))}
     except (OSError, ValueError, KeyError, TypeError):
         cached = {}
-    hashes = {remote: _sha256(local) for remote, local in files}
+    hashes: dict[str, str] = {}
+    for remote, local in files:
+        try:
+            hashes[remote] = _sha256(local)
+        except OSError:
+            continue
+    files = [(remote, local) for remote, local in files if remote in hashes]
     out: dict[str, ApkCheck] = {}
     todo: list[tuple[str, Path]] = []
     for remote, local in files:

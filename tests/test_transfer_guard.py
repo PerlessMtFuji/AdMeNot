@@ -246,3 +246,15 @@ def test_append_only_adb_wrapper():
         adb.shell("pm list packages")
     other = adb.with_serial("S2")
     assert isinstance(other, AppendOnlyAdb) and other.serial == "S2"
+
+
+def test_append_only_stat_tail_exact():
+    from admenot.engine.transfer.guard import STAT_TAIL, assert_append_only
+    assert_append_only("stat -c '%s|%Y|%n' /sdcard/a '/sdcard/it'\"'\"'s.jpg'" + STAT_TAIL)
+    for cmd in ("ls /sdcard" + STAT_TAIL, "df -k /sdcard/" + STAT_TAIL, "mkdir -p /sdcard/x" + STAT_TAIL,
+                "stat /sdcard/a 2>&1 || reboot", "stat /sdcard/a 2>/dev/null", "stat /sdcard/a || true",
+                "stat /sdcard/a 2>&1", "stat /sdcard/a 2>&1 || true; reboot",
+                "stat /sdcard/a; reboot" + STAT_TAIL, "stat /sdcard/a" + STAT_TAIL + STAT_TAIL,
+                "stat '/sdcard/a" + STAT_TAIL):
+        with pytest.raises(UnsafeCommand):
+            assert_append_only(cmd)

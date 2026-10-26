@@ -26,7 +26,9 @@ Awarie: `deny_prefixes` (push pod taką ścieżkę -> `adb: error: … Permissio
 w `offline` do `reconnect()`; licznik liczy pliki ŁĄCZNIE z wielu wywołań i nie zeruje się sam —
 test po `reconnect()` ustawia `fail_after_push_files = None`; pozostałe równoległe `push` dostają rc 1
 i nic już nie zapisują), `push` sprawdza `safe_target(remote)` jak `RealPusher`, `free_kb` (None = domyślne 70 000 000, bez zmian przy push; liczba =
-zmniejszana o rozmiar wgranych plików, zwracana przez `df -k`).
+zmniejszana o rozmiar wgranych plików, zwracana przez `df -k`). `stat … STAT_TAIL` daje linię błędu na
+plik (`stat: '<ścieżka>': No such file or directory`) i kod 0 zamiast `AdbError`; `deny_stat_prefixes` —
+`stat` takich ścieżek kończy się `Permission denied`.
 """
 
 from __future__ import annotations
@@ -40,7 +42,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from admenot.engine.adb.transport import AdbError
-from admenot.engine.transfer.guard import safe_target
+from admenot.engine.transfer.guard import STAT_TAIL, safe_target
 from admenot.engine.transfer.puller import PullResult
 
 _MMS_PREFIX = "content://mms/part/"
@@ -73,6 +75,7 @@ class FakeStoragePhone:
         self.total_kb = 120_000_000
         self.free_kb: int | None = None
         self.deny_prefixes: set[str] = set()
+        self.deny_stat_prefixes: set[str] = set()
         self.fail_after_push_files: int | None = None
         self.push_calls = 0
         self.pushed: list[str] = []
@@ -129,6 +132,10 @@ class FakeStoragePhone:
         self.commands.append(command)
         if self.on_shell is not None:
             self.on_shell(command)
+        if command.endswith(STAT_TAIL):  # `stat … 2>&1 || true`: błędy jako linie wyniku, kod 0
+            argv = shlex.split(command[: -len(STAT_TAIL)])
+            assert argv[0] == "stat", argv
+            return self._stat(argv[1:], tolerant=True)
         argv = shlex.split(command)
         if argv[:2] == ["pm", "path"] and len(argv) == 3:
             return self._pm_path(argv[2])
@@ -190,13 +197,23 @@ class FakeStoragePhone:
             raise AdbError("command_failed", f"ls: {args[1]}: No such file or directory")
         return "".join(f"{p.name}\n" for p in sorted(base.iterdir())).encode("utf-8")
 
-    def _stat(self, args: list[str]) -> bytes:
+    def _stat(self, args: list[str], tolerant: bool = False) -> bytes:
+        """Jak toybox + `adb shell`: błąd = kod 1 (`AdbError`, wynik ginie), chyba że `tolerant`
+        (przyrostek `STAT_TAIL`) — wtedy linia błędu na każdy plik i dalej."""
         assert args[0] == "-c" and args[1] == "%s|%Y|%n", args
         out: list[str] = []
         for remote in args[2:]:
             path = self.local(remote)
-            if not path.exists():
-                raise AdbError("command_failed", f"stat: '{remote}': No such file or directory")
+            error = None
+            if any(remote.startswith(p) for p in self.deny_stat_prefixes):
+                error = f"stat: '{remote}': Permission denied"
+            elif not path.exists():
+                error = f"stat: '{remote}': No such file or directory"
+            if error is not None:
+                if not tolerant:
+                    raise AdbError("command_failed", error)
+                out.append(error)
+                continue
             st = path.stat()
             out.append(f"{st.st_size}|{int(st.st_mtime)}|{remote}")
         return ("\n".join(out) + "\n").encode("utf-8")

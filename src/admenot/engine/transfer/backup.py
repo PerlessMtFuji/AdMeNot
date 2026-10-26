@@ -389,7 +389,7 @@ class _Backup:
             self._disconnected()
             return
         try:
-            current, gone = restat(self.adb, [f.remote for f, _, _ in failed])
+            current, gone = self._restat([f.remote for f, _, _ in failed])
         except AdbError:  # błąd połączenia tuż po sprawdzeniu stanu
             self._disconnected()
             return
@@ -407,6 +407,34 @@ class _Backup:
             else:  # bez zmian albo `stat` się nie udał (np. przekroczenie czasu) — zwykła próba
                 state.update(f.remote, attempts=attempts, error=reason,
                              status="error" if attempts >= MAX_ATTEMPTS else "pending")
+
+    def _restat(self, remotes: list[str]) -> tuple[dict[str, tuple[int, int]], set[str]]:
+        """(aktualny rozmiar i mtime, pliki, których na pewno nie ma). `stat` kończy się błędem,
+        gdy brakuje choć jednego pliku — wtedy pytamy o każdy osobno. Plik bez odpowiedzi i bez
+        `No such file` (przekroczenie czasu, brak dostępu) nie trafia do żadnego z wyników.
+        Błąd połączenia idzie wyżej."""
+        stats: dict[str, tuple[int, int]] = {}
+        gone: set[str] = set()
+        for batch in _cmd_batches(remotes):
+            try:
+                out = self.adb.shell("stat -c " + q("%s|%Y|%n") + " " + " ".join(q(r) for r in batch),
+                                     timeout=120)
+            except AdbError as exc:
+                if exc.kind in _CONNECTION_KINDS:
+                    raise
+                if len(batch) > 1:
+                    for remote in batch:
+                        s, g = self._restat([remote])
+                        stats.update(s)
+                        gone |= g
+                elif exc.kind == "command_failed" and _has(exc.message, _GONE):
+                    gone.add(batch[0])
+                continue
+            for line in out.split("\n"):
+                bits = line.split("|", 2)
+                if len(bits) == 3 and bits[0].isdigit() and bits[1].lstrip("-").isdigit():
+                    stats[bits[2]] = (int(bits[0]), int(bits[1]))
+        return stats, gone
 
     def _verify(self, ok: list[tuple[FileRow, Path]]
                 ) -> tuple[list[tuple[FileRow, Path]], Failed, dict[str, str]]:
@@ -629,34 +657,6 @@ def _chunks(pend: list[FileRow]) -> list[list[FileRow]]:
     if cur:
         chunks.append(cur)
     return chunks
-
-
-def restat(adb: AdbTransport, remotes: list[str]) -> tuple[dict[str, tuple[int, int]], set[str]]:
-    """(aktualny rozmiar i mtime, pliki, których na pewno nie ma). `stat` kończy się błędem,
-    gdy brakuje choć jednego pliku — wtedy pytamy o każdy osobno. Plik bez odpowiedzi i bez
-    `No such file` (przekroczenie czasu, brak dostępu) nie trafia do żadnego z wyników.
-    Błąd połączenia idzie wyżej. Wspólne dla kopii i planu wgrywania (`restore_plan`)."""
-    stats: dict[str, tuple[int, int]] = {}
-    gone: set[str] = set()
-    for batch in _cmd_batches(remotes):
-        try:
-            out = adb.shell("stat -c " + q("%s|%Y|%n") + " " + " ".join(q(r) for r in batch), timeout=120)
-        except AdbError as exc:
-            if exc.kind in _CONNECTION_KINDS:
-                raise
-            if len(batch) > 1:
-                for remote in batch:
-                    s, g = restat(adb, [remote])
-                    stats.update(s)
-                    gone |= g
-            elif exc.kind == "command_failed" and _has(exc.message, _GONE):
-                gone.add(batch[0])
-            continue
-        for line in out.split("\n"):
-            bits = line.split("|", 2)
-            if len(bits) == 3 and bits[0].isdigit() and bits[1].lstrip("-").isdigit():
-                stats[bits[2]] = (int(bits[0]), int(bits[1]))
-    return stats, gone
 
 
 def _cmd_batches(remotes: list[str]) -> list[list[str]]:

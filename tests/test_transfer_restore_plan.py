@@ -13,8 +13,8 @@ from admenot.engine.device.info import DeviceInfo
 from admenot.engine.transfer import restore_plan as rp
 from admenot.engine.transfer import store
 from admenot.engine.transfer.apkcheck import ApkCheck
-from admenot.engine.transfer.backup import Selection, run_backup
-from admenot.engine.transfer.guard import AppendOnlyAdb, ReadOnlyAdb, q
+from admenot.engine.transfer.backup import Selection, _cmd_batches, run_backup
+from admenot.engine.transfer.guard import STAT_TAIL, AppendOnlyAdb, ReadOnlyAdb, q
 from admenot.engine.transfer.inventory import Inventory, scan_files
 from admenot.engine.transfer.restore_plan import (
     UPLOAD_GROUPS,
@@ -60,7 +60,8 @@ def _write(root: Path, files: dict[str, bytes], mtime: int = MTIME) -> None:
         os.utime(path, (mtime, mtime))
 
 
-def _copy(tmp_path: Path, files: dict[str, bytes] = OLD) -> store.CopyDir:
+def _copy(tmp_path: Path, files: dict[str, bytes] = OLD, others: set[str] | None = None,
+          extra: tuple[str, ...] = ()) -> store.CopyDir:
     """Kopia Etapu 1: `run_backup` ze starego telefonu (Zdjęcia i Pobrane)."""
     _write(tmp_path / "old", files)
     old = FakeStoragePhone(tmp_path / "old", serial="OLD")
@@ -68,7 +69,8 @@ def _copy(tmp_path: Path, files: dict[str, bytes] = OLD) -> store.CopyDir:
     inv = Inventory(contacts=0, sms=0, mms=0, mms_bytes=0, calls=0, files=found, others=others,
                     apps=[], skipped_apps=[], whatsapp_backup=None, storage=None, unreadable=unreadable)
     sel = Selection(contacts=False, sms=False, mms=False, calls=False,
-                    categories=frozenset({"media", "downloads"}), others=frozenset(), apps=frozenset())
+                    categories=frozenset({"media", "downloads", *extra}), others=frozenset(others or ()),
+                    apps=frozenset())
     copy = store.create_copy("OLD", _device(), None, NOW)
     res = run_backup(old, old, _device(), copy, inv, sel, on_progress=lambda p: None,
                      should_stop=lambda: False, wait_device=old.reconnect, free_bytes=lambda p: 10 ** 12)
@@ -172,19 +174,89 @@ def test_taken_alt_identical_is_exists(tmp_path):
     assert (f.action, f.target) == ("exists", "/sdcard/DCIM/Camera/IMG (z kopii).JPG")
 
 
-def test_unreadable_target_is_never_overwritten(tmp_path):
-    """`stat` bez rozmiaru i bez „No such file” (np. brak dostępu) = zajęte przez cudzy plik."""
+def test_denied_folder_pushes_to_original_without_alt_search(tmp_path):
+    """`stat` odmówiony (FUSE) = zapis też odmówiony: `push` pod oryginalną ścieżkę, bez nazw zastępczych."""
     copy = _copy(tmp_path)
     new = _new(tmp_path)
-    target = "/sdcard/DCIM/Camera/IMG.JPG"
+    new.deny_stat_prefixes = {"/sdcard/DCIM/Camera/"}
+    files = _by_remote(_plan(new, copy))
+    for remote in ("/sdcard/DCIM/Camera/IMG.JPG", "/sdcard/DCIM/Camera/VID.MP4"):
+        assert (files[remote].action, files[remote].target) == ("push", remote)
+    assert not any("z kopii" in c for c in new.commands)
 
-    def deny(command: str) -> None:
-        if command.startswith("stat ") and q(target) in command:
-            raise AdbError("command_failed", f"stat: '{target}': Permission denied")
 
-    new.on_shell = deny
-    f = _by_remote(_plan(new, copy))[target]
-    assert (f.action, f.target) == ("rename", "/sdcard/DCIM/Camera/IMG (z kopii).JPG")
+def test_candidate_timeout_raises_never_guesses(tmp_path):
+    copy = _copy(tmp_path)
+    new = _new(tmp_path, {"DCIM/Camera/IMG.JPG": b"other", "DCIM/Camera/IMG (z kopii).JPG": b"theirs"})
+    candidate = q("/sdcard/DCIM/Camera/IMG (z kopii).JPG")
+    tries: list[str] = []
+
+    def slow(command: str) -> None:
+        if command.startswith("stat ") and candidate in command:
+            tries.append(command)
+            raise AdbError("timeout", "stat (>120s)")
+
+    new.on_shell = slow
+    with pytest.raises(AdbError) as exc:
+        _plan(new, copy)
+    assert exc.value.kind == "timeout" and len(tries) == 2  # jedna powtórka paczki
+
+
+def test_timeout_once_is_retried(tmp_path):
+    copy = _copy(tmp_path)
+    new = _new(tmp_path)
+    fired: list[str] = []
+
+    def once(command: str) -> None:
+        if command.startswith("stat ") and not fired:
+            fired.append(command)
+            raise AdbError("timeout", "stat (>120s)")
+
+    new.on_shell = once
+    assert {f.action for f in _plan(new, copy).files} == {"push"}
+
+
+def test_empty_phone_stat_is_batched(tmp_path):
+    many = {f"DCIM/Camera/IMG_20261025_120000_{i:04d}_long_name_for_batching.jpg": b"x" for i in range(1200)}
+    copy = _copy(tmp_path, many)
+    new = _new(tmp_path)
+    plan = _plan(new, copy)
+    assert {f.action for f in plan.files} == {"push"}
+    stats = [c for c in new.commands if c.startswith("stat ")]
+    assert len(stats) == len(_cmd_batches(["/sdcard/" + r for r in many])) == 2
+    assert all(c.endswith(STAT_TAIL) for c in stats)
+
+
+def test_missing_local_files_left_out(tmp_path, monkeypatch):
+    _apks(monkeypatch, {"/sdcard/Download/evil.apk": ("malicious", False),
+                        "/sdcard/Download/odd.apk": ("suspicious", False),
+                        "/sdcard/Download/ok.APK": ("clean", True),
+                        "/sdcard/DCIM/bundle.xapk": ("unknown", True)})
+    copy = _copy(tmp_path, APK_FILES)
+    (copy.files_dir / "Download" / "ok.APK").unlink()  # np. kwarantanna antywirusa
+    (copy.files_dir / "DCIM" / "x.heic").unlink()
+    (copy.files_dir / "DCIM" / "plik").write_bytes(b"short")  # inny rozmiar niż w stanie
+    plan = _plan(_new(tmp_path), copy)
+    assert plan.missing == 3
+    assert not {"/sdcard/Download/ok.APK", "/sdcard/DCIM/x.heic", "/sdcard/DCIM/plik"} & set(_by_remote(plan))
+
+
+def test_missing_apk_with_real_check(tmp_path):
+    copy = _copy(tmp_path, {**OLD, "Download/gone.apk": b"G" * 10})
+    (copy.files_dir / "Download" / "gone.apk").unlink()
+    (copy.files_dir / "DCIM" / "x.heic").unlink()
+    plan = _plan(_new(tmp_path), copy)
+    assert plan.missing == 2
+    assert {"/sdcard/Download/gone.apk", "/sdcard/DCIM/x.heic"}.isdisjoint(_by_remote(plan))
+
+
+def test_whatsapp_and_other_groups(tmp_path):
+    files = {**OLD, "WhatsApp/Media/w.jpg": b"W" * 7, "Music/song.mp3": b"M" * 9}
+    plan = _plan(_new(tmp_path), _copy(tmp_path, files, others={"Music"}, extra=("whatsapp",)))
+    got = _by_remote(plan)
+    assert got["/sdcard/WhatsApp/Media/w.jpg"].group == "whatsapp"
+    assert got["/sdcard/Music/song.mp3"].group == "other:Music"
+    assert plan.groups["other:Music"] == GroupTotals(files=1, bytes=9, exists=0, rename=0)
 
 
 def test_alt_name_shapes():
@@ -193,6 +265,7 @@ def test_alt_name_shapes():
     assert alt_name("/sdcard/x/a.tar.gz", 1) == "/sdcard/x/a.tar (z kopii).gz"
     assert alt_name("/sdcard/x/README", 1) == "/sdcard/x/README (z kopii)"
     assert alt_name("/sdcard/x/.nomedia", 3) == "/sdcard/x/.nomedia (z kopii 3)"
+    assert alt_name("/sdcard/x/.foo.txt", 1) == "/sdcard/x/.foo (z kopii).txt"
 
 
 def test_media_split_photos_videos(tmp_path):
