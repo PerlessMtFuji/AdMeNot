@@ -57,3 +57,67 @@ def test_fake_pull_and_disconnect(tmp_path):
     phone.fail_after_files = 3
     result = phone.pull(["/sdcard/DCIM/a.jpg", "/sdcard/DCIM/b.jpg"], out, lambda: False, lambda: None)
     assert result.rc == 1 and phone.get_state() == "offline"
+
+
+def test_fake_push_preserves_mtime_and_denies(tmp_path):
+    import os
+    src = tmp_path / "src"
+    src.mkdir()
+    f = src / "a.jpg"
+    f.write_bytes(b"hello")
+    os.utime(f, (1_600_000_000, 1_600_000_000))
+    phone = FakeStoragePhone(tmp_path / "phone")
+    (tmp_path / "phone" / "sdcard").mkdir(parents=True)
+    phone.free_kb = 1000
+    # katalog nie istnieje bez mkdir -p
+    res = phone.push([f], "/sdcard/DCIM/", lambda: False, lambda: None)
+    assert res.rc != 0
+    phone.shell("mkdir -p /sdcard/DCIM")
+    res = phone.push([f], "/sdcard/DCIM/", lambda: False, lambda: None)
+    assert res.rc == 0 and phone.push_calls == 2
+    dest = tmp_path / "phone" / "sdcard" / "DCIM" / "a.jpg"
+    assert dest.read_bytes() == b"hello" and int(dest.stat().st_mtime) == 1_600_000_000
+    assert phone.shell("stat -c '%s|%Y|%n' /sdcard/DCIM/a.jpg") == "5|1600000000|/sdcard/DCIM/a.jpg\n"
+    # push pod nową nazwą (pełna ścieżka pliku)
+    assert phone.push([f], "/sdcard/DCIM/b.jpg", lambda: False, lambda: None).rc == 0
+    assert (tmp_path / "phone" / "sdcard" / "DCIM" / "b.jpg").exists()
+    # df: nagłówek + jedna linia, Available zmniejszone o wgrane (2 x 5 B -> zaokrąglone w górę do 1 KB)
+    lines = phone.shell("df -k /sdcard/").splitlines()
+    assert len(lines) == 2 and lines[1].split()[3] == "998"
+    # odmowa
+    phone.deny_prefixes = {"/sdcard/Android/media"}
+    phone.shell("mkdir -p /sdcard/Android/media/com.x")
+    res = phone.push([f], "/sdcard/Android/media/com.x/", lambda: False, lambda: None)
+    assert res.rc == 1 and "Permission denied" in res.lines[0] and res.lines[0].startswith("adb: error:")
+    assert not (tmp_path / "phone" / "sdcard" / "Android" / "media" / "com.x" / "a.jpg").exists()
+
+
+def test_fake_scan_volume_and_default_df(tmp_path):
+    phone = _phone(tmp_path)
+    assert phone.scans == 0
+    phone.shell("content call --uri content://media --method scan_volume --arg external_primary")
+    assert phone.scans == 1
+    assert phone.free_kb is None and phone.shell("df -k /sdcard/").splitlines()[1].split()[3] == "70000000"
+
+
+def test_fake_fail_after_push_files_goes_offline_and_reconnects(tmp_path):
+    src = tmp_path / "src"
+    src.mkdir()
+    files = []
+    for n in "abc":
+        (src / f"{n}.bin").write_bytes(b"0123456789")
+        files.append(src / f"{n}.bin")
+    phone = FakeStoragePhone(tmp_path / "phone")
+    (tmp_path / "phone" / "sdcard").mkdir(parents=True)
+    phone.shell("mkdir -p /sdcard/X")
+    phone.fail_after_push_files = 2
+    res = phone.push(files, "/sdcard/X/", lambda: False, lambda: None)
+    assert res.rc != 0 and phone.get_state() == "offline"
+    out = tmp_path / "phone" / "sdcard" / "X"
+    assert (out / "a.bin").stat().st_size == 10 and (out / "b.bin").stat().st_size == 10
+    assert (out / "c.bin").stat().st_size == 5  # urwany w połowie
+    assert phone.push([files[2]], "/sdcard/X/", lambda: False, lambda: None).rc != 0  # offline
+    phone.reconnect()
+    phone.fail_after_push_files = None
+    assert phone.push([files[2]], "/sdcard/X/", lambda: False, lambda: None).rc == 0
+    assert (out / "c.bin").stat().st_size == 10

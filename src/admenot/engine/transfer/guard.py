@@ -142,6 +142,74 @@ class ReadOnlyAdb:
         return self.inner.run_bytes(args, timeout=timeout)
 
 
+_APPEND_CMDS = {"stat", "sha256sum", "df", "ls", "getprop", "mkdir", "content"}
+_SCAN_VOLUME = ["content", "call", "--uri", "content://media", "--method", "scan_volume",
+                "--arg", "external_primary"]
+
+
+def safe_target(remote: str) -> str:
+    """Ścieżka na nowym telefonie: pod `/sdcard/`, bez `..` i bez znaku nowej linii."""
+    if not remote.startswith("/sdcard/") or "\n" in remote or ".." in PurePosixPath(remote).parts:
+        raise UnsafeCommand(f"Niedozwolona ścieżka docelowa: {remote[:120]!r}")
+    return remote
+
+
+def assert_append_only(cmd: str) -> None:
+    """Rzuca UnsafeCommand, jeśli polecenie na NOWYM telefonie mogłoby coś usunąć, przenieść lub zmienić.
+
+    Dozwolone: odczyty (`stat`, `sha256sum`, `df`, `ls`, `getprop`), `mkdir -p` pod `/sdcard/`
+    i dokładnie jedno `content call` (skan mediów po wgraniu).
+    """
+    words = _unquoted_view(cmd).split()
+    if not words or words[0] not in _APPEND_CMDS:
+        raise UnsafeCommand(f"Polecenie spoza allowlisty: {cmd[:120]}")
+    try:
+        tokens = shlex.split(cmd)
+    except ValueError:
+        raise UnsafeCommand(f"Nieczytelne polecenie: {cmd[:120]}") from None
+    if words[0] == "content":
+        if tokens != _SCAN_VOLUME:
+            raise UnsafeCommand(f"Dozwolone jest wyłącznie skanowanie mediów: {cmd[:120]}")
+    elif words[0] == "mkdir":
+        if len(tokens) < 3 or tokens[1] != "-p":
+            raise UnsafeCommand(f"Dozwolone jest wyłącznie 'mkdir -p': {cmd[:120]}")
+        for path in tokens[2:]:
+            safe_target(path)
+
+
+class AppendOnlyAdb:
+    """`AdbTransport` dla nowego telefonu: tylko `shell -T <polecenie dopisujące/odczytujące>` i `get-state`."""
+
+    def __init__(self, inner: AdbTransport) -> None:
+        self.inner = inner
+
+    @property
+    def serial(self) -> str | None:
+        return self.inner.serial
+
+    def with_serial(self, serial: str) -> AppendOnlyAdb:
+        return AppendOnlyAdb(self.inner.with_serial(serial))
+
+    def shell(self, command: str, timeout: float = 20.0) -> str:
+        assert_append_only(command)
+        return self.inner.shell(command, timeout=timeout)
+
+    def run(self, args: list[str], timeout: float = 20.0) -> str:
+        cmd = _shell_T_command(args)
+        if cmd is not None:
+            assert_append_only(cmd)
+        elif args != ["get-state"]:
+            raise UnsafeCommand(f"Polecenie hosta spoza allowlisty: {' '.join(args)[:120]}")
+        return self.inner.run(args, timeout=timeout)
+
+    def run_bytes(self, args: list[str], timeout: float = 20.0) -> bytes:
+        cmd = _shell_T_command(args)
+        if cmd is None:
+            raise UnsafeCommand(f"Polecenie hosta spoza allowlisty: {' '.join(args)[:120]}")
+        assert_append_only(cmd)
+        return self.inner.run_bytes(args, timeout=timeout)
+
+
 class ApkReadAdb:
     """`ReadOnlyAdb` + dokładnie to, czego potrzebuje `backup_apks` dla jednego pakietu:
     `pm path <pakiet>` (odczyt ścieżek) i `pull <ścieżka bezwzględna .apk> <plik lokalny>`."""

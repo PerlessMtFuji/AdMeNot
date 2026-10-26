@@ -162,3 +162,66 @@ def test_apk_read_adb_rejects_bad_package_name():
     with pytest.raises(UnsafeCommand):
         ApkReadAdb(Recorder(), "com.x; reboot")
 
+
+
+def test_append_only_allows_mkdir_under_sdcard():
+    from admenot.engine.transfer.guard import assert_append_only
+    assert_append_only("mkdir -p '/sdcard/DCIM/Ą B' /sdcard/Download/x")
+    assert_append_only("stat -c '%s|%Y|%n' /sdcard/a")
+    assert_append_only("df -k /sdcard/")
+    assert_append_only("getprop ro.build.version.sdk")
+
+
+def test_append_only_rejects_mkdir_outside():
+    from admenot.engine.transfer.guard import assert_append_only
+    for cmd in ("mkdir -p /data/x", "mkdir -p /sdcard/../data", "mkdir /sdcard/x", "mkdir -p",
+                "mkdir -p /sdcardx/a", "mkdir -p /sdcard/a /data/b"):
+        with pytest.raises(UnsafeCommand):
+            assert_append_only(cmd)
+
+
+def test_append_only_rejects_rm_mv():
+    from admenot.engine.transfer.guard import assert_append_only
+    for cmd in ("rm /sdcard/a", "mv /sdcard/a /sdcard/b", "stat /sdcard/a; rm x", "cp /sdcard/a /sdcard/b",
+                "find /sdcard -delete"):
+        with pytest.raises(UnsafeCommand):
+            assert_append_only(cmd)
+
+
+def test_append_only_scan_volume_exact():
+    from admenot.engine.transfer.guard import assert_append_only
+    assert_append_only("content call --uri content://media --method scan_volume --arg external_primary")
+    for cmd in ("content call --uri content://media --method other --arg external_primary",
+                "content call --uri content://media --method scan_volume --arg internal",
+                "content insert --uri content://media --bind a:s:b",
+                "content query --uri content://sms"):
+        with pytest.raises(UnsafeCommand):
+            assert_append_only(cmd)
+
+
+def test_safe_target():
+    from admenot.engine.transfer.guard import safe_target
+    assert safe_target("/sdcard/DCIM/a.jpg") == "/sdcard/DCIM/a.jpg"
+    for bad in ("/data/a", "/sdcard/../x", "/sdcard/a\nb", "sdcard/a", "/sdcardx/a"):
+        with pytest.raises(UnsafeCommand):
+            safe_target(bad)
+
+
+def test_append_only_adb_wrapper():
+    from admenot.engine.transfer.guard import AppendOnlyAdb
+    rec = Recorder()
+    adb = AppendOnlyAdb(rec)
+    assert adb.serial == "S1"
+    assert adb.shell("mkdir -p /sdcard/a") == "ok"
+    assert adb.run(["shell", "-T", "df -k /sdcard/"]) == "ok"
+    assert adb.run(["get-state"]) == "ok"
+    for args in (["push", "a", "/sdcard/a"], ["shell", "-T", "rm /sdcard/a"], ["exec-out", "ls"]):
+        with pytest.raises(UnsafeCommand):
+            adb.run(args)
+    assert adb.run_bytes(["shell", "-T", "ls /sdcard"]) == b"ok"
+    with pytest.raises(UnsafeCommand):
+        adb.run_bytes(["exec-out", "ls /sdcard"])
+    with pytest.raises(UnsafeCommand):
+        adb.shell("pm list packages")
+    other = adb.with_serial("S2")
+    assert isinstance(other, AppendOnlyAdb) and other.serial == "S2"

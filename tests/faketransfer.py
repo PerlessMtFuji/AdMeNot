@@ -17,6 +17,14 @@ każdym poleceniem shell (może rzucić `AdbError`, np. przekroczenie czasu `sta
 Awarie: `fail_after_files` (po tylu pobranych plikach pull urywa się w środku pliku, a telefon
 przechodzi w stan `offline` do `reconnect()`), `deny_uris` (odmowa dostępu do providera),
 `online` / `get_state()` (`"device"` / `"offline"`).
+
+Nowy telefon (Etap 2, wgrywanie): `push(locals_, remote, …)` (jako `Pusher`) kopiuje do `root/sdcard`,
+zachowując czas modyfikacji; katalog docelowy musi istnieć po `mkdir -p`. `content call … scan_volume`
+zlicza `scans`; `push_calls` = liczba wywołań `push`; `pushed` = zdalne ścieżki wgranych plików.
+Awarie: `deny_prefixes` (push pod taką ścieżkę -> `adb: error: … Permission denied`, rc 1),
+`fail_after_push_files` (po tylu wgranych plikach następny jest urwany w połowie, a telefon przechodzi
+w `offline` do `reconnect()`), `free_kb` (None = domyślne 70 000 000, bez zmian przy push; liczba =
+zmniejszana o rozmiar wgranych plików, zwracana przez `df -k`).
 """
 
 from __future__ import annotations
@@ -32,6 +40,7 @@ from admenot.engine.adb.transport import AdbError
 from admenot.engine.transfer.puller import PullResult
 
 _MMS_PREFIX = "content://mms/part/"
+DEFAULT_FREE_KB = 70_000_000
 APK_DIR = "/data/app/~~fake==/{package}-1"
 
 
@@ -58,7 +67,12 @@ class FakeStoragePhone:
         self.deny_uris: set[str] = set()
         self.online = True
         self.total_kb = 120_000_000
-        self.free_kb = 70_000_000
+        self.free_kb: int | None = None
+        self.deny_prefixes: set[str] = set()
+        self.fail_after_push_files: int | None = None
+        self.push_calls = 0
+        self.pushed: list[str] = []
+        self.scans = 0
         self.commands: list[str] = []  # polecenia shell w kolejności wywołań
         self.pulled: list[str] = []  # zdalne ścieżki plików pobranych `pull`
         self.pull_calls = 0
@@ -114,7 +128,8 @@ class FakeStoragePhone:
         if argv[:2] == ["pm", "path"] and len(argv) == 3:
             return self._pm_path(argv[2])
         handler = {"find": self._find, "stat": self._stat, "df": self._df,
-                   "sha256sum": self._sha256, "content": self._content, "ls": self._ls}.get(argv[0])
+                   "sha256sum": self._sha256, "content": self._content, "ls": self._ls,
+                   "mkdir": self._mkdir}.get(argv[0])
         if handler is None:
             raise AdbError("command_failed", f"{argv[0]}: inaccessible or not found")
         return handler(argv[1:])
@@ -182,10 +197,11 @@ class FakeStoragePhone:
         return ("\n".join(out) + "\n").encode("utf-8")
 
     def _df(self, args: list[str]) -> bytes:
-        used = self.total_kb - self.free_kb
+        free = DEFAULT_FREE_KB if self.free_kb is None else self.free_kb
+        used = self.total_kb - free
         pct = round(100 * used / self.total_kb)
         return (f"Filesystem 1K-blocks Used Available Use% Mounted on\n"
-                f"/dev/fuse {self.total_kb} {used} {self.free_kb} {pct}% /storage/emulated\n"
+                f"/dev/fuse {self.total_kb} {used} {free} {pct}% /storage/emulated\n"
                 ).encode()
 
     def _sha256(self, args: list[str]) -> bytes:
@@ -200,7 +216,18 @@ class FakeStoragePhone:
             lines.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {remote}")
         return ("\n".join(lines) + "\n").encode("utf-8")
 
+    def _mkdir(self, args: list[str]) -> bytes:
+        assert args[0] == "-p" and len(args) >= 2, args
+        for remote in args[1:]:
+            self.local(remote).mkdir(parents=True, exist_ok=True)
+        return b""
+
     def _content(self, args: list[str]) -> bytes:
+        if args[0] == "call":
+            assert args[1:] == ["--uri", "content://media", "--method", "scan_volume",
+                                "--arg", "external_primary"], args
+            self.scans += 1
+            return b"Result: Bundle[{}]\n"
         if args[0] == "query":
             uri = args[args.index("--uri") + 1]
             if uri in self.deny_uris:
@@ -284,8 +311,46 @@ class FakeStoragePhone:
         lines.append(f"{count} files pulled, 0 skipped.")
         return PullResult(1 if any(x.startswith("adb: error") for x in lines) else 0, lines, False)
 
+    # ---- Pusher ---------------------------------------------------------------------------
+    def push(self, locals_: list[Path], remote: str, should_stop: Callable[[], bool],
+             tick: Callable[[], None]) -> PullResult:
+        self.push_calls += 1
+        if not self.online:
+            return PullResult(1, ["adb: error: device offline"], False)
+        lines: list[str] = []
+        count = 0
+        for src in locals_:
+            target = remote + src.name if remote.endswith("/") else remote
+            if any(target.startswith(p) for p in self.deny_prefixes):
+                lines.append(f"adb: error: failed to copy '{src}' to '{target}': "
+                             "remote couldn't create file: Permission denied")
+                continue
+            dest = self.local(target)
+            if not dest.parent.is_dir():
+                lines.append(f"adb: error: failed to copy '{src}' to '{target}': "
+                             "remote couldn't create file: No such file or directory")
+                continue
+            data = src.read_bytes()
+            if self.fail_after_push_files is not None and len(self.pushed) >= self.fail_after_push_files:
+                dest.write_bytes(data[: len(data) // 2])
+                self.online = False
+                lines.append("adb: error: failed to copy: device offline")
+                return PullResult(1, lines, False)
+            dest.write_bytes(data)
+            st = src.stat()
+            os.utime(dest, (st.st_atime, st.st_mtime))
+            self.pushed.append(target)
+            if self.free_kb is not None:
+                self.free_kb -= -(-len(data) // 1024)
+            count += 1
+            tick()
+            if should_stop():
+                return PullResult(1, lines, True)
+        lines.append(f"{count} files pushed, 0 skipped.")
+        return PullResult(1 if any(x.startswith("adb: error") for x in lines) else 0, lines, False)
 
-_STORAGE_TOOLS = {"find", "stat", "ls", "df", "content", "sha256sum"}
+
+_STORAGE_TOOLS = {"find", "stat", "ls", "df", "content", "sha256sum", "mkdir"}
 
 
 class TransferPhone:
@@ -334,3 +399,7 @@ class TransferPhone:
     def pull(self, remotes: list[str], target: Path, should_stop: Callable[[], bool],
              tick: Callable[[], None]) -> PullResult:
         return self.storage.pull(remotes, target, should_stop, tick)
+
+    def push(self, locals_: list[Path], remote: str, should_stop: Callable[[], bool],
+             tick: Callable[[], None]) -> PullResult:
+        return self.storage.push(locals_, remote, should_stop, tick)
