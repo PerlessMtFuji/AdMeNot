@@ -56,7 +56,7 @@ def test_push_args_quote_odd_names(tmp_path):
         assert Path(arg).is_absolute() and not arg.startswith("-")
         assert Path(arg) == f.resolve()
     assert argv[-1] == "/sdcard/DCIM/Ą B/"
-    assert log.notes == ["host:push 3 files"]
+    assert log.notes == ["host:push <3 files>"]
 
 
 def test_real_pusher_rejects_unsafe_target(tmp_path):

@@ -33,5 +33,5 @@ class RealPusher:
         # bezwzględne ścieżki: żadna nie zaczyna się od `-`, więc adb nie weźmie nazwy pliku za opcję
         args = ["push", *(str(p.resolve()) for p in locals_), target]
         if self.log is not None:  # w logu sesji tylko liczba plików — bez nazw i folderów klienta
-            self.log.note(f"host:push {len(locals_)} files")
+            self.log.note(f"host:push <{len(locals_)} files>")
         return run_stream(self.adb_path, self.serial, args, should_stop, tick)

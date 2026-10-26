@@ -121,3 +121,21 @@ def test_fake_fail_after_push_files_goes_offline_and_reconnects(tmp_path):
     phone.fail_after_push_files = None
     assert phone.push([files[2]], "/sdcard/X/", lambda: False, lambda: None).rc == 0
     assert (out / "c.bin").stat().st_size == 10
+
+
+def test_fake_push_after_offline_writes_nothing_and_rejects_unsafe_target(tmp_path):
+    from admenot.engine.transfer.guard import UnsafeCommand
+    src = tmp_path / "a.bin"
+    src.write_bytes(b"0123456789")
+    phone = FakeStoragePhone(tmp_path / "phone")
+    (tmp_path / "phone" / "sdcard").mkdir(parents=True)
+    phone.shell("mkdir -p /sdcard/X")
+    phone.fail_after_push_files = 0
+    assert phone.push([src], "/sdcard/X/", lambda: False, lambda: None).rc == 1  # urwanie
+    other = tmp_path / "b.bin"
+    other.write_bytes(b"zz")
+    res = phone.push([other, src], "/sdcard/X/", lambda: False, lambda: None)  # "równoległe", już offline
+    assert res.rc == 1 and "device offline" in res.lines[-1]
+    assert not (tmp_path / "phone" / "sdcard" / "X" / "b.bin").exists()
+    with pytest.raises(UnsafeCommand):
+        phone.push([src], "/sdcard/../x/", lambda: False, lambda: None)

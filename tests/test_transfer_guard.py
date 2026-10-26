@@ -207,6 +207,27 @@ def test_safe_target():
             safe_target(bad)
 
 
+_NEWLINE_PROBES = ["ls /sdcard\nrm -rf /sdcard", "stat /sdcard/a\nreboot", "df -k\nsettings put global x 1",
+                   "getprop\nam start x", "ls /sdcard\rrm -rf /sdcard", "ls /sdcard\r\nreboot"]
+
+
+def test_newline_injection_rejected_by_both_guards():
+    from admenot.engine.transfer.guard import assert_append_only
+    for cmd in _NEWLINE_PROBES:
+        with pytest.raises(UnsafeCommand):
+            assert_append_only(cmd)
+        with pytest.raises(UnsafeCommand):
+            assert_read_only(cmd)
+    assert_read_only("stat -c '%s|%Y|%n' '/sdcard/a b'")  # w apostrofach nadal w porządku
+
+
+def test_append_only_rejects_odd_mkdir_forms():
+    from admenot.engine.transfer.guard import assert_append_only
+    for cmd in ('"mkdir" -p /sdcard/x', "mkdir -p -m 777 /sdcard/x", 'mkdir -p "/sdcard/$(reboot)"'):
+        with pytest.raises(UnsafeCommand):
+            assert_append_only(cmd)
+
+
 def test_append_only_adb_wrapper():
     from admenot.engine.transfer.guard import AppendOnlyAdb
     rec = Recorder()

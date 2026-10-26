@@ -23,7 +23,9 @@ zachowując czas modyfikacji; katalog docelowy musi istnieć po `mkdir -p`. `con
 zlicza `scans`; `push_calls` = liczba wywołań `push`; `pushed` = zdalne ścieżki wgranych plików.
 Awarie: `deny_prefixes` (push pod taką ścieżkę -> `adb: error: … Permission denied`, rc 1),
 `fail_after_push_files` (po tylu wgranych plikach następny jest urwany w połowie, a telefon przechodzi
-w `offline` do `reconnect()`), `free_kb` (None = domyślne 70 000 000, bez zmian przy push; liczba =
+w `offline` do `reconnect()`; licznik liczy pliki ŁĄCZNIE z wielu wywołań i nie zeruje się sam —
+test po `reconnect()` ustawia `fail_after_push_files = None`; pozostałe równoległe `push` dostają rc 1
+i nic już nie zapisują), `push` sprawdza `safe_target(remote)` jak `RealPusher`, `free_kb` (None = domyślne 70 000 000, bez zmian przy push; liczba =
 zmniejszana o rozmiar wgranych plików, zwracana przez `df -k`).
 """
 
@@ -33,10 +35,12 @@ import fnmatch
 import hashlib
 import os
 import shlex
+import threading
 from collections.abc import Callable
 from pathlib import Path
 
 from admenot.engine.adb.transport import AdbError
+from admenot.engine.transfer.guard import safe_target
 from admenot.engine.transfer.puller import PullResult
 
 _MMS_PREFIX = "content://mms/part/"
@@ -73,6 +77,7 @@ class FakeStoragePhone:
         self.push_calls = 0
         self.pushed: list[str] = []
         self.scans = 0
+        self._push_lock = threading.Lock()
         self.commands: list[str] = []  # polecenia shell w kolejności wywołań
         self.pulled: list[str] = []  # zdalne ścieżki plików pobranych `pull`
         self.pull_calls = 0
@@ -314,34 +319,37 @@ class FakeStoragePhone:
     # ---- Pusher ---------------------------------------------------------------------------
     def push(self, locals_: list[Path], remote: str, should_stop: Callable[[], bool],
              tick: Callable[[], None]) -> PullResult:
-        self.push_calls += 1
-        if not self.online:
-            return PullResult(1, ["adb: error: device offline"], False)
+        safe_target(remote)
+        with self._push_lock:
+            self.push_calls += 1
         lines: list[str] = []
         count = 0
+        offline = "adb: error: failed to copy: device offline"
         for src in locals_:
             target = remote + src.name if remote.endswith("/") else remote
-            if any(target.startswith(p) for p in self.deny_prefixes):
-                lines.append(f"adb: error: failed to copy '{src}' to '{target}': "
-                             "remote couldn't create file: Permission denied")
-                continue
-            dest = self.local(target)
-            if not dest.parent.is_dir():
-                lines.append(f"adb: error: failed to copy '{src}' to '{target}': "
-                             "remote couldn't create file: No such file or directory")
-                continue
-            data = src.read_bytes()
-            if self.fail_after_push_files is not None and len(self.pushed) >= self.fail_after_push_files:
-                dest.write_bytes(data[: len(data) // 2])
-                self.online = False
-                lines.append("adb: error: failed to copy: device offline")
-                return PullResult(1, lines, False)
-            dest.write_bytes(data)
-            st = src.stat()
-            os.utime(dest, (st.st_atime, st.st_mtime))
-            self.pushed.append(target)
-            if self.free_kb is not None:
-                self.free_kb -= -(-len(data) // 1024)
+            with self._push_lock:  # równoległe push-e: jedno urwanie kabla zatrzymuje wszystkie
+                if not self.online:
+                    return PullResult(1, [*lines, offline], False)
+                if any(target.startswith(p) for p in self.deny_prefixes):
+                    lines.append(f"adb: error: failed to copy '{src}' to '{target}': "
+                                 "remote couldn't create file: Permission denied")
+                    continue
+                dest = self.local(target)
+                if not dest.parent.is_dir():
+                    lines.append(f"adb: error: failed to copy '{src}' to '{target}': "
+                                 "remote couldn't create file: No such file or directory")
+                    continue
+                data = src.read_bytes()
+                if self.fail_after_push_files is not None and len(self.pushed) >= self.fail_after_push_files:
+                    dest.write_bytes(data[: len(data) // 2])
+                    self.online = False
+                    return PullResult(1, [*lines, offline], False)
+                dest.write_bytes(data)
+                st = src.stat()
+                os.utime(dest, (st.st_atime, st.st_mtime))
+                self.pushed.append(target)
+                if self.free_kb is not None:
+                    self.free_kb -= -(-len(data) // 1024)
             count += 1
             tick()
             if should_stop():

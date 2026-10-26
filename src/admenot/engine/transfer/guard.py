@@ -55,6 +55,8 @@ def _unquoted_view(cmd: str) -> str:
             out.append(c)
             i += 1
     view = "".join(out)
+    if "\n" in view or "\r" in view:  # str.split() zjadłby je jako białe znaki, a sh -c uruchomiłby drugie polecenie
+        raise UnsafeCommand(f"Nowa linia poza cudzysłowem: {cmd[:120]!r}")
     for word in view.split():
         if word == "{}":
             continue
