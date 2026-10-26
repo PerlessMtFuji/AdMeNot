@@ -148,6 +148,7 @@ _APPEND_CMDS = {"stat", "sha256sum", "df", "ls", "getprop", "mkdir", "content"}
 STAT_TAIL = " 2>&1 || true"  # błędy `stat` na stdout, zawsze kod 0 (adb gubi stdout przy kodzie ≠ 0)
 _SCAN_VOLUME = ["content", "call", "--uri", "content://media", "--method", "scan_volume",
                 "--arg", "external_primary"]
+SCAN_VOLUME_CMD = " ".join(_SCAN_VOLUME)  # skan mediów po wgraniu (Android 10+)
 
 
 def safe_target(remote: str) -> str:

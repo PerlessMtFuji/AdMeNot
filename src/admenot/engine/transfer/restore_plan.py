@@ -146,7 +146,7 @@ def _stat_batch(adb: AdbTransport, batch: list[str]) -> str:
     return adb.shell(cmd, timeout=STAT_TIMEOUT)
 
 
-def _stat_all(adb: AdbTransport, remotes: list[str], should_stop: Callable[[], bool]) -> dict[str, Answer]:
+def stat_all(adb: AdbTransport, remotes: list[str], should_stop: Callable[[], bool]) -> dict[str, Answer]:
     """Odpowiedź telefonu o każdą ścieżkę: (rozmiar, mtime), `gone` („No such file”) albo `denied`
     (każdy inny błąd, np. „Permission denied”). Ścieżka bez żadnej linii → `AdbError` (nie zgadujemy)."""
     answers: dict[str, Answer] = {}
@@ -188,7 +188,7 @@ def _resolve_conflicts(adb: AdbTransport, conflicts: list[FileRow], used: set[st
         if n > ALT_MAX:
             raise AdbError("command_failed", f"no free name after {ALT_MAX} tries")
         cands = {r.remote: [alt_name(r.remote, k) for k in range(n, n + ALT_ROUND)] for r in pending}
-        answers = _stat_all(adb, [c for names in cands.values() for c in names], should_stop)
+        answers = stat_all(adb, [c for names in cands.values() for c in names], should_stop)
         left: list[FileRow] = []
         for r in pending:
             choice: tuple[Action, str] | None = None
@@ -236,7 +236,7 @@ def build_plan(adb: AdbTransport, copy: CopyDir, should_stop: Callable[[], bool]
     rows = [r for r, _ in present]
     local = {r.remote: path for r, path in present}
     targets = {r.remote: safe_target(taken.get(r.remote, r.remote)) for r in rows}
-    answers = _stat_all(adb, list(targets.values()), should_stop)
+    answers = stat_all(adb, list(targets.values()), should_stop)
 
     decided: dict[str, tuple[Action, str]] = {}
     conflicts: list[FileRow] = []
