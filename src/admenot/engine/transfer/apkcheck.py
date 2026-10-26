@@ -63,6 +63,7 @@ def _installed_certs(copy: CopyDir, package: str) -> set[str] | None:
     """Certyfikat aplikacji skopiowanej ze starego telefonu; `None`, gdy brak APK w kopii."""
     for apk in sorted((copy.apps_dir / package).glob("*/base.apk")):
         try:
+            preflight(apk)
             certs = set(read_manifest(apk).cert_sha256)
         except Exception:  # noqa: BLE001, S112 — nieczytelny APK = certyfikat nieznany
             continue
@@ -79,10 +80,24 @@ def _facts(report: ApkReport) -> AppFacts:
     return facts
 
 
-def _judge(remote: str, report: ApkReport, verdicts: dict[str, tuple[int | None, str]] | None,
-           iocs: IocList, copy: CopyDir) -> ApkCheck:
+def _sha_ioc(local: Path, report: ApkReport | None, iocs: IocList) -> bool:
+    """Zgodność SHA-256 pliku z IOC nie wymaga manifestu; haszowanie nie parsuje archiwum."""
+    hashes = set(report.files.values()) if report else set()
+    if report and report.sha256:
+        hashes.add(report.sha256)
+    try:
+        hashes.add(_sha256(local))
+    except OSError:
+        pass
+    return any(i.kind == "sha256" and i.value in hashes for i in iocs.entries)
+
+
+def _judge(remote: str, local: Path, report: ApkReport,
+           verdicts: dict[str, tuple[int | None, str]] | None, iocs: IocList, copy: CopyDir) -> ApkCheck:
     package = report.package or None
     if (report.error or "").startswith("rejected:") or not package:
+        if _sha_ioc(local, report, iocs):
+            return _check(remote, package, "malicious", "ioc")
         return _check(remote, package, "unknown", "none")
     known = verdicts.get(package) if verdicts else None
     if known and known[1] in ("malicious", "suspicious"):
@@ -117,9 +132,12 @@ def check_apks(
         try:
             report = analyze(remote, [local])
         except Exception:  # noqa: BLE001 — jeden plik nie przerywa oceny reszty
-            result.append(_check(remote, None, "unknown", "none"))
+            if _sha_ioc(local, None, iocs):
+                result.append(_check(remote, None, "malicious", "ioc"))
+            else:
+                result.append(_check(remote, None, "unknown", "none"))
             continue
-        result.append(_judge(remote, report, verdicts, iocs, copy))
+        result.append(_judge(remote, local, report, verdicts, iocs, copy))
     return result
 
 

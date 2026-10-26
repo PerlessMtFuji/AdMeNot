@@ -179,3 +179,51 @@ def test_results_cached(tmp_path, monkeypatch):
     files[0][1].write_bytes(b"changed")
     load_or_check(copy, files)
     assert len(calls) == 2
+
+
+def _sha_ioc_list(data: bytes):
+    import hashlib
+    return IocList(1, (Ioc("sha256", hashlib.sha256(data).hexdigest(), "fam", "https://x",
+                           date(2026, 1, 1)),))
+
+
+def test_unreadable_manifest_sha256_ioc_is_malicious(tmp_path):
+    f = _file(tmp_path, data=b"evil")
+    for rep in (_report(package=""), _report(package="", files={})):
+        c = check_apks(_copy(tmp_path), [f], _sha_ioc_list(b"evil"), lambda r, p, rep=rep: rep)[0]
+        assert (c.outcome, c.level, c.default_on) == ("malicious", "ioc", False)
+    c = check_apks(_copy(tmp_path), [f], NO_IOCS, lambda r, p: _report(package=""))[0]
+    assert (c.outcome, c.level, c.default_on) == ("unknown", "none", True)
+
+
+def test_rejected_sha256_ioc_is_malicious(tmp_path):
+    f = _file(tmp_path, data=b"bomb")
+    rep = ApkReport("", error="rejected: bomb")
+    c = check_apks(_copy(tmp_path), [f], _sha_ioc_list(b"bomb"), lambda r, p: rep)[0]
+    assert (c.outcome, c.level, c.default_on) == ("malicious", "ioc", False)
+    c = check_apks(_copy(tmp_path), [f], NO_IOCS, lambda r, p: rep)[0]
+    assert (c.outcome, c.level, c.default_on) == ("unknown", "none", True)
+
+
+def test_analyze_exception_is_unknown(tmp_path):
+    def boom(r, p):
+        raise RuntimeError("x")
+
+    c = check_apks(_copy(tmp_path), [_file(tmp_path)], NO_IOCS, boom)[0]
+    assert (c.outcome, c.level, c.default_on) == ("unknown", "none", True)
+
+
+def test_installed_certs_skips_unreadable_old_apk(tmp_path, monkeypatch):
+    copy = _copy(tmp_path)
+    for vc in ("1", "2"):
+        apk = copy.apps_dir / PKG / vc / "base.apk"
+        apk.parent.mkdir(parents=True)
+        apk.write_bytes(b"x")
+
+    def fake(p):
+        if "1" in p.parent.name:
+            raise ValueError("bad")
+        return SimpleNamespace(cert_sha256=(CERT_A,), package=PKG)
+
+    monkeypatch.setattr(apkcheck, "read_manifest", fake)
+    assert apkcheck._installed_certs(copy, PKG) == {CERT_A}
