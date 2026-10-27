@@ -7,7 +7,7 @@ Port `plan()` i `alt_name` ze skryptu adb-backup (`restore.py`). Gwarancje:
   zastępcza jest na pewno wolna na telefonie („No such file”) i nie jest celem żadnego innego
   pliku tego planu — nigdy nie nadpisujemy cudzego pliku. Bez odpowiedzi `stat` (dwa razy
   przekroczony czas, brak linii o ścieżce) plan się nie buduje: nie zgadujemy;
-* pliki brakujące w kopii na PC (albo o innym rozmiarze niż w stanie) pomijamy i liczymy w `missing`;
+* pliki brakujące w kopii na PC (albo o innym rozmiarze niż w stanie) pomijamy i liczymy w `missing_by_group`;
 * `taken_alts` (cele z poprzedniego podejścia) mają pierwszeństwo: ten plik jest nasz, więc bez
   ponownego szukania nazwy (silnik nadpisuje go tylko w stanie `pushing`).
 
@@ -18,7 +18,8 @@ from __future__ import annotations
 
 import posixpath
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from collections import Counter
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Protocol
 
@@ -87,7 +88,17 @@ class RestorePlan:
     groups: dict[str, GroupTotals]
     space: PhoneSpace
     reserve: int
-    missing: int = 0  # pliki kopii, których nie ma na PC (albo mają inny rozmiar) — poza `files`
+    # pliki kopii, których nie ma na PC (albo mają inny rozmiar) — poza `files`; wg grupy wgrywania
+    missing_by_group: dict[str, int] = field(default_factory=dict)
+
+    @property
+    def missing(self) -> int:
+        """Brakujące na PC we wszystkich grupach (widok planu)."""
+        return sum(self.missing_by_group.values())
+
+    def missing_in(self, groups: set[str] | frozenset[str]) -> int:
+        """Brakujące na PC w wybranych grupach (wynik wgrywania)."""
+        return sum(n for g, n in self.missing_by_group.items() if g in groups)
 
     def need(self, groups: set[str], apk_on: set[str]) -> int:
         """Bajty do wgrania w wybranych grupach; zapis obok liczy się w pełnym rozmiarze."""
@@ -241,11 +252,12 @@ def resolve_conflicts(adb: AdbTransport, conflicts: Sequence[Candidate], used: s
     return decided
 
 
-def _local_rows(copy: CopyDir, rows: list[FileRow]) -> tuple[list[tuple[FileRow, Path]], int]:
-    """(wiersze z plikiem w kopii, liczba brakujących): plik usunięty z PC (np. przez antywirus)
+def _local_rows(copy: CopyDir, rows: list[FileRow]) -> tuple[list[tuple[FileRow, Path]], list[FileRow]]:
+    """(wiersze z plikiem w kopii, wiersze brakujące): plik usunięty z PC (np. przez antywirus)
     albo o innym rozmiarze niż w stanie nie jest wgrywany."""
     files_dir = copy.files_dir.absolute()
     present: list[tuple[FileRow, Path]] = []
+    missing: list[FileRow] = []
     for r in rows:
         local = files_dir.joinpath(*r.local_rel.split("/"))
         try:
@@ -254,7 +266,9 @@ def _local_rows(copy: CopyDir, rows: list[FileRow]) -> tuple[list[tuple[FileRow,
             ok = False
         if ok:
             present.append((r, local))
-    return present, len(rows) - len(present)
+        else:
+            missing.append(r)
+    return present, missing
 
 
 def build_plan(adb: AdbTransport, copy: CopyDir, should_stop: Callable[[], bool],
@@ -288,8 +302,8 @@ def build_plan(adb: AdbTransport, copy: CopyDir, should_stop: Callable[[], bool]
     checks = {c.remote: c for c in load_or_check(copy, apk_files)} if apk_files else {}
     unchecked = {remote for remote, _ in apk_files} - set(checks)  # zniknął z PC w trakcie: nie bez oceny
     if unchecked:
+        missing += [r for r in rows if r.remote in unchecked]
         rows = [r for r in rows if r.remote not in unchecked]
-        missing += len(unchecked)
     _check(should_stop)
 
     files = [PlanFile(r.remote, local[r.remote], r.size, r.mtime, upload_group(r.root, r.remote),
@@ -301,6 +315,7 @@ def build_plan(adb: AdbTransport, copy: CopyDir, should_stop: Callable[[], bool]
         groups[f.group] = GroupTotals(g.files + 1, g.bytes + (f.size if counted else 0),
                                       g.exists + (f.action == "exists"), g.rename + (f.action == "rename"))
     space = read_space(adb)
-    return RestorePlan(files, groups, space, reserve(space), missing)
+    missing_by_group = dict(Counter(upload_group(r.root, r.remote) for r in missing))
+    return RestorePlan(files, groups, space, reserve(space), missing_by_group)
 
 

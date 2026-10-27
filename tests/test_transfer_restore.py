@@ -344,6 +344,19 @@ def test_unselected_group_skipped(tmp_path):
     assert (row.status, row.error) == ("skipped", "unselected")
 
 
+def test_missing_counted_only_in_selected_groups(tmp_path):
+    """Plik zniknął z PC w grupie, której nie wgrywamy → wynik nie jest żółty z tego powodu."""
+    copy = _copy(tmp_path)
+    (copy.files_dir / "DCIM" / "Camera" / "VID.MP4").unlink()
+    new = _new(tmp_path)
+    plan = _plan(new, copy)
+    assert plan.missing == 1
+    res = _run(new, copy, plan, UploadChoice(ALL - {"videos"}, frozenset()))
+    assert (res.status, res.files_missing) == ("complete", 0)
+    res = _run(new, copy, plan)
+    assert (res.status, res.files_missing) == ("complete", 1)
+
+
 def test_own_partial_kept_own_while_group_unticked(tmp_path):
     """Przerwany w połowie pliku, wznowiony z odznaczoną grupą, potem z zaznaczoną: nadpisany ten sam
     plik (nasz), bez „(z kopii)”."""

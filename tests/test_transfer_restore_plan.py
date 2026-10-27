@@ -238,6 +238,8 @@ def test_missing_local_files_left_out(tmp_path, monkeypatch):
     (copy.files_dir / "DCIM" / "plik").write_bytes(b"short")  # inny rozmiar niż w stanie
     plan = _plan(_new(tmp_path), copy)
     assert plan.missing == 3
+    assert plan.missing_by_group == {"downloads": 1, "photos": 2}
+    assert plan.missing_in({"photos", "videos"}) == 2
     assert not {"/sdcard/Download/ok.APK", "/sdcard/DCIM/x.heic", "/sdcard/DCIM/plik"} & set(_by_remote(plan))
 
 
@@ -247,6 +249,7 @@ def test_missing_apk_with_real_check(tmp_path):
     (copy.files_dir / "DCIM" / "x.heic").unlink()
     plan = _plan(_new(tmp_path), copy)
     assert plan.missing == 2
+    assert plan.missing_by_group == {"downloads": 1, "photos": 1}
     assert {"/sdcard/Download/gone.apk", "/sdcard/DCIM/x.heic"}.isdisjoint(_by_remote(plan))
 
 

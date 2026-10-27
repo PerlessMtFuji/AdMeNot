@@ -116,7 +116,7 @@ class RestoreResult:
     hashed: bool  # sprawdzono sumy SHA-256 (a nie tylko rozmiar)
     # skończone: Android 10+ `done`/`failed`, starszy `restart`; przerwane: `skipped` (skanuje wznowienie)
     media_scan: MediaScan
-    files_missing: int = 0  # pliki kopii, których nie ma na PC (`plan.missing`)
+    files_missing: int = 0  # pliki wybranych grup, których nie ma na PC (`plan.missing_in`)
 
 
 class RestoreError(Exception):
@@ -542,7 +542,7 @@ class _Restore:
             apk_skipped=skipped["apk_malicious"], apk_suspicious_skipped=skipped["apk_suspicious"],
             bytes=sum(r.size for r in done), seconds=round(time.monotonic() - t0),
             hashed=self.choice.verify_hash and self.hash_ok, media_scan=media_scan,
-            files_missing=self.plan.missing)
+            files_missing=self.plan.missing_in(self.choice.groups))
 
 
 def _mark(state: RestoreState, status: str) -> None:
