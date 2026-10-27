@@ -451,3 +451,25 @@ def test_loose_file_in_storage_root_uploaded(tmp_path):
     res = _run(new, copy, _plan(new, copy), UploadChoice(ALL | {"other:"}, frozenset()))
     assert res.status == "complete" and res.files_done == len(OLD) + 1
     assert new.local("/sdcard/notes.txt").read_bytes() == b"loose"
+
+
+def test_read_restores_skips_locked_state_quickly(tmp_path):
+    """Stan zablokowany zapisem trwającego wgrywania: widok kopii nie czeka dłużej niż `READ_TIMEOUT`."""
+    import sqlite3
+    import time
+
+    from admenot.engine.transfer.restore_state import READ_TIMEOUT, read_restores
+
+    copy = _copy(tmp_path)
+    new = _new(tmp_path)
+    _run(new, copy, _plan(new, copy), should_stop=lambda: new.push_calls >= 1)
+    writer = sqlite3.connect(restore_state_path(copy, "NEW"), isolation_level=None)
+    try:
+        writer.execute("BEGIN EXCLUSIVE")
+        started = time.monotonic()
+        assert read_restores(copy) == []
+        assert time.monotonic() - started < READ_TIMEOUT + 1.0
+    finally:
+        writer.execute("ROLLBACK")
+        writer.close()
+    assert [r.serial for r in read_restores(copy)] == ["NEW"]

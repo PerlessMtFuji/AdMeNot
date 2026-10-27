@@ -465,7 +465,7 @@ def test_start_restore_completes(tmp_path):
     for rel, data in FILES.items():
         assert new.local("/sdcard/" + rel).read_bytes() == data, rel
     restores = api.transfers()["copies"][0]["restores"]
-    assert [(r["serial"], r["status"]) for r in restores] == [(NEW, "complete")]
+    assert [(r["serial"], r["status"], r["resumable"]) for r in restores] == [(NEW, "complete", False)]
     assert restores[0]["updated"].endswith("+00:00")
     # skończone wgrywanie nie jest proponowane do wznowienia; drugi plan widzi pliki jako „już są”
     again = _planned(api, rec, copy_id)
@@ -487,8 +487,22 @@ def test_restore_resume_offered(tmp_path):
     event = _planned(api, rec, copy_id)
     assert event["resumable"] is True
     assert event["copy"]["restores"] == [{"serial": NEW, "status": "stopped",
-                                          "updated": "2026-09-26T12:00:00+00:00"}]
+                                          "updated": "2026-09-26T12:00:00+00:00", "resumable": True}]
     assert _planned(api, rec, copy_id, SERIAL)["resumable"] is False  # stan innego telefonu
+
+
+def test_finished_incomplete_upload_is_not_resumable(tmp_path):
+    """Skończone wgrywanie z odmową Androida (`denied`, bez plików w kolejce) to wynik, nie przerwanie:
+    ani widok kopii, ani plan nie proponują wznowienia."""
+    api, rec, host, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+    host.phone(NEW).storage.deny_prefixes.add("/sdcard/Music")
+    api.start_restore(CHOICE)
+    result = rec.of("transfer:restore_done")[0]["result"]
+    assert result["status"] == "incomplete" and result["files_denied"] == 1
+    (entry,) = api.transfers()["copies"][0]["restores"]
+    assert (entry["status"], entry["resumable"]) == ("incomplete", False)
+    assert _planned(api, rec, copy_id)["resumable"] is False
 
 
 def test_restore_phone_full_maps_to_job_error(tmp_path):
@@ -498,7 +512,8 @@ def test_restore_phone_full_maps_to_job_error(tmp_path):
     api.start_restore(CHOICE)
     assert rec.of("job:error")[-1]["key"] == "transfer_phone_full"
     assert not rec.of("transfer:restore_done")
-    assert api.transfers()["copies"][0]["restores"][0]["status"] == "phone_full"
+    (entry,) = api.transfers()["copies"][0]["restores"]
+    assert (entry["status"], entry["resumable"]) == ("phone_full", True)  # przerwane: pliki w kolejce
 
 
 def test_start_restore_rejects_unknown_group(tmp_path):

@@ -17,6 +17,7 @@ from admenot.engine.paths import device_dir_name
 
 from .store import CopyDir
 
+READ_TIMEOUT = 1.0  # s — odczyt stanu dla widoku kopii
 # Powody nieudanej próby po `push` — pod celem może leżeć nasz niedokończony plik.
 OWN_PARTIAL = frozenset({"interrupted", "disconnect", "push_failed", "hash_mismatch"})
 
@@ -118,9 +119,10 @@ class RestoreSummary:
 def _summary(path: Path) -> RestoreSummary | None:
     """Sam odczyt istniejącego pliku: `mode=rw` bez tworzenia, więc widok kopii niczego nie
     zakłada, a pozostawiony po awarii dziennik transakcji SQLite może się wycofać (`mode=ro` by
-    na nim odmówił i Banner wznowienia by zniknął)."""
+    na nim odmówił i Banner wznowienia by zniknął). Krótki `timeout`: wątek API nie czeka za
+    zapisem trwającego wgrywania — zablokowany stan jest na ten raz pomijany."""
     try:
-        db = sqlite3.connect(f"{path.absolute().as_uri()}?mode=rw", uri=True)
+        db = sqlite3.connect(f"{path.absolute().as_uri()}?mode=rw", uri=True, timeout=READ_TIMEOUT)
     except sqlite3.Error:
         return None
     try:

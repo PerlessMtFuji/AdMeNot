@@ -309,9 +309,8 @@ def _stable_transfer(data: dict[str, Any]) -> dict[str, Any]:
 def _stable_restores(value: Any) -> Any:
     """`updated` stanu wgrywania to zegar komputera (UTC), nie zegar `Api` — w nagraniu stały."""
     if isinstance(value, dict):
-        if set(value) == {"serial", "status", "updated"}:
-            return {**value, "updated": "2026-09-26T12:31:00+00:00"}
-        return {k: _stable_restores(v) for k, v in value.items()}
+        return {k: ([{**r, "updated": "2026-09-26T12:31:00+00:00"} for r in v] if k == "restores"
+                    else _stable_restores(v)) for k, v in value.items()}
     if isinstance(value, list):
         return [_stable_restores(v) for v in value]
     return value

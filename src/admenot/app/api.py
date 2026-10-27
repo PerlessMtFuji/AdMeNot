@@ -1693,13 +1693,14 @@ class Api:
             try:
                 with _transfer_errors("restore_plan"):
                     device, plan = plan_on(job)
+                    view = copy_view(copy.read_meta(), self._now())  # kopia zniknęła → błąd kopii
             finally:
                 self._restore_copy_id = None
             self._restore = (device, copy, plan)
             mine = next((r for r in read_restores(copy) if r.serial == device.serial), None)
             self._emit("transfer:restore_plan", {
                 "plan": restore_plan_view(plan),
-                "copy": copy_view(copy.read_meta(), self._now()),
+                "copy": view,
                 "resumable": mine is not None and mine.resumable,
                 "same_phone_recent": (meta.serial == device.serial
                                       and self._now() - meta.created < SAME_PHONE_RECENT)})
@@ -1749,10 +1750,10 @@ class Api:
             try:
                 with _transfer_errors("restore"), device_lock(journal_path(), serial):
                     result = self._run_restore(job, adb, raw, device, copy, plan, chosen)
+                    view = copy_view(copy.read_meta(), self._now())  # kopia zniknęła → błąd kopii
             finally:
                 self._restore_copy_id = None
-            self._emit("transfer:restore_done", {"result": restore_result_view(result),
-                                                 "copy": copy_view(copy.read_meta(), self._now())})
+            self._emit("transfer:restore_done", {"result": restore_result_view(result), "copy": view})
             telemetry.record("transfer_restore",
                              lambda _packages: transfer_restore_event(device, result, chosen, STREAMS))
 
