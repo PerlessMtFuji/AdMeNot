@@ -222,7 +222,8 @@ class _Restore:
 
     def _reconcile(self, state: RestoreState) -> None:
         """Plan + wybór do stanu. `done`/`exists` zostają; reszta od nowa z planu (bez prób), a ślad
-        własnego niedokończonego pliku (`interrupted`) zostaje, gdy cel się nie zmienił. Nasz plik,
+        własnego niedokończonego pliku (`interrupted`, a przy `skipped` — `own`) zostaje, gdy cel się
+        nie zmienił. Nasz plik,
         który plan widzi jako „już jest” (wgrany przed przerwaniem), liczy się jako wgrany (`done`).
         Wiersze spoza planu (plik zniknął z PC) → `skipped`/`missing`."""
         existing = state.all_files()
@@ -231,15 +232,16 @@ class _Restore:
             if row is not None and row.status in ("done", "exists"):
                 continue
             status, error = self._initial(f)
-            if row is not None and row.target == f.target and is_own(row):
-                if status == "pending":
-                    error = "interrupted"
-                elif status == "exists":
-                    status = "done"
-            state.insert(RestoreRow(f.remote, f.target, f.group, f.size, f.mtime, status, 0, error))
+            own = row is not None and row.target == f.target and is_own(row)
+            if own and status == "pending":
+                error = "interrupted"
+            elif own and status == "exists":
+                status = "done"
+            state.insert(RestoreRow(f.remote, f.target, f.group, f.size, f.mtime, status, 0, error,
+                                    own=own and status == "skipped"))
         for remote, row in existing.items():
             if remote not in self.files and row.status not in ("done", "exists", "skipped"):
-                state.update(remote, status="skipped", error="missing")
+                state.update(remote, status="skipped", error="missing", own=int(is_own(row)))
         state.commit()
         rows = [r for r in state.all_files().values() if r.status in ("pending", "done")]
         self.total_files, self.total_bytes = len(rows), sum(r.size for r in rows)

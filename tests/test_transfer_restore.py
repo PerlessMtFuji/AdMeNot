@@ -281,7 +281,46 @@ def test_unselected_group_skipped(tmp_path):
     assert (row.status, row.error) == ("skipped", "unselected")
 
 
-OUTCOMES = {"/sdcard/Download/evil.apk": ("malicious", False), "/sdcard/Download/odd.apk": ("suspicious", False),
+def test_own_partial_kept_own_while_group_unticked(tmp_path):
+    """Przerwany w połowie pliku, wznowiony z odznaczoną grupą, potem z zaznaczoną: nadpisany ten sam
+    plik (nasz), bez „(z kopii)”."""
+    copy = _copy(tmp_path)
+    remote = "/sdcard/DCIM/Camera/VID.MP4"
+    new = _new(tmp_path, {"DCIM/Camera/VID.MP4": OLD["DCIM/Camera/VID.MP4"][:250]})
+    state = RestoreState(restore_state_path(copy, "NEW"))
+    state.set_meta("serial", "NEW")
+    state.insert(RestoreRow(remote, remote, "videos", 500, MTIME, "pushing", 0, None))
+    state.close()
+    first = _run(new, copy, _plan(new, copy, taken=True), UploadChoice(ALL - {"videos"}, frozenset()))
+    assert (first.status, first.files_unselected) == ("complete", 1)
+    row = _rows(copy)[remote]
+    assert (row.status, row.error, row.own) == ("skipped", "unselected", True)
+    second = _run(new, copy, _plan(new, copy, taken=True))
+    assert second.status == "complete"
+    _assert_uploaded(new, OLD)
+    assert not any("z kopii" in rel for rel in _phone_files(new))
+    assert _rows(copy)[remote].target == remote
+
+
+def test_restore_state_without_own_column_migrated(tmp_path):
+    import sqlite3
+    path = tmp_path / "old.sqlite"
+    db = sqlite3.connect(path)
+    db.executescript("CREATE TABLE files (remote TEXT PRIMARY KEY, target TEXT NOT NULL, grp TEXT NOT NULL, "
+                     "size INTEGER NOT NULL, mtime INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', "
+                     "attempts INTEGER NOT NULL DEFAULT 0, error TEXT);"
+                     "INSERT INTO files VALUES ('/sdcard/a', '/sdcard/a', 'photos', 1, 2, 'pushing', 0, NULL);")
+    db.commit()
+    db.close()
+    state = RestoreState(path)
+    try:
+        assert state.all_files()["/sdcard/a"].own is False
+        assert state.taken_alts() == {"/sdcard/a": "/sdcard/a"}
+    finally:
+        state.close()
+
+
+OUTCOMES = {"/sdcard/Download/evil.apk":("malicious", False), "/sdcard/Download/odd.apk": ("suspicious", False),
             "/sdcard/Download/ok.APK": ("clean", True), "/sdcard/DCIM/bundle.xapk": ("unknown", True)}
 
 

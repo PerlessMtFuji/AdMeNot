@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS files (
     mtime    INTEGER NOT NULL,
     status   TEXT NOT NULL DEFAULT 'pending',
     attempts INTEGER NOT NULL DEFAULT 0,
-    error    TEXT
+    error    TEXT,
+    own      INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS ix_files_status ON files(status);
 """
@@ -52,12 +53,15 @@ class RestoreRow:
     status: str  # pending | pushing | done | exists | denied | error | skipped
     attempts: int
     error: str | None = None
+    # `skipped` z naszym niedokończonym plikiem pod celem (grupa odznaczona po przerwaniu) — po
+    # ponownym zaznaczeniu wznowienie nadpisze własny plik zamiast zapisywać obok
+    own: bool = False
 
 
 class RestoreState:
     """Stan wgrywania w SQLite (jak `state.State`); meta: `serial`, `choice`, `status`, `updated`."""
 
-    _COLS = "remote, target, grp, size, mtime, status, attempts, error"
+    _COLS = "remote, target, grp, size, mtime, status, attempts, error, own"
 
     def __init__(self, path: Path):
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -65,6 +69,8 @@ class RestoreState:
         self.db = sqlite3.connect(path)
         self.db.execute("PRAGMA synchronous=FULL")
         self.db.executescript(SCHEMA)
+        if "own" not in {c[1] for c in self.db.execute("PRAGMA table_info(files)")}:  # stan sprzed kolumny
+            self.db.execute("ALTER TABLE files ADD COLUMN own INTEGER NOT NULL DEFAULT 0")
         self.db.commit()
 
     def close(self) -> None:
@@ -80,11 +86,11 @@ class RestoreState:
         return json.loads(row[0]) if row else default
 
     def all_files(self) -> dict[str, RestoreRow]:
-        return {r[0]: RestoreRow(*r) for r in self.db.execute(f"SELECT {self._COLS} FROM files")}
+        return {r[0]: _row(r) for r in self.db.execute(f"SELECT {self._COLS} FROM files")}
 
     def insert(self, r: RestoreRow) -> None:
-        self.db.execute(f"INSERT OR REPLACE INTO files({self._COLS}) VALUES(?,?,?,?,?,?,?,?)",
-                        (r.remote, r.target, r.grp, r.size, r.mtime, r.status, r.attempts, r.error))
+        self.db.execute(f"INSERT OR REPLACE INTO files({self._COLS}) VALUES(?,?,?,?,?,?,?,?,?)",
+                        (r.remote, r.target, r.grp, r.size, r.mtime, r.status, r.attempts, r.error, int(r.own)))
 
     def update(self, remote: str, **fields: Any) -> None:
         if not fields:
@@ -94,12 +100,12 @@ class RestoreState:
 
     def by_status(self, status: str) -> list[RestoreRow]:
         cur = self.db.execute(f"SELECT {self._COLS} FROM files WHERE status=? ORDER BY remote", (status,))
-        return [RestoreRow(*r) for r in cur]
+        return [_row(r) for r in cur]
 
     def taken_alts(self) -> dict[str, str]:
-        """Cele, pod którymi może leżeć nasz niedokończony plik (`pushing` albo nieudana próba po
-        `push`) — dla `build_plan(taken_alts=…)`, żeby wznowienie nadpisało własny plik zamiast
-        zapisywać obok jako „(z kopii)”."""
+        """Cele, pod którymi może leżeć nasz niedokończony plik (`pushing`, nieudana próba po
+        `push` albo taki plik w grupie odznaczonej po przerwaniu) — dla `build_plan(taken_alts=…)`,
+        żeby wznowienie nadpisało własny plik zamiast zapisywać obok jako „(z kopii)”."""
         return {r.remote: r.target for r in self.all_files().values() if is_own(r)}
 
     def commit(self) -> None:
@@ -150,6 +156,11 @@ def read_restores(copy: CopyDir) -> list[RestoreSummary]:
     return sorted(found, key=lambda s: (s.updated or "", s.serial), reverse=True)
 
 
+def _row(r: tuple[Any, ...]) -> RestoreRow:
+    return RestoreRow(*r[:-1], own=bool(r[-1]))
+
+
 def is_own(row: RestoreRow) -> bool:
     """Pod celem wiersza może leżeć nasz (niedokończony) plik z poprzedniego podejścia."""
-    return row.status == "pushing" or (row.status in ("pending", "error") and row.error in OWN_PARTIAL)
+    return (row.status == "pushing" or (row.status in ("pending", "error") and row.error in OWN_PARTIAL)
+            or (row.status == "skipped" and row.own))
