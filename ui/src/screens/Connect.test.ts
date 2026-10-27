@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import { renderWith, setupCtl } from '../test-utils';
 import Connect from './Connect.svelte';
 
@@ -52,6 +52,9 @@ describe('Connect', () => {
   });
 
   test('a new phone is offered the newest copy of another phone; "Upload" plans it, "Another copy" opens the list', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-25T20:35:39'));  // kopia sprzed godziny: świeża
+    onTestFinished(() => { vi.useRealTimers(); });
     const env = await setupCtl('clean');
     const copy = { id: 'OLD/20261025-193539', serial: 'OLD', model: 'SM-A145R', manufacturer: 'samsung', client: 'Anna K.',
       created: '2026-10-25T19:35:39', expires: '2026-11-01T19:35:39', days_left: 7, status: 'complete' as const, bytes: 10,

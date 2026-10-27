@@ -14,7 +14,7 @@
   // Wspólne z kopią klucze („rozpocznij kopię jeszcze raz”) przy wgrywaniu mają własny tekst.
   const restoreKeys: readonly string[] = RESTORE_ERROR_KEYS;
   const restoreKinds: readonly string[] = RESTORE_JOB_KINDS;
-  const text = $derived(restoreKeys.includes(key) && restoreKinds.includes((s.error as { kind?: string } | null)?.kind ?? '')
+  const text = $derived(restoreKeys.includes(key) && restoreKinds.includes(s.error?.kind ?? '')
     ? `transfer.restore.error.${key}` : `error.${key}`);
   // Telefon jak na karcie urządzenia: nazwa, a obok IMEI (zapas: numer seryjny), żeby rozróżnić dwa takie same modele.
   const device = $derived.by(() => {

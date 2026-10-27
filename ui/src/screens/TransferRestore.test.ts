@@ -59,9 +59,18 @@ describe('TransferRestore', () => {
     expect(screen.getByText(/nie udało się wgrać: 2/)).toBeTruthy();
   });
 
-  test('Android below 10 asks for a restart; a stopped run never does', async () => {
+  test('Android below 10: still green, plus a separate restart banner', async () => {
     await show('transfer_restored', result({ media_scan: 'restart' }));
+    expect(screen.getByText('Pliki wgrane')).toBeTruthy();
     expect(screen.getByText('Uruchom ponownie telefon, żeby galeria zobaczyła pliki')).toBeTruthy();
+    expect(screen.queryByText(/nie wszystko się udało/)).toBeNull();
+  });
+
+  test('a failed gallery scan gets its own text, not the generic failure', async () => {
+    await show('transfer_restored', result({ media_scan: 'failed' }));
+    expect(screen.getByText('Pliki wgrane, ale galeria może ich nie widzieć do restartu telefonu')).toBeTruthy();
+    expect(screen.queryByText(/nie wszystko się udało/)).toBeNull();
+    expect(screen.queryByText('Pliki wgrane')).toBeNull();
   });
 
   test('a stopped upload says so and does not ask for a restart', async () => {

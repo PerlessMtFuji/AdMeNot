@@ -670,11 +670,15 @@ export const otherGroup = (name: string): string => `other:${name}`;
 const finished = (c: CopyView): boolean => c.status === 'complete' || c.status === 'incomplete';
 const newest = (a: CopyView, b: CopyView): number => b.created.localeCompare(a.created);
 
-/** Propozycja na ekranie Połącz: najnowsza skończona kopia innego telefonu niż podłączony (pełna przed niepełną).
- *  Kopia już w całości wgrana na ten telefon nie wraca jako propozycja. */
-export function restoreOffer(copies: CopyView[], serial: string | null): CopyView | null {
+/** Świeża kopia: młodsza niż 24 h (ta sama heurystyka co ostrzeżenie „ten sam telefon”). Starsze — z Historii. */
+export const OFFER_MAX_AGE_MS = 24 * 3_600_000;
+
+/** Propozycja na ekranie Połącz: najnowsza świeża skończona kopia innego telefonu niż podłączony (pełna przed
+ *  niepełną). Kopia już w całości wgrana na ten telefon nie wraca jako propozycja. */
+export function restoreOffer(copies: CopyView[], serial: string | null, now: Date): CopyView | null {
   if (!serial) return null;
-  const candidates = copies.filter((c) => finished(c) && c.serial !== serial
+  const fresh = (c: CopyView) => now.getTime() - new Date(c.created).getTime() < OFFER_MAX_AGE_MS;
+  const candidates = copies.filter((c) => finished(c) && c.serial !== serial && fresh(c)
     && !(c.restores ?? []).some((r) => r.serial === serial && r.status === 'complete')).sort(newest);
   return candidates.find((c) => c.status === 'complete') ?? candidates[0] ?? null;
 }
@@ -695,6 +699,15 @@ export function defaultUploadChoice(plan: RestorePlanView): UploadChoiceView {
   };
 }
 
+/** Wybór serwisanta przeniesiony na nowy plan (np. po braku miejsca): tylko grupy i podejrzane APK, które nowy
+ *  plan jeszcze ma. */
+export function keptUploadChoice(plan: RestorePlanView, prev: UploadChoiceView): UploadChoiceView {
+  const groups = new Set([...UPLOAD_GROUPS.filter((g) => g in plan.groups), ...plan.others.map((o) => otherGroup(o.name))]);
+  const apks = new Set(plan.apks.filter((a) => a.outcome !== 'malicious' && !a.default_on).map((a) => a.remote));
+  return { groups: prev.groups.filter((g) => groups.has(g)), apks_on: prev.apks_on.filter((a) => apks.has(a)),
+    verify_hash: prev.verify_hash };
+}
+
 /** Ta sama reguła co `RestorePlan.need/fits` w silniku. Sumy grup mają już APK według domyślnego wyboru
  *  (czyste i „nie do oceny”), bez szkodliwych i bez podejrzanych — dokładamy tylko zaznaczone podejrzane
  *  (`default_on` fałsz, nie szkodliwe), których jeszcze nie ma na telefonie. `missing`: ile brakuje do zapasu. */
@@ -710,11 +723,10 @@ export function uploadNeed(plan: RestorePlanView, choice: UploadChoiceView): { n
   return { need, fits: missing === 0, missing };
 }
 
-/** Zielone „Pliki wgrane” tylko, gdy wszystko weszło i galeria została odświeżona. */
-export function restoreOutcome(r: RestoreResultView): 'ok' | 'warn' | 'stopped' {
+/** Zielone „Pliki wgrane”, gdy wszystkie pliki weszły — także na Androidzie < 10 (`restart`: osobny baner
+ *  z prośbą o restart). `scan`: pliki weszły, tylko galeria się nie odświeżyła (własny tekst, nie ogólna porażka). */
+export function restoreOutcome(r: RestoreResultView): 'ok' | 'scan' | 'warn' | 'stopped' {
   if (r.status === 'stopped') return 'stopped';
-  if (r.status !== 'complete' || r.files_denied > 0 || r.files_failed > 0 || r.files_missing > 0 || r.media_scan !== 'done') {
-    return 'warn';
-  }
-  return 'ok';
+  if (r.status !== 'complete' || r.files_denied > 0 || r.files_failed > 0 || r.files_missing > 0) return 'warn';
+  return r.media_scan === 'failed' ? 'scan' : 'ok';
 }

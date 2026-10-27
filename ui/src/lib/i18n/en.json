@@ -739,8 +739,9 @@
       "done_stopped": "Upload stopped",
       "done_stopped_text": "Uploaded files stay on the phone. To finish, connect this phone and choose “Resume” next to the copy.",
       "restart": "Restart the phone so the gallery sees the files",
-      "scan_failed": "The gallery may not show the new files right away",
-      "scan_failed_text": "The phone didn't refresh its gallery. The files are there — they appear after a while or after a restart.",
+      "restart_text": "This Android version doesn't refresh the gallery by itself. The files are already on the phone.",
+      "scan_failed": "Files uploaded, but the gallery may not see them until the phone restarts",
+      "scan_failed_text": "The phone didn't refresh its gallery. The files are there — if the gallery doesn't show them, restart the phone.",
       "sum": {
         "done": "Uploaded",
         "exists": "Already on the phone",

@@ -1,10 +1,10 @@
 import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
-import { actedAfter, changedVerdicts, defaultSelection, defaultUploadChoice, otherGroup, resumableCopy, UPLOAD_GROUPS, resumeSelection, TRANSFER_CATEGORIES, transferNeed, transferTotals, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
+import { actedAfter, changedVerdicts, defaultSelection, defaultUploadChoice, keptUploadChoice, otherGroup, resumableCopy, UPLOAD_GROUPS, resumeSelection, TRANSFER_CATEGORIES, transferNeed, transferTotals, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
 import { EMPTY_TRANSFER_SELECTION, emptyRestore, type AppState } from './state.svelte';
 import { applyTheme } from './theme';
 import type {
-  ApiError, AppView, CacheUsage, TransferCategory, EtaView, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, TelemetrySample, Theme, Verdict,
+  ApiError, AppView, CacheUsage, TransferCategory, EtaView, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, TelemetrySample, Theme, UploadChoiceView, Verdict,
 } from './types';
 
 const CONSOLE_LIMIT = 500;
@@ -13,6 +13,8 @@ export class Controller {
   private ended = new Set<string>();
   private knownLoaded = false;
   private autoMirrored = new Set<string>();
+  /** Wybór serwisanta sprzed ponownego planu po `transfer_phone_full` — nowy plan go zachowuje (przycięty). */
+  private replanChoice: UploadChoiceView | null = null;
   private resumeAfterScan = false;  // „Wznów” z ekranu Połącz: po odczycie telefonu kopia rusza sama
   private uiErrorSent = false;
   private rechecking = false;  // odczyt kontroli w tle: następny nie startuje, póki poprzedni trwa
@@ -307,6 +309,9 @@ export class Controller {
         s.transfer.restore.resumable = true;
         s.phase = 'transfer_restore_plan';
         void this.loadTransfers();
+        // Brak miejsca: stary plan ma nieaktualne wolne miejsce i liczy już wgrane pliki — plan od nowa,
+        // z zachowanym wyborem i widocznym błędem.
+        if (d.key === 'transfer_phone_full') void this.replanRestore();
       } else if (d.kind === 'undo') {
         s.undoSites = null;
         s.userWait = null;
@@ -690,7 +695,10 @@ export class Controller {
     });
     on('transfer:restore_plan', (d) => {
       if (s.phase !== 'transfer_restore_plan') return; // serwisant już wyszedł z ekranu wgrywania
-      Object.assign(s.transfer.restore, { plan: d.plan, copy: d.copy, choice: defaultUploadChoice(d.plan),
+      const kept = this.replanChoice;
+      this.replanChoice = null;
+      Object.assign(s.transfer.restore, { plan: d.plan, copy: d.copy,
+        choice: kept ? keptUploadChoice(d.plan, kept) : defaultUploadChoice(d.plan),
         resumable: d.resumable, sameRecent: d.same_phone_recent });
     });
     on('transfer:restore_progress', (d) => {
@@ -834,11 +842,24 @@ export class Controller {
     const s = this.state;
     if (!s.serial) return;
     this.resetTransfer();
+    this.replanChoice = null;
     s.transfer.restore.copy = s.transfer.copies.find((c) => c.id === copyId) ?? null;
     Object.assign(s, { error: null, device: null, screen: 'main', phase: 'transfer_restore_plan', stopping: false });
     const r = await this.call(this.api.restore_plan(copyId, s.serial));
     if (r) this.setJob(r.job_id, 'restore_plan');
     else s.phase = 'connect';
+  }
+
+  /** Ponowny plan po braku miejsca: bez czyszczenia błędu i stanu (inaczej niż `planRestore`). */
+  private async replanRestore(): Promise<void> {
+    const s = this.state;
+    const r = s.transfer.restore;
+    if (!r.copy || !s.serial) return;
+    this.replanChoice = r.choice;
+    r.plan = null;
+    const res = await this.call(this.api.restore_plan(r.copy.id, s.serial));
+    if (res) this.setJob(res.job_id, 'restore_plan');
+    else this.replanChoice = null;
   }
 
   /** Grupa plików (`photos`…, `other:<folder>`) albo `others` — wszystkie inne foldery naraz. */

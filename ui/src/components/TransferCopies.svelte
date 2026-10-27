@@ -18,9 +18,9 @@
   // Wgrać można skończoną kopię, na telefon wybrany na ekranie Połącz i gdy nic innego nie trwa.
   const phoneReady = $derived(!!s.serial && s.devices.some((d) => d.serial === s.serial && d.state === 'device') && s.job === null);
   const finished = (c: CopyView) => c.status === 'complete' || c.status === 'incomplete';
-  // „wgrano na”: nic już nie zostało do wgrania; „przerwane”: most da się wznowić (flaga `resumable`).
-  const serials = (c: CopyView, done: boolean) => (c.restores ?? []).filter((r) => r.resumable !== done)
-    .map((r) => r.serial).join(', ');
+  // „wgrano na”: wgrywanie skończone w całości (jak w `restoreOffer`); „przerwane”: da się wznowić (`resumable`).
+  const serials = (c: CopyView, done: boolean) => (c.restores ?? [])
+    .filter((r) => (done ? r.status === 'complete' : r.resumable)).map((r) => r.serial).join(', ');
 
   const title = (c: CopyView) => `${c.manufacturer} ${c.model}`.trim();
   const date = (iso: string) => new Date(iso).toLocaleString(i18n.lang === 'pl' ? 'pl-PL' : 'en-GB',

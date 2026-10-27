@@ -8,7 +8,8 @@ import TransferCopies from './TransferCopies.svelte';
 const COPY: CopyView = { id: 'OLD/1', serial: 'OLD', model: 'SM-A145R', manufacturer: 'samsung', client: 'Anna K.',
   created: '2026-10-25T14:30:00', expires: '2026-11-01T14:30:00', days_left: 7, status: 'complete', bytes: 10, counts: {},
   restores: [{ serial: 'NEW1', status: 'complete', updated: null, resumable: false },
-    { serial: 'NEW2', status: 'stopped', updated: null, resumable: true }] };
+    { serial: 'NEW2', status: 'stopped', updated: null, resumable: true },
+    { serial: 'NEW4', status: 'incomplete', updated: null, resumable: false }] };  // ani „wgrano”, ani „przerwane”
 
 async function show(copies: CopyView[], serial: string | null) {
   const env = await setupCtl('clean');

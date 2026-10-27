@@ -206,6 +206,7 @@ test('phone state in English', async ({ page }) => {
 test('upload a copy: the new phone is offered the copy, the plan shows APK labels, the result is green', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  await page.clock.setFixedTime(new Date('2026-09-26T15:00:00'));  // nagrana kopia jest świeża (< 24 h)
   await page.goto('/?scenario=transfer_restore');
   await page.getByRole('radio', { name: /R58W20NEW01/ }).dispatchEvent('click');  // radio jest sr-only pod kartą
   await expect(page.getByText(/Wgrać kopię z samsung SM-A145R \(Anna K\./)).toBeVisible();

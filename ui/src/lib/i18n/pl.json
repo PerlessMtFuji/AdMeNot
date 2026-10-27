@@ -739,8 +739,9 @@
       "done_stopped": "Wgrywanie przerwane",
       "done_stopped_text": "Wgrane pliki zostają na telefonie. Żeby dokończyć, podłącz ten telefon i wybierz „Wznów” przy kopii.",
       "restart": "Uruchom ponownie telefon, żeby galeria zobaczyła pliki",
-      "scan_failed": "Galeria może nie od razu pokazać nowe pliki",
-      "scan_failed_text": "Telefon nie odświeżył galerii. Pliki są na miejscu — pojawią się po chwili albo po ponownym uruchomieniu telefonu.",
+      "restart_text": "Ten Android nie odświeża galerii sam. Pliki są już na telefonie.",
+      "scan_failed": "Pliki wgrane, ale galeria może ich nie widzieć do restartu telefonu",
+      "scan_failed_text": "Telefon nie odświeżył galerii. Pliki są na miejscu — jeśli galeria ich nie pokazuje, uruchom telefon ponownie.",
       "sum": {
         "done": "Wgrane",
         "exists": "Już były na telefonie",

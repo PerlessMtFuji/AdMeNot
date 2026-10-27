@@ -27,7 +27,7 @@
   const resumable = $derived(link === 'ready' || link === 'many' ? resumableCopy(s.transfer.copies, s.serial) : null);
   // Wgrywanie kopii na ten telefon: najpierw przerwane wgrywanie, potem propozycja świeżej kopii innego telefonu.
   const restoring = $derived(link === 'ready' || link === 'many' ? restoreResumable(s.transfer.copies, s.serial) : null);
-  const offer = $derived(link === 'ready' || link === 'many' ? restoreOffer(s.transfer.copies, s.serial) : null);
+  const offer = $derived(link === 'ready' || link === 'many' ? restoreOffer(s.transfer.copies, s.serial, new Date()) : null);
   const when = (iso: string) => new Date(iso).toLocaleString(i18n.lang === 'pl' ? 'pl-PL' : 'en-GB',
     { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   const source = (c: CopyView) => ({ phone: `${c.manufacturer} ${c.model}`.trim(),

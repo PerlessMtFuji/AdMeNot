@@ -77,13 +77,15 @@
         <Banner tone="ok" icon="check" title={t('transfer.restore.done_ok')} />
       {:else if outcome === 'stopped'}
         <Banner tone="warn" icon="pause" title={t('transfer.restore.done_stopped')}>{t('transfer.restore.done_stopped_text')}</Banner>
+      {:else if outcome === 'scan'}
+        <Banner tone="warn" icon="info" title={t('transfer.restore.scan_failed')}>{t('transfer.restore.scan_failed_text')}</Banner>
       {:else}
         <Banner tone="warn" icon="triangle-alert" title={t('transfer.restore.done_warn')}>{t('transfer.restore.done_warn_text')}</Banner>
       {/if}
       <!-- „skipped” = przebieg się nie skończył: galerię odświeży wznowienie, bez prośby o restart -->
       {#if done.media_scan === 'restart'}
-        <Banner tone="warn" icon="rotate-ccw" title={t('transfer.restore.restart')} />
-      {:else if done.media_scan === 'failed'}
+        <Banner tone="warn" icon="rotate-ccw" title={t('transfer.restore.restart')}>{t('transfer.restore.restart_text')}</Banner>
+      {:else if done.media_scan === 'failed' && outcome !== 'scan'}
         <Banner tone="warn" icon="info" title={t('transfer.restore.scan_failed')}>{t('transfer.restore.scan_failed_text')}</Banner>
       {/if}
 

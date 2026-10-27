@@ -425,6 +425,8 @@ export type AdbSource = 'settings' | 'bundled' | 'path' | 'missing';
 export interface ApiErrorBody {
   key: string;
   message: string;
+  /** Rodzaj zadania (`job:error`), np. `restore` — wybiera tekst błędu wgrywania. */
+  kind?: string;
   /** Lokalny raport błędu do wysłania (internal). */
   crash?: string;
   serial?: string;

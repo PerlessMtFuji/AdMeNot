@@ -1328,17 +1328,38 @@ describe('data transfer — uploading a copy', () => {
     expect(bridge.calls.at(-1)).toEqual({ method: 'stop', args: ['job-4'] });
   });
 
-  test('phone full during the upload: error shown, back to the plan, which is now resumable', async () => {
-    const { s, bridge } = await planned();
+  test('phone full during the upload: error kept, a fresh plan keeps the technician choice', async () => {
+    const { ctl, s, bridge } = await planned();
+    ctl.toggleUploadGroup('whatsapp');
+    ctl.toggleUploadApk('/sdcard/Download/gra.apk');
+    const choice = JSON.parse(JSON.stringify(s.transfer.restore.choice));
     s.phase = 'transfer_restore';
     s.transfer.waiting = true;
     s.stopping = true;
+    const before = bridge.calls.filter((c) => c.method === 'restore_plan').length;
     bridge.emit('job:error', { job_id: 'job-4', kind: 'restore', key: 'transfer_phone_full', message: '' });
     expect(s.error?.key).toBe('transfer_phone_full');
     expect(s.phase).toBe('transfer_restore_plan');
+    expect(s.transfer.restore.plan).toBeNull();  // stary plan ma nieaktualne miejsce
+    expect([s.transfer.waiting, s.stopping]).toEqual([false, false]);
+    await vi.waitFor(() => expect(s.transfer.restore.plan).not.toBeNull());
+    const calls = bridge.calls.filter((c) => c.method === 'restore_plan');
+    expect(calls).toHaveLength(before + 1);
+    expect(calls.at(-1)?.args).toEqual([COPY_ID, NEW]);
+    expect(s.transfer.restore.choice).toEqual(choice);
+    expect(s.error?.key).toBe('transfer_phone_full');
+  });
+
+  test('other upload errors go back to the stored plan without asking for a new one', async () => {
+    const { s, bridge } = await planned();
+    s.phase = 'transfer_restore';
+    const before = bridge.calls.filter((c) => c.method === 'restore_plan').length;
+    bridge.emit('job:error', { job_id: 'job-4', kind: 'restore', key: 'transfer_too_many_disconnects', message: '' });
+    expect(s.phase).toBe('transfer_restore_plan');
     expect(s.transfer.restore.plan).not.toBeNull();
     expect(s.transfer.restore.resumable).toBe(true);
-    expect([s.transfer.waiting, s.stopping]).toEqual([false, false]);
+    await flush();
+    expect(bridge.calls.filter((c) => c.method === 'restore_plan')).toHaveLength(before);
   });
 
   test('a failed plan goes back to the connect screen', async () => {

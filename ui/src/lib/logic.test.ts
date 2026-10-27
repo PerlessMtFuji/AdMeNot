@@ -4,6 +4,7 @@ import type { CopyView, InventoryView, RestoreApk, RestorePlanView, RestoreResul
 import {
   backupOutcome,
   defaultUploadChoice,
+  keptUploadChoice,
   restoreOffer,
   restoreOutcome,
   restoreResumable,
@@ -734,21 +735,29 @@ describe('uploading a copy to the new phone', () => {
       copy('NEW/3', 'NEW', 'complete', '2026-10-26T12:00:00'),  // kopia podłączonego telefonu
       copy('B/2', 'B', 'in_progress', '2026-10-26T11:00:00'),   // niedokończona
       copy('C/1', 'C', 'incomplete', '2026-10-26T10:00:00'),
-      copy('D/1', 'D', 'complete', '2026-10-24T10:00:00'),
-      copy('A/1', 'A', 'complete', '2026-10-25T10:00:00'),
+      copy('D/1', 'D', 'complete', '2026-10-25T14:00:00'),
+      copy('A/1', 'A', 'complete', '2026-10-25T15:00:00'),
     ];
-    expect(restoreOffer(copies, 'NEW')?.id).toBe('A/1');
-    expect(restoreOffer([copies[2]], 'NEW')?.id).toBe('C/1');
-    expect(restoreOffer(copies.slice(0, 2), 'NEW')).toBeNull();
-    expect(restoreOffer(copies, null)).toBeNull();
-    expect(restoreOffer([], 'NEW')).toBeNull();
+    const now = new Date('2026-10-26T13:00:00');
+    expect(restoreOffer(copies, 'NEW', now)?.id).toBe('A/1');
+    expect(restoreOffer([copies[2]], 'NEW', now)?.id).toBe('C/1');
+    expect(restoreOffer(copies.slice(0, 2), 'NEW', now)).toBeNull();
+    expect(restoreOffer(copies, null, now)).toBeNull();
+    expect(restoreOffer([], 'NEW', now)).toBeNull();
+  });
+
+  test('only a fresh copy (under 24 h) is offered; older ones stay in History', () => {
+    const one = [copy('A/1', 'A', 'complete', '2026-10-26T12:00:00')];
+    expect(restoreOffer(one, 'NEW', new Date('2026-10-26T13:00:00'))?.id).toBe('A/1');  // 1 h
+    expect(restoreOffer(one, 'NEW', new Date('2026-10-27T13:00:00'))).toBeNull();       // 25 h
   });
 
   test('a copy already fully uploaded to this phone is not offered again', () => {
     const copies = [copy('A/2', 'A', 'complete', '2026-10-26T10:00:00', [restore('NEW', 'complete', false)]),
-      copy('A/1', 'A', 'complete', '2026-10-25T10:00:00')];
-    expect(restoreOffer(copies, 'NEW')?.id).toBe('A/1');
-    expect(restoreOffer(copies, 'OTHER')?.id).toBe('A/2');
+      copy('A/1', 'A', 'complete', '2026-10-25T20:00:00')];
+    const now = new Date('2026-10-26T12:00:00');
+    expect(restoreOffer(copies, 'NEW', now)?.id).toBe('A/1');
+    expect(restoreOffer(copies, 'OTHER', now)?.id).toBe('A/2');
   });
 
   test('an interrupted upload is resumable only from the per-phone resumable flag', () => {
@@ -769,6 +778,13 @@ describe('uploading a copy to the new phone', () => {
     const plan: RestorePlanView = { ...recorded.plan, groups,
       others: [...recorded.plan.others, { name: '', files: 2, bytes: 5, exists: 0, rename: 0 }] };
     expect(defaultUploadChoice(plan)).toEqual({ groups: ['photos', 'downloads', 'other:Music', 'other:'], apks_on: [], verify_hash: false });
+  });
+
+  test('a kept choice keeps only groups and suspicious APK files the new plan still has', () => {
+    const plan = recorded.plan;
+    expect(keptUploadChoice(plan, { groups: ['photos', 'other:Music', 'other:Gone', 'videos'],
+      apks_on: ['/sdcard/Download/gra.apk', '/sdcard/Download/szybki-cleaner.apk', '/sdcard/x.apk'], verify_hash: true }))
+      .toEqual({ groups: ['photos', 'other:Music', 'videos'], apks_on: ['/sdcard/Download/gra.apk'], verify_hash: true });
   });
 
   test('upload need mirrors RestorePlan.need: group totals already hold default APKs, suspicious only when ticked', () => {
@@ -807,7 +823,7 @@ describe('uploading a copy to the new phone', () => {
     expect(transferStages('transfer_restored')).toEqual(['done', 'done', 'done', 'done', 'todo']);
   });
 
-  test('upload outcome: green only when everything went in and the gallery was refreshed', () => {
+  test('upload outcome: green when every file went in; a failed gallery scan has its own outcome', () => {
     const r = (over: Partial<RestoreResultView> = {}): RestoreResultView => ({ status: 'complete', target_serial: 'N', files_done: 5,
       files_exists: 0, files_renamed: 1, files_denied: 0, files_failed: 0, files_unselected: 0, apk_skipped: 1,
       apk_suspicious_skipped: 0, bytes: 1, seconds: 1, hashed: false, media_scan: 'done', files_missing: 0, ...over });
@@ -815,8 +831,9 @@ describe('uploading a copy to the new phone', () => {
     expect(restoreOutcome(r({ files_denied: 2 }))).toBe('warn');
     expect(restoreOutcome(r({ files_failed: 1 }))).toBe('warn');
     expect(restoreOutcome(r({ files_missing: 1 }))).toBe('warn');
-    expect(restoreOutcome(r({ media_scan: 'failed' }))).toBe('warn');
-    expect(restoreOutcome(r({ media_scan: 'restart' }))).toBe('warn');
+    expect(restoreOutcome(r({ media_scan: 'failed' }))).toBe('scan');
+    expect(restoreOutcome(r({ media_scan: 'restart' }))).toBe('ok');  // Android < 10: osobny baner o restarcie
+    expect(restoreOutcome(r({ media_scan: 'failed', files_denied: 1 }))).toBe('warn');
     expect(restoreOutcome(r({ status: 'incomplete' }))).toBe('warn');
     expect(restoreOutcome(r({ status: 'stopped', media_scan: 'skipped' }))).toBe('stopped');
   });
