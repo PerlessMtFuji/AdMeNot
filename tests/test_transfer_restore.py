@@ -127,6 +127,69 @@ def test_conflict_saved_beside(tmp_path):
     assert (res.status, res.files_done, res.files_renamed) == ("complete", 5, 1)
 
 
+def _appear(new: FakeStoragePhone, rel: str, data: bytes, mtime: int = MTIME) -> None:
+    """Plik, który pojawił się na telefonie po zbudowaniu planu (np. odtwarzanie WhatsAppa)."""
+    path = new.local("/sdcard/" + rel)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    os.utime(path, (mtime, mtime))
+
+
+def test_foreign_file_after_plan_saved_beside(tmp_path):
+    copy = _copy(tmp_path)
+    new = _new(tmp_path, {"DCIM/Camera/IMG (z kopii).JPG": b"older theirs"})
+    plan = _plan(new, copy)
+    assert next(f for f in plan.files if f.remote == "/sdcard/DCIM/Camera/IMG.JPG").action == "push"
+    _appear(new, "DCIM/Camera/IMG.JPG", b"theirs, written meanwhile")
+    res = _run(new, copy, plan)
+    assert new.local("/sdcard/DCIM/Camera/IMG.JPG").read_bytes() == b"theirs, written meanwhile"
+    assert new.local("/sdcard/DCIM/Camera/IMG (z kopii).JPG").read_bytes() == b"older theirs"
+    assert new.local("/sdcard/DCIM/Camera/IMG (z kopii 2).JPG").read_bytes() == OLD["DCIM/Camera/IMG.JPG"]
+    assert "/sdcard/DCIM/Camera/IMG.JPG" not in new.pushed
+    assert (res.status, res.files_done, res.files_renamed) == ("complete", 5, 1)
+    assert _rows(copy)["/sdcard/DCIM/Camera/IMG.JPG"].target == "/sdcard/DCIM/Camera/IMG (z kopii 2).JPG"
+
+
+def test_identical_file_after_plan_not_pushed(tmp_path):
+    copy = _copy(tmp_path)
+    new = _new(tmp_path)
+    plan = _plan(new, copy)
+    _appear(new, "DCIM/Camera/VID.MP4", OLD["DCIM/Camera/VID.MP4"], MTIME + 2)
+    res = _run(new, copy, plan)
+    assert "/sdcard/DCIM/Camera/VID.MP4" not in new.pushed
+    assert (res.status, res.files_done, res.files_exists) == ("complete", 4, 1)
+    assert _rows(copy)["/sdcard/DCIM/Camera/VID.MP4"].status == "exists"
+
+
+def test_recheck_one_stat_per_chunk(tmp_path):
+    """Przed każdą paczką jeden `stat` celów, po niej jeden (sprawdzenie rozmiaru) — nic więcej."""
+    copy = _copy(tmp_path, MANY)
+    new = _new(tmp_path)
+    plan = _plan(new, copy)
+    new.commands.clear()
+    _run(new, copy, plan)
+    stats = [c for c in new.commands if c.startswith("stat ")]
+    assert new.push_calls == 4 and len(stats) == 2 * new.push_calls
+
+
+def test_own_partial_not_rechecked(tmp_path):
+    """Własny niedokończony plik pod celem nie jest „cudzy” — nadpisany, bez `stat` przed `push`."""
+    copy = _copy(tmp_path)
+    remote = "/sdcard/DCIM/Camera/VID.MP4"
+    new = _new(tmp_path, {"DCIM/Camera/VID.MP4": OLD["DCIM/Camera/VID.MP4"][:250]})
+    state = RestoreState(restore_state_path(copy, "NEW"))
+    state.set_meta("serial", "NEW")
+    state.insert(RestoreRow(remote, remote, "videos", 500, MTIME, "pushing", 0, None))
+    state.close()
+    plan = _plan(new, copy, taken=True)
+    new.commands.clear()
+    res = _run(new, copy, plan)
+    assert res.status == "complete"
+    _assert_uploaded(new, OLD)
+    stats = [c for c in new.commands if c.startswith("stat ")]
+    assert sum(1 for c in stats if "VID.MP4" in c) == 1  # tylko sprawdzenie po `push`
+
+
 def test_resume_after_stop_no_duplicates(tmp_path):
     copy = _copy(tmp_path, MANY)
     new = _new(tmp_path)

@@ -17,10 +17,10 @@ Na telefon idą wyłącznie odczyty (`stat`, `df`); wołający podaje `guard.App
 from __future__ import annotations
 
 import posixpath
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Protocol
 
 from admenot.engine.adb.transport import AdbError, AdbTransport
 
@@ -130,7 +130,19 @@ def _check(should_stop: Callable[[], bool]) -> None:
         raise Stopped()
 
 
-def _same(answer: Answer | None, row: FileRow) -> bool:
+class Candidate(Protocol):
+    """Plik, dla którego szukamy celu: wiersz kopii (`FileRow`) albo stanu wgrywania (`RestoreRow`)."""
+
+    @property
+    def remote(self) -> str: ...
+    @property
+    def size(self) -> int: ...
+    @property
+    def mtime(self) -> int: ...
+
+
+def same_file(answer: Answer | None, row: Candidate) -> bool:
+    """„Już jest”: ten sam rozmiar i `|mtime telefonu − mtime kopii| ≤ 2 s`."""
     return isinstance(answer, tuple) and answer[0] == row.size and abs(answer[1] - row.mtime) <= MTIME_TOLERANCE
 
 
@@ -194,26 +206,26 @@ def _done_rows(copy: CopyDir) -> list[FileRow]:
         state.close()
 
 
-def _resolve_conflicts(adb: AdbTransport, conflicts: list[FileRow], used: set[str],
-                       should_stop: Callable[[], bool]) -> dict[str, tuple[Action, str]]:
+def resolve_conflicts(adb: AdbTransport, conflicts: Sequence[Candidate], used: set[str],
+                      should_stop: Callable[[], bool]) -> dict[str, tuple[Action, str]]:
     """Nazwa zastępcza dla każdego konfliktu: pierwsza na pewno wolna na telefonie (`gone`) i w planie
     (`used`, casefold — /sdcard nie rozróżnia wielkości liter). Nazwa `denied` liczy się jako zajęta.
     Identyczny plik pod nazwą zastępczą (stan wgrywania utracony) → „już jest”."""
     decided: dict[str, tuple[Action, str]] = {}
-    pending = conflicts
+    pending = list(conflicts)
     n = 1
     while pending:
         if n > ALT_MAX:
             raise AdbError("command_failed", f"no free name after {ALT_MAX} tries")
         cands = {r.remote: [alt_name(r.remote, k) for k in range(n, n + ALT_ROUND)] for r in pending}
         answers = stat_all(adb, [c for names in cands.values() for c in names], should_stop)
-        left: list[FileRow] = []
+        left: list[Candidate] = []
         for r in pending:
             choice: tuple[Action, str] | None = None
             for c in cands[r.remote]:
                 if c.casefold() in used:
                     continue
-                if _same(answers[c], r):
+                if same_file(answers[c], r):
                     choice = ("exists", c)
                     break
                 if answers[c] == "gone":
@@ -257,11 +269,11 @@ def build_plan(adb: AdbTransport, copy: CopyDir, should_stop: Callable[[], bool]
     answers = stat_all(adb, list(targets.values()), should_stop)
 
     decided: dict[str, tuple[Action, str]] = {}
-    conflicts: list[FileRow] = []
+    conflicts: list[Candidate] = []
     for r in rows:
         tgt = targets[r.remote]
         answer = answers[tgt]
-        if _same(answer, r):
+        if same_file(answer, r):
             decided[r.remote] = ("exists", tgt)
         # `denied`: FUSE, który odmawia `stat`, odmawia też zapisu — `push` zostanie odrzucony
         # (silnik: `denied`) i niczego nie nadpisze; bez szukania nazwy zastępczej.
@@ -270,7 +282,7 @@ def build_plan(adb: AdbTransport, copy: CopyDir, should_stop: Callable[[], bool]
         else:  # cudzy plik pod tą ścieżką
             conflicts.append(r)
     used = {t.casefold() for t in targets.values()}
-    decided.update(_resolve_conflicts(adb, conflicts, used, should_stop))
+    decided.update(resolve_conflicts(adb, conflicts, used, should_stop))
 
     apk_files = [(r.remote, local[r.remote]) for r in rows if r.remote.lower().endswith((".apk", *BUNDLE_EXT))]
     checks = {c.remote: c for c in load_or_check(copy, apk_files)} if apk_files else {}

@@ -5,6 +5,8 @@ Port `_restore_files`/`_push_chunks`/`_push_chunk` ze skryptu adb-backup. Gwaran
   i skan mediów — wołający podaje `guard.AppendOnlyAdb` i `RealPusher`;
 * pliki idą wyłącznie pod cele z planu; nadpisać wolno tylko własny niedokończony plik (stan
   `pushing` albo nieudana próba w tym stanie); plik „już jest” nigdy nie jest wgrywany;
+* plan może się zestarzeć: tuż przed każdą paczką jeden `stat` jej celów — cudzy plik, który
+  pojawił się od planu, zostaje nietknięty (identyczny → `exists`, inny → nazwa zastępcza);
 * stan w SQLite po każdej paczce, osobno dla każdego telefonu docelowego — przerwanie (kabel,
   zamknięcie okna, brak miejsca) traci najwyżej paczki w locie;
 * małe pliki w `streams` równoległych `adb push`, duże potem w jednym strumieniu; stan zapisuje
@@ -25,7 +27,7 @@ import time
 from collections import Counter, deque
 from collections.abc import Callable
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -44,7 +46,16 @@ from .backup import (
 from .guard import SCAN_VOLUME_CMD, q, safe_target
 from .puller import PullResult
 from .pusher import Pusher
-from .restore_plan import MTIME_TOLERANCE, PlanFile, RestorePlan, read_space, stat_all
+from .restore_plan import (
+    MTIME_TOLERANCE,
+    Action,
+    PlanFile,
+    RestorePlan,
+    read_space,
+    resolve_conflicts,
+    same_file,
+    stat_all,
+)
 from .restore_state import RestoreRow, RestoreState, is_own, restore_state_path
 from .store import CopyDir
 from .telephony import _CONNECTION_KINDS
@@ -125,6 +136,7 @@ class _Chunk:
     rows: list[RestoreRow]
     locals_: list[Path]
     remote: str  # katalog z `/` na końcu albo pełna ścieżka jednego pliku
+    checked: bool = False  # cele sprawdzone tuż przed `push` (`_recheck`)
 
     @property
     def bytes(self) -> int:
@@ -299,6 +311,18 @@ class _Restore:
                         halt.add(reason)
                         break
                     chunk = queue.popleft()
+                    if not chunk.checked:
+                        pieces = self._recheck(state, chunk)
+                        if pieces is None:
+                            queue.appendleft(chunk)
+                            halt.add("disconnect")
+                            break
+                        # reszta paczki (≤ sprawdzonych bajtów) idzie od razu; pliki przeniesione
+                        # pod nazwę zastępczą — osobno, na początek kolejki
+                        queue.extendleft(reversed(pieces[1:]))
+                        chunk = pieces[0]
+                        if not chunk.rows:
+                            continue
                     for r in chunk.rows:
                         state.update(r.remote, status="pushing")
                     state.commit()
@@ -334,6 +358,53 @@ class _Restore:
         if space.free - inflight_bytes - chunk.bytes < self.plan.reserve:
             return "full"
         return None
+
+    def _recheck(self, state: RestoreState, chunk: _Chunk) -> list[_Chunk] | None:
+        """Plan mógł się zestarzeć (np. WhatsApp odtwarza kopię pod tę samą ścieżkę): jeden `stat`
+        celów paczki tuż przed `push` (poza własnymi plikami — te wolno nadpisać). Cudzy plik
+        identyczny → `exists`, bez wgrywania; inny → następna wolna nazwa zastępcza (jak w planie),
+        zapisana w stanie, plik idzie sam. `denied` bez zmian — rozstrzygnie `push`.
+        Zwraca [reszta paczki, *pliki pod nową nazwą] albo None przy rozłączeniu (wątek główny)."""
+        foreign = [r for r in chunk.rows if not is_own(r)]
+        if not foreign:
+            return [replace(chunk, checked=True)]
+        try:
+            answers = stat_all(self.adb, [r.target for r in foreign], lambda: False)
+        except AdbError as exc:
+            if exc.kind in _CONNECTION_KINDS or not self._online():
+                return None
+            raise
+        exists = [r for r in foreign if same_file(answers[r.target], r)]
+        conflicts = [r for r in foreign if r not in exists and isinstance(answers[r.target], tuple)]
+        decided: dict[str, tuple[Action, str]] = {}
+        if conflicts:
+            used = {r.target.casefold() for r in state.all_files().values()}
+            try:
+                decided = resolve_conflicts(self.adb, conflicts, used, lambda: False)
+            except AdbError as exc:
+                if exc.kind in _CONNECTION_KINDS or not self._online():
+                    return None
+                raise
+        decided.update({r.remote: ("exists", r.target) for r in exists})
+        if not decided:
+            return [replace(chunk, checked=True)]
+        local = dict(zip((r.remote for r in chunk.rows), chunk.locals_, strict=True))
+        moved: list[_Chunk] = []
+        for r in chunk.rows:
+            if r.remote not in decided:
+                continue
+            action, target = decided[r.remote]
+            if action == "exists":
+                state.update(r.remote, status="exists", error=None, target=target)
+                self.total_files -= 1
+                self.total_bytes -= r.size
+            else:
+                state.update(r.remote, target=target)
+                moved.append(_Chunk([replace(r, target=target)], [local[r.remote]], target, True))
+        state.commit()
+        keep = [r for r in chunk.rows if r.remote not in decided]
+        rest = _Chunk(keep, [local[r.remote] for r in keep], chunk.remote, True)
+        return [rest, *moved]
 
     def _start(self, pool: ThreadPoolExecutor | None, chunk: _Chunk) -> Future[PullResult]:
         """Jeden strumień — w wątku głównym (z postępem w trakcie); kilka — w puli, bez postępu
