@@ -187,6 +187,38 @@ def _sha_ioc_list(data: bytes):
                            date(2026, 1, 1)),))
 
 
+def test_cache_rechecked_when_ioc_list_changes(tmp_path, monkeypatch):
+    copy = _copy(tmp_path)
+    files = [_file(tmp_path, data=b"evil")]
+    calls = []
+
+    def fake(remote, paths):
+        calls.append(remote)
+        return _report(package="")
+
+    monkeypatch.setattr(apkcheck, "_analyze_file", fake)
+    assert load_or_check(copy, files, NO_IOCS)[0].outcome == "unknown"
+    assert load_or_check(copy, files, NO_IOCS)[0].outcome == "unknown"
+    assert len(calls) == 1
+    # nowy wpis IOC dla tego pliku → pamięć nieważna, plik oceniony od nowa
+    assert load_or_check(copy, files, _sha_ioc_list(b"evil"))[0].outcome == "malicious"
+    assert len(calls) == 2
+    saved = json.loads((copy.path / apkcheck.CHECKS_FILE).read_text(encoding="utf-8"))
+    assert saved["iocs"] == apkcheck.iocs_fingerprint(_sha_ioc_list(b"evil"))
+
+
+def test_old_cache_format_rechecked(tmp_path, monkeypatch):
+    copy = _copy(tmp_path)
+    files = [_file(tmp_path)]
+    calls = []
+    monkeypatch.setattr(apkcheck, "_analyze_file", lambda r, p: calls.append(r) or _report())
+    first = load_or_check(copy, files, NO_IOCS)
+    saved = json.loads((copy.path / apkcheck.CHECKS_FILE).read_text(encoding="utf-8"))
+    (copy.path / apkcheck.CHECKS_FILE).write_text(json.dumps(saved["files"]), encoding="utf-8")
+    assert load_or_check(copy, files, NO_IOCS) == first
+    assert len(calls) == 2
+
+
 def test_unreadable_manifest_sha256_ioc_is_malicious(tmp_path):
     f = _file(tmp_path, data=b"evil")
     for rep in (_report(package=""), _report(package="", files={})):

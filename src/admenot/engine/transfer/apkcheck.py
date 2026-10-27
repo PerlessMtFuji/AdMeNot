@@ -146,12 +146,24 @@ def _sha256(path: Path) -> str:
         return hashlib.file_digest(f, "sha256").hexdigest()
 
 
-def load_or_check(copy: CopyDir, files: list[tuple[str, Path]]) -> list[ApkCheck]:
-    """Wynik w `<copy>/apk_checks.json` (z SHA-256 pliku); niezmienione pliki nie są analizowane ponownie.
-    Pliku nieczytelnego (np. usuniętego z kopii przez antywirus) nie ma w wyniku."""
+def iocs_fingerprint(iocs: IocList) -> str:
+    """Odcisk listy IOC dla pamięci ocen: wersja i wpisy, od których zależy wynik oceny."""
+    entries = sorted((i.kind, i.value, i.exclusive) for i in iocs.entries)
+    return hashlib.sha256(json.dumps([iocs.version, entries]).encode("utf-8")).hexdigest()
+
+
+def load_or_check(copy: CopyDir, files: list[tuple[str, Path]], iocs: IocList | None = None) -> list[ApkCheck]:
+    """Wynik w `<copy>/apk_checks.json` (z SHA-256 pliku i odciskiem listy IOC); niezmienione pliki
+    nie są analizowane ponownie, chyba że zmieniła się lista IOC (wtedy ocena od nowa — nowy wpis
+    może uczynić plik szkodliwym). Pliku nieczytelnego (np. usuniętego z kopii przez antywirus) nie ma w wyniku."""
+    iocs = iocs if iocs is not None else load_default_iocs()
+    fingerprint = iocs_fingerprint(iocs)
     path = copy.path / CHECKS_FILE
     try:
-        cached = {e["remote"]: e for e in json.loads(path.read_text(encoding="utf-8"))}
+        data = json.loads(path.read_text(encoding="utf-8"))
+        # stary zapis (sama lista) albo inna lista IOC → nic z pamięci
+        entries = data["files"] if isinstance(data, dict) and data.get("iocs") == fingerprint else []
+        cached = {e["remote"]: e for e in entries}
     except (OSError, ValueError, KeyError, TypeError):
         cached = {}
     hashes: dict[str, str] = {}
@@ -173,10 +185,11 @@ def load_or_check(copy: CopyDir, files: list[tuple[str, Path]]) -> list[ApkCheck
             pass
         todo.append((remote, local))
     if todo:
-        for check in check_apks(copy, todo):
+        for check in check_apks(copy, todo, iocs):
             out[check.remote] = check
-        data = [{"remote": r, "sha256": hashes[r], "check": asdict(out[r])} for r, _ in files]
+        saved = {"iocs": fingerprint,
+                 "files": [{"remote": r, "sha256": hashes[r], "check": asdict(out[r])} for r, _ in files]}
         tmp = path.with_name(CHECKS_FILE + ".tmp")
-        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.write_text(json.dumps(saved, ensure_ascii=False, indent=2), encoding="utf-8")
         os.replace(tmp, path)
     return [out[remote] for remote, _ in files]
