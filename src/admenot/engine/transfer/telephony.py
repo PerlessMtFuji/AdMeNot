@@ -28,7 +28,7 @@ from typing import Literal
 from admenot.engine.adb.transport import AdbError, AdbTransport
 from admenot.engine.clientpaths import client_paths
 
-from .guard import q
+from .guard import CONTENT_TAIL, q
 
 log = logging.getLogger(__name__)
 
@@ -126,6 +126,7 @@ def content_query(adb: AdbTransport, uri: str, columns: list[str], sort: str | N
     cmd = f"content query --uri {q(uri)} --projection {q(':'.join(columns))}"
     if sort:
         cmd += f" --sort {q(sort)}"
+    cmd += CONTENT_TAIL
     try:
         out = adb.shell(cmd, timeout=600)
     except AdbError as exc:
@@ -134,6 +135,8 @@ def content_query(adb: AdbTransport, uri: str, columns: list[str], sort: str | N
         raise ContentQueryError(exc.message[:600] or exc.kind, is_denied(exc.message)) from exc
     if raw_sink:
         raw_sink(out)
+    if not out.strip():  # zero wierszy to "No result found." — pusty wynik to zgubiony błąd
+        raise ContentQueryError("content query: empty output")
     head = out[:400]
     if not head.startswith("Row:") and ("Exception" in head or "Error while accessing provider" in head):
         raise ContentQueryError(out.strip()[:600], is_denied(out[:600]))

@@ -173,6 +173,28 @@ def test_count_rows_raises_on_denial(tmp_path):
     assert err.value.denied
 
 
+def test_empty_output_is_an_error_not_zero_rows():
+    # `content query` zawsze coś wypisuje ("No result found." przy zerze wierszy);
+    # pusty stdout = błąd zgubiony na stderr, nie pusta baza.
+    class Silent:
+        serial = "S1"
+
+        def shell(self, command: str, timeout: float = 20.0) -> str:
+            return ""
+
+    with pytest.raises(ContentQueryError) as err:
+        count_rows(Silent(), "content://com.android.contacts/contacts")
+    assert not err.value.denied
+
+
+def test_contacts_denied_on_export_marks_unavailable(tmp_path):
+    phone = _phone(tmp_path)
+    phone.deny_uris = {"content://com.android.contacts/contacts"}
+    res = _export(phone, tmp_path / "out")
+    assert res["contacts"] == CategoryResult("unavailable", 0, "permission_denied")
+    assert res["sms"].status == "ok"
+
+
 def test_stop_request_raises_stopped(tmp_path):
     phone = _phone(tmp_path)
     with pytest.raises(Stopped):

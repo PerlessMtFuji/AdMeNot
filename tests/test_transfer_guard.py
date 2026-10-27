@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from admenot.engine.transfer.guard import (
+    CONTENT_TAIL,
     ApkReadAdb,
     ReadOnlyAdb,
     UnsafeCommand,
@@ -52,6 +53,24 @@ def test_allowed_reads():
     "find /sdcard -exec 'rm' {} +", "find /sdcard '-fprint' /sdcard/x",
 ])
 def test_blocked(bad):
+    with pytest.raises(UnsafeCommand):
+        assert_read_only(bad)
+
+
+def test_content_query_may_merge_stderr():
+    assert_read_only("content query --uri 'content://sms' --projection '_id'" + CONTENT_TAIL)
+
+
+@pytest.mark.parametrize("bad", [
+    "ls /sdcard" + CONTENT_TAIL,
+    "content read --uri content://mms/part/1" + CONTENT_TAIL,
+    "content delete --uri content://sms" + CONTENT_TAIL,
+    "content query --uri 'content://sms'; rm x" + CONTENT_TAIL,
+    "content query --uri 'content://sms' 2>&1" + CONTENT_TAIL,
+    "content query --uri 'content://sms' 2>/sdcard/x",
+    "content query --uri 'content://sms' 2>&1 || true",
+])
+def test_content_tail_only_after_query(bad):
     with pytest.raises(UnsafeCommand):
         assert_read_only(bad)
 

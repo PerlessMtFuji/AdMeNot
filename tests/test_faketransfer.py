@@ -6,7 +6,7 @@ import pytest
 from faketransfer import FakeStoragePhone, provider_file
 
 from admenot.engine.adb.transport import AdbError
-from admenot.engine.transfer.guard import ReadOnlyAdb
+from admenot.engine.transfer.guard import CONTENT_TAIL, ReadOnlyAdb
 
 
 def _phone(tmp_path):
@@ -39,8 +39,10 @@ def test_fake_df_sha_content_and_state(tmp_path):
     assert "body=hi" in phone.shell("content query --uri 'content://sms' --projection '_id:body'")
     assert phone.run_bytes(["shell", "-T", "content read --uri content://mms/part/7"]) == b"\x00\x01"
     phone.deny_uris.add("content://sms")
-    with pytest.raises(AdbError):
-        phone.shell("content query --uri 'content://sms' --projection '_id'")
+    # odmowa: kod 0, komunikat tylko na stderr (jak Xiaomi bez „ustawień zabezpieczeń”)
+    assert phone.shell("content query --uri 'content://sms' --projection '_id'") == ""
+    merged = phone.shell("content query --uri 'content://sms' --projection '_id'" + CONTENT_TAIL)
+    assert "SecurityException" in merged
     assert phone.get_state() == "device"
     phone.online = False
     assert phone.get_state() == "offline"

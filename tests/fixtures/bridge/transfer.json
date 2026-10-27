@@ -367,7 +367,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "content query --uri content://call_log/calls --projection _id",
+      "command": "content query --uri content://call_log/calls --projection _id 2>&1",
       "status": "ok",
       "duration": 0.0,
       "output": "",
@@ -379,7 +379,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "content query --uri content://com.android.contacts/contacts --projection _id",
+      "command": "content query --uri content://com.android.contacts/contacts --projection _id 2>&1",
       "status": "ok",
       "duration": 0.0,
       "output": "",
@@ -391,10 +391,10 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "content query --uri content://mms --projection _id:m_size",
-      "status": "error:command_failed",
+      "command": "content query --uri content://mms --projection _id:m_size 2>&1",
+      "status": "ok",
       "duration": 0.0,
-      "output": "Error while accessing provider:content://mms\njava.lang.IllegalArgumentException: Unknown URL",
+      "output": "",
       "tag": null
      }
     ],
@@ -403,7 +403,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "content query --uri content://sms --projection _id",
+      "command": "content query --uri content://sms --projection _id 2>&1",
       "status": "ok",
       "duration": 0.0,
       "output": "",
@@ -771,7 +771,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "content query --uri content://call_log/calls --projection _id:number:date:duration:type:presentation:subscription_id:name --sort 'date ASC'",
+      "command": "content query --uri content://call_log/calls --projection _id:number:date:duration:type:presentation:subscription_id:name --sort 'date ASC' 2>&1",
       "status": "ok",
       "duration": 0.0,
       "output": "",
@@ -783,7 +783,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "content query --uri content://com.android.contacts/contacts --projection _id:starred:display_name",
+      "command": "content query --uri content://com.android.contacts/contacts --projection _id:starred:display_name 2>&1",
       "status": "ok",
       "duration": 0.0,
       "output": "",
@@ -795,7 +795,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "content query --uri content://com.android.contacts/data --projection contact_id:raw_contact_id:mimetype:is_primary:data2:data3:data4:data5:data6:data7:data8:data9:data10:data1",
+      "command": "content query --uri content://com.android.contacts/data --projection contact_id:raw_contact_id:mimetype:is_primary:data2:data3:data4:data5:data6:data7:data8:data9:data10:data1 2>&1",
       "status": "ok",
       "duration": 0.0,
       "output": "",
@@ -807,7 +807,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "content query --uri content://com.android.contacts/raw_contacts --projection _id:contact_id:deleted:account_type:account_name",
+      "command": "content query --uri content://com.android.contacts/raw_contacts --projection _id:contact_id:deleted:account_type:account_name 2>&1",
       "status": "ok",
       "duration": 0.0,
       "output": "",
@@ -819,7 +819,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "content query --uri content://sms --projection _id:address:date:type:read:status:body --sort 'date ASC'",
+      "command": "content query --uri content://sms --projection _id:address:date:type:read:status:body --sort 'date ASC' 2>&1",
       "status": "ok",
       "duration": 0.0,
       "output": "",
@@ -831,7 +831,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "content query --uri content://sms --projection _id:thread_id:address:date:date_sent:type:read:status:locked:sub_id:protocol:service_center:subject:body --sort 'date ASC'",
+      "command": "content query --uri content://sms --projection _id:thread_id:address:date:date_sent:type:read:status:locked:sub_id:protocol:service_center:subject:body --sort 'date ASC' 2>&1",
       "status": "ok",
       "duration": 0.0,
       "output": "",

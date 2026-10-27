@@ -15,7 +15,8 @@ pliku w trakcie kopii), `pull_calls` = liczba wywołań `pull`, `on_shell(comman
 każdym poleceniem shell (może rzucić `AdbError`, np. przekroczenie czasu `stat`).
 
 Awarie: `fail_after_files` (po tylu pobranych plikach pull urywa się w środku pliku, a telefon
-przechodzi w stan `offline` do `reconnect()`), `deny_uris` (odmowa dostępu do providera),
+przechodzi w stan `offline` do `reconnect()`), `deny_uris` (odmowa dostępu do providera: kod 0,
+komunikat na stderr — widoczny tylko z `CONTENT_TAIL`, jak na Xiaomi bez ustawień zabezpieczeń),
 `online` / `get_state()` (`"device"` / `"offline"`).
 
 Nowy telefon (Etap 2, wgrywanie): `push(locals_, remote, …)` (jako `Pusher`) kopiuje do `root/sdcard`,
@@ -44,7 +45,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from admenot.engine.adb.transport import AdbError
-from admenot.engine.transfer.guard import STAT_TAIL, safe_target
+from admenot.engine.transfer.guard import CONTENT_TAIL, STAT_TAIL, safe_target
 from admenot.engine.transfer.puller import PullResult
 
 _MMS_PREFIX = "content://mms/part/"
@@ -139,6 +140,10 @@ class FakeStoragePhone:
             argv = shlex.split(command[: -len(STAT_TAIL)])
             assert argv[0] == "stat", argv
             return self._stat(argv[1:], tolerant=True)
+        if command.endswith(CONTENT_TAIL):  # `content query … 2>&1`: błąd providera na stdout
+            argv = shlex.split(command[: -len(CONTENT_TAIL)])
+            assert argv[:2] == ["content", "query"], argv
+            return self._content(argv[1:], merged=True)
         argv = shlex.split(command)
         if argv[:2] == ["pm", "path"] and len(argv) == 3:
             return self._pm_path(argv[2])
@@ -257,22 +262,24 @@ class FakeStoragePhone:
             raise AdbError("command_failed", "\n".join(errors))
         return b""
 
-    def _content(self, args: list[str]) -> bytes:
+    def _content(self, args: list[str], merged: bool = False) -> bytes:
         if args[0] == "call":
             assert args[1:] == ["--uri", "content://media", "--method", "scan_volume",
                                 "--arg", "external_primary"], args
             self.scans += 1
             return b"Result: Bundle[{}]\n"
         if args[0] == "query":
+            # Jak prawdziwy telefon: błąd providera idzie na stderr, a kod wyjścia to 0 —
+            # bez `2>&1` (merged) adb zwraca pusty stdout.
             uri = args[args.index("--uri") + 1]
+            error = None
             if uri in self.deny_uris:
-                raise AdbError("command_failed", f"Error while accessing provider:{uri}\n"
-                                                 "java.lang.SecurityException: Permission Denial")
-            path = provider_file(self.root, uri)
-            if not path.is_file():
-                raise AdbError("command_failed", f"Error while accessing provider:{uri}\n"
-                                                 "java.lang.IllegalArgumentException: Unknown URL")
-            return path.read_bytes()
+                error = f"Error while accessing provider:{uri}\njava.lang.SecurityException: Permission Denial\n"
+            elif not provider_file(self.root, uri).is_file():
+                error = f"Error while accessing provider:{uri}\njava.lang.IllegalArgumentException: Unknown URL\n"
+            if error is not None:
+                return error.encode("utf-8") if merged else b""
+            return provider_file(self.root, uri).read_bytes()
         assert args[:2] == ["read", "--uri"] and args[2].startswith(_MMS_PREFIX), args
         part = self.root / "mms_parts" / args[2][len(_MMS_PREFIX):]
         if not part.is_file():

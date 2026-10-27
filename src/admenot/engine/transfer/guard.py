@@ -20,6 +20,9 @@ _FIND_FORBIDDEN = {"-delete", "-fprint", "-fprint0", "-fprintf", "-fls", "-ok", 
 _META = set(";|&<>`$\n\r\\(){}*?[]~!#")
 _MMS_PART_URI = re.compile(r"content://mms/part/[0-9]{1,18}")
 _PACKAGE = re.compile(r"[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+")
+# Błąd providera (np. odmowa na Xiaomi) `content query` pisze na stderr z kodem 0 — bez tego
+# przyrostka adb zwraca pusty stdout, który wyglądał jak „0 kontaktów”.
+CONTENT_TAIL = " 2>&1"
 
 
 class UnsafeCommand(Exception):
@@ -66,7 +69,14 @@ def _unquoted_view(cmd: str) -> str:
 
 
 def assert_read_only(cmd: str) -> None:
-    """Rzuca UnsafeCommand, jeśli polecenie nie wygląda na bezpieczny odczyt."""
+    """Rzuca UnsafeCommand, jeśli polecenie nie wygląda na bezpieczny odczyt.
+
+    Jedyny dozwolony operator powłoki to stały przyrostek `CONTENT_TAIL` po `content query`."""
+    if cmd.endswith(CONTENT_TAIL):
+        rest = cmd[: -len(CONTENT_TAIL)]
+        if not rest.startswith("content query "):
+            raise UnsafeCommand(f"Przyrostek dozwolony tylko po 'content query': {cmd[:120]}")
+        cmd = rest
     words = _unquoted_view(cmd).split()
     if not words or words[0] not in _ALLOWED_CMDS:
         raise UnsafeCommand(f"Polecenie spoza allowlisty: {cmd[:120]}")
