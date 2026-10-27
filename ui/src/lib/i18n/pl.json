@@ -646,6 +646,126 @@
       "in_progress": "niedokończona",
       "incomplete": "niepełna",
       "complete": "pełna"
+    },
+    "restore": {
+      "offer_title": "Wgrać kopię z {phone} ({details})?",
+      "offer_text": "Pliki z kopii trafią na ten telefon. Niczego na nim nie nadpiszę.",
+      "upload": "Wgraj",
+      "other_copy": "Inna kopia",
+      "resume_title": "Wznów przerwane wgrywanie",
+      "resume_text": "Kopia z {phone} ({details}). Wgrane pliki zostają — program dokończy resztę.",
+      "resume": "Wznów",
+      "to_phone": "Wgraj na podłączony telefon",
+      "uploaded_to": "wgrano na: {list}",
+      "interrupted_on": "wgrywanie przerwane: {list}",
+      "planning": "Sprawdzam nowy telefon…",
+      "planning_sub": "Liczę wolne miejsce i sprawdzam, które pliki już na nim są. Jeszcze niczego nie wgrywam.",
+      "title": "Co wgrać na nowy telefon?",
+      "sub": "Kopia z {phone} ({details}). Niczego nie nadpiszę — inny plik o tej samej nazwie zapiszę obok jako „(z kopii)”.",
+      "same_title": "To ten sam telefon, z którego jest kopia",
+      "same_text": "Kopia ma mniej niż 24 godziny, więc te pliki najpewniej już są na tym telefonie. Wgrać mimo to?",
+      "same_no": "Nie",
+      "same_yes": "Tak, wgraj",
+      "incomplete_title": "Kopia jest niepełna",
+      "incomplete_text": "Tego nie ma w kopii: {list}. Wgram to, co w niej jest.",
+      "incomplete_unknown": "Część danych nie trafiła do kopii. Wgram to, co w niej jest.",
+      "incomplete_files": "nieudane pliki: {count}",
+      "incomplete_apps": "nieudane aplikacje: {count}",
+      "incomplete_unreadable": "nieodczytane pliki: {count}",
+      "missing": {
+        "one": "Na komputerze nie ma już {count} pliku z kopii — nie zostanie wgrany",
+        "few": "Na komputerze nie ma już {count} plików z kopii — nie zostaną wgrane",
+        "many": "Na komputerze nie ma już {count} plików z kopii — nie zostaną wgrane",
+        "other": "Na komputerze nie ma już {count} pliku z kopii — nie zostaną wgrane"
+      },
+      "missing_text": "Mógł je usunąć np. program antywirusowy. Reszta wgra się normalnie.",
+      "resumable": "Dokończę przerwane wgrywanie — pliki już wgrane zostają na telefonie.",
+      "group": {
+        "photos": "Zdjęcia",
+        "videos": "Filmy",
+        "downloads": "Pobrane i dokumenty",
+        "whatsapp": "WhatsApp",
+        "others": "Inne foldery"
+      },
+      "note": {
+        "photos": "Aparat, zrzuty ekranu, Pictures",
+        "videos": "Filmy z aparatu, Movies",
+        "downloads": "Download, Documents",
+        "whatsapp": "Pliki WhatsAppa — czaty przywrócisz w aplikacji"
+      },
+      "exists": "już na telefonie: {count}",
+      "rename": "zapisane obok: {count}",
+      "section_files": "Pliki",
+      "section_apks": "Pliki APK",
+      "apks_note": "Instalatory aplikacji z kopii, ocenione na komputerze. Szkodliwych nie wgrywam.",
+      "apk": {
+        "clean": "sprawdzony",
+        "suspicious_off": "podejrzany — odznaczony",
+        "suspicious_on": "podejrzany — zaznaczony",
+        "malicious": "pominięty jako szkodliwy",
+        "unknown": "nie do oceny"
+      },
+      "later_title": "Później w programie",
+      "later": {
+        "sms": "SMS i MMS",
+        "calls": "Historia połączeń",
+        "contacts": "Kontakty",
+        "apps": "Aplikacje",
+        "whatsapp": "Przywracanie czatów WhatsApp"
+      },
+      "next_version": "w kolejnej wersji",
+      "panel": "Miejsce na nowym telefonie",
+      "space_label": "Zajęte miejsce i pliki do wgrania",
+      "to_upload": "Do wgrania",
+      "free": "Wolne",
+      "reserve": "Zapas, którego nie zapełnię",
+      "left": "zostanie {size} wolnego",
+      "no_space": "Brakuje {size} na nowym telefonie — odznacz część danych",
+      "begin": "Wgraj",
+      "uploading": "Wgrywam pliki na nowy telefon",
+      "uploading_sub": "Nie odłączaj telefonu. Gdy kabel się rozłączy, wgrywanie poczeka i będzie kontynuowane.",
+      "phase": {
+        "plan": "Przygotowanie",
+        "files": "Pliki",
+        "scan": "Odświeżanie galerii"
+      },
+      "progress_label": "Postęp wgrywania",
+      "starting": "Przygotowuję wgrywanie…",
+      "waiting": "Telefon odłączony — podłącz ponownie, wgrywanie będzie kontynuowane",
+      "done_heading": "Wgrywanie na nowy telefon",
+      "done_ok": "Pliki wgrane",
+      "done_warn": "Pliki wgrane, ale nie wszystko się udało",
+      "done_warn_text": "Szczegóły poniżej. Pliki, których nie udało się wgrać, zostają w kopii na komputerze.",
+      "done_stopped": "Wgrywanie przerwane",
+      "done_stopped_text": "Wgrane pliki zostają na telefonie. Żeby dokończyć, podłącz ten telefon i wybierz „Wznów” przy kopii.",
+      "restart": "Uruchom ponownie telefon, żeby galeria zobaczyła pliki",
+      "scan_failed": "Galeria może nie od razu pokazać nowe pliki",
+      "scan_failed_text": "Telefon nie odświeżył galerii. Pliki są na miejscu — pojawią się po chwili albo po ponownym uruchomieniu telefonu.",
+      "sum": {
+        "done": "Wgrane",
+        "exists": "Już były na telefonie",
+        "size": "Rozmiar",
+        "checked": "Sprawdzenie",
+        "checked_size": "sprawdzono rozmiar",
+        "checked_hash": "sprawdzono sumy kontrolne",
+        "renamed": "zapisano obok jako „(z kopii)”: {count}",
+        "denied": "Android nie pozwolił zapisać: {count}",
+        "failed": "nie udało się wgrać: {count}",
+        "missing": "brak w kopii na komputerze: {count}",
+        "unselected": "odznaczone przez serwis: {count}",
+        "suspicious": "pominięto podejrzane pliki APK: {count}"
+      },
+      "apk_skipped": {
+        "one": "pominięto {count} plik oceniony jako szkodliwy",
+        "few": "pominięto {count} pliki ocenione jako szkodliwe",
+        "many": "pominięto {count} plików ocenionych jako szkodliwe",
+        "other": "pominięto {count} pliku ocenionego jako szkodliwy"
+      },
+      "error": {
+        "transfer_wrong_device": "Podłączono inny telefon niż ten, na który trwa wgrywanie. Podłącz właściwy telefon i wybierz „Wgraj” jeszcze raz — wgrane pliki zostaną.",
+        "transfer_too_many_disconnects": "Telefon zbyt często się rozłączał. Sprawdź kabel i wybierz „Wgraj” jeszcze raz — wgrane pliki zostaną.",
+        "transfer_failed": "Wgrywanie nie powiodło się. Spróbuj jeszcze raz — pliki już wgrane zostaną na telefonie."
+      }
     }
   },
   "error": {
@@ -685,7 +805,10 @@
     "transfer_wrong_device": "Podłączono inny telefon niż ten, z którego robiona jest kopia. Podłącz właściwy telefon i rozpocznij kopię jeszcze raz.",
     "transfer_too_many_disconnects": "Telefon zbyt często się rozłączał. Sprawdź kabel i rozpocznij kopię jeszcze raz — skopiowane pliki zostaną.",
     "transfer_failed": "Kopia nie powiodła się. Skopiowane pliki zostają — rozpocznij kopię jeszcze raz.",
-    "transfer_in_use": "Plik tej kopii jest otwarty w innym programie (np. w Eksploratorze albo w przeglądarce zdjęć). Zamknij go i spróbuj ponownie."
+    "transfer_in_use": "Plik tej kopii jest otwarty w innym programie (np. w Eksploratorze albo w przeglądarce zdjęć). Zamknij go i spróbuj ponownie.",
+    "transfer_phone_full": "Na nowym telefonie skończyło się miejsce. Zwolnij miejsce albo odznacz część danych i wybierz „Wgraj” — wgrane pliki zostaną.",
+    "transfer_copy_missing": "Tej kopii nie ma już na komputerze (została usunięta albo przeniesiona).",
+    "transfer_no_plan": "Telefonu z ekranu wgrywania nie ma już przy komputerze. Podłącz go i wybierz kopię jeszcze raz."
 
   }
 }

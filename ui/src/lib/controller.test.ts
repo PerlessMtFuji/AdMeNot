@@ -1248,6 +1248,131 @@ describe('data transfer', () => {
   });
 });
 
+describe('data transfer — uploading a copy', () => {
+  const COPY_ID = 'R58T00TEST-90fae0b8e3f0/20260926-143000';
+  const NEW = 'R58W20NEW01';
+
+  async function planned() {
+    const env = setup('transfer_restore');
+    await env.ctl.init();
+    env.ctl.selectDevice(NEW);
+    await env.ctl.loadTransfers();
+    await env.ctl.planRestore(COPY_ID);
+    await vi.waitFor(() => expect(env.s.transfer.restore.plan).not.toBeNull());
+    return env;
+  }
+
+  test('planRestore asks for the plan of this copy on the picked phone and opens the upload screen', async () => {
+    const { s, bridge } = await planned();
+    expect(bridge.calls.find((c) => c.method === 'restore_plan')?.args).toEqual([COPY_ID, NEW]);
+    expect(s.phase).toBe('transfer_restore_plan');
+    expect(s.transfer.restore.copy?.id).toBe(COPY_ID);
+    expect(s.transfer.restore.sameRecent).toBe(false);
+    expect(s.transfer.restore.resumable).toBe(false);
+    expect(s.transfer.restore.choice).toEqual({ groups: ['photos', 'downloads', 'whatsapp', 'other:Music'], apks_on: [],
+      verify_hash: false });
+    await vi.waitFor(() => expect(s.job).toBeNull());
+  });
+
+  test('toggles change the upload choice; a harmful APK cannot be ticked', async () => {
+    const { ctl, s } = await planned();
+    ctl.toggleUploadGroup('photos');
+    expect(s.transfer.restore.choice.groups).toEqual(['downloads', 'whatsapp', 'other:Music']);
+    ctl.toggleUploadGroup('photos');
+    expect(s.transfer.restore.choice.groups).toEqual(['photos', 'downloads', 'whatsapp', 'other:Music']);
+    ctl.toggleUploadGroup('others');
+    expect(s.transfer.restore.choice.groups).toEqual(['photos', 'downloads', 'whatsapp']);
+    ctl.toggleUploadGroup('others');
+    expect(s.transfer.restore.choice.groups).toContain('other:Music');
+    ctl.toggleUploadGroup('unknown');
+    expect(s.transfer.restore.choice.groups).toHaveLength(4);
+    ctl.toggleUploadApk('/sdcard/Download/gra.apk');
+    expect(s.transfer.restore.choice.apks_on).toEqual(['/sdcard/Download/gra.apk']);
+    ctl.toggleUploadApk('/sdcard/Download/szybki-cleaner.apk');
+    expect(s.transfer.restore.choice.apks_on).toEqual(['/sdcard/Download/gra.apk']);
+    ctl.toggleUploadApk('/sdcard/Download/gra.apk');
+    expect(s.transfer.restore.choice.apks_on).toEqual([]);
+  });
+
+  test('startRestore sends the choice and the done event shows the result', async () => {
+    const { ctl, s, bridge } = await planned();
+    ctl.toggleUploadGroup('videos');  // pusta grupa: zaznaczenie i tak przechodzi do mostu
+    await ctl.startRestore();
+    expect(s.phase).toBe('transfer_restore');
+    expect(bridge.calls.find((c) => c.method === 'start_restore')?.args[0]).toEqual({
+      groups: ['photos', 'videos', 'downloads', 'whatsapp', 'other:Music'], apks_on: [], verify_hash: false });
+    await vi.waitFor(() => expect(s.phase).toBe('transfer_restored'));
+    expect(s.transfer.restore.result?.files_renamed).toBe(1);
+    expect(s.transfer.restore.progress?.stage).toBe('scan');
+    // „wgrano na …” w Historii od razu, bez ponownego odczytu kopii
+    expect(s.transfer.copies.find((c) => c.id === COPY_ID)?.restores?.[0]?.serial).toBe(NEW);
+  });
+
+  test('a disconnect during the upload shows the waiting state until progress comes back', async () => {
+    const { s, bridge } = await planned();
+    s.phase = 'transfer_restore';
+    bridge.emit('transfer:waiting', {});
+    expect(s.transfer.waiting).toBe(true);
+    bridge.emit('transfer:restore_progress', { stage: 'files', done_files: 1, total_files: 2, done_bytes: 1, total_bytes: 2,
+      current: 'DCIM/a.jpg' });
+    expect(s.transfer.waiting).toBe(false);
+    expect(s.transfer.restore.progress?.current).toBe('DCIM/a.jpg');
+  });
+
+  test('stopRestore stops the upload job', async () => {
+    const { ctl, s, bridge } = await planned();
+    s.phase = 'transfer_restore';
+    ctl.setJob('job-4', 'restore');
+    await ctl.stopRestore();
+    expect(s.stopping).toBe(true);
+    expect(bridge.calls.at(-1)).toEqual({ method: 'stop', args: ['job-4'] });
+  });
+
+  test('phone full during the upload: error shown, back to the plan, which is now resumable', async () => {
+    const { s, bridge } = await planned();
+    s.phase = 'transfer_restore';
+    s.transfer.waiting = true;
+    s.stopping = true;
+    bridge.emit('job:error', { job_id: 'job-4', kind: 'restore', key: 'transfer_phone_full', message: '' });
+    expect(s.error?.key).toBe('transfer_phone_full');
+    expect(s.phase).toBe('transfer_restore_plan');
+    expect(s.transfer.restore.plan).not.toBeNull();
+    expect(s.transfer.restore.resumable).toBe(true);
+    expect([s.transfer.waiting, s.stopping]).toEqual([false, false]);
+  });
+
+  test('a failed plan goes back to the connect screen', async () => {
+    const { ctl, s, bridge } = setup('transfer_restore');
+    await ctl.init();
+    ctl.selectDevice(NEW);
+    bridge.failNext('restore_plan', 'bad_request');
+    await ctl.planRestore(COPY_ID);
+    expect(s.phase).toBe('connect');
+    expect(s.error?.key).toBe('bad_request');
+    s.phase = 'transfer_restore_plan';
+    bridge.emit('job:error', { job_id: 'job-3', kind: 'restore_plan', key: 'transfer_copy_missing', message: '' });
+    expect(s.phase).toBe('connect');
+    expect(s.transfer.restore.plan).toBeNull();
+    expect(s.error?.key).toBe('transfer_copy_missing');
+  });
+
+  test('planRestore needs a picked phone', async () => {
+    const { ctl, s, bridge } = setup('transfer_restore');
+    await ctl.init();
+    await ctl.planRestore(COPY_ID);
+    expect(bridge.calls.some((c) => c.method === 'restore_plan')).toBe(false);
+    expect(s.phase).toBe('connect');
+  });
+
+  test('leaving after the upload goes back to connect and forgets the plan', async () => {
+    const { ctl, s } = await planned();
+    ctl.leaveTransfer();
+    expect(s.phase).toBe('connect');
+    expect(s.transfer.restore.plan).toBeNull();
+    expect(s.transfer.restore.choice.groups).toEqual([]);
+  });
+});
+
 describe('data transfer — resuming', () => {
   const RESUMABLE = { id: 'R58T00TEST-x/20260925-100000', serial: 'R58T00TEST', model: 'SM-A145R', manufacturer: 'samsung', client: 'Anna K.',
     created: '2026-09-25T10:00:00', expires: '2026-10-02T10:00:00', days_left: 6, status: 'in_progress' as const, bytes: 0,

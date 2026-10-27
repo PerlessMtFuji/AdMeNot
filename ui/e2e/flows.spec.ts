@@ -203,6 +203,22 @@ test('phone state in English', async ({ page }) => {
   await expect(page.getByRole('switch', { name: 'All sites in Samsung Internet' })).toBeVisible();
 });
 
+test('upload a copy: the new phone is offered the copy, the plan shows APK labels, the result is green', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/?scenario=transfer_restore');
+  await page.getByRole('radio', { name: /R58W20NEW01/ }).dispatchEvent('click');  // radio jest sr-only pod kartą
+  await expect(page.getByText(/Wgrać kopię z samsung SM-A145R \(Anna K\./)).toBeVisible();
+  await page.getByRole('button', { name: 'Wgraj', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Co wgrać na nowy telefon?' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('pominięty jako szkodliwy')).toBeVisible();
+  await expect(page.getByText('podejrzany — odznaczony')).toBeVisible();
+  await page.getByRole('complementary', { name: 'Miejsce na nowym telefonie' }).getByRole('button', { name: /^Wgraj/ }).click();
+  await expect(page.getByText('Pliki wgrane', { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('pominięto 1 plik oceniony jako szkodliwy')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test('phone state: a site fix on an app from the plan runs as one row with the app level', async ({ page }) => {
   // Przeglądarka z poprawką witryny i własnym poziomem w jednym zleceniu: bez scalenia ekran wykonania pada.
   const errors: string[] = [];

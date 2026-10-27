@@ -1,7 +1,13 @@
 import { describe, expect, test } from 'vitest';
-import type { InventoryView } from './types';
+import fixture from '../../../tests/fixtures/bridge/transfer_restore.json';
+import type { CopyView, InventoryView, RestoreApk, RestorePlanView, RestoreResultView } from './types';
 import {
   backupOutcome,
+  defaultUploadChoice,
+  restoreOffer,
+  restoreOutcome,
+  restoreResumable,
+  uploadNeed,
   changedVerdicts,
   defaultTransferSelection,
   isXiaomi,
@@ -710,5 +716,108 @@ describe('data transfer', () => {
     expect(transferNeed(10_000, null)).toBe(10_000);
     expect(transferNeed(10_000, { bytes: 7_000 })).toBe(3_000);
     expect(transferNeed(10_000, { bytes: 12_000 })).toBe(0);
+  });
+});
+
+describe('uploading a copy to the new phone', () => {
+  const FIXTURE = (fixture as { calls: { method: string; events: unknown[][] }[] }).calls;
+  const recorded = FIXTURE.find((c) => c.method === 'restore_plan')!.events
+    .find(([name]) => name === 'transfer:restore_plan')![1] as { plan: RestorePlanView };
+  const restore = (serial: string, status: string, resumable: boolean) => ({ serial, status, updated: null, resumable });
+  const copy = (id: string, serial: string, status: CopyView['status'], created: string,
+    restores: CopyView['restores'] = []): CopyView => ({
+    id, serial, model: 'M', manufacturer: 'm', client: null, created, expires: created, days_left: 7, status, bytes: 1,
+    counts: {}, restores });
+
+  test('the offer is the newest finished copy of another phone, complete before incomplete', () => {
+    const copies = [
+      copy('NEW/3', 'NEW', 'complete', '2026-10-26T12:00:00'),  // kopia podłączonego telefonu
+      copy('B/2', 'B', 'in_progress', '2026-10-26T11:00:00'),   // niedokończona
+      copy('C/1', 'C', 'incomplete', '2026-10-26T10:00:00'),
+      copy('D/1', 'D', 'complete', '2026-10-24T10:00:00'),
+      copy('A/1', 'A', 'complete', '2026-10-25T10:00:00'),
+    ];
+    expect(restoreOffer(copies, 'NEW')?.id).toBe('A/1');
+    expect(restoreOffer([copies[2]], 'NEW')?.id).toBe('C/1');
+    expect(restoreOffer(copies.slice(0, 2), 'NEW')).toBeNull();
+    expect(restoreOffer(copies, null)).toBeNull();
+    expect(restoreOffer([], 'NEW')).toBeNull();
+  });
+
+  test('a copy already fully uploaded to this phone is not offered again', () => {
+    const copies = [copy('A/2', 'A', 'complete', '2026-10-26T10:00:00', [restore('NEW', 'complete', false)]),
+      copy('A/1', 'A', 'complete', '2026-10-25T10:00:00')];
+    expect(restoreOffer(copies, 'NEW')?.id).toBe('A/1');
+    expect(restoreOffer(copies, 'OTHER')?.id).toBe('A/2');
+  });
+
+  test('an interrupted upload is resumable only from the per-phone resumable flag', () => {
+    const copies = [
+      copy('A/2', 'A', 'complete', '2026-10-26T10:00:00', [restore('NEW', 'stopped', false)]),  // nic do wgrania
+      copy('A/1', 'A', 'complete', '2026-10-25T10:00:00', [restore('OTHER', 'stopped', true), restore('NEW', 'phone_full', true)]),
+    ];
+    expect(restoreResumable(copies, 'NEW')?.id).toBe('A/1');
+    expect(restoreResumable(copies, 'OTHER')?.id).toBe('A/1');
+    expect(restoreResumable(copies, 'THIRD')).toBeNull();
+    expect(restoreResumable(copies, null)).toBeNull();
+    expect(restoreResumable([copy('X/1', 'X', 'complete', '2026-10-25T10:00:00', undefined)], 'NEW')).toBeNull();
+  });
+
+  test('default choice: every group with files and every other folder, no suspicious APK', () => {
+    const groups = { ...recorded.plan.groups };
+    delete groups.whatsapp;  // grupy bez plików mogą nie przyjść
+    const plan: RestorePlanView = { ...recorded.plan, groups,
+      others: [...recorded.plan.others, { name: '', files: 2, bytes: 5, exists: 0, rename: 0 }] };
+    expect(defaultUploadChoice(plan)).toEqual({ groups: ['photos', 'downloads', 'other:Music', 'other:'], apks_on: [], verify_hash: false });
+  });
+
+  test('upload need mirrors RestorePlan.need: group totals already hold default APKs, suspicious only when ticked', () => {
+    const plan = recorded.plan;  // downloads: 504 B; oba APK (902 podejrzany, 702 szkodliwy) są poza tą sumą
+    const all = defaultUploadChoice(plan);
+    expect(uploadNeed(plan, all)).toEqual({ need: 5000 + 504 + 800 + 400, fits: true, missing: 0 });
+    // podejrzany zaznaczony: +902; szkodliwy nigdy, nawet gdyby przyszedł w apks_on
+    expect(uploadNeed(plan, { ...all, apks_on: ['/sdcard/Download/gra.apk', '/sdcard/Download/szybki-cleaner.apk'] }).need)
+      .toBe(5000 + 504 + 800 + 400 + 902);
+    // podejrzany zaznaczony w odznaczonej grupie nie liczy się
+    expect(uploadNeed(plan, { ...all, groups: ['photos'], apks_on: ['/sdcard/Download/gra.apk'] }).need).toBe(5000);
+    expect(uploadNeed(plan, { groups: [], apks_on: [], verify_hash: false }).need).toBe(0);
+  });
+
+  test('upload need: clean APK bytes are not counted twice, a ticked one already on the phone adds nothing', () => {
+    const apk = (remote: string, outcome: RestoreApk['outcome'], default_on: boolean, action: RestoreApk['action'] = 'push'): RestoreApk =>
+      ({ remote, name: remote, group: 'downloads', bytes: 100, action, outcome, level: 'static', default_on });
+    const plan: RestorePlanView = { groups: { downloads: { files: 3, bytes: 100, exists: 2, rename: 0 } }, others: [],
+      apks: [apk('a.apk', 'clean', true), apk('b.apk', 'suspicious', false, 'exists'), apk('c.apk', 'unknown', true, 'exists')],
+      space: { free: 10_000, total: null }, reserve: 1_000, missing: 0 };
+    expect(uploadNeed(plan, { groups: ['downloads'], apks_on: ['b.apk'], verify_hash: false }).need).toBe(100);
+  });
+
+  test('fits keeps the reserve free and reports what is missing', () => {
+    const plan: RestorePlanView = { groups: { photos: { files: 1, bytes: 9_000, exists: 0, rename: 0 },
+      videos: { files: 1, bytes: 3_000, exists: 0, rename: 0 } }, others: [], apks: [],
+      space: { free: 10_000, total: 20_000 }, reserve: 1_000, missing: 0 };
+    expect(uploadNeed(plan, { groups: ['photos'], apks_on: [], verify_hash: false })).toEqual({ need: 9_000, fits: true, missing: 0 });
+    expect(uploadNeed(plan, { groups: ['photos', 'videos'], apks_on: [], verify_hash: false }))
+      .toEqual({ need: 12_000, fits: false, missing: 3_000 });
+  });
+
+  test('transfer stages for the upload phases', () => {
+    expect(transferStages('transfer_restore_plan')).toEqual(['done', 'done', 'now', 'todo', 'todo']);
+    expect(transferStages('transfer_restore')).toEqual(['done', 'done', 'done', 'now', 'todo']);
+    expect(transferStages('transfer_restored')).toEqual(['done', 'done', 'done', 'done', 'todo']);
+  });
+
+  test('upload outcome: green only when everything went in and the gallery was refreshed', () => {
+    const r = (over: Partial<RestoreResultView> = {}): RestoreResultView => ({ status: 'complete', target_serial: 'N', files_done: 5,
+      files_exists: 0, files_renamed: 1, files_denied: 0, files_failed: 0, files_unselected: 0, apk_skipped: 1,
+      apk_suspicious_skipped: 0, bytes: 1, seconds: 1, hashed: false, media_scan: 'done', files_missing: 0, ...over });
+    expect(restoreOutcome(r())).toBe('ok');
+    expect(restoreOutcome(r({ files_denied: 2 }))).toBe('warn');
+    expect(restoreOutcome(r({ files_failed: 1 }))).toBe('warn');
+    expect(restoreOutcome(r({ files_missing: 1 }))).toBe('warn');
+    expect(restoreOutcome(r({ media_scan: 'failed' }))).toBe('warn');
+    expect(restoreOutcome(r({ media_scan: 'restart' }))).toBe('warn');
+    expect(restoreOutcome(r({ status: 'incomplete' }))).toBe('warn');
+    expect(restoreOutcome(r({ status: 'stopped', media_scan: 'skipped' }))).toBe('stopped');
   });
 });

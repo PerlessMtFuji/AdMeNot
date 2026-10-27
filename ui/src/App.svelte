@@ -14,6 +14,8 @@
   import Settings from './screens/Settings.svelte';
   import TransferBackup from './screens/TransferBackup.svelte';
   import TransferChoose from './screens/TransferChoose.svelte';
+  import TransferRestore from './screens/TransferRestore.svelte';
+  import TransferRestorePlan from './screens/TransferRestorePlan.svelte';
   import Welcome from './screens/Welcome.svelte';
   import AppShell from './ui/AppShell.svelte';
   import Banner from './ui/Banner.svelte';
@@ -28,9 +30,10 @@
   // Ostrzeżenie przy pierwszym starcie (spec kroku H §3.1): zamiast zwykłego widoku, bez panelu kroków.
   const welcome = $derived(s.settingsLoaded && needsWelcome(s.settings));
 
-  const ORDER = ['connect', 'transfer_choose', 'transfer_backup', 'scanning', 'results', 'executing', 'history', 'settings', 'fatal'];
+  const ORDER = ['connect', 'transfer_choose', 'transfer_backup', 'transfer_restore_plan', 'transfer_restore', 'scanning', 'results', 'executing', 'history', 'settings', 'fatal'];
   const view = $derived(s.fatal ? 'fatal' : s.screen !== 'main' ? s.screen
-    : s.phase === 'done' ? 'executing' : s.phase === 'transfer_done' ? 'transfer_backup' : s.phase);
+    : s.phase === 'done' ? 'executing' : s.phase === 'transfer_done' ? 'transfer_backup'
+    : s.phase === 'transfer_restored' ? 'transfer_restore' : s.phase);
   let last = 'connect';
   let dir = $state<1 | -1>(1);
   $effect.pre(() => {
@@ -60,6 +63,10 @@
         <TransferChoose />
       {:else if s.phase === 'transfer_backup' || s.phase === 'transfer_done'}
         <TransferBackup />
+      {:else if s.phase === 'transfer_restore_plan'}
+        <TransferRestorePlan />
+      {:else if s.phase === 'transfer_restore' || s.phase === 'transfer_restored'}
+        <TransferRestore />
       {:else if s.phase === 'executing' || s.phase === 'done'}
         <Execute />
       {:else}

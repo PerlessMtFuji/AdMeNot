@@ -1,8 +1,9 @@
 import { CATEGORY_ORDER } from './categories';
-import type { AppView, BackupResultView, Category, CopyView, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferProgress, TransferSelection, InventoryView, UndoSite, UpdateView, UserWait, Verdict } from './types';
+import type { AppView, BackupResultView, Category, CopyView, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferProgress, TransferSelection, InventoryView, RestorePlanView, RestoreResultView, UndoSite, UploadChoiceView, UploadGroup, UpdateView, UserWait, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done'
-  | 'transfer_choose' | 'transfer_backup' | 'transfer_done';
+  | 'transfer_choose' | 'transfer_backup' | 'transfer_done'
+  | 'transfer_restore_plan' | 'transfer_restore' | 'transfer_restored';
 export type StageState = 'done' | 'now' | 'todo';
 
 export function defaultSelection(apps: AppView[]): Record<string, Level> {
@@ -624,7 +625,12 @@ export function transferStages(phase: Phase): StageState[] {
     case 'transfer_backup':
       return ['done', 'now', 'todo', 'todo', 'todo'];
     case 'transfer_done':
+    case 'transfer_restore_plan':
       return ['done', 'done', 'now', 'todo', 'todo'];
+    case 'transfer_restore':
+      return ['done', 'done', 'done', 'now', 'todo'];
+    case 'transfer_restored':
+      return ['done', 'done', 'done', 'done', 'todo'];
     default:
       return ['now', 'todo', 'todo', 'todo', 'todo'];
   }
@@ -655,4 +661,60 @@ export function resumableCopy(copies: CopyView[], serial: string | null): CopyVi
  *  a wolne miejsce zmalało właśnie o nie). Prawdziwą strażą jest sprawdzanie przed każdą paczką w silniku. */
 export function transferNeed(selectedBytes: number, resumable: { bytes: number } | null): number {
   return Math.max(0, selectedBytes - (resumable?.bytes ?? 0));
+}
+
+// --- przenoszenie danych: wgrywanie kopii na nowy telefon ----------------------------------------
+
+export const UPLOAD_GROUPS: readonly UploadGroup[] = ['photos', 'videos', 'downloads', 'whatsapp'];
+export const otherGroup = (name: string): string => `other:${name}`;
+const finished = (c: CopyView): boolean => c.status === 'complete' || c.status === 'incomplete';
+const newest = (a: CopyView, b: CopyView): number => b.created.localeCompare(a.created);
+
+/** Propozycja na ekranie Połącz: najnowsza skończona kopia innego telefonu niż podłączony (pełna przed niepełną).
+ *  Kopia już w całości wgrana na ten telefon nie wraca jako propozycja. */
+export function restoreOffer(copies: CopyView[], serial: string | null): CopyView | null {
+  if (!serial) return null;
+  const candidates = copies.filter((c) => finished(c) && c.serial !== serial
+    && !(c.restores ?? []).some((r) => r.serial === serial && r.status === 'complete')).sort(newest);
+  return candidates.find((c) => c.status === 'complete') ?? candidates[0] ?? null;
+}
+
+/** Kopia z przerwanym wgrywaniem na ten telefon (flaga `resumable` z mostu: zostały pliki do wgrania). */
+export function restoreResumable(copies: CopyView[], serial: string | null): CopyView | null {
+  if (!serial) return null;
+  return [...copies].sort(newest).find((c) => (c.restores ?? []).some((r) => r.serial === serial && r.resumable)) ?? null;
+}
+
+/** Wszystkie grupy z plikami i wszystkie inne foldery kopii (każdy był w niej wybrany); podejrzane APK odznaczone. */
+export function defaultUploadChoice(plan: RestorePlanView): UploadChoiceView {
+  return {
+    groups: [...UPLOAD_GROUPS.filter((g) => (plan.groups[g]?.files ?? 0) > 0),
+      ...plan.others.filter((o) => o.files > 0).map((o) => otherGroup(o.name))],
+    apks_on: [],
+    verify_hash: false,
+  };
+}
+
+/** Ta sama reguła co `RestorePlan.need/fits` w silniku. Sumy grup mają już APK według domyślnego wyboru
+ *  (czyste i „nie do oceny”), bez szkodliwych i bez podejrzanych — dokładamy tylko zaznaczone podejrzane
+ *  (`default_on` fałsz, nie szkodliwe), których jeszcze nie ma na telefonie. `missing`: ile brakuje do zapasu. */
+export function uploadNeed(plan: RestorePlanView, choice: UploadChoiceView): { need: number; fits: boolean; missing: number } {
+  const groups = new Set(choice.groups);
+  const on = new Set(choice.apks_on);
+  const base = UPLOAD_GROUPS.filter((g) => groups.has(g)).reduce((n, g) => n + (plan.groups[g]?.bytes ?? 0), 0)
+    + plan.others.filter((o) => groups.has(otherGroup(o.name))).reduce((n, o) => n + o.bytes, 0);
+  const ticked = plan.apks.filter((a) => groups.has(a.group) && a.action !== 'exists' && a.outcome !== 'malicious'
+    && !a.default_on && on.has(a.remote)).reduce((n, a) => n + a.bytes, 0);
+  const need = base + ticked;
+  const missing = Math.max(0, need + plan.reserve - plan.space.free);
+  return { need, fits: missing === 0, missing };
+}
+
+/** Zielone „Pliki wgrane” tylko, gdy wszystko weszło i galeria została odświeżona. */
+export function restoreOutcome(r: RestoreResultView): 'ok' | 'warn' | 'stopped' {
+  if (r.status === 'stopped') return 'stopped';
+  if (r.status !== 'complete' || r.files_denied > 0 || r.files_failed > 0 || r.files_missing > 0 || r.media_scan !== 'done') {
+    return 'warn';
+  }
+  return 'ok';
 }

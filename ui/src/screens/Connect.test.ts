@@ -51,6 +51,46 @@ describe('Connect', () => {
     expect(start).toHaveBeenCalledWith(true);  // wznowienie, nie nowy wybór danych
   });
 
+  test('a new phone is offered the newest copy of another phone; "Upload" plans it, "Another copy" opens the list', async () => {
+    const env = await setupCtl('clean');
+    const copy = { id: 'OLD/20261025-193539', serial: 'OLD', model: 'SM-A145R', manufacturer: 'samsung', client: 'Anna K.',
+      created: '2026-10-25T19:35:39', expires: '2026-11-01T19:35:39', days_left: 7, status: 'complete' as const, bytes: 10,
+      counts: {}, restores: [] };
+    env.bridge.setCopies([copy]);
+    env.s.devices = [{ serial: 'R58T00TEST', state: 'device', model: 'SM_A145R', name: null, imei: null }];
+    render(Connect, { context: new Map([['ctl', env.ctl]]) });
+    await flush();
+    expect(screen.getByText(/Wgrać kopię z samsung SM-A145R \(Anna K\., 25 paź/)).toBeTruthy();
+    const plan = vi.spyOn(env.ctl, 'planRestore').mockResolvedValue();
+    await fireEvent.click(screen.getByRole('button', { name: 'Wgraj' }));
+    expect(plan).toHaveBeenCalledWith(copy.id);
+    const history = vi.spyOn(env.ctl, 'openHistory').mockResolvedValue();
+    await fireEvent.click(screen.getByRole('button', { name: 'Inna kopia' }));
+    expect(history).toHaveBeenCalled();
+  });
+
+  test('an interrupted upload to this phone is offered for resuming instead of a new upload', async () => {
+    const env = await setupCtl('clean');
+    const copy = { id: 'OLD/1', serial: 'OLD', model: 'SM-A145R', manufacturer: 'samsung', client: null,
+      created: '2026-10-25T19:35:39', expires: '2026-11-01T19:35:39', days_left: 7, status: 'complete' as const, bytes: 10,
+      counts: {}, restores: [{ serial: 'R58T00TEST', status: 'stopped', updated: null, resumable: true }] };
+    env.bridge.setCopies([copy]);
+    env.s.devices = [{ serial: 'R58T00TEST', state: 'device', model: 'SM_A145R', name: null, imei: null }];
+    render(Connect, { context: new Map([['ctl', env.ctl]]) });
+    await flush();
+    expect(screen.getByText('Wznów przerwane wgrywanie')).toBeTruthy();
+    expect(screen.queryByText(/Wgrać kopię/)).toBeNull();
+    const plan = vi.spyOn(env.ctl, 'planRestore').mockResolvedValue();
+    await fireEvent.click(screen.getByRole('button', { name: 'Wznów' }));
+    expect(plan).toHaveBeenCalledWith('OLD/1');
+    // przerwana kopia tego telefonu (Etap 1) ma pierwszeństwo
+    env.bridge.setCopies([copy, { ...copy, id: 'R58T00TEST-x/1', serial: 'R58T00TEST', status: 'in_progress', restores: [] }]);
+    await env.ctl.loadTransfers();
+    await tick();
+    expect(screen.getByText(/Wznów przerwaną kopię/)).toBeTruthy();
+    expect(screen.queryByText('Wznów przerwane wgrywanie')).toBeNull();
+  });
+
   test('the connect screen reloads the copies, so a finished copy no longer offers resuming', async () => {
     const env = await setupCtl('clean');
     render(Connect, { context: new Map([['ctl', env.ctl]]) });

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getContext, onMount } from 'svelte';
+  import { getContext, onMount, tick } from 'svelte';
   import ConnectChecklist from '../components/ConnectChecklist.svelte';
   import DeviceCard from '../components/DeviceCard.svelte';
   import InterruptedBanner from '../components/InterruptedBanner.svelte';
@@ -8,7 +8,8 @@
   import UsbGuide from '../components/UsbGuide.svelte';
   import type { Controller } from '../lib/controller';
   import { i18n, t } from '../lib/i18n/index.svelte';
-  import { connectChecklist, linkState, modelName, resumableCopy } from '../lib/logic';
+  import { connectChecklist, linkState, modelName, restoreOffer, restoreResumable, resumableCopy } from '../lib/logic';
+  import type { CopyView } from '../lib/types';
   import { enter } from '../lib/motion';
   import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
@@ -24,8 +25,20 @@
   const known = $derived(pending !== null && s.knownSerials.includes(pending.serial));
   // Przerwana kopia danych (np. zamknięty program): propozycja wznowienia od razu po podłączeniu tego telefonu.
   const resumable = $derived(link === 'ready' || link === 'many' ? resumableCopy(s.transfer.copies, s.serial) : null);
+  // Wgrywanie kopii na ten telefon: najpierw przerwane wgrywanie, potem propozycja świeżej kopii innego telefonu.
+  const restoring = $derived(link === 'ready' || link === 'many' ? restoreResumable(s.transfer.copies, s.serial) : null);
+  const offer = $derived(link === 'ready' || link === 'many' ? restoreOffer(s.transfer.copies, s.serial) : null);
   const when = (iso: string) => new Date(iso).toLocaleString(i18n.lang === 'pl' ? 'pl-PL' : 'en-GB',
     { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const source = (c: CopyView) => ({ phone: `${c.manufacturer} ${c.model}`.trim(),
+    details: [c.client, when(c.created)].filter(Boolean).join(', ') });
+
+  /** „Inna kopia”: lista kopii jest w Historii — otwieramy ją i przewijamy do kopii. */
+  async function otherCopy(): Promise<void> {
+    await ctl.openHistory();
+    await tick();
+    document.getElementById('transfer-copies')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }
 
   // Za każdym powrotem na ten ekran: kopia mogła się w międzyczasie skończyć albo przerwać.
   onMount(() => { void ctl.loadTransfers(); });
@@ -52,6 +65,21 @@
         {t('transfer.resume_text')}
         {#snippet actions()}
           <Button variant="primary" size="sm" onclick={() => ctl.startTransfer(true)}>{t('transfer.resume')}</Button>
+        {/snippet}
+      </Banner>
+    {:else if restoring}
+      <Banner tone="info" icon="rotate-ccw" title={t('transfer.restore.resume_title')}>
+        {t('transfer.restore.resume_text', source(restoring))}
+        {#snippet actions()}
+          <Button variant="primary" size="sm" onclick={() => ctl.planRestore(restoring.id)}>{t('transfer.restore.resume')}</Button>
+        {/snippet}
+      </Banner>
+    {:else if offer}
+      <Banner tone="info" icon="smartphone" title={t('transfer.restore.offer_title', source(offer))}>
+        {t('transfer.restore.offer_text')}
+        {#snippet actions()}
+          <Button variant="primary" size="sm" onclick={() => ctl.planRestore(offer.id)}>{t('transfer.restore.upload')}</Button>
+          <Button size="sm" onclick={otherCopy}>{t('transfer.restore.other_copy')}</Button>
         {/snippet}
       </Banner>
     {/if}

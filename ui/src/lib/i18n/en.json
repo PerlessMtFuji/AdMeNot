@@ -646,6 +646,126 @@
       "in_progress": "unfinished",
       "incomplete": "incomplete",
       "complete": "complete"
+    },
+    "restore": {
+      "offer_title": "Upload the copy of {phone} ({details})?",
+      "offer_text": "Files from the copy go to this phone. Nothing on it is overwritten.",
+      "upload": "Upload",
+      "other_copy": "Another copy",
+      "resume_title": "Resume the interrupted upload",
+      "resume_text": "Copy of {phone} ({details}). Uploaded files stay — the program finishes the rest.",
+      "resume": "Resume",
+      "to_phone": "Upload to the connected phone",
+      "uploaded_to": "uploaded to: {list}",
+      "interrupted_on": "upload interrupted: {list}",
+      "planning": "Checking the new phone…",
+      "planning_sub": "Reading the free space and which files are already there. Nothing is uploaded yet.",
+      "title": "What to upload to the new phone?",
+      "sub": "Copy of {phone} ({details}). Nothing is overwritten — a different file with the same name is saved beside it as “(z kopii)”.",
+      "same_title": "This is the phone the copy was made from",
+      "same_text": "The copy is less than 24 hours old, so these files are most likely already on this phone. Upload anyway?",
+      "same_no": "No",
+      "same_yes": "Yes, upload",
+      "incomplete_title": "The copy is incomplete",
+      "incomplete_text": "Missing from the copy: {list}. What is in it will be uploaded.",
+      "incomplete_unknown": "Some data didn't make it into the copy. What is in it will be uploaded.",
+      "incomplete_files": "failed files: {count}",
+      "incomplete_apps": "failed apps: {count}",
+      "incomplete_unreadable": "unreadable files: {count}",
+      "missing": {
+        "one": "{count} file of the copy is no longer on this computer — it won't be uploaded",
+        "few": "{count} files of the copy are no longer on this computer — they won't be uploaded",
+        "many": "{count} files of the copy are no longer on this computer — they won't be uploaded",
+        "other": "{count} files of the copy are no longer on this computer — they won't be uploaded"
+      },
+      "missing_text": "Something like an antivirus may have removed them. The rest uploads normally.",
+      "resumable": "The interrupted upload will be finished — files already uploaded stay on the phone.",
+      "group": {
+        "photos": "Photos",
+        "videos": "Videos",
+        "downloads": "Downloads and documents",
+        "whatsapp": "WhatsApp",
+        "others": "Other folders"
+      },
+      "note": {
+        "photos": "Camera, screenshots, Pictures",
+        "videos": "Camera videos, Movies",
+        "downloads": "Download, Documents",
+        "whatsapp": "WhatsApp files — chats are restored in the app"
+      },
+      "exists": "already on the phone: {count}",
+      "rename": "saved beside: {count}",
+      "section_files": "Files",
+      "section_apks": "APK files",
+      "apks_note": "App installers from the copy, assessed on this computer. Harmful ones are never uploaded.",
+      "apk": {
+        "clean": "checked",
+        "suspicious_off": "suspicious — unticked",
+        "suspicious_on": "suspicious — ticked",
+        "malicious": "skipped as harmful",
+        "unknown": "can't be assessed"
+      },
+      "later_title": "Later in the program",
+      "later": {
+        "sms": "SMS and MMS",
+        "calls": "Call history",
+        "contacts": "Contacts",
+        "apps": "Apps",
+        "whatsapp": "Restoring WhatsApp chats"
+      },
+      "next_version": "in a later version",
+      "panel": "Space on the new phone",
+      "space_label": "Used space and files to upload",
+      "to_upload": "To upload",
+      "free": "Free",
+      "reserve": "Reserve left free",
+      "left": "{size} will be left free",
+      "no_space": "{size} short on the new phone — untick some of the data",
+      "begin": "Upload",
+      "uploading": "Uploading files to the new phone",
+      "uploading_sub": "Don't disconnect the phone. If the cable comes loose, the upload waits and then continues.",
+      "phase": {
+        "plan": "Preparing",
+        "files": "Files",
+        "scan": "Refreshing the gallery"
+      },
+      "progress_label": "Upload progress",
+      "starting": "Preparing the upload…",
+      "waiting": "Phone disconnected — reconnect it and the upload will continue",
+      "done_heading": "Upload to the new phone",
+      "done_ok": "Files uploaded",
+      "done_warn": "Files uploaded, but not everything worked",
+      "done_warn_text": "Details below. Files that couldn't be uploaded stay in the copy on this computer.",
+      "done_stopped": "Upload stopped",
+      "done_stopped_text": "Uploaded files stay on the phone. To finish, connect this phone and choose “Resume” next to the copy.",
+      "restart": "Restart the phone so the gallery sees the files",
+      "scan_failed": "The gallery may not show the new files right away",
+      "scan_failed_text": "The phone didn't refresh its gallery. The files are there — they appear after a while or after a restart.",
+      "sum": {
+        "done": "Uploaded",
+        "exists": "Already on the phone",
+        "size": "Size",
+        "checked": "Check",
+        "checked_size": "size checked",
+        "checked_hash": "checksums verified",
+        "renamed": "saved beside as “(z kopii)”: {count}",
+        "denied": "Android refused to save: {count}",
+        "failed": "failed to upload: {count}",
+        "missing": "missing from the copy on this computer: {count}",
+        "unselected": "unticked by the technician: {count}",
+        "suspicious": "suspicious APK files skipped: {count}"
+      },
+      "apk_skipped": {
+        "one": "skipped {count} file assessed as harmful",
+        "few": "skipped {count} files assessed as harmful",
+        "many": "skipped {count} files assessed as harmful",
+        "other": "skipped {count} files assessed as harmful"
+      },
+      "error": {
+        "transfer_wrong_device": "A different phone is connected than the one being uploaded to. Connect the right phone and choose “Upload” again — uploaded files stay.",
+        "transfer_too_many_disconnects": "The phone disconnected too often. Check the cable and choose “Upload” again — uploaded files stay.",
+        "transfer_failed": "The upload failed. Try again — files already uploaded stay on the phone."
+      }
     }
   },
   "error": {
@@ -685,7 +805,10 @@
     "transfer_wrong_device": "A different phone is connected than the one being copied. Connect the right phone and start the copy again.",
     "transfer_too_many_disconnects": "The phone disconnected too often. Check the cable and start the copy again — files already copied stay.",
     "transfer_failed": "The copy failed. Files already copied stay — start the copy again.",
-    "transfer_in_use": "A file of this copy is open in another program (e.g. File Explorer or a photo viewer). Close it and try again."
+    "transfer_in_use": "A file of this copy is open in another program (e.g. File Explorer or a photo viewer). Close it and try again.",
+    "transfer_phone_full": "The new phone ran out of space. Free up space or untick some of the data and choose “Upload” — uploaded files stay.",
+    "transfer_copy_missing": "This copy is no longer on this computer (it was deleted or moved).",
+    "transfer_no_plan": "The phone from the upload screen is no longer connected. Connect it and choose the copy again."
 
   }
 }

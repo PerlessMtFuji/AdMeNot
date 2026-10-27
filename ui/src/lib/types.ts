@@ -500,6 +500,92 @@ export interface CopyView {
   counts: Record<string, number>;
   /** Wybór zapisany w kopii (pusty, gdy kopia jeszcze nie ruszyła); wznowienie zaczyna od niego. */
   selection?: Partial<TransferSelection>;
+  /** Wgrywania tej kopii na nowe telefony, najnowsze pierwsze; starsze mosty ich nie wysyłają. */
+  restores?: CopyRestore[];
+}
+
+/** Stan wgrywania kopii na jeden telefon (`read_restores`). `resumable`: zostały pliki do wgrania. */
+export interface CopyRestore {
+  serial: string;
+  /** running | complete | incomplete | stopped albo klucz błędu (np. `phone_full`). */
+  status: string;
+  updated: string | null;
+  resumable: boolean;
+}
+
+// --- przenoszenie danych: wgrywanie kopii na nowy telefon (present.restore_plan_view / restore_result_view)
+
+export type UploadGroup = 'photos' | 'videos' | 'downloads' | 'whatsapp';
+
+export interface UploadTotals {
+  files: number;
+  /** Do wgrania: bez plików „już są”, z APK według domyślnego wyboru (szkodliwe i podejrzane poza sumą). */
+  bytes: number;
+  exists: number;
+  rename: number;
+}
+
+export interface RestoreApk {
+  remote: string;
+  name: string;
+  /** `photos`… albo `other:<folder>`. */
+  group: string;
+  bytes: number;
+  action: 'push' | 'exists' | 'rename';
+  outcome: 'clean' | 'suspicious' | 'malicious' | 'unknown';
+  level: 'installed' | 'ioc' | 'static' | 'none';
+  default_on: boolean;
+}
+
+export interface RestorePlanView {
+  /** Grupa bez plików może nie przyjść. */
+  groups: Partial<Record<UploadGroup, UploadTotals>>;
+  /** Foldery „Inne” z kopii; `""` = luźne pliki w folderze głównym. */
+  others: ({ name: string } & UploadTotals)[];
+  apks: RestoreApk[];
+  space: { free: number; total: number | null };
+  reserve: number;
+  /** Pliki kopii, których nie ma już na komputerze — nie zostaną wgrane. */
+  missing: number;
+}
+
+/** Wybór wysyłany do `start_restore` (UploadChoice z silnika). */
+export interface UploadChoiceView {
+  /** `photos`… albo `other:<folder>`. */
+  groups: string[];
+  /** `remote` zaznaczonych podejrzanych APK. */
+  apks_on: string[];
+  verify_hash: boolean;
+}
+
+export interface RestoreProgressView {
+  stage: 'plan' | 'files' | 'scan';
+  done_files: number;
+  total_files: number;
+  done_bytes: number;
+  total_bytes: number;
+  current: string;
+}
+
+export interface RestoreResultView {
+  status: 'complete' | 'incomplete' | 'stopped';
+  target_serial: string;
+  files_done: number;
+  files_exists: number;
+  /** Wgrane obok jako „(z kopii)”. */
+  files_renamed: number;
+  files_denied: number;
+  files_failed: number;
+  files_unselected: number;
+  /** Ocenione jako szkodliwe — nigdy nie wgrywane. */
+  apk_skipped: number;
+  apk_suspicious_skipped: number;
+  bytes: number;
+  seconds: number;
+  hashed: boolean;
+  /** `skipped`: przebieg się nie skończył (skan zrobi wznowienie) — wtedy bez prośby o restart. */
+  media_scan: 'done' | 'failed' | 'restart' | 'skipped';
+  files_missing: number;
 }
 
 export type TransferStage = 'telephony' | 'files' | 'apps' | 'verify';
@@ -612,6 +698,8 @@ export interface Api {
   transfers(): R<{ copies: CopyView[] }>;
   extend_transfer(copyId: string): R<{ copy: CopyView }>;
   delete_transfer(copyId: string): R<{ deleted: string }>;
+  restore_plan(copyId: string, serial: string): R<{ job_id: string }>;
+  start_restore(choice: UploadChoiceView): R<{ job_id: string }>;
 }
 
 export interface EventMap {
@@ -654,6 +742,9 @@ export interface EventMap {
   'transfer:progress': TransferProgress;
   'transfer:waiting': Record<string, never>;
   'transfer:done': { result: BackupResultView; copy: CopyView };
+  'transfer:restore_plan': { plan: RestorePlanView; copy: CopyView; resumable: boolean; same_phone_recent: boolean };
+  'transfer:restore_progress': RestoreProgressView;
+  'transfer:restore_done': { result: RestoreResultView; copy: CopyView };
 }
 
 export type EventName = keyof EventMap;

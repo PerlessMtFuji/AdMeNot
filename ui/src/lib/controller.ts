@@ -1,7 +1,7 @@
 import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
-import { actedAfter, changedVerdicts, defaultSelection, resumableCopy, resumeSelection, TRANSFER_CATEGORIES, transferNeed, transferTotals, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
-import { EMPTY_TRANSFER_SELECTION, type AppState } from './state.svelte';
+import { actedAfter, changedVerdicts, defaultSelection, defaultUploadChoice, otherGroup, resumableCopy, UPLOAD_GROUPS, resumeSelection, TRANSFER_CATEGORIES, transferNeed, transferTotals, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
+import { EMPTY_TRANSFER_SELECTION, emptyRestore, type AppState } from './state.svelte';
 import { applyTheme } from './theme';
 import type {
   ApiError, AppView, CacheUsage, TransferCategory, EtaView, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, TelemetrySample, Theme, Verdict,
@@ -297,6 +297,16 @@ export class Controller {
         s.stopping = false;
         s.phase = 'transfer_choose';
         void this.refreshResumable();
+      } else if (d.kind === 'restore_plan' && s.phase === 'transfer_restore_plan') {
+        s.transfer.restore = emptyRestore();
+        s.phase = 'connect';
+      } else if (d.kind === 'restore' && s.phase === 'transfer_restore') {
+        // Stan wgrywania zostaje: „Wgraj” na ekranie planu wznowi je (np. po zwolnieniu miejsca).
+        s.transfer.waiting = false;
+        s.stopping = false;
+        s.transfer.restore.resumable = true;
+        s.phase = 'transfer_restore_plan';
+        void this.loadTransfers();
       } else if (d.kind === 'undo') {
         s.undoSites = null;
         s.userWait = null;
@@ -678,12 +688,28 @@ export class Controller {
       s.stopping = false;
       s.phase = 'transfer_done';
     });
+    on('transfer:restore_plan', (d) => {
+      if (s.phase !== 'transfer_restore_plan') return; // serwisant już wyszedł z ekranu wgrywania
+      Object.assign(s.transfer.restore, { plan: d.plan, copy: d.copy, choice: defaultUploadChoice(d.plan),
+        resumable: d.resumable, sameRecent: d.same_phone_recent });
+    });
+    on('transfer:restore_progress', (d) => {
+      s.transfer.restore.progress = d;
+      s.transfer.waiting = false;
+    });
+    on('transfer:restore_done', (d) => {
+      Object.assign(s.transfer.restore, { result: d.result, copy: d.copy });
+      s.transfer.copies = s.transfer.copies.map((c) => (c.id === d.copy.id ? d.copy : c));
+      s.transfer.waiting = false;
+      s.stopping = false;
+      s.phase = 'transfer_restored';
+    });
   }
 
   private resetTransfer(): void {
     const tr = this.state.transfer;
     Object.assign(tr, { inventory: null, resumable: null, selection: { ...EMPTY_TRANSFER_SELECTION }, progress: null,
-      waiting: false, result: null, copy: null });
+      waiting: false, result: null, copy: null, restore: emptyRestore() });
   }
 
   /** „Przenieś dane” na ekranie Połącz: inwentarz wybranego telefonu, potem ekran wyboru. `resume` („Wznów”
@@ -799,6 +825,70 @@ export class Controller {
     s.transfer.copies = r.copies;
     const copy = resumableCopy(r.copies, s.device?.serial ?? s.serial);
     if (copy && s.phase === 'transfer_choose') s.transfer.resumable = copy;
+  }
+
+  // --- przenoszenie danych: wgrywanie kopii na nowy telefon ------------------------------------------
+
+  /** „Wgraj” (Połącz albo Historia): plan wgrywania kopii na wybrany telefon, potem ekran wyboru. */
+  async planRestore(copyId: string): Promise<void> {
+    const s = this.state;
+    if (!s.serial) return;
+    this.resetTransfer();
+    s.transfer.restore.copy = s.transfer.copies.find((c) => c.id === copyId) ?? null;
+    Object.assign(s, { error: null, device: null, screen: 'main', phase: 'transfer_restore_plan', stopping: false });
+    const r = await this.call(this.api.restore_plan(copyId, s.serial));
+    if (r) this.setJob(r.job_id, 'restore_plan');
+    else s.phase = 'connect';
+  }
+
+  /** Grupa plików (`photos`…, `other:<folder>`) albo `others` — wszystkie inne foldery naraz. */
+  toggleUploadGroup(key: string): void {
+    const r = this.state.transfer.restore;
+    if (!r.plan) return;
+    const groups = new Set(r.choice.groups);
+    const others = r.plan.others.map((o) => otherGroup(o.name));
+    const known = [...UPLOAD_GROUPS.filter((g) => g in r.plan!.groups), ...others]; // kolejność jak na ekranie
+    if (key === 'others') {
+      const on = !others.some((g) => groups.has(g));
+      for (const g of others) if (on) groups.add(g); else groups.delete(g);
+    } else if (known.includes(key)) {
+      if (!groups.delete(key)) groups.add(key);
+    } else {
+      return;
+    }
+    r.choice = { ...r.choice, groups: known.filter((g) => groups.has(g)) };
+  }
+
+  /** Podejrzany APK (domyślnie odznaczony); szkodliwego nie da się zaznaczyć, domyślne idą z grupą. */
+  toggleUploadApk(remote: string): void {
+    const r = this.state.transfer.restore;
+    const apk = r.plan?.apks.find((a) => a.remote === remote);
+    if (!apk || apk.outcome === 'malicious' || apk.default_on) return;
+    const on = r.choice.apks_on;
+    r.choice = { ...r.choice, apks_on: on.includes(remote) ? on.filter((x) => x !== remote) : [...on, remote] };
+  }
+
+  /** Wgrywanie wybranych plików; przerwane wgrywanie tej kopii na ten telefon most wznawia sam. */
+  async startRestore(): Promise<void> {
+    const s = this.state;
+    const choice = s.transfer.restore.choice;
+    s.error = null;
+    const r = await this.call(this.api.start_restore({ groups: [...choice.groups], apks_on: [...choice.apks_on],
+      verify_hash: choice.verify_hash }));
+    if (!r) return;
+    Object.assign(s.transfer.restore, { progress: null, result: null });
+    s.transfer.waiting = false;
+    s.stopping = false;
+    s.phase = 'transfer_restore';
+    this.setJob(r.job_id, 'restore');
+  }
+
+  /** „Przerwij” (także w czasie czekania na telefon): wgrywanie kończy się `transfer:restore_done` ze statusem „stopped”. */
+  async stopRestore(): Promise<void> {
+    const job = this.state.job;
+    if (job?.kind !== 'restore') return;
+    this.state.stopping = true;
+    await this.call(this.api.stop(job.id));
   }
 
   async loadTransfers(): Promise<void> {

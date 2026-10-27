@@ -1,7 +1,7 @@
 import { SvelteSet } from 'svelte/reactivity';
 import { actedLevels, type ActedLog, type OpenGroups, type Phase } from './logic';
 import type {
-  ApiErrorBody, ApkEstimate, BackupResultView, CopyView, InventoryView, TransferProgress, TransferSelection, ApkQuestion, Category, ConsoleEntry, DeviceEntry, EtaView, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
+  ApiErrorBody, ApkEstimate, BackupResultView, CopyView, InventoryView, RestorePlanView, RestoreProgressView, RestoreResultView, TransferProgress, TransferSelection, UploadChoiceView, ApkQuestion, Category, ConsoleEntry, DeviceEntry, EtaView, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
   PlanView, Question, ReportResult, ScanView, Settings, ShareState, ShotsView, ShotView, StepEvent, UndoDone, UndoSite, UpdateView, UserWait, Verdict, WhoView,
 } from './types';
 
@@ -12,6 +12,23 @@ export const EMPTY_TRANSFER_SELECTION: TransferSelection = {
   contacts: false, sms: false, mms: false, calls: false, categories: [], others: [], apps: [],
 };
 
+export const emptyRestore = (): RestoreState => ({ plan: null, copy: null,
+  choice: { groups: [], apks_on: [], verify_hash: false }, progress: null, result: null, sameRecent: false, resumable: false });
+
+/** Wgrywanie kopii na nowy telefon: plan z mostu, wybór serwisanta, postęp i wynik. */
+export interface RestoreState {
+  plan: RestorePlanView | null;
+  /** Wgrywana kopia (zanim przyjdzie plan — z listy kopii). */
+  copy: CopyView | null;
+  choice: UploadChoiceView;
+  progress: RestoreProgressView | null;
+  result: RestoreResultView | null;
+  /** Ten sam telefon co w kopii i kopia młodsza niż 24 h — ostrzeżenie, domyślnie „Nie”. */
+  sameRecent: boolean;
+  /** Na tym telefonie jest przerwane wgrywanie tej kopii — „Wgraj” je wznowi. */
+  resumable: boolean;
+}
+
 /** Przenoszenie danych: inwentarz starego telefonu, wybór, postęp kopii i kopie na komputerze. */
 export interface TransferState {
   inventory: InventoryView | null;
@@ -19,12 +36,13 @@ export interface TransferState {
   resumable: CopyView | null;
   selection: TransferSelection;
   progress: TransferProgress | null;
-  /** Telefon odłączony w trakcie kopii — most czeka na ponowne podłączenie. */
+  /** Telefon odłączony w trakcie kopii albo wgrywania — most czeka na ponowne podłączenie. */
   waiting: boolean;
   result: BackupResultView | null;
   /** Kopia z `transfer:done` (ile dni do usunięcia). */
   copy: CopyView | null;
   copies: CopyView[];
+  restore: RestoreState;
 }
 
 export class AppState {
@@ -141,7 +159,7 @@ export class AppState {
   crashError = $state<ApiErrorBody | null>(null);
   fatalCrash = $state<string | null>(null);
   transfer = $state<TransferState>({ inventory: null, resumable: null, selection: { ...EMPTY_TRANSFER_SELECTION },
-    progress: null, waiting: false, result: null, copy: null, copies: [] });
+    progress: null, waiting: false, result: null, copy: null, copies: [], restore: emptyRestore() });
 
   get orderRunning(): boolean {
     return this.job !== null && ORDER_KINDS.includes(this.job.kind);
