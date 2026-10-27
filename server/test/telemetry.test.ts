@@ -34,6 +34,12 @@ const transfer = (extra: Record<string, unknown> = {}) => common("transfer_backu
   device: DEVICE, status: "complete", seconds: 2710, bytes_mb: 38400, files: 5230, files_failed: 0,
   apps: 12, apps_failed: 0, categories: CATEGORIES, ...extra,
 });
+const GROUPS = { photos: true, videos: true, downloads: false, whatsapp: true, others: false };
+const restore = (extra: Record<string, unknown> = {}) => common("transfer_restore", {
+  device: DEVICE, status: "complete", seconds: 1800, bytes_mb: 31000, files: 5100, exists: 120, renamed: 3,
+  denied: 0, failed: 0, unselected: 40, missing: 0, apk_skipped: 1, apk_suspicious_skipped: 1, streams: 4,
+  hashed: false, media_scan: "done", groups: GROUPS, ...extra,
+});
 
 async function post(events: unknown[], raw?: string): Promise<Response> {
   return exports.default.fetch(new Request(BASE + "/api/v1/telemetry", {
@@ -140,6 +146,35 @@ describe("POST /api/v1/telemetry", () => {
     ["bytes_mb ponad limit", transfer({ bytes_mb: 10_000_001 })],
     ["brak urządzenia", transfer({ device: undefined })],
   ])("transfer_backup 400: %s", async (_name, event) => {
+    expect((await post([event])).status).toBe(400);
+    expect(await rows()).toEqual([]);
+  });
+
+  it("transfer_restore: przyjęte i zapisane same liczby oraz flagi grup", async () => {
+    const res = await post([restore(), restore({ status: "stopped", media_scan: "skipped", streams: 1, hashed: true })]);
+    expect(res.status).toBe(200);
+    const [first, second] = (await rows()).map((r) => JSON.parse(r.body));
+    expect(first).toMatchObject({ type: "transfer_restore", status: "complete", files: 5100, exists: 120,
+      missing: 0, streams: 4, media_scan: "done", groups: GROUPS });
+    expect(second).toMatchObject({ status: "stopped", media_scan: "skipped", streams: 1, hashed: true });
+  });
+
+  it.each([
+    ["dodatkowe pole path", restore({ path: "DCIM/Camera" })],
+    ["nieznany media_scan", restore({ media_scan: "x" })],
+    ["streams ponad 8", restore({ streams: 99 })],
+    ["streams 0", restore({ streams: 0 })],
+    ["nieznany status", restore({ status: "phone_full" })],
+    ["nazwa folderu w groups", restore({ groups: { ...GROUPS, "other:Music": true } })],
+    ["brak grupy", restore({ groups: { photos: true } })],
+    ["liczba zamiast flagi", restore({ groups: { ...GROUPS, photos: 1 } })],
+    ["hashed nie logiczne", restore({ hashed: "no" })],
+    ["ujemna liczba", restore({ denied: -1 })],
+    ["brak missing", restore({ missing: undefined })],
+    ["seconds ponad dobę", restore({ seconds: 86_401 })],
+    ["bytes_mb ponad limit", restore({ bytes_mb: 10_000_001 })],
+    ["brak urządzenia", restore({ device: undefined })],
+  ])("transfer_restore 400: %s", async (_name, event) => {
     expect((await post([event])).status).toBe(400);
     expect(await rows()).toEqual([]);
   });

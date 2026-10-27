@@ -251,7 +251,8 @@ class _Restore:
         denied`, `Read-only file system` przy nim lub przy folderze nad nim) → jego pliki od razu
         `denied`, bez prób `push`. Inny błąd nie jest tu rozstrzygany — zdecyduje wynik `push`."""
         pending = state.by_status("pending")
-        dirs = sorted({posixpath.dirname(safe_target(r.target)) for r in pending})
+        # `/sdcard` (luźne pliki w głównym folderze) zawsze jest — i nie jest celem pod `/sdcard/`
+        dirs = sorted({posixpath.dirname(safe_target(r.target)) for r in pending} - {"/sdcard"})
         refused: set[str] = set()
         for batch in _cmd_batches(dirs):
             while True:

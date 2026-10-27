@@ -994,7 +994,8 @@
          "com.whatsapp"
         ],
         "verify_hash": false
-       }
+       },
+       "restores": []
       }
      }
     ],
@@ -1052,7 +1053,8 @@
         "com.whatsapp"
        ],
        "verify_hash": false
-      }
+      },
+      "restores": []
      }
     ]
    },

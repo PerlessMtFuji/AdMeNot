@@ -19,6 +19,8 @@ from admenot.engine.device.info import DeviceInfo
 from admenot.engine.journal.db import Action
 from admenot.engine.session import ScanReport
 from admenot.engine.transfer.backup import BackupResult, Selection
+from admenot.engine.transfer.restore import RestoreResult, UploadChoice
+from admenot.engine.transfer.restore_plan import UPLOAD_GROUPS
 from admenot.engine.transfer.telephony import CategoryResult
 from admenot.engine.workflow import AppStatus, OrderResult
 
@@ -38,6 +40,7 @@ MAX_SCORE = 1000
 MAX_MB = 10_000_000  # 10 TB w MB — kopia telefonu; serwer ma ten sam limit `bytes_mb`
 TRANSFER_CATEGORIES = ("contacts", "sms", "mms", "calls", "media", "downloads", "whatsapp",
                        "others", "apps")
+MAX_STREAMS = 8  # serwer: `streams` 1–8
 
 
 def _short(value: str | None) -> str:
@@ -180,6 +183,27 @@ def transfer_backup_event(device: DeviceInfo, result: BackupResult,
     }
 
 
+def transfer_restore_event(device: DeviceInfo, result: RestoreResult, choice: UploadChoice,
+                           streams: int) -> dict[str, Any]:
+    """Wgrywanie kopii na nowy telefon (`device` = telefon docelowy): same liczby i wybrane grupy.
+    Bez nazw plików, folderów i pakietów z plików APK — „Inne foldery” to tylko `others`: coś
+    wybrano. Serial telefonu docelowego (`result.target_serial`) też nie wychodzi."""
+    groups = {g: g in choice.groups for g in UPLOAD_GROUPS}
+    groups["others"] = any(g.startswith("other:") for g in choice.groups)
+    return {
+        "device": device_of(device), "status": result.status,
+        "seconds": _count(result.seconds, MAX_SECONDS),
+        "bytes_mb": _count(round(result.bytes / 1_000_000), MAX_MB),
+        "files": _count(result.files_done), "exists": _count(result.files_exists),
+        "renamed": _count(result.files_renamed), "denied": _count(result.files_denied),
+        "failed": _count(result.files_failed), "unselected": _count(result.files_unselected),
+        "missing": _count(result.files_missing), "apk_skipped": _count(result.apk_skipped),
+        "apk_suspicious_skipped": _count(result.apk_suspicious_skipped),
+        "streams": min(max(1, int(streams)), MAX_STREAMS), "hashed": result.hashed,
+        "media_scan": result.media_scan, "groups": groups,
+    }
+
+
 _SAMPLE_DEVICE = DeviceInfo(serial="-", brand="OPPO", manufacturer="OPPO", model="CPH2483",
                             device="-", market_name=None, android_release="14", sdk=34,
                             security_patch=None, uptime_s=0.0, local_now=datetime(2026, 10, 10))
@@ -210,6 +234,11 @@ def sample() -> dict[str, list[dict[str, Any]]]:
     chosen = Selection(contacts=True, sms=True, mms=False, calls=True,
                        categories=frozenset({"media", "whatsapp"}), others=frozenset(),
                        apps=frozenset({"-"}))
+    restore = RestoreResult(status="complete", target_serial="-", files_done=5108, files_exists=120,
+                            files_renamed=3, files_denied=0, files_failed=0, files_unselected=0,
+                            apk_skipped=1, apk_suspicious_skipped=0, bytes=37_900_000_000, seconds=1840,
+                            hashed=False, media_scan="done", files_missing=0)
+    upload = UploadChoice(groups=frozenset({"photos", "videos", "downloads", "whatsapp"}), apks_on=frozenset())
     out: dict[str, list[dict[str, Any]]] = {}
     for name, packages in (("basic", False), ("packages", True)):
         bodies = [("start", start_body("simple")), ("scan", _sample_scan(packages)),
@@ -217,6 +246,7 @@ def sample() -> dict[str, list[dict[str, Any]]]:
                                           None, packages)),
                   ("undo", undo_event(_SAMPLE_DEVICE, ["com.wlive.forecast"], [], 2, packages,
                                     sites=2, sites_restored=1)),
-                  ("transfer_backup", transfer_backup_event(_SAMPLE_DEVICE, backup, chosen))]
+                  ("transfer_backup", transfer_backup_event(_SAMPLE_DEVICE, backup, chosen)),
+                  ("transfer_restore", transfer_restore_event(_SAMPLE_DEVICE, restore, upload, 4))]
         out[name] = [{**common(SAMPLE_INSTALL, t, now, "pl"), **body} for t, body in bodies]
     return out

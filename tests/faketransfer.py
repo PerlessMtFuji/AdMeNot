@@ -438,3 +438,33 @@ class TransferPhone:
     def push(self, locals_: list[Path], remote: str, should_stop: Callable[[], bool],
              tick: Callable[[], None]) -> PullResult:
         return self.storage.push(locals_, remote, should_stop, tick)
+
+
+class PhoneHost:
+    """Host adb z kilkoma telefonami (stary i nowy przy wgrywaniu kopii): `with_serial` oddaje
+    atrapę danego telefonu, `devices -l` listuje wszystkie podłączone (`connected`). Do
+    `puller_factory`/`pusher_factory` mostu: `phone(serial)`."""
+
+    def __init__(self, *phones: TransferPhone) -> None:
+        self.phones = {p.storage.serial: p for p in phones}
+        self.connected = set(self.phones)
+        self.serial: str | None = None
+
+    def phone(self, serial: str) -> TransferPhone:
+        return self.phones[serial]
+
+    def with_serial(self, serial: str) -> TransferPhone:
+        return self.phones[serial].with_serial(serial)
+
+    def run(self, args: list[str], timeout: float = 20.0) -> str:
+        if args == ["devices", "-l"]:
+            lines = [f"{s}  device usb:1-{i} model:SM_A145R transport_id:{i}"
+                     for i, s in enumerate(sorted(self.connected), start=1)]
+            return "List of devices attached\n" + "".join(line + "\n" for line in lines) + "\n"
+        raise AdbError("command_failed", f"fake host: unsupported {args}")
+
+    def shell(self, command: str, timeout: float = 20.0) -> str:
+        raise AdbError("command_failed", "fake host: shell without serial")
+
+    def run_bytes(self, args: list[str], timeout: float = 20.0) -> bytes:
+        raise AdbError("command_failed", f"fake host: unsupported {args}")

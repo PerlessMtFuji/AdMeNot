@@ -108,7 +108,7 @@ def test_purge_deletes_expired_only():
     expired = _copy(now=NOW - timedelta(days=8))
     fresh = _copy(now=NOW - timedelta(days=1))
     expired_id = expired.read_meta().id
-    assert store.purge_expired(NOW, lambda serial: False) == [expired_id]
+    assert store.purge_expired(NOW, lambda serial: False, lambda copy_id: False) == [expired_id]
     assert not expired.path.exists()
     assert fresh.path.exists()
 
@@ -121,15 +121,32 @@ def test_purge_skips_locked_copy():
         seen.append(serial)
         return True
 
-    assert store.purge_expired(NOW, busy) == []
+    assert store.purge_expired(NOW, busy, lambda copy_id: False) == []
     assert seen == ["ABC123"]
     assert expired.path.exists()
+
+
+def test_purge_skips_copy_in_use():
+    """Kopia wgrywana właśnie na nowy telefon (`busy_copy(id)`) zostaje, choć jej telefon jest wolny."""
+    used = _copy(now=NOW - timedelta(days=8))
+    other = _copy(now=NOW - timedelta(days=9))
+    used_id, other_id = used.read_meta().id, other.read_meta().id
+    assert used_id != other_id
+    assert store.purge_expired(NOW, lambda serial: False, lambda copy_id: copy_id == used_id) == [other_id]
+    assert used.path.exists() and not other.path.exists()
+
+
+def test_copy_dir_resolves_id_only():
+    copy = _copy()
+    assert store.copy_dir(copy.read_meta().id).path == copy.path.resolve()
+    with pytest.raises(ValueError):
+        store.copy_dir("../x")
 
 
 def test_purge_leaves_broken_meta():
     broken = _copy(now=NOW - timedelta(days=30))
     broken.meta_path.write_text("{nie json", encoding="utf-8")
-    assert store.purge_expired(NOW, lambda serial: False) == []
+    assert store.purge_expired(NOW, lambda serial: False, lambda copy_id: False) == []
     assert broken.path.exists()
 
 
@@ -216,10 +233,10 @@ def test_delete_failure_keeps_meta_and_retry_succeeds(monkeypatch):
         return real_rmtree(path, *args, **kwargs)
 
     monkeypatch.setattr(store.shutil, "rmtree", flaky)
-    assert store.purge_expired(NOW, lambda serial: False) == []
+    assert store.purge_expired(NOW, lambda serial: False, lambda copy_id: False) == []
     assert copy.meta_path.is_file()
     assert [m.id for m in store.list_copies()] == [copy_id]
-    assert store.purge_expired(NOW, lambda serial: False) == [copy_id]
+    assert store.purge_expired(NOW, lambda serial: False, lambda copy_id: False) == [copy_id]
     assert not copy.path.exists()
 
 

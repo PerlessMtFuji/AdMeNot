@@ -17,7 +17,7 @@ def _module():
 def test_bridge_fixtures_are_up_to_date():
     fresh = _module().record_all()
     assert set(fresh) == {"adware", "adware-en", "clean", "manual", "disconnect", "report",
-                          "transfer", "unauthorized", "many", "empty"}
+                          "transfer", "transfer_restore", "unauthorized", "many", "empty"}
     for name, data in fresh.items():
         path = OUT / f"{name}.json"
         assert path.exists(), f"brak {path} — uruchom: python scripts/record_bridge_fixtures.py"
@@ -59,3 +59,19 @@ def test_transfer_scenario_inventories_copies_and_lists():
     done = next(d for c in data["calls"] for n, d in c["events"] if n == "transfer:done")
     assert done["result"]["status"] == "complete"
     assert data["calls"][-1]["result"]["copies"][0]["id"] == done["copy"]["id"]
+
+
+def test_transfer_restore_scenario_plans_uploads_and_lists():
+    data = _module().record_all()["transfer_restore"]
+    assert [c["method"] for c in data["calls"]] == ["list_devices", "transfer_inventory", "start_backup",
+                                                    "transfers", "restore_plan", "start_restore", "transfers"]
+    events = {name: d for c in data["calls"] for name, d in c["events"]}
+    for name in ("transfer:restore_plan", "transfer:restore_progress", "transfer:restore_done"):
+        assert name in events, name
+    plan = events["transfer:restore_plan"]["plan"]
+    assert plan["groups"]["photos"]["rename"] == 1  # inny plik pod tą ścieżką: zapis obok
+    assert {a["outcome"] for a in plan["apks"]} == {"suspicious", "malicious"}
+    result = events["transfer:restore_done"]["result"]
+    assert (result["status"], result["files_renamed"], result["apk_skipped"]) == ("complete", 1, 1)
+    listed = data["calls"][-1]["result"]["copies"][0]["restores"]
+    assert [(r["serial"], r["status"]) for r in listed] == [(result["target_serial"], "complete")]

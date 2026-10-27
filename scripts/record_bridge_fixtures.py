@@ -25,14 +25,16 @@ OUT = ROOT / "tests" / "fixtures" / "bridge"
 sys.path.insert(0, str(ROOT / "tests"))  # conftest.py, fakephone.py, apphelpers.py
 
 from apphelpers import Disk, make_api, policy_factory
-from conftest import SERIAL
+from conftest import GETPROP_OUT, SERIAL
 from fakephone import make_cli_phone
-from faketransfer import FakeStoragePhone, TransferPhone
+from faketransfer import FakeStoragePhone, PhoneHost, TransferPhone
 from telephony_fixtures import install_telephony
 
 from admenot.engine.apk import cache as C
+from admenot.engine.device.info import GETPROP
 from admenot.engine.report.pdf import PdfError
 from admenot.engine.settings import save_settings
+from admenot.engine.transfer.apkcheck import ApkCheck
 
 CLIENT = "Anna K."
 DISABLE = "pm disable-user --user 0 com.wlive.forecast"
@@ -137,7 +139,10 @@ def _scenario(name: str, steps: Callable[[Recorder, Any], None], lang: str = "pl
             phone = make_cli_phone()
         else:
             phone = phone_factory(Path(tmp))
-            kw["puller_factory"] = lambda adb_path, serial, log: phone
+            # kilka telefonów (`PhoneHost`): `adb pull`/`push` idzie do atrapy danego telefonu
+            route = phone.phone if isinstance(phone, PhoneHost) else (lambda serial: phone)
+            kw["puller_factory"] = lambda adb_path, serial, log: route(serial)
+            kw["pusher_factory"] = lambda adb_path, serial, log: route(serial)
         recorder = Recorder(phone, lang, apk_mode=apk_mode, **kw)
         steps(recorder, phone)
         return _normalize({"name": name, "calls": recorder.calls}, tmp)
@@ -238,22 +243,78 @@ def _transfer(r: Recorder, phone: Any) -> None:
     r.call("transfers")
 
 
+RESTORE_SERIAL = "R58W20NEW01"
+RESTORE_CHOICE = {"groups": ["photos", "videos", "downloads", "whatsapp", "other:Music"], "apks_on": [],
+                  "verify_hash": False}
+# Pliki APK w Pobranych starego telefonu i ich ocena (podstawiona: bez prawdziwych APK i bazy IOC).
+RESTORE_APKS = {"Download/gra.apk": (b"PK" + b"g" * 900, "suspicious", "static", False),
+                "Download/szybki-cleaner.apk": (b"PK" + b"e" * 700, "malicious", "ioc", False)}
+
+
+def _restore_phones(tmp: Path) -> PhoneHost:
+    """Stary telefon z kopią (jak `transfer`, plus dwa APK) i nowy Galaxy A54, na którym już jest
+    inny plik o ścieżce zdjęcia z kopii — wgrywanie zapisze zdjęcie obok jako „(z kopii)”."""
+    old = _transfer_phone(tmp)
+    for rel, (data, *_check) in RESTORE_APKS.items():
+        path = old.storage.local("/sdcard/" + rel)
+        path.write_bytes(data)
+        os.utime(path, (TRANSFER_MTIME, TRANSFER_MTIME))
+    root = tmp / "new-phone"
+    theirs = root / "sdcard" / "DCIM" / "Camera" / "IMG_0001.jpg"
+    theirs.parent.mkdir(parents=True)
+    theirs.write_bytes(b"photo taken on the new phone")
+    os.utime(theirs, (TRANSFER_MTIME, TRANSFER_MTIME))
+    cli = make_cli_phone()
+    cli.static[GETPROP] = (GETPROP_OUT.replace("SM-A145R", "SM-A546B").replace("[a14]", "[a54x]")
+                           .replace(SERIAL, RESTORE_SERIAL).replace("Telefon Anny", "Nowy telefon Anny"))
+    return PhoneHost(old, TransferPhone(cli, FakeStoragePhone(root, serial=RESTORE_SERIAL)))
+
+
+def _apk_checks(copy: Any, files: list[tuple[str, Path]]) -> list[ApkCheck]:
+    checks = {"/sdcard/" + rel: c for rel, (_data, *c) in RESTORE_APKS.items()}
+    return [ApkCheck(remote, None, *checks[remote]) for remote, _ in files]
+
+
+def _transfer_restore(r: Recorder, phone: Any) -> None:
+    r.call("list_devices")
+    r.call("transfer_inventory", SERIAL, CLIENT)
+    r.call("start_backup", TRANSFER_SELECTION)
+    copy_id = r.events("transfer:done")[0]["copy"]["id"]
+    r.call("transfers")  # Historia: kopia bez wgrywań
+    with mock.patch("admenot.engine.transfer.restore_plan.load_or_check", _apk_checks):
+        r.call("restore_plan", copy_id, RESTORE_SERIAL)
+    r.call("start_restore", RESTORE_CHOICE)
+    r.call("transfers")  # Historia: „wgrano na …”
+
+
 def _stable_transfer(data: dict[str, Any]) -> dict[str, Any]:
-    """`transfer:progress` jest dławiony co 0,5 s, więc ich liczba zależy od szybkości komputera:
-    zostaje pierwsze zdarzenie każdego etapu w wywołaniu (to wysyła się zawsze). Czas kopii -> 0."""
+    """`transfer:progress` i `transfer:restore_progress` są dławione co 0,5 s, więc ich liczba
+    zależy od szybkości komputera: zostaje pierwsze zdarzenie każdego etapu w wywołaniu (to wysyła
+    się zawsze). Czas kopii i wgrywania -> 0, czas zapisu stanu wgrywania -> stały."""
     for call in data["calls"]:
-        seen: set[str] = set()
+        seen: set[tuple[str, str]] = set()
         events = []
         for name, detail in call["events"]:
-            if name == "transfer:progress":
-                if detail["stage"] in seen:
+            if name in ("transfer:progress", "transfer:restore_progress"):
+                if (name, detail["stage"]) in seen:
                     continue
-                seen.add(detail["stage"])
-            if name == "transfer:done":
+                seen.add((name, detail["stage"]))
+            if name in ("transfer:done", "transfer:restore_done"):
                 detail["result"]["seconds"] = 0
             events.append([name, detail])
         call["events"] = events
-    return data
+    return _stable_restores(data)
+
+
+def _stable_restores(value: Any) -> Any:
+    """`updated` stanu wgrywania to zegar komputera (UTC), nie zegar `Api` — w nagraniu stały."""
+    if isinstance(value, dict):
+        if set(value) == {"serial", "status", "updated"}:
+            return {**value, "updated": "2026-09-26T12:31:00+00:00"}
+        return {k: _stable_restores(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_stable_restores(v) for v in value]
+    return value
 
 
 def _devices_only(output: str) -> Callable[[Recorder, Any], None]:
@@ -300,6 +361,8 @@ def record_all() -> dict[str, dict[str, Any]]:
         "report": _scenario("report", _report),
         "transfer": _stable_transfer(_scenario("transfer", _transfer,
                                                phone_factory=_transfer_phone)),
+        "transfer_restore": _stable_transfer(_scenario("transfer_restore", _transfer_restore,
+                                                       phone_factory=_restore_phones)),
         "unauthorized": _scenario("unauthorized", _devices_only(unauthorized)),
         "many": _scenario("many", _devices_only(many)),
         "empty": _scenario("empty", _devices_only("List of devices attached\n\n")),

@@ -13,7 +13,7 @@ import pytest
 from apphelpers import NOW, Disk, make_api
 from conftest import SERIAL
 from fakephone import make_cli_phone
-from faketransfer import FakeStoragePhone, TransferPhone
+from faketransfer import FakeStoragePhone, PhoneHost, TransferPhone
 from telephony_fixtures import install_telephony
 
 from admenot.engine.device.info import DeviceInfo
@@ -366,3 +366,216 @@ def test_backup_result_view_keeps_telephony_error():
 
     r = BackupResult("incomplete", "S/1", {"mms": CategoryResult("failed", 4, "addresses_missing:3")}, 0, 0, 0, 0, 0, 1)
     assert backup_result_view(r)["telephony"]["mms"] == {"status": "failed", "count": 4, "error": "addresses_missing:3"}
+
+
+# --- Etap 2: wgrywanie kopii na nowy telefon -----------------------------------------------------
+
+NEW = "R58NEW00001"
+ALL_GROUPS = ["photos", "videos", "downloads", "whatsapp", "other:Music", "other:"]
+CHOICE = {"groups": ALL_GROUPS, "apks_on": [], "verify_hash": False}
+
+
+def _new_phone(tmp_path: Path, files: dict[str, bytes] | None = None) -> TransferPhone:
+    root = tmp_path / "new-phone"
+    (root / "sdcard").mkdir(parents=True)
+    for rel, data in (files or {}).items():
+        path = root / "sdcard" / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        os.utime(path, (MTIME, MTIME))
+    return TransferPhone(make_cli_phone(), FakeStoragePhone(root, serial=NEW))
+
+
+def _copied(tmp_path, extra: dict[str, bytes] | None = None, **kw):
+    """Kopia Etapu 1 ze starego telefonu (przez most) i nowy telefon obok: (api, rec, host, id kopii)."""
+    old = _phone(tmp_path)
+    for rel, data in (extra or {}).items():
+        path = old.storage.local("/sdcard/" + rel)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        os.utime(path, (MTIME, MTIME))
+    host = PhoneHost(old, _new_phone(tmp_path))
+    api, rec = make_api(host, puller_factory=lambda adb_path, serial, log: host.phone(serial),
+                        pusher_factory=lambda adb_path, serial, log: host.phone(serial), **kw)
+    api.transfer_inventory(SERIAL, "Anna K.")
+    assert api._jobs.wait(5)
+    api.start_backup(SELECTION)
+    assert api._jobs.wait(5)
+    copy_id = rec.wait_for("transfer:done")["copy"]["id"]
+    return api, rec, host, copy_id
+
+
+def _planned(api, rec, copy_id: str, serial: str = NEW) -> dict:
+    assert "job_id" in api.restore_plan(copy_id, serial)
+    assert api._jobs.wait(5)
+    return rec.of("transfer:restore_plan")[-1]
+
+
+def test_restore_plan_emits_view(tmp_path):
+    api, rec, host, copy_id = _copied(tmp_path)
+    event = _planned(api, rec, copy_id)
+    assert rec.of("scan:device")[-1]["device"]["serial"] == NEW
+    plan = event["plan"]
+    assert plan["groups"] == {
+        "photos": {"files": 2, "bytes": 500, "exists": 0, "rename": 0},
+        "videos": {"files": 0, "bytes": 0, "exists": 0, "rename": 0},
+        "downloads": {"files": 1, "bytes": len(FILES["Download/c.pdf"]), "exists": 0, "rename": 0},
+        "whatsapp": {"files": 0, "bytes": 0, "exists": 0, "rename": 0}}
+    assert plan["others"] == [
+        {"name": "", "files": 1, "bytes": len(FILES["notes.txt"]), "exists": 0, "rename": 0},
+        {"name": "Music", "files": 1, "bytes": 40, "exists": 0, "rename": 0}]
+    assert plan["apks"] == [] and plan["missing"] == 0
+    assert plan["space"] == {"free": 70_000_000 * 1024, "total": 120_000_000 * 1024}
+    assert plan["reserve"] == 120_000_000 * 1024 // 20
+    assert event["resumable"] is False and event["same_phone_recent"] is False
+    assert event["copy"]["id"] == copy_id and event["copy"]["restores"] == []
+    assert not (store.transfers_dir() / copy_id / "restore").exists()  # plan nie zakłada stanu
+    assert host.phone(NEW).storage.pushed == []
+
+
+def test_restore_plan_rejects_bad_copy(tmp_path):
+    api, _, _, copy_id = _copied(tmp_path)
+    assert api.restore_plan("../x", NEW)["error"]["key"] == "bad_request"
+    assert api.restore_plan(copy_id, "")["error"]["key"] == "bad_request"
+
+
+def test_same_phone_recent_flag(tmp_path):
+    api, rec, _, copy_id = _copied(tmp_path)
+    assert _planned(api, rec, copy_id, SERIAL)["same_phone_recent"] is True
+    copy = store.CopyDir(store.transfers_dir() / copy_id)
+    meta = copy.read_meta()
+    meta.created = NOW - timedelta(hours=25)
+    copy.write_meta(meta)
+    assert _planned(api, rec, copy_id, SERIAL)["same_phone_recent"] is False
+    assert _planned(api, rec, copy_id, NEW)["same_phone_recent"] is False
+
+
+def test_start_restore_completes(tmp_path):
+    api, rec, host, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+    assert "job_id" in api.start_restore(CHOICE)
+    done = rec.of("transfer:restore_done")[0]
+    result = done["result"]
+    assert result["status"] == "complete" and result["target_serial"] == NEW
+    assert (result["files_done"], result["files_exists"], result["files_missing"]) == (5, 0, 0)
+    assert result["media_scan"] == "done" and result["hashed"] is False
+    assert rec.of("transfer:restore_progress")
+    assert done["copy"]["id"] == copy_id
+    new = host.phone(NEW).storage
+    for rel, data in FILES.items():
+        assert new.local("/sdcard/" + rel).read_bytes() == data, rel
+    restores = api.transfers()["copies"][0]["restores"]
+    assert [(r["serial"], r["status"]) for r in restores] == [(NEW, "complete")]
+    assert restores[0]["updated"].endswith("+00:00")
+    # skończone wgrywanie nie jest proponowane do wznowienia; drugi plan widzi pliki jako „już są”
+    again = _planned(api, rec, copy_id)
+    assert again["resumable"] is False and again["plan"]["groups"]["photos"]["exists"] == 2
+
+
+def test_restore_resume_offered(tmp_path):
+    from admenot.engine.transfer.restore_state import RestoreRow, RestoreState, restore_state_path
+
+    api, rec, _, copy_id = _copied(tmp_path)
+    copy = store.CopyDir(store.transfers_dir() / copy_id)
+    state = RestoreState(restore_state_path(copy, NEW))
+    state.set_meta("serial", NEW)
+    state.set_meta("status", "stopped")
+    state.set_meta("updated", "2026-09-26T12:00:00+00:00")
+    state.insert(RestoreRow("/sdcard/DCIM/Camera/a.jpg", "/sdcard/DCIM/Camera/a.jpg", "photos", 300,
+                            MTIME, "pending", 0, None))
+    state.close()
+    event = _planned(api, rec, copy_id)
+    assert event["resumable"] is True
+    assert event["copy"]["restores"] == [{"serial": NEW, "status": "stopped",
+                                          "updated": "2026-09-26T12:00:00+00:00"}]
+    assert _planned(api, rec, copy_id, SERIAL)["resumable"] is False  # stan innego telefonu
+
+
+def test_restore_phone_full_maps_to_job_error(tmp_path):
+    api, rec, host, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+    host.phone(NEW).storage.free_kb = 1000
+    api.start_restore(CHOICE)
+    assert rec.of("job:error")[-1]["key"] == "transfer_phone_full"
+    assert not rec.of("transfer:restore_done")
+    assert api.transfers()["copies"][0]["restores"][0]["status"] == "phone_full"
+
+
+def test_start_restore_rejects_unknown_group(tmp_path):
+    api, rec, _, copy_id = _copied(tmp_path)
+    assert api.start_restore(CHOICE)["error"]["key"] == "transfer_no_plan"
+    _planned(api, rec, copy_id)
+    for bad in ({**CHOICE, "groups": ["Music"]}, {**CHOICE, "groups": ["other:Nope"]},
+                {**CHOICE, "groups": "photos"}, {**CHOICE, "apks_on": ["/sdcard/Download/x.apk"]},
+                {**CHOICE, "verify_hash": "yes"}, ["photos"]):
+        assert api.start_restore(bad)["error"]["key"] == "bad_request", bad
+    assert not rec.of("transfer:restore_done")
+
+
+def test_failed_replan_drops_previous_plan(tmp_path):
+    api, rec, host, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+    host.phone(NEW).storage.online = False  # `stat` planu dostaje AdbError
+    api.restore_plan(copy_id, NEW)
+    assert rec.of("job:error")
+    host.phone(NEW).storage.reconnect()
+    assert api.start_restore(CHOICE)["error"]["key"] == "transfer_no_plan"
+
+
+def test_start_restore_refused_when_new_phone_is_gone(tmp_path):
+    api, rec, host, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+    host.connected.discard(NEW)
+    assert api.start_restore(CHOICE)["error"]["key"] == "transfer_no_plan"
+
+
+def test_purge_skips_copy_being_restored(tmp_path):
+    api, rec, host, copy_id = _copied(tmp_path, sync=False, transfer_purge_s=None, poll_interval=0.01)
+    _planned(api, rec, copy_id)
+    copy = store.CopyDir(store.transfers_dir() / copy_id)
+    meta = copy.read_meta()
+    meta.expires = NOW - timedelta(days=1)
+    copy.write_meta(meta)
+    new = host.phone(NEW).storage
+    new.fail_after_push_files = 0  # pierwszy plik urwany, telefon znika: zadanie czeka na telefon
+    api.start_restore(CHOICE)
+    try:
+        rec.wait_for("transfer:waiting")
+        api._purge_transfers()
+        api.transfers()
+        assert copy.path.exists()
+        assert api.delete_transfer(copy_id)["error"]["key"] == "busy"
+    finally:
+        new.fail_after_push_files = None
+        new.reconnect()
+    assert rec.wait_for("transfer:restore_done")["result"]["status"] == "complete"
+    assert api._jobs.wait(5)
+    api._purge_transfers()  # po wgraniu kopia po terminie znika jak każda inna
+    assert not copy.path.exists()
+
+
+def test_restore_telemetry_has_no_paths(tmp_path, monkeypatch):
+    from admenot.engine.transfer import restore_plan as rp
+    from admenot.engine.transfer.apkcheck import ApkCheck
+
+    monkeypatch.setattr(rp, "load_or_check", lambda copy, files: [
+        ApkCheck(remote, "com.evil.game", "suspicious", "static", False) for remote, _ in files])
+    api, rec, _, copy_id = _copied(tmp_path, extra={"Download/gra.apk": b"PK" + b"g" * 70})
+    api.set_telemetry(True, True)
+    plan = _planned(api, rec, copy_id)["plan"]
+    assert plan["apks"] == [{"remote": "/sdcard/Download/gra.apk", "name": "gra.apk", "group": "downloads",
+                             "bytes": 72, "action": "push", "outcome": "suspicious", "level": "static",
+                             "default_on": False}]
+    api.start_restore(CHOICE)
+    result = rec.of("transfer:restore_done")[0]["result"]
+    assert result["apk_suspicious_skipped"] == 1 and result["files_done"] == 5
+    events = [json.loads(x) for x in telemetry_path().read_text("utf-8").splitlines()]
+    event = next(e for e in events if e["type"] == "transfer_restore")
+    assert event["status"] == "complete" and event["files"] == 5 and event["apk_suspicious_skipped"] == 1
+    assert event["groups"] == {"photos": True, "videos": True, "downloads": True, "whatsapp": True,
+                               "others": True}
+    assert event["streams"] == 4 and event["media_scan"] == "done" and event["missing"] == 0
+    text = json.dumps(event)
+    for name in ("DCIM", "Camera", "a.jpg", "Music", "notes.txt", "Download", "gra.apk", "com.evil.game",
+                 "Anna", SERIAL, NEW, "sdcard"):
+        assert name not in text, name

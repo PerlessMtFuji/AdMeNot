@@ -265,6 +265,7 @@
       "repair": "Po naprawie: ile aplikacji wyciszono, wyłączono i usunięto, ile z nich oznaczył program, ile się nie udało i kody błędów.",
       "undo": "Po cofnięciu: ile aplikacji cofnięto i ile dni minęło od naprawy.",
       "transfer_backup": "Po kopii danych starego telefonu: producent, model i wersja Androida telefonu, wynik, czas, rozmiar w MB, liczba skopiowanych i nieudanych plików oraz aplikacji, które rodzaje danych wybrano — bez nazw folderów, plików i aplikacji.",
+      "transfer_restore": "Po wgraniu kopii na nowy telefon: producent, model i wersja Androida nowego telefonu, wynik, czas, rozmiar w MB, liczby plików wgranych, już obecnych, zapisanych obok, odrzuconych przez Androida, nieudanych, pominiętych i brakujących w kopii, liczba pominiętych plików APK (szkodliwych i podejrzanych), liczba równoczesnych przesyłań, sposób sprawdzenia plików, wynik odświeżenia galerii, które rodzaje plików wybrano — bez nazw folderów, plików i aplikacji.",
       "packages": "Z drugą zgodą: nazwy pakietów oznaczonych przez program i zaznaczonych przez Ciebie, z oceną i Twoją decyzją.",
       "never": "Nigdy: numer seryjny, IMEI, nazwa klienta, numer zlecenia, dane serwisu, zrzuty ekranu, nazwy aplikacji uznanych za bezpieczne i nieruszanych."
     },

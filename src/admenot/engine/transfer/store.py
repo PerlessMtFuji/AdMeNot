@@ -243,13 +243,20 @@ def delete(copy_id: str) -> None:
     path.rmdir()
 
 
-def purge_expired(now: datetime, busy: Callable[[str], bool]) -> list[str]:
-    """Usuwa kopie po terminie. Kopia, której telefon jest zajęty (`busy(serial)`), i kopia z
-    nieczytelnym `meta.json` zostają: nie kasujemy tego, czego nie umiemy rozpoznać."""
+def copy_dir(copy_id: str) -> CopyDir:
+    """Katalog kopii z identyfikatora (`<telefon>/<RRRRMMDD-GGMMSS>`); każdy inny kształt albo
+    katalog bez `meta.json` → ValueError."""
+    return _resolve(copy_id)
+
+
+def purge_expired(now: datetime, busy: Callable[[str], bool], busy_copy: Callable[[str], bool]) -> list[str]:
+    """Usuwa kopie po terminie. Kopia, której telefon jest zajęty (`busy(serial)`), kopia właśnie
+    używana (`busy_copy(id)`, np. wgrywana na nowy telefon) i kopia z nieczytelnym `meta.json`
+    zostają: nie kasujemy tego, czego nie umiemy rozpoznać."""
     removed: list[str] = []
     for copy in _copy_dirs():
         meta = _readable(copy)
-        if meta is None or meta.expires > now or busy(meta.serial):
+        if meta is None or meta.expires > now or busy(meta.serial) or busy_copy(meta.id):
             continue
         try:
             delete(meta.id)

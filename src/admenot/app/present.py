@@ -51,7 +51,10 @@ from admenot.engine.texts import (
 )
 from admenot.engine.transfer.backup import BackupResult
 from admenot.engine.transfer.inventory import FILE_CATEGORIES, Inventory
-from admenot.engine.transfer.store import CopyMeta
+from admenot.engine.transfer.restore import RestoreResult
+from admenot.engine.transfer.restore_plan import UPLOAD_GROUPS, GroupTotals, RestorePlan
+from admenot.engine.transfer.restore_state import read_restores
+from admenot.engine.transfer.store import CopyDir, CopyMeta
 from admenot.engine.workflow import OrderPlan, OrderResult
 
 MAX_PROBLEMS = 3
@@ -464,16 +467,50 @@ def inventory_view(inv: Inventory, lang: str) -> dict[str, Any]:
 def copy_view(meta: CopyMeta, now: datetime) -> dict[str, Any]:
     """`days_left`: pełne dni do usunięcia, zaokrąglone w górę (0 = po terminie). `now` z zegara
     `Api` (w testach stały), bo widok sam nie czyta czasu. `selection`: wybór zapisany w kopii —
-    wznowienie przerwanej kopii zaczyna od niego (pusty słownik = kopia bez wyboru)."""
+    wznowienie przerwanej kopii zaczyna od niego (pusty słownik = kopia bez wyboru). `restores`:
+    wgrywania tej kopii na nowe telefony (stany z `<kopia>/restore/`, najnowsze pierwsze) — „wgrano
+    na …” i Banner wznowienia wgrywania."""
     left = (meta.expires - now).total_seconds()
+    restores = read_restores(CopyDir(transfers_dir() / meta.id))
     return {"id": meta.id, "serial": meta.serial, "model": meta.model, "manufacturer": meta.manufacturer,
             "client": meta.client, "created": meta.created.isoformat(timespec="seconds"),
             "expires": meta.expires.isoformat(timespec="seconds"),
             "days_left": max(0, math.ceil(left / 86_400)), "status": meta.status,
-            "bytes": meta.bytes, "counts": dict(meta.counts), "selection": dict(meta.selection)}
+            "bytes": meta.bytes, "counts": dict(meta.counts), "selection": dict(meta.selection),
+            "restores": [{"serial": r.serial, "status": r.status, "updated": r.updated} for r in restores]}
 
 
 def backup_result_view(r: BackupResult) -> dict[str, Any]:
     return {**{k: v for k, v in asdict(r).items() if k != "telephony"},
             "telephony": {k: {"status": v.status, "count": v.count, "error": v.error}
                           for k, v in r.telephony.items()}}
+
+
+# --- przenoszenie danych (wgrywanie kopii na nowy telefon) ---------------------------------------
+
+def _totals(g: GroupTotals | None) -> dict[str, int]:
+    g = g or GroupTotals(0, 0, 0, 0)
+    return {"files": g.files, "bytes": g.bytes, "exists": g.exists, "rename": g.rename}
+
+
+def restore_plan_view(plan: RestorePlan) -> dict[str, Any]:
+    """Ekran wgrywania. `groups`: zawsze cztery grupy (pusta = zera); `bytes` = do wgrania bez plików
+    „już są” i z domyślnym wyborem APK. `others`: foldery „Inne” z kopii (`""` = luźne pliki
+    w głównym folderze). `apks`: każdy oceniony plik APK z grupą, rozmiarem i akcją planu — UI liczy
+    z nich „brakuje / zmieści się” po zaznaczeniu podejrzanego; `name` (nazwa pliku) tylko do UI."""
+    others = sorted((g[len("other:"):], t) for g, t in plan.groups.items() if g.startswith("other:"))
+    return {
+        "groups": {g: _totals(plan.groups.get(g)) for g in UPLOAD_GROUPS},
+        "others": [{"name": name, **_totals(t)} for name, t in others],
+        "apks": [{"remote": f.remote, "name": f.remote.rsplit("/", 1)[-1], "group": f.group, "bytes": f.size,
+                  "action": f.action, "outcome": f.apk.outcome, "level": f.apk.level,
+                  "default_on": f.apk.default_on}
+                 for f in sorted(plan.files, key=lambda f: f.remote) if f.apk is not None],
+        "space": {"free": plan.space.free, "total": plan.space.total},
+        "reserve": plan.reserve,
+        "missing": plan.missing,
+    }
+
+
+def restore_result_view(r: RestoreResult) -> dict[str, Any]:
+    return asdict(r)

@@ -20,7 +20,7 @@ import time
 import webbrowser
 from collections.abc import Callable, Iterator
 from dataclasses import asdict, replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -43,6 +43,8 @@ from admenot.app.present import (
     history_view,
     inventory_view,
     plan_view,
+    restore_plan_view,
+    restore_result_view,
     result_view,
     scan_view,
     step_view,
@@ -52,6 +54,7 @@ from admenot.app.telemetry_events import (
     sample,
     scan_event,
     transfer_backup_event,
+    transfer_restore_event,
     undo_event,
     undo_targets,
 )
@@ -131,7 +134,7 @@ from admenot.engine.transfer.backup import (
     Selection,
     run_backup,
 )
-from admenot.engine.transfer.guard import ReadOnlyAdb
+from admenot.engine.transfer.guard import AppendOnlyAdb, ReadOnlyAdb
 from admenot.engine.transfer.inventory import (
     FILE_CATEGORIES,
     Inventory,
@@ -139,6 +142,17 @@ from admenot.engine.transfer.inventory import (
     whatsapp_backup_time,
 )
 from admenot.engine.transfer.puller import Puller, RealPuller
+from admenot.engine.transfer.pusher import Pusher, RealPusher
+from admenot.engine.transfer.restore import (
+    STREAMS,
+    RestoreError,
+    RestoreProgress,
+    RestoreResult,
+    UploadChoice,
+    run_restore,
+)
+from admenot.engine.transfer.restore_plan import UPLOAD_GROUPS, RestorePlan, build_plan
+from admenot.engine.transfer.restore_state import RestoreState, read_restores, restore_state_path
 from admenot.engine.transfer.telephony import Stopped as TransferStopped
 from admenot.engine.workflow import (
     OrderInterrupted,
@@ -157,6 +171,7 @@ from admenot.net.client import BackendError
 HostFactory = Callable[[str | None], AdbTransport]
 ApkFactory = Callable[..., ApkProvider]
 PullerFactory = Callable[[str | None, str, SessionLogAdb], Puller]
+PusherFactory = Callable[[str | None, str, SessionLogAdb], Pusher]
 
 ADMIN_TIMEOUT = 180.0
 # Dwa scrcpy naraz wgrywają ten sam /data/local/tmp/scrcpy-server.jar: nazwy aplikacji czekają,
@@ -174,18 +189,28 @@ _SHARE_ID = re.compile(r"[A-Za-z0-9-]{1,64}")
 SHOWN_MAX = 200  # pamiętane kody kontrolne pokazane klientom w tej sesji; najstarsze odpadają
 TRANSFER_PURGE_S = 24 * 3600.0  # kopie danych po terminie: sprawdzane też w trakcie pracy okna
 TRANSFER_PROGRESS_S = 0.5  # dławienie zdarzeń `transfer:progress`
-TRANSFER_KINDS = frozenset({"transfer_scan", "backup"})
+TRANSFER_KINDS = frozenset({"transfer_scan", "backup", "restore_plan", "restore"})
+RESTORE_KINDS = frozenset({"restore_plan", "restore"})  # zadania, które czytają kopię z dysku
+SAME_PHONE_RECENT = timedelta(hours=24)  # wgrywanie na telefon, z którego jest świeża kopia: ostrzeżenie
 
 
 def _real_host(adb_path: str | None) -> AdbTransport:
     return RealAdb(adb_path=adb_path)
 
 
-def _real_puller(adb_path: str | None, serial: str, log: SessionLogAdb) -> Puller:
+def _adb_path(adb_path: str | None) -> str:
     path = resolve_adb(adb_path).path
     if path is None:
         raise AdbError("adb_missing", "adb")
-    return RealPuller(path, serial, log)
+    return path
+
+
+def _real_puller(adb_path: str | None, serial: str, log: SessionLogAdb) -> Puller:
+    return RealPuller(_adb_path(adb_path), serial, log)
+
+
+def _real_pusher(adb_path: str | None, serial: str, log: SessionLogAdb) -> Pusher:
+    return RealPusher(_adb_path(adb_path), serial, log)
 
 
 def _startfile(path: Path) -> None:
@@ -228,6 +253,27 @@ def _selection(value: Any) -> Selection:
     return Selection(**flags, **lists, verify_hash=verify)
 
 
+def _upload_choice(value: Any, plan: RestorePlan) -> UploadChoice:
+    """Wybór z ekranu wgrywania: grupy (`UPLOAD_GROUPS` albo `other:<folder>` z planu), zaznaczone
+    podejrzane APK (tylko pliki APK z planu) i sumy SHA-256. Nieznana grupa albo plik → odmowa."""
+    if not isinstance(value, dict):
+        raise AppError("bad_request", "choice")
+    lists: dict[str, frozenset[str]] = {}
+    for key in ("groups", "apks_on"):
+        items = value.get(key)
+        if not isinstance(items, list) or not all(isinstance(i, str) for i in items):
+            raise AppError("bad_request", "choice")
+        lists[key] = frozenset(items)
+    verify = value.get("verify_hash", False)
+    if not isinstance(verify, bool):
+        raise AppError("bad_request", "choice")
+    known = set(UPLOAD_GROUPS) | {g for g in plan.groups if g.startswith("other:")}
+    apks = {f.remote for f in plan.files if f.apk is not None}
+    if not lists["groups"] <= known or not lists["apks_on"] <= apks:
+        raise AppError("bad_request", "choice")
+    return UploadChoice(lists["groups"], lists["apks_on"], verify)
+
+
 @contextlib.contextmanager
 def _transfer_errors(kind: str) -> Iterator[None]:
     """Błędy zadań kopii danych. Znane przechodzą jak zwykle (`BackupError` → `transfer_<klucz>`);
@@ -236,7 +282,7 @@ def _transfer_errors(kind: str) -> Iterator[None]:
     wychodzą z komputera."""
     try:
         yield
-    except BackupError as exc:
+    except (BackupError, RestoreError) as exc:
         raise AppError(f"transfer_{exc.key}") from None
     except (AppError, AdbError, DeviceBusy, Stopped):
         raise
@@ -287,6 +333,7 @@ class Api:
         share_retry_s: float = SHARE_RETRY_S,
         share_retry_window_s: float = SHARE_RETRY_WINDOW_S,
         puller_factory: PullerFactory = _real_puller,
+        pusher_factory: PusherFactory = _real_pusher,
         transfer_purge_s: float | None = TRANSFER_PURGE_S,
     ) -> None:
         self._emitter = emitter
@@ -346,6 +393,10 @@ class Api:
         # Ostatni inwentarz kopii danych: (telefon, inwentarz, klient) — z niego startuje kopia.
         self._transfer: tuple[DeviceInfo, Inventory, str | None] | None = None
         self._backup_serial: str | None = None  # telefon, którego kopia właśnie trwa
+        self._pusher_factory = pusher_factory
+        # Ostatni plan wgrywania: (nowy telefon, kopia, plan) — z niego startuje wgrywanie.
+        self._restore: tuple[DeviceInfo, store.CopyDir, RestorePlan] | None = None
+        self._restore_copy_id: str | None = None  # kopia czytana przez plan albo wgrywanie
         self._purge_stop = threading.Event()
         self._clean_screenshots()
         self._purge_old_data()
@@ -409,7 +460,7 @@ class Api:
     def _purge_transfers(self) -> None:
         """Kopie danych po terminie (7 dni od utworzenia, chyba że przedłużone)."""
         try:
-            store.purge_expired(self._now(), self._transfer_busy)
+            store.purge_expired(self._now(), self._transfer_busy, self._copy_busy)
         except Exception as exc:  # noqa: BLE001 — sprzątanie nie może zablokować okna
             log_exception(exc)
 
@@ -425,6 +476,15 @@ class Api:
             return False
         busy = self._backup_serial
         return busy is None or busy == serial
+
+    def _copy_busy(self, copy_id: str) -> bool:
+        """Czy kopię czyta właśnie plan albo wgrywanie na nowy telefon (nie wolno jej usunąć, choćby
+        była po terminie). Zadanie, które jeszcze nie zapisało kopii, blokuje każdą (jak wyżej)."""
+        job = self._jobs.current()
+        if job is None or job.kind not in RESTORE_KINDS:
+            return False
+        busy = self._restore_copy_id
+        return busy is None or busy == copy_id
 
     def _bind_order(self, journal: Journal, serial: str, order_id: int) -> None:
         with self._shots_lock:
@@ -1561,20 +1621,33 @@ class Api:
         copy = store.find_resumable(device.serial) or store.create_copy(
             device.serial, device, client, self._now())
         puller = self._puller_factory(self._settings.adb_path, device.serial, adb.tagged("pull"))
+        progress, wait_device = self._transfer_events(job, raw, "transfer:progress")
+        # Surowy transport (z logiem sesji), nie `ReadOnlyAdb`: silnik opakowuje go sam.
+        result = run_backup(adb, puller, device, copy, inventory, chosen, on_progress=progress,
+                            should_stop=job.should_stop, wait_device=wait_device, now=self._now())
+
+        return result, copy
+
+    def _transfer_events(self, job: Job, raw: AdbTransport, event: str,
+                         ) -> tuple[Callable[[Progress | RestoreProgress], None], Callable[[], None]]:
+        """(`on_progress`, `wait_device`) dla silnika kopii i wgrywania. Postęp idzie zdarzeniem
+        `event`, dławiony do jednego na `TRANSFER_PROGRESS_S` w obrębie etapu (nowy etap — od
+        razu). `wait_device` odpytuje `get-state` surowym transportem (`raw`, bez wpisu w logu co
+        sekundę) i raz wysyła `transfer:waiting`."""
         last: dict[str, Any] = {"at": None, "stage": None, "p": None}
 
-        def progress(p: Progress) -> None:
+        def progress(p: Progress | RestoreProgress) -> None:
             last["p"] = p
             now = time.monotonic()
             if (last["stage"] == p.stage and last["at"] is not None
                     and now - last["at"] < TRANSFER_PROGRESS_S):
                 return
             last["at"], last["stage"] = now, p.stage
-            self._emit("transfer:progress", asdict(p))
+            self._emit(event, asdict(p))
 
         def wait_device() -> None:
             # Zatrzymanie w czasie czekania: wracamy, a silnik sam kończy przebieg wynikiem
-            # „stopped” (jak zatrzymanie w trakcie kopii) — z `transfer:done` i statystyką.
+            # „stopped” (jak zatrzymanie w trakcie przebiegu) — z wynikiem i statystyką.
             waiting = False
             while not job.should_stop():
                 try:
@@ -1582,7 +1655,7 @@ class Api:
                         if waiting and last["p"] is not None:
                             # telefon wrócił: UI chowa „Telefon odłączony” od razu, nie dopiero
                             # przy następnym postępie (eksport telefonii trwa minuty)
-                            self._emit("transfer:progress", asdict(last["p"]))
+                            self._emit(event, asdict(last["p"]))
                         return
                 except AdbError:
                     pass
@@ -1591,11 +1664,106 @@ class Api:
                     self._emit("transfer:waiting", {})
                 time.sleep(self._poll_interval)
 
-        # Surowy transport (z logiem sesji), nie `ReadOnlyAdb`: silnik opakowuje go sam.
-        result = run_backup(adb, puller, device, copy, inventory, chosen, on_progress=progress,
-                            should_stop=job.should_stop, wait_device=wait_device, now=self._now())
+        return progress, wait_device
 
-        return result, copy
+    # --- przenoszenie danych: wgrywanie kopii na nowy telefon -------------------------------------
+
+    @_api
+    def restore_plan(self, copy_id: str, serial: str) -> dict[str, Any]:
+        """Plan wgrywania kopii na telefon `serial`: co już jest, co trafi obok jako „(z kopii)”,
+        ocena APK i miejsce. Na telefon idą tylko odczyty (`AppendOnlyAdb`); stan wgrywania tej
+        kopii na ten telefon (jeśli jest) daje cele własnych niedokończonych plików."""
+        if not isinstance(copy_id, str):
+            raise AppError("bad_request", "copy_id")
+        if not isinstance(serial, str) or not serial.strip():
+            raise AppError("bad_request", "serial")
+        try:
+            copy = store.copy_dir(copy_id)
+            meta = copy.read_meta()
+        except (OSError, ValueError, KeyError, TypeError):  # ścieżka nie idzie do raportu
+            raise AppError("bad_request", "copy_id") from None
+        if meta.status == "in_progress":  # wgrywać można tylko kopię skończoną (spec §4.1)
+            raise AppError("bad_request", "copy_status")
+        self._abandon_apk(notify=False)
+        adb = self._session(serial.strip())
+
+        def run(job: Job) -> None:
+            self._restore = None  # nieudany plan nie zostawia poprzedniego (innej kopii albo telefonu)
+            self._restore_copy_id = copy_id
+            try:
+                with _transfer_errors("restore_plan"):
+                    device, plan = plan_on(job)
+            finally:
+                self._restore_copy_id = None
+            self._restore = (device, copy, plan)
+            mine = next((r for r in read_restores(copy) if r.serial == device.serial), None)
+            self._emit("transfer:restore_plan", {
+                "plan": restore_plan_view(plan),
+                "copy": copy_view(copy.read_meta(), self._now()),
+                "resumable": mine is not None and mine.resumable,
+                "same_phone_recent": (meta.serial == device.serial
+                                      and self._now() - meta.created < SAME_PHONE_RECENT)})
+
+        def plan_on(job: Job) -> tuple[DeviceInfo, RestorePlan]:
+            device = read_device_info(adb)
+            crash.note_device(device.serial, device.manufacturer, device.model, device.android_release)
+            match = self._provider.match(device)
+            self._remember(device, match)
+            self._emit("scan:device", {"device": device_card(device, match)})
+            taken = None
+            path = restore_state_path(copy, device.serial)
+            if path.is_file():  # sam plan nie zakłada stanu wgrywania
+                state = RestoreState(path)
+                try:
+                    taken = state.taken_alts()
+                finally:
+                    state.close()
+            try:
+                plan = build_plan(AppendOnlyAdb(adb), copy, job.should_stop, taken_alts=taken)
+            except TransferStopped:
+                raise Stopped from None
+            job.check()
+            return device, plan
+
+        return {"job_id": self._jobs.start("restore_plan", run)}
+
+    @_api
+    def start_restore(self, choice: dict[str, Any]) -> dict[str, Any]:
+        """Wgrywanie wybranych plików kopii na nowy telefon z ostatniego planu. Przerwane wgrywanie
+        tej kopii na ten telefon jest wznawiane (stan w katalogu kopii)."""
+        state = self._restore
+        if state is None:
+            raise AppError("transfer_no_plan")
+        device, copy, plan = state
+        serial = device.serial
+        if serial not in {e.serial for e in list_devices(self._host) if e.state == "device"}:
+            raise AppError("transfer_no_plan", serial)
+        chosen = _upload_choice(choice, plan)
+        copy_id = f"{copy.path.parent.name}/{copy.path.name}"
+        self._abandon_apk()
+        adb = self._session(serial)
+        raw = self._host.with_serial(serial)  # odpytywanie `get-state` bez wpisu w logu co sekundę
+
+        def run(job: Job) -> None:
+            self._restore_copy_id = copy_id
+            try:
+                with _transfer_errors("restore"), device_lock(journal_path(), serial):
+                    result = self._run_restore(job, adb, raw, device, copy, plan, chosen)
+            finally:
+                self._restore_copy_id = None
+            self._emit("transfer:restore_done", {"result": restore_result_view(result),
+                                                 "copy": copy_view(copy.read_meta(), self._now())})
+            telemetry.record("transfer_restore",
+                             lambda _packages: transfer_restore_event(device, result, chosen, STREAMS))
+
+        return {"job_id": self._jobs.start("restore", run)}
+
+    def _run_restore(self, job: Job, adb: SessionLogAdb, raw: AdbTransport, device: DeviceInfo,
+                     copy: store.CopyDir, plan: RestorePlan, chosen: UploadChoice) -> RestoreResult:
+        pusher = self._pusher_factory(self._settings.adb_path, device.serial, adb.tagged("push"))
+        progress, wait_device = self._transfer_events(job, raw, "transfer:restore_progress")
+        return run_restore(AppendOnlyAdb(adb), pusher, device, copy, plan, chosen, on_progress=progress,
+                           should_stop=job.should_stop, wait_device=wait_device, streams=STREAMS)
 
     @_api
     def transfers(self) -> dict[str, Any]:
@@ -1617,6 +1785,8 @@ class Api:
     def delete_transfer(self, copy_id: str) -> dict[str, Any]:
         if not isinstance(copy_id, str):
             raise AppError("bad_request", "copy_id")
+        if self._copy_busy(copy_id):
+            raise AppError("busy", "restore")
         meta = next((m for m in store.list_copies() if m.id == copy_id), None)
         if meta is not None and self._transfer_busy(meta.serial):
             raise AppError("busy", "backup")

@@ -1,7 +1,8 @@
 """Stan wgrywania kopii na nowy telefon — SQLite osobno dla każdego telefonu docelowego.
 
 `<kopia>/restore/<device_dir_name(serial)>.sqlite`: pliki (cel, status, próby) i meta `serial`,
-`choice`, `status`, `updated`. Czyta go też widok kopii i ochrona przed `purge_expired`.
+`choice`, `status`, `updated`. Czyta go też widok kopii (`read_restores`: „wgrano na …” i Banner
+wznowienia).
 """
 
 from __future__ import annotations
@@ -102,6 +103,49 @@ class RestoreState:
 
     def commit(self) -> None:
         self.db.commit()
+
+
+@dataclass(frozen=True)
+class RestoreSummary:
+    """Stan wgrywania kopii na jeden telefon — do widoku kopii i Bannera wznowienia."""
+
+    serial: str
+    status: str  # running | complete | incomplete | stopped | klucz `RestoreError`
+    updated: str | None  # ISO-8601 UTC
+    resumable: bool  # zostały pliki do wgrania (`pending`/`pushing`) i przebieg nie jest `complete`
+
+
+def _summary(path: Path) -> RestoreSummary | None:
+    """Sam odczyt istniejącego pliku: `mode=rw` bez tworzenia, więc widok kopii niczego nie
+    zakłada, a pozostawiony po awarii dziennik transakcji SQLite może się wycofać (`mode=ro` by
+    na nim odmówił i Banner wznowienia by zniknął)."""
+    try:
+        db = sqlite3.connect(f"{path.absolute().as_uri()}?mode=rw", uri=True)
+    except sqlite3.Error:
+        return None
+    try:
+        meta = {k: json.loads(v) for k, v in db.execute("SELECT key, value FROM meta")}
+        (left,) = db.execute("SELECT COUNT(*) FROM files WHERE status IN ('pending', 'pushing')").fetchone()
+    except (sqlite3.Error, ValueError):
+        return None
+    finally:
+        db.close()
+    serial, status, updated = meta.get("serial"), meta.get("status"), meta.get("updated")
+    if not isinstance(serial, str) or not isinstance(status, str):
+        return None
+    return RestoreSummary(serial, status, updated if isinstance(updated, str) else None,
+                          status != "complete" and left > 0)
+
+
+def read_restores(copy: CopyDir) -> list[RestoreSummary]:
+    """Wgrywania tej kopii (po jednym na telefon docelowy), najnowsze pierwsze; nieczytelny stan
+    albo stan bez `serial`/`status` (przebieg, który nic nie zaczął) pomijamy."""
+    try:
+        paths = sorted((copy.path / "restore").glob("*.sqlite"))
+    except OSError:
+        return []
+    found = [s for s in map(_summary, paths) if s is not None]
+    return sorted(found, key=lambda s: (s.updated or "", s.serial), reverse=True)
 
 
 def is_own(row: RestoreRow) -> bool:

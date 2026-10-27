@@ -122,8 +122,9 @@ def test_undo_targets_do_not_fail_an_app_for_skipped_or_timed_out_sites():
 
 def test_sample_uses_the_same_shapes():
     s = ev.sample()
-    assert [e["type"] for e in s["basic"]] == ["start", "scan", "repair", "undo", "transfer_backup"]
-    no_packages = ("start", "transfer_backup")  # zdarzenia bez listy pakietów
+    assert [e["type"] for e in s["basic"]] == ["start", "scan", "repair", "undo", "transfer_backup",
+                                              "transfer_restore"]
+    no_packages = ("start", "transfer_backup", "transfer_restore")  # zdarzenia bez listy pakietów
     assert all(e["packages"] is None for e in s["basic"] if e["type"] not in no_packages)
     assert all(e["packages"] for e in s["packages"] if e["type"] not in no_packages)
     assert all("packages" not in e for e in s["basic"] + s["packages"] if e["type"] in no_packages)
@@ -292,3 +293,42 @@ def test_transfer_backup_event_fits_server_limits():
     assert body["seconds"] == 86_400 and body["bytes_mb"] == ev.MAX_MB
     assert body["files"] == ev.MAX_COUNT
     assert body["categories"]["others"] is False and body["categories"]["apps"] is False
+
+
+def _restore_result(**kw):
+    from admenot.engine.transfer.restore import RestoreResult
+
+    opts = {"status": "incomplete", "target_serial": "R58NEW00001", "files_done": 40, "files_exists": 3,
+            "files_renamed": 2, "files_denied": 1, "files_failed": 1, "files_unselected": 7,
+            "apk_skipped": 1, "apk_suspicious_skipped": 2, "bytes": 2_600_000, "seconds": 75,
+            "hashed": False, "media_scan": "done", "files_missing": 4}
+    opts.update(kw)
+    return RestoreResult(**opts)
+
+
+def _upload_choice(groups=("photos", "whatsapp", "other:Music"), apks_on=("/sdcard/Download/gra.apk",)):
+    from admenot.engine.transfer.restore import UploadChoice
+
+    return UploadChoice(frozenset(groups), frozenset(apks_on))
+
+
+def test_transfer_restore_event_has_only_numbers_and_flags():
+    body = ev.transfer_restore_event(ev._SAMPLE_DEVICE, _restore_result(), _upload_choice(), 4)
+    assert body == {
+        "device": {"manufacturer": "OPPO", "model": "CPH2483", "android": "14"},
+        "status": "incomplete", "seconds": 75, "bytes_mb": 3, "files": 40, "exists": 3, "renamed": 2,
+        "denied": 1, "failed": 1, "unselected": 7, "missing": 4, "apk_skipped": 1,
+        "apk_suspicious_skipped": 2, "streams": 4, "hashed": False, "media_scan": "done",
+        "groups": {"photos": True, "videos": False, "downloads": False, "whatsapp": True, "others": True}}
+    text = json.dumps(body)
+    for name in ("Music", "gra.apk", "Download", "sdcard", "R58NEW00001"):
+        assert name not in text, name
+
+
+def test_transfer_restore_event_fits_server_limits():
+    body = ev.transfer_restore_event(
+        ev._SAMPLE_DEVICE, _restore_result(seconds=10**7, bytes=10**20, files_done=10**9, media_scan="skipped"),
+        _upload_choice(groups=("videos",)), 99)
+    assert body["seconds"] == 86_400 and body["bytes_mb"] == ev.MAX_MB and body["files"] == ev.MAX_COUNT
+    assert body["streams"] == 8 and body["media_scan"] == "skipped"
+    assert body["groups"]["others"] is False and body["groups"]["videos"] is True

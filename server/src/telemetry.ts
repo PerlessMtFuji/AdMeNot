@@ -76,6 +76,15 @@ const TRANSFER_FIELDS = ["device", "status", "seconds", "bytes_mb", "files", "fi
 const TRANSFER_CATEGORIES = ["contacts", "sms", "mms", "calls", "media", "downloads", "whatsapp", "others",
   "apps"] as const;
 const MAX_MB = 10_000_000; // 10 TB w MB (telemetry_events.MAX_MB)
+// Wgrywanie kopii na nowy telefon: tak samo same liczby i flagi grup — bez nazw plików, folderów
+// („Inne foldery” to tylko `others`) i pakietów z plików APK.
+const RESTORE_FIELDS = ["device", "status", "seconds", "bytes_mb", "files", "exists", "renamed", "denied",
+  "failed", "unselected", "missing", "apk_skipped", "apk_suspicious_skipped", "streams", "hashed", "media_scan",
+  "groups"] as const;
+const RESTORE_COUNTS = ["files", "exists", "renamed", "denied", "failed", "unselected", "missing", "apk_skipped",
+  "apk_suspicious_skipped"] as const;
+const RESTORE_GROUPS = ["photos", "videos", "downloads", "whatsapp", "others"] as const;
+const MAX_STREAMS = 8; // telemetry_events.MAX_STREAMS
 
 // Obiekt z dokładnie tymi kluczami (wartości logiczne).
 function flags(v: unknown, keys: readonly string[]): Obj {
@@ -161,6 +170,18 @@ function body(e: Obj): Obj {
         files: e.files, files_failed: e.files_failed, apps: e.apps, apps_failed: e.apps_failed,
         categories: flags(e.categories, TRANSFER_CATEGORIES),
       };
+    case "transfer_restore": {
+      need(Object.keys(e).every((k) => (COMMON as readonly string[]).includes(k)
+        || (RESTORE_FIELDS as readonly string[]).includes(k)));
+      need(oneOf(e.status, ["complete", "incomplete", "stopped"]) && int(e.seconds, 86_400)
+        && int(e.bytes_mb, MAX_MB) && RESTORE_COUNTS.every((k) => int(e[k]))
+        && int(e.streams, MAX_STREAMS) && (e.streams as number) >= 1 && typeof e.hashed === "boolean"
+        && oneOf(e.media_scan, ["done", "failed", "restart", "skipped"]));
+      const out: Obj = { device: device(e.device), status: e.status, seconds: e.seconds, bytes_mb: e.bytes_mb };
+      for (const k of RESTORE_COUNTS) out[k] = e[k];
+      return { ...out, streams: e.streams, hashed: e.hashed, media_scan: e.media_scan,
+        groups: flags(e.groups, RESTORE_GROUPS) };
+    }
     default:
       throw new Invalid();
   }
