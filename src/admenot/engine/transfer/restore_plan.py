@@ -39,7 +39,7 @@ MTIME_TOLERANCE = 2  # s
 ALT_ROUND = 5  # nazwy zastępcze sprawdzane jednym `stat` na plik i rundę
 ALT_MAX = 100
 STAT_TIMEOUT = 120  # s na paczkę; przekroczony dwa razy z rzędu → `AdbError`
-_ERR_PREFIX = "stat: '"
+_ERR_PREFIX = "stat: "
 
 Action = Literal["push", "exists", "rename"]
 Answer = tuple[int, int] | Literal["gone", "denied"]  # (rozmiar, mtime) albo czego nie ma / czego nie wolno
@@ -146,18 +146,36 @@ def _stat_batch(adb: AdbTransport, batch: list[str]) -> str:
     return adb.shell(cmd, timeout=STAT_TIMEOUT)
 
 
+def _error_line(line: str, known: set[str]) -> tuple[str, str] | None:
+    """(ścieżka, komunikat) z linii błędu `stat` — toybox: `stat: '<ścieżka>': <komunikat>`, inne
+    wersje bez cudzysłowów: `stat: <ścieżka>: <komunikat>`. Ścieżka musi być jedną z pytanych
+    (`known`); wygrywa najdłuższa, więc nazwy z `: ` w środku też się zgadzają. Inaczej None."""
+    rest = line[len(_ERR_PREFIX):]
+    for quote in ("'", ""):
+        if not rest.startswith(quote):
+            continue
+        body, sep = rest[len(quote):], quote + ": "
+        i = body.rfind(sep)
+        while i >= 0:
+            if body[:i] in known:
+                return body[:i], body[i + len(sep):]
+            i = body.rfind(sep, 0, i)
+    return None
+
+
 def stat_all(adb: AdbTransport, remotes: list[str], should_stop: Callable[[], bool]) -> dict[str, Answer]:
     """Odpowiedź telefonu o każdą ścieżkę: (rozmiar, mtime), `gone` („No such file”) albo `denied`
     (każdy inny błąd, np. „Permission denied”). Ścieżka bez żadnej linii → `AdbError` (nie zgadujemy)."""
     answers: dict[str, Answer] = {}
     for batch in _cmd_batches(remotes):
         _check(should_stop)
+        known = set(batch)
         for raw in _stat_batch(adb, batch).split("\n"):
             line = raw.removesuffix("\r")
             if line.startswith(_ERR_PREFIX):
-                path, sep, msg = line[len(_ERR_PREFIX):].rpartition("': ")
-                if sep:
-                    answers[path] = "gone" if "no such file" in msg.lower() else "denied"
+                err = _error_line(line, known)
+                if err is not None:
+                    answers[err[0]] = "gone" if "no such file" in err[1].lower() else "denied"
                 continue
             bits = line.split("|", 2)
             if len(bits) == 3 and bits[0].isdigit() and bits[1].lstrip("-").isdigit():

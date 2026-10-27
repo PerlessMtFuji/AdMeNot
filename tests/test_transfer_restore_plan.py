@@ -351,6 +351,46 @@ def test_plan_odd_names(tmp_path):
         assert any(q("/sdcard/" + rel) in c for c in stats)
 
 
+@pytest.mark.parametrize("unquoted", [False, True])
+def test_stat_error_lines_quoted_and_unquoted(tmp_path, unquoted):
+    """toybox: `stat: '<ścieżka>': …`; inne wersje bez cudzysłowów — obie dają ten sam plan."""
+    copy = _copy(tmp_path)
+    new = _new(tmp_path, {"DCIM/Camera/IMG.JPG": b"theirs"})
+    new.stat_unquoted = unquoted
+    new.deny_stat_prefixes = {"/sdcard/Download/"}
+    files = _by_remote(_plan(new, copy))
+    img = files["/sdcard/DCIM/Camera/IMG.JPG"]
+    assert (img.action, img.target) == ("rename", "/sdcard/DCIM/Camera/IMG (z kopii).JPG")
+    assert files["/sdcard/DCIM/x.heic"].action == "push"
+    assert files["/sdcard/Download/c.pdf"].action == "push"  # `denied` → bez szukania nazwy
+
+
+class _CannedStat:
+    """Telefon, który na `stat` odpowiada gotowym tekstem (nazwy z `:` nie istnieją na NTFS)."""
+
+    def __init__(self, out: str) -> None:
+        self.out = out
+
+    def shell(self, command: str, timeout: float = 20.0) -> str:
+        return self.out
+
+
+def test_stat_unquoted_name_with_colon_space_longest_match():
+    a, b = "/sdcard/DCIM/a", "/sdcard/DCIM/a: b.jpg"
+    out = (f"stat: {b}: No such file or directory\n"
+           f"stat: {a}: Permission denied\n"
+           f"stat: '/sdcard/x: y': No such file or directory\n")
+    answers = rp.stat_all(_CannedStat(out), [a, b, "/sdcard/x: y"], lambda: False)
+    assert answers == {a: "denied", b: "gone", "/sdcard/x: y": "gone"}
+
+
+def test_stat_unknown_path_in_error_line_never_guessed():
+    """Linia o ścieżce, o którą nie pytaliśmy, nie odpowiada za żadną z pytanych → plan przerwany."""
+    out = "stat: /sdcard/DCIM/inna.jpg: No such file or directory\n"
+    with pytest.raises(AdbError):
+        rp.stat_all(_CannedStat(out), ["/sdcard/DCIM/a.jpg"], lambda: False)
+
+
 def test_stop_requested(tmp_path):
     copy = _copy(tmp_path)
     with pytest.raises(Stopped):

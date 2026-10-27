@@ -98,6 +98,16 @@ def test_upload_all_complete(tmp_path):
     assert UploadChoice.from_json(_meta(copy, "choice")) == UploadChoice(ALL, frozenset())
 
 
+def test_unquoted_stat_errors_plan_and_verify(tmp_path):
+    """Telefon bez toyboxowych cudzysłowów w błędach `stat`: plan i sprawdzenie po `push` działają."""
+    copy = _copy(tmp_path)
+    new = _new(tmp_path)
+    new.stat_unquoted = True
+    res = _run(new, copy, _plan(new, copy))
+    _assert_uploaded(new, OLD)
+    assert (res.status, res.files_done) == ("complete", 5)
+
+
 def test_existing_identical_not_pushed(tmp_path):
     copy = _copy(tmp_path)
     new = _new(tmp_path, {"DCIM/Camera/IMG.JPG": OLD["DCIM/Camera/IMG.JPG"]})

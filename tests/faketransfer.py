@@ -29,7 +29,8 @@ test po `reconnect()` ustawia `fail_after_push_files = None`; pozostałe równol
 i nic już nie zapisują), `push` sprawdza `safe_target(remote)` jak `RealPusher`, `free_kb` (None = domyślne 70 000 000, bez zmian przy push; liczba =
 zmniejszana o rozmiar wgranych plików, zwracana przez `df -k`). `stat … STAT_TAIL` daje linię błędu na
 plik (`stat: '<ścieżka>': No such file or directory`) i kod 0 zamiast `AdbError`; `deny_stat_prefixes` —
-`stat` takich ścieżek kończy się `Permission denied`.
+`stat` takich ścieżek kończy się `Permission denied`. `stat_unquoted` — linie błędu bez cudzysłowów
+(`stat: <ścieżka>: No such file or directory`).
 """
 
 from __future__ import annotations
@@ -77,6 +78,7 @@ class FakeStoragePhone:
         self.free_kb: int | None = None
         self.deny_prefixes: set[str] = set()
         self.deny_stat_prefixes: set[str] = set()
+        self.stat_unquoted = False  # linie błędu `stat: <ścieżka>: …` (bez cudzysłowów, nie toybox)
         self.fail_after_push_files: int | None = None
         self.push_calls = 0
         self.pushed: list[str] = []
@@ -206,10 +208,11 @@ class FakeStoragePhone:
         for remote in args[2:]:
             path = self.local(remote)
             error = None
+            shown = remote if self.stat_unquoted else f"'{remote}'"
             if any(remote.startswith(p) for p in self.deny_stat_prefixes):
-                error = f"stat: '{remote}': Permission denied"
+                error = f"stat: {shown}: Permission denied"
             elif not path.exists():
-                error = f"stat: '{remote}': No such file or directory"
+                error = f"stat: {shown}: No such file or directory"
             if error is not None:
                 if not tolerant:
                     raise AdbError("command_failed", error)
