@@ -17,8 +17,8 @@ Na telefon idą wyłącznie odczyty (`stat`, `df`); wołający podaje `guard.App
 from __future__ import annotations
 
 import posixpath
-from collections.abc import Callable, Sequence
 from collections import Counter
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Protocol
