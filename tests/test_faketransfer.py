@@ -85,9 +85,13 @@ def test_fake_push_preserves_mtime_and_denies(tmp_path):
     lines = phone.shell("df -k /sdcard/").splitlines()
     assert len(lines) == 2 and lines[1].split()[3] == "998"
     # odmowa
-    phone.deny_prefixes = {"/sdcard/Android/media"}
     phone.shell("mkdir -p /sdcard/Android/media/com.x")
-    res = phone.push([f], "/sdcard/Android/media/com.x/", lambda: False, lambda: None)
+    phone.deny_prefixes = {"/sdcard/Android/media"}
+    phone.shell("mkdir -p /sdcard/Android/media/com.x")  # istniejący katalog — bez błędu
+    with pytest.raises(AdbError, match="mkdir: '/sdcard/Android/media/com.y': Permission denied"):
+        phone.shell("mkdir -p /sdcard/DCIM/new /sdcard/Android/media/com.y")
+    assert (tmp_path / "phone" / "sdcard" / "DCIM" / "new").is_dir()
+    res =phone.push([f], "/sdcard/Android/media/com.x/", lambda: False, lambda: None)
     assert res.rc == 1 and "Permission denied" in res.lines[0] and res.lines[0].startswith("adb: error:")
     assert not (tmp_path / "phone" / "sdcard" / "Android" / "media" / "com.x" / "a.jpg").exists()
 

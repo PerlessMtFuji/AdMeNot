@@ -19,9 +19,8 @@ from __future__ import annotations
 
 import csv
 import hashlib
-import json
 import posixpath
-import sqlite3
+import re
 import time
 from collections import Counter, deque
 from collections.abc import Callable
@@ -33,7 +32,6 @@ from typing import Any, Literal
 
 from admenot.engine.adb.transport import AdbError, AdbTransport
 from admenot.engine.device.info import DeviceInfo
-from admenot.engine.paths import device_dir_name
 
 from .backup import (
     CHUNK_MAX_FILES,
@@ -47,6 +45,7 @@ from .guard import SCAN_VOLUME_CMD, q, safe_target
 from .puller import PullResult
 from .pusher import Pusher
 from .restore_plan import MTIME_TOLERANCE, PlanFile, RestorePlan, read_space, stat_all
+from .restore_state import RestoreRow, RestoreState, is_own, restore_state_path
 from .store import CopyDir
 from .telephony import _CONNECTION_KINDS
 
@@ -59,97 +58,11 @@ SCAN_TIMEOUT = 3600  # s
 HASH_TIMEOUT = 3600  # s na paczkę `sha256sum`
 _DENIED = ("permission denied", "read-only file system")
 _NO_TOOL = ("not found", "inaccessible")
-# Powody nieudanej próby po `push` — pod celem może leżeć nasz niedokończony plik.
-_OWN_PARTIAL = frozenset({"interrupted", "disconnect", "push_failed", "hash_mismatch"})
+_SDCARD_PATH = re.compile(r"/sdcard/[^'\"\n:]+")
 
 Status = Literal["complete", "incomplete", "stopped"]
+MediaScan = Literal["done", "failed", "restart", "skipped"]
 ErrorKey = Literal["phone_full", "too_many_disconnects", "wrong_device", "copy_missing"]
-
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
-CREATE TABLE IF NOT EXISTS files (
-    remote   TEXT PRIMARY KEY,
-    target   TEXT NOT NULL,
-    grp      TEXT NOT NULL,
-    size     INTEGER NOT NULL,
-    mtime    INTEGER NOT NULL,
-    status   TEXT NOT NULL DEFAULT 'pending',
-    attempts INTEGER NOT NULL DEFAULT 0,
-    error    TEXT
-);
-CREATE INDEX IF NOT EXISTS ix_files_status ON files(status);
-"""
-
-
-def restore_state_path(copy: CopyDir, serial: str) -> Path:
-    """Stan wgrywania kopii na telefon `serial`: `<kopia>/restore/<device_dir_name(serial)>.sqlite`."""
-    return copy.path / "restore" / f"{device_dir_name(serial)}.sqlite"
-
-
-@dataclass
-class RestoreRow:
-    remote: str  # ścieżka na starym telefonie (klucz w kopii)
-    target: str  # cel na nowym telefonie
-    grp: str
-    size: int
-    mtime: int
-    status: str  # pending | pushing | done | exists | denied | error | skipped
-    attempts: int
-    error: str | None = None
-
-
-class RestoreState:
-    """Stan wgrywania w SQLite (jak `state.State`); meta: `serial`, `choice`, `status`, `updated`."""
-
-    _COLS = "remote, target, grp, size, mtime, status, attempts, error"
-
-    def __init__(self, path: Path):
-        path.parent.mkdir(parents=True, exist_ok=True)
-        self.path = path
-        self.db = sqlite3.connect(path)
-        self.db.execute("PRAGMA synchronous=FULL")
-        self.db.executescript(SCHEMA)
-        self.db.commit()
-
-    def close(self) -> None:
-        self.db.commit()
-        self.db.close()
-
-    def set_meta(self, key: str, value: Any) -> None:
-        self.db.execute("INSERT OR REPLACE INTO meta(key, value) VALUES(?, ?)", (key, json.dumps(value)))
-        self.db.commit()
-
-    def get_meta(self, key: str, default: Any = None) -> Any:
-        row = self.db.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
-        return json.loads(row[0]) if row else default
-
-    def all_files(self) -> dict[str, RestoreRow]:
-        return {r[0]: RestoreRow(*r) for r in self.db.execute(f"SELECT {self._COLS} FROM files")}
-
-    def insert(self, r: RestoreRow) -> None:
-        self.db.execute(f"INSERT OR REPLACE INTO files({self._COLS}) VALUES(?,?,?,?,?,?,?,?)",
-                        (r.remote, r.target, r.grp, r.size, r.mtime, r.status, r.attempts, r.error))
-
-    def update(self, remote: str, **fields: Any) -> None:
-        if not fields:
-            return
-        sets = ", ".join(f"{k}=?" for k in fields)
-        self.db.execute(f"UPDATE files SET {sets} WHERE remote=?", (*fields.values(), remote))
-
-    def by_status(self, status: str) -> list[RestoreRow]:
-        cur = self.db.execute(f"SELECT {self._COLS} FROM files WHERE status=? ORDER BY remote", (status,))
-        return [RestoreRow(*r) for r in cur]
-
-    def taken_alts(self) -> dict[str, str]:
-        """Cele, pod którymi może leżeć nasz niedokończony plik (`pushing` albo nieudana próba po
-        `push`) — dla `build_plan(taken_alts=…)`, żeby wznowienie nadpisało własny plik zamiast
-        zapisywać obok jako „(z kopii)”."""
-        return {r.remote: r.target for r in self.all_files().values()
-                if r.status == "pushing" or (r.status in ("pending", "error") and r.error in _OWN_PARTIAL)}
-
-    def commit(self) -> None:
-        self.db.commit()
-
 
 @dataclass(frozen=True)
 class UploadChoice:
@@ -190,7 +103,8 @@ class RestoreResult:
     bytes: int
     seconds: int
     hashed: bool  # sprawdzono sumy SHA-256 (a nie tylko rozmiar)
-    media_scan: Literal["done", "failed", "restart"]  # przerwane wgrywanie: „restart” (galeria bez skanu)
+    # skończone: Android 10+ `done`/`failed`, starszy `restart`; przerwane: `skipped` (skanuje wznowienie)
+    media_scan: MediaScan
     files_missing: int = 0  # pliki kopii, których nie ma na PC (`plan.missing`)
 
 
@@ -260,7 +174,7 @@ class _Restore:
                 self._mkdirs(state)
                 self._transfer(state)
             except _Stop:
-                result = self._result(state, "stopped", "restart", t0)
+                result = self._result(state, "stopped", "skipped", t0)  # bez skanu: stop ma być szybki
                 _mark(state, "stopped")
                 return result
             except RestoreError as exc:
@@ -308,17 +222,20 @@ class _Restore:
 
     def _reconcile(self, state: RestoreState) -> None:
         """Plan + wybór do stanu. `done`/`exists` zostają; reszta od nowa z planu (bez prób), a ślad
-        własnego niedokończonego pliku (`interrupted`) zostaje, gdy cel się nie zmienił. Wiersze spoza
-        planu (plik zniknął z PC) → `skipped`/`missing`."""
+        własnego niedokończonego pliku (`interrupted`) zostaje, gdy cel się nie zmienił. Nasz plik,
+        który plan widzi jako „już jest” (wgrany przed przerwaniem), liczy się jako wgrany (`done`).
+        Wiersze spoza planu (plik zniknął z PC) → `skipped`/`missing`."""
         existing = state.all_files()
         for f in self.plan.files:
             row = existing.get(f.remote)
             if row is not None and row.status in ("done", "exists"):
                 continue
             status, error = self._initial(f)
-            if (status == "pending" and row is not None and row.target == f.target
-                    and (row.status == "pushing" or row.error in _OWN_PARTIAL)):
-                error = "interrupted"
+            if row is not None and row.target == f.target and is_own(row):
+                if status == "pending":
+                    error = "interrupted"
+                elif status == "exists":
+                    status = "done"
             state.insert(RestoreRow(f.remote, f.target, f.group, f.size, f.mtime, status, 0, error))
         for remote, row in existing.items():
             if remote not in self.files and row.status not in ("done", "exists", "skipped"):
@@ -330,9 +247,12 @@ class _Restore:
         self.done_files, self.done_bytes = len(done), sum(r.size for r in done)
 
     def _mkdirs(self, state: RestoreState) -> None:
-        """Katalogi docelowe paczkami. Odmowa (np. `Android/media`) nie jest tu błędem — `push`
-        do takiego katalogu zostanie odrzucony i trafi do `denied`."""
-        dirs = sorted({posixpath.dirname(safe_target(r.target)) for r in state.by_status("pending")})
+        """Katalogi docelowe paczkami. Katalog, którego Android nie pozwala utworzyć (`Permission
+        denied`, `Read-only file system` przy nim lub przy folderze nad nim) → jego pliki od razu
+        `denied`, bez prób `push`. Inny błąd nie jest tu rozstrzygany — zdecyduje wynik `push`."""
+        pending = state.by_status("pending")
+        dirs = sorted({posixpath.dirname(safe_target(r.target)) for r in pending})
+        refused: set[str] = set()
         for batch in _cmd_batches(dirs):
             while True:
                 if self.should_stop():
@@ -342,8 +262,16 @@ class _Restore:
                     break
                 except AdbError as exc:
                     if exc.kind not in _CONNECTION_KINDS and self._online():
+                        refused |= _refused_paths(exc.message)
                         break
                     self._disconnected()
+        if not refused:
+            return
+        for r in pending:
+            d = posixpath.dirname(r.target)
+            if any(d == p or d.startswith(p + "/") for p in refused):
+                state.update(r.remote, status="denied", error="denied")
+        state.commit()
 
     # ---- pliki ----------------------------------------------------------------------------
     def _transfer(self, state: RestoreState) -> None:
@@ -527,7 +455,7 @@ class _Restore:
             return "failed"
         return "done"
 
-    def _result(self, state: RestoreState, status: Status, media_scan: Literal["done", "failed", "restart"],
+    def _result(self, state: RestoreState, status: Status, media_scan: MediaScan,
                 t0: float) -> RestoreResult:
         rows = list(state.all_files().values())
         cnt = Counter(r.status for r in rows)
@@ -552,6 +480,12 @@ def _mark(state: RestoreState, status: str) -> None:
 def _has(text: str, needles: tuple[str, ...]) -> bool:
     low = text.lower()
     return any(n in low for n in needles)
+
+
+def _refused_paths(message: str) -> set[str]:
+    """Ścieżki z linii błędu `mkdir`, w których Android odmówił zapisu (`mkdir: '/sdcard/…': Permission denied`)."""
+    return {m.rstrip("/") for line in message.splitlines() if _has(line, _DENIED)
+            for m in _SDCARD_PATH.findall(line)}
 
 
 def _manifest_sums(path: Path) -> dict[str, str]:

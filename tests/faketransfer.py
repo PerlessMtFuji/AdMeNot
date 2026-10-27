@@ -22,6 +22,7 @@ Nowy telefon (Etap 2, wgrywanie): `push(locals_, remote, …)` (jako `Pusher`) k
 zachowując czas modyfikacji; katalog docelowy musi istnieć po `mkdir -p`. `content call … scan_volume`
 zlicza `scans`; `push_calls` = liczba wywołań `push`; `pushed` = zdalne ścieżki wgranych plików.
 Awarie: `deny_prefixes` (push pod taką ścieżkę -> `adb: error: … Permission denied`, rc 1),
+`mkdir -p` nowego katalogu pod takim prefiksem -> `AdbError` z `mkdir: '<ścieżka>': Permission denied`,
 `fail_after_push_files` (po tylu wgranych plikach następny jest urwany w połowie, a telefon przechodzi
 w `offline` do `reconnect()`; licznik liczy pliki ŁĄCZNIE z wielu wywołań i nie zeruje się sam —
 test po `reconnect()` ustawia `fail_after_push_files = None`; pozostałe równoległe `push` dostają rc 1
@@ -239,9 +240,18 @@ class FakeStoragePhone:
         return ("\n".join(lines) + "\n").encode("utf-8")
 
     def _mkdir(self, args: list[str]) -> bytes:
+        """Jak toybox: odmowa przy jednym katalogu nie zatrzymuje pozostałych; kod 1 na końcu. Pod
+        `deny_prefixes` katalogu, którego jeszcze nie ma, nie da się utworzyć (istniejący — bez błędu)."""
         assert args[0] == "-p" and len(args) >= 2, args
+        errors: list[str] = []
         for remote in args[1:]:
-            self.local(remote).mkdir(parents=True, exist_ok=True)
+            path = self.local(remote)
+            if not path.is_dir() and any((remote + "/").startswith(p) for p in self.deny_prefixes):
+                errors.append(f"mkdir: '{remote}': Permission denied")
+                continue
+            path.mkdir(parents=True, exist_ok=True)
+        if errors:
+            raise AdbError("command_failed", "\n".join(errors))
         return b""
 
     def _content(self, args: list[str]) -> bytes:

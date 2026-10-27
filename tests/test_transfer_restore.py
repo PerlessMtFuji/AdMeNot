@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import os
 import shutil
+import threading
 from pathlib import Path
 
 import pytest
@@ -15,15 +16,9 @@ from admenot.engine.paths import device_dir_name
 from admenot.engine.transfer import restore as rs
 from admenot.engine.transfer import store
 from admenot.engine.transfer.guard import AppendOnlyAdb
-from admenot.engine.transfer.restore import (
-    RestoreError,
-    RestoreResult,
-    RestoreState,
-    UploadChoice,
-    restore_state_path,
-    run_restore,
-)
+from admenot.engine.transfer.restore import RestoreError, RestoreResult, UploadChoice, run_restore
 from admenot.engine.transfer.restore_plan import UPLOAD_GROUPS, RestorePlan, build_plan
+from admenot.engine.transfer.restore_state import RestoreRow, RestoreState, restore_state_path
 
 GiB = 1024 ** 3
 ALL = frozenset(UPLOAD_GROUPS)
@@ -55,7 +50,7 @@ def _run(new: FakeStoragePhone, copy: store.CopyDir, plan: RestorePlan, choice: 
                        should_stop=should_stop, wait_device=wait_device or new.reconnect, streams=streams)
 
 
-def _rows(copy: store.CopyDir) -> dict[str, rs.RestoreRow]:
+def _rows(copy: store.CopyDir) -> dict[str, RestoreRow]:
     state = RestoreState(restore_state_path(copy, "NEW"))
     try:
         return state.all_files()
@@ -126,8 +121,9 @@ def test_resume_after_stop_no_duplicates(tmp_path):
     copy = _copy(tmp_path, MANY)
     new = _new(tmp_path)
     first = _run(new, copy, _plan(new, copy), should_stop=lambda: new.push_calls >= 1)
-    assert first.status == "stopped"
+    assert (first.status, first.media_scan) == ("stopped", "skipped")
     assert _meta(copy, "status") == "stopped"
+    assert new.scans == 0
     before = set(new.pushed)
     assert 0 < len(before) < len(MANY)
     second = _run(new, copy, _plan(new, copy, taken=True))
@@ -144,13 +140,30 @@ def test_own_partial_file_overwritten(tmp_path):
     new = _new(tmp_path, {"DCIM/Camera/VID.MP4": OLD["DCIM/Camera/VID.MP4"][:250]})
     state = RestoreState(restore_state_path(copy, "NEW"))
     state.set_meta("serial", "NEW")
-    state.insert(rs.RestoreRow(remote, remote, "videos", 500, MTIME, "pushing", 0, None))
+    state.insert(RestoreRow(remote, remote, "videos", 500, MTIME, "pushing", 0, None))
     state.close()
     res = _run(new, copy, _plan(new, copy, taken=True))
     assert res.status == "complete"
     _assert_uploaded(new, OLD)
     assert not any("z kopii" in rel for rel in _phone_files(new))
     assert _rows(copy)[remote].target == remote
+
+
+def test_own_file_found_complete_counts_as_done(tmp_path):
+    """Nasz plik (`pushing`) wgrany w całości przed przerwaniem: plan widzi „już jest”, raport — wgrany."""
+    copy = _copy(tmp_path)
+    remote = "/sdcard/DCIM/Camera/VID.MP4"
+    new = _new(tmp_path, {"DCIM/Camera/VID.MP4": OLD["DCIM/Camera/VID.MP4"]})
+    state = RestoreState(restore_state_path(copy, "NEW"))
+    state.set_meta("serial", "NEW")
+    state.insert(RestoreRow(remote, remote, "videos", 500, MTIME, "pushing", 0, None))
+    state.close()
+    plan = _plan(new, copy, taken=True)
+    assert next(f for f in plan.files if f.remote == remote).action == "exists"
+    res = _run(new, copy, plan)
+    assert remote not in new.pushed
+    assert (res.status, res.files_done, res.files_exists) == ("complete", 5, 0)
+    assert _rows(copy)[remote].status == "done"
 
 
 def test_disconnect_during_parallel_push(tmp_path):
@@ -193,13 +206,53 @@ def test_phone_full_stops_resumable(tmp_path):
     _assert_uploaded(new, files)
 
 
-def test_denied_folder_reported_not_failed(tmp_path):
+def test_phone_full_counts_chunks_in_flight(tmp_path, monkeypatch):
+    """4 strumienie: `df` nie widzi jeszcze paczki w locie, więc liczymy ją jako zajętą."""
+    files = {f"DCIM/{d}/{i}.jpg": d.encode() * 1000 for d in "ABCD" for i in range(2)}
+    copy = _copy(tmp_path, files)
+    new = _new(tmp_path)
+    new.total_kb = 8 * GiB // 1024  # zapas = 1 GiB
+    plan = _plan(new, copy)
+    new.free_kb = GiB // 1024 + 3  # bez paczki w locie zmieściłaby się każda z osobna
+    release = threading.Event()
+    push, real_df = new.push, rs.read_space
+    dfs: list[int] = []
+
+    def held(locals_, remote, should_stop, tick):
+        assert release.wait(10)  # paczka A „w locie”, dopóki nie zapadnie decyzja o paczce B
+        return push(locals_, remote, should_stop, tick)
+
+    def df(adb):
+        space = real_df(adb)
+        dfs.append(space.free)
+        if len(dfs) == 2:
+            release.set()
+        return space
+
+    new.push = held  # type: ignore[method-assign]
+    monkeypatch.setattr(rs, "read_space", df)
+    with pytest.raises(RestoreError) as exc:
+        _run(new, copy, plan, streams=4)
+    assert exc.value.key == "phone_full"
+    assert dfs == [(GiB // 1024 + 3) * 1024] * 2  # drugi `df` przed zapisem A — zatrzymała paczka w locie
+    assert new.push_calls == 1
+    rows = _rows(copy)
+    assert {r for r, row in rows.items() if row.status == "done"} == {"/sdcard/DCIM/A/0.jpg", "/sdcard/DCIM/A/1.jpg"}
+    assert all(row.status == "pending" for r, row in rows.items() if "/A/" not in r)
+
+
+@pytest.mark.parametrize("folder_exists", [True, False], ids=["push_refused", "mkdir_refused"])
+def test_denied_folder_reported_not_failed(tmp_path, folder_exists):
     wa = {"Android/media/com.whatsapp/WhatsApp/Media/w1.jpg": b"1" * 7,
           "Android/media/com.whatsapp/WhatsApp/Media/w2.jpg": b"2" * 8}
     copy = _copy(tmp_path, {**OLD, **wa}, extra=("whatsapp",))
     new = _new(tmp_path)
+    if folder_exists:  # folder jest, ale Android nie pozwala zapisać w nim plików
+        new.local("/sdcard/Android/media/com.whatsapp/WhatsApp/Media").mkdir(parents=True)
     new.deny_prefixes = {"/sdcard/Android/media/"}
     res = _run(new, copy, _plan(new, copy))
+    # odmowa `mkdir -p` → pliki od razu `denied`, bez `push` do tego folderu
+    assert new.push_calls == (4 if folder_exists else 3)
     rows = _rows(copy)
     assert {r for r, row in rows.items() if row.status == "denied"} == {"/sdcard/" + k for k in wa}
     assert all(row.attempts == 0 for row in rows.values())
@@ -245,6 +298,14 @@ def test_suspicious_apk_pushed_only_when_on(tmp_path, monkeypatch):
     res = _run(new, copy, plan, UploadChoice(ALL, frozenset({"/sdcard/Download/odd.apk"})))
     assert _phone_files(new)["Download/odd.apk"] == APK_FILES["Download/odd.apk"]
     assert (res.apk_suspicious_skipped, res.apk_skipped) == (0, 1)
+
+
+@pytest.mark.parametrize("sdk", [33, 28])
+def test_stopped_skips_media_scan(tmp_path, sdk):
+    copy = _copy(tmp_path)
+    new = _new(tmp_path)
+    res = _run(new, copy, _plan(new, copy), device=_target(sdk=sdk), should_stop=lambda: True)
+    assert (res.status, res.media_scan, new.scans) == ("stopped", "skipped", 0)
 
 
 def test_android9_asks_restart(tmp_path):
