@@ -486,6 +486,14 @@ class Api:
         busy = self._restore_copy_id
         return busy is None or busy == copy_id
 
+    def _restoring(self) -> str | None:
+        """Id kopii, którą właśnie wgrywa zadanie `restore` (None — żadnej)."""
+        job = self._jobs.current()
+        return self._restore_copy_id if job is not None and job.kind == "restore" else None
+
+    def _copy_view(self, meta: store.CopyMeta) -> dict[str, Any]:
+        return copy_view(meta, self._now(), self._restoring())
+
     def _bind_order(self, journal: Journal, serial: str, order_id: int) -> None:
         with self._shots_lock:
             pending = self._pending.pop(serial, [])
@@ -1568,7 +1576,7 @@ class Api:
             resumable = store.find_resumable(device.serial)
             self._emit("transfer:inventory", {
                 "inventory": inventory_view(inventory, self._lang),
-                "resumable": copy_view(resumable.read_meta(), self._now()) if resumable else None,
+                "resumable": self._copy_view(resumable.read_meta()) if resumable else None,
                 "client": name})
 
         return {"job_id": self._jobs.start("transfer_scan", run)}
@@ -1609,7 +1617,7 @@ class Api:
             finally:
                 self._backup_serial = None
             self._emit("transfer:done", {"result": backup_result_view(result),
-                                         "copy": copy_view(copy.read_meta(), self._now())})
+                                         "copy": self._copy_view(copy.read_meta())})
             telemetry.record("transfer_backup",
                              lambda _packages: transfer_backup_event(device, result, chosen))
 
@@ -1693,7 +1701,7 @@ class Api:
             try:
                 with _transfer_errors("restore_plan"):
                     device, plan = plan_on(job)
-                    view = copy_view(copy.read_meta(), self._now())  # kopia zniknęła → błąd kopii
+                    view = self._copy_view(copy.read_meta())  # kopia zniknęła → błąd kopii
             finally:
                 self._restore_copy_id = None
             self._restore = (device, copy, plan)
@@ -1750,7 +1758,7 @@ class Api:
             try:
                 with _transfer_errors("restore"), device_lock(journal_path(), serial):
                     result = self._run_restore(job, adb, raw, device, copy, plan, chosen)
-                    view = copy_view(copy.read_meta(), self._now())  # kopia zniknęła → błąd kopii
+                    view = self._copy_view(copy.read_meta())  # kopia zniknęła → błąd kopii
             finally:
                 self._restore_copy_id = None
             self._emit("transfer:restore_done", {"result": restore_result_view(result), "copy": view})
@@ -1770,7 +1778,8 @@ class Api:
     def transfers(self) -> dict[str, Any]:
         self._purge_transfers()
         now = self._now()
-        return {"copies": [copy_view(m, now) for m in store.list_copies()]}
+        restoring = self._restoring()
+        return {"copies": [copy_view(m, now, restoring) for m in store.list_copies()]}
 
     @_api
     def extend_transfer(self, copy_id: str) -> dict[str, Any]:
@@ -1780,7 +1789,7 @@ class Api:
             meta = store.extend(copy_id)
         except OSError:  # meta.json zablokowany przez inny program; ścieżka nie idzie do raportu
             raise AppError("transfer_in_use") from None
-        return {"copy": copy_view(meta, self._now())}
+        return {"copy": self._copy_view(meta)}
 
     @_api
     def delete_transfer(self, copy_id: str) -> dict[str, Any]:

@@ -491,6 +491,36 @@ def test_restore_resume_offered(tmp_path):
     assert _planned(api, rec, copy_id, SERIAL)["resumable"] is False  # stan innego telefonu
 
 
+def test_running_restore_after_hard_kill_shown_stopped(tmp_path):
+    """Stan `running` bez trwającego zadania `restore` (program zabity) → w widoku kopii `stopped`;
+    w trakcie wgrywania tej kopii — `running`."""
+    from admenot.engine.transfer.restore_state import RestoreRow, RestoreState, restore_state_path
+
+    api, rec, host, copy_id = _copied(tmp_path)
+    copy = store.CopyDir(store.transfers_dir() / copy_id)
+    state = RestoreState(restore_state_path(copy, NEW))
+    state.set_meta("serial", NEW)
+    state.set_meta("status", "running")
+    state.set_meta("updated", "2026-09-26T12:00:00+00:00")
+    state.insert(RestoreRow("/sdcard/DCIM/Camera/a.jpg", "/sdcard/DCIM/Camera/a.jpg", "photos", 300,
+                            MTIME, "pushing", 0, None))
+    state.close()
+    (entry,) = api.transfers()["copies"][0]["restores"]
+    assert (entry["status"], entry["resumable"]) == ("stopped", True)
+    assert _planned(api, rec, copy_id)["copy"]["restores"][0]["status"] == "stopped"
+
+    seen: list[str] = []
+
+    def during(command: str) -> None:
+        if command.startswith("mkdir ") and not seen:
+            seen.append(api.transfers()["copies"][0]["restores"][0]["status"])
+
+    host.phone(NEW).storage.on_shell = during
+    api.start_restore(CHOICE)
+    assert seen == ["running"]
+    assert rec.of("transfer:restore_done")[0]["copy"]["restores"][0]["status"] == "complete"
+
+
 def test_finished_incomplete_upload_is_not_resumable(tmp_path):
     """Skończone wgrywanie z odmową Androida (`denied`, bez plików w kolejce) to wynik, nie przerwanie:
     ani widok kopii, ani plan nie proponują wznowienia."""

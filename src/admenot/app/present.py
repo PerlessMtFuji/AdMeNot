@@ -464,12 +464,14 @@ def inventory_view(inv: Inventory, lang: str) -> dict[str, Any]:
     }
 
 
-def copy_view(meta: CopyMeta, now: datetime) -> dict[str, Any]:
+def copy_view(meta: CopyMeta, now: datetime, restoring: str | None = None) -> dict[str, Any]:
     """`days_left`: pełne dni do usunięcia, zaokrąglone w górę (0 = po terminie). `now` z zegara
     `Api` (w testach stały), bo widok sam nie czyta czasu. `selection`: wybór zapisany w kopii —
     wznowienie przerwanej kopii zaczyna od niego (pusty słownik = kopia bez wyboru). `restores`:
     wgrywania tej kopii na nowe telefony (stany z `<kopia>/restore/`, najnowsze pierwsze) — „wgrano
-    na …” i Banner wznowienia wgrywania (`resumable`: ta sama reguła co w `transfer:restore_plan`)."""
+    na …” i Banner wznowienia wgrywania (`resumable`: ta sama reguła co w `transfer:restore_plan`).
+    `restoring`: id kopii, którą właśnie wgrywa zadanie `restore`; stan `running` bez takiego
+    zadania został po twardym zamknięciu programu — pokazujemy go jako `stopped`."""
     left = (meta.expires - now).total_seconds()
     restores = read_restores(CopyDir(transfers_dir() / meta.id))
     return {"id": meta.id, "serial": meta.serial, "model": meta.model, "manufacturer": meta.manufacturer,
@@ -477,8 +479,9 @@ def copy_view(meta: CopyMeta, now: datetime) -> dict[str, Any]:
             "expires": meta.expires.isoformat(timespec="seconds"),
             "days_left": max(0, math.ceil(left / 86_400)), "status": meta.status,
             "bytes": meta.bytes, "counts": dict(meta.counts), "selection": dict(meta.selection),
-            "restores": [{"serial": r.serial, "status": r.status, "updated": r.updated,
-                          "resumable": r.resumable} for r in restores]}
+            "restores": [{"serial": r.serial,
+                          "status": "stopped" if r.status == "running" and restoring != meta.id else r.status,
+                          "updated": r.updated, "resumable": r.resumable} for r in restores]}
 
 
 def backup_result_view(r: BackupResult) -> dict[str, Any]:
