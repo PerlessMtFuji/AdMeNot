@@ -517,6 +517,7 @@
       "title_failed": "Nie udało się odczytać: {what}.",
       "xiaomi": "Xiaomi wpuszcza do tych danych tylko z opcją „Debugowanie USB (ustawienia zabezpieczeń)”, a ta wymaga konta Mi.",
       "howto": "Bez niej wyeksportuj dane do pliku (Kontakty → Importuj/eksportuj albo aplikacją typu SMS Backup & Restore), zapisz go w pamięci telefonu, np. w Pobranych albo w nowym folderze, i kliknij „Skanuj ponownie”.",
+      "howto_plain": "Wyeksportuj dane do pliku (Kontakty → Importuj/eksportuj albo aplikacją typu SMS Backup & Restore), zapisz go w pamięci telefonu, np. w Pobranych albo w nowym folderze, i kliknij „Skanuj ponownie”.",
       "files": "Pliki eksportu na telefonie",
       "newest": "najnowszy",
       "none_fit": "Brak aktualnego? Wyeksportuj dane do pliku i:",

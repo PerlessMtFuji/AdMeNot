@@ -60,6 +60,8 @@
   const failedKinds = $derived(problems.filter((k) => !inv?.denied?.includes(k)));
   const withFiles = $derived(problems.filter((k) => files(k).length > 0));
   const rescanning = $derived(s.job?.kind === 'transfer_scan');
+  // Zdanie o koncie Mi tylko przy odmowie na Xiaomi; „Bez niej…” w instrukcji odnosi się do niego.
+  const xiaomiNote = $derived(deniedKinds.length > 0 && isXiaomi(s.device));
   /** „kontaktów”, „kontaktów i wiadomości”, „kontaktów, wiadomości i historii połączeń”. */
   function what(kinds: ExportKind[]): string {
     const w = kinds.map((k) => t(`transfer.export.what.${k}`));
@@ -162,9 +164,10 @@
           {#if deniedKinds.length && failedKinds.length}
             <b class="block text-ink">{t('transfer.export.title_failed', { what: what(failedKinds) })}</b>
           {/if}
-          {#if deniedKinds.length && isXiaomi(s.device)}<p>{t('transfer.export.xiaomi')}</p>{/if}
+          {#if xiaomiNote}<p>{t('transfer.export.xiaomi')}</p>{/if}
           {#each withFiles as k (k)}{@render exportList(k)}{/each}
-          <p class="mt-2">{problems.length > withFiles.length ? t('transfer.export.howto') : t('transfer.export.none_fit')}</p>
+          <p class="mt-2">{problems.length > withFiles.length ? t(xiaomiNote ? 'transfer.export.howto' : 'transfer.export.howto_plain')
+            : t('transfer.export.none_fit')}</p>
           <div class="mt-2">
             <Button size="sm" disabled={s.job !== null} onclick={() => ctl.rescanTransfer()}>
               {#if rescanning}<Spinner />{/if}{t('transfer.export.rescan')}

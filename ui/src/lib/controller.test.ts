@@ -1323,6 +1323,26 @@ describe('data transfer — export files', () => {
     expect(s.transfer.selection.exports?.contacts).toBe(newer.remote);
   });
 
+  test('resuming a copy with contacts and SMS unticked: ticking them uses the export files', async () => {
+    const { ctl, s, bridge } = setup('transfer_export');
+    await ctl.init();
+    s.phase = 'transfer_choose';
+    const event = (await import('../../../tests/fixtures/bridge/transfer_export.json')).default.calls
+      .find((c) => c.method === 'transfer_inventory')!.events.find(([name]) => name === 'transfer:inventory')![1] as never;
+    bridge.emit('transfer:inventory', { ...(event as object), resumable: { id: 'S/1', serial: 'R58T00TEST', model: 'SM-A145R',
+      manufacturer: 'samsung', client: null, created: '2026-10-24T14:20:00', expires: '2026-10-31T14:20:00', days_left: 6,
+      status: 'in_progress', bytes: 0, counts: {}, selection: { contacts: false, sms: false, mms: false, calls: true,
+        categories: ['media'], others: [], apps: [] } } } as never);
+    expect([s.transfer.selection.contacts, s.transfer.selection.sms]).toEqual([false, false]);
+    ctl.toggleTransfer('contacts');
+    ctl.toggleTransfer('sms');
+    expect(s.transfer.selection.exports).toEqual({ contacts: NEWEST, sms: SMS });
+    expect([s.transfer.selection.contacts, s.transfer.selection.sms, s.transfer.selection.mms]).toEqual([true, true, false]);
+    await ctl.startBackup();
+    const sent = bridge.calls.find((c) => c.method === 'start_backup')?.args[0] as Record<string, unknown>;
+    expect(sent.exports).toEqual({ contacts: NEWEST, sms: SMS });
+  });
+
   test('a failed rescan keeps the choice screen and its selection', async () => {
     const { ctl, s, bridge } = await chosen();
     const before = s.transfer.selection;

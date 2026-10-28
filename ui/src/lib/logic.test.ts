@@ -711,6 +711,13 @@ describe('data transfer', () => {
     expect(resumeSelection(data, stored('/sdcard/old.vcf')).contacts).toBe(true);
   });
 
+  test('a resumed copy with an unticked category still has its export file ready for ticking', () => {
+    const data = denied(['/sdcard/new.vcf'], ['/sdcard/sms.xml']);
+    const sel = resumeSelection(data, { contacts: false, sms: false, mms: false, calls: true });
+    expect([sel.contacts, sel.sms]).toEqual([false, false]);
+    expect(sel.exports).toEqual({ contacts: '/sdcard/new.vcf', sms: '/sdcard/sms.xml' });
+  });
+
   test('copy progress counts apps with an estimated size, so copied files alone do not fill the bar', () => {
     const p = (done_files: number, done_bytes: number, done_apps: number, total_apps: number) =>
       ({ stage: 'files', done_files, total_files: 10, done_bytes, total_bytes: 1000 * MB, current: '', done_apps, total_apps }) as const;

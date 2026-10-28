@@ -517,6 +517,7 @@
       "title_failed": "Could not read {what}.",
       "xiaomi": "Xiaomi allows access to this data only with “USB debugging (Security settings)”, which requires a Mi account.",
       "howto": "Without it, export the data to a file (Contacts → Import/export or an app such as SMS Backup & Restore), save it in the phone’s storage, e.g. in Downloads or a new folder, and click “Scan again”.",
+      "howto_plain": "Export the data to a file (Contacts → Import/export or an app such as SMS Backup & Restore), save it in the phone’s storage, e.g. in Downloads or a new folder, and click “Scan again”.",
       "files": "Export files on the phone",
       "newest": "newest",
       "none_fit": "No current one? Export the data to a file and:",

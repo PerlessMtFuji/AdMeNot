@@ -162,6 +162,14 @@ describe('TransferChoose', () => {
     await tick();
     expect(screen.getByText('Telefon nie pozwolił odczytać: kontaktów.')).toBeTruthy();
     expect(screen.queryByText(/Xiaomi wpuszcza/)).toBeNull();
+    expect(screen.getByText(/^Wyeksportuj dane do pliku \(Kontakty/)).toBeTruthy();
+    expect(screen.queryByText(/Bez niej/)).toBeNull();
+  });
+
+  test('a read error that is not a refusal explains the export without "Bez niej", even on a Xiaomi', async () => {
+    await onXiaomi({ contacts: null });
+    expect(screen.getByText(/^Wyeksportuj dane do pliku \(Kontakty/)).toBeTruthy();
+    expect(screen.queryByText(/Bez niej/)).toBeNull();
   });
 
   test('unticking the row sends no export file', async () => {

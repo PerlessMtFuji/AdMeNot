@@ -612,7 +612,8 @@ export function resumeSelection(inv: InventoryView, stored: StoredSelection | un
   const exports: ExportChoice = {};
   for (const k of EXPORT_KINDS) {
     const files = exportFiles(inv, k);
-    if (!stored[k] || !files.length) continue;
+    // także dla odznaczonej kategorii: zaznaczenie wiersza ma od razu plik do skopiowania
+    if (!files.length) continue;
     const was = stored.exports?.find((e) => e.kind === k)?.remote;
     exports[k] = files.some((f) => f.remote === was) ? was : files[0].remote;
   }
