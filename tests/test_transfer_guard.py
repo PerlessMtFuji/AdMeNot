@@ -57,6 +57,24 @@ def test_blocked(bad):
         assert_read_only(bad)
 
 
+def test_head_allowed():
+    from admenot.engine.transfer.exports import head_cmd
+
+    assert_read_only(head_cmd("/sdcard/Kopia kontaktów/it's.vcf"))
+    assert_read_only(f"head -c 10 {q('/sdcard/a.vcf')}")
+
+
+@pytest.mark.parametrize("bad", [
+    "head -c 70000 '/sdcard/a.vcf'", "head -c 10 '/data/a'", "head -c 10 '/sdcard/../data/a'",
+    "head -c 10 '/sdcard/a' '/sdcard/b'", "head '/sdcard/a'", "head -n 5 '/sdcard/a'",
+    "head -c 10 '/sdcard/a'; rm x", "head -c 10 '/sdcard/a' > /sdcard/b", "head -c -1 '/sdcard/a'",
+    "head -c 10 \"/sdcard/a\"", "head  -c 10 '/sdcard/a'", "head -c 010 '/sdcard/a'",
+])
+def test_head_blocked(bad):
+    with pytest.raises(UnsafeCommand):
+        assert_read_only(bad)
+
+
 def test_content_query_may_merge_stderr():
     assert_read_only("content query --uri 'content://sms' --projection '_id'" + CONTENT_TAIL)
 

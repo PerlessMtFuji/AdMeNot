@@ -147,6 +147,12 @@ class FakeStoragePhone:
         argv = shlex.split(command)
         if argv[:2] == ["pm", "path"] and len(argv) == 3:
             return self._pm_path(argv[2])
+        if argv[:2] == ["head", "-c"] and len(argv) == 4:  # nagłówek pliku eksportu
+            path = self.local(argv[3])
+            if not path.is_file():
+                raise AdbError("command_failed", f"head: {argv[3]}: No such file or directory")
+            with path.open("rb") as fh:
+                return fh.read(int(argv[2]))
         handler = {"find": self._find, "stat": self._stat, "df": self._df,
                    "sha256sum": self._sha256, "content": self._content, "ls": self._ls,
                    "mkdir": self._mkdir}.get(argv[0])
@@ -395,7 +401,7 @@ class FakeStoragePhone:
         return PullResult(1 if any(x.startswith("adb: error") for x in lines) else 0, lines, False)
 
 
-_STORAGE_TOOLS = {"find", "stat", "ls", "df", "content", "sha256sum", "mkdir"}
+_STORAGE_TOOLS = {"find", "stat", "ls", "df", "content", "sha256sum", "mkdir", "head"}
 
 
 class TransferPhone:

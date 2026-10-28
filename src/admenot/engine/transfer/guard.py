@@ -14,7 +14,8 @@ from pathlib import PurePosixPath
 
 from admenot.engine.adb.transport import AdbTransport
 
-_ALLOWED_CMDS = {"getprop", "find", "stat", "content", "df", "sha256sum", "md5sum", "ls"}
+_ALLOWED_CMDS = {"getprop", "find", "stat", "content", "df", "sha256sum", "md5sum", "ls", "head"}
+HEAD_LIMIT = 65536  # największy odczyt `head -c` (nagłówek pliku eksportu)
 _FIND_EXEC_ALLOWED = {"stat", "sha256sum", "md5sum"}
 _FIND_FORBIDDEN = {"-delete", "-fprint", "-fprint0", "-fprintf", "-fls", "-ok", "-okdir", "-execdir"}
 _META = set(";|&<>`$\n\r\\(){}*?[]~!#")
@@ -89,6 +90,18 @@ def assert_read_only(cmd: str) -> None:
             raise UnsafeCommand(f"Niedozwolone 'content read': {cmd[:120]}")
         if len(words) < 2 or words[1] != "query":
             raise UnsafeCommand("Dozwolone jest wyłącznie 'content query' (i odczyt załącznika MMS)")
+    if words[0] == "head":
+        # Wyłącznie początek jednego pliku pod /sdcard/ w postaci kanonicznej (nagłówek pliku eksportu).
+        try:
+            a = shlex.split(cmd)
+        except ValueError:
+            raise UnsafeCommand(f"Nieczytelne polecenie head: {cmd[:120]}") from None
+        if (len(a) != 4 or a[1] != "-c" or not a[2].isascii() or not a[2].isdigit()
+                or int(a[2]) > HEAD_LIMIT):
+            raise UnsafeCommand(f"Dozwolone jest wyłącznie 'head -c N <plik>': {cmd[:120]}")
+        safe_target(a[3])
+        if cmd != f"head -c {a[2]} {q(a[3])}":
+            raise UnsafeCommand(f"Niekanoniczna postać head: {cmd[:120]}")
     if words[0] == "find":
         # Także po `shlex.split`: powłoka zdejmuje cudzysłowy, więc `'-delete'` to wciąż `-delete`.
         try:
