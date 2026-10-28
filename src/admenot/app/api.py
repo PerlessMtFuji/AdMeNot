@@ -130,15 +130,18 @@ from admenot.engine.transfer import store
 from admenot.engine.transfer.backup import (
     BackupError,
     BackupResult,
+    ExportChoice,
     Progress,
     Selection,
     run_backup,
 )
+from admenot.engine.transfer.exports import EXPORT_KINDS
 from admenot.engine.transfer.guard import AppendOnlyAdb, ReadOnlyAdb
 from admenot.engine.transfer.inventory import (
     FILE_CATEGORIES,
     Inventory,
     build_inventory,
+    refresh_inventory,
     whatsapp_backup_time,
 )
 from admenot.engine.transfer.puller import Puller, RealPuller
@@ -234,8 +237,26 @@ def _fixes(value: Any) -> tuple[str, ...]:
     return tuple(value)
 
 
-def _selection(value: Any) -> Selection:
-    """Wybór z ekranu kopii: flagi telefonii, listy kategorii / folderów / pakietów."""
+def _export_choices(value: Any, flags: dict[str, Any], inventory: Inventory) -> tuple[ExportChoice, ...]:
+    """Pliki eksportu z ekranu kopii (rodzaj → ścieżka). Ścieżka musi być kandydatem z inwentarza,
+    a flaga rodzaju włączona; rozmiar i mtime bierzemy z inwentarza, nie od UI."""
+    if value is None:
+        return ()
+    if not isinstance(value, dict):
+        raise AppError("bad_request", "selection")
+    chosen = []
+    for kind, remote in value.items():
+        if kind not in EXPORT_KINDS or not isinstance(remote, str) or flags[kind] is not True:
+            raise AppError("bad_request", "selection")
+        file = next((e for e in inventory.exports.get(kind, []) if e.remote == remote), None)
+        if file is None:
+            raise AppError("bad_request", "selection")
+        chosen.append(ExportChoice(file.kind, file.remote, file.size, file.mtime))
+    return tuple(chosen)
+
+
+def _selection(value: Any, inventory: Inventory) -> Selection:
+    """Wybór z ekranu kopii: flagi telefonii, listy kategorii / folderów / pakietów, pliki eksportu."""
     if not isinstance(value, dict):
         raise AppError("bad_request", "selection")
     flags = {k: value.get(k) for k in ("contacts", "sms", "mms", "calls")}
@@ -250,7 +271,10 @@ def _selection(value: Any) -> Selection:
         lists[key] = frozenset(items)
     if not lists["categories"] <= set(FILE_CATEGORIES):
         raise AppError("bad_request", "selection")
-    return Selection(**flags, **lists, verify_hash=verify)
+    exports = _export_choices(value.get("exports"), flags, inventory)
+    if any(c.kind == "sms" for c in exports):
+        flags["mms"] = False  # MMS idą przez providera, a ten odmówił — z pliku XML ich nie ma
+    return Selection(**flags, **lists, verify_hash=verify, exports=exports)
 
 
 def _upload_choice(value: Any, plan: RestorePlan) -> UploadChoice:
@@ -1572,12 +1596,33 @@ class Api:
             except TransferStopped:
                 raise Stopped from None
             job.check()
-            self._transfer = (device, inventory, name)
-            resumable = store.find_resumable(device.serial)
-            self._emit("transfer:inventory", {
-                "inventory": inventory_view(inventory, self._lang),
-                "resumable": self._copy_view(resumable.read_meta()) if resumable else None,
-                "client": name})
+            self._publish_inventory(device, inventory, name)
+
+        return {"job_id": self._jobs.start("transfer_scan", run)}
+
+    def _publish_inventory(self, device: DeviceInfo, inventory: Inventory, name: str | None) -> None:
+        self._transfer = (device, inventory, name)
+        resumable = store.find_resumable(device.serial)
+        self._emit("transfer:inventory", {
+            "inventory": inventory_view(inventory, self._lang),
+            "resumable": self._copy_view(resumable.read_meta()) if resumable else None,
+            "client": name})
+
+    @_api
+    def transfer_rescan(self) -> dict[str, Any]:
+        """Ponowny odczyt telefonu (serwisant nadał uprawnienie albo skopiował plik eksportu):
+        aplikacje zostają z poprzedniego skanu, reszta inwentarza jest czytana od nowa."""
+        device, previous, name = self._transfer_state()
+        adb = self._session(device.serial)
+
+        def run(job: Job) -> None:
+            with _transfer_errors("transfer_scan"):
+                try:
+                    inventory = refresh_inventory(ReadOnlyAdb(adb), previous, job.should_stop)
+                except TransferStopped:
+                    raise Stopped from None
+                job.check()
+                self._publish_inventory(device, inventory, name)
 
         return {"job_id": self._jobs.start("transfer_scan", run)}
 
@@ -1602,8 +1647,8 @@ class Api:
     @_api
     def start_backup(self, selection: dict[str, Any]) -> dict[str, Any]:
         """Kopia wybranych danych na komputer. Niedokończona kopia tego telefonu jest wznawiana."""
-        chosen = _selection(selection)
         device, inventory, client = self._transfer_state()
+        chosen = _selection(selection, inventory)
         serial = device.serial
         self._abandon_apk()
         adb = self._session(serial)

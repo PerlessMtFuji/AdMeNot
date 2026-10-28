@@ -105,7 +105,7 @@ def test_start_backup_completes_and_lists(tmp_path):
     done = rec.of("transfer:done")[0]
     assert done["result"]["status"] == "complete"
     assert done["result"]["files_done"] == 5 and done["result"]["apps_done"] == 1
-    assert done["result"]["telephony"]["contacts"] == {"status": "ok", "count": 2, "error": None}
+    assert done["result"]["telephony"]["contacts"] == {"status": "ok", "count": 2, "error": None, "source": "phone"}
     assert done["copy"]["status"] == "complete" and done["copy"]["client"] == "Anna K."
     assert rec.of("transfer:progress")
     copies = api.transfers()["copies"]
@@ -365,7 +365,112 @@ def test_backup_result_view_keeps_telephony_error():
     from admenot.engine.transfer.telephony import CategoryResult
 
     r = BackupResult("incomplete", "S/1", {"mms": CategoryResult("failed", 4, "addresses_missing:3")}, 0, 0, 0, 0, 0, 1)
-    assert backup_result_view(r)["telephony"]["mms"] == {"status": "failed", "count": 4, "error": "addresses_missing:3"}
+    assert backup_result_view(r)["telephony"]["mms"] == {
+        "status": "failed", "count": 4, "error": "addresses_missing:3", "source": "phone"}
+
+
+def test_backup_result_view_source():
+    from admenot.app.present import backup_result_view
+    from admenot.engine.transfer.backup import BackupResult
+    from admenot.engine.transfer.telephony import CategoryResult
+
+    r = BackupResult("complete", "S/1", {"contacts": CategoryResult("ok", 3, None, "export")}, 0, 0, 0, 0, 0, 1)
+    assert backup_result_view(r)["telephony"]["contacts"] == {
+        "status": "ok", "count": 3, "error": None, "source": "export"}
+
+
+# --- pliki eksportu zamiast odczytu providera ---------------------------------------------------
+
+VCF_OLD = "".join(f"BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Osoba {i}\r\nEND:VCARD\r\n" for i in range(2))
+VCF_NEW = "".join(f"BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Osoba {i}\r\nEND:VCARD\r\n" for i in range(3))
+SMS_XML = ('<?xml version=\'1.0\' encoding=\'UTF-8\' standalone=\'yes\' ?>\n<smses count="2">\n'
+           '<sms address="1" body="a" />\n<sms address="2" body="b" />\n</smses>\n')
+
+
+def _put(phone: TransferPhone, rel: str, data: str, mtime: int = MTIME) -> str:
+    path = phone.storage.local("/sdcard/" + rel)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(data, encoding="utf-8")
+    os.utime(path, (mtime, mtime))
+    return "/sdcard/" + rel
+
+
+def _denied(tmp_path):
+    phone = _phone(tmp_path)
+    phone.storage.deny_uris = {"content://com.android.contacts/contacts", "content://sms"}
+    old = _put(phone, "Kopia/stare.vcf", VCF_OLD, MTIME - 100)
+    new = _put(phone, "Kopia/nowe.vcf", VCF_NEW, MTIME)
+    sms = _put(phone, "Backup/sms.xml", SMS_XML)
+    api, rec = _api(phone)
+    assert "error" not in api.transfer_inventory(SERIAL, "Anna K.")
+    return api, rec, phone, old, new, sms
+
+
+def test_start_backup_with_export_choice(tmp_path, monkeypatch):
+    api, rec, _, old, _new, sms = _denied(tmp_path)
+    inv = rec.of("transfer:inventory")[0]["inventory"]
+    assert inv["denied"] == ["contacts", "sms"] and set(inv["exports"]) == {"contacts", "sms"}
+    seen = []
+    real = backup_mod.run_backup
+
+    def spy(adb, puller, device, copy, inventory, chosen, **kw):
+        seen.append(chosen)
+        return real(adb, puller, device, copy, inventory, chosen, **kw)
+
+    monkeypatch.setattr("admenot.app.api.run_backup", spy)
+    selection = {**SELECTION, "mms": True, "calls": False, "categories": [], "others": [], "apps": [],
+                 "exports": {"contacts": old, "sms": sms}}
+    assert "job_id" in api.start_backup(selection)
+    (chosen,) = seen
+    stat = {e.remote: e for kind in ("contacts", "sms") for e in api._transfer[1].exports[kind]}
+    assert {(c.kind, c.remote, c.size, c.mtime) for c in chosen.exports} == {
+        ("contacts", old, stat[old].size, stat[old].mtime), ("sms", sms, stat[sms].size, stat[sms].mtime)}
+    assert chosen.mms is False
+    done = rec.of("transfer:done")[0]
+    assert done["result"]["telephony"]["contacts"] == {
+        "status": "ok", "count": 2, "error": None, "source": "export"}
+    assert done["result"]["telephony"]["sms"]["source"] == "export"
+
+
+@pytest.mark.parametrize("exports", [
+    {"contacts": "/sdcard/Inna/obca.vcf"},           # ścieżka spoza kandydatów
+    {"photos": "/sdcard/Kopia/nowe.vcf"},            # nieznany rodzaj
+    {"calls": "/sdcard/Kopia/nowe.vcf"},             # rodzaj bez kandydatów
+    {"contacts": 5},                                  # zły typ
+    ["contacts"],                                     # zły kształt
+])
+def test_start_backup_rejects_unknown_export(tmp_path, exports):
+    api, *_ = _denied(tmp_path)
+    assert api.start_backup({**SELECTION, "exports": exports})["error"]["key"] == "bad_request"
+
+
+def test_start_backup_rejects_export_with_flag_off(tmp_path):
+    api, _, _, _, new, _ = _denied(tmp_path)
+    selection = {**SELECTION, "contacts": False, "exports": {"contacts": new}}
+    assert api.start_backup(selection)["error"]["key"] == "bad_request"
+
+
+def test_transfer_rescan_without_inventory_is_refused(tmp_path):
+    api, _ = _api(_phone(tmp_path))
+    assert api.transfer_rescan()["error"]["key"] == "transfer_no_inventory"
+
+
+def test_transfer_rescan_emits_inventory(tmp_path, monkeypatch):
+    api, rec, phone, *_ = _denied(tmp_path)
+    before = rec.of("transfer:inventory")[0]
+    assert len(before["inventory"]["exports"]["contacts"]) == 2
+    _put(phone, "Pobrane/jeszcze-nowsze.vcf", VCF_NEW, MTIME + 50)
+    monkeypatch.setattr("admenot.app.api.run_scan",
+                        lambda *a, **k: pytest.fail("rescan nie skanuje aplikacji od nowa"))
+    assert "job_id" in api.transfer_rescan()
+    events = rec.of("transfer:inventory")
+    assert len(events) == 2
+    after = events[1]
+    assert after["inventory"]["exports"]["contacts"][0]["name"] == "jeszcze-nowsze.vcf"
+    assert len(after["inventory"]["exports"]["contacts"]) == 3
+    assert after["inventory"]["apps"] == before["inventory"]["apps"]
+    assert after["client"] == "Anna K." and after["resumable"] is None
+    assert api._transfer[1].exports["contacts"][0].remote.endswith("jeszcze-nowsze.vcf")
 
 
 # --- Etap 2: wgrywanie kopii na nowy telefon -----------------------------------------------------

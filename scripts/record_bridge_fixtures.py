@@ -243,6 +243,39 @@ def _transfer(r: Recorder, phone: Any) -> None:
     r.call("transfers")
 
 
+EXPORT_VCF = "".join(f"BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Osoba {i}\r\nEND:VCARD\r\n" for i in range(3))
+EXPORT_SMS = ("<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n<smses count=\"2\">\n"
+              '<sms address="1" body="a" />\n<sms address="2" body="b" />\n</smses>\n')
+EXPORT_FILES = {  # rel -> (zawartość, mtime)
+    "Kopia/kontakty-stare.vcf": (EXPORT_VCF[:-len("BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Osoba 2\r\nEND:VCARD\r\n")],
+                                 TRANSFER_MTIME - 86_400),
+    "Kopia/kontakty.vcf": (EXPORT_VCF, TRANSFER_MTIME),
+    "Backup/sms.xml": (EXPORT_SMS, TRANSFER_MTIME),
+}
+
+
+def _export_phone(tmp: Path) -> TransferPhone:
+    """Stary telefon, który odmawia kontaktów i SMS-ów; na karcie leżą ich pliki eksportu."""
+    phone = _transfer_phone(tmp)
+    phone.storage.deny_uris = {"content://com.android.contacts/contacts", "content://sms"}
+    for rel, (data, mtime) in EXPORT_FILES.items():
+        path = phone.storage.local("/sdcard/" + rel)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(data, encoding="utf-8")
+        os.utime(path, (mtime, mtime))
+    return phone
+
+
+def _transfer_export(r: Recorder, phone: Any) -> None:
+    r.call("list_devices")
+    r.call("transfer_inventory", SERIAL, CLIENT)
+    r.call("transfer_rescan")
+    r.call("start_backup", {**TRANSFER_SELECTION, "calls": False, "mms": True,
+                            "exports": {"contacts": "/sdcard/Kopia/kontakty.vcf",
+                                        "sms": "/sdcard/Backup/sms.xml"}})
+    r.call("transfers")
+
+
 RESTORE_SERIAL = "R58W20NEW01"
 RESTORE_CHOICE = {"groups": ["photos", "videos", "downloads", "whatsapp", "other:Music"], "apks_on": [],
                   "verify_hash": False}
@@ -360,6 +393,8 @@ def record_all() -> dict[str, dict[str, Any]]:
         "report": _scenario("report", _report),
         "transfer": _stable_transfer(_scenario("transfer", _transfer,
                                                phone_factory=_transfer_phone)),
+        "transfer_export": _stable_transfer(_scenario("transfer_export", _transfer_export,
+                                                      phone_factory=_export_phone)),
         "transfer_restore": _stable_transfer(_scenario("transfer_restore", _transfer_restore,
                                                        phone_factory=_restore_phones)),
         "unauthorized": _scenario("unauthorized", _devices_only(unauthorized)),

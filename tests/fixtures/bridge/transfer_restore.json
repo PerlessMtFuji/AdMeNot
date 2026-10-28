@@ -1038,17 +1038,20 @@
         "contacts": {
          "status": "ok",
          "count": 2,
-         "error": null
+         "error": null,
+         "source": "phone"
         },
         "sms": {
          "status": "ok",
          "count": 2,
-         "error": null
+         "error": null,
+         "source": "phone"
         },
         "calls": {
          "status": "ok",
          "count": 1,
-         "error": null
+         "error": null,
+         "source": "phone"
         }
        }
       },

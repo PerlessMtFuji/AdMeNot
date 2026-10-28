@@ -491,7 +491,8 @@ def copy_view(meta: CopyMeta, now: datetime, restoring: str | None = None) -> di
 
 def backup_result_view(r: BackupResult) -> dict[str, Any]:
     return {**{k: v for k, v in asdict(r).items() if k != "telephony"},
-            "telephony": {k: {"status": v.status, "count": v.count, "error": v.error}
+            "telephony": {k: {"status": v.status, "count": v.count, "error": v.error,
+                              "source": v.source}
                           for k, v in r.telephony.items()}}
 
 
