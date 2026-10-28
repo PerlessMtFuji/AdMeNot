@@ -713,7 +713,9 @@
         "total": 122880000000
        },
        "free_pc": 536870912000,
-       "unreadable": 0
+       "unreadable": 0,
+       "denied": [],
+       "exports": {}
       },
       "resumable": null,
       "client": "Anna K."

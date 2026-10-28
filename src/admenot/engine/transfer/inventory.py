@@ -9,13 +9,14 @@ a korzeń, który mimo to zawodzi, liczymy do „nieczytelnych”.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from admenot.engine.adb.transport import AdbError, AdbTransport
 from admenot.engine.scoring import AppResult
 from admenot.engine.session import ScanReport
 
+from .exports import EXPORT_KINDS, ExportFile, find_exports
 from .guard import q
 from .mms import mms_stats
 from .telephony import _CONNECTION_KINDS, ContentQueryError, Stopped, count_rows
@@ -74,6 +75,9 @@ class Inventory:
     whatsapp_backup: datetime | None
     storage: tuple[int, int] | None  # (zajęte, razem) w bajtach
     unreadable: int  # nieczytelne nazwy plików + całe korzenie, których nie udało się przeskanować
+    denied: frozenset[str] = frozenset()  # kategorie (contacts/sms/calls), które telefon odmówił oddać
+    # pliki eksportu (najnowszy pierwszy) — tylko dla kategorii, których provider nie oddał
+    exports: dict[str, list[ExportFile]] = field(default_factory=dict)
 
 
 def _check(should_stop: Callable[[], bool]) -> None:
@@ -230,11 +234,12 @@ def _entry(r: AppResult) -> AppEntry:
                     default_on=r.verdict != "suspicious")
 
 
-def _count(fn: Callable[[], int]) -> int | None:
+def _count(fn: Callable[[], int]) -> tuple[int | None, bool]:
+    """(liczba, odmowa): `None` gdy provider nie odpowiada; `odmowa` tylko przy braku uprawnień."""
     try:
-        return fn()
-    except ContentQueryError:
-        return None
+        return fn(), False
+    except ContentQueryError as exc:
+        return None, exc.denied
 
 
 def _storage(adb: AdbTransport) -> tuple[int, int] | None:
@@ -251,11 +256,29 @@ def _storage(adb: AdbTransport) -> tuple[int, int] | None:
 
 
 def build_inventory(adb: AdbTransport, report: ScanReport, should_stop: Callable[[], bool]) -> Inventory:
+    apps, skipped = classify_apps(report)
+    return _build(adb, apps, skipped, should_stop)
+
+
+def refresh_inventory(
+    adb: AdbTransport, previous: Inventory, should_stop: Callable[[], bool]
+) -> Inventory:
+    """Ponowny odczyt telefonu (po nadaniu uprawnień / skopiowaniu plików eksportu): bez raportu
+    skanu — aplikacje i pominięte bierzemy z poprzedniego inwentarza."""
+    return _build(adb, previous.apps, previous.skipped_apps, should_stop)
+
+
+def _build(
+    adb: AdbTransport, apps: list[AppEntry], skipped: list[AppEntry], should_stop: Callable[[], bool]
+) -> Inventory:
     counts: dict[str, int | None] = {}
+    denied: set[str] = set()
     for key, uri in (("contacts", "content://com.android.contacts/contacts"),
                      ("sms", "content://sms"), ("calls", "content://call_log/calls")):
         _check(should_stop)
-        counts[key] = _count(lambda uri=uri: count_rows(adb, uri))
+        counts[key], refused = _count(lambda uri=uri: count_rows(adb, uri))
+        if refused:
+            denied.add(key)
     _check(should_stop)
     mms: int | None = None
     mms_bytes = 0
@@ -266,6 +289,8 @@ def build_inventory(adb: AdbTransport, report: ScanReport, should_stop: Callable
     files, others, unreadable = scan_files(adb, should_stop)
     _check(should_stop)
     wa = whatsapp_backup_time(adb)
-    apps, skipped = classify_apps(report)
+    # Pliki eksportu proponujemy tylko dla kategorii, której provider nie oddał (odmowa albo inny błąd).
+    missing = {k for k in EXPORT_KINDS if counts[k] is None}
+    exports = find_exports(adb, files, missing, should_stop) if missing else {}
     return Inventory(counts["contacts"], counts["sms"], mms, mms_bytes, counts["calls"], files, others,
-                     apps, skipped, wa, _storage(adb), unreadable)
+                     apps, skipped, wa, _storage(adb), unreadable, frozenset(denied), exports)

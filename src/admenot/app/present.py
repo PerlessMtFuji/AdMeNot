@@ -461,6 +461,11 @@ def inventory_view(inv: Inventory, lang: str) -> dict[str, Any]:
         "storage": {"used": inv.storage[0], "total": inv.storage[1]} if inv.storage else None,
         "free_pc": _free_pc(),
         "unreadable": inv.unreadable,
+        "denied": sorted(inv.denied),
+        "exports": {kind: [{"remote": e.remote, "name": e.remote.rsplit("/", 1)[-1], "size": e.size,
+                            "mtime": datetime.fromtimestamp(e.mtime).isoformat(timespec="seconds"),
+                            "count": e.count} for e in files]
+                    for kind, files in inv.exports.items()},
     }
 
 

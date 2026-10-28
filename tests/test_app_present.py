@@ -497,3 +497,22 @@ def test_cli_and_gui_texts_cover_fix_reasons_levels_and_errors():
         assert "fix" in texts["levels"]
         assert {"user_timeout", "rdp_unavailable", "rdp_failed", "browser_removed",
                 "unknown_fix"} <= set(texts["errors"])
+
+
+def test_inventory_view_lists_denied_and_export_candidates():
+    from admenot.app.present import inventory_view
+    from admenot.engine.transfer.exports import ExportFile
+    from admenot.engine.transfer.inventory import Inventory
+
+    stamp = 1_761_598_860
+    remote = "/sdcard/Kopia kontaktów/kontakty.vcf"
+    inv = Inventory(None, 5, 0, 0, 7, [], {}, [], [], None, None, 0,
+                    denied=frozenset({"contacts"}),
+                    exports={"contacts": [ExportFile(remote, 321, stamp, "contacts", 3)]})
+    view = inventory_view(inv, "pl")
+    assert view["denied"] == ["contacts"]
+    assert view["exports"] == {"contacts": [{
+        "remote": remote, "name": "kontakty.vcf", "size": 321,
+        "mtime": datetime.fromtimestamp(stamp).isoformat(timespec="seconds"), "count": 3}]}
+    assert inventory_view(
+        Inventory(1, 1, 0, 0, 1, [], {}, [], [], None, None, 0), "pl")["exports"] == {}

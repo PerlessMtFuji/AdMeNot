@@ -13,13 +13,15 @@ import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from admenot.engine.adb.transport import AdbError, AdbTransport
 
 from .guard import HEAD_LIMIT, q
-from .inventory import RemoteFile
 from .telephony import _CONNECTION_KINDS
+
+if TYPE_CHECKING:  # inventory.py importuje ten moduł, więc w czasie działania nie możemy odwrotnie
+    from .inventory import RemoteFile
 
 ExportKind = Literal["contacts", "sms", "calls"]
 EXPORT_KINDS: tuple[ExportKind, ...] = ("contacts", "sms", "calls")

@@ -13,6 +13,7 @@ from admenot.engine.transfer.guard import ReadOnlyAdb
 from admenot.engine.transfer.inventory import (
     build_inventory,
     classify_apps,
+    refresh_inventory,
     scan_files,
     whatsapp_backup_time,
 )
@@ -110,6 +111,66 @@ def test_build_inventory_unavailable_sms(tmp_path):
     assert [f.remote for f in inv.files] == ["/sdcard/DCIM/a.jpg"]
     assert inv.storage == (50_000_000 * 1024, 120_000_000 * 1024)
     assert [a.package for a in inv.apps] == ["ok"]
+
+
+VCARD = "BEGIN:VCARD\r\nVERSION:2.1\r\nN:Ala\r\nEND:VCARD\r\n"
+CONTACTS_URI = "content://com.android.contacts/contacts"
+
+
+def _vcf(root, rel: str = "Kopia kontaktów/kontakty.vcf", mtime: int | None = None) -> None:
+    _put(root, rel, (VCARD * 3).encode(), mtime)
+
+
+def _inv(phone, tmp_path):
+    return build_inventory(ReadOnlyAdb(phone), _report(_result("ok", "safe")), lambda: False)
+
+
+def test_inventory_denied_contacts_with_exports(tmp_path):
+    phone = FakeStoragePhone(tmp_path / "phone")
+    install_telephony(tmp_path / "phone")
+    _vcf(tmp_path / "phone")
+    phone.deny_uris = {CONTACTS_URI}
+    inv = _inv(phone, tmp_path)
+    assert inv.contacts is None
+    assert inv.denied == {"contacts"}
+    assert [e.remote for e in inv.exports["contacts"]] == ["/sdcard/Kopia kontaktów/kontakty.vcf"]
+    assert inv.exports["contacts"][0].count == 3
+    assert "sms" not in inv.exports
+
+
+def test_inventory_readable_contacts_ignore_exports(tmp_path):
+    phone = FakeStoragePhone(tmp_path / "phone")
+    install_telephony(tmp_path / "phone")
+    _vcf(tmp_path / "phone")
+    inv = _inv(phone, tmp_path)
+    assert inv.contacts
+    assert inv.denied == frozenset()
+    assert inv.exports == {}
+    assert not any(c.startswith("head") for c in phone.commands)
+
+
+def test_inventory_failed_query_is_not_denied(tmp_path):
+    phone = FakeStoragePhone(tmp_path / "phone")
+    (tmp_path / "phone" / "sdcard").mkdir(parents=True, exist_ok=True)
+    _vcf(tmp_path / "phone")
+    inv = _inv(phone, tmp_path)
+    assert inv.contacts is None
+    assert "contacts" not in inv.denied
+    assert "contacts" in inv.exports
+
+
+def test_refresh_inventory_keeps_apps(tmp_path):
+    phone = FakeStoragePhone(tmp_path / "phone")
+    install_telephony(tmp_path / "phone")
+    phone.deny_uris = {CONTACTS_URI}
+    _put(tmp_path / "phone", "DCIM/a.jpg")
+    previous = _inv(phone, tmp_path)
+    assert previous.exports == {}
+    _vcf(tmp_path / "phone")
+    inv = refresh_inventory(ReadOnlyAdb(phone), previous, lambda: False)
+    assert [e.remote for e in inv.exports["contacts"]] == ["/sdcard/Kopia kontaktów/kontakty.vcf"]
+    assert inv.denied == {"contacts"}
+    assert inv.apps is previous.apps and inv.skipped_apps is previous.skipped_apps
 
 
 def test_loose_files_in_main_folder_go_to_empty_other(tmp_path):
