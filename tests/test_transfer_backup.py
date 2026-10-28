@@ -881,6 +881,39 @@ def test_backup_export_invalid(tmp_path):
     assert not (copy.phone_dir / "contacts.vcf").exists() and _parts(copy) == []
 
 
+def test_backup_export_unreadable_local_file(tmp_path, monkeypatch):
+    """Błąd dysku przy liczeniu nie przerywa kopii — kategoria kończy się `export_invalid`."""
+    phone = _denied_phone(tmp_path)
+    choice = _put(phone, f"{EXPORT_DIR}/kontakty.vcf", VCF3)
+
+    def boom(path, kind):
+        raise PermissionError(errno.EACCES, "locked")
+
+    monkeypatch.setattr(backup_mod, "count_export", boom)
+    copy = _copy()
+    res = _run(phone, copy, _inventory(phone), _sel(contacts=True, exports=(choice,)))
+    assert res.telephony["contacts"] == CategoryResult("failed", 0, "export_invalid", "export")
+    assert res.status == "incomplete"
+    assert not (copy.phone_dir / "contacts.vcf").exists()
+
+
+def test_backup_export_tmp_cleanup_oserror(tmp_path, monkeypatch):
+    """Blokada pliku tymczasowego (antywirus) nie maskuje wyniku."""
+    phone = _denied_phone(tmp_path)
+    choice = _put(phone, f"{EXPORT_DIR}/kontakty.vcf", VCF3)
+    _put(phone, f"{EXPORT_DIR}/kontakty.vcf", "hello" + "x" * (choice.size - 5))
+    real = Path.unlink
+
+    def unlink(self, *a, **kw):
+        if self.name.startswith(".export-") and self.exists():
+            raise PermissionError(errno.EACCES, "locked")
+        return real(self, *a, **kw)
+
+    monkeypatch.setattr(Path, "unlink", unlink)
+    res = _run(phone, _copy(), _inventory(phone), _sel(contacts=True, exports=(choice,)))
+    assert res.telephony["contacts"] == CategoryResult("failed", 0, "export_invalid", "export")
+
+
 def test_backup_export_odd_name(tmp_path):
     phone = _denied_phone(tmp_path)
     choice = _put(phone, f"{EXPORT_DIR}/it's żółć.vcf", VCF3)

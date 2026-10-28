@@ -311,12 +311,15 @@ class _Backup:
                 return failed
             try:
                 count = count_export(tmp, choice.kind)
-            except ExportFormatError:
+                os.replace(tmp, self.copy.phone_dir / EXPORT_NAMES[choice.kind])
+            except (ExportFormatError, OSError):  # zły format albo plik nie do odczytu/podmiany
                 return CategoryResult("failed", 0, "export_invalid", "export")
-            os.replace(tmp, self.copy.phone_dir / EXPORT_NAMES[choice.kind])
             return CategoryResult("ok", count, None, "export")
         finally:
-            tmp.unlink(missing_ok=True)
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:  # np. antywirus trzyma plik (Windows) — nie maskujemy wyniku
+                pass
 
     # ---- uzgadnianie stanu ----------------------------------------------------------------
     def _wanted(self, category: str) -> bool:

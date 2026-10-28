@@ -9,11 +9,10 @@ Dokładną liczbę rekordów daje dopiero `count_export` na pobranym pliku.
 from __future__ import annotations
 
 import re
-import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, BinaryIO, Literal
 
 from admenot.engine.adb.transport import AdbError, AdbTransport
 
@@ -29,10 +28,14 @@ HEAD_BYTES = HEAD_LIMIT
 MAX_CANDIDATES = 50
 _BOM = b"\xef\xbb\xbf"
 _XML_ROOTS: dict[str, ExportKind] = {"smses": "sms", "calls": "calls"}
-_XML_ITEMS: dict[ExportKind, frozenset[str]] = {
-    "sms": frozenset({"sms", "mms"}),
-    "calls": frozenset({"call"}),
+_XML_TAGS: dict[ExportKind, re.Pattern[bytes]] = {
+    "sms": re.compile(rb"<(?:sms|mms)[\s/>]"),
+    "calls": re.compile(rb"<call[\s/>]"),
 }
+_XML_CLOSE: dict[ExportKind, bytes] = {"sms": b"</smses>", "calls": b"</calls>"}
+_TAIL_BYTES = 256
+_COUNT_CHUNK = 1 << 20
+_MAX_TAG = 6  # najdłuższe dopasowanie wzorca: `<call>`
 _PROLOG = re.compile(r"\s*(?:<\?.*?\?>|<!--.*?-->|<!DOCTYPE[^>]*>)", re.DOTALL)
 _ROOT = re.compile(r"\s*<(smses|calls)(?=[\s>/]|$)([^>]*)")
 _COUNT_ATTR = re.compile(r"""\bcount\s*=\s*["'](\d+)["']""")
@@ -54,12 +57,28 @@ class ExportFormatError(Exception):
 
 
 def head_cmd(remote: str) -> str:
-    """Polecenie czytające początek pliku — jedyna postać `head`, jaką przepuszcza strażnik."""
+    """Polecenie czytające początek pliku — jedyna postać `head`, jaką przepuszcza strażnik.
+
+    Na bardzo starym Androidzie (toolbox bez `head -c`) exec-out zwraca tekst błędu jako bajty,
+    więc detekcja niczego nie znajdzie — kończy się bezpiecznie, bez fałszywych trafień."""
     return f"head -c {HEAD_BYTES} {q(remote)}"
 
 
 def _extension(name: str) -> str:
     return name.rsplit(".", 1)[-1].lower() if "." in name else ""
+
+
+def _xml_root(head: bytes) -> tuple[ExportKind, int | None] | None:
+    """Rodzaj XML-a (`<smses` / `<calls`) i deklarowane `count` z nagłówka pliku albo None."""
+    text = head.removeprefix(_BOM).decode("utf-8", errors="ignore")  # ucięty w środku znaku wielobajtowego
+    pos = 0
+    while m := _PROLOG.match(text, pos):
+        pos = m.end()
+    root = _ROOT.match(text, pos)
+    if root is None:
+        return None
+    count = _COUNT_ATTR.search(root.group(2))
+    return _XML_ROOTS[root.group(1)], int(count.group(1)) if count else None
 
 
 def detect_export(head: bytes, name: str, size: int) -> tuple[ExportKind, int | None] | None:
@@ -77,15 +96,7 @@ def detect_export(head: bytes, name: str, size: int) -> tuple[ExportKind, int | 
             return "contacts", None  # plik większy niż nagłówek — nie znamy liczby
         return "contacts", sum(1 for ln in text.splitlines() if ln.strip() == _VCARD_BEGIN)
     if ext == "xml":
-        text = head.decode("utf-8", errors="ignore")  # ucięty w środku znaku wielobajtowego
-        pos = 0
-        while m := _PROLOG.match(text, pos):
-            pos = m.end()
-        root = _ROOT.match(text, pos)
-        if root is None:
-            return None
-        count = _COUNT_ATTR.search(root.group(2))
-        return _XML_ROOTS[root.group(1)], int(count.group(1)) if count else None
+        return _xml_root(head)
     return None
 
 
@@ -129,22 +140,31 @@ def count_export(path: Path, kind: ExportKind) -> int:
         if not text.lstrip().startswith(_VCARD_BEGIN):
             raise ExportFormatError(f"To nie jest plik vCard: {path.name}")
         return sum(1 for ln in text.splitlines() if ln.strip() == _VCARD_BEGIN)
-    items = _XML_ITEMS[kind]
-    expected_root = "smses" if kind == "sms" else "calls"
+    with path.open("rb") as fh:
+        root = _xml_root(fh.read(HEAD_BYTES))
+        if root is None or root[0] != kind:
+            raise ExportFormatError(f"Nieoczekiwany korzeń XML w {path.name}")
+        size = fh.seek(0, 2)
+        fh.seek(max(0, size - _TAIL_BYTES))
+        if not fh.read().rstrip().endswith(_XML_CLOSE[kind]):  # brak zamknięcia = plik ucięty
+            raise ExportFormatError(f"Plik XML jest ucięty: {path.name}")
+        fh.seek(0)
+        return _count_tags(fh, _XML_TAGS[kind])
+
+
+def _count_tags(fh: BinaryIO, tag: re.Pattern[bytes]) -> int:
+    """Liczy tagi otwierające bez parsowania XML-a (eksporty z emoji mają odwołania do znaków
+    zastępczych, które expat odrzuca). W wartościach atrybutów `<` jest zapisane jako `&lt;`,
+    więc surowe `<sms` występuje tylko jako tag. Dopasowania zaczynające się w ostatnich
+    `_MAX_TAG - 1` bajtach bloku liczymy dopiero w następnym, więc tag na granicy bloków
+    liczy się raz."""
     count = 0
-    seen_root = False
-    try:
-        with path.open("rb") as fh:
-            for event, elem in ET.iterparse(fh, events=("start", "end")):
-                if not seen_root:
-                    if event != "start" or elem.tag != expected_root:
-                        raise ExportFormatError(f"Nieoczekiwany korzeń <{elem.tag}> w {path.name}")
-                    seen_root = True
-                elif event == "end" and elem.tag in items:
-                    count += 1
-                    elem.clear()
-    except ET.ParseError as exc:
-        raise ExportFormatError(f"Uszkodzony plik XML: {path.name}") from exc
-    if not seen_root:
-        raise ExportFormatError(f"Pusty plik XML: {path.name}")
-    return count
+    carry = b""
+    while True:
+        chunk = fh.read(_COUNT_CHUNK)
+        buf = carry + chunk
+        limit = len(buf) if not chunk else len(buf) - (_MAX_TAG - 1)
+        count += sum(1 for m in tag.finditer(buf) if m.start() < limit)
+        if not chunk:
+            return count
+        carry = buf[max(limit, 0):]

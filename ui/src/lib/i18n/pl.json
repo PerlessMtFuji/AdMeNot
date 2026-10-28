@@ -512,10 +512,10 @@
       "apps_note": "Same aplikacje, bez ich danych i logowań."
     },
     "export": {
-      "title_denied": "Telefon nie pozwolił odczytać: {what}.",
-      "title_denied_file": "Telefon nie pozwolił odczytać: {what} — użyto pliku eksportu.",
-      "title_failed": "Nie udało się odczytać: {what}.",
-      "xiaomi": "Xiaomi wpuszcza do tych danych tylko z opcją „Debugowanie USB (ustawienia zabezpieczeń)”, a ta wymaga konta Mi.",
+      "title_denied": "Telefon nie pozwolił odczytać {what}.",
+      "title_denied_file": "Telefon nie pozwolił odczytać {what} — użyto pliku eksportu.",
+      "title_failed": "Nie udało się odczytać {what}.",
+      "xiaomi": "Xiaomi wpuszcza do tych danych tylko z opcją „Debugowanie USB (ustawienia zabezpieczeń)” w Opcjach programisty, a ta wymaga konta Mi.",
       "howto": "Bez niej wyeksportuj dane do pliku (Kontakty → Importuj/eksportuj albo aplikacją typu SMS Backup & Restore), zapisz go w pamięci telefonu, np. w Pobranych albo w nowym folderze, i kliknij „Skanuj ponownie”.",
       "howto_plain": "Wyeksportuj dane do pliku (Kontakty → Importuj/eksportuj albo aplikacją typu SMS Backup & Restore), zapisz go w pamięci telefonu, np. w Pobranych albo w nowym folderze, i kliknij „Skanuj ponownie”.",
       "files": "Pliki eksportu na telefonie",

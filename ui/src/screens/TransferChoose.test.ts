@@ -97,7 +97,7 @@ describe('TransferChoose', () => {
     expect(screen.getByText('kontakty_2026-10-27.vcf', { selector: '[data-testid="export-chosen"] *' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'zmień plik' })).toBeTruthy();
 
-    expect(screen.getByText('Telefon nie pozwolił odczytać: kontaktów — użyto pliku eksportu.')).toBeTruthy();
+    expect(screen.getByText('Telefon nie pozwolił odczytać kontaktów — użyto pliku eksportu.')).toBeTruthy();
     expect(screen.getByText(/Xiaomi wpuszcza do tych danych tylko z opcją/)).toBeTruthy();
     expect(screen.getByText('Pliki eksportu na telefonie')).toBeTruthy();
     const radios = within(screen.getByRole('radiogroup')).getAllByRole('radio') as HTMLInputElement[];
@@ -126,7 +126,7 @@ describe('TransferChoose', () => {
     const box = screen.getByRole('checkbox', { name: /Kontakty/ }) as HTMLInputElement;
     expect(box.disabled).toBe(true);
     expect(meta(/Kontakty/)).toContain('niedostępne');
-    expect(screen.getByText('Telefon nie pozwolił odczytać: kontaktów.')).toBeTruthy();
+    expect(screen.getByText('Telefon nie pozwolił odczytać kontaktów.')).toBeTruthy();
     expect(screen.getByText(/Bez niej wyeksportuj dane do pliku/)).toBeTruthy();
     expect(screen.queryByRole('radiogroup')).toBeNull();
     expect(screen.getByRole('button', { name: 'Skanuj ponownie' })).toBeTruthy();
@@ -144,7 +144,7 @@ describe('TransferChoose', () => {
   test('denied contacts and messages get a section each', async () => {
     await onXiaomi({ contacts: null, sms: null, mms: null, denied: ['contacts', 'sms'],
       exports: { contacts: THREE, sms: [{ remote: '/sdcard/Backup/sms.xml', name: 'sms.xml', size: 147, mtime: '2026-10-27T20:00:00', count: 60 }] } });
-    expect(screen.getByText('Telefon nie pozwolił odczytać: kontaktów i wiadomości — użyto pliku eksportu.')).toBeTruthy();
+    expect(screen.getByText('Telefon nie pozwolił odczytać kontaktów i wiadomości — użyto pliku eksportu.')).toBeTruthy();
     expect(screen.getAllByRole('radiogroup')).toHaveLength(2);
     expect(meta(/SMS i MMS/)).toContain('60 z pliku eksportu');
   });
@@ -152,7 +152,7 @@ describe('TransferChoose', () => {
   test('a read error that is not a refusal gets no Xiaomi sentence', async () => {
     await onXiaomi({ sms: null, mms: null });
     expect((screen.getByRole('checkbox', { name: /SMS i MMS/ }) as HTMLInputElement).disabled).toBe(true);
-    expect(screen.getByText('Nie udało się odczytać: wiadomości.')).toBeTruthy();
+    expect(screen.getByText('Nie udało się odczytać wiadomości.')).toBeTruthy();
     expect(screen.queryByText(/Xiaomi wpuszcza/)).toBeNull();
   });
 
@@ -160,7 +160,7 @@ describe('TransferChoose', () => {
     const { s } = await show({ contacts: null, denied: ['contacts'] });
     s.device = { serial: 'R58T00TEST', manufacturer: 'samsung', brand: 'samsung' } as never;
     await tick();
-    expect(screen.getByText('Telefon nie pozwolił odczytać: kontaktów.')).toBeTruthy();
+    expect(screen.getByText('Telefon nie pozwolił odczytać kontaktów.')).toBeTruthy();
     expect(screen.queryByText(/Xiaomi wpuszcza/)).toBeNull();
     expect(screen.getByText(/^Wyeksportuj dane do pliku \(Kontakty/)).toBeTruthy();
     expect(screen.queryByText(/Bez niej/)).toBeNull();

@@ -6,6 +6,7 @@ import pytest
 from faketransfer import FakeStoragePhone
 
 from admenot.engine.adb.transport import AdbError
+from admenot.engine.transfer import exports
 from admenot.engine.transfer.exports import (
     HEAD_BYTES,
     MAX_CANDIDATES,
@@ -76,8 +77,34 @@ def test_count_export(tmp_path):
         count_export(calls, "contacts")
     bad = tmp_path / "bad.xml"
     bad.write_text('<smses count="3"><sms body="a"/><sms bo', encoding="utf-8")
-    with pytest.raises(ExportFormatError):
+    with pytest.raises(ExportFormatError):  # brak zamykającego </smses> = plik ucięty
         count_export(bad, "sms")
+    empty = tmp_path / "empty.xml"
+    empty.write_bytes(b"")
+    with pytest.raises(ExportFormatError):
+        count_export(empty, "sms")
+
+
+def test_count_export_surrogate_refs(tmp_path):
+    """SMS Backup & Restore zapisuje emoji jako pary zastępcze — expat by je odrzucił."""
+    sms = tmp_path / "s.xml"
+    sms.write_text('<?xml version="1.0"?><smses count="2"><sms body="hi &#55357;&#56832;"/>'
+                   '<sms body="a &lt;sms x"/></smses>', encoding="utf-8")
+    assert count_export(sms, "sms") == 2
+
+
+def test_count_export_tag_spanning_chunks(tmp_path, monkeypatch):
+    monkeypatch.setattr(exports, "_COUNT_CHUNK", 16)
+    for n in range(1, 40):  # różne przesunięcia tagów względem granic bloków
+        sms = tmp_path / f"s{n}.xml"
+        sms.write_text('<smses count="3">' + "x" * n + '<sms a="1"/><mms/><sms/></smses>', encoding="utf-8")
+        assert count_export(sms, "sms") == 3, n
+
+
+def test_count_export_root_not_counted(tmp_path):
+    sms = tmp_path / "s.xml"
+    sms.write_text('<smses count="0"></smses>', encoding="utf-8")
+    assert count_export(sms, "sms") == 0
 
 
 def _put(phone: FakeStoragePhone, rel: str, data: bytes, mtime: int) -> RemoteFile:
