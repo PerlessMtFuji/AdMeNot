@@ -37,6 +37,7 @@ from admenot.engine.adb.transport import AdbError, AdbTransport
 from admenot.engine.apk.cache import NoSpace
 from admenot.engine.device.info import DeviceInfo
 
+from .exports import ExportFormatError, ExportKind, count_export
 from .guard import ApkReadAdb, ReadOnlyAdb, UnsafeCommand, q
 from .inventory import Inventory
 from .puller import Puller
@@ -56,10 +57,21 @@ MMS_FACTOR = 2.4  # załączniki jako pliki + te same dane w base64 w mms.xml
 MANIFEST = "manifest.csv"
 APK_TMP = ".apk-tmp"  # pobrane APK przed sprawdzeniem; usuwany po etapie aplikacji
 TELEPHONY = ("contacts", "sms", "mms", "calls")
+EXPORT_NAMES: dict[str, str] = {"contacts": "contacts.vcf", "sms": "sms.xml", "calls": "calls.xml"}
 _GONE = ("no such file", "does not exist")  # `stat`/`sha256sum`: pliku na pewno nie ma
 _NO_TOOL = ("not found", "inaccessible")  # `sha256sum` niedostępne na telefonie
 
 Stage = Literal["telephony", "files", "apps", "verify"]
+
+
+@dataclass(frozen=True)
+class ExportChoice:
+    """Plik eksportu wybrany na telefonie zamiast odczytu providera (rozmiar i mtime ze skanu)."""
+
+    kind: ExportKind
+    remote: str
+    size: int
+    mtime: int
 
 
 @dataclass(frozen=True)
@@ -72,6 +84,7 @@ class Selection:
     others: frozenset[str]  # nazwy folderów; "" = luźne pliki w głównym folderze
     apps: frozenset[str]  # pakiety
     verify_hash: bool = False
+    exports: tuple[ExportChoice, ...] = ()  # kategorie telefonii kopiowane z pliku, nie z providera
 
     def to_json(self) -> dict[str, Any]:
         data = asdict(self)
@@ -237,9 +250,16 @@ class _Backup:
     # ---- telefonia ----------------------------------------------------------------------
     def _telephony(self, state: State) -> dict[str, CategoryResult]:
         """Kategorie zakończone `ok` w poprzednim przebiegu nie są eksportowane ponownie."""
-        wanted = [k for k in TELEPHONY if getattr(self.sel, k)]
+        exports = {c.kind: c for c in self.sel.exports if getattr(self.sel, c.kind)}
+        # MMS z providera pomijamy, gdy SMS idzie z pliku (załączników w pliku nie ma)
+        wanted = [k for k in TELEPHONY if getattr(self.sel, k) and not (k == "mms" and "sms" in exports)]
         saved = {k: CategoryResult(**v) for k, v in state.get_meta("telephony", {}).items()}
         todo = [k for k in wanted if k not in saved or saved[k].status != "ok"]
+        for kind in (k for k in todo if k in exports):
+            self._progress("telephony")
+            saved[kind] = self._copy_export(exports[kind])
+            state.set_meta("telephony", {k: asdict(v) for k, v in saved.items()})
+        todo = [k for k in todo if k not in exports]
         if todo:
             self._progress("telephony")
             self._need(int(self.inventory.mms_bytes * MMS_FACTOR) if "mms" in todo else 0)
@@ -260,6 +280,43 @@ class _Backup:
             saved.update(res)
             state.set_meta("telephony", {k: asdict(v) for k, v in saved.items()})
         return {k: saved[k] for k in wanted if k in saved}
+
+    def _copy_export(self, choice: ExportChoice) -> CategoryResult:
+        """Kopiuje wybrany plik eksportu jako `phone/contacts.vcf` / `sms.xml` / `calls.xml`.
+        Plik zmieniony od skanu → `export_changed`, zły format po pobraniu → `export_invalid`;
+        tymczasowy `.export-<rodzaj>.part` nie zostaje po żadnym wyniku."""
+        tmp = self.copy.phone_dir / f".export-{choice.kind}.part"
+        failed = CategoryResult("failed", 0, "export_changed", "export")
+        self._need(choice.size)
+        self.copy.phone_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            while True:
+                self._check_stop()
+                try:
+                    stats, _ = self._restat([choice.remote])
+                except AdbError:  # błąd połączenia (inne `_restat` pomija)
+                    self._disconnected()
+                    continue
+                if stats.get(choice.remote) != (choice.size, choice.mtime):
+                    return failed
+                tmp.unlink(missing_ok=True)
+                res = self.puller.pull([choice.remote], tmp, self.should_stop, lambda: self._progress("telephony"))
+                if res.stopped:
+                    raise _Stop()
+                if tmp.is_file() and tmp.stat().st_size == choice.size:
+                    break
+                if not self._online():
+                    self._disconnected()
+                    continue
+                return failed
+            try:
+                count = count_export(tmp, choice.kind)
+            except ExportFormatError:
+                return CategoryResult("failed", 0, "export_invalid", "export")
+            os.replace(tmp, self.copy.phone_dir / EXPORT_NAMES[choice.kind])
+            return CategoryResult("ok", count, None, "export")
+        finally:
+            tmp.unlink(missing_ok=True)
 
     # ---- uzgadnianie stanu ----------------------------------------------------------------
     def _wanted(self, category: str) -> bool:

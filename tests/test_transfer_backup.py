@@ -18,10 +18,17 @@ from admenot.engine.adb.transport import AdbError
 from admenot.engine.device.info import DeviceInfo
 from admenot.engine.transfer import backup as backup_mod
 from admenot.engine.transfer import store
-from admenot.engine.transfer.backup import BackupError, Progress, Selection, run_backup
+from admenot.engine.transfer.backup import (
+    BackupError,
+    ExportChoice,
+    Progress,
+    Selection,
+    run_backup,
+)
 from admenot.engine.transfer.guard import ReadOnlyAdb, assert_read_only
 from admenot.engine.transfer.inventory import AppEntry, Inventory, scan_files
 from admenot.engine.transfer.state import State
+from admenot.engine.transfer.telephony import CategoryResult
 
 NOW = datetime(2026, 10, 25, 12, 0, 0)
 MTIME = 1_700_000_000
@@ -780,3 +787,137 @@ def test_sqlite_disk_full_is_disk_full(tmp_path, monkeypatch):
     with pytest.raises(BackupError) as err:
         _run(phone, copy, _inventory(phone), _sel())
     assert err.value.key == "disk_full"
+
+
+# ---- kopia z pliku eksportu ----------------------------------------------------------------
+VCF3 = "".join(f"BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Osoba {i}\r\nEND:VCARD\r\n" for i in range(3))
+SMS_XML = ("<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n"
+           '<smses count="3">\n<sms address="1" body="a" />\n<sms address="2" body="b" />\n'
+           '<mms address="3" />\n</smses>\n')
+EXPORT_DIR = "Kopia kontaktów"
+
+
+def _put(phone: FakeStoragePhone, rel: str, data: bytes | str) -> ExportChoice:
+    path = phone.root / "sdcard" / rel
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data.encode("utf-8") if isinstance(data, str) else data)
+    os.utime(path, (MTIME, MTIME))
+    kind = "contacts" if rel.endswith(".vcf") else "sms"
+    return ExportChoice(kind, "/sdcard/" + rel, path.stat().st_size, MTIME)
+
+
+def _denied_phone(tmp_path: Path) -> FakeStoragePhone:
+    phone = _phone(tmp_path)
+    phone.deny_uris = {"content://com.android.contacts/contacts", "content://sms"}
+    return phone
+
+
+def _parts(copy: store.CopyDir) -> list[Path]:
+    return [p for p in copy.phone_dir.iterdir() if p.name.startswith(".export")]
+
+
+def test_backup_contacts_from_export(tmp_path):
+    phone = _denied_phone(tmp_path)
+    choice = _put(phone, f"{EXPORT_DIR}/kontakty.vcf", VCF3)
+    copy = _copy()
+    res = _run(phone, copy, _inventory(phone), _sel(contacts=True, categories=frozenset(), exports=(choice,)))
+    assert res.status == "complete"
+    assert res.telephony["contacts"] == CategoryResult("ok", 3, None, "export")
+    assert (copy.phone_dir / "contacts.vcf").read_bytes() == VCF3.encode("utf-8")
+    assert _parts(copy) == []
+    assert copy.read_meta().selection["exports"] == [
+        {"kind": "contacts", "remote": choice.remote, "size": choice.size, "mtime": MTIME}]
+
+
+def test_backup_sms_from_export_skips_mms(tmp_path):
+    phone = _denied_phone(tmp_path)
+    choice = _put(phone, "Backup/sms.xml", SMS_XML)
+    copy = _copy()
+    res = _run(phone, copy, _inventory(phone),
+               _sel(sms=True, mms=True, categories=frozenset(), exports=(choice,)))
+    assert res.telephony["sms"] == CategoryResult("ok", 3, None, "export")
+    assert "mms" not in res.telephony
+    assert (copy.phone_dir / "sms.xml").read_text(encoding="utf-8") == SMS_XML
+    assert not any("content://mms" in c for c in phone.commands)
+
+
+def test_backup_export_other_categories_still_from_provider(tmp_path):
+    phone = _phone(tmp_path)
+    phone.deny_uris = {"content://sms"}
+    choice = _put(phone, "Backup/sms.xml", SMS_XML)
+    res = _run(phone, _copy(), _inventory(phone),
+               _sel(sms=True, calls=True, categories=frozenset(), exports=(choice,)))
+    assert res.telephony["sms"].source == "export"
+    assert res.telephony["calls"] == CategoryResult("ok", 1, None, "phone")
+
+
+def test_backup_export_changed(tmp_path):
+    phone = _denied_phone(tmp_path)
+    choice = _put(phone, f"{EXPORT_DIR}/kontakty.vcf", VCF3)
+    (phone.root / "sdcard" / EXPORT_DIR / "kontakty.vcf").unlink()
+    copy = _copy()
+    res = _run(phone, copy, _inventory(phone), _sel(contacts=True, exports=(choice,)))
+    assert res.telephony["contacts"] == CategoryResult("failed", 0, "export_changed", "export")
+    assert res.files_done == 3 and res.status == "incomplete"
+    assert not (copy.phone_dir / "contacts.vcf").exists() and _parts(copy) == []
+    # zmieniony rozmiar
+    phone2 = _denied_phone(tmp_path / "b")
+    choice2 = _put(phone2, f"{EXPORT_DIR}/kontakty.vcf", VCF3)
+    _put(phone2, f"{EXPORT_DIR}/kontakty.vcf", VCF3 + "BEGIN:VCARD\r\nEND:VCARD\r\n")
+    copy2 = _copy()
+    res2 = _run(phone2, copy2, _inventory(phone2), _sel(contacts=True, exports=(choice2,)))
+    assert res2.telephony["contacts"] == CategoryResult("failed", 0, "export_changed", "export")
+    assert res2.status == "incomplete" and _parts(copy2) == []
+
+
+def test_backup_export_invalid(tmp_path):
+    phone = _denied_phone(tmp_path)
+    choice = _put(phone, f"{EXPORT_DIR}/kontakty.vcf", VCF3)
+    _put(phone, f"{EXPORT_DIR}/kontakty.vcf", "hello" + "x" * (choice.size - 5))
+    copy = _copy()
+    res = _run(phone, copy, _inventory(phone), _sel(contacts=True, exports=(choice,)))
+    assert res.telephony["contacts"] == CategoryResult("failed", 0, "export_invalid", "export")
+    assert res.status == "incomplete"
+    assert not (copy.phone_dir / "contacts.vcf").exists() and _parts(copy) == []
+
+
+def test_backup_export_odd_name(tmp_path):
+    phone = _denied_phone(tmp_path)
+    choice = _put(phone, f"{EXPORT_DIR}/it's żółć.vcf", VCF3)
+    res = _run(phone, _copy(), _inventory(phone), _sel(contacts=True, categories=frozenset(), exports=(choice,)))
+    assert res.telephony["contacts"] == CategoryResult("ok", 3, None, "export")
+    for cmd in phone.commands:
+        assert_read_only(cmd)
+
+
+def test_backup_export_disconnect_during_pull_retries(tmp_path):
+    phone = _denied_phone(tmp_path)
+    choice = _put(phone, f"{EXPORT_DIR}/kontakty.vcf", VCF3)
+    phone.fail_after_files = 0
+    waits: list[int] = []
+
+    def wait_device():
+        waits.append(1)
+        phone.fail_after_files = None
+        phone.reconnect()
+
+    copy = _copy()
+    res = _run(phone, copy, _inventory(phone), _sel(contacts=True, categories=frozenset(), exports=(choice,)),
+               wait_device=wait_device)
+    assert len(waits) == 1
+    assert res.telephony["contacts"] == CategoryResult("ok", 3, None, "export")
+    assert _parts(copy) == []
+
+
+def test_backup_resume_reuses_export(tmp_path):
+    phone = _denied_phone(tmp_path)
+    choice = _put(phone, f"{EXPORT_DIR}/kontakty.vcf", VCF3)
+    copy = _copy()
+    inv = _inventory(phone)
+    sel = _sel(contacts=True, exports=(choice,))
+    first = _run(phone, copy, inv, sel, should_stop=lambda: len(phone.pulled) >= 2)
+    assert first.status == "stopped"
+    second = _run(phone, copy, inv, sel)
+    assert second.status == "complete"
+    assert phone.pulled.count(choice.remote) == 1
+    assert second.telephony["contacts"] == CategoryResult("ok", 3, None, "export")

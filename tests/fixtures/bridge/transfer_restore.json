@@ -1091,7 +1091,8 @@
         "apps": [
          "com.whatsapp"
         ],
-        "verify_hash": false
+        "verify_hash": false,
+        "exports": []
        },
        "restores": []
       }
@@ -1150,7 +1151,8 @@
        "apps": [
         "com.whatsapp"
        ],
-       "verify_hash": false
+       "verify_hash": false,
+       "exports": []
       },
       "restores": []
      }
@@ -1431,7 +1433,8 @@
         "apps": [
          "com.whatsapp"
         ],
-        "verify_hash": false
+        "verify_hash": false,
+        "exports": []
        },
        "restores": []
       },
@@ -1752,7 +1755,8 @@
         "apps": [
          "com.whatsapp"
         ],
-        "verify_hash": false
+        "verify_hash": false,
+        "exports": []
        },
        "restores": [
         {
@@ -1818,7 +1822,8 @@
        "apps": [
         "com.whatsapp"
        ],
-       "verify_hash": false
+       "verify_hash": false,
+       "exports": []
       },
       "restores": [
        {

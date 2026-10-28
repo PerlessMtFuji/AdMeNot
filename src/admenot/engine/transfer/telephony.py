@@ -53,6 +53,7 @@ class CategoryResult:
     status: Literal["ok", "unavailable", "failed"]
     count: int = 0
     error: str | None = None
+    source: Literal["phone", "export"] = "phone"  # z providera telefonu albo z wybranego pliku eksportu
 
 
 def is_denied(text: str) -> bool:
