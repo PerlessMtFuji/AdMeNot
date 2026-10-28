@@ -11,6 +11,9 @@ import {
   uploadNeed,
   changedVerdicts,
   defaultTransferSelection,
+  exportDefaults,
+  keptExport,
+  rescanSelection,
   isXiaomi,
   APK_ESTIMATE,
   resumableCopy,
@@ -615,12 +618,12 @@ describe('data transfer', () => {
       { package: 'b.sus', label: 'B', verdict: 'suspicious', default_on: false, bytes: null },
     ],
     skipped_apps: [{ package: 'c.bad', label: 'C' }],
-    whatsapp_backup: null, storage: null, free_pc: 10 ** 12, unreadable: 0, ...over,
+    whatsapp_backup: null, storage: null, free_pc: 10 ** 12, unreadable: 0, denied: [], exports: {}, ...over,
   });
 
   test('default selection: everything readable, no other folders, suspicious apps off', () => {
     expect(defaultTransferSelection(inv())).toEqual({
-      contacts: true, sms: true, mms: true, calls: true, categories: ['media', 'whatsapp'], others: [], apps: ['a.ok'],
+      contacts: true, sms: true, mms: true, calls: true, categories: ['media', 'whatsapp'], others: [], apps: ['a.ok'], exports: {},
     });
   });
 
@@ -650,8 +653,62 @@ describe('data transfer', () => {
     expect(resumeSelection(data, {})).toEqual(defaultTransferSelection(data));
     expect(resumeSelection(data, { contacts: false, sms: true, mms: false, calls: true,
       categories: ['downloads', 'media'], others: ['Music', 'Gone'], apps: ['b.sus', 'x.removed'] })).toEqual({
-      contacts: false, sms: true, mms: false, calls: true, categories: ['media'], others: ['Music'], apps: ['b.sus'] });
+      contacts: false, sms: true, mms: false, calls: true, categories: ['media'], others: ['Music'], apps: ['b.sus'], exports: {} });
     expect(resumeSelection(inv({ sms: null }), { sms: true }).sms).toBe(false);
+  });
+
+  const file = (remote: string, count: number | null = 3) =>
+    ({ remote, name: remote.split('/').at(-1)!, size: 100, mtime: '2026-10-27T20:41:00', count });
+  const denied = (contacts: string[], sms: string[] = []) => inv({
+    contacts: null, sms: sms.length ? null : 5, mms: sms.length ? null : 1, denied: sms.length ? ['contacts', 'sms'] : ['contacts'],
+    exports: { contacts: contacts.map((r) => file(r)), ...(sms.length ? { sms: sms.map((r) => file(r)) } : {}) },
+  });
+
+  test('export defaults: the newest file of each kind', () => {
+    expect(exportDefaults(inv())).toEqual({});
+    expect(exportDefaults(denied(['/sdcard/new.vcf', '/sdcard/old.vcf'], ['/sdcard/sms.xml'])))
+      .toEqual({ contacts: '/sdcard/new.vcf', sms: '/sdcard/sms.xml' });
+  });
+
+  test('a denied category with an export file starts ticked from the newest file; SMS from a file has no MMS', () => {
+    const sel = defaultTransferSelection(denied(['/sdcard/new.vcf', '/sdcard/old.vcf'], ['/sdcard/sms.xml']));
+    expect([sel.contacts, sel.sms, sel.mms, sel.calls]).toEqual([true, true, false, true]);
+    expect(sel.exports).toEqual({ contacts: '/sdcard/new.vcf', sms: '/sdcard/sms.xml' });
+    expect(defaultTransferSelection(denied([])).contacts).toBe(false);
+  });
+
+  test('after a rescan the newest file wins unless the technician picked an older one that is still there', () => {
+    const before = denied(['/sdcard/a.vcf', '/sdcard/b.vcf']);
+    const newer = denied(['/sdcard/new.vcf', '/sdcard/a.vcf', '/sdcard/b.vcf']);
+    // wybrany był najnowszy — pojawił się nowszy
+    expect(keptExport({ contacts: '/sdcard/a.vcf' }, before, newer)).toEqual({ contacts: '/sdcard/new.vcf' });
+    // wybrany starszy plik nadal jest na liście
+    expect(keptExport({ contacts: '/sdcard/b.vcf' }, before, newer)).toEqual({ contacts: '/sdcard/b.vcf' });
+    // wybrany plik zniknął
+    expect(keptExport({ contacts: '/sdcard/b.vcf' }, before, denied(['/sdcard/new.vcf', '/sdcard/a.vcf'])))
+      .toEqual({ contacts: '/sdcard/new.vcf' });
+    // pierwszy plik po ponownym skanie
+    expect(keptExport({}, denied([]), newer)).toEqual({ contacts: '/sdcard/new.vcf' });
+    expect(keptExport({ contacts: '/sdcard/a.vcf' }, before, denied([]))).toEqual({});
+  });
+
+  test('a rescan keeps the other choices and ticks a category whose first export file just appeared', () => {
+    const before = denied([]);
+    const prev = { ...defaultTransferSelection(before), calls: false, categories: ['media' as const] };
+    const sel = rescanSelection(prev, before, denied(['/sdcard/new.vcf']));
+    expect(sel).toEqual({ ...prev, contacts: true, exports: { contacts: '/sdcard/new.vcf' } });
+    // odznaczony wiersz z plikiem zostaje odznaczony
+    const had = denied(['/sdcard/a.vcf']);
+    const off = { ...defaultTransferSelection(had), contacts: false };
+    expect(rescanSelection(off, had, denied(['/sdcard/new.vcf', '/sdcard/a.vcf'])).contacts).toBe(false);
+  });
+
+  test('a resumed copy reuses its stored export file when it is still offered, else the newest', () => {
+    const data = denied(['/sdcard/new.vcf', '/sdcard/old.vcf']);
+    const stored = (remote: string) => ({ contacts: true, exports: [{ kind: 'contacts' as const, remote, size: 1, mtime: 1 }] });
+    expect(resumeSelection(data, stored('/sdcard/old.vcf')).exports).toEqual({ contacts: '/sdcard/old.vcf' });
+    expect(resumeSelection(data, stored('/sdcard/gone.vcf')).exports).toEqual({ contacts: '/sdcard/new.vcf' });
+    expect(resumeSelection(data, stored('/sdcard/old.vcf')).contacts).toBe(true);
   });
 
   test('copy progress counts apps with an estimated size, so copied files alone do not fill the bar', () => {

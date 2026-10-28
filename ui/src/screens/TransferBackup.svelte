@@ -31,20 +31,23 @@
   ]);
   const TELEPHONY = ['contacts', 'sms', 'mms', 'calls'] as const;
   const telephony = $derived(done ? TELEPHONY.filter((k) => k in done.telephony).map((k) => [k, done.telephony[k]] as const) : []);
-  const unavailable = $derived(telephony.some(([, r]) => r.status === 'unavailable'));
+  const unavailable = $derived(telephony.some(([, r]) => r.status === 'unavailable' && r.source !== 'export'));
 
   const size = (bytes: number) => formatSize(bytes, i18n.lang);
 
-  /** `addresses_missing:3,attachments_missing:1` → czytelne braki; nieznane fragmenty pomijamy. */
+  const KNOWN_ERRORS = ['addresses_missing', 'attachments_missing', 'export_changed', 'export_invalid'];
+
+  /** `addresses_missing:3,attachments_missing:1`, `export_changed` → czytelne braki; nieznane fragmenty pomijamy. */
   function problems(r: TelephonyResult): string[] {
     return (r.error ?? '').split(',').flatMap((part) => {
       const [key, n] = part.split(':');
-      return key === 'addresses_missing' || key === 'attachments_missing' ? [t(`transfer.sum.${key}`, { count: n ?? '' })] : [];
+      return KNOWN_ERRORS.includes(key) ? [t(`transfer.sum.${key}`, { count: n ?? '' })] : [];
     });
   }
 
+  /** Dane z pliku eksportu: dopisek przy liczbie zamiast podpowiedzi o Xiaomi. */
   function telephonyText(r: TelephonyResult): string {
-    if (r.status === 'ok') return num(r.count);
+    if (r.status === 'ok') return r.source === 'export' ? `${num(r.count)} · ${t('transfer.export.from_file')}` : num(r.count);
     if (r.status === 'unavailable') return t('transfer.unavailable');
     return [t('transfer.sum.tel_failed'), ...problems(r)].join(' · ');
   }

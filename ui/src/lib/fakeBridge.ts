@@ -156,6 +156,14 @@ export function createFakeBridge(name: string,
         return { deleted: String(args[0]) };
       case 'transfer_whatsapp':
         return { whatsapp_backup: '2026-09-26T14:29:00' };
+      case 'transfer_rescan': {
+        // Scenariusz bez nagranego ponownego skanu: ten sam odczyt co `transfer_inventory`.
+        const events = data.calls.find((c) => c.method === 'transfer_inventory')?.events ?? [];
+        const end = events.find(([event]) => event === 'job:end')?.[1] as { job_id: string } | undefined;
+        if (!end) return { error: { key: 'transfer_no_inventory', message: '' } };
+        replay(events);
+        return { job_id: end.job_id };
+      }
       case 'delete_order':
         return { deleted: String(args[0]) };
       case 'get_settings':

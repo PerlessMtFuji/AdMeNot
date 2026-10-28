@@ -458,6 +458,19 @@ export interface InventoryApp {
   bytes: number | null; // nieznany przed kopią
 }
 
+/** Rodzaj pliku eksportu: wizytówki .vcf, SMS Backup & Restore (`<smses>`, `<calls>`). */
+export type ExportKind = 'contacts' | 'sms' | 'calls';
+
+/** Plik eksportu znaleziony na telefonie (z `present.inventory_view`). `mtime`: czas lokalny ISO, sekundy;
+ *  `count`: null, gdy plik jest większy niż odczytany nagłówek (liczba będzie znana po pobraniu). */
+export interface ExportFileView {
+  remote: string;
+  name: string;
+  size: number;
+  mtime: string;
+  count: number | null;
+}
+
 export interface InventoryView {
   /** null: telefon nie pozwolił odczytać (np. Xiaomi bez „Debugowanie USB (ustawienia zabezpieczeń)”). */
   contacts: number | null;
@@ -475,6 +488,10 @@ export interface InventoryView {
   storage: { used: number; total: number } | null;
   free_pc: number;
   unreadable: number;
+  /** Kategorie, których odczytu telefon odmówił (nie zwykły błąd). */
+  denied: ExportKind[];
+  /** Pliki eksportu dla kategorii, których telefon nie dał odczytać — najnowsze pierwsze. */
+  exports: Partial<Record<ExportKind, ExportFileView[]>>;
 }
 
 /** Wybór wysyłany do `start_backup` (Selection z silnika). */
@@ -486,7 +503,20 @@ export interface TransferSelection {
   categories: TransferCategory[];
   others: string[];
   apps: string[];
+  /** Wybrany plik eksportu (rodzaj → `remote`); most bierze tylko rodzaje z włączoną flagą. */
+  exports?: Partial<Record<ExportKind, string>>;
 }
+
+/** Plik eksportu zapisany w wyborze kopii (`copy.selection.exports`). `mtime`: sekundy od epoki. */
+export interface StoredExport {
+  kind: ExportKind;
+  remote: string;
+  size: number;
+  mtime: number;
+}
+
+/** Wybór zapisany w kopii — pliki eksportu jako lista, nie jak w `start_backup`. */
+export type StoredSelection = Partial<Omit<TransferSelection, 'exports'>> & { verify_hash?: boolean; exports?: StoredExport[] };
 
 export interface CopyView {
   id: string;
@@ -501,7 +531,7 @@ export interface CopyView {
   bytes: number;
   counts: Record<string, number>;
   /** Wybór zapisany w kopii (pusty, gdy kopia jeszcze nie ruszyła); wznowienie zaczyna od niego. */
-  selection?: Partial<TransferSelection>;
+  selection?: StoredSelection;
   /** Wgrywania tej kopii na nowe telefony, najnowsze pierwsze; starsze mosty ich nie wysyłają. */
   restores?: CopyRestore[];
 }
@@ -607,8 +637,10 @@ export interface TransferProgress {
 export interface TelephonyResult {
   status: 'ok' | 'unavailable' | 'failed';
   count: number;
-  /** np. `addresses_missing:3,attachments_missing:1`; starsze widoki go nie mają. */
+  /** np. `addresses_missing:3,attachments_missing:1`, `export_changed`, `export_invalid`; starsze widoki go nie mają. */
   error?: string | null;
+  /** Skąd dane: z telefonu albo z pliku eksportu; starsze widoki go nie mają. */
+  source?: 'phone' | 'export';
 }
 
 export interface BackupResultView {
@@ -696,6 +728,8 @@ export interface Api {
   quit(): R<{ ok: boolean; closing_after_step?: boolean }>;
   transfer_inventory(serial: string, client: string | null): R<{ job_id: string }>;
   transfer_whatsapp(): R<{ whatsapp_backup: string | null }>;
+  /** Ponowny odczyt telefonu (np. po eksporcie kontaktów do pliku) — wynik jak `transfer_inventory`. */
+  transfer_rescan(): R<{ job_id: string }>;
   start_backup(selection: TransferSelection): R<{ job_id: string }>;
   transfers(): R<{ copies: CopyView[] }>;
   extend_transfer(copyId: string): R<{ copy: CopyView }>;

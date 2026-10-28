@@ -5,7 +5,7 @@ import { CHECKS_SAMPLE, createFakeBridge } from './fakeBridge';
 import { i18n } from './i18n/index.svelte';
 import { actedAfter, actedLevels, needsWelcome, withoutUndone } from './logic';
 import { AppState } from './state.svelte';
-import type { Settings } from './types';
+import type { InventoryView, Settings } from './types';
 
 function setup(scenario: string) {
   const bridge = createFakeBridge(scenario, { delay: 0 });
@@ -1105,7 +1105,7 @@ describe('data transfer', () => {
     expect(s.phase).toBe('transfer_choose');
     expect(s.device?.serial).toBe('R58T00TEST');
     expect(s.transfer.selection).toEqual({ contacts: true, sms: true, mms: false, calls: true,
-      categories: ['media', 'downloads', 'whatsapp'], others: [], apps: ['com.wlive.forecast', 'com.whatsapp'] });
+      categories: ['media', 'downloads', 'whatsapp'], others: [], apps: ['com.wlive.forecast', 'com.whatsapp'], exports: {} });
     await vi.waitFor(() => expect(s.job).toBeNull());
   });
 
@@ -1245,6 +1245,92 @@ describe('data transfer', () => {
     ctl.leaveTransfer();
     expect(s.phase).toBe('connect');
     expect(s.transfer.inventory).toBeNull();
+  });
+});
+
+describe('data transfer — export files', () => {
+  const NEWEST = '/sdcard/Kopia/kontakty.vcf';
+  const OLDER = '/sdcard/Kopia/kontakty-stare.vcf';
+  const SMS = '/sdcard/Backup/sms.xml';
+
+  async function chosen() {
+    const env = setup('transfer_export');
+    await env.ctl.init();
+    env.s.client = 'Anna K.';
+    await env.ctl.startTransfer();
+    await vi.waitFor(() => expect(env.s.transfer.inventory).not.toBeNull());
+    await vi.waitFor(() => expect(env.s.job).toBeNull());
+    return env;
+  }
+
+  test('denied contacts and SMS with export files start ticked from the newest files', async () => {
+    const { s } = await chosen();
+    expect(s.transfer.selection.contacts).toBe(true);
+    expect(s.transfer.selection.sms).toBe(true);
+    expect(s.transfer.selection.mms).toBe(false);
+    expect(s.transfer.selection.exports).toEqual({ contacts: NEWEST, sms: SMS });
+  });
+
+  test('choosing another file changes the selection', async () => {
+    const { ctl, s } = await chosen();
+    ctl.chooseExport('contacts', OLDER);
+    expect(s.transfer.selection.exports?.contacts).toBe(OLDER);
+    expect(s.transfer.selection.contacts).toBe(true);
+  });
+
+  test('startBackup sends the chosen export files, without MMS', async () => {
+    const { ctl, bridge } = await chosen();
+    ctl.chooseExport('contacts', OLDER);
+    await ctl.startBackup();
+    const sent = bridge.calls.find((c) => c.method === 'start_backup')?.args[0] as Record<string, unknown>;
+    expect(sent.exports).toEqual({ contacts: OLDER, sms: SMS });
+    expect(sent).toMatchObject({ contacts: true, sms: true, mms: false });
+  });
+
+  test('an unticked category sends no export file', async () => {
+    const { ctl, bridge } = await chosen();
+    ctl.toggleTransfer('contacts');
+    await ctl.startBackup();
+    const sent = bridge.calls.find((c) => c.method === 'start_backup')?.args[0] as Record<string, unknown>;
+    expect(sent.contacts).toBe(false);
+    expect(sent.exports).toEqual({ sms: SMS });
+  });
+
+  test('rescan asks the bridge, keeps an older picked file and the other choices', async () => {
+    const { ctl, s, bridge } = await chosen();
+    ctl.chooseExport('contacts', OLDER);
+    ctl.toggleTransfer('downloads');
+    ctl.toggleTransferOther('Music');
+    const before = s.transfer.selection;
+    await ctl.rescanTransfer();
+    expect(bridge.calls.at(-1)?.method).toBe('transfer_rescan');
+    expect(s.job?.kind).toBe('transfer_scan');
+    await vi.waitFor(() => expect(s.job).toBeNull());
+    expect(s.phase).toBe('transfer_choose');
+    expect(s.transfer.selection).toEqual(before);
+    expect(s.transfer.selection.exports?.contacts).toBe(OLDER);
+  });
+
+  test('rescan moves from the newest file to an even newer one', async () => {
+    const { ctl, s, bridge } = await chosen();
+    const inv = JSON.parse(JSON.stringify(s.transfer.inventory)) as InventoryView;
+    const newer = { remote: '/sdcard/Download/kontakty-nowe.vcf', name: 'kontakty-nowe.vcf', size: 200,
+      mtime: '2023-11-15T10:00:00', count: 4 };
+    await ctl.rescanTransfer();
+    await vi.waitFor(() => expect(s.job).toBeNull());
+    bridge.emit('transfer:inventory', { inventory: { ...inv, exports: { ...inv.exports, contacts: [newer, ...inv.exports.contacts!] } },
+      resumable: null, client: 'Anna K.' });
+    expect(s.transfer.selection.exports?.contacts).toBe(newer.remote);
+  });
+
+  test('a failed rescan keeps the choice screen and its selection', async () => {
+    const { ctl, s, bridge } = await chosen();
+    const before = s.transfer.selection;
+    await ctl.rescanTransfer();
+    bridge.emit('job:error', { job_id: 'job-2', kind: 'transfer_scan', key: 'timeout', message: '' });
+    expect(s.phase).toBe('transfer_choose');
+    expect(s.transfer.selection).toEqual(before);
+    expect(s.error?.key).toBe('timeout');
   });
 });
 
@@ -1409,7 +1495,7 @@ describe('data transfer — resuming', () => {
       contacts: true, sms: false, mms: false, calls: false, categories: ['media'], others: ['Music', 'Gone'],
       apps: ['com.whatsapp'], verify_hash: false } as never } } as never);
     expect(s.transfer.selection).toEqual({ contacts: true, sms: false, mms: false, calls: false, categories: ['media'],
-      others: ['Music'], apps: ['com.whatsapp'] });
+      others: ['Music'], apps: ['com.whatsapp'], exports: {} });
     await ctl.startBackup();
     expect(bridge.calls.find((c) => c.method === 'start_backup')?.args[0]).toEqual({ contacts: true, sms: false, mms: false,
       calls: false, categories: ['media'], others: ['Music'], apps: ['com.whatsapp'] });

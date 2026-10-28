@@ -511,6 +511,52 @@
       "apps": "Apps",
       "apps_note": "Only the apps, without their data and sign-ins."
     },
+    "export": {
+      "title_denied": "The phone did not allow reading {what}.",
+      "title_denied_file": "The phone did not allow reading {what} — an export file is used.",
+      "title_failed": "Could not read {what}.",
+      "xiaomi": "Xiaomi allows access to this data only with “USB debugging (Security settings)”, which requires a Mi account.",
+      "howto": "Without it, export the data to a file (Contacts → Import/export or an app such as SMS Backup & Restore), save it in the phone’s storage, e.g. in Downloads or a new folder, and click “Scan again”.",
+      "files": "Export files on the phone",
+      "newest": "newest",
+      "none_fit": "No current one? Export the data to a file and:",
+      "rescan": "Scan again",
+      "change": "change file",
+      "from_file": "from an export file",
+      "count": {
+        "one": "{count} from an export file",
+        "few": "{count} from an export file",
+        "many": "{count} from an export file",
+        "other": "{count} from an export file"
+      },
+      "what": {
+        "contacts": "contacts",
+        "sms": "messages",
+        "calls": "call history",
+        "and": " and ",
+        "sep": ", "
+      },
+      "items": {
+        "contacts": {
+          "one": "{count} contact",
+          "few": "{count} contacts",
+          "many": "{count} contacts",
+          "other": "{count} contacts"
+        },
+        "sms": {
+          "one": "{count} message",
+          "few": "{count} messages",
+          "many": "{count} messages",
+          "other": "{count} messages"
+        },
+        "calls": {
+          "one": "{count} call",
+          "few": "{count} calls",
+          "many": "{count} calls",
+          "other": "{count} calls"
+        }
+      }
+    },
     "unavailable": "unavailable",
     "unreadable": "The phone did not allow reading this data.",
     "xiaomi_hint": "On Xiaomi, Redmi and POCO phones, turn on “USB debugging (Security settings)” in Developer options, then choose “Transfer data” again. If the copy is already done, select only the missing data, e.g. SMS and contacts — the rest does not need to be copied again.",
@@ -621,7 +667,9 @@
       "failed": "failed: {count}",
       "tel_failed": "failed",
       "addresses_missing": "without addresses: {count}",
-      "attachments_missing": "without attachments: {count}"
+      "attachments_missing": "without attachments: {count}",
+      "export_changed": "the export file changed since the scan — scan again",
+      "export_invalid": "the export file is damaged"
     },
     "expires": {
       "one": "The copy is deleted from this computer in {count} day — change that in History.",

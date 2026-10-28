@@ -1,10 +1,10 @@
 import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
-import { actedAfter, changedVerdicts, defaultSelection, defaultUploadChoice, keptUploadChoice, otherGroup, resumableCopy, UPLOAD_GROUPS, resumeSelection, TRANSFER_CATEGORIES, transferNeed, transferTotals, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
+import { actedAfter, changedVerdicts, defaultSelection, defaultUploadChoice, keptUploadChoice, otherGroup, resumableCopy, UPLOAD_GROUPS, resumeSelection, rescanSelection, TRANSFER_CATEGORIES, transferNeed, transferTotals, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
 import { EMPTY_TRANSFER_SELECTION, emptyRestore, type AppState } from './state.svelte';
 import { applyTheme } from './theme';
 import type {
-  ApiError, AppView, CacheUsage, TransferCategory, EtaView, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, TelemetrySample, Theme, UploadChoiceView, Verdict,
+  ApiError, AppView, CacheUsage, ExportKind, TransferCategory, EtaView, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, TelemetrySample, Theme, UploadChoiceView, Verdict,
 } from './types';
 
 const CONSOLE_LIMIT = 500;
@@ -289,6 +289,8 @@ export class Controller {
         s.verifying = false;
         s.stopping = false;
         s.phase = 'connect';
+      } else if (d.kind === 'transfer_scan' && s.phase === 'transfer_choose' && s.transfer.inventory) {
+        // „Skanuj ponownie” nie wyszło: zostaje poprzedni odczyt i wybór, błąd widać na karcie.
       } else if (d.kind === 'transfer_scan' && s.phase === 'transfer_choose') {
         this.resetTransfer();
         s.device = null;
@@ -676,9 +678,11 @@ export class Controller {
     const s = this.state;
     on('transfer:inventory', (d) => {
       if (s.phase !== 'transfer_choose') return; // serwisant już wyszedł z przenoszenia
+      const prev = s.transfer.inventory; // jest tylko po „Skanuj ponownie” (`startTransfer` czyści stan)
+      s.transfer.selection = prev ? rescanSelection(s.transfer.selection, prev, d.inventory)
+        : resumeSelection(d.inventory, d.resumable?.selection);
       s.transfer.inventory = d.inventory;
       s.transfer.resumable = d.resumable;
-      s.transfer.selection = resumeSelection(d.inventory, d.resumable?.selection);
       s.phase = 'transfer_choose';
     });
     on('transfer:progress', (d) => {
@@ -755,8 +759,9 @@ export class Controller {
       sel[key] = !sel[key];
     } else if (key === 'sms') {
       const on = !(sel.sms || sel.mms);
-      sel.sms = on && (inv?.sms ?? 0) > 0;
-      sel.mms = on && (inv?.mms ?? 0) > 0;
+      const fromFile = !!sel.exports?.sms;
+      sel.sms = on && ((inv?.sms ?? 0) > 0 || fromFile);
+      sel.mms = on && (inv?.mms ?? 0) > 0 && !fromFile;
     } else if (key === 'others') {
       sel.others = sel.others.length ? [] : (inv?.others ?? []).map((o) => o.name);
     } else if (key === 'apps') {
@@ -785,6 +790,23 @@ export class Controller {
       others: sel.others.includes(name) ? sel.others.filter((o) => o !== name) : [...sel.others, name] };
   }
 
+  /** Inny plik eksportu z listy w banerze; wybór pliku zaznacza też jego wiersz (SMS z pliku — bez MMS). */
+  chooseExport(kind: ExportKind, remote: string): void {
+    const sel = this.state.transfer.selection;
+    this.state.transfer.selection = { ...sel, [kind]: true, ...(kind === 'sms' ? { mms: false } : {}),
+      exports: { ...sel.exports, [kind]: remote } };
+  }
+
+  /** „Skanuj ponownie”: serwisant wyeksportował dane do pliku. Nowy inwentarz przychodzi jak zwykle
+   *  (`transfer:inventory`) i zachowuje wybór — patrz `rescanSelection`. */
+  async rescanTransfer(): Promise<void> {
+    const s = this.state;
+    if (s.phase !== 'transfer_choose' || !s.transfer.inventory || s.job) return;
+    s.error = null;
+    const r = await this.call(this.api.transfer_rescan());
+    if (r) this.setJob(r.job_id, 'transfer_scan');
+  }
+
   /** „Sprawdź ponownie”: serwisant właśnie zrobił kopię czatów WhatsApp na telefonie. */
   async recheckWhatsapp(): Promise<void> {
     const r = await this.call(this.api.transfer_whatsapp());
@@ -797,9 +819,12 @@ export class Controller {
     const s = this.state;
     const sel = s.transfer.selection;
     s.error = null;
+    // Plik eksportu tylko dla zaznaczonego wiersza (most odrzuca plik przy wyłączonej fladze).
+    const exports = Object.fromEntries(Object.entries(sel.exports ?? {}).filter(([k]) => sel[k as ExportKind]));
     const r = await this.call(this.api.start_backup({
-      contacts: sel.contacts, sms: sel.sms, mms: sel.mms, calls: sel.calls,
+      contacts: sel.contacts, sms: sel.sms, mms: sel.mms && !exports.sms, calls: sel.calls,
       categories: [...sel.categories], others: [...sel.others], apps: [...sel.apps],
+      ...(Object.keys(exports).length ? { exports } : {}),
     }));
     if (!r) return;
     Object.assign(s.transfer, { progress: null, waiting: false, result: null, copy: null });

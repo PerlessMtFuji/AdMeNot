@@ -1,5 +1,5 @@
 import { CATEGORY_ORDER } from './categories';
-import type { AppView, BackupResultView, Category, CopyView, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferProgress, TransferSelection, InventoryView, RestorePlanView, RestoreResultView, UndoSite, UploadChoiceView, UploadGroup, UpdateView, UserWait, Verdict } from './types';
+import type { AppView, BackupResultView, Category, CopyView, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferProgress, TransferSelection, InventoryView, ExportFileView, ExportKind, StoredSelection, RestorePlanView, RestoreResultView, UndoSite, UploadChoiceView, UploadGroup, UpdateView, UserWait, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done'
   | 'transfer_choose' | 'transfer_backup' | 'transfer_done'
@@ -555,29 +555,91 @@ export const TRANSFER_CATEGORIES: readonly TransferCategory[] = ['media', 'downl
 const TRANSFER_RATE = 25 * 1024 ** 2; // B/s — zgrubnie, kopia przez USB 2.0 / adb pull
 const readable = (n: number | null): boolean => n !== null && n > 0;
 
-/** Wszystko, co telefon dał odczytać, poza innymi folderami i aplikacjami odznaczonymi przez silnik (podejrzane). */
+export const EXPORT_KINDS: readonly ExportKind[] = ['contacts', 'sms', 'calls'];
+
+/** Pliki eksportu rodzaju, najnowsze pierwsze — tylko gdy telefon nie dał odczytać tej kategorii. */
+export function exportFiles(inv: InventoryView, kind: ExportKind): ExportFileView[] {
+  return inv[kind] === null ? inv.exports?.[kind] ?? [] : [];
+}
+
+type ExportChoice = Partial<Record<ExportKind, string>>;
+
+/** Domyślny plik eksportu: najnowszy z każdego rodzaju. */
+export function exportDefaults(inv: InventoryView): ExportChoice {
+  const out: ExportChoice = {};
+  for (const k of EXPORT_KINDS) {
+    const first = exportFiles(inv, k)[0];
+    if (first) out[k] = first.remote;
+  }
+  return out;
+}
+
+/** Plik po ponownym skanie: wybór serwisanta zostaje tylko, gdy był inny niż najnowszy i nadal jest na liście;
+ *  w przeciwnym razie najnowszy (np. świeżo wyeksportowany). */
+export function keptExport(prev: ExportChoice, prevInv: InventoryView, inv: InventoryView): ExportChoice {
+  const out: ExportChoice = {};
+  for (const k of EXPORT_KINDS) {
+    const files = exportFiles(inv, k);
+    if (!files.length) continue;
+    const p = prev[k];
+    const kept = p !== undefined && p !== exportFiles(prevInv, k)[0]?.remote && files.some((f) => f.remote === p);
+    out[k] = kept ? p : files[0].remote;
+  }
+  return out;
+}
+
+/** Wszystko, co telefon dał odczytać, poza innymi folderami i aplikacjami odznaczonymi przez silnik (podejrzane).
+ *  Kategoria, której telefon nie dał odczytać, a jest dla niej plik eksportu — z najnowszego pliku (SMS bez MMS). */
 export function defaultTransferSelection(inv: InventoryView): TransferSelection {
+  const exports = exportDefaults(inv);
   return {
-    contacts: readable(inv.contacts), sms: readable(inv.sms), mms: readable(inv.mms), calls: readable(inv.calls),
+    contacts: readable(inv.contacts) || !!exports.contacts, sms: readable(inv.sms) || !!exports.sms,
+    mms: readable(inv.mms) && !exports.sms, calls: readable(inv.calls) || !!exports.calls,
     categories: TRANSFER_CATEGORIES.filter((c) => (inv.categories[c]?.files ?? 0) > 0),
     others: [],
     apps: inv.apps.filter((a) => a.default_on).map((a) => a.package),
+    exports,
   };
 }
 
 /** Wybór przerwanej kopii (wznowienie dokłada do niej i nadpisuje jej wybór), zawężony do tego, co telefon
- *  ma teraz; kopia bez zapisanego wyboru — wybór domyślny. */
-export function resumeSelection(inv: InventoryView, stored: Partial<TransferSelection> | undefined): TransferSelection {
+ *  ma teraz; kopia bez zapisanego wyboru — wybór domyślny. Zapisany plik eksportu zostaje, jeśli nadal jest
+ *  na liście, inaczej najnowszy. */
+export function resumeSelection(inv: InventoryView, stored: StoredSelection | undefined): TransferSelection {
   if (!stored || !Object.keys(stored).length) return defaultTransferSelection(inv);
   const others = new Set(inv.others.map((o) => o.name));
   const apps = new Set(inv.apps.map((a) => a.package));
+  const exports: ExportChoice = {};
+  for (const k of EXPORT_KINDS) {
+    const files = exportFiles(inv, k);
+    if (!stored[k] || !files.length) continue;
+    const was = stored.exports?.find((e) => e.kind === k)?.remote;
+    exports[k] = files.some((f) => f.remote === was) ? was : files[0].remote;
+  }
   return {
-    contacts: !!stored.contacts && readable(inv.contacts), sms: !!stored.sms && readable(inv.sms),
-    mms: !!stored.mms && readable(inv.mms), calls: !!stored.calls && readable(inv.calls),
+    contacts: !!stored.contacts && (readable(inv.contacts) || !!exports.contacts),
+    sms: !!stored.sms && (readable(inv.sms) || !!exports.sms),
+    mms: !!stored.mms && readable(inv.mms) && !exports.sms,
+    calls: !!stored.calls && (readable(inv.calls) || !!exports.calls),
     categories: TRANSFER_CATEGORIES.filter((c) => (stored.categories ?? []).includes(c) && (inv.categories[c]?.files ?? 0) > 0),
     others: (stored.others ?? []).filter((o) => others.has(o)),
     apps: (stored.apps ?? []).filter((p) => apps.has(p)),
+    exports,
   };
+}
+
+/** Wybór po „Skanuj ponownie”: zaznaczenia serwisanta zostają (zawężone do tego, co telefon ma teraz), plik
+ *  eksportu według `keptExport`; kategoria, dla której pierwszy plik eksportu właśnie się pojawił, jest zaznaczana. */
+export function rescanSelection(prev: TransferSelection, prevInv: InventoryView, inv: InventoryView): TransferSelection {
+  const exports = keptExport(prev.exports ?? {}, prevInv, inv);
+  const flag = (k: ExportKind): boolean => {
+    const has = readable(inv[k]) || !!exports[k];
+    const had = readable(prevInv[k]) || exportFiles(prevInv, k).length > 0;
+    return has && (had ? prev[k] : true);
+  };
+  const narrowed = resumeSelection(inv, { ...prev, exports: undefined });
+  return { ...narrowed, contacts: flag('contacts'), sms: flag('sms'), mms: prev.mms && readable(inv.mms) && !exports.sms,
+    calls: flag('calls'), exports };
 }
 
 /** Xiaomi, Redmi i POCO ukrywają odczyt SMS-ów i kontaktów za osobnym przełącznikiem w opcjach programisty. */

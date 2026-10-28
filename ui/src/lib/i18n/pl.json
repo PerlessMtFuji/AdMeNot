@@ -511,6 +511,52 @@
       "apps": "Aplikacje",
       "apps_note": "Same aplikacje, bez ich danych i logowań."
     },
+    "export": {
+      "title_denied": "Telefon nie pozwolił odczytać: {what}.",
+      "title_denied_file": "Telefon nie pozwolił odczytać: {what} — użyto pliku eksportu.",
+      "title_failed": "Nie udało się odczytać: {what}.",
+      "xiaomi": "Xiaomi wpuszcza do tych danych tylko z opcją „Debugowanie USB (ustawienia zabezpieczeń)”, a ta wymaga konta Mi.",
+      "howto": "Bez niej wyeksportuj dane do pliku (Kontakty → Importuj/eksportuj albo aplikacją typu SMS Backup & Restore), zapisz go w pamięci telefonu, np. w Pobranych albo w nowym folderze, i kliknij „Skanuj ponownie”.",
+      "files": "Pliki eksportu na telefonie",
+      "newest": "najnowszy",
+      "none_fit": "Brak aktualnego? Wyeksportuj dane do pliku i:",
+      "rescan": "Skanuj ponownie",
+      "change": "zmień plik",
+      "from_file": "z pliku eksportu",
+      "count": {
+        "one": "{count} z pliku eksportu",
+        "few": "{count} z pliku eksportu",
+        "many": "{count} z pliku eksportu",
+        "other": "{count} z pliku eksportu"
+      },
+      "what": {
+        "contacts": "kontaktów",
+        "sms": "wiadomości",
+        "calls": "historii połączeń",
+        "and": " i ",
+        "sep": ", "
+      },
+      "items": {
+        "contacts": {
+          "one": "{count} kontakt",
+          "few": "{count} kontakty",
+          "many": "{count} kontaktów",
+          "other": "{count} kontaktu"
+        },
+        "sms": {
+          "one": "{count} wiadomość",
+          "few": "{count} wiadomości",
+          "many": "{count} wiadomości",
+          "other": "{count} wiadomości"
+        },
+        "calls": {
+          "one": "{count} połączenie",
+          "few": "{count} połączenia",
+          "many": "{count} połączeń",
+          "other": "{count} połączenia"
+        }
+      }
+    },
     "unavailable": "niedostępne",
     "unreadable": "Telefon nie pozwolił odczytać tych danych.",
     "xiaomi_hint": "Na telefonach Xiaomi, Redmi i POCO włącz w Opcjach programisty „Debugowanie USB (ustawienia zabezpieczeń)”, a potem wybierz „Przenieś dane” jeszcze raz. Jeśli kopia jest już zrobiona, zaznacz tylko brakujące dane, np. SMS i kontakty — reszty nie trzeba kopiować od nowa.",
@@ -621,7 +667,9 @@
       "failed": "nieudane: {count}",
       "tel_failed": "nie udało się",
       "addresses_missing": "bez adresów: {count}",
-      "attachments_missing": "bez załączników: {count}"
+      "attachments_missing": "bez załączników: {count}",
+      "export_changed": "plik eksportu zmienił się od skanu — zeskanuj ponownie",
+      "export_invalid": "plik eksportu jest uszkodzony"
     },
     "expires": {
       "one": "Kopia zostanie usunięta z komputera za {count} dzień — zmienisz to w Historii.",

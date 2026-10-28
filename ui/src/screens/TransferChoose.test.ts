@@ -20,7 +20,7 @@ function inventory(over: Partial<InventoryView> = {}): InventoryView {
     ],
     skipped_apps: [{ package: 'com.clean.pro.boost', label: 'Cleaner' }],
     whatsapp_backup: new Date().toISOString().slice(0, 19), storage: { used: 50e9, total: 128e9 },
-    free_pc: 500e9, unreadable: 0, ...over,
+    free_pc: 500e9, unreadable: 0, denied: [], exports: {}, ...over,
   };
 }
 
@@ -74,21 +74,103 @@ describe('TransferChoose', () => {
     expect(screen.getByRole('button', { name: 'Sprawdź ponownie' })).toBeTruthy();
   });
 
-  test('unreadable messages are unticked with the Xiaomi hint on a Xiaomi phone', async () => {
-    const { s } = await show({ sms: null, mms: null });
-    s.device = { serial: 'R58T00TEST', manufacturer: 'Xiaomi', brand: 'Redmi' } as never;
+  const XIAOMI = { serial: 'R58T00TEST', manufacturer: 'Xiaomi', brand: 'Redmi' } as never;
+  const vcf = (name: string, count: number | null, mtime: string, size = 2000) =>
+    ({ remote: `/sdcard/Kopia/${name}`, name, size, mtime, count });
+  const THREE = [vcf('kontakty_2026-10-27.vcf', 3, '2026-10-27T20:41:00'), vcf('contacts.vcf', 214, '2025-03-12T10:00:00'),
+    vcf('00001.vcf', 198, '2024-01-03T09:00:00')];
+
+  async function onXiaomi(over: Partial<InventoryView>) {
+    const env = await show(over);
+    env.s.device = XIAOMI;
     await tick();
-    expect((screen.getByRole('checkbox', { name: /SMS i MMS/ }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText('Telefon nie pozwolił odczytać tych danych.')).toBeTruthy();
-    expect(screen.getByText(/Debugowanie USB \(ustawienia zabezpieczeń\)/)).toBeTruthy();
+    return env;
+  }
+  const meta = (name: RegExp) => screen.getByRole('checkbox', { name }).closest('label')!.textContent!;
+
+  test('denied contacts on a Xiaomi use the newest export file; picking another changes the count', async () => {
+    const { s } = await onXiaomi({ contacts: null, denied: ['contacts'], exports: { contacts: THREE } });
+    const box = screen.getByRole('checkbox', { name: /Kontakty/ }) as HTMLInputElement;
+    expect(box.checked).toBe(true);
+    expect(box.disabled).toBe(false);
+    expect(meta(/Kontakty/)).toContain('3 z pliku eksportu');
+    expect(screen.getByText('kontakty_2026-10-27.vcf', { selector: '[data-testid="export-chosen"] *' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'zmień plik' })).toBeTruthy();
+
+    expect(screen.getByText('Telefon nie pozwolił odczytać: kontaktów — użyto pliku eksportu.')).toBeTruthy();
+    expect(screen.getByText(/Xiaomi wpuszcza do tych danych tylko z opcją/)).toBeTruthy();
+    expect(screen.getByText('Pliki eksportu na telefonie')).toBeTruthy();
+    const radios = within(screen.getByRole('radiogroup')).getAllByRole('radio') as HTMLInputElement[];
+    expect(radios).toHaveLength(3);
+    expect(radios[0].checked).toBe(true);
+    expect(radios[0].closest('label')!.textContent).toContain('najnowszy');
+    expect(radios[1].closest('label')!.textContent).not.toContain('najnowszy');
+    expect(screen.getByText('Brak aktualnego? Wyeksportuj dane do pliku i:')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Skanuj ponownie' })).toBeTruthy();
+
+    await fireEvent.click(radios[1]);
+    expect(s.transfer.selection.exports?.contacts).toBe('/sdcard/Kopia/contacts.vcf');
+    expect(meta(/Kontakty/)).toContain('214 z pliku eksportu');
   });
 
-  test('other brands get the plain unreadable notice without the Xiaomi hint', async () => {
-    const { s } = await show({ sms: null, mms: null });
+  test('a file too big to count shows its size in the list and no count in the row', async () => {
+    await onXiaomi({ contacts: null, denied: ['contacts'],
+      exports: { contacts: [vcf('duzy.vcf', null, '2026-10-27T20:41:00', 2.4 * MB)] } });
+    expect(meta(/Kontakty/)).toContain('z pliku eksportu');
+    expect(meta(/Kontakty/)).not.toMatch(/\d+ z pliku eksportu/);
+    expect(within(screen.getByRole('radiogroup')).getByText('2 MB')).toBeTruthy();
+  });
+
+  test('no export file: the row stays unavailable and the notice says how to make one', async () => {
+    await onXiaomi({ contacts: null, denied: ['contacts'] });
+    const box = screen.getByRole('checkbox', { name: /Kontakty/ }) as HTMLInputElement;
+    expect(box.disabled).toBe(true);
+    expect(meta(/Kontakty/)).toContain('niedostępne');
+    expect(screen.getByText('Telefon nie pozwolił odczytać: kontaktów.')).toBeTruthy();
+    expect(screen.getByText(/Bez niej wyeksportuj dane do pliku/)).toBeTruthy();
+    expect(screen.queryByRole('radiogroup')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Skanuj ponownie' })).toBeTruthy();
+  });
+
+  test('rescanning asks the bridge and is disabled while the phone is read', async () => {
+    const { s, bridge } = await onXiaomi({ contacts: null, denied: ['contacts'] });
+    await fireEvent.click(screen.getByRole('button', { name: 'Skanuj ponownie' }));
+    expect(bridge.calls.some((c) => c.method === 'transfer_rescan')).toBe(true);
+    s.job = { id: 'job-9', kind: 'transfer_scan' } as never;
+    await tick();
+    expect((screen.getByRole('button', { name: /Skanuj ponownie/ }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  test('denied contacts and messages get a section each', async () => {
+    await onXiaomi({ contacts: null, sms: null, mms: null, denied: ['contacts', 'sms'],
+      exports: { contacts: THREE, sms: [{ remote: '/sdcard/Backup/sms.xml', name: 'sms.xml', size: 147, mtime: '2026-10-27T20:00:00', count: 60 }] } });
+    expect(screen.getByText('Telefon nie pozwolił odczytać: kontaktów i wiadomości — użyto pliku eksportu.')).toBeTruthy();
+    expect(screen.getAllByRole('radiogroup')).toHaveLength(2);
+    expect(meta(/SMS i MMS/)).toContain('60 z pliku eksportu');
+  });
+
+  test('a read error that is not a refusal gets no Xiaomi sentence', async () => {
+    await onXiaomi({ sms: null, mms: null });
+    expect((screen.getByRole('checkbox', { name: /SMS i MMS/ }) as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getByText('Nie udało się odczytać: wiadomości.')).toBeTruthy();
+    expect(screen.queryByText(/Xiaomi wpuszcza/)).toBeNull();
+  });
+
+  test('other brands get no Xiaomi sentence even when refused', async () => {
+    const { s } = await show({ contacts: null, denied: ['contacts'] });
     s.device = { serial: 'R58T00TEST', manufacturer: 'samsung', brand: 'samsung' } as never;
     await tick();
-    expect(screen.getByText('Telefon nie pozwolił odczytać tych danych.')).toBeTruthy();
-    expect(screen.queryByText(/Debugowanie USB \(ustawienia zabezpieczeń\)/)).toBeNull();
+    expect(screen.getByText('Telefon nie pozwolił odczytać: kontaktów.')).toBeTruthy();
+    expect(screen.queryByText(/Xiaomi wpuszcza/)).toBeNull();
+  });
+
+  test('unticking the row sends no export file', async () => {
+    const { bridge } = await onXiaomi({ contacts: null, denied: ['contacts'], exports: { contacts: THREE } });
+    await fireEvent.click(screen.getByRole('checkbox', { name: /Kontakty/ }));
+    await fireEvent.click(screen.getByRole('button', { name: /Rozpocznij kopię/ }));
+    const sent = bridge.calls.find((c) => c.method === 'start_backup')?.args[0] as Record<string, unknown>;
+    expect(sent.contacts).toBe(false);
+    expect((sent.exports as Record<string, string> | undefined)?.contacts).toBeUndefined();
   });
 
   test('a selection bigger than the free disk space cannot start', async () => {

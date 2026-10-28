@@ -90,6 +90,18 @@ describe('TransferBackup', () => {
     expect(screen.queryByText(/Debugowanie USB/)).toBeNull();
   });
 
+  test('data copied from an export file says so instead of the Xiaomi hint', async () => {
+    const { s } = await show('transfer_done');
+    s.device = { manufacturer: 'Xiaomi' } as never;
+    s.transfer.result = result({ telephony: { contacts: { status: 'ok', count: 3, error: null, source: 'export' },
+      sms: { status: 'failed', count: 0, error: 'export_changed', source: 'export' } } });
+    s.transfer.copy = COPY;
+    await tick();
+    expect(screen.getByText('3 · z pliku eksportu')).toBeTruthy();
+    expect(screen.getByText(/plik eksportu zmienił się od skanu/)).toBeTruthy();
+    expect(screen.queryByText(/Debugowanie USB/)).toBeNull();
+  });
+
   test('a stopped copy says so and can be resumed later', async () => {
     const { s } = await show('transfer_done');
     s.transfer.result = result({ status: 'stopped' });

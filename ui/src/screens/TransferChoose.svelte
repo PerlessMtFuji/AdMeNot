@@ -11,7 +11,8 @@
   import DeviceCard from '../components/DeviceCard.svelte';
   import type { Controller } from '../lib/controller';
   import { i18n, t, tp } from '../lib/i18n/index.svelte';
-  import { formatSize, isXiaomi, modelName, transferNeed, transferTotals, whatsappStale } from '../lib/logic';
+  import { EXPORT_KINDS, exportFiles, formatSize, isXiaomi, modelName, transferNeed, transferTotals, whatsappStale } from '../lib/logic';
+  import type { ExportFileView, ExportKind } from '../lib/types';
   import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
@@ -20,7 +21,7 @@
   import Spinner from '../ui/Spinner.svelte';
 
   type Row = { key: string; icon: typeof Users; title: string; meta: string; note?: string; bytes: number | null;
-    checked: boolean; disabled: boolean };
+    checked: boolean; disabled: boolean; kind?: ExportKind; file?: ExportFileView | null };
 
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
@@ -44,20 +45,56 @@
   const readable = (n: number | null) => n !== null && n > 0;
   const count = (n: number | null, key: string) => (n === null ? t('transfer.unavailable') : tp(key, n, { count: num(n) }));
 
+  // Kategorie telefonu, których nie dało się odczytać: odmowa telefonu (`denied`) albo zwykły błąd odczytu.
+  // Dla nich most szuka plików eksportu; wybrany plik zastępuje odczyt z telefonu.
+  const files = (k: ExportKind) => (inv ? exportFiles(inv, k) : []);
+  const chosen = (k: ExportKind) => files(k).find((f) => f.remote === sel.exports?.[k]) ?? null;
+  const rowOn = (k: ExportKind) => (k === 'sms' ? sel.sms || sel.mms : sel[k]);
+  function fileMeta(k: ExportKind): string {
+    const f = chosen(k);
+    if (!f) return t('transfer.unavailable');
+    return f.count === null ? t('transfer.export.from_file') : tp('transfer.export.count', f.count, { count: num(f.count) });
+  }
+  const problems = $derived(inv ? EXPORT_KINDS.filter((k) => (k === 'sms' ? inv.sms === null || inv.mms === null : inv[k] === null)) : []);
+  const deniedKinds = $derived(problems.filter((k) => inv?.denied?.includes(k)));
+  const failedKinds = $derived(problems.filter((k) => !inv?.denied?.includes(k)));
+  const withFiles = $derived(problems.filter((k) => files(k).length > 0));
+  const rescanning = $derived(s.job?.kind === 'transfer_scan');
+  /** „kontaktów”, „kontaktów i wiadomości”, „kontaktów, wiadomości i historii połączeń”. */
+  function what(kinds: ExportKind[]): string {
+    const w = kinds.map((k) => t(`transfer.export.what.${k}`));
+    return w.length < 2 ? w.join('') : w.slice(0, -1).join(t('transfer.export.what.sep')) + t('transfer.export.what.and') + w.at(-1);
+  }
+  const exportTitle = $derived(deniedKinds.length
+    ? t(deniedKinds.every((k) => !!chosen(k) && rowOn(k)) ? 'transfer.export.title_denied_file' : 'transfer.export.title_denied',
+      { what: what(deniedKinds) })
+    : t('transfer.export.title_failed', { what: what(failedKinds) }));
+  const fileDate = (iso: string) => new Date(iso).toLocaleString(i18n.lang === 'pl' ? 'pl-PL' : 'en-GB',
+    { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  /** „zmień plik”: lista plików w banerze — przewinięcie i fokus na wybranym pliku. */
+  function showFiles(k: ExportKind): void {
+    const list = document.getElementById(`export-files-${k}`);
+    list?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    (list?.querySelector<HTMLInputElement>('input:checked') ?? list?.querySelector<HTMLInputElement>('input'))?.focus({ preventScroll: true });
+  }
+
   const phoneRows = $derived.by((): Row[] => {
     if (!inv) return [];
     const messages = inv.sms === null && inv.mms === null ? null : (inv.sms ?? 0) + (inv.mms ?? 0);
+    const smsFile = !readable(inv.sms) && !readable(inv.mms) ? chosen('sms') : null;
     return [
-      { key: 'contacts', icon: Users, title: t('transfer.row.contacts'), meta: inv.contacts === null ? t('transfer.unavailable') : num(inv.contacts),
-        note: t('transfer.row.contacts_note'), bytes: null, checked: sel.contacts, disabled: !readable(inv.contacts) },
-      { key: 'sms', icon: MessageSquare, title: t('transfer.row.sms'), meta: count(messages, 'transfer.messages'),
-        note: t('transfer.row.sms_note'), bytes: readable(inv.mms) ? inv.mms_bytes : null, checked: sel.sms || sel.mms,
-        disabled: !readable(inv.sms) && !readable(inv.mms) },
-      { key: 'calls', icon: PhoneIcon, title: t('transfer.row.calls'), meta: inv.calls === null ? t('transfer.unavailable') : num(inv.calls),
-        bytes: null, checked: sel.calls, disabled: !readable(inv.calls) },
+      { key: 'contacts', icon: Users, title: t('transfer.row.contacts'), meta: inv.contacts === null ? fileMeta('contacts') : num(inv.contacts),
+        note: chosen('contacts') ? undefined : t('transfer.row.contacts_note'), bytes: null, checked: sel.contacts,
+        disabled: !readable(inv.contacts) && !files('contacts').length, kind: 'contacts', file: chosen('contacts') },
+      { key: 'sms', icon: MessageSquare, title: t('transfer.row.sms'),
+        meta: messages === null ? fileMeta('sms') : count(messages, 'transfer.messages'),
+        note: smsFile ? undefined : t('transfer.row.sms_note'), bytes: readable(inv.mms) ? inv.mms_bytes : null, checked: sel.sms || sel.mms,
+        disabled: !readable(inv.sms) && !readable(inv.mms) && !files('sms').length, kind: 'sms', file: smsFile },
+      { key: 'calls', icon: PhoneIcon, title: t('transfer.row.calls'), meta: inv.calls === null ? fileMeta('calls') : num(inv.calls),
+        bytes: null, checked: sel.calls, disabled: !readable(inv.calls) && !files('calls').length, kind: 'calls', file: chosen('calls') },
     ];
   });
-  const phoneUnreadable = $derived(!!inv && (inv.contacts === null || inv.sms === null || inv.mms === null || inv.calls === null));
 
   function fileRow(key: 'media' | 'downloads' | 'whatsapp', icon: typeof Users, note: string): Row {
     const c = inv!.categories[key];
@@ -83,6 +120,13 @@
       </label>
       <span class="mono flex-none pt-1.5 text-sm text-mut">{r.bytes !== null ? size(r.bytes) : ''}</span>
     </div>
+    {#if r.file && r.kind}
+      {@const kind = r.kind}
+      <div class="mt-0.5 pl-[82px] text-sm text-mut" data-testid="export-chosen">
+        <span class="mono">{r.file.name}</span> ·
+        <button type="button" class="font-semibold text-accent hover:underline" onclick={() => showFiles(kind)}>{t('transfer.export.change')}</button>
+      </div>
+    {/if}
     {#if extra}<div class="mt-2 pl-[76px]">{@render extra()}</div>{/if}
   </div>
 {/snippet}
@@ -113,12 +157,20 @@
 
       <span class="lbl mt-1">{t('transfer.group.phone')}</span>
       {#each phoneRows as r (r.key)}{@render row(r)}{/each}
-      {#if phoneUnreadable}
-        {#if isXiaomi(s.device)}
-          <Banner tone="warn" icon="triangle-alert" title={t('transfer.unreadable')}>{t('transfer.xiaomi_hint')}</Banner>
-        {:else}
-          <Banner tone="warn" icon="triangle-alert" title={t('transfer.unreadable')} />
-        {/if}
+      {#if problems.length}
+        <Banner tone="warn" icon="triangle-alert" title={exportTitle}>
+          {#if deniedKinds.length && failedKinds.length}
+            <b class="block text-ink">{t('transfer.export.title_failed', { what: what(failedKinds) })}</b>
+          {/if}
+          {#if deniedKinds.length && isXiaomi(s.device)}<p>{t('transfer.export.xiaomi')}</p>{/if}
+          {#each withFiles as k (k)}{@render exportList(k)}{/each}
+          <p class="mt-2">{problems.length > withFiles.length ? t('transfer.export.howto') : t('transfer.export.none_fit')}</p>
+          <div class="mt-2">
+            <Button size="sm" disabled={s.job !== null} onclick={() => ctl.rescanTransfer()}>
+              {#if rescanning}<Spinner />{/if}{t('transfer.export.rescan')}
+            </Button>
+          </div>
+        </Banner>
       {/if}
 
       <span class="lbl mt-2">{t('transfer.group.files')}</span>
@@ -162,6 +214,27 @@
     {/if}
   </SidePanel>
 </div>
+
+{#snippet exportList(k: ExportKind)}
+  <div id="export-head-{k}" class="mt-2.5 text-xs font-bold text-mut">
+    {t('transfer.export.files')}{problems.length > 1 ? ` · ${t(`transfer.row.${k}`)}` : ''}
+  </div>
+  <div role="radiogroup" id="export-files-{k}" aria-labelledby="export-head-{k}" class="mt-1 flex flex-col gap-1">
+    {#each files(k) as f, i (f.remote)}
+      <label class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm text-ink
+        {i === 0 ? 'bg-accent-soft shadow-[inset_3px_0_0_var(--color-accent)]' : 'opacity-75'}">
+        <input type="radio" name="export-{k}" class="h-4 w-4 flex-none accent-[var(--color-accent)]"
+          checked={sel.exports?.[k] === f.remote} onchange={() => ctl.chooseExport(k, f.remote)} />
+        <span class="mono min-w-0 flex-1 truncate text-xs" title={f.remote}>{f.name}</span>
+        <span class="whitespace-nowrap text-mut">{fileDate(f.mtime)}</span>
+        <span class="w-28 whitespace-nowrap text-right text-mut">
+          {f.count === null ? size(f.size) : tp(`transfer.export.items.${k}`, f.count, { count: num(f.count) })}
+        </span>
+        <span class="flex w-[84px] flex-none justify-end">{#if i === 0}<Pill tone="accent">{t('transfer.export.newest')}</Pill>{/if}</span>
+      </label>
+    {/each}
+  </div>
+{/snippet}
 
 {#snippet whatsapp()}
   {@const backup = inv?.whatsapp_backup ?? null}
