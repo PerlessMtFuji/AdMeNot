@@ -63,6 +63,9 @@ Telefonia nowego telefonu (Etap 3), w pamięci:
   Instalacja zakłada katalog wejścia `helper.COMPANION_IN`, odinstalowanie usuwa `Android/data/<pakiet>`.
 * `accounts: list[(typ, nazwa)]` dla `dumpsys account`; `tmp_files`: pliki pod `/data/local/tmp/admenot`
   (lokalnie `root/data_local_tmp/admenot`, `mkdir -p`, `push`, `stat`, `sha256sum`, `rm -rf`).
+* droga 3 (plik do importu): `content call --uri content://media --method scan_file --arg
+  /storage/emulated/0/<ścieżka>` nadaje istniejącemu plikowi (`/sdcard/<ścieżka>`) `_id` w `media_files`,
+  a `content query --uri content://media/external/file --projection _id --where "_data='…'"` go zwraca.
 """
 
 from __future__ import annotations
@@ -93,6 +96,8 @@ TEL_URIS = {"content://sms": "sms", "content://mms": "mms", "content://call_log/
 CONVERSATIONS_URI = "content://mms-sms/conversations?simple=true"
 _MMS_ADDR = re.compile(r"content://mms/([0-9]+)/addr")
 _TMP_LOCAL = "data_local_tmp/admenot"
+_MEDIA_ROOT = "/storage/emulated/0/"
+MEDIA_FILES_URI = "content://media/external/file"
 
 
 def provider_file(root: Path, uri: str) -> Path:
@@ -153,6 +158,7 @@ class FakeStoragePhone:
         self.install_blocked = False
         self.host_commands: list[list[str]] = []  # polecenia hosta (`install`)
         self.accounts: list[tuple[str, str]] = []
+        self.media_files: dict[str, str] = {}  # `/storage/emulated/0/…` -> `_id` po `scan_file`
 
     # ---- stan ---------------------------------------------------------------------------
     def get_state(self) -> str:
@@ -349,11 +355,23 @@ class FakeStoragePhone:
         return b""
 
     def _content(self, args: list[str], merged: bool = False) -> bytes:
+        if args[:6] == ["call", "--uri", "content://media", "--method", "scan_file", "--arg"] and len(args) == 7:
+            remote = "/sdcard/" + args[6].removeprefix(_MEDIA_ROOT)
+            assert args[6].startswith(_MEDIA_ROOT), args
+            if self.local(remote).is_file():
+                self.media_files.setdefault(args[6], str(1000 + len(self.media_files)))
+            return b"Result: Bundle[{}]\n"
         if args[0] == "call":
             assert args[1:] == ["--uri", "content://media", "--method", "scan_volume",
                                 "--arg", "external_primary"], args
             self.scans += 1
             return b"Result: Bundle[{}]\n"
+        if args[:3] == ["query", "--uri", MEDIA_FILES_URI]:
+            assert args[3:6] == ["--projection", "_id", "--where"] and len(args) == 7, args
+            m = re.fullmatch(r"_data='([^']+)'", args[6])
+            assert m, args
+            mid = self.media_files.get(m.group(1))
+            return (f"Row: 0 _id={mid}\n" if mid else "No result found.\n").encode()
         if args[0] == "query":
             # Jak prawdziwy telefon: błąd providera idzie na stderr, a kod wyjścia to 0 —
             # bez `2>&1` (merged) adb zwraca pusty stdout.

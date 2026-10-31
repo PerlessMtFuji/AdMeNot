@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -292,6 +293,33 @@ def _mms_keys_from_phone(adb: AdbTransport, need_addrs: bool) -> set[tuple] | No
             addrs = []
         keys.add(mms_key_row(r, addrs))
     return keys
+
+
+def phone_has(adb: AdbTransport, kind: str) -> Callable[[Any], bool] | None:
+    """Predykat „ten rekord kopii już jest na telefonie” z nowego odczytu kategorii `kind` (te same
+    klucze co plan; po urwanym zapisie wiersze zapisane przed urwaniem nie mają linii `OK`).
+    `None` = telefon odmówił odczytu. `AdbError` rozłączenia przechodzi wyżej."""
+    if kind == "contacts":
+        try:
+            rows_c = tel.content_query(adb, CONTACTS_URI, tel.CONTACT_COLS)
+            rows_r = tel.content_query(adb, RAW_URI, tel.RAW_COLS)
+            rows_d = tel.content_query(adb, DATA_URI, tel.DATA_COLS)
+        except tel.ContentQueryError:
+            return None
+        deleted = {r["_id"] for r in rows_r if r.get("deleted") == "1"}
+        return ContactIndex.from_rows(rows_c, [d for d in rows_d if d.get("raw_contact_id") not in deleted]).has
+    if kind == "mms":
+        have = _mms_keys_from_phone(adb, True)
+        key: Callable[[Any], tuple] = mms_key
+    elif kind == "sms":
+        have, key = _keys_from_phone(adb, "content://sms", tel.SMS_COLS, sms_key_row), sms_key
+    elif kind == "calls":
+        have, key = _keys_from_phone(adb, "content://call_log/calls", tel.CALL_COLS, call_key_row), call_key
+    else:
+        raise ValueError(f"unknown kind {kind!r}")
+    if have is None:
+        return None
+    return lambda r: key(r) in have
 
 
 def build_tel_plan(adb: AdbTransport, copy: CopyDir, meta: CopyMeta, kinds: set[str]) -> TelPlan:
