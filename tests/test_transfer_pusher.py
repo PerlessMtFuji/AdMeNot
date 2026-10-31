@@ -65,3 +65,18 @@ def test_real_pusher_rejects_unsafe_target(tmp_path):
     from admenot.engine.transfer.guard import UnsafeCommand
     with pytest.raises(UnsafeCommand):
         RealPusher("adb", "S1", None).push([tmp_path / "a"], "/data/x/", lambda: False, lambda: None)
+
+
+def test_pusher_accepts_helper_targets(tmp_path):
+    import pytest
+
+    from admenot.engine.transfer import helper
+    from admenot.engine.transfer.guard import UnsafeCommand
+
+    adb = _fake_adb(tmp_path, "import sys\nprint('ok')\n")
+    for remote in ("/data/local/tmp/admenot/in/", "/data/local/tmp/admenot/admenot-helper.dex",
+                   helper.COMPANION_IN + "/", "/sdcard/DCIM/"):
+        assert RealPusher(adb, "S1", None).push([tmp_path / "a"], remote, lambda: False, lambda: None).rc == 0
+    for remote in ("/data/local/tmp/admenot/../x", "/data/local/tmp/", "/data/local/tmp/admenot/a\nb", "/system/x"):
+        with pytest.raises(UnsafeCommand):
+            RealPusher(adb, "S1", None).push([tmp_path / "a"], remote, lambda: False, lambda: None)

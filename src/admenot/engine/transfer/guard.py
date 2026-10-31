@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 import shlex
+from collections.abc import Callable
 from pathlib import PurePosixPath
 
 from admenot.engine.adb.transport import AdbTransport
@@ -281,3 +282,193 @@ class ApkReadAdb:
 
     def run_bytes(self, args: list[str], timeout: float = 20.0) -> bytes:
         return self.ro.run_bytes(args, timeout=timeout)
+
+
+# --------------------------------------------------------------------------------------
+# Zapis telefonii (kontakty, SMS, MMS, połączenia) przez pomocnika na nowym telefonie
+# --------------------------------------------------------------------------------------
+_HELPER_PATH = re.compile(r"[A-Za-z0-9._/-]+")  # nazwy wejścia są ASCII, więc bez cytowania
+_VCF_NAME = re.compile(r"[A-Za-z0-9._-]+\.vcf")
+_DIGITS = re.compile(r"[0-9]{1,18}")
+SMS_ROLE = "android.app.role.SMS"
+_APPOP_MODES = ("allow", "default", "ignore", "deny", "foreground")
+_HELPER_PERMISSIONS = ("READ_CONTACTS", "WRITE_CONTACTS", "READ_CALL_LOG", "WRITE_CALL_LOG", "READ_SMS")
+VCF_DIR = "/storage/emulated/0/Download"
+
+
+def safe_helper_target(remote: str) -> str:
+    """Cel wgrania pomocnika: pod `/data/local/tmp/admenot/` albo `COMPANION_IN/`, bez `..` i nowej linii."""
+    from admenot.engine.transfer import (
+        helper,  # późny import: helper importuje pusher, a ten ten moduł
+    )
+
+    ok = remote.startswith((f"{helper.HELPER_DIR}/", f"{helper.COMPANION_IN}/"))
+    if not ok or "\n" in remote or "\r" in remote or ".." in PurePosixPath(remote).parts:
+        raise UnsafeCommand(f"Niedozwolona ścieżka docelowa: {remote[:120]!r}")
+    return remote
+
+
+def safe_push_target(remote: str) -> str:
+    """Cel `adb push`: `/sdcard/` (pliki) albo katalog pomocnika."""
+    try:
+        return safe_target(remote)
+    except UnsafeCommand:
+        return safe_helper_target(remote)
+
+
+def _helper_input(path: str, base: str) -> str:
+    if (not _HELPER_PATH.fullmatch(path) or not path.startswith(f"{base}/") or path.endswith("/")
+            or ".." in PurePosixPath(path).parts):
+        raise UnsafeCommand(f"Niedozwolona ścieżka wejścia: {path[:120]!r}")
+    return path
+
+
+def _account_args_ok(*values: str) -> None:
+    if any(not v or "\n" in v or "\r" in v or "\0" in v for v in values):
+        raise UnsafeCommand("Niepoprawne dane konta")
+
+
+def _vcf_path(path: str) -> None:
+    directory, _, name = path.rpartition("/")
+    if directory != VCF_DIR or not _VCF_NAME.fullmatch(name):
+        raise UnsafeCommand(f"Niedozwolony plik vCard: {path[:120]!r}")
+
+
+def _fixed_commands(helper) -> frozenset[str]:
+    d, p = helper.HELPER_DIR, helper.PACKAGE
+    out = {
+        f"mkdir -p {helper.HELPER_IN}", f"rm -rf {helper.HELPER_IN}", f"rm -rf {d}",
+        f"sha256sum {helper.DEX_REMOTE}",
+        "appops get com.android.shell WRITE_SMS",
+        f"pm list packages {p}", f"pm uninstall {p}",
+        "dumpsys role", "dumpsys account",
+        f"cmd role remove-role-holder {SMS_ROLE} {p}",
+        f"am start -n {p}/.RoleActivity",
+        "am start -a android.settings.MANAGE_DEFAULT_APPS_SETTINGS",
+    }
+    out |= {f"appops set com.android.shell WRITE_SMS {m}" for m in _APPOP_MODES}
+    out |= {f"pm grant {p} android.permission.{perm}" for perm in _HELPER_PERMISSIONS}
+    return frozenset(out)
+
+
+def assert_telephony_write(cmd: str, role_restore: Callable[[], frozenset[str]]) -> None:
+    """Rzuca UnsafeCommand, jeśli polecenie nie jest jednym z dokładnych kroków zapisu telefonii.
+
+    Przepuszcza to, co `assert_append_only`, oraz allowlistę z `TelephonyWriteAdb`. Każda forma jest
+    porównywana z postacią kanoniczną (jak `head`), więc nic poza nią nie przejdzie."""
+    from admenot.engine.transfer import helper
+
+    try:
+        assert_append_only(cmd)
+        return
+    except UnsafeCommand:
+        pass
+    _unquoted_view(cmd)  # metaznaki poza cudzysłowami
+    bad = UnsafeCommand(f"Polecenie spoza allowlisty zapisu telefonii: {cmd[:120]}")
+    if cmd in _fixed_commands(helper):
+        return
+    try:
+        t = shlex.split(cmd)
+    except ValueError:
+        raise UnsafeCommand(f"Nieczytelne polecenie: {cmd[:120]}") from None
+    pkg = helper.PACKAGE
+
+    if t[:5] == [f"CLASSPATH={helper.DEX_REMOTE}", "app_process", "/", helper.MAIN_CLASS, "write"] \
+            and len(t) in (6, 9):
+        path = _helper_input(t[5], helper.HELPER_IN)
+        acct = ""
+        if len(t) == 9:
+            _account_args_ok(t[7], t[8])
+            acct = f" --account {q(t[7])} {q(t[8])}"
+        if t[6:7] in ([], ["--account"]) and cmd == (
+                f"CLASSPATH={helper.DEX_REMOTE} app_process / {helper.MAIN_CLASS} write {path}{acct}"):
+            return
+        raise bad
+
+    if t[:3] == ["cmd", "role", "add-role-holder"]:
+        if (len(t) == 5 and t[3] == SMS_ROLE and _PACKAGE.fullmatch(t[4])
+                and (t[4] == pkg or t[4] in role_restore())
+                and cmd == f"cmd role add-role-holder {SMS_ROLE} {t[4]}"):
+            return
+        raise UnsafeCommand(f"Rola SMS tylko dla pomocnika albo zapisanego posiadacza: {cmd[:120]}")
+
+    if t[:9] == ["am", "instrument", "-w", "-r", "-e", "cmd", "write", "-e", "input"] and len(t) in (11, 17):
+        path = _helper_input(t[9], helper.COMPANION_IN)
+        acct = ""
+        if len(t) == 17:
+            _account_args_ok(t[12], t[15])
+            if (t[10], t[11], t[13], t[14]) != ("-e", "account_type", "-e", "account_name"):
+                raise bad
+            acct = f" -e account_type {q(t[12])} -e account_name {q(t[15])}"
+        if t[-1] == helper.RUNNER and cmd == (
+                f"am instrument -w -r -e cmd write -e input {path}{acct} {helper.RUNNER}"):
+            return
+        raise bad
+
+    if (len(t) == 8 and t[:7] == ["am", "start", "-a", "android.intent.action.VIEW", "-t", "text/x-vcard", "-d"]
+            and t[7].startswith("content://media/external/file/")
+            and _DIGITS.fullmatch(t[7].rsplit("/", 1)[1]) and cmd == " ".join(t)):
+        return
+
+    if (len(t) == 8 and t[:7] == ["content", "call", "--uri", "content://media", "--method", "scan_file", "--arg"]
+            and cmd == " ".join(t)):
+        _vcf_path(t[7])
+        return
+
+    if (len(t) == 8 and t[:7] == ["content", "query", "--uri", "content://media/external/file",
+                                  "--projection", "_id", "--where"]):
+        m = re.fullmatch(r"_data='([^']+)'", t[7])
+        if m:
+            _vcf_path(m.group(1))
+            if cmd == f'content query --uri content://media/external/file --projection _id --where "{t[7]}"':
+                return
+    raise bad
+
+
+class TelephonyWriteAdb:
+    """`AppendOnlyAdb` + wąska allowlista kroków zapisu kontaktów i wiadomości (pomocnik na telefonie).
+
+    `role_restore` zwraca pakiety zapisane jako poprzedni posiadacz roli SMS — tylko im wolno ją oddać."""
+
+    def __init__(self, inner: AdbTransport, role_restore: Callable[[], frozenset[str]]) -> None:
+        self.inner = inner
+        self.role_restore = role_restore
+
+    @property
+    def serial(self) -> str | None:
+        return self.inner.serial
+
+    def with_serial(self, serial: str) -> TelephonyWriteAdb:
+        return TelephonyWriteAdb(self.inner.with_serial(serial), self.role_restore)
+
+    def shell(self, command: str, timeout: float = 20.0) -> str:
+        assert_telephony_write(command, self.role_restore)
+        return self.inner.shell(command, timeout=timeout)
+
+    def _check_run(self, args: list[str]) -> None:
+        cmd = _shell_T_command(args)
+        if cmd is not None:
+            assert_telephony_write(cmd, self.role_restore)
+        elif args == ["get-state"]:
+            return
+        elif len(args) == 3 and args[:2] == ["install", "-g"]:
+            from admenot.engine.transfer import helper
+
+            try:
+                apk = str(helper.artifact("apk")[0])
+            except helper.HelperBroken as exc:
+                raise UnsafeCommand(f"Artefakt APK pomocnika niepoprawny: {exc}") from None
+            if args[2] != apk:
+                raise UnsafeCommand(f"Instalacja dozwolona tylko dla APK pomocnika: {args[2][:120]}")
+        else:
+            raise UnsafeCommand(f"Polecenie hosta spoza allowlisty: {' '.join(args)[:120]}")
+
+    def run(self, args: list[str], timeout: float = 20.0) -> str:
+        self._check_run(args)
+        return self.inner.run(args, timeout=timeout)
+
+    def run_bytes(self, args: list[str], timeout: float = 20.0) -> bytes:
+        if _shell_T_command(args) is None:
+            raise UnsafeCommand(f"Polecenie hosta spoza allowlisty: {' '.join(args)[:120]}")
+        self._check_run(args)
+        return self.inner.run_bytes(args, timeout=timeout)

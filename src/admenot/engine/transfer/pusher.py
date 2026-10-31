@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Protocol
 
 from admenot.engine.adb.sessionlog import SessionLogAdb
-from admenot.engine.transfer.guard import safe_target
+from admenot.engine.transfer.guard import safe_push_target
 from admenot.engine.transfer.puller import PullResult, run_stream
 
 
@@ -29,7 +29,7 @@ class RealPusher:
 
     def push(self, locals_: list[Path], remote: str, should_stop: Callable[[], bool],
              tick: Callable[[], None]) -> PullResult:
-        target = safe_target(remote)
+        target = safe_push_target(remote)
         # bezwzględne ścieżki: żadna nie zaczyna się od `-`, więc adb nie weźmie nazwy pliku za opcję
         args = ["push", *(str(p.resolve()) for p in locals_), target]
         if self.log is not None:  # w logu sesji tylko liczba plików — bez nazw i folderów klienta

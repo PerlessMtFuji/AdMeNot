@@ -295,3 +295,230 @@ def test_append_only_stat_tail_exact():
                 "stat '/sdcard/a" + STAT_TAIL):
         with pytest.raises(UnsafeCommand):
             assert_append_only(cmd)
+
+
+# --------------------------------------------------------------------------------------
+# TelephonyWriteAdb
+# --------------------------------------------------------------------------------------
+from admenot.engine.transfer import helper
+from admenot.engine.transfer.guard import TelephonyWriteAdb, safe_helper_target
+
+_PKG = "pl.admenot.helper"
+_SAVED = "com.google.android.apps.messaging"
+_CP = ("CLASSPATH=/data/local/tmp/admenot/admenot-helper.dex app_process / pl.admenot.helper.Main write ")
+_IN = "/data/local/tmp/admenot/in/"
+
+
+def _tel(saved=frozenset({_SAVED})):
+    rec = Recorder()
+    return TelephonyWriteAdb(rec, lambda: saved), rec
+
+
+_TEL_ALLOWED = [
+    "mkdir -p /data/local/tmp/admenot/in",
+    "rm -rf /data/local/tmp/admenot/in",
+    "rm -rf /data/local/tmp/admenot",
+    "sha256sum /data/local/tmp/admenot/admenot-helper.dex",
+    _CP + _IN + "input.jsonl",
+    _CP + _IN + "input.jsonl --account vnd.sec.contact.phone 'my phone'",
+    "appops get com.android.shell WRITE_SMS",
+    *(f"appops set com.android.shell WRITE_SMS {m}" for m in ("allow", "default", "ignore", "deny", "foreground")),
+    "pm list packages pl.admenot.helper",
+    *(f"pm grant pl.admenot.helper android.permission.{p}"
+      for p in ("READ_CONTACTS", "WRITE_CONTACTS", "READ_CALL_LOG", "WRITE_CALL_LOG", "READ_SMS")),
+    "pm uninstall pl.admenot.helper",
+    "dumpsys role",
+    f"cmd role add-role-holder android.app.role.SMS {_PKG}",
+    f"cmd role add-role-holder android.app.role.SMS {_SAVED}",
+    f"cmd role remove-role-holder android.app.role.SMS {_PKG}",
+    f"am instrument -w -r -e cmd write -e input {helper.COMPANION_IN}/input.jsonl pl.admenot.helper/.Runner",
+    (f"am instrument -w -r -e cmd write -e input {helper.COMPANION_IN}/input.jsonl "
+     "-e account_type com.google -e account_name 'a b@x.pl' pl.admenot.helper/.Runner"),
+    "am start -n pl.admenot.helper/.RoleActivity",
+    "am start -a android.settings.MANAGE_DEFAULT_APPS_SETTINGS",
+    "am start -a android.intent.action.VIEW -t text/x-vcard -d content://media/external/file/1234",
+    "content call --uri content://media --method scan_file --arg /storage/emulated/0/Download/admenot-1.vcf",
+    ("content query --uri content://media/external/file --projection _id --where "
+     "\"_data='/storage/emulated/0/Download/admenot-1.vcf'\""),
+    "dumpsys account",
+]
+
+
+@pytest.mark.parametrize("cmd", _TEL_ALLOWED)
+def test_tel_guard_allows_exact_forms(cmd):
+    adb, rec = _tel()
+    assert adb.shell(cmd) == "ok"
+    assert rec.calls == [("shell", cmd)]
+
+
+def test_tel_guard_allows_append_only_shell_T_and_install():
+    adb, rec = _tel()
+    adb.shell("mkdir -p /sdcard/DCIM/")
+    adb.run(["shell", "-T", "dumpsys role"])
+    adb.run(["get-state"])
+    apk = str(helper.artifact("apk")[0])
+    adb.run(["install", "-g", apk])
+    assert ("run", ["install", "-g", apk]) in rec.calls
+
+
+@pytest.mark.parametrize("cmd", [
+    "rm -rf /data/local/tmp",
+    "rm -rf /data/local/tmp/admenot/../x",
+    "rm -rf /data/local/tmp/admenot/in/x",
+    "rm /sdcard/a",
+    "rm -rf /sdcard",
+    "mkdir -p /data/local/tmp/other",
+])
+def test_tel_guard_rejects_rm_elsewhere(cmd):
+    adb, rec = _tel()
+    with pytest.raises(UnsafeCommand):
+        adb.shell(cmd)
+    assert rec.calls == []
+
+
+@pytest.mark.parametrize("cmd", [
+    "pm uninstall com.whatsapp", "pm uninstall --user 0 pl.admenot.helper", "pm uninstall -k pl.admenot.helper",
+    "pm grant com.evil android.permission.READ_CONTACTS",
+    "pm grant pl.admenot.helper android.permission.CAMERA",
+    "pm clear pl.admenot.helper",
+])
+def test_tel_guard_rejects_other_package_uninstall(cmd):
+    adb, _ = _tel()
+    with pytest.raises(UnsafeCommand):
+        adb.shell(cmd)
+
+
+def test_tel_guard_role_only_ours_or_saved():
+    adb, _ = _tel()
+    for cmd in ("cmd role add-role-holder android.app.role.SMS com.evil",
+                f"cmd role remove-role-holder android.app.role.SMS {_SAVED}",
+                f"cmd role add-role-holder android.app.role.DIALER {_PKG}",
+                "cmd role get-role-holders android.app.role.SMS"):
+        with pytest.raises(UnsafeCommand):
+            adb.shell(cmd)
+    nothing, _ = _tel(saved=frozenset())
+    with pytest.raises(UnsafeCommand):
+        nothing.shell(f"cmd role add-role-holder android.app.role.SMS {_SAVED}")
+    nothing.shell(f"cmd role add-role-holder android.app.role.SMS {_PKG}")
+
+
+@pytest.mark.parametrize("cmd", [
+    "appops set com.whatsapp WRITE_SMS allow",
+    "appops set com.android.shell READ_SMS allow",
+    "appops set com.android.shell WRITE_SMS maybe",
+    "appops set --user 0 com.android.shell WRITE_SMS allow",
+    "appops get com.whatsapp WRITE_SMS",
+    "appops reset",
+])
+def test_tel_guard_rejects_appops_other_package_or_op(cmd):
+    adb, _ = _tel()
+    with pytest.raises(UnsafeCommand):
+        adb.shell(cmd)
+
+
+def test_tel_guard_install_only_artifact(tmp_path):
+    adb, rec = _tel()
+    other = tmp_path / "evil.apk"
+    other.write_bytes(b"x")
+    apk = str(helper.artifact("apk")[0])
+    for args in (["install", "-g", str(other)], ["install", apk], ["install", "-r", "-g", apk],
+                 ["uninstall", _PKG], ["push", "a", "/sdcard/b"]):
+        with pytest.raises(UnsafeCommand):
+            adb.run(args)
+    assert rec.calls == []
+
+
+@pytest.mark.parametrize("cmd", [
+    "rm -rf /data/local/tmp/admenot; rm -rf /sdcard",
+    "rm -rf /data/local/tmp/admenot/in && id",
+    "dumpsys role | cat",
+    "dumpsys role\nid",
+    "dumpsys role $(id)",
+    "dumpsys package pl.admenot.helper",
+    _CP + _IN + "a;id",
+    _CP + _IN + "a$(id).jsonl",
+    _CP + "'" + _IN + "a\nb'",
+    _CP + _IN + "../x.jsonl",
+    _CP + "/sdcard/x.jsonl",
+    _CP + _IN + "a.jsonl --account t 'n\nx'",
+    _CP + _IN + "a.jsonl --account t n; id",
+    _CP + _IN + "a.jsonl --account t",
+    "CLASSPATH=/data/local/tmp/other.dex app_process / pl.admenot.helper.Main write " + _IN + "a",
+    f"am instrument -w -r -e cmd write -e input {helper.COMPANION_IN}/../x pl.admenot.helper/.Runner",
+    f"am instrument -w -r -e cmd write -e input {helper.COMPANION_IN}/a;id pl.admenot.helper/.Runner",
+    f"am instrument -w -r -e cmd write -e input {helper.COMPANION_IN}/a pl.evil/.Runner",
+    (f"am instrument -w -r -e cmd write -e input {helper.COMPANION_IN}/a -e account_type 'x\ny' "
+     "-e account_name n pl.admenot.helper/.Runner"),
+    "am start -a android.intent.action.VIEW -t text/x-vcard -d content://media/external/file/12a",
+    "am start -a android.intent.action.VIEW -t text/x-vcard -d file:///sdcard/x.vcf",
+    "am start -n com.evil/.Main",
+    "content call --uri content://media --method scan_file --arg /sdcard/x.vcf",
+    "content call --uri content://media --method scan_file --arg /storage/emulated/0/Download/../x.vcf",
+    "content call --uri content://media --method scan_file --arg /storage/emulated/0/Download/a.vcf;id",
+    "content delete --uri content://sms",
+    "content query --uri content://sms",
+    ("content query --uri content://media/external/file --projection _id --where "
+     "\"_data='/storage/emulated/0/Download/a.vcf' OR 1=1\""),
+    ("content query --uri content://media/external/file --projection _id --where "
+     "\"_data='/storage/emulated/0/Download/$(id).vcf'\""),
+])
+def test_tel_guard_rejects_injection(cmd):
+    adb, rec = _tel()
+    with pytest.raises(UnsafeCommand):
+        adb.shell(cmd)
+    assert rec.calls == []
+
+
+def test_tel_guard_serial_and_with_serial():
+    adb, _ = _tel()
+    assert adb.serial == "S1"
+    other = adb.with_serial("S2")
+    assert isinstance(other, TelephonyWriteAdb) and other.serial == "S2"
+    assert other.role_restore is adb.role_restore
+
+
+def test_tel_guard_run_bytes_only_shell_T():
+    adb, _ = _tel()
+    assert adb.run_bytes(["shell", "-T", "dumpsys role"]) == b"ok"
+    with pytest.raises(UnsafeCommand):
+        adb.run_bytes(["exec-out", "dumpsys role"])
+    with pytest.raises(UnsafeCommand):
+        adb.run_bytes(["shell", "-T", "rm -rf /data/local/tmp"])
+
+
+def test_safe_helper_target():
+    assert safe_helper_target("/data/local/tmp/admenot/in/") == "/data/local/tmp/admenot/in/"
+    assert safe_helper_target("/data/local/tmp/admenot/admenot-helper.dex")
+    assert safe_helper_target(helper.COMPANION_IN + "/")
+    for bad in ("/data/local/tmp/", "/data/local/tmp/admenot", "/data/local/tmp/admenot/../x", "/sdcard/x",
+                "/data/local/tmp/admenotx/", "/data/local/tmp/admenot/a\nb"):
+        with pytest.raises(UnsafeCommand):
+            safe_helper_target(bad)
+
+
+def test_tel_guard_allows_everything_helper_writers_issue():
+    """Polecenia budowane przez prawdziwe AppProcessWriter i CompanionWriter przechodzą przez strażnika."""
+    from admenot.engine.transfer.guard import safe_push_target
+    from admenot.engine.transfer.puller import PullResult
+    from admenot.engine.transfer.telrecords import SmsRecord
+
+    digest = helper.artifact("dex")[1]
+    cmds: list[str] = []
+
+    class Fake(Recorder):
+        def shell(self, command, timeout=20.0):
+            cmds.append(command)
+            return f"{digest}  x\n" if command.startswith("sha256sum") else "DONE 0 0\n"
+
+    class Pusher:
+        def push(self, locals_, remote, should_stop, tick):
+            safe_push_target(remote)
+            return PullResult(0, [], False)
+
+    adb = TelephonyWriteAdb(Fake(), lambda: frozenset())
+    sms = [("a1", SmsRecord("+48000000001", 1, 1, 1, 1, -1, None, "x"))]
+    for account in (None, ("vnd.sec.contact.phone", "my phone"), ("com.google", "o'neil $x@x.pl")):
+        helper.AppProcessWriter(adb, Pusher(), account).write("sms", sms, lambda: None)
+        helper.CompanionWriter(adb, Pusher(), account).write("sms", sms, lambda: None)
+    assert any(c.startswith("CLASSPATH=") and "--account" in c for c in cmds)
+    assert any(c.startswith("am instrument") and "account_name" in c for c in cmds)
