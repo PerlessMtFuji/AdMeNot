@@ -306,3 +306,59 @@ def test_tel_status_and_set(tmp_path):
     assert state.tel_status("calls") == {"a": "manual"}
     row = state.db.execute("SELECT path, error FROM tel WHERE kind='sms' AND rid='b'").fetchone()
     assert row == ("companion", "ERR_X")
+
+
+# ---- R14: nigdy nie odinstalowujemy posiadacza roli SMS ----------------------------------------
+def test_install_leftover_holding_role_is_blocked_not_uninstalled(tmp_path):
+    phone, _, state, adb = _setup(tmp_path, role_holders=[PKG])
+    phone.installed.add(PKG)  # pozostałość po niedokończonym sprzątaniu, z rolą SMS
+    assert install_companion(adb, state) == "blocked"
+    assert f"pm uninstall {PKG}" not in phone.commands and phone.host_commands == []
+    assert PKG in phone.installed and phone.role_holders == [PKG]
+    assert device_changes(state) == DeviceChanges(None, None, True, False)
+
+
+def test_cleanup_leftover_holding_role_waits_for_tap_then_uninstalls(tmp_path, monkeypatch):
+    phone, _, state, adb = _setup(tmp_path, role_holders=[PKG])
+    phone.installed.add(PKG)
+    assert install_companion(adb, state) == "blocked"
+    polls = []
+
+    def sleep(seconds):
+        polls.append(seconds)
+        if len(polls) == 2:
+            phone.tap_role(PREV)
+
+    monkeypatch.setattr(phonesetup, "_sleep", sleep)
+    taps: list[str | None] = []
+    res = cleanup(adb, state, taps.append, _never)
+    assert res.ok and len(polls) == 2 and taps == ["sms_role_restore", None]
+    settings = phone.commands.index("am start -a android.settings.MANAGE_DEFAULT_APPS_SETTINGS")
+    assert phone.commands.index(f"pm uninstall {PKG}") > settings
+    assert not any(c.startswith("cmd role") for c in phone.commands)  # nie wiemy, komu oddać rolę
+    assert PKG not in phone.installed and phone.role_holders == [PREV]
+    assert device_changes(state) == DeviceChanges()
+
+
+def test_cleanup_leftover_holding_role_stop_keeps_it_installed(tmp_path):
+    phone, copy, state, adb = _setup(tmp_path, role_holders=[PKG])
+    phone.installed.add(PKG)
+    assert install_companion(adb, state) == "blocked"
+    res = cleanup(adb, state, lambda r: None, lambda: True)
+    assert not res.role_ok and not res.companion_removed
+    assert f"pm uninstall {PKG}" not in phone.commands and PKG in phone.installed
+    assert pending_cleanup([copy], "NEW") == [restore_state_path(copy, "NEW")]
+
+
+def test_uninstall_refused_while_we_hold_role(tmp_path):
+    phone, _, state, adb = _setup(tmp_path, role_holders=[PKG])
+    phone.installed.add(PKG)
+    assert phonesetup._uninstall_companion(adb) is False
+    # wywołanie z cleanup także przy `role_ok=True` (np. rola wróciła do nas po potwierdzeniu)
+    phonesetup._update(state, companion=True)
+    assert phonesetup._remove_companion(adb, state, True) is False
+    assert f"pm uninstall {PKG}" not in phone.commands and PKG in phone.installed
+    assert device_changes(state).companion
+    phone.tap_role(PREV)
+    assert phonesetup._remove_companion(adb, state, True) is True
+    assert PKG not in phone.installed and phone.role_holders == [PREV]

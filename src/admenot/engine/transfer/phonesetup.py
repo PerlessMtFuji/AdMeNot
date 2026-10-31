@@ -145,6 +145,15 @@ def _connection(exc: AdbError) -> bool:
     return exc.kind in _CONNECTION_KINDS
 
 
+def _uninstall_companion(adb: AdbTransport) -> bool:
+    """`pm uninstall` aplikacji pomocniczej, ale nigdy, gdy jest posiadaczem roli SMS (odczyt tuż przed):
+    odinstalowanie posiadacza zostawiłoby telefon bez aplikacji SMS. `False` = odmowa."""
+    if helper.PACKAGE in sms_role_holders(adb):
+        return False
+    adb.shell(f"pm uninstall {helper.PACKAGE}")
+    return True
+
+
 # --------------------------------------------------------------------------------------
 # Zmiany
 # --------------------------------------------------------------------------------------
@@ -162,12 +171,13 @@ def set_appop_allow(adb: AdbTransport, state: RestoreState) -> None:
 def install_companion(adb: AdbTransport, state: RestoreState) -> Literal["ok", "blocked"]:
     """Instaluje aplikację pomocniczą (`install -g`: uprawnienia od razu). APK sprawdzany najpierw na
     komputerze (`HelperBroken` przy złym SHA-256). Pozostałość po awarii najpierw odinstalowana.
-    `blocked`: telefon odmówił instalacji (np. Xiaomi bez „Instaluj przez USB”)."""
+    `blocked`: telefon odmówił instalacji (np. Xiaomi bez „Instaluj przez USB”) albo pozostałość ma
+    rolę SMS (nie odinstalowujemy posiadacza roli)."""
     apk, _ = helper.artifact("apk")
     if not device_changes(state).companion:
         _update(state, companion=True)
-    if _installed(adb):
-        adb.shell(f"pm uninstall {helper.PACKAGE}")
+    if _installed(adb) and not _uninstall_companion(adb):
+        return "blocked"  # pozostałość z rolą SMS: nie ruszamy, sprzątanie najpierw odda rolę
     try:
         out = adb.run(["install", "-g", str(apk)], timeout=INSTALL_TIMEOUT)
     except AdbError as exc:
@@ -215,30 +225,43 @@ def _role_restored(holders: tuple[str, ...], prev: tuple[str, ...]) -> bool:
     return not prev or prev[0] in holders
 
 
+def _wait_role(adb: AdbTransport, prev: tuple[str, ...], on_tap: OnTap,
+               should_stop: Callable[[], bool]) -> bool:
+    """Rola nie wróciła z ADB: systemowe okno domyślnych aplikacji i czekanie na stuknięcie bez limitu
+    (wariant B), aż odczyt pokaże przywróconą rolę; `should_stop()` przerywa (`False`)."""
+    if _role_restored(sms_role_holders(adb), prev):
+        return True
+    adb.shell("am start -a android.settings.MANAGE_DEFAULT_APPS_SETTINGS")
+    on_tap("sms_role_restore")
+    try:
+        while True:
+            if should_stop():
+                return False
+            _sleep(TAP_POLL)
+            if _role_restored(sms_role_holders(adb), prev):
+                return True
+    finally:
+        on_tap(None)
+
+
 def _restore_role(adb: AdbTransport, state: RestoreState, on_tap: OnTap,
                   should_stop: Callable[[], bool]) -> bool:
-    prev = device_changes(state).role_prev
-    if prev is None:
-        return True
+    changes = device_changes(state)
+    prev = changes.role_prev
     try:
+        if prev is None:
+            # Nie zmienialiśmy roli w tym stanie, ale pozostałość (inna kopia, zgubiony stan) może ją mieć:
+            # przed odinstalowaniem rola musi przejść do innej aplikacji (stuknięcie, bez `add-role-holder`,
+            # bo nie wiemy, komu ją oddać).
+            return not changes.companion or _wait_role(adb, (), on_tap, should_stop)
         try:
             adb.shell(f"cmd role add-role-holder {SMS_ROLE} {prev[0]}" if prev
                       else f"cmd role remove-role-holder {SMS_ROLE} {helper.PACKAGE}")
         except AdbError as exc:
             if _connection(exc):
                 return False
-        if not _role_restored(sms_role_holders(adb), prev):
-            adb.shell("am start -a android.settings.MANAGE_DEFAULT_APPS_SETTINGS")
-            on_tap("sms_role_restore")
-            try:
-                while True:  # bez limitu (wariant B): zadanie nie kończy się przed przywróceniem roli
-                    if should_stop():
-                        return False
-                    _sleep(TAP_POLL)
-                    if _role_restored(sms_role_holders(adb), prev):
-                        break
-            finally:
-                on_tap(None)
+        if not _wait_role(adb, prev, on_tap, should_stop):
+            return False
     except AdbError:
         return False
     _update(state, role_prev=None)
@@ -267,10 +290,8 @@ def _remove_companion(adb: AdbTransport, state: RestoreState, role_ok: bool) -> 
     if not role_ok:  # odinstalowanie posiadacza roli oddałoby ją systemowi, nie poprzedniej aplikacji
         return False
     try:
-        if _installed(adb):
-            adb.shell(f"pm uninstall {helper.PACKAGE}")
-            if _installed(adb):
-                return False
+        if _installed(adb) and (not _uninstall_companion(adb) or _installed(adb)):
+            return False
     except AdbError:
         return False
     _update(state, companion=False)
