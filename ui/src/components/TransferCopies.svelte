@@ -62,7 +62,8 @@
     {t('transfer.delete_text')}
     {#snippet actions()}
       <Button onclick={() => (confirming = null)}>{t('common.cancel')}</Button>
-      <Button variant="danger" onclick={() => { confirming = null; void ctl.deleteTransfer(c.id); }}>{t('transfer.delete_confirm')}</Button>
+      <!-- `c` jest wyliczane z `confirming` przy każdym odczycie: id bierzemy przed zamknięciem okna -->
+      <Button variant="danger" onclick={() => { const id = c.id; confirming = null; void ctl.deleteTransfer(id); }}>{t('transfer.delete_confirm')}</Button>
     {/snippet}
   </Dialog>
 {/if}

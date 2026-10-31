@@ -31,6 +31,15 @@ describe('TransferCopies', () => {
     expect(plan).toHaveBeenCalledWith('OLD/1');
   });
 
+  test('deleting a copy asks first, then deletes that copy', async () => {
+    const env = await show([COPY], null);
+    const del = vi.spyOn(env.ctl, 'deleteTransfer').mockResolvedValue();
+    await fireEvent.click(screen.getByRole('button', { name: 'Usuń teraz' }));
+    expect(del).not.toHaveBeenCalled();
+    await fireEvent.click(screen.getByRole('button', { name: 'Usuń' }));
+    expect(del).toHaveBeenCalledWith('OLD/1');
+  });
+
   test('without a connected phone the upload button is off; an unfinished copy has none', async () => {
     await show([COPY, { ...COPY, id: 'OLD/2', status: 'in_progress', restores: [] }], null);
     const buttons = screen.getAllByRole('button', { name: 'Wgraj na podłączony telefon' }) as HTMLButtonElement[];
