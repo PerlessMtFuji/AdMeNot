@@ -80,8 +80,20 @@ final class Writer {
         return e;
     }
 
+    /** SecurityException, our own Denied, or applyBatch refused by appop ("App op not allowed"). */
     static boolean isDenial(Throwable e) {
-        return unwrap(e) instanceof SecurityException;
+        Throwable u = unwrap(e);
+        if (u instanceof SecurityException || u instanceof Denied) return true;
+        return u instanceof android.content.OperationApplicationException
+                && u.getMessage() != null && u.getMessage().contains("App op not allowed");
+    }
+
+    /**
+     * An insert ignored by appop is not an error to the caller: ContentProvider.Transport returns
+     * rejectInsert(), i.e. the collection URI + "/0". Treat it as a denial, never as written.
+     */
+    static boolean rejected(Uri u) {
+        return u != null && "0".equals(u.getLastPathSegment());
     }
 
     static String code(Throwable e) {
@@ -131,7 +143,9 @@ final class Writer {
     private void oneByOne(Uri uri, List<String> ids, List<ContentValues> vals) throws Exception {
         for (int i = 0; i < ids.size(); i++) {
             try {
-                if (t.insert(uri, vals.get(i)) == null) errId(ids.get(i), "insert_null");
+                Uri u = t.insert(uri, vals.get(i));
+                if (u == null) errId(ids.get(i), "insert_null");
+                else if (rejected(u)) throw new Denied();
                 else okId(ids.get(i));
             } catch (Exception e) {
                 if (isDenial(e)) throw new Denied();
@@ -201,6 +215,7 @@ final class Writer {
         for (JSONObject r : recs) addContact(batch, r);
         try {
             android.content.ContentProviderResult[] res = t.applyBatch(CONTACTS_AUTHORITY, batch);
+            if (anyRejected(res)) throw new Denied();
             if (res != null && res.length == batch.size()) {
                 for (String id : ids) okId(id);
                 return;
@@ -213,6 +228,7 @@ final class Writer {
             addContact(one, recs.get(i));
             try {
                 android.content.ContentProviderResult[] res = t.applyBatch(CONTACTS_AUTHORITY, one);
+                if (anyRejected(res)) throw new Denied();
                 if (res != null && res.length == one.size()) okId(ids.get(i));
                 else errId(ids.get(i), "batch_short");
             } catch (Exception e) {
@@ -220,6 +236,12 @@ final class Writer {
                 errId(ids.get(i), code(e));
             }
         }
+    }
+
+    static boolean anyRejected(android.content.ContentProviderResult[] res) {
+        if (res == null) return false;
+        for (android.content.ContentProviderResult x : res) if (rejected(x.uri)) return true;
+        return false;
     }
 
     private void addContact(ArrayList<ContentProviderOperation> batch, JSONObject r) throws Exception {
@@ -288,11 +310,18 @@ final class Writer {
         pdu.put("tr_id", "admenot" + r.getString("id").substring(0, Math.min(16, r.getString("id").length())));
         Uri pu = t.insert(Uri.parse("content://mms/" + boxPath), pdu);
         if (pu == null) throw new MmsWriteError("pdu_null");
+        if (rejected(pu)) throw new Denied(); // nothing stored, so nothing to roll back
         try {
             writeMmsBody(in, r, pu, addrs);
         } catch (Exception e) {
             // roll back only the pdu row this process has just inserted (its own returned URI)
-            try { t.delete(pu); } catch (Exception ignored) { }
+            int removed;
+            try {
+                removed = t.delete(pu);
+            } catch (Exception d) {
+                removed = isDenial(d) ? 0 : -1;
+            }
+            if (removed == 0) throw new Denied(); // rejectDelete(): the write appop is not allowed
             throw e;
         }
     }
@@ -312,6 +341,7 @@ final class Writer {
             if (!p.isNull("text") && p.has("text")) { pv.put("text", p.getString("text")); pv.put("chset", 106); }
             Uri part = t.insert(partsUri, pv);
             if (part == null) throw new MmsWriteError("part_null");
+            if (rejected(part)) throw new Denied();
             if (!p.isNull("file") && p.has("file")) copy(in.part(p.getString("file")), t.openOutput(part));
         }
         Uri addrUri = Uri.parse("content://mms/" + mid + "/addr");
@@ -321,7 +351,9 @@ final class Writer {
             av.put("address", a.getString(0));
             av.put("type", a.getInt(1));
             av.put("charset", 106);
-            if (t.insert(addrUri, av) == null) throw new MmsWriteError("addr_null");
+            Uri au = t.insert(addrUri, av);
+            if (au == null) throw new MmsWriteError("addr_null");
+            if (rejected(au)) throw new Denied();
         }
     }
 

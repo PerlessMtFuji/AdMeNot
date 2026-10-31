@@ -92,6 +92,13 @@ def test_parse_output_mms_rolled_back_is_failed_not_ok():
     assert out.ok == {"m1", "m3"} and out.failed == {"m2": "FileNotFoundException"} and out.finished
 
 
+def test_parse_output_appop_ignored_insert_is_denied_not_ok():
+    # An insert ignored by appop returns `<uri>/0`; the helper reports DENIED instead of OK, so the
+    # record is not marked done and the next path (companion) gets it.
+    out = helper.parse_output(["DENIED", "DONE 0 0"])
+    assert out.ok == set() and out.failed == {} and out.denied and not out.finished
+
+
 def test_parse_output_denied_stops():
     out = helper.parse_output(["OK a", "DENIED", "OK b", "ERR c x"])
     assert out.ok == {"a"} and out.failed == {} and out.denied and not out.finished
