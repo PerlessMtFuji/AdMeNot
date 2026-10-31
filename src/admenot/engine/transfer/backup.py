@@ -49,7 +49,6 @@ from .winpath import PathPlanner
 CHUNK_MAX_FILES = 200
 CHUNK_MAX_BYTES = 1024 ** 3
 CMD_MAX_CHARS = 24_000  # linia poleceń Windows ma limit 32 767 znaków
-DEVICE_CMD_MAX = 48_000  # limit długości polecenia `adb shell`
 MAX_ATTEMPTS = 3
 MAX_DISCONNECTS = 20
 SPACE_MARGIN = 64 * 1024 ** 2  # zapas na dysku ponad rozmiar paczki / eksportu / APK
@@ -719,13 +718,21 @@ def _chunks(pend: list[FileRow]) -> list[list[FileRow]]:
     return chunks
 
 
+def _host_len(arg: str) -> int:
+    """Ile `arg` zajmie w linii poleceń Windows: jednostki UTF-16 (emoji = 2) plus ukośniki,
+    które list2cmdline dokleja przed cudzysłowami i ukośnikami."""
+    return len(arg.encode("utf-16-le")) // 2 + arg.count('"') + arg.count("\\")
+
+
 def _cmd_batches(remotes: list[str]) -> list[list[str]]:
+    """Paczki ścieżek do jednego `adb shell` — ten idzie przez CreateProcess, więc limit linii
+    poleceń Windows obowiązuje też polecenia wykonywane na telefonie."""
     batches: list[list[str]] = []
     cur: list[str] = []
     n = 0
     for r in remotes:
-        ln = len(q(r)) + 1
-        if cur and n + ln > DEVICE_CMD_MAX:
+        ln = _host_len(q(r)) + 1
+        if cur and n + ln > CMD_MAX_CHARS:
             batches.append(cur)
             cur, n = [], 0
         cur.append(r)

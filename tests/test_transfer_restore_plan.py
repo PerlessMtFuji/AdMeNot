@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import os
+import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -223,8 +224,22 @@ def test_empty_phone_stat_is_batched(tmp_path):
     plan = _plan(new, copy)
     assert {f.action for f in plan.files} == {"push"}
     stats = [c for c in new.commands if c.startswith("stat ")]
-    assert len(stats) == len(_cmd_batches(["/sdcard/" + r for r in many])) == 2
+    assert len(stats) == len(_cmd_batches(["/sdcard/" + r for r in many])) > 1
     assert all(c.endswith(STAT_TAIL) for c in stats)
+
+
+def test_stat_batches_fit_the_windows_command_line(tmp_path):
+    """`adb shell <polecenie>` idzie przez CreateProcess: cała linia ≤ 32 767 jednostek UTF-16
+    (emoji = 2), a list2cmdline dokleja cudzysłowy i ukośniki. Próba na OPPO: 1279 ścieżek
+    w jednej paczce = 48 049 znaków → WinError 206."""
+    many = {f"DCIM/AdMeNotTest/Ą B/'$x' zażółć 😀 {i:04d} — długa nazwa pliku.jpg": b"x" for i in range(1500)}
+    copy = _copy(tmp_path, many)
+    new = _new(tmp_path)
+    _plan(new, copy)
+    adb_path = r"C:\Program Files\AdMeNot\assets\tools\scrcpy\adb.exe"
+    for c in (c for c in new.commands if c.startswith("stat ")):
+        line = subprocess.list2cmdline([adb_path, "-s", "79SSSW6PDMEMCI6S", "shell", c])
+        assert len(line.encode("utf-16-le")) // 2 < 32_767
 
 
 def test_missing_local_files_left_out(tmp_path, monkeypatch):
