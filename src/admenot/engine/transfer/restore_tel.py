@@ -14,7 +14,10 @@ Gwarancje:
   pomocnika) — wznowienie nie zapisze go drugi raz;
 * rozłączenie nie zużywa prób: jedno `wait_device()`, ponowny odczyt kluczy kategorii z telefonu
   (wiersze zapisane przed urwaniem nie mają linii `OK`) i dopiero reszta wraca do kolejki;
-* `ERR` pomocnika: ponowienie, po `MAX_ATTEMPTS` próbach `error`; `DENIED`: następna droga;
+* `ERR` pomocnika: ponowienie, a po `MAX_ATTEMPTS` próbach rekord idzie następną drogą (per
+  wiadomość, spec §5.3); `DENIED`: cała reszta kategorii następną drogą; `error` dopiero, gdy nie zapisze
+  go żadna droga (także plik);
+* telefon nie daje się odczytać po urwanej paczce: jej rekordy od razu do pliku (bez duplikatów);
 * po zapisie SMS/MMS sprawdzenie, że wiadomości mają wątki (inaczej `visible_warning`);
 * sprzątanie (`phonesetup.cleanup`) zawsze na końcu, także po zatrzymaniu i wyjątku.
 
@@ -149,6 +152,11 @@ def _int(v: Any) -> int:
         return 0
 
 
+def _missing_part(rec: Any) -> bool:
+    """MMS z częścią, której pliku nie ma już w kopii (pomocnik dostaje części jako pliki)."""
+    return any(p.file is not None and not p.file.is_file() for p in rec.parts)
+
+
 def _mark(state: RestoreState, status: str) -> None:
     state.set_meta("status", status)
     state.set_meta("updated", datetime.now(UTC).isoformat(timespec="seconds"))
@@ -179,7 +187,8 @@ class _TelRestore:
         self.records = {k: self._records(k) for k in self.kinds}
         self.stats = {k: _Kind() for k in self.kinds}
         self.disconnects = 0
-        self.attempts: dict[tuple[str, str], int] = {}
+        self.attempts: dict[tuple[str, str, str], int] = {}  # (kategoria, droga, id) -> próby
+        self.codes: dict[tuple[str, str], str] = {}  # (kategoria, id) -> ostatni kod błędu pomocnika
         self.deferred: list[tuple[str, list[Rec], tuple[str, ...]]] = []
         self.manual: dict[str, list[Rec]] = {}
         self.cache: dict[str, Writer] = {}
@@ -300,11 +309,15 @@ class _TelRestore:
             if todo[kind]:
                 self._progress(kind, CHAIN[kind][0])
                 self._kind(kind, todo[kind], CHAIN[kind], defer=True)
+        # pliki kategorii bez roli (kontakty + okno importu, połączenia) przed czekaniem na stuknięcie
+        self._write_files(set(self.manual) - ROLE_KINDS)
         for kind, recs, chain in self.deferred:  # rola SMS dopiero po pozostałych kategoriach (§6.2)
             self._kind(kind, recs, chain, defer=False)
-        self._write_files()
+        self._write_files(set(self.manual))
 
     def _kind(self, kind: str, records: list[Rec], chain: tuple[str, ...], *, defer: bool) -> None:
+        """Rekordy przechodzą drogi po kolei: następna dostaje te, których poprzednia nie zapisała
+        (odmowa, pomocnik niedostępny albo `ERR` po `MAX_ATTEMPTS` próbach — spec §5.3, R15)."""
         remaining = records
         for i, route in enumerate(chain):
             if not remaining:
@@ -317,8 +330,15 @@ class _TelRestore:
                 return
             if self._prepare(route, kind):
                 remaining = self._route(kind, route, remaining)
-        if remaining:  # łańcuch bez drogi „plik”
-            self.state.tel_set(kind, [rid for rid, _ in remaining], "error", chain[-1], "no_route")
+        for code, rids in self._by_code(kind, remaining, "no_route").items():  # łańcuch bez drogi „plik”
+            self.state.tel_set(kind, rids, "error", chain[-1], code)
+            self.stats[kind].done += len(rids)
+
+    def _by_code(self, kind: str, recs: list[Rec], default: str) -> dict[str, list[str]]:
+        out: dict[str, list[str]] = {}
+        for rid, _ in recs:
+            out.setdefault(self.codes.get((kind, rid), default)[:40], []).append(rid)
+        return out
 
     def _prepare(self, route: str, kind: str) -> bool:
         """Zmiany telefonu potrzebne drodze (raz na przebieg). `False` = droga niedostępna."""
@@ -364,20 +384,28 @@ class _TelRestore:
         niedostępny)."""
         writer = self._writer(route)
         pending = list(records)
+        onward: list[Rec] = []
         while pending:
             if self.should_stop():
                 raise _Stop()
             chunk, pending = pending[:BATCH], pending[BATCH:]
-            retry, passed = self._chunk(kind, route, writer, chunk)
+            retry, passed, abandon = self._chunk(kind, route, writer, chunk)
             self._progress(kind, route)
-            if passed is not None:
-                return passed + pending
+            onward += passed
+            if abandon:  # odmowa albo pomocnik niedostępny: cała reszta idzie dalej
+                return onward + retry + pending
             pending = retry + pending
-        return []
+        return onward
 
     def _chunk(self, kind: str, route: str, writer: Writer, chunk: list[Rec]
-               ) -> tuple[list[Rec], list[Rec] | None]:
-        """Jedna paczka: (do ponowienia tą drogą, dla następnej drogi albo `None`)."""
+               ) -> tuple[list[Rec], list[Rec], bool]:
+        """Jedna paczka: (do ponowienia tą drogą, dla następnej drogi, czy porzucić tę drogę)."""
+        broken = [r for r in chunk if kind == "mms" and _missing_part(r[1])]
+        if broken:  # plik załącznika zniknął z kopii: żadna droga z pomocnikiem go nie zapisze
+            self.codes.update({(kind, rid): "missing_part" for rid, _ in broken})
+            chunk = [r for r in chunk if r not in broken]
+            if not chunk:
+                return [], broken, False
         if route == AP:
             mark_helper_dir(self.state)
         try:
@@ -385,36 +413,42 @@ class _TelRestore:
         except HelperBroken as exc:
             if self._online():
                 log.warning("helper unusable for %s via %s: %s", kind, route, exc)
-                return [], chunk
+                return [], broken + chunk, True
             self._disconnected()
-            return self._drop_present(kind, route, chunk), None
+            return self._drop_present(kind, route, chunk), broken, False
         except AdbError as exc:
             if self._connection(exc):
                 self._disconnected()
-                return self._drop_present(kind, route, chunk), None
+                return self._drop_present(kind, route, chunk), broken, False
             log.warning("helper failed for %s via %s: %s", kind, route, exc.kind)
             rest = self._drop_present(kind, route, chunk)
-            return self._failed(kind, route, rest, dict.fromkeys((rid for rid, _ in rest), "helper_failed")), None
+            retry, exhausted = self._failed(kind, route, rest, dict.fromkeys((rid for rid, _ in rest),
+                                                                             "helper_failed"))
+            return retry, broken + exhausted, False
         ok = [r for r in chunk if r[0] in out.ok]
         self._done(kind, route, ok)
         log.info("telephony %s via %s: %d ok, %d failed, denied=%s", kind, route, len(ok), len(out.failed),
                  out.denied)
         if out.denied:
-            return [], [r for r in chunk if r[0] not in out.ok]
+            return [], broken + [r for r in chunk if r[0] not in out.ok], True
         bad = [r for r in chunk if r[0] in out.failed]
         missing = [r for r in chunk if r[0] not in out.ok and r[0] not in out.failed]
         if missing:
             missing = self._drop_present(kind, route, missing)
         codes = {**dict.fromkeys((rid for rid, _ in missing), "no_result"), **out.failed}
-        return self._failed(kind, route, bad + missing, codes), None
+        retry, exhausted = self._failed(kind, route, bad + missing, codes)
+        return retry, broken + exhausted, False
 
     def _drop_present(self, kind: str, route: str, recs: list[Rec]) -> list[Rec]:
-        """Po urwanym zapisie: rekordy, które już są na telefonie, liczą się jako zapisane (`done`)."""
+        """Po urwanym zapisie: rekordy, które już są na telefonie, liczą się jako zapisane (`done`).
+        Telefon nie daje się odczytać (R17): rekordy przerwanej paczki nie wracają na telefon (mogły
+        zostać zapisane bez linii `OK`), tylko od razu do pliku do ręcznego importu."""
         if not recs:
             return recs
         has = self._retry(lambda: phone_has(self.read_adb, kind))
-        if has is None:  # telefon nie daje się odczytać — nie ma czym sprawdzić
-            return recs
+        if has is None:
+            self.manual.setdefault(kind, []).extend(recs)
+            return []
         present = [r for r in recs if has(r[1])]
         self._done(kind, route, present)
         return [r for r in recs if r not in present]
@@ -427,21 +461,18 @@ class _TelRestore:
         self.stats[kind].written += [rec for _, rec in recs]
         self._used(kind, route)
 
-    def _failed(self, kind: str, route: str, recs: list[Rec], codes: dict[str, str]) -> list[Rec]:
-        """Nieudana próba: ponowienie, a po `MAX_ATTEMPTS` próbach stan `error` z kodem."""
+    def _failed(self, kind: str, route: str, recs: list[Rec], codes: dict[str, str]
+                ) -> tuple[list[Rec], list[Rec]]:
+        """Nieudana próba tą drogą: (do ponowienia, wyczerpane po `MAX_ATTEMPTS` — dla następnej drogi).
+        Ostatni kod błędu zostaje zapamiętany na wypadek, gdyby żadna droga go nie zapisała."""
         retry: list[Rec] = []
-        final: dict[str, list[str]] = {}
+        exhausted: list[Rec] = []
         for rid, rec in recs:
-            n = self.attempts.get((kind, rid), 0) + 1
-            self.attempts[(kind, rid)] = n
-            if n >= MAX_ATTEMPTS:
-                final.setdefault(codes.get(rid, "error")[:40], []).append(rid)
-            else:
-                retry.append((rid, rec))
-        for code, rids in final.items():
-            self.state.tel_set(kind, rids, "error", route, code)
-            self.stats[kind].done += len(rids)
-        return retry
+            self.codes[(kind, rid)] = codes.get(rid, "error")
+            n = self.attempts.get((kind, route, rid), 0) + 1
+            self.attempts[(kind, route, rid)] = n
+            (exhausted if n >= MAX_ATTEMPTS else retry).append((rid, rec))
+        return retry, exhausted
 
     def _used(self, kind: str, route: str) -> None:
         """Najdalsza droga, którą poszły rekordy kategorii (meta `tel_path`, także z poprzednich przebiegów)."""
@@ -455,8 +486,8 @@ class _TelRestore:
         self.on_progress(TelProgress(kind, s.done, s.total, route))
 
     # ---- droga 3 --------------------------------------------------------------------------
-    def _write_files(self) -> None:
-        recs = {k: v for k, v in self.manual.items() if v}
+    def _write_files(self, kinds: set[str]) -> None:
+        recs = {k: self.manual.pop(k) for k in sorted(kinds) if self.manual.get(k)}
         if not recs:
             return
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -469,7 +500,8 @@ class _TelRestore:
                 if self._online():
                     log.warning("manual import files not written: %s", exc)
                     for k, v in recs.items():
-                        self.state.tel_set(k, [rid for rid, _ in v], "error", FILE, "file_failed")
+                        for code, rids in self._by_code(k, v, "file_failed").items():
+                            self.state.tel_set(k, rids, "error", FILE, code)
                         self.stats[k].done += len(v)
                     return
                 self._disconnected()
@@ -524,6 +556,13 @@ class _TelRestore:
                 skipped_messenger=sel.skipped_messenger if sel else 0,
                 failed=cnt["error"], manual=cnt["manual"], path=paths.get(k, "none"),
                 visible_warning=self.visible.get(k, False))
-        manual = [ManualStep(d["kind"], d["remote"]) for d in self.state.get_meta("tel_manual") or []]
+        # kroki „do zrobienia” tylko dla kategorii, które nadal mają rekordy do ręcznego importu (plik
+        # zaimportowany i plan bez tych rekordów -> krok znika, a przebieg może być `complete`)
+        still = {"sms" if k == "mms" else k for k, v in kinds.items() if v.manual}
+        saved = self.state.get_meta("tel_manual") or []
+        kept = [d for d in saved if d.get("kind") in still]
+        if kept != saved:
+            self.state.set_meta("tel_manual", kept)
+        manual = [ManualStep(d["kind"], d["remote"]) for d in kept]
         synced = dict(contacts.skipped_synced) if contacts else {}
         return TelResult(kinds, self.safety, manual, clean, synced, round(time.monotonic() - t0), stopped)

@@ -157,8 +157,10 @@ class Run:
         self.phone.reconnect()
 
     def __call__(self, kinds: frozenset[str] = ALL, *, should_stop=lambda: False, skip_tap=lambda: False,
-                 on_tap=None, wait_device=None) -> TelResult:
+                 on_tap=None, wait_device=None, after_plan=None) -> TelResult:
         plan = build_tel_plan(self.phone, self.copy, self.copy.read_meta(), {"contacts", "sms", "mms", "calls"})
+        if after_plan is not None:
+            after_plan(plan)
         state = RestoreState(restore_state_path(self.copy, "NEW"))
         try:
             def tap(req: str | None) -> None:
@@ -433,9 +435,10 @@ def test_export_sms_source_ignores_stale_mms(tmp_path):
     assert "mms" not in r.kinds and "mms" not in r.safety
 
 
-def test_helper_error_retried_then_error(tmp_path):
+def test_helper_error_moves_to_next_route_then_file(tmp_path):
+    """R15: `ERR` po 3 próbach `app_process` -> aplikacja pomocnicza (rola SMS) -> po 3 próbach plik."""
     copy, phone = _copy(tmp_path), _new(tmp_path)
-    # MMS bez pliku części: pomocnik odpowiada `ERR <id> missing_part` za każdym razem
+    # części MMS znikają z wejścia pomocnika: obie drogi odpowiadają `ERR <id> missing_part`
     real = phone._read_input
 
     def broken(remote):
@@ -448,14 +451,142 @@ def test_helper_error_retried_then_error(tmp_path):
 
     phone._read_input = broken  # type: ignore[method-assign]
     r = Run(phone, copy)()
-    assert r.kinds["mms"].failed == 1 and r.kinds["mms"].written == 0
     assert sum(1 for c in phone.commands if "app_process" in c) == 3 + 3  # 3 próby MMS + pozostałe kategorie
-    assert r.status == "incomplete" and r.cleanup.ok
+    assert sum(1 for c in phone.commands if c.startswith("am instrument")) == 3
+    assert phone.providers["mms"] == []
+    assert r.kinds["mms"].failed == 0 and r.kinds["mms"].manual == 1 and r.kinds["mms"].path == FILE
+    (mms,) = read_mms_xml(phone.local(r.manual[0].remote), None)  # plik z kopii ma załącznik
+    assert any(p.file is not None and p.file.read_bytes() == IMG for p in mms.parts)
+    assert phone.role_holders == [PREV] and PKG not in phone.installed and r.cleanup.ok
+    assert r.status == "incomplete"
     st = _state(copy)
     try:
-        assert set(st.tel_status("mms").values()) == {"error"}
+        assert set(st.tel_status("mms").values()) == {"manual"}
     finally:
         st.close()
+
+
+def test_err_on_app_process_written_by_companion_once(tmp_path):
+    copy, phone = _copy(tmp_path), _new(tmp_path)
+    real = phone._write
+
+    def write(kind, records, account, remote):
+        if kind == "sms" and remote.startswith(helper.HELPER_DIR):
+            bad = [x for x in records if x["body"].startswith("Wiadomość 3")]
+            lines = real(kind, [x for x in records if x not in bad], account, remote)[:-1]
+            lines += [f"ERR {x['id']} insert_failed" for x in bad]
+            return [*lines, f"DONE {len(lines) - len(bad)} {len(bad)}"]
+        return real(kind, records, account, remote)
+
+    phone._write = write  # type: ignore[method-assign]
+    r = Run(phone, copy)()
+    assert sum(1 for c in phone.commands if c.startswith("am instrument")) == 1
+    assert _counts(phone) == EXPECTED
+    assert sum(1 for x in phone.providers["sms"] if x["body"].startswith("Wiadomość 3")) == 1
+    assert r.kinds["sms"].written == 5 and r.kinds["sms"].path == CO and r.kinds["sms"].failed == 0
+    assert phone.role_holders == [PREV] and r.status == "complete"
+
+
+def test_no_route_left_counts_failed_with_last_code(tmp_path, monkeypatch):
+    copy, phone = _copy(tmp_path), _new(tmp_path)
+    monkeypatch.setitem(rt.CHAIN, "calls", (AP,))
+    real = phone._write
+
+    def write(kind, records, account, remote):
+        if kind == "calls":
+            return [*(f"ERR {x['id']} insert_failed" for x in records), f"DONE 0 {len(records)}"]
+        return real(kind, records, account, remote)
+
+    phone._write = write  # type: ignore[method-assign]
+    r = Run(phone, copy)()
+    assert r.kinds["calls"].failed == 4 and r.status == "incomplete"
+    st = _state(copy)
+    try:
+        assert set(st.tel_status("calls").values()) == {"error"}
+        assert {row[0] for row in st.db.execute("SELECT error FROM tel WHERE kind='calls'")} == {"insert_failed"}
+    finally:
+        st.close()
+
+
+def test_missing_part_file_does_not_crash(tmp_path):
+    copy, phone = _copy(tmp_path), _new(tmp_path)
+
+    def lose_attachment(plan):
+        for part in plan.mms[0].parts:
+            if part.file is not None:
+                part.file.unlink()
+
+    r = Run(phone, copy)(after_plan=lose_attachment)
+    assert phone.providers["mms"] == [] and len(phone.providers["sms"]) == 5
+    assert r.kinds["mms"].manual == 1 and r.kinds["mms"].path == FILE
+    (mms,) = read_mms_xml(phone.local(r.manual[0].remote), None)
+    assert [p.content_type for p in mms.parts] == ["text/plain"]  # bez zgubionego zdjęcia
+    assert r.cleanup.ok
+    st = _state(copy)
+    try:
+        rows = dict(st.db.execute("SELECT status, error FROM tel WHERE kind='mms'"))
+        assert rows == {"manual": None}
+    finally:
+        st.close()
+
+
+def test_unreadable_after_disconnect_goes_to_file(tmp_path):
+    """R17: urwana paczka SMS na telefonie, którego nie da się odczytać -> nic nie wraca na telefon."""
+    copy = _copy(tmp_path)
+    phone = _new(tmp_path, fail_after_records=3 + 2)
+    phone.deny_uris.add("content://sms")
+    run = Run(phone, copy)
+    r = run()
+    assert run.waits == 1
+    assert len(phone.providers["sms"]) == 2  # zapisane przed urwaniem, bez powtórki
+    assert r.kinds["sms"].manual == 5 and r.kinds["sms"].path == FILE
+    assert len(phone.providers["mms"]) == 1 and len(phone.providers["calls"]) == 4
+    step = next(m for m in r.manual if m.kind == "sms")
+    assert len(read_sms_xml(phone.local(step.remote))) == 5
+    assert r.cleanup.ok and r.status == "incomplete"
+
+
+def _import_contacts(phone: FakeStoragePhone) -> None:
+    """Klient zaimportował plik `.vcf`: kontakty są na telefonie."""
+    for cid, name, mime, value in (("1", "Jan Kowalski", tel.M_PHONE, A), ("2", "Żaneta Łęcka", tel.M_PHONE, B),
+                                   ("3", "Biuro", tel.M_EMAIL, "biuro@firma.pl")):
+        phone.providers["contacts"].append({"_id": cid, "starred": "0", "display_name": name})
+        phone.providers["raw_contacts"].append({"_id": cid, "contact_id": cid, "deleted": "0",
+                                                "account_type": None, "account_name": None})
+        phone.providers["data"].append({**{c: None for c in tel.DATA_COLS}, "contact_id": cid,
+                                        "raw_contact_id": cid, "mimetype": mime, "data1": value})
+
+
+def test_manual_step_dropped_after_import(tmp_path):
+    copy, phone = _copy(tmp_path), _new(tmp_path, helper_denied={"contacts"}, install_blocked=True)
+    run = Run(phone, copy)
+    assert [m.kind for m in run().manual] == ["contacts"]
+    _import_contacts(phone)
+    again = run()
+    assert again.manual == [] and again.kinds["contacts"].manual == 0
+    assert again.kinds["contacts"].existed == 3 and again.status == "complete"
+    st = _state(copy)
+    try:
+        assert st.get_meta("tel_manual") == []
+    finally:
+        st.close()
+
+
+def test_contacts_file_opened_before_role_tap(tmp_path):
+    copy, phone = _copy(tmp_path), _new(tmp_path, helper_denied={"contacts", "sms", "mms"},
+                                        companion_denied={"contacts"}, role_needs_tap=True)
+    seen: list[tuple[bool, bool]] = []
+
+    def on_tap(req):
+        if req == "sms_role_grant":
+            vcf = list((phone.root / "sdcard" / "Download").glob("admenot-kontakty-*.vcf"))
+            seen.append((bool(vcf), any("text/x-vcard" in s for s in phone.started)))
+            phone.tap_role(PKG)
+
+    r = Run(phone, copy)(on_tap=on_tap)
+    assert seen == [(True, True)]  # okno importu kontaktów otwarte, zanim program czeka na stuknięcie
+    assert r.kinds["contacts"].path == FILE and r.kinds["sms"].path == CO
+    assert [m.kind for m in r.manual] == ["contacts"] and r.cleanup.ok
 
 
 def test_chunks_of_at_most_500(tmp_path, monkeypatch):
@@ -495,6 +626,18 @@ def test_contacts_vcf_roundtrip(tmp_path):
     got = read_vcards(path)
     assert [(c.display, c.starred) for c in got] == [("Jan Kowalski", True), ("Żaneta Łęcka", False),
                                                      ("Biuro", False)]
+
+
+def test_messages_xml_skips_missing_part_file(tmp_path):
+    copy = _copy(tmp_path)
+    plan = build_tel_plan(_new(tmp_path), copy, copy.read_meta(), {"sms", "mms"})
+    for part in plan.mms[0].parts:
+        if part.file is not None:
+            part.file.unlink()
+    path = tmp_path / "out.xml"
+    path.write_text(messages_xml([], plan.mms), encoding="utf-8")
+    (got,) = read_mms_xml(path, None)
+    assert [p.text for p in got.parts] == ["Zdjęcie z wakacji"]
 
 
 def test_manual_step_shape():

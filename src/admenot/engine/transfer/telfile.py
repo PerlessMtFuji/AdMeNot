@@ -77,7 +77,11 @@ def _mms_element(r: MmsRecord) -> list[str]:
                        ("text", p.text)])
         data = ""
         if p.file is not None:
-            data = f' data="{base64.b64encode(p.file.read_bytes()).decode("ascii")}"'
+            try:
+                blob = p.file.read_bytes()
+            except OSError:  # plik załącznika zniknął z kopii: wiadomość bez tej części, ale jest
+                continue
+            data = f' data="{base64.b64encode(blob).decode("ascii")}"'
         out.append(f"      <part {part}{data} />")
     out += ["    </parts>", "    <addrs>"]
     out += [f"      <addr {_attrs([('address', a), ('type', str(t)), ('charset', '106')])} />"
