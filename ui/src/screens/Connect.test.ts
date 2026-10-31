@@ -72,6 +72,24 @@ describe('Connect', () => {
     expect(history).toHaveBeenCalled();
   });
 
+  test('any finished copy can be uploaded by hand, also an old one already uploaded to this phone', async () => {
+    const env = await setupCtl('clean');
+    env.s.devices = [{ serial: 'R58T00TEST', state: 'device', model: 'SM_A145R', name: null, imei: null }];
+    render(Connect, { context: new Map([['ctl', env.ctl]]) });
+    await flush();
+    expect(screen.queryByRole('button', { name: 'Wgraj kopię' })).toBeNull();  // nie ma czego wgrać
+    const copy = { id: 'OLD/20261020-100000', serial: 'OLD', model: 'SM-A145R', manufacturer: 'samsung', client: null,
+      created: '2026-10-20T10:00:00', expires: '2026-10-27T10:00:00', days_left: 1, status: 'complete' as const, bytes: 10,
+      counts: {}, restores: [{ serial: 'R58T00TEST', status: 'complete', updated: null, resumable: false }] };
+    env.bridge.setCopies([copy]);
+    await env.ctl.loadTransfers();
+    await tick();
+    expect(screen.queryByText(/Wgrać kopię/)).toBeNull();  // stara i już wgrana: bez banera
+    const history = vi.spyOn(env.ctl, 'openHistory').mockResolvedValue();
+    await fireEvent.click(screen.getByRole('button', { name: 'Wgraj kopię' }));
+    expect(history).toHaveBeenCalled();
+  });
+
   test('an interrupted upload to this phone is offered for resuming instead of a new upload', async () => {
     const env = await setupCtl('clean');
     const copy = { id: 'OLD/1', serial: 'OLD', model: 'SM-A145R', manufacturer: 'samsung', client: null,

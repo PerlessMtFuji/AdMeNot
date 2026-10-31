@@ -701,6 +701,7 @@
       "offer_text": "Files from the copy go to this phone. Nothing on it is overwritten.",
       "upload": "Upload",
       "other_copy": "Another copy",
+      "pick": "Upload a copy",
       "resume_title": "Resume the interrupted upload",
       "resume_text": "Copy of {phone} ({details}). Uploaded files stay — the program finishes the rest.",
       "resume": "Resume",

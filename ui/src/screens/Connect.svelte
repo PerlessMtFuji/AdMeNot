@@ -28,12 +28,15 @@
   // Wgrywanie kopii na ten telefon: najpierw przerwane wgrywanie, potem propozycja świeżej kopii innego telefonu.
   const restoring = $derived(link === 'ready' || link === 'many' ? restoreResumable(s.transfer.copies, s.serial) : null);
   const offer = $derived(link === 'ready' || link === 'many' ? restoreOffer(s.transfer.copies, s.serial, new Date()) : null);
+  // Ręczne wgrywanie: dowolna skończona kopia, także stara albo już wgrana (baner proponuje tylko świeżą).
+  const anyCopy = $derived(s.transfer.copies.some((c) => c.status === 'complete' || c.status === 'incomplete'));
   const when = (iso: string) => new Date(iso).toLocaleString(i18n.lang === 'pl' ? 'pl-PL' : 'en-GB',
     { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   const source = (c: CopyView) => ({ phone: `${c.manufacturer} ${c.model}`.trim(),
     details: [c.client, when(c.created)].filter(Boolean).join(', ') });
 
-  /** „Inna kopia”: lista kopii jest w Historii — otwieramy ją i przewijamy do kopii. */
+  /** „Inna kopia” i „Wgraj kopię”: lista kopii (z „Wgraj na podłączony telefon”) jest w Historii — otwieramy ją
+   *  i przewijamy do kopii. */
   async function otherCopy(): Promise<void> {
     await ctl.openHistory();
     await tick();
@@ -115,6 +118,9 @@
             placeholder={t('connect.client_placeholder')} aria-label={t('connect.client_label')} maxlength="80" />
           <Button type="submit" variant="primary" size="lg" disabled={!s.serial}>{t('connect.scan')}</Button>
           <Button variant="secondary" size="lg" disabled={!s.serial} onclick={() => ctl.startTransfer()}>{t('transfer.start')}</Button>
+          {#if anyCopy}
+            <Button variant="secondary" size="lg" disabled={!s.serial} onclick={otherCopy}>{t('transfer.restore.pick')}</Button>
+          {/if}
         </form>
       </div>
     {:else}

@@ -701,6 +701,7 @@
       "offer_text": "Pliki z kopii trafią na ten telefon. Niczego na nim nie nadpiszę.",
       "upload": "Wgraj",
       "other_copy": "Inna kopia",
+      "pick": "Wgraj kopię",
       "resume_title": "Wznów przerwane wgrywanie",
       "resume_text": "Kopia z {phone} ({details}). Wgrane pliki zostają — program dokończy resztę.",
       "resume": "Wznów",
