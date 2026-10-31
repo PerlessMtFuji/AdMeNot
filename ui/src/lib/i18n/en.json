@@ -289,7 +289,8 @@
   },
   "history": {
     "manual": "by hand",
-    "title": "Order history", "phone": "Phone", "empty": "No orders for this phone.", "none": "No saved orders.",
+    "title": "Order history", "phone": "Phone",
+    "tabs": "History view", "tab_orders": "Repairs", "tab_copies": "Data copies ({n})", "empty": "No orders for this phone.", "none": "No saved orders.",
     "restore": "Restore", "undo_all": "Undo the whole order", "resume": "Finish",
     "delete": "Delete order", "delete_title": "Delete order {number}?", "delete_text": "Its steps, screenshots, report and APK copies will be removed. Changes on the phone can no longer be undone in AdMeNot.", "delete_confirm": "Delete",
     "admin_note": "Undo does not restore device admin rights.", "undo_errors": "Not everything could be undone:",
@@ -680,6 +681,7 @@
     },
     "finish": "Finish",
     "copies_title": "Data copies on this computer",
+    "copies_sub": "From all phones. Each copy is deleted after 7 days unless you extend it.",
     "days_left": {
       "one": "{count} day left",
       "few": "{count} days left",

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getContext, onMount, tick } from 'svelte';
+  import { getContext, onMount } from 'svelte';
   import ConnectChecklist from '../components/ConnectChecklist.svelte';
   import DeviceCard from '../components/DeviceCard.svelte';
   import InterruptedBanner from '../components/InterruptedBanner.svelte';
@@ -35,12 +35,9 @@
   const source = (c: CopyView) => ({ phone: `${c.manufacturer} ${c.model}`.trim(),
     details: [c.client, when(c.created)].filter(Boolean).join(', ') });
 
-  /** „Inna kopia” i „Wgraj kopię”: lista kopii (z „Wgraj na podłączony telefon”) jest w Historii — otwieramy ją
-   *  i przewijamy do kopii. */
+  /** „Inna kopia” i „Wgraj kopię”: lista kopii (z „Wgraj na podłączony telefon”) to zakładka Historii. */
   async function otherCopy(): Promise<void> {
-    await ctl.openHistory();
-    await tick();
-    document.getElementById('transfer-copies')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    await ctl.openHistory(null, 'copies');
   }
 
   // Za każdym powrotem na ten ekran: kopia mogła się w międzyczasie skończyć albo przerwać.

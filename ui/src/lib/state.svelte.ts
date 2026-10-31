@@ -120,6 +120,8 @@ export class AppState {
   }
   disconnectedOrder = $state<string | null>(null);
   history = $state<HistoryView | null>(null);
+  /** Zakładka Historii: naprawy wybranego telefonu albo kopie danych wszystkich telefonów. */
+  historyTab = $state<'orders' | 'copies'>('orders');
   undoSteps = $state<StepEvent[]>([]);
   undoResult = $state<UndoDone | null>(null);
   /** Kolejka witryn bieżącego cofania (`undo:sites`); null — cofanie nie ma ekranów witryn. */

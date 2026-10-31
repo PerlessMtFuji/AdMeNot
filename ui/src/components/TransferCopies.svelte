@@ -29,7 +29,7 @@
 
 {#if s.transfer.copies.length}
   <section id="transfer-copies" aria-label={t('transfer.copies_title')} class="flex scroll-mt-4 flex-col gap-2">
-    <span class="lbl">{t('transfer.copies_title')}</span>
+    <p class="text-mut">{t('transfer.copies_sub')}</p>
     {#each s.transfer.copies as c, i (c.id)}
       <article aria-label={title(c)} class="flex items-center gap-3 rounded-2xl card px-5 py-3" in:enter={{ delay: stagger(i) }}>
         <div class="min-w-0 flex-1">

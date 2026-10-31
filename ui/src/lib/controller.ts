@@ -1092,9 +1092,10 @@ export class Controller {
 
   // --- historia, ustawienia, konsola -------------------------------------------------------------
 
-  async openHistory(serial: string | null = null): Promise<void> {
+  async openHistory(serial: string | null = null, tab: 'orders' | 'copies' = 'orders'): Promise<void> {
     const s = this.state;
     s.screen = 'history';
+    s.historyTab = tab;
     s.undoResult = null;
     void this.loadTransfers();
     await this.refreshHistory(serial ?? s.history?.serial ?? s.device?.serial ?? null);

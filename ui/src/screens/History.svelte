@@ -13,6 +13,7 @@
   import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
   import Card from '../ui/Card.svelte';
+  import Segmented from '../ui/Segmented.svelte';
   import SidePanel from '../ui/SidePanel.svelte';
   import Spinner from '../ui/Spinner.svelte';
 
@@ -22,6 +23,10 @@
   const scanned = $derived(s.scan?.apps ?? []);
   const interrupted = $derived(h?.orders.filter((o) => o.interrupted) ?? []);
   let other = $state('');
+  // Kopie danych dotyczą wszystkich telefonów, więc mają własną zakładkę — bez panelu wyboru telefonu.
+  const tab = $derived(s.transfer.copies.length ? s.historyTab : 'orders');
+  const tabs = $derived([{ value: 'orders' as const, label: t('history.tab_orders') },
+    { value: 'copies' as const, label: t('history.tab_copies', { n: s.transfer.copies.length }) }]);
 
   function day(iso: string): string {
     const key = dayKey(iso, new Date());
@@ -47,99 +52,106 @@
 <div class="flex min-h-0 min-w-0 flex-1">
   <main class="flex min-w-0 flex-1 flex-col gap-3 scroll-fade overflow-auto px-7 py-7">
     <h1 class="text-2xl font-extrabold">{t('history.title')}</h1>
-
-    {#if s.orderRunning}
-      <Card>
-        <div class="flex items-center gap-2 px-4 py-3 font-semibold"><Spinner />{t('history.undoing')}</div>
-        {#if s.undoSteps.length}<StepTimeline steps={s.undoSteps} />{/if}
-        {#if s.undoSites?.length}<SiteQueue />{/if}
-      </Card>
+    {#if s.transfer.copies.length}
+      <div><Segmented label={t('history.tabs')} value={tab} options={tabs} onchange={(v) => (s.historyTab = v)} /></div>
     {/if}
-    {#if s.undoResult}
-      {@const r = s.undoResult}
-      <Banner tone={r.errors.length ? 'warn' : 'ok'} icon={r.errors.length ? 'triangle-alert' : 'check'}
-        title="{r.order}: {r.status_label}">
-        {#if r.admin_not_restored}<p>{t('history.admin_note')}</p>{/if}
-        {#if r.sites_total > 0}
-          <p>{tp('history.sites_restored', r.sites_total, { restored: r.sites_restored })}</p>
-          {#if r.sites_restored < r.sites_total}<p>{t('history.sites_rest')}</p>{/if}
+
+    {#if tab === 'copies'}
+      <TransferCopies />
+    {:else}
+      {#if s.orderRunning}
+        <Card>
+          <div class="flex items-center gap-2 px-4 py-3 font-semibold"><Spinner />{t('history.undoing')}</div>
+          {#if s.undoSteps.length}<StepTimeline steps={s.undoSteps} />{/if}
+          {#if s.undoSites?.length}<SiteQueue />{/if}
+        </Card>
+      {/if}
+      {#if s.undoResult}
+        {@const r = s.undoResult}
+        <Banner tone={r.errors.length ? 'warn' : 'ok'} icon={r.errors.length ? 'triangle-alert' : 'check'}
+          title="{r.order}: {r.status_label}">
+          {#if r.admin_not_restored}<p>{t('history.admin_note')}</p>{/if}
+          {#if r.sites_total > 0}
+            <p>{tp('history.sites_restored', r.sites_total, { restored: r.sites_restored })}</p>
+            {#if r.sites_restored < r.sites_total}<p>{t('history.sites_rest')}</p>{/if}
+          {/if}
+          {#if r.errors.length}
+            <p>{t('history.undo_errors')}</p>
+            <ul class="list-disc pl-5">{#each r.errors as e, i (i)}<li>{e}</li>{/each}</ul>
+          {/if}
+        </Banner>
+        {@const reopen = r.restored_sites.filter((x) => x.url)}
+        {#if reopen.length}
+          <!-- strona po przywróceniu zgody musi zapisać telefon od nowa: otwiera ją serwisant -->
+          <Banner tone="info" icon="bell-ring" title={t('history.sites_resubscribe')}>
+            {#snippet actions()}
+              {#each reopen as x (x.action_id)}
+                <Button variant="ghost" size="sm" disabled={s.job !== null} onclick={() => ctl.openSite(r.order, x.action_id)}>🌐 {x.browser} · {x.site ?? t('undo.site_all')}</Button>
+              {/each}
+            {/snippet}
+          </Banner>
         {/if}
-        {#if r.errors.length}
-          <p>{t('history.undo_errors')}</p>
-          <ul class="list-disc pl-5">{#each r.errors as e, i (i)}<li>{e}</li>{/each}</ul>
-        {/if}
-      </Banner>
-      {@const reopen = r.restored_sites.filter((x) => x.url)}
-      {#if reopen.length}
-        <!-- strona po przywróceniu zgody musi zapisać telefon od nowa: otwiera ją serwisant -->
-        <Banner tone="info" icon="bell-ring" title={t('history.sites_resubscribe')}>
+        {#if r.firefox_debugging}<Banner tone="warn" icon="triangle-alert" title={t('exec.firefox_debugging')} />{/if}
+      {/if}
+      {#if s.openSiteFailed}<Banner tone="warn" icon="triangle-alert" title={t('history.open_site_failed')} />{/if}
+      {#each interrupted as o (o.id)}
+        <Banner tone="warn" icon="triangle-alert"
+          title={t('history.banner', { when: `${day(o.created_at).toLowerCase()}, ${o.created_at.slice(11, 16)}` })}>
+          {detail(o)}
           {#snippet actions()}
-            {#each reopen as x (x.action_id)}
-              <Button variant="ghost" size="sm" disabled={s.job !== null} onclick={() => ctl.openSite(r.order, x.action_id)}>🌐 {x.browser} · {x.site ?? t('undo.site_all')}</Button>
-            {/each}
+            <Button variant="ghost" size="sm" disabled={s.orderRunning} onclick={() => ctl.undo(o.number)}>{t('history.undo_changes')}</Button>
+            <Button variant="primary" size="sm" disabled={s.orderRunning} onclick={() => ctl.resume(o.number)}>{t('history.resume')}</Button>
           {/snippet}
         </Banner>
+      {/each}
+
+      {#if !h || !h.serial}
+        <p class="text-mut">{t('history.none')}</p>
+      {:else if h.orders.length === 0}
+        <p class="text-mut">{t('history.empty')}</p>
+      {:else}
+        <ol class="relative mt-2 pl-[104px] before:absolute before:top-2 before:bottom-0 before:left-[88px] before:w-0.5 before:rounded-full before:bg-[linear-gradient(var(--color-accent),var(--color-line)_40%)] before:opacity-60">
+          {#each h.orders as o, i (o.id)}
+            <li class="relative mb-4" in:enter={{ delay: stagger(i) }}>
+              <div class="absolute top-3 -left-[104px] w-[74px] text-right">
+                <b class="block text-md">{day(o.created_at)}</b>
+                <span class="text-xs text-soft">{o.created_at.slice(11, 16)}</span>
+              </div>
+              <span class="absolute top-4 -left-[21px] h-3.5 w-3.5 rounded-full border-2 {dot(o)}" aria-hidden="true"></span>
+              <OrderCard order={o} {scanned} disabled={s.orderRunning} openDisabled={s.job !== null}
+                onrestore={(pkg) => ctl.undo(o.number, null, pkg)}
+                onrestoreStep={(id) => ctl.undo(o.number, id)}
+                onopenSite={(id) => ctl.openSite(o.number, id)}
+                onundoAll={() => ctl.undo(o.number)}
+                ondelete={() => ctl.deleteOrder(o.number)} />
+            </li>
+          {/each}
+        </ol>
       {/if}
-      {#if r.firefox_debugging}<Banner tone="warn" icon="triangle-alert" title={t('exec.firefox_debugging')} />{/if}
-    {/if}
-    {#if s.openSiteFailed}<Banner tone="warn" icon="triangle-alert" title={t('history.open_site_failed')} />{/if}
-    {#each interrupted as o (o.id)}
-      <Banner tone="warn" icon="triangle-alert"
-        title={t('history.banner', { when: `${day(o.created_at).toLowerCase()}, ${o.created_at.slice(11, 16)}` })}>
-        {detail(o)}
-        {#snippet actions()}
-          <Button variant="ghost" size="sm" disabled={s.orderRunning} onclick={() => ctl.undo(o.number)}>{t('history.undo_changes')}</Button>
-          <Button variant="primary" size="sm" disabled={s.orderRunning} onclick={() => ctl.resume(o.number)}>{t('history.resume')}</Button>
-        {/snippet}
-      </Banner>
-    {/each}
-
-    <TransferCopies />
-
-    {#if !h || !h.serial}
-      <p class="text-mut">{t('history.none')}</p>
-    {:else if h.orders.length === 0}
-      <p class="text-mut">{t('history.empty')}</p>
-    {:else}
-      <ol class="relative mt-2 pl-[104px] before:absolute before:top-2 before:bottom-0 before:left-[88px] before:w-0.5 before:rounded-full before:bg-[linear-gradient(var(--color-accent),var(--color-line)_40%)] before:opacity-60">
-        {#each h.orders as o, i (o.id)}
-          <li class="relative mb-4" in:enter={{ delay: stagger(i) }}>
-            <div class="absolute top-3 -left-[104px] w-[74px] text-right">
-              <b class="block text-md">{day(o.created_at)}</b>
-              <span class="text-xs text-soft">{o.created_at.slice(11, 16)}</span>
-            </div>
-            <span class="absolute top-4 -left-[21px] h-3.5 w-3.5 rounded-full border-2 {dot(o)}" aria-hidden="true"></span>
-            <OrderCard order={o} {scanned} disabled={s.orderRunning} openDisabled={s.job !== null}
-              onrestore={(pkg) => ctl.undo(o.number, null, pkg)}
-              onrestoreStep={(id) => ctl.undo(o.number, id)}
-              onopenSite={(id) => ctl.openSite(o.number, id)}
-              onundoAll={() => ctl.undo(o.number)}
-              ondelete={() => ctl.deleteOrder(o.number)} />
-          </li>
-        {/each}
-      </ol>
     {/if}
   </main>
 
-  <SidePanel width={290} label={t('history.phone')}>
-    <span class="lbl">{t('history.phone')}</span>
-    {#each h?.devices ?? [] as d (d.serial)}
-      {@const current = d.serial === h?.serial}
-      <button type="button" aria-pressed={current} onclick={() => ctl.refreshHistory(d.serial)}
-        class="flex items-center gap-3 rounded-xl p-3 text-left transition duration-150 {current ? 'rail-now' : 'hover:bg-neutral-soft'}">
-        <PhoneThumb compact image={d.image} name={modelName(d.name)} />
-        <span class="min-w-0 flex-1">
-          <b class="line-clamp-2 break-words leading-snug">{modelName(d.name)}</b>
-          {#if d.model && d.model !== d.name}<span class="block truncate text-xs text-mut">{modelName(d.model)}</span>{/if}
-          <span class="mono block truncate text-2xs text-soft">{d.imei ? `IMEI ${d.imei}` : d.serial}</span>
-        </span>
-        {#if s.device?.serial === d.serial}<span class="text-xs text-ok">● USB</span>{/if}
-      </button>
-    {/each}
-    <form class="flex gap-2" onsubmit={(e) => { e.preventDefault(); if (other.trim()) void ctl.refreshHistory(other.trim()); }}>
-      <input class="field mono min-w-0 flex-1 rounded-[10px] px-2.5 py-1.5 text-sm" bind:value={other}
-        placeholder={t('history.serial_placeholder')} aria-label={t('history.other_serial')} />
-      <Button type="submit" size="sm" disabled={!other.trim()}>{t('history.show')}</Button>
-    </form>
-  </SidePanel>
+  {#if tab === 'orders'}
+    <SidePanel width={290} label={t('history.phone')}>
+      <span class="lbl">{t('history.phone')}</span>
+      {#each h?.devices ?? [] as d (d.serial)}
+        {@const current = d.serial === h?.serial}
+        <button type="button" aria-pressed={current} onclick={() => ctl.refreshHistory(d.serial)}
+          class="flex items-center gap-3 rounded-xl p-3 text-left transition duration-150 {current ? 'rail-now' : 'hover:bg-neutral-soft'}">
+          <PhoneThumb compact image={d.image} name={modelName(d.name)} />
+          <span class="min-w-0 flex-1">
+            <b class="line-clamp-2 break-words leading-snug">{modelName(d.name)}</b>
+            {#if d.model && d.model !== d.name}<span class="block truncate text-xs text-mut">{modelName(d.model)}</span>{/if}
+            <span class="mono block truncate text-2xs text-soft">{d.imei ? `IMEI ${d.imei}` : d.serial}</span>
+          </span>
+          {#if s.device?.serial === d.serial}<span class="text-xs text-ok">● USB</span>{/if}
+        </button>
+      {/each}
+      <form class="flex gap-2" onsubmit={(e) => { e.preventDefault(); if (other.trim()) void ctl.refreshHistory(other.trim()); }}>
+        <input class="field mono min-w-0 flex-1 rounded-[10px] px-2.5 py-1.5 text-sm" bind:value={other}
+          placeholder={t('history.serial_placeholder')} aria-label={t('history.other_serial')} />
+        <Button type="submit" size="sm" disabled={!other.trim()}>{t('history.show')}</Button>
+      </form>
+    </SidePanel>
+  {/if}
 </div>
