@@ -82,6 +82,17 @@ class AdbError(Exception):
         self.message = message
 
 
+_WIN_CMDLINE_TOO_LONG = 206
+
+
+def launch_error(exc: OSError) -> AdbError:
+    """Nieudane uruchomienie adb. WinError 206 (za długa linia poleceń) Python zgłasza jako
+    FileNotFoundError — to błąd polecenia, nie brak adb."""
+    if getattr(exc, "winerror", None) == _WIN_CMDLINE_TOO_LONG:
+        return AdbError("command_failed", f"command line too long: {exc}")
+    return AdbError("adb_missing", str(exc))
+
+
 class AdbTransport(Protocol):
     serial: str | None
 
@@ -132,7 +143,7 @@ class RealAdb:
         except OutputTooLarge as exc:
             raise AdbError("command_failed", f"{' '.join(args)}: output over the limit") from exc
         except OSError as exc:
-            raise AdbError("adb_missing", str(exc)) from exc
+            raise launch_error(exc) from exc
         if proc.returncode != 0:
             raise classify_error(_decode(proc.stderr) or _decode(proc.stdout))
         return proc.stdout

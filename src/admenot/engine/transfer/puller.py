@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Protocol
 
 from admenot.engine.adb.sessionlog import SessionLogAdb
-from admenot.engine.adb.transport import AdbError
+from admenot.engine.adb.transport import launch_error
 
 _CREATE_NO_WINDOW = 0x08000000
 TICK_SECONDS = 0.5
@@ -53,7 +53,7 @@ def run_stream(adb_path: str, serial: str, args: list[str], should_stop: Callabl
         proc = subprocess.Popen([adb_path, "-s", serial, *args], stdin=subprocess.DEVNULL,
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, creationflags=flags)
     except OSError as exc:
-        raise AdbError("adb_missing", str(exc)) from exc
+        raise launch_error(exc) from exc
     lines: list[str] = []
     lock = threading.Lock()
 
