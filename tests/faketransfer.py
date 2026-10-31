@@ -32,25 +32,67 @@ zmniejszana o rozmiar wgranych plików, zwracana przez `df -k`). `stat … STAT_
 plik (`stat: '<ścieżka>': No such file or directory`) i kod 0 zamiast `AdbError`; `deny_stat_prefixes` —
 `stat` takich ścieżek kończy się `Permission denied`. `stat_unquoted` — linie błędu bez cudzysłowów
 (`stat: <ścieżka>: No such file or directory`).
+
+Telefonia nowego telefonu (Etap 3), w pamięci:
+* providery `providers["sms" | "mms" | "calls" | "contacts" | "raw_contacts" | "data"]` to listy wierszy
+  (`dict` kolumna -> tekst albo `None`). `content query` ich URI (`TEL_URIS`) zwraca je w kolejności
+  kolumn z `--projection` (brak kolumny = `NULL`), gdy lista jest niepusta albo `telephony = True`
+  (pusty nowy telefon: „No result found.”); inaczej jak dotąd plik z `providers/` albo „Unknown URL”.
+  Każdy zapis pomocnika włącza `telephony`, dopisuje wiersze i aktualizuje plik w `providers/`. Adresy MMS: `mms_addrs[_id]` dla `content://mms/<_id>/addr`.
+  SMS/MMS dostają `thread_id` (jeden wątek na `phone_key` adresu), a `content://mms-sms/conversations`
+  zwraca wątki; flaga `no_threads` daje `thread_id=0` i brak wątków.
+* pomocnik: `CLASSPATH=<dex> app_process / … write <wejście> [--account T N]` (wymaga wgranego `.dex`)
+  i `am instrument -w -r -e cmd write -e input <wejście> [-e account_type T -e account_name N] <runner>`
+  (wymaga zainstalowanej aplikacji pomocniczej) czytają prawdziwe JSON Lines z `helper.encode` i
+  odpowiadają protokołem: `OK <id>`, `DENIED`, `DONE <ok> <err>`; instrumentacja opakowuje linie
+  w `INSTRUMENTATION_STATUS: line=…`. Odmowy: `helper_denied` (kategorie dla `app_process`;
+  dodatkowo SMS/MMS przez `app_process` tylko przy `appop == "allow"`, jak OPPO), `companion_denied`
+  (dla instrumentacji; SMS/MMS tylko, gdy pomocnik ma rolę SMS). Brakująca część MMS -> `ERR <id>
+  missing_part`. `fail_after_records`: po tylu zapisanych rekordach (łącznie, `records_written`)
+  telefon przechodzi w `offline` w środku paczki (zapisane wiersze zostają, linie wyjścia giną:
+  `AdbError("offline")`).
+* `appops get/set com.android.shell WRITE_SMS`: `appop` (`None` = brak wpisu: `No operations.`
+  i `Default mode: <appop_default>`, bez tej linii, gdy `appop_default is None`).
+* rola SMS: `role_holders`, `dumpsys role` w formacie OPPO; `cmd role add-role-holder` /
+  `remove-role-holder`. `role_needs_tap`: nadanie roli pomocnikowi nic nie zmienia, test „stuka”
+  przez `tap_role(pkg)`; `role_restore_needs_tap`: to samo dla oddania roli innej aplikacji i zdjęcia
+  jej z pomocnika. `am start` zapisuje intencję w `started`.
+* aplikacje: `installed` (`pm list packages`, `pm uninstall` — odinstalowanie posiadacza roli SMS
+  zostawia rolę pustą, `adb install -g <apk>` z `host_commands`; `install_blocked` -> `Failure
+  [INSTALL_FAILED_USER_RESTRICTED: …]`, ponowna instalacja -> `INSTALL_FAILED_ALREADY_EXISTS`).
+  Instalacja zakłada katalog wejścia `helper.COMPANION_IN`, odinstalowanie usuwa `Android/data/<pakiet>`.
+* `accounts: list[(typ, nazwa)]` dla `dumpsys account`; `tmp_files`: pliki pod `/data/local/tmp/admenot`
+  (lokalnie `root/data_local_tmp/admenot`, `mkdir -p`, `push`, `stat`, `sha256sum`, `rm -rf`).
 """
 
 from __future__ import annotations
 
 import fnmatch
 import hashlib
+import json
 import os
+import re
 import shlex
+import shutil
 import threading
 from collections.abc import Callable
 from pathlib import Path
 
 from admenot.engine.adb.transport import AdbError
-from admenot.engine.transfer.guard import CONTENT_TAIL, STAT_TAIL, safe_target
+from admenot.engine.transfer import helper
+from admenot.engine.transfer import telephony as tel
+from admenot.engine.transfer.guard import CONTENT_TAIL, SMS_ROLE, STAT_TAIL, safe_push_target
 from admenot.engine.transfer.puller import PullResult
+from admenot.engine.transfer.telplan import CONTACTS_URI, DATA_URI, RAW_URI
 
 _MMS_PREFIX = "content://mms/part/"
 DEFAULT_FREE_KB = 70_000_000
 APK_DIR = "/data/app/~~fake==/{package}-1"
+TEL_URIS = {"content://sms": "sms", "content://mms": "mms", "content://call_log/calls": "calls",
+            CONTACTS_URI: "contacts", RAW_URI: "raw_contacts", DATA_URI: "data"}
+CONVERSATIONS_URI = "content://mms-sms/conversations?simple=true"
+_MMS_ADDR = re.compile(r"content://mms/([0-9]+)/addr")
+_TMP_LOCAL = "data_local_tmp/admenot"
 
 
 def provider_file(root: Path, uri: str) -> Path:
@@ -91,6 +133,26 @@ class FakeStoragePhone:
         self.before_pull: Callable[[list[str]], None] | None = None
         self.on_shell: Callable[[str], None] | None = None
         self.apps: dict[str, dict[str, bytes]] = {}
+        # telefonia (Etap 3)
+        self.telephony = False  # puste providery w pamięci odpowiadają „No result found.”
+        self.providers: dict[str, list[dict[str, str | None]]] = {k: [] for k in TEL_URIS.values()}
+        self.mms_addrs: dict[str, list[dict[str, str | None]]] = {}
+        self.no_threads = False
+        self._threads: dict[str, str] = {}
+        self.helper_denied: set[str] = set()
+        self.companion_denied: set[str] = set()
+        self.fail_after_records: int | None = None
+        self.records_written = 0
+        self.appop: str | None = "default"
+        self.appop_default: str | None = "ignore"
+        self.role_holders: list[str] = []
+        self.role_needs_tap = False
+        self.role_restore_needs_tap = False
+        self.started: list[str] = []  # intencje `am start`
+        self.installed: set[str] = set()
+        self.install_blocked = False
+        self.host_commands: list[list[str]] = []  # polecenia hosta (`install`)
+        self.accounts: list[tuple[str, str]] = []
 
     # ---- stan ---------------------------------------------------------------------------
     def get_state(self) -> str:
@@ -100,8 +162,22 @@ class FakeStoragePhone:
         self.online = True
 
     def local(self, remote: str) -> Path:
+        if remote == helper.HELPER_DIR or remote.startswith(helper.HELPER_DIR + "/"):
+            return self.root / _TMP_LOCAL / remote[len(helper.HELPER_DIR):].lstrip("/")
         assert remote == "/sdcard" or remote.startswith("/sdcard/"), remote
         return self.root / "sdcard" / remote[len("/sdcard"):].lstrip("/")
+
+    @property
+    def tmp_files(self) -> set[str]:
+        """Pliki pod `/data/local/tmp/admenot` (zdalne ścieżki)."""
+        base = self.root / _TMP_LOCAL
+        if not base.is_dir():
+            return set()
+        return {f"{helper.HELPER_DIR}/{p.relative_to(base).as_posix()}" for p in base.rglob("*") if p.is_file()}
+
+    def tap_role(self, package: str) -> None:
+        """Stuknięcie na telefonie: `package` zostaje domyślną aplikacją SMS."""
+        self.role_holders = [package]
 
     # ---- AdbTransport -------------------------------------------------------------------
     def with_serial(self, serial: str) -> FakeStoragePhone:
@@ -120,6 +196,8 @@ class FakeStoragePhone:
             return self._shell(args[2]).decode("utf-8")
         if len(args) == 3 and args[0] == "pull":
             return self._pull_apk(args[1], Path(args[2]))
+        if len(args) == 3 and args[:2] == ["install", "-g"]:
+            return self._install(args)
         raise AdbError("command_failed", f"fake: unsupported {args}")
 
     def run_bytes(self, args: list[str], timeout: float = 20.0) -> bytes:
@@ -145,6 +223,8 @@ class FakeStoragePhone:
             assert argv[:2] == ["content", "query"], argv
             return self._content(argv[1:], merged=True)
         argv = shlex.split(command)
+        if (out := self._tel_shell(argv)) is not None:
+            return out
         if argv[:2] == ["pm", "path"] and len(argv) == 3:
             return self._pm_path(argv[2])
         if argv[:2] == ["head", "-c"] and len(argv) == 4:  # nagłówek pliku eksportu
@@ -279,8 +359,12 @@ class FakeStoragePhone:
             # bez `2>&1` (merged) adb zwraca pusty stdout.
             uri = args[args.index("--uri") + 1]
             error = None
+            rows = self._tel_rows(uri)
             if uri in self.deny_uris:
                 error = f"Error while accessing provider:{uri}\njava.lang.SecurityException: Permission Denial\n"
+            elif rows is not None:
+                cols = args[args.index("--projection") + 1].split(":") if "--projection" in args else None
+                return _render(rows, cols).encode("utf-8")
             elif not provider_file(self.root, uri).is_file():
                 error = f"Error while accessing provider:{uri}\njava.lang.IllegalArgumentException: Unknown URL\n"
             if error is not None:
@@ -318,6 +402,220 @@ class FakeStoragePhone:
 
     def has_apk(self, remote: str) -> bool:
         return self._apk(remote) is not None
+
+    # ---- telefonia: polecenia -------------------------------------------------------------
+    def _tel_shell(self, argv: list[str]) -> bytes | None:
+        """Polecenia zapisu telefonii; `None` = nie nasze (obsługa jak dotąd)."""
+        if argv and argv[0].startswith("CLASSPATH="):
+            return self._app_process(argv)
+        head = argv[:2]
+        if head == ["am", "instrument"]:
+            return self._instrument(argv)
+        if head == ["am", "start"]:
+            self.started.append(" ".join(argv[2:]))
+            return f"Starting: Intent {{ {' '.join(argv[2:])} }}\n".encode()
+        if head == ["appops", "get"]:
+            assert argv[2:] == ["com.android.shell", "WRITE_SMS"], argv
+            if self.appop is not None:
+                return f"WRITE_SMS: {self.appop}; time=+1m2s3ms ago\n".encode()
+            default = "" if self.appop_default is None else f"Default mode: {self.appop_default}\n"
+            return f"No operations.\n{default}".encode()
+        if head == ["appops", "set"]:
+            assert argv[2:4] == ["com.android.shell", "WRITE_SMS"] and len(argv) == 5, argv
+            self.appop = argv[4]
+            return b""
+        if head == ["cmd", "role"]:
+            return self._role(argv[2:])
+        if head == ["dumpsys", "role"]:
+            return self._dumpsys_role().encode()
+        if head == ["dumpsys", "account"]:
+            lines = [f"    Account {{name={n}, type={t}}}\n" for t, n in self.accounts]
+            return (f"User UserInfo{{0:Właściciel:c13}}:\n  Accounts: {len(lines)}\n" + "".join(lines)
+                    + "\n  Active Sessions: 0\n").encode()
+        if head == ["pm", "list"]:
+            assert argv[2] == "packages" and len(argv) == 4, argv
+            return "".join(f"package:{p}\n" for p in sorted(self.installed) if p.startswith(argv[3])).encode()
+        if head == ["pm", "uninstall"]:
+            return self._uninstall(argv[2])
+        if head == ["pm", "grant"]:
+            return b""
+        if head == ["rm", "-rf"]:
+            assert len(argv) == 3 and self.local(argv[2]).is_relative_to(self.root / _TMP_LOCAL), argv
+            shutil.rmtree(self.local(argv[2]), ignore_errors=True)
+            return b""
+        return None
+
+    def _install(self, args: list[str]) -> str:
+        if not self.online:
+            raise AdbError("offline", "device offline")
+        self.host_commands.append(list(args))
+        if self.install_blocked:
+            raise AdbError("command_failed", f"Performing Streamed Install\nadb: failed to install {args[2]}: "
+                                             "Failure [INSTALL_FAILED_USER_RESTRICTED: Install canceled by user]")
+        if helper.PACKAGE in self.installed:
+            raise AdbError("command_failed", f"adb: failed to install {args[2]}: Failure "
+                                             f"[INSTALL_FAILED_ALREADY_EXISTS: Attempt to re-install "
+                                             f"{helper.PACKAGE} without first uninstalling.]")
+        self.installed.add(helper.PACKAGE)
+        self.local(helper.COMPANION_IN).mkdir(parents=True, exist_ok=True)
+        return "Performing Streamed Install\nSuccess\n"
+
+    def _uninstall(self, package: str) -> bytes:
+        if package not in self.installed:
+            raise AdbError("command_failed", "Failure [DELETE_FAILED_INTERNAL_ERROR]")
+        self.installed.discard(package)
+        if package in self.role_holders:  # rola nie wraca do poprzedniej aplikacji sama
+            self.role_holders = [p for p in self.role_holders if p != package]
+        shutil.rmtree(self.local(f"/sdcard/Android/data/{package}"), ignore_errors=True)
+        return b"Success\n"
+
+    def _role(self, args: list[str]) -> bytes:
+        assert len(args) == 3 and args[1] == SMS_ROLE, args
+        op, pkg = args[0], args[2]
+        if op == "add-role-holder":
+            if pkg == helper.PACKAGE:
+                if pkg not in self.installed:
+                    raise AdbError("command_failed", f"Package {pkg} not found")
+                if self.role_needs_tap:
+                    return b""
+            elif self.role_restore_needs_tap:
+                return b""
+            self.role_holders = [pkg]  # rola SMS ma jednego posiadacza
+            return b""
+        assert op == "remove-role-holder", args
+        if not self.role_restore_needs_tap:
+            self.role_holders = [p for p in self.role_holders if p != pkg]
+        return b""
+
+    def _dumpsys_role(self) -> str:
+        def role(name: str, holders: list[str]) -> str:
+            return ("      {\n" f"        name={name}\n        fallback_enabled=false\n"
+                    + "".join(f"        holders={h}\n" for h in holders) + "      }\n")
+
+        return ("ROLE STATE (dumpsys role):\n{\n  user_states={\n    user_id=0\n    version=-1\n    roles=[\n"
+                + role("android.app.role.SYSTEM_UI_INTELLIGENCE", [])
+                + role(SMS_ROLE, self.role_holders)
+                + role("android.app.role.DIALER", ["com.google.android.dialer"])
+                + "    ]\n  }\n}\n")
+
+    # ---- telefonia: pomocnik --------------------------------------------------------------
+    def _app_process(self, argv: list[str]) -> bytes:
+        assert argv[0] == f"CLASSPATH={helper.DEX_REMOTE}" and argv[1:5] == [
+            "app_process", "/", helper.MAIN_CLASS, "write"], argv
+        if not self.local(helper.DEX_REMOTE).is_file():
+            raise AdbError("command_failed", f"Error: Could not find or load main class {helper.MAIN_CLASS}")
+        account = (argv[7], argv[8]) if argv[6:7] == ["--account"] else None
+        kind, records = self._read_input(argv[5])
+        if kind in self.helper_denied or (kind in ("sms", "mms") and self.appop != "allow"):
+            return b"DENIED\n"
+        return "".join(line + "\n" for line in self._write(kind, records, account, argv[5])).encode("utf-8")
+
+    def _instrument(self, argv: list[str]) -> bytes:
+        assert argv[2:4] == ["-w", "-r"] and argv[-1] == helper.RUNNER, argv
+        extras = dict(zip(argv[5:-1:3], argv[6:-1:3], strict=True))
+        assert argv[4:-1:3] == ["-e"] * len(extras) and extras["cmd"] == "write", argv
+        if helper.PACKAGE not in self.installed:
+            raise AdbError("command_failed", f"INSTRUMENTATION_FAILED: {helper.RUNNER}")
+        account = (extras["account_type"], extras["account_name"]) if "account_type" in extras else None
+        kind, records = self._read_input(extras["input"])
+        if kind in self.companion_denied or (kind in ("sms", "mms") and self.role_holders != [helper.PACKAGE]):
+            lines = ["DENIED"]
+        else:
+            lines = self._write(kind, records, account, extras["input"])
+        status = "".join(f"INSTRUMENTATION_STATUS: line={line}\nINSTRUMENTATION_STATUS_CODE: 1\n"
+                         for line in lines)
+        return (status + "INSTRUMENTATION_RESULT: done=1\nINSTRUMENTATION_CODE: -1\n").encode("utf-8")
+
+    def _read_input(self, remote: str) -> tuple[str, list[dict]]:
+        lines = self.local(remote).read_text(encoding="utf-8").splitlines()
+        header = json.loads(lines[0])
+        assert header["v"] == 1, header
+        return header["kind"], [json.loads(line) for line in lines[1:] if line]
+
+    def _write(self, kind: str, records: list[dict], account: tuple[str, str] | None, remote: str) -> list[str]:
+        self.telephony = True
+        out: list[str] = []
+        parts_dir = self.local(remote).parent
+        for rec in records:
+            if self.fail_after_records is not None and self.records_written >= self.fail_after_records:
+                self.online = False
+                raise AdbError("offline", "device offline")
+            if kind == "mms" and any(p["file"] and not (parts_dir / p["file"]).is_file() for p in rec["parts"]):
+                out.append(f"ERR {rec['id']} missing_part")
+                continue
+            {"sms": self._add_sms, "calls": self._add_call, "contacts": self._add_contact,
+             "mms": self._add_mms}[kind](rec, account)
+            self.records_written += 1
+            out.append(f"OK {rec['id']}")
+        for uri in TEL_URIS:
+            self._mirror(uri)
+        ok = sum(1 for x in out if x.startswith("OK"))
+        return [*out, f"DONE {ok} {len(out) - ok}"]
+
+    # ---- telefonia: providery -------------------------------------------------------------
+    def _tel_rows(self, uri: str) -> list[dict[str, str | None]] | None:
+        if uri == CONVERSATIONS_URI:
+            threads = sorted({r.get("thread_id") for k in ("sms", "mms") for r in self.providers[k]}
+                             - {None, "0"}, key=int)
+            return [{"_id": t} for t in threads]
+        if m := _MMS_ADDR.fullmatch(uri):
+            return self.mms_addrs.get(m.group(1))
+        kind = TEL_URIS.get(uri)
+        if kind is None or not (self.telephony or self.providers[kind]):
+            return None
+        return self.providers[kind]
+
+    def _mirror(self, uri: str) -> None:
+        rows = self.providers[TEL_URIS[uri]]
+        if rows:
+            cols = list(dict.fromkeys(c for r in rows for c in r))
+            write_provider(self.root, uri, rows, cols)
+
+    def _next_id(self, kind: str) -> str:
+        return str(max((int(r["_id"]) for r in self.providers[kind] if r.get("_id")), default=0) + 1)
+
+    def _thread(self, addresses: list[str]) -> str:
+        if self.no_threads:
+            return "0"
+        key = ",".join(sorted(tel.phone_key(a) for a in addresses))
+        return self._threads.setdefault(key, str(len(self._threads) + 1))
+
+    def _add_sms(self, rec: dict, account: tuple[str, str] | None) -> None:
+        self.providers["sms"].append({
+            "_id": self._next_id("sms"), "thread_id": self._thread([rec["address"]]),
+            "address": rec["address"], "date": str(rec["date"]), "date_sent": str(rec["date_sent"]),
+            "type": str(rec["type"]), "read": str(rec["read"]), "status": str(rec["status"]),
+            "locked": "0", "sub_id": "-1", "protocol": None, "service_center": None,
+            "subject": rec["subject"], "body": rec["body"]})
+
+    def _add_call(self, rec: dict, account: tuple[str, str] | None) -> None:
+        self.providers["calls"].append({
+            "_id": self._next_id("calls"), "number": rec["number"], "date": str(rec["date"]),
+            "duration": str(rec["duration"]), "type": str(rec["type"]),
+            "presentation": str(rec["presentation"]), "subscription_id": None, "name": rec["name"]})
+
+    def _add_mms(self, rec: dict, account: tuple[str, str] | None) -> None:
+        mid = self._next_id("mms")
+        self.providers["mms"].append({
+            "_id": mid, "thread_id": self._thread([a for a, _ in rec["addrs"]]),
+            "date": str(rec["date"] // 1000), "date_sent": str(rec["date_sent"] // 1000),
+            "msg_box": str(rec["msg_box"]), "read": str(rec["read"]), "sub": rec["subject"]})
+        self.mms_addrs[mid] = [{"type": str(t), "address": a} for a, t in rec["addrs"]]
+
+    def _add_contact(self, rec: dict, account: tuple[str, str] | None) -> None:
+        cid = self._next_id("contacts")
+        name = next((r["values"].get("data1") for r in rec["rows"] if r["mimetype"] == tel.M_NAME), None)
+        self.providers["contacts"].append({"_id": cid, "starred": str(rec["starred"]), "display_name": name})
+        self.providers["raw_contacts"].append({
+            "_id": cid, "contact_id": cid, "deleted": "0",
+            "account_type": account[0] if account else None, "account_name": account[1] if account else None})
+        for r in rec["rows"]:
+            vals = r["values"]
+            self.providers["data"].append({
+                "contact_id": cid, "raw_contact_id": cid, "mimetype": r["mimetype"],
+                "is_primary": vals.get("is_primary", "0"),
+                **{f"data{i}": vals.get(f"data{i}") for i in range(2, 11)}, "data1": vals.get("data1")})
+
 
     # ---- Puller ---------------------------------------------------------------------------
     def pull(self, remotes: list[str], target: Path, should_stop: Callable[[], bool],
@@ -362,7 +660,7 @@ class FakeStoragePhone:
     # ---- Pusher ---------------------------------------------------------------------------
     def push(self, locals_: list[Path], remote: str, should_stop: Callable[[], bool],
              tick: Callable[[], None]) -> PullResult:
-        safe_target(remote)
+        safe_push_target(remote)
         with self._push_lock:
             self.push_calls += 1
         lines: list[str] = []
@@ -399,6 +697,15 @@ class FakeStoragePhone:
                 return PullResult(1, lines, True)
         lines.append(f"{count} files pushed, 0 skipped.")
         return PullResult(1 if any(x.startswith("adb: error") for x in lines) else 0, lines, False)
+
+
+def _render(rows: list[dict[str, str | None]], cols: list[str] | None) -> str:
+    """Wyjście `content query` dla wierszy w pamięci, w kolejności kolumn projekcji."""
+    if not rows:
+        return "No result found.\n"
+    cols = cols or list(dict.fromkeys(c for r in rows for c in r))
+    return "".join(f"Row: {i} " + ", ".join(f"{c}={'NULL' if r.get(c) is None else r[c]}" for c in cols) + "\n"
+                   for i, r in enumerate(rows))
 
 
 _STORAGE_TOOLS = {"find", "stat", "ls", "df", "content", "sha256sum", "mkdir", "head"}

@@ -158,3 +158,166 @@ def test_fake_stat_tail_reports_errors_as_lines(tmp_path):
     assert lines[0].startswith("5|") and lines[0].endswith("|/sdcard/DCIM/a.jpg")
     assert lines[1:] == ["stat: '/sdcard/nope': No such file or directory",
                          "stat: '/sdcard/DCIM/b.jpg': Permission denied"]
+
+
+# ---- telefonia (Etap 3) -------------------------------------------------------------------
+def _tel_phone(tmp_path, **kw):
+    from admenot.engine.transfer.guard import TelephonyWriteAdb
+
+    (tmp_path / "phone" / "sdcard").mkdir(parents=True)
+    phone = FakeStoragePhone(tmp_path / "phone", serial="NEW")
+    phone.telephony = True
+    for k, v in kw.items():
+        setattr(phone, k, v)
+    return phone, TelephonyWriteAdb(phone, role_restore=lambda: frozenset())
+
+
+def _sms_rec(n: int):
+    from admenot.engine.transfer.telrecords import SmsRecord
+
+    return SmsRecord(f"+4860000000{n}", 1_700_000_000_000 + n, 1_700_000_000_000, 1, 1, -1, None,
+                     f"Cześć {n} — żółć")
+
+
+def _install(phone, adb):
+    from admenot.engine.transfer import helper
+
+    adb.run(["install", "-g", str(helper.artifact("apk")[0])])
+    assert helper.PACKAGE in phone.installed
+
+
+def test_fake_helper_writes_rows_visible_to_query(tmp_path):
+    from admenot.engine.transfer import helper
+    from admenot.engine.transfer import telephony as tel
+    from admenot.engine.transfer.telrecords import ContactRecord, DataRow
+
+    phone, adb = _tel_phone(tmp_path, appop="allow")
+    recs = [(f"id{n}", _sms_rec(n)) for n in range(3)]
+    lines = []
+    out = helper.AppProcessWriter(adb, phone, None).write("sms", recs, lambda: lines.append(1))
+    assert out.ok == {"id0", "id1", "id2"} and out.finished and not out.denied and len(lines) == 4
+    rows = tel.content_query(ReadOnlyAdb(phone), "content://sms", tel.SMS_COLS[0])
+    assert [r["body"] for r in rows] == [f"Cześć {n} — żółć" for n in range(3)]
+    assert all(r["thread_id"] not in (None, "0") for r in rows)
+    assert phone.tmp_files == {helper.DEX_REMOTE}  # wejście usunięte, `.dex` zostaje do sprzątania
+    # aplikacja pomocnicza: kontakty przez instrumentację (`INSTRUMENTATION_STATUS: line=…`)
+    _install(phone, adb)
+    contact = ContactRecord("1", "Zażółć Gęślą", True, (), (
+        DataRow(tel.M_NAME, (("data1", "Zażółć Gęślą"),)),
+        DataRow(tel.M_PHONE, (("data1", "+48 600 000 009"), ("data2", "2")))))
+    out = helper.CompanionWriter(adb, phone, ("com.google", "a@b.pl")).write(
+        "contacts", [("c1", contact)], lambda: None)
+    assert out.ok == {"c1"} and out.finished
+    (c,) = tel.content_query(ReadOnlyAdb(phone), "content://com.android.contacts/contacts", tel.CONTACT_COLS)
+    assert (c["display_name"], c["starred"]) == ("Zażółć Gęślą", "1")
+    (raw,) = tel.content_query(ReadOnlyAdb(phone), "content://com.android.contacts/raw_contacts", tel.RAW_COLS)
+    assert (raw["account_type"], raw["account_name"]) == ("com.google", "a@b.pl")
+    data = tel.content_query(ReadOnlyAdb(phone), "content://com.android.contacts/data", tel.DATA_COLS)
+    assert {d["data1"] for d in data} == {"Zażółć Gęślą", "+48 600 000 009"}
+    assert provider_file(phone.root, "content://sms").is_file()  # zapis aktualizuje pliki providerów
+
+
+def test_fake_helper_denied(tmp_path):
+    from admenot.engine.transfer import helper
+    from admenot.engine.transfer import telephony as tel
+
+    phone, adb = _tel_phone(tmp_path, appop="allow", helper_denied={"sms"})
+    out = helper.AppProcessWriter(adb, phone, None).write("sms", [("a", _sms_rec(1))], lambda: None)
+    assert out.denied and not out.ok
+    assert tel.content_query(ReadOnlyAdb(phone), "content://sms", tel.SMS_COLS[0]) == []
+    phone.helper_denied = set()
+    phone.appop = "default"  # jak OPPO: bez `allow` shell nie zapisze SMS
+    out = helper.AppProcessWriter(adb, phone, None).write("sms", [("a", _sms_rec(1))], lambda: None)
+    assert out.denied
+    # aplikacja pomocnicza: SMS tylko jako domyślna aplikacja SMS, `companion_denied` odmawia zawsze
+    _install(phone, adb)
+    out = helper.CompanionWriter(adb, phone, None).write("sms", [("a", _sms_rec(1))], lambda: None)
+    assert out.denied
+    phone.role_holders = [helper.PACKAGE]
+    phone.companion_denied = {"sms"}
+    out = helper.CompanionWriter(adb, phone, None).write("sms", [("a", _sms_rec(1))], lambda: None)
+    assert out.denied
+    phone.companion_denied = set()
+    out = helper.CompanionWriter(adb, phone, None).write("sms", [("a", _sms_rec(1))], lambda: None)
+    assert out.ok == {"a"}
+
+
+def test_fake_helper_fail_after_records_goes_offline(tmp_path):
+    from admenot.engine.transfer import helper
+    from admenot.engine.transfer import telephony as tel
+
+    phone, adb = _tel_phone(tmp_path, appop="allow", fail_after_records=2)
+    recs = [(f"id{n}", _sms_rec(n)) for n in range(4)]
+    with pytest.raises(AdbError) as exc:
+        helper.AppProcessWriter(adb, phone, None).write("sms", recs, lambda: None)
+    assert exc.value.kind == "offline" and phone.get_state() == "offline"
+    phone.reconnect()
+    assert len(tel.content_query(ReadOnlyAdb(phone), "content://sms", tel.SMS_COLS[0])) == 2  # zapisane bez `OK`
+
+
+def test_fake_role_needs_tap(tmp_path):
+    from admenot.engine.transfer import helper
+    from admenot.engine.transfer.phonesetup import sms_role_holders
+
+    phone, adb = _tel_phone(tmp_path, role_holders=["com.google.android.apps.messaging"],
+                            role_needs_tap=True)
+    _install(phone, adb)
+    adb.shell(f"cmd role add-role-holder android.app.role.SMS {helper.PACKAGE}")
+    assert sms_role_holders(adb) == ("com.google.android.apps.messaging",)
+    phone.tap_role(helper.PACKAGE)
+    assert sms_role_holders(adb) == (helper.PACKAGE,)
+    phone.role_restore_needs_tap = True
+    adb2 = type(adb)(phone, role_restore=lambda: frozenset({"com.google.android.apps.messaging"}))
+    adb2.shell("cmd role add-role-holder android.app.role.SMS com.google.android.apps.messaging")
+    assert sms_role_holders(adb) == (helper.PACKAGE,)  # oddanie roli też czeka na stuknięcie
+    phone.role_restore_needs_tap = False
+    adb2.shell("cmd role add-role-holder android.app.role.SMS com.google.android.apps.messaging")
+    assert sms_role_holders(adb) == ("com.google.android.apps.messaging",)
+
+
+def test_fake_appops_accounts_install_and_uninstall(tmp_path):
+    from admenot.engine.transfer import helper
+    from admenot.engine.transfer.telplan import parse_accounts
+
+    phone, adb = _tel_phone(tmp_path, accounts=[("com.google", "a@b.pl")], appop=None)
+    assert adb.shell("appops get com.android.shell WRITE_SMS") == "No operations.\nDefault mode: ignore\n"
+    adb.shell("appops set com.android.shell WRITE_SMS allow")
+    assert adb.shell("appops get com.android.shell WRITE_SMS").startswith("WRITE_SMS: allow;")
+    assert parse_accounts(adb.shell("dumpsys account")) == {("com.google", "a@b.pl")}
+    assert adb.shell(f"pm list packages {helper.PACKAGE}") == ""
+    _install(phone, adb)
+    assert adb.shell(f"pm list packages {helper.PACKAGE}") == f"package:{helper.PACKAGE}\n"
+    with pytest.raises(AdbError, match="INSTALL_FAILED_ALREADY_EXISTS"):
+        _install(phone, adb)
+    phone.role_holders = [helper.PACKAGE]
+    adb.shell(f"pm uninstall {helper.PACKAGE}")
+    assert phone.installed == set() and phone.role_holders == []  # rola znika z pakietem
+    phone.install_blocked = True
+    with pytest.raises(AdbError, match=r"Failure \[INSTALL_FAILED_USER_RESTRICTED"):
+        _install(phone, adb)
+
+
+def test_fake_helper_mms_addrs_and_threads(tmp_path):
+    from admenot.engine.transfer import helper
+    from admenot.engine.transfer import telephony as tel
+    from admenot.engine.transfer.telrecords import MmsPart, MmsRecord
+
+    phone, adb = _tel_phone(tmp_path, appop="allow")
+    img = tmp_path / "a.jpg"
+    img.write_bytes(b"\xff\xd8")
+    mms = MmsRecord(1_700_000_000_000, 1_700_000_000_000, 1, 1, None,
+                    (("+48600000001", 137), ("+48600000002", 151)),
+                    (MmsPart("image/jpeg", "a.jpg", None, img), MmsPart("text/plain", None, "hej", None)))
+    w = helper.AppProcessWriter(adb, phone, None)
+    assert w.write("mms", [("m1", mms)], lambda: None).ok == {"m1"}
+    assert w.write("sms", [("s1", _sms_rec(1))], lambda: None).ok == {"s1"}
+    ro = ReadOnlyAdb(phone)
+    (row,) = tel.content_query(ro, "content://mms", ["_id", "date", "msg_box"])
+    assert row["date"] == "1700000000"  # sekundy, jak na telefonie
+    addrs = tel.content_query(ro, f"content://mms/{row['_id']}/addr", ["type", "address"])
+    assert {a["address"] for a in addrs} == {"+48600000001", "+48600000002"}
+    assert len(tel.content_query(ro, "content://mms-sms/conversations?simple=true", ["_id"])) == 2
+    phone.no_threads = True
+    assert w.write("sms", [("s2", _sms_rec(2))], lambda: None).ok == {"s2"}
+    rows = tel.content_query(ro, "content://sms", ["_id", "thread_id"])
+    assert rows[-1]["thread_id"] == "0"

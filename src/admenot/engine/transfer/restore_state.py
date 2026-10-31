@@ -1,17 +1,19 @@
 """Stan wgrywania kopii na nowy telefon — SQLite osobno dla każdego telefonu docelowego.
 
-`<kopia>/restore/<device_dir_name(serial)>.sqlite`: pliki (cel, status, próby) i meta `serial`,
-`choice`, `status`, `updated`. Czyta go też widok kopii (`read_restores`: „wgrano na …” i Banner
-wznowienia).
+`<kopia>/restore/<device_dir_name(serial)>.sqlite`: pliki (cel, status, próby), rekordy telefonii
+(`tel`: kategoria, id rekordu, status, droga) i meta `serial`, `choice`, `status`, `updated`,
+`device_changes` (zmiany telefonu do odwrócenia, `phonesetup`). Czyta go też widok kopii
+(`read_restores`: „wgrano na …”, Banner wznowienia i sprzątania).
 """
 
 from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from admenot.engine.paths import device_dir_name
 
@@ -35,7 +37,21 @@ CREATE TABLE IF NOT EXISTS files (
     own      INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS ix_files_status ON files(status);
+CREATE TABLE IF NOT EXISTS tel (
+    kind   TEXT,
+    rid    TEXT,
+    status TEXT,
+    path   TEXT,
+    error  TEXT,
+    PRIMARY KEY(kind, rid)
+);
 """
+
+
+def changes_pending(value: Any) -> bool:
+    """Meta `device_changes` z czymś do odwrócenia (pole różne od `None`/`False`; `[]` też się liczy:
+    zapisany brak posiadacza roli SMS)."""
+    return isinstance(value, dict) and any(v is not None and v is not False for v in value.values())
 
 
 def restore_state_path(copy: CopyDir, serial: str) -> Path:
@@ -111,6 +127,18 @@ class RestoreState:
     def commit(self) -> None:
         self.db.commit()
 
+    # ---- telefonia ----------------------------------------------------------------------
+    def tel_status(self, kind: str) -> dict[str, str]:
+        """Rekordy telefonii kategorii `kind`: id rekordu -> status (`done` | `error` | `manual`)."""
+        return dict(self.db.execute("SELECT rid, status FROM tel WHERE kind=?", (kind,)))
+
+    def tel_set(self, kind: str, rids: Iterable[str], status: Literal["done", "error", "manual"],
+                path: str, error: str | None = None) -> None:
+        """Status rekordów (droga zapisu `path`), z commitem — wznowienie nie zapisze ich drugi raz."""
+        self.db.executemany("INSERT OR REPLACE INTO tel(kind, rid, status, path, error) VALUES(?,?,?,?,?)",
+                            [(kind, rid, status, path, error) for rid in rids])
+        self.db.commit()
+
 
 @dataclass(frozen=True)
 class RestoreSummary:
@@ -120,13 +148,16 @@ class RestoreSummary:
     status: str  # running | complete | incomplete | stopped | klucz `RestoreError`
     updated: str | None  # ISO-8601 UTC
     resumable: bool  # zostały pliki do wgrania (`pending`/`pushing`) i przebieg nie jest `complete`
+    cleanup_pending: bool = False  # zostały zmiany telefonu do odwrócenia (`device_changes`)
 
 
-def _summary(path: Path) -> RestoreSummary | None:
-    """Sam odczyt istniejącego pliku: `mode=rw` bez tworzenia, więc widok kopii niczego nie
-    zakłada, a pozostawiony po awarii dziennik transakcji SQLite może się wycofać (`mode=ro` by
-    na nim odmówił i Banner wznowienia by zniknął). Krótki `timeout`: wątek API nie czeka za
-    zapisem trwającego wgrywania — zablokowany stan jest na ten raz pomijany."""
+def _read(path: Path) -> tuple[dict[str, Any], int] | None:
+    """(meta, liczba plików `pending`/`pushing`) istniejącego stanu albo `None`.
+
+    Sam odczyt: `mode=rw` bez tworzenia, więc widok kopii niczego nie zakłada, a pozostawiony po
+    awarii dziennik transakcji SQLite może się wycofać (`mode=ro` by na nim odmówił i Banner
+    wznowienia by zniknął). Krótki `timeout`: wątek API nie czeka za zapisem trwającego
+    wgrywania — zablokowany stan jest na ten raz pomijany."""
     try:
         db = sqlite3.connect(f"{path.absolute().as_uri()}?mode=rw", uri=True, timeout=READ_TIMEOUT)
     except sqlite3.Error:
@@ -138,11 +169,25 @@ def _summary(path: Path) -> RestoreSummary | None:
         return None
     finally:
         db.close()
+    return meta, left
+
+
+def device_changes_pending(path: Path) -> bool:
+    """Stan `path` istnieje i ma zmiany telefonu do odwrócenia (odczyt jak w widoku kopii)."""
+    found = _read(path) if path.is_file() else None
+    return found is not None and changes_pending(found[0].get("device_changes"))
+
+
+def _summary(path: Path) -> RestoreSummary | None:
+    found = _read(path)
+    if found is None:
+        return None
+    meta, left = found
     serial, status, updated = meta.get("serial"), meta.get("status"), meta.get("updated")
     if not isinstance(serial, str) or not isinstance(status, str):
         return None
     return RestoreSummary(serial, status, updated if isinstance(updated, str) else None,
-                          status != "complete" and left > 0)
+                          status != "complete" and left > 0, changes_pending(meta.get("device_changes")))
 
 
 def read_restores(copy: CopyDir) -> list[RestoreSummary]:
