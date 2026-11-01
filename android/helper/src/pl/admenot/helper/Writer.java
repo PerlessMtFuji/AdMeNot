@@ -20,8 +20,8 @@ import java.util.List;
 /**
  * Writes one input file through a Target and reports per line:
  * OK id | ERR id code | DENIED | DONE ok err (FAIL code when the input itself is unusable).
- * The first SecurityException, or a bulkInsert that stores fewer rows than sent
- * (appop "ignore" drops SMS silently), gives DENIED and nothing more is written.
+ * The first SecurityException, an insert rejected by appop ("ignore" drops SMS silently) or a
+ * bulkInsert that stores fewer rows than sent gives DENIED and nothing more is written.
  */
 final class Writer {
     interface Out { void line(String s); }
@@ -104,7 +104,18 @@ final class Writer {
 
     private void errId(String id, String code) { err++; out.line("ERR " + id + " " + code); }
 
-    // ---------- SMS and calls: bulkInsert ----------
+    // ---------- SMS: insert one by one; calls: bulkInsert ----------
+
+    /**
+     * SmsProvider has no bulkInsert override: the default loops insert() without a transaction, so a
+     * failure in the middle leaves part of the batch stored and a retry would duplicate it, and a row
+     * whose insert() returned null would count as written. SMS therefore go one insert per row with the
+     * returned Uri checked. CallLogProvider's bulkInsert is transactional, so calls keep it.
+     */
+    private void flush(Uri uri, List<String> ids, List<ContentValues> vals, boolean sms) throws Exception {
+        if (sms) oneByOne(uri, ids, vals, "null_uri");
+        else flushBulk(uri, ids, vals);
+    }
 
     private void bulk(JsonLines in, Uri uri, boolean sms) throws Exception {
         List<String> ids = new ArrayList<>();
@@ -122,9 +133,9 @@ final class Writer {
             }
             ids.add(id);
             vals.add(v);
-            if (ids.size() >= BATCH) { flushBulk(uri, ids, vals); ids.clear(); vals.clear(); }
+            if (ids.size() >= BATCH) { flush(uri, ids, vals, sms); ids.clear(); vals.clear(); }
         }
-        if (!ids.isEmpty()) flushBulk(uri, ids, vals);
+        if (!ids.isEmpty()) flush(uri, ids, vals, sms);
     }
 
     private void flushBulk(Uri uri, List<String> ids, List<ContentValues> vals) throws Exception {
@@ -133,18 +144,18 @@ final class Writer {
             n = t.bulkInsert(uri, vals.toArray(new ContentValues[0]));
         } catch (Exception e) {
             if (isDenial(e)) throw new Denied();
-            oneByOne(uri, ids, vals);
+            oneByOne(uri, ids, vals, "insert_null"); // transactional bulkInsert failed: nothing was stored
             return;
         }
         if (n < ids.size()) throw new Denied();
         for (String id : ids) okId(id);
     }
 
-    private void oneByOne(Uri uri, List<String> ids, List<ContentValues> vals) throws Exception {
+    private void oneByOne(Uri uri, List<String> ids, List<ContentValues> vals, String nullCode) throws Exception {
         for (int i = 0; i < ids.size(); i++) {
             try {
                 Uri u = t.insert(uri, vals.get(i));
-                if (u == null) errId(ids.get(i), "insert_null");
+                if (u == null) errId(ids.get(i), nullCode);
                 else if (rejected(u)) throw new Denied();
                 else okId(ids.get(i));
             } catch (Exception e) {

@@ -9,7 +9,8 @@ z ADMENOT_HELPER_KS_PASS; klucz leży poza repo, obok klucza manifestu aktualiza
 
     keytool -genkeypair -keystore <ścieżka> -alias admenot-helper -keyalg RSA -keysize 3072 -validity 36500
 
-Bez klucza powstaje tylko .dex, a SHA256SUMS zostaje bez zmian (kod wyjścia 3).
+Bez klucza powstaje tylko .dex w build/helper/; helper_bin (dex, APK, SHA256SUMS) zostaje bez zmian
+(kod wyjścia 3).
 """
 
 from __future__ import annotations
@@ -32,6 +33,7 @@ from admenot.engine.transfer import helper
 
 SRC = ROOT / "android" / "helper"
 OUT = helper.HELPER_BIN
+LOCAL_OUT = ROOT / "build" / "helper"  # bez klucza: sam .dex do prób, poza wydawanymi plikami (build/ w .gitignore)
 ALIAS = "admenot-helper"
 MIN_SDK, TARGET_SDK = 21, 35
 
@@ -148,22 +150,25 @@ def main(argv: list[str] | None = None) -> int:
         sdk = find_sdk()
         bt, jar, javac = find_build_tools(sdk), find_android_jar(sdk), find_javac(args.javac)
         print(f"build-tools {bt.name}, {jar.parent.name}, {javac}")
-        OUT.mkdir(parents=True, exist_ok=True)
+        ks = args.keystore or os.environ.get("ADMENOT_HELPER_KEYSTORE")
+        if ks and not Path(ks).is_file():
+            raise BuildError(f"keystore not found: {ks}")
         with tempfile.TemporaryDirectory(prefix="admenot-helper-build-") as tmp:
             work = Path(tmp)
             dex = build_dex(javac, bt, jar, work)
-            shutil.copyfile(dex, OUT / helper.ARTIFACTS["dex"])
             print(f"{helper.ARTIFACTS['dex']}: {dex.stat().st_size} B")
-            ks = args.keystore or os.environ.get("ADMENOT_HELPER_KEYSTORE")
             if not ks:
-                print("no keystore (--keystore / ADMENOT_HELPER_KEYSTORE): APK and SHA256SUMS not written",
-                      file=sys.stderr)
+                # helper_bin zostaje nietknięty: nowy .dex obok starego SHA256SUMS nie przeszedłby weryfikacji
+                LOCAL_OUT.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(dex, LOCAL_OUT / helper.ARTIFACTS["dex"])
+                print(f"no keystore (--keystore / ADMENOT_HELPER_KEYSTORE): only {LOCAL_OUT / helper.ARTIFACTS['dex']}"
+                      f" written; {OUT} unchanged", file=sys.stderr)
                 return 3
-            if not Path(ks).is_file():
-                raise BuildError(f"keystore not found: {ks}")
             apk = build_apk(bt, jar, dex, work, Path(ks))
-            shutil.copyfile(apk, OUT / helper.ARTIFACTS["apk"])
             print(f"{helper.ARTIFACTS['apk']}: {apk.stat().st_size} B")
+            OUT.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(dex, OUT / helper.ARTIFACTS["dex"])
+            shutil.copyfile(apk, OUT / helper.ARTIFACTS["apk"])
         write_sums(OUT)
         print(f"{helper.SUMS} written")
         return 0

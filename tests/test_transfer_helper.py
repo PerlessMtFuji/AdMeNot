@@ -199,3 +199,52 @@ def test_sources_not_newer_than_artifacts():
     sums = helper.read_sums(helper.HELPER_BIN)
     assert sums.get("sources") == helper.sources_digest(ROOT / "android" / "helper"), \
         "android/helper changed since the last build: run scripts/build_helper.py"
+
+
+def _writer_method(name: str) -> str:
+    src = (ROOT / "android" / "helper" / "src" / "pl" / "admenot" / "helper" / "Writer.java").read_text("utf-8")
+    start = src.index(f"void {name}(")
+    return src[start:src.index("\n    }\n", start)]
+
+
+def test_writer_inserts_sms_one_by_one_and_checks_the_uri():
+    """SmsProvider nie ma własnego `bulkInsert` (domyślny: pętla `insert()` bez transakcji), więc po
+    wyjątku w połowie paczki ponowienie zdublowałoby SMS-y: SMS idą po jednym z `null_uri` przy `null`;
+    połączenia zostają przy transakcyjnym `bulkInsert`."""
+    flush = _writer_method("flush")
+    assert 'if (sms) oneByOne(uri, ids, vals, "null_uri");' in flush
+    assert "else flushBulk(uri, ids, vals);" in flush
+    bulk = _writer_method("bulk")
+    assert "flushBulk" not in bulk and "flush(uri, ids, vals, sms)" in bulk
+    one = _writer_method("oneByOne")
+    assert "errId(ids.get(i), nullCode)" in one and "rejected(u)) throw new Denied()" in one
+
+
+def test_build_without_keystore_leaves_shipped_artifacts(tmp_path, monkeypatch):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("build_helper", ROOT / "scripts" / "build_helper.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    shipped = tmp_path / "helper_bin"
+    shipped.mkdir()
+    for name in ("admenot-helper.dex", "admenot-helper.apk", "SHA256SUMS"):
+        (shipped / name).write_bytes(b"old " + name.encode())
+
+    def fake_dex(javac, bt, jar, work):
+        out = work / "classes.dex"
+        out.write_bytes(b"new dex")
+        return out
+
+    monkeypatch.setattr(mod, "OUT", shipped)
+    monkeypatch.setattr(mod, "LOCAL_OUT", tmp_path / "local")
+    monkeypatch.setattr(mod, "find_sdk", lambda: tmp_path)
+    monkeypatch.setattr(mod, "find_build_tools", lambda sdk: tmp_path / "bt")
+    monkeypatch.setattr(mod, "find_android_jar", lambda sdk: tmp_path / "android.jar")
+    monkeypatch.setattr(mod, "find_javac", lambda explicit: tmp_path / "javac")
+    monkeypatch.setattr(mod, "build_dex", fake_dex)
+    monkeypatch.delenv("ADMENOT_HELPER_KEYSTORE", raising=False)
+    assert mod.main([]) == 3
+    for name in ("admenot-helper.dex", "admenot-helper.apk", "SHA256SUMS"):
+        assert (shipped / name).read_bytes() == b"old " + name.encode(), name
+    assert (tmp_path / "local" / "admenot-helper.dex").read_bytes() == b"new dex"
