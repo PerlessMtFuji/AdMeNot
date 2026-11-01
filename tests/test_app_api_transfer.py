@@ -1005,6 +1005,25 @@ def test_deleted_copy_keeps_phone_changes_and_cleanup_still_runs(tmp_path, no_ta
     assert not record.exists()
 
 
+def test_unreadable_phone_record_fails_cleanup_within_the_try_limit(tmp_path, no_tap_wait):
+    """Zapis telefonu, którego nie da się odczytać: lista telefonów działa, sprzątanie kończy się
+    niepowodzeniem (najwyżej 3 próby), zapis zostaje nietknięty, a po limicie zadania nie czekają."""
+    from admenot.engine.paths import device_dir_name, phone_changes_dir
+
+    api, rec, _host, _copy_id = _tel_copied(tmp_path)
+    record = phone_changes_dir() / f"{device_dir_name(NEW)}.json"
+    record.parent.mkdir(parents=True, exist_ok=True)
+    record.write_bytes(b"{broken")
+    clock = [0.0]
+    api._clock = lambda: clock[0]
+    for _ in range(5):
+        assert api.list_devices()["error"] is None
+        clock[0] += 60.0
+    assert rec.of("transfer:cleanup_done") == [{"ok": False, "serial": NEW}] * 3
+    assert record.read_bytes() == b"{broken"
+    assert "job_id" in api.start_scan(NEW)
+
+
 def test_copy_view_has_no_cleanup_flag(tmp_path):
     api, _rec, _host, _copy_id = _copied(tmp_path)
     assert "cleanup_pending" not in api.transfers()["copies"][0]

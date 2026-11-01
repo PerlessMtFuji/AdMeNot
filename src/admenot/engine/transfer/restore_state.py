@@ -158,8 +158,10 @@ class RestoreSummary:
     cleanup_pending: bool = False  # zostały zmiany telefonu do odwrócenia (`device_changes`)
 
 
-def _read(path: Path) -> tuple[dict[str, Any], int] | None:
+def _read(path: Path, strict: bool = False) -> tuple[dict[str, Any], int] | None:
     """(meta, liczba plików `pending`/`pushing`) istniejącego stanu albo `None`.
+    `strict`: stanu, którego nie da się otworzyć (blokada, brak dostępu — `sqlite3.OperationalError`),
+    nie pomijamy, tylko OSError; uszkodzony plik dalej daje `None`.
 
     Sam odczyt: `mode=rw` bez tworzenia, więc widok kopii niczego nie zakłada, a pozostawiony po
     awarii dziennik transakcji SQLite może się wycofać (`mode=ro` by na nim odmówił i Banner
@@ -167,11 +169,19 @@ def _read(path: Path) -> tuple[dict[str, Any], int] | None:
     wgrywania — zablokowany stan jest na ten raz pomijany."""
     try:
         db = sqlite3.connect(f"{path.absolute().as_uri()}?mode=rw", uri=True, timeout=READ_TIMEOUT)
+    except sqlite3.OperationalError as exc:
+        if strict:
+            raise OSError(f"restore state not readable: {exc}") from exc
+        return None
     except sqlite3.Error:
         return None
     try:
         meta = {k: json.loads(v) for k, v in db.execute("SELECT key, value FROM meta")}
         (left,) = db.execute("SELECT COUNT(*) FROM files WHERE status IN ('pending', 'pushing')").fetchone()
+    except sqlite3.OperationalError as exc:
+        if strict:
+            raise OSError(f"restore state not readable: {exc}") from exc
+        return None
     except (sqlite3.Error, ValueError):
         return None
     finally:
@@ -224,13 +234,19 @@ class PhoneRecord:
         return cls(phone_changes_dir() / f"{path.stem}.json")
 
     def get_meta(self, key: str, default: Any = None) -> Any:
+        """Brak pliku = brak zapisu. Plik, który jest, ale nie daje się odczytać (zablokowany, uszkodzony)
+        → OSError: nie wolno go wziąć za brak zapisu ani nadpisać (`_save`, `keep_copy_changes`)."""
         try:
-            data = json.loads(self.path.read_text("utf-8"))
+            text = self.path.read_text("utf-8")
         except FileNotFoundError:
             return default
-        except (OSError, ValueError):  # zapis jest atomowy; zablokowany plik: spróbujemy następnym razem
-            return default
-        return data.get(key, default) if isinstance(data, dict) else default
+        try:
+            data = json.loads(text)
+        except ValueError as exc:
+            raise OSError(f"phone changes record not readable: {self.path.name}") from exc
+        if not isinstance(data, dict):
+            raise OSError(f"phone changes record not readable: {self.path.name}")
+        return data.get(key, default)
 
     def set_meta(self, key: str, value: Any) -> None:
         if key != CHANGES_KEY:
@@ -251,14 +267,14 @@ class PhoneRecord:
 def keep_copy_changes(copy: CopyDir) -> None:
     """Przed usunięciem kopii: zmiany telefonów zapisane tylko w jej stanach wgrywania (stany sprzed
     zapisu poza kopią, także bez `serial`/`status`) dopisujemy do zapisu telefonu. Nieudany zapis →
-    OSError: kopia zostaje. Stanu nieczytelnego (uszkodzony plik) i tak nie odczytamy — pomijamy go
-    (wgrywana kopia, której stan bywa zablokowany, nie trafia tu: usunięcie odmawia `busy`)."""
+    OSError: kopia zostaje — tak samo przy stanie, którego nie da się otworzyć (blokada) i przy
+    nieczytelnym zapisie telefonu. Uszkodzonego pliku stanu i tak nie odczytamy — pomijamy go."""
     try:
         paths = sorted((copy.path / "restore").glob("*.sqlite"))
     except OSError:
         return
     for path in paths:
-        found = _read(path)
+        found = _read(path, strict=True)
         if found is None:
             continue
         changes = found[0].get(CHANGES_KEY)

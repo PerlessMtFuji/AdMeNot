@@ -173,6 +173,59 @@ def test_delete_keeps_the_copy_when_phone_changes_cannot_be_saved(monkeypatch):
     assert copy.path.exists() and restore_state_path(copy, "NEW").is_file()
 
 
+def _state_with_changes(copy):
+    from admenot.engine.transfer.restore_state import RestoreState, restore_state_path
+
+    state = RestoreState(restore_state_path(copy, "NEW"))
+    state.set_meta("device_changes", {"appop_prev": "ignore", "role_prev": None, "companion": False,
+                                      "helper_dir": False})
+    state.close()
+    return restore_state_path(copy, "NEW")
+
+
+@pytest.mark.parametrize("content", [b"{not json", b"[1, 2]"])
+def test_unreadable_phone_record_keeps_the_copy_and_the_record(content):
+    """Zapis telefonu, który istnieje, ale nie daje się odczytać, nie jest „brakiem zapisu”: usunięcie
+    kopii odmawia (OSError) i niczego w nim nie nadpisuje."""
+    from admenot.engine.paths import phone_changes_dir
+
+    copy = _copy()
+    _state_with_changes(copy)
+    record = phone_changes_dir() / f"{device_dir_name('NEW')}.json"
+    record.parent.mkdir(parents=True)
+    record.write_bytes(content)
+    with pytest.raises(OSError):
+        store.delete(copy.read_meta().id)
+    assert copy.path.exists() and record.read_bytes() == content
+    assert store.purge_expired(NOW + timedelta(days=30), lambda s: False, lambda c: False) == []
+    assert copy.path.exists() and record.read_bytes() == content
+
+
+def test_locked_restore_state_keeps_the_copy(monkeypatch):
+    """Stan wgrywania, którego nie da się otworzyć (blokada), mógł mieć zmiany telefonu: kopia zostaje."""
+    import sqlite3
+
+    from admenot.engine.paths import phone_changes_dir
+    from admenot.engine.transfer import restore_state
+
+    monkeypatch.setattr(restore_state, "READ_TIMEOUT", 0.05)
+    copy = _copy()
+    path = _state_with_changes(copy)
+    (copy.path / "files").mkdir(exist_ok=True)
+    (copy.path / "files" / "a.jpg").write_bytes(b"x")
+    before = sorted(p.relative_to(copy.path) for p in copy.path.rglob("*"))
+    lock = sqlite3.connect(path)
+    try:
+        lock.execute("BEGIN EXCLUSIVE")
+        with pytest.raises(OSError):
+            store.delete(copy.read_meta().id)
+    finally:
+        lock.rollback()
+        lock.close()
+    assert sorted(p.relative_to(copy.path) for p in copy.path.rglob("*")) == before  # nic nie usunięte
+    assert not (phone_changes_dir() / f"{device_dir_name('NEW')}.json").exists()
+
+
 def test_copy_dir_resolves_id_only():
     copy = _copy()
     assert store.copy_dir(copy.read_meta().id).path == copy.path.resolve()

@@ -131,7 +131,11 @@ def pending_cleanup(copies: list[CopyDir], serial: str) -> list[Path]:
     paths = [p for p in (restore_state_path(c, serial) for c in copies) if device_changes_pending(p)]
     if not paths:
         record = PhoneRecord.for_serial(serial)
-        if record.pending:
+        try:
+            pending = record.pending
+        except OSError:  # zapis jest, ale nieczytelny: sprzątanie spróbuje (i się nie uda — limit prób)
+            pending = True
+        if pending:
             paths.append(record.path)
     return paths
 
