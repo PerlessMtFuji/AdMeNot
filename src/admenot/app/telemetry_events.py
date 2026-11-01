@@ -185,10 +185,11 @@ def transfer_backup_event(device: DeviceInfo, result: BackupResult,
     }
 
 
-def _restore_status(result: RestoreResult, tel: TelResult | None) -> str:
-    """Stan całego wgrywania: pliki i telefonia (przerwana telefonia → `stopped`)."""
+def _restore_status(result: RestoreResult, tel: TelResult | None, tel_failed: bool = False) -> str:
+    """Stan całego wgrywania: pliki i telefonia (przerwana telefonia → `stopped`; błąd telefonii po
+    skończonych plikach → `incomplete`)."""
     if tel is None:
-        return result.status
+        return "incomplete" if tel_failed and result.status == "complete" else result.status
     if tel.stopped:
         return "stopped"
     return "incomplete" if result.status == "complete" and tel.status == "incomplete" else result.status
@@ -207,15 +208,17 @@ def _tel_part(tel: TelResult) -> dict[str, Any]:
 
 
 def transfer_restore_event(device: DeviceInfo, result: RestoreResult, choice: UploadChoice,
-                           streams: int, tel: TelResult | None = None) -> dict[str, Any]:
+                           streams: int, tel: TelResult | None = None,
+                           tel_failed: bool = False) -> dict[str, Any]:
     """Wgrywanie kopii na nowy telefon (`device` = telefon docelowy): same liczby i wybrane grupy.
     Bez nazw plików, folderów i pakietów z plików APK — „Inne foldery” to tylko `others`: coś
     wybrano. Serial telefonu docelowego (`result.target_serial`) też nie wychodzi. Z telefonią (`tel`)
-    dochodzą `tel`, `safety` i `cleanup_ok` — same liczby i flagi, bez nazw kont (adresów e-mail)."""
+    dochodzą `tel`, `safety` i `cleanup_ok` — same liczby i flagi, bez nazw kont (adresów e-mail).
+    `tel_failed`: telefonia przerwana błędem po plikach (bez wyniku telefonii) — stan `incomplete`."""
     groups = {g: g in choice.groups for g in UPLOAD_GROUPS}
     groups["others"] = any(g.startswith("other:") for g in choice.groups)
     return {
-        "device": device_of(device), "status": _restore_status(result, tel),
+        "device": device_of(device), "status": _restore_status(result, tel, tel_failed),
         "seconds": _count(result.seconds, MAX_SECONDS),
         "bytes_mb": _count(round(result.bytes / 1_000_000), MAX_MB),
         "files": _count(result.files_done), "exists": _count(result.files_exists),

@@ -148,8 +148,8 @@ class RestoreSummary:
     serial: str
     status: str  # running | complete | incomplete | stopped | klucz `RestoreError`
     updated: str | None  # ISO-8601 UTC
-    # zostały pliki do wgrania (`pending`/`pushing`) albo rekordy telefonii (`tel_left`) i przebieg
-    # nie jest `complete`
+    # zostały pliki do wgrania (`pending`/`pushing`) i przebieg nie jest `complete`, albo zostały rekordy
+    # wybranej telefonii (`tel_left`)
     resumable: bool
     cleanup_pending: bool = False  # zostały zmiany telefonu do odwrócenia (`device_changes`)
 
@@ -190,7 +190,9 @@ def _summary(path: Path) -> RestoreSummary | None:
     if not isinstance(serial, str) or not isinstance(status, str):
         return None
     return RestoreSummary(serial, status, updated if isinstance(updated, str) else None,
-                          status != "complete" and (left > 0 or _tel_left(meta) > 0),
+                          # `complete` z `tel_left`: pliki skończone, a wybranej telefonii jeszcze nie
+                          # było (program zamknięty między etapami; most zapisuje `tel_left` przed plikami)
+                          (status != "complete" and left > 0) or _tel_left(meta) > 0,
                           changes_pending(meta.get("device_changes")))
 
 

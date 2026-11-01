@@ -951,3 +951,163 @@ def test_tel_telemetry_has_no_names_or_numbers(tmp_path, no_tap_wait):
     for secret in ("a@b", "Jan", "Kowalski", "Firma", "biuro@firma.pl", "600100200", "999888777",
                    "Cześć", "Emoji", PREV, NEW, SERIAL):
         assert secret not in text, secret
+
+
+# --- sprzątanie przy podłączeniu: poprawki (przegląd zadania 8, runda 1) ----------------------------
+
+
+@pytest.mark.parametrize("call", ["start_scan", "transfer_inventory", "restore_plan"])
+def test_entry_point_runs_cleanup_missed_while_another_job_ran(tmp_path, no_tap_wait, call):
+    """Telefon podłączony w trakcie innego zadania (lista telefonów nie mogła wtedy wystartować
+    sprzątania): pierwsze wywołanie na tym serialu startuje sprzątanie i dostaje `busy`; potem działa."""
+    api, rec, host, copy_id = _tel_copied(tmp_path)
+    _copy, new = _leftover_changes(host, copy_id)
+    api._jobs.start("apk", lambda job: api.list_devices())  # inne zadanie trwa w chwili podłączenia
+    assert rec.of("transfer:cleanup_done") == [] and new.role_holders == [_helper_pkg()]
+
+    def go():
+        return api.restore_plan(copy_id, NEW) if call == "restore_plan" else getattr(api, call)(NEW)
+
+    err = go()["error"]
+    assert (err["key"], err["message"]) == ("busy", "phone_cleanup")
+    assert rec.of("transfer:cleanup_done") == [{"ok": True}] and new.role_holders == [PREV]
+    assert "job_id" in go()
+    assert len(rec.of("transfer:cleanup_done")) == 1
+
+
+def test_failed_cleanup_is_retried_on_same_connection(tmp_path, no_tap_wait, monkeypatch):
+    from admenot.app import api as api_mod
+    from admenot.engine.transfer.phonesetup import CleanupResult
+
+    api, rec, host, copy_id = _tel_copied(tmp_path)
+    _copy, new = _leftover_changes(host, copy_id)
+    real, calls = api_mod.cleanup, []
+
+    def flaky(*args):
+        calls.append(1)
+        if len(calls) == 1:
+            return CleanupResult(False, True, False, True)  # np. rola nie wróciła
+        if len(calls) == 2:
+            raise RuntimeError("boom")
+        return real(*args)
+
+    monkeypatch.setattr(api_mod, "cleanup", flaky)
+    for _ in range(4):
+        assert api.list_devices()["error"] is None
+    assert len(calls) == 3  # ponowienia w tle; po udanym — już nie
+    assert rec.of("transfer:cleanup_done") == [{"ok": False}, {"ok": False}, {"ok": True}]
+    assert new.role_holders == [PREV]
+
+
+def test_stopped_cleanup_not_prompted_again_on_same_connection(tmp_path, no_tap_wait, monkeypatch):
+    from admenot.app import api as api_mod
+    from admenot.engine.transfer.phonesetup import CleanupResult
+
+    api, rec, host, copy_id = _tel_copied(tmp_path)
+    _leftover_changes(host, copy_id)
+    calls = []
+
+    def stopped(*args):
+        calls.append(1)
+        api._jobs.stop()  # serwisant zatrzymał sprzątanie
+        return CleanupResult(False, True, False, True)
+
+    monkeypatch.setattr(api_mod, "cleanup", stopped)
+    api.list_devices()
+    api.list_devices()
+    assert len(calls) == 1 and rec.of("transfer:cleanup_done") == [{"ok": False}]
+
+
+def test_cleanup_check_error_logged_once_per_connection(tmp_path, monkeypatch):
+    from admenot.app import api as api_mod
+
+    api, _rec, _host, _copy_id = _tel_copied(tmp_path)
+    calls, logged = [], []
+
+    def broken(copies, serial):
+        calls.append(serial)
+        raise RuntimeError("zepsuty stan")
+
+    monkeypatch.setattr(api_mod, "pending_cleanup", broken)
+    monkeypatch.setattr(api_mod, "log_exception", lambda exc, **kw: logged.append(exc))
+    for _ in range(3):
+        assert api.list_devices()["error"] is None
+    assert calls.count(NEW) == 3  # sprawdzamy dalej przy każdym odczycie listy
+    assert len(logged) == len(set(calls))  # ale log raz na telefon i podłączenie
+
+
+def test_cleanup_check_not_run_twice_concurrently(tmp_path, monkeypatch):
+    from admenot.app import api as api_mod
+
+    api, _rec, _host, _copy_id = _tel_copied(tmp_path)
+    real, calls = api_mod.pending_cleanup, []
+    entered, go = threading.Event(), threading.Event()
+
+    def slow(copies, serial):
+        calls.append(serial)
+        if serial == NEW and not entered.is_set():
+            entered.set()
+            go.wait(5)
+        return real(copies, serial)
+
+    monkeypatch.setattr(api_mod, "pending_cleanup", slow)
+    first = threading.Thread(target=api.list_devices)  # wątek obserwatora telefonów
+    first.start()
+    assert entered.wait(5)
+    second = threading.Thread(target=api.list_devices)  # `list_devices` z UI w tym samym czasie
+    second.start()
+    second.join(0.3)
+    go.set()
+    first.join(5)
+    second.join(5)
+    assert calls.count(NEW) == 1
+
+
+def test_tel_error_after_files_still_reports_files(tmp_path, no_tap_wait, monkeypatch):
+    from admenot.app import api as api_mod
+
+    api, rec, _host, copy_id = _tel_copied(tmp_path)
+    api.set_telemetry(True, True)
+    _planned(api, rec, copy_id)
+
+    def boom(*args, **kw):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(api_mod, "run_tel_restore", boom)
+    assert "job_id" in api.start_restore(TEL_CHOICE)
+    done = rec.of("transfer:restore_done")[0]
+    assert done["result"]["status"] == "complete" and done["result"]["files_done"] == 5
+    assert done["tel"] is None and done["tel_error"] == "transfer_failed"
+    events = [json.loads(x) for x in telemetry_path().read_text("utf-8").splitlines()]
+    event = next(e for e in events if e["type"] == "transfer_restore")
+    assert event["status"] == "incomplete" and event["files"] == 5 and "tel" not in event
+
+
+def test_files_only_restore_done_has_no_tel_error(tmp_path):
+    api, rec, _host, copy_id = _tel_copied(tmp_path)
+    _planned(api, rec, copy_id)
+    api.start_restore(CHOICE)
+    done = rec.of("transfer:restore_done")[0]
+    assert done["tel"] is None and done["tel_error"] is None
+
+
+def test_tel_choice_keeps_resume_banner_between_files_and_tel(tmp_path, no_tap_wait, monkeypatch):
+    """Program zamknięty po plikach, a przed telefonią: stan i tak daje Banner wznowienia."""
+    from admenot.app import api as api_mod
+    from admenot.engine.transfer.restore_state import read_restores
+
+    api, rec, _host, copy_id = _tel_copied(tmp_path)
+    _planned(api, rec, copy_id)
+    copy = store.CopyDir(store.transfers_dir() / copy_id)
+    seen = []
+
+    def died(*args, **kw):
+        seen.extend(read_restores(copy))  # stan dokładnie w chwili po plikach
+        raise RuntimeError("program zamknięty")
+
+    monkeypatch.setattr(api_mod, "run_tel_restore", died)
+    api.start_restore(TEL_CHOICE)
+    (entry,) = seen
+    assert (entry.status, entry.resumable) == ("complete", True)
+    (entry,) = read_restores(copy)
+    assert entry.resumable is True

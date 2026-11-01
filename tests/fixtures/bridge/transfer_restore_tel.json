@@ -1320,7 +1320,7 @@
       "command": "dumpsys account",
       "status": "ok",
       "duration": 0.0,
-      "output": "User UserInfo{0:Właściciel:c13}:\n  Accounts: 0\n\n  Active Sessions: 0\n",
+      "output": "",
       "tag": null
      }
     ],
@@ -2405,7 +2405,8 @@
        "seconds": 0,
        "stopped": false,
        "status": "incomplete"
-      }
+      },
+      "tel_error": null
      }
     ],
     [

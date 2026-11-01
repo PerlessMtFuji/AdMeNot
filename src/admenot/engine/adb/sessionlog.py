@@ -1,8 +1,9 @@
 """Log techniczny sesji (spec §7.5): polecenia ADB, status i czas — bez wyjścia poleceń.
 
 GUI dostaje każde polecenie na żywo (`on_command`, z wyjściem obciętym do OUTPUT_LIMIT) dla
-konsoli ADB — bez wyjścia zrzutu powiadomień z treścią (`--noredact`), o ile serwisant nie wpisał
-go sam. Polecenia wpisane w konsoli mają `tag="console"` i prefiks `console:` w logu.
+konsoli ADB — bez wyjścia zrzutu powiadomień z treścią (`--noredact`), danych z providerów (`content`)
+i listy kont (`dumpsys account`), o ile serwisant nie wpisał go sam. Polecenia wpisane w konsoli
+mają `tag="console"` i prefiks `console:` w logu.
 W pliku logu ścieżki plików klienta (`/sdcard/…`, katalog kopii) są zwinięte (`client_paths`).
 """
 
@@ -25,6 +26,8 @@ _PRIVATE = "--noredact"  # zrzut powiadomień z tytułami i treścią
 # Dane klienta z providerów (kontakty, SMS, połączenia, MMS) — `content query` / `content read`,
 # także w postaci `host:shell -T …` i `host:exec-out …`.
 _CONTENT = re.compile(r"^(?:host:(?:shell -T |exec-out ))?content (?:query|read)(?:\s|$)")
+# Konta na telefonie (plan telefonii): `dumpsys account` wypisuje adresy e-mail klienta.
+_ACCOUNTS = re.compile(r"^(?:host:(?:shell -T |exec-out ))?dumpsys account(?:\s|$)")
 
 OnCommand = Callable[[dict[str, Any]], None]
 
@@ -95,8 +98,9 @@ class SessionLogAdb:
         if self.on_command is not None:
             if _PRIVATE in what and status == "ok" and self.tag != "console":  # treść powiadomień klienta
                 output = f"<{len(output.encode())} B>"
-            elif _CONTENT.match(what) and status == "ok" and self.tag != "console":
-                output = ""  # kontakty i wiadomości klienta nie trafiają do konsoli
+            elif (_CONTENT.match(what) or _ACCOUNTS.match(what)) and status == "ok" \
+                    and self.tag != "console":
+                output = ""  # kontakty, wiadomości i konta klienta nie trafiają do konsoli
             self.on_command({"time": stamp, "serial": self.serial, "command": what,
                              "status": status, "duration": round(duration, 2),
                              "output": output[:OUTPUT_LIMIT], "tag": self.tag})

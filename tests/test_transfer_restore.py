@@ -598,3 +598,28 @@ def test_read_restores_skips_locked_state_quickly(tmp_path):
         writer.execute("ROLLBACK")
         writer.close()
     assert [r.serial for r in read_restores(copy)] == ["NEW"]
+
+
+def test_files_complete_with_tel_still_to_run_is_resumable(tmp_path):
+    """Program zamknięty między plikami a telefonią: pliki `complete`, ale wybrana telefonia ma rekordy
+    (`tel_left`) — Banner wznowienia zostaje. Bez telefonii w wyborze stary `tel_left` się nie liczy."""
+    from admenot.engine.transfer.restore_state import read_restores
+
+    copy = _copy(tmp_path)
+    state = RestoreState(restore_state_path(copy, "NEW"))
+    try:
+        state.set_meta("serial", "NEW")
+        state.set_meta("status", "complete")
+        state.set_meta("tel_left", 3)
+        state.set_meta("choice", UploadChoice(ALL, frozenset(), tel=frozenset({"sms"})).to_json())
+    finally:
+        state.close()
+    (entry,) = read_restores(copy)
+    assert (entry.status, entry.resumable) == ("complete", True)
+    state = RestoreState(restore_state_path(copy, "NEW"))
+    try:
+        state.set_meta("choice", UploadChoice(ALL, frozenset()).to_json())
+    finally:
+        state.close()
+    (entry,) = read_restores(copy)
+    assert entry.resumable is False
