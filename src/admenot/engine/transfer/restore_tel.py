@@ -62,6 +62,7 @@ from .telplan import TelPlan, call_key, mms_key, phone_has, record_id, sms_key
 log = logging.getLogger(__name__)
 
 AP, CO, FILE = "app_process", "companion", "file"
+UNVERIFIED = "unverified"  # kod `ERR` pomocnika: SMS mógł zostać zapisany albo nie (Writer.flushSms)
 # Wynik spike'u (Task 1): `app_process` zapisał każdą kategorię na OPPO; łańcuch bez zmian.
 CHAIN: dict[str, tuple[str, ...]] = {"contacts": (AP, CO, FILE), "sms": (AP, CO, FILE),
                                      "mms": (AP, CO, FILE), "calls": (AP, CO, FILE)}
@@ -443,7 +444,12 @@ class _TelRestore:
                  out.denied)
         if out.denied:
             return [], broken + [r for r in chunk if r[0] not in out.ok], True
-        bad = [r for r in chunk if r[0] in out.failed]
+        unverified = [r for r in chunk if out.failed.get(r[0]) == UNVERIFIED]
+        if unverified:
+            # pomocnik nie wie, czy rekord zapisał (R17 jak po urwanej paczce): żadna droga z pomocnikiem
+            # nie pisze go drugi raz — od razu plik do ręcznego importu
+            self.manual.setdefault(kind, []).extend(unverified)
+        bad = [r for r in chunk if r[0] in out.failed and r not in unverified]
         missing = [r for r in chunk if r[0] not in out.ok and r[0] not in out.failed]
         if missing:
             missing = self._drop_present(kind, route, missing)

@@ -31,6 +31,8 @@ final class Writer {
 
     static final int BATCH = 500;
     static final int CONTACT_OPS = 450;
+    /** ERR code of an SMS that may or may not be stored: never written again by another route. */
+    static final String UNVERIFIED = "unverified";
     static final Uri SMS = Uri.parse("content://sms");
     static final Uri CALLS = Uri.parse("content://call_log/calls");
     static final Uri RAW = Uri.parse("content://com.android.contacts/raw_contacts");
@@ -122,11 +124,16 @@ final class Writer {
      * SMS on an OPPO with ~23k SMS), so the batch goes through bulkInsert and is then verified:
      * 1. maxId = the highest _id in content://sms before the batch (empty table: 0);
      * 2. bulkInsert the batch;
-     * 3. read the rows with _id > maxId and match them to the batch by (address, date, type, body);
-     *    each stored row confirms one batch row (OK). Extra stored rows with the same key (e.g. the
-     *    SMS app received such a message meanwhile) are ignored, so those batch rows are just OK;
-     * 4. a batch row not found (bulkInsert stored fewer, or threw a non-denial exception) is inserted
-     *    alone with its Uri checked (null: ERR id null_uri, appop "/0": DENIED).
+     * 3. newCount = the number of rows with _id > maxId. newCount == batch size and bulkInsert did not
+     *    throw: OK for every row, no key matching (a provider that rewrites a stored value, e.g. the
+     *    address, cannot make good rows look missing);
+     * 4. otherwise (fewer or more new rows - the SMS app may receive a message meanwhile - or a
+     *    non-denial exception) match the new rows to the batch by (address, date, type, body); each
+     *    stored row confirms one batch row (OK), extra stored rows with the same key are ignored. The
+     *    unmatched rows are inserted alone (Uri checked: null gives ERR id null_uri, appop "/0" DENIED)
+     *    only when they explain the gap exactly (unmatched == batch size - newCount); else the keys are
+     *    unreliable on this provider and nothing more is inserted: each unmatched row gets
+     *    ERR id unverified (the PC sends those to the manual import file, never to another route).
      * Denial stays as before: a SecurityException, or appop "ignore" (bulkInsert returns fewer rows
      * and nothing new appears with _id > maxId) gives DENIED. A failed verification query stops the
      * run (FAIL) rather than guess what was stored.
@@ -134,14 +141,21 @@ final class Writer {
     private void flushSms(List<String> ids, List<ContentValues> vals) throws Exception {
         long maxId = maxSmsId();
         int n = -1;
+        boolean threw = false;
         try {
             n = t.bulkInsert(SMS, vals.toArray(new ContentValues[0]));
         } catch (Exception e) {
             if (isDenial(e)) throw new Denied();
-            // not a denial: part of the batch may be stored, the verification below finds which
+            threw = true; // not a denial: part of the batch may be stored, the verification below decides
         }
         Map<String, Integer> found = storedSince(maxId);
-        if (n >= 0 && n < ids.size() && found.isEmpty()) throw new Denied();
+        int newCount = 0;
+        for (int c : found.values()) newCount += c;
+        if (!threw && newCount == ids.size()) {
+            for (String id : ids) okId(id);
+            return;
+        }
+        if (n >= 0 && n < ids.size() && newCount == 0) throw new Denied();
         List<String> missIds = new ArrayList<>();
         List<ContentValues> missVals = new ArrayList<>();
         for (int i = 0; i < ids.size(); i++) {
@@ -155,7 +169,9 @@ final class Writer {
                 missVals.add(vals.get(i));
             }
         }
-        if (!missIds.isEmpty()) oneByOne(SMS, missIds, missVals, "null_uri");
+        if (missIds.isEmpty()) return;
+        if (missIds.size() == ids.size() - newCount) oneByOne(SMS, missIds, missVals, "null_uri");
+        else for (String id : missIds) errId(id, UNVERIFIED);
     }
 
     /** The highest _id in content://sms, 0 for an empty table. */

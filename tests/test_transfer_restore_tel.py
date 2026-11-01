@@ -555,6 +555,35 @@ def test_err_on_app_process_written_by_companion_once(tmp_path):
     assert phone.role_holders == [PREV] and r.status == "complete"
 
 
+def test_unverified_sms_go_straight_to_file_not_to_companion(tmp_path):
+    """`ERR <id> unverified`: pomocnik nie wie, czy SMS zapisał (klucze dostawcy niewiarygodne). Ani
+    ponowienie, ani aplikacja pomocnicza nie piszą go drugi raz — od razu plik do ręcznego importu."""
+    copy, phone = _copy(tmp_path), _new(tmp_path)
+    real = phone._write
+    sms_writes = []
+
+    def write(kind, records, account, remote):
+        if kind == "sms" and remote.startswith(helper.HELPER_DIR):
+            sms_writes.append(len(records))
+            bad = [x for x in records if x["body"].startswith("Wiadomość 3")]
+            lines = real(kind, [x for x in records if x not in bad], account, remote)[:-1]
+            lines += [f"ERR {x['id']} unverified" for x in bad]
+            return [*lines, f"DONE {len(lines) - len(bad)} {len(bad)}"]
+        return real(kind, records, account, remote)
+
+    phone._write = write  # type: ignore[method-assign]
+    r = Run(phone, copy)()
+    assert not any(c.startswith("am instrument") for c in phone.commands)  # bez drogi przez aplikację
+    assert len(phone.providers["sms"]) == 4 and r.kinds["sms"].written == 4
+    assert r.kinds["sms"].manual == 1 and r.kinds["sms"].failed == 0 and r.kinds["sms"].path == FILE
+    assert sms_writes == [5]  # bez ponowienia tą drogą
+    st = _state(copy)
+    try:
+        assert sorted(st.tel_status("sms").values()) == ["done"] * 4 + ["manual"]
+    finally:
+        st.close()
+
+
 def test_no_route_left_counts_failed_with_last_code(tmp_path, monkeypatch):
     copy, phone = _copy(tmp_path), _new(tmp_path)
     monkeypatch.setitem(rt.CHAIN, "calls", (AP,))

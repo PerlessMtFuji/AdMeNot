@@ -202,8 +202,12 @@ def test_sources_not_newer_than_artifacts():
         "android/helper changed since the last build: run scripts/build_helper.py"
 
 
+def _writer_source() -> str:
+    return (ROOT / "android" / "helper" / "src" / "pl" / "admenot" / "helper" / "Writer.java").read_text("utf-8")
+
+
 def _writer_method(name: str) -> str:
-    src = (ROOT / "android" / "helper" / "src" / "pl" / "admenot" / "helper" / "Writer.java").read_text("utf-8")
+    src = _writer_source()
     m = re.search(r"\n    [\w<>, ]+ " + name + r"\([^\n;]*\{\n", src)  # a method declaration, not a call
     assert m, name
     return src[m.start():src.index("\n    }\n", m.start())]
@@ -213,8 +217,8 @@ def test_writer_bulk_inserts_sms_and_verifies_what_was_stored():
     """SmsProvider nie ma własnego `bulkInsert` (domyślny: pętla `insert()` bez transakcji), a `insert`
     po jednym był ~4× wolniejszy (OPPO: 66 s zamiast 13–17 s na 500 SMS). SMS idą więc `bulkInsert`,
     a potem helper czyta wiersze z `_id` > największego sprzed paczki i dopasowuje je po
-    (address, date, type, body); tylko nieznalezione wstawia po jednym (`null_uri` przy `null`).
-    Połączenia zostają przy transakcyjnym `bulkInsert`."""
+    (address, date, type, body) tylko, gdy nowych wierszy jest inaczej niż wysłanych; nieznalezione
+    wstawia po jednym (`null_uri` przy `null`) tylko, gdy dokładnie wyjaśniają lukę. Połączenia zostają przy transakcyjnym `bulkInsert`."""
     flush = _writer_method("flush")
     assert "if (sms) flushSms(ids, vals);" in flush
     assert "else flushBulk(uri, ids, vals);" in flush
@@ -228,8 +232,16 @@ def test_writer_bulk_inserts_sms_and_verifies_what_was_stored():
     assert order == sorted(order)
     assert "if (isDenial(e)) throw new Denied();" in sms  # odmowa z bulkInsert jak dotąd
     # appop "ignore": mniej wierszy niż wysłano i nic nowego w tabeli → DENIED
-    assert "n < ids.size() && found.isEmpty()) throw new Denied();" in sms
+    assert "n < ids.size() && newCount == 0) throw new Denied();" in sms
     assert "smsKey(vals.get(i))" in sms
+    # tyle nowych wierszy, ile wysłano (bez wyjątku): OK bez dopasowania kluczy — dostawca, który
+    # przepisuje adres albo treść, nie zrobi z dobrych wierszy „brakujących”
+    count = sms.index("if (!threw && newCount == ids.size()) {")
+    assert count < sms.index("smsKey(vals.get(i))")
+    # pojedyncze wstawienia tylko, gdy brakujące wyjaśniają lukę dokładnie; inaczej `ERR id unverified`
+    assert ('if (missIds.size() == ids.size() - newCount) oneByOne(SMS, missIds, missVals, "null_uri");\n'
+            "        else for (String id : missIds) errId(id, UNVERIFIED);") in sms
+    assert 'static final String UNVERIFIED = "unverified";' in _writer_source()
 
     newest = _writer_method("maxSmsId")
     assert '"_id DESC"' in newest and "return 0;" in newest  # pusta tabela → 0
