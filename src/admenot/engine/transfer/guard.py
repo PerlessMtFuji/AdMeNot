@@ -345,7 +345,6 @@ def _fixed_commands(helper) -> frozenset[str]:
     d, p = helper.HELPER_DIR, helper.PACKAGE
     out = {
         f"mkdir -p {helper.HELPER_IN}", f"rm -rf {helper.HELPER_IN}", f"rm -rf {d}",
-        f"mkdir -p {helper.COMPANION_IN}",
         f"sha256sum {helper.DEX_REMOTE}",
         "appops get com.android.shell WRITE_SMS",
         f"pm list packages {p}", f"pm uninstall {p}",

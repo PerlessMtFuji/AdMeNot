@@ -341,6 +341,16 @@ _TEL_ALLOWED = [
 ]
 
 
+def test_tel_fixed_commands_leave_sdcard_mkdir_to_append_only():
+    """`mkdir -p` katalogu wejścia aplikacji pomocniczej (pod `/sdcard/`) przepuszcza już strażnik
+    dopisywania — na stałej liście strażnika telefonii byłby martwym wpisem."""
+    from admenot.engine.transfer.guard import _fixed_commands
+
+    assert not any(c.startswith("mkdir -p /sdcard/") for c in _fixed_commands(helper))
+    adb, _rec = _tel()
+    assert adb.shell(f"mkdir -p {helper.COMPANION_IN}") == "ok"
+
+
 @pytest.mark.parametrize("cmd", _TEL_ALLOWED)
 def test_tel_guard_allows_exact_forms(cmd):
     adb, rec = _tel()
