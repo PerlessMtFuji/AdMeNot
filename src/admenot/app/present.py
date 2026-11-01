@@ -440,6 +440,14 @@ def _free_pc() -> int:
         return 0
 
 
+def _iso_mtime(mtime: int) -> str | None:
+    """Czas pliku z `stat` telefonu; ujemny albo spoza zakresu dat (zły zegar, uszkodzony plik) — `None`."""
+    try:
+        return datetime.fromtimestamp(mtime).isoformat(timespec="seconds")
+    except (OSError, ValueError, OverflowError):
+        return None
+
+
 def inventory_view(inv: Inventory, lang: str) -> dict[str, Any]:
     """Ekran wyboru kopii. Folder `""` w `others` to luźne pliki w głównym folderze — nazwę
     pokazuje UI. `bytes` aplikacji nie znamy przed kopią (None). `lang`: jak w innych widokach;
@@ -465,7 +473,7 @@ def inventory_view(inv: Inventory, lang: str) -> dict[str, Any]:
         "unreadable": inv.unreadable,
         "denied": sorted(inv.denied),
         "exports": {kind: [{"remote": e.remote, "name": e.remote.rsplit("/", 1)[-1], "size": e.size,
-                            "mtime": datetime.fromtimestamp(e.mtime).isoformat(timespec="seconds"),
+                            "mtime": _iso_mtime(e.mtime),
                             "count": e.count} for e in files]
                     for kind, files in inv.exports.items()},
     }

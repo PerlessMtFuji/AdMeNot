@@ -71,7 +71,8 @@
     ? t(deniedKinds.every((k) => !!chosen(k) && rowOn(k)) ? 'transfer.export.title_denied_file' : 'transfer.export.title_denied',
       { what: what(deniedKinds) })
     : t('transfer.export.title_failed', { what: what(failedKinds) }));
-  const fileDate = (iso: string) => new Date(iso).toLocaleString(i18n.lang === 'pl' ? 'pl-PL' : 'en-GB',
+  // Czas pliku spoza zakresu dat (most daje null): bez daty zamiast „Invalid Date”.
+  const fileDate = (iso: string | null) => iso === null ? '' : new Date(iso).toLocaleString(i18n.lang === 'pl' ? 'pl-PL' : 'en-GB',
     { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   /** „zmień plik”: lista plików w banerze — przewinięcie i fokus na wybranym pliku. */

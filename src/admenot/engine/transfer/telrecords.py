@@ -529,8 +529,9 @@ def read_raw_contacts(phone_dir: Path) -> list[ContactRecord]:
 # Źródła w kopii
 # --------------------------------------------------------------------------------------
 def copy_sources(copy: CopyDir, meta: CopyMeta) -> TelSources:
-    """Pliki telefonii w kopii. Kategoria z pliku eksportu nie ma zrzutów `raw/`, a załączników MMS
-    w eksporcie SMS nie ma (spec §5.1) — wtedy `mms = None`. `None` = kategorii nie ma w kopii."""
+    """Pliki telefonii w kopii. Kategoria z pliku eksportu nie ma zrzutów `raw/`; MMS z wybranego eksportu
+    SMS (SB&R) są w tym samym `sms.xml` (`mms` wskazuje wtedy ten plik, załączniki w base64), a eksport bez
+    `<mms>` to `mms = None` (stary `mms.xml` z providera się nie liczy). `None` = kategorii nie ma w kopii."""
     phone = copy.phone_dir
     sel = meta.selection
     exported = {e.get("kind") for e in (sel.get("exports") or []) if isinstance(e, dict) and sel.get(e.get("kind"))}
@@ -545,5 +546,26 @@ def copy_sources(copy: CopyDir, meta: CopyMeta) -> TelSources:
         contacts = "raw"
     else:
         contacts = "vcf" if exists("contacts.vcf") else None
-    return TelSources(contacts, exists("sms.xml"), None if "sms" in exported else exists("mms.xml"),
-                      exists("calls.xml"))
+    sms = exists("sms.xml")
+    if "sms" in exported:  # MMS z eksportu SB&R są w tym samym pliku, załączniki w base64 (`data`)
+        mms = sms if sms is not None and _has_tag(sms, b"mms") else None
+    else:
+        mms = exists("mms.xml")
+    return TelSources(contacts, sms, mms, exists("calls.xml"))
+
+
+def _has_tag(path: Path, tag: bytes) -> bool:
+    """Czy w pliku XML jest element `<tag …>` (szukanie w bajtach kawałkami; w wartościach atrybutów
+    `<` jest zawsze zapisane jako `&lt;`, więc trafia tylko znacznik)."""
+    pattern = re.compile(rb"<" + re.escape(tag) + rb"[\s/>]")
+    keep = len(tag) + 1
+    tail = b""
+    try:
+        with path.open("rb") as fh:
+            while chunk := fh.read(1 << 20):
+                if pattern.search(tail + chunk):
+                    return True
+                tail = chunk[-keep:]
+    except OSError:
+        return False
+    return False

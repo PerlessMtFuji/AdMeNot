@@ -121,6 +121,14 @@ describe('TransferChoose', () => {
     expect(within(screen.getByRole('radiogroup')).getByText('2 MB')).toBeTruthy();
   });
 
+  test('an export file without a usable date is listed without one', async () => {
+    await onXiaomi({ contacts: null, denied: ['contacts'],
+      exports: { contacts: [{ ...vcf('stary.vcf', 5, ''), mtime: null }] } });
+    const radio = within(screen.getByRole('radiogroup')).getByRole('radio');
+    expect(radio.closest('label')!.textContent).toContain('stary.vcf');
+    expect(radio.closest('label')!.textContent).not.toMatch(/1970|Invalid/);  // nie data z null (epoka)
+  });
+
   test('no export file: the row stays unavailable and the notice says how to make one', async () => {
     await onXiaomi({ contacts: null, denied: ['contacts'] });
     const box = screen.getByRole('checkbox', { name: /Kontakty/ }) as HTMLInputElement;

@@ -516,3 +516,15 @@ def test_inventory_view_lists_denied_and_export_candidates():
         "mtime": datetime.fromtimestamp(stamp).isoformat(timespec="seconds"), "count": 3}]}
     assert inventory_view(
         Inventory(1, 1, 0, 0, 1, [], {}, [], [], None, None, 0), "pl")["exports"] == {}
+
+
+@pytest.mark.parametrize("stamp", [-1, -62_135_596_801, 10**18])
+def test_inventory_view_export_mtime_out_of_range_is_none(stamp):
+    """P3: ujemny albo ogromny mtime z telefonu nie wywraca widoku inwentarza."""
+    from admenot.app.present import inventory_view
+    from admenot.engine.transfer.exports import ExportFile
+    from admenot.engine.transfer.inventory import Inventory
+
+    inv = Inventory(None, 5, 0, 0, 7, [], {}, [], [], None, None, 0,
+                    exports={"sms": [ExportFile("/sdcard/sms.xml", 10, stamp, "sms", 1)]})
+    assert inventory_view(inv, "pl")["exports"]["sms"][0]["mtime"] is None

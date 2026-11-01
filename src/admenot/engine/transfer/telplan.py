@@ -358,7 +358,8 @@ def build_tel_plan(adb: AdbTransport, copy: CopyDir, meta: CopyMeta, kinds: set[
             existing["calls"] = len(calls) - len(kept)
             calls = kept
     if "mms" in kinds and src.mms is not None:
-        mms = read_mms_xml(src.mms, copy.phone_dir / "mms_parts")
+        # MMS z eksportu SB&R (ten sam plik co SMS) mają załączniki w base64, bez `mms_parts`
+        mms = read_mms_xml(src.mms, None if src.mms == src.sms else copy.phone_dir / "mms_parts")
         have = _mms_keys_from_phone(adb, bool(mms))
         readable["mms"] = have is not None
         if have:

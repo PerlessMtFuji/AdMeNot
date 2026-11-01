@@ -459,6 +459,50 @@ def test_export_sms_source_ignores_stale_mms(tmp_path):
     assert "mms" not in r.kinds and "mms" not in r.safety
 
 
+def test_mms_inside_chosen_sbr_export_are_restored(tmp_path):
+    """P1: wybrany eksport SB&R (`sms.xml`) ma też `<mms>` z załącznikiem w base64 — liczone w kopii,
+    więc muszą też trafić na nowy telefon (czytane z tego samego pliku, bez `mms_parts`)."""
+    import base64
+
+    copy = _copy(tmp_path)
+    meta = copy.read_meta()
+    sel = {**meta.selection, "exports": [{"kind": "sms", "remote": "/sdcard/SMSBackupRestore/sms.xml",
+                                          "size": 1, "mtime": 1}]}
+    copy.write_meta(dataclasses.replace(meta, selection=sel))
+    data = base64.b64encode(IMG).decode()
+    (copy.phone_dir / "sms.xml").write_text(
+        "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>\n"
+        '<smses count="2" backup_set="x" backup_date="1700000300000" type="full">\n'
+        '  <sms protocol="0" address="+48600100200" date="1700000000000" type="1" subject="null" '
+        'body="Cześć, wyślę zdjęcie" toa="null" sc_toa="null" service_center="null" read="1" status="-1" '
+        'locked="0" date_sent="1700000000000" sub_id="1" readable_date="14 lis 2023" contact_name="Jan" />\n'
+        '  <mms date="1700000100000" ct_t="application/vnd.wap.multipart.related" msg_box="1" rr="null" '
+        'sub="null" read_status="null" address="+48600100200" m_id="null" read="1" m_size="2100" m_type="132" '
+        'sim_slot="0" readable_date="14 lis 2023" contact_name="Jan">\n'
+        '    <parts>\n'
+        '      <part seq="-1" ct="application/smil" name="null" chset="null" cd="null" fn="null" cid="&lt;smil&gt;" '
+        'cl="smil.xml" ctt_s="null" ctt_t="null" text="&lt;smil&gt;&lt;/smil&gt;" />\n'
+        f'      <part seq="0" ct="image/jpeg" name="IMG_1.jpg" chset="null" cd="null" fn="null" cid="&lt;0&gt;" '
+        f'cl="IMG_1.jpg" ctt_s="null" ctt_t="null" text="null" data="{data}" />\n'
+        '    </parts>\n'
+        '    <addrs>\n'
+        '      <addr address="+48600100200" type="137" charset="106" />\n'
+        '      <addr address="insert-address-token" type="151" charset="106" />\n'
+        '    </addrs>\n'
+        '  </mms>\n'
+        '</smses>\n', encoding="utf-8")
+    phone = _new(tmp_path)
+    images: list[bytes] = []
+
+    def keep_image(plan):
+        images.extend(p.file.read_bytes() for r in plan.mms for p in r.parts if p.file is not None)
+
+    r = Run(phone, copy)(after_plan=keep_image)
+    assert len(phone.providers["sms"]) == 1 and len(phone.providers["mms"]) == 1
+    assert r.kinds["mms"].written == 1 and r.kinds["mms"].path == AP
+    assert images == [IMG]
+
+
 def test_helper_error_moves_to_next_route_then_file(tmp_path):
     """R15: `ERR` po 3 próbach `app_process` -> aplikacja pomocnicza (rola SMS) -> po 3 próbach plik."""
     copy, phone = _copy(tmp_path), _new(tmp_path)

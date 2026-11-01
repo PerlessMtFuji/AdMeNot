@@ -942,6 +942,32 @@ def test_backup_export_disconnect_during_pull_retries(tmp_path):
     assert _parts(copy) == []
 
 
+def test_backup_resume_redoes_category_from_another_source(tmp_path):
+    """P2: wznowienie z innym źródłem kategorii zakończonej `ok` kopiuje ją od nowa — inny plik eksportu,
+    ten sam plik zmieniony (rozmiar/mtime), provider zamiast pliku i odwrotnie."""
+    phone = _phone(tmp_path)
+    first = _put(phone, f"{EXPORT_DIR}/kontakty.vcf", VCF3)
+    copy = _copy()
+    inv = _inventory(phone)
+    res = _run(phone, copy, inv, _sel(contacts=True, categories=frozenset(), exports=(first,)))
+    assert res.telephony["contacts"] == CategoryResult("ok", 3, None, "export")
+    vcf2 = "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Inna\r\nEND:VCARD\r\n"
+    other = _put(phone, f"{EXPORT_DIR}/inne.vcf", vcf2)
+    res = _run(phone, copy, inv, _sel(contacts=True, categories=frozenset(), exports=(other,)))
+    assert res.telephony["contacts"] == CategoryResult("ok", 1, None, "export")
+    assert (copy.phone_dir / "contacts.vcf").read_bytes() == vcf2.encode("utf-8")
+    changed = _put(phone, f"{EXPORT_DIR}/inne.vcf", VCF3)  # ten sam plik, nowa treść
+    assert changed.size != other.size
+    res = _run(phone, copy, inv, _sel(contacts=True, categories=frozenset(), exports=(changed,)))
+    assert res.telephony["contacts"] == CategoryResult("ok", 3, None, "export")
+    res = _run(phone, copy, inv, _sel(contacts=True, categories=frozenset()))  # teraz z providera
+    assert res.telephony["contacts"].source == "phone"
+    pulled = phone.pulled.count(changed.remote)
+    res = _run(phone, copy, inv, _sel(contacts=True, categories=frozenset(), exports=(changed,)))
+    assert res.telephony["contacts"] == CategoryResult("ok", 3, None, "export")  # i z powrotem z pliku
+    assert phone.pulled.count(changed.remote) == pulled + 1
+
+
 def test_backup_resume_reuses_export(tmp_path):
     phone = _denied_phone(tmp_path)
     choice = _put(phone, f"{EXPORT_DIR}/kontakty.vcf", VCF3)
@@ -954,3 +980,18 @@ def test_backup_resume_reuses_export(tmp_path):
     assert second.status == "complete"
     assert phone.pulled.count(choice.remote) == 1
     assert second.telephony["contacts"] == CategoryResult("ok", 3, None, "export")
+
+
+def test_pull_chunks_measure_paths_like_the_windows_command_line():
+    """Paczka `pull` liczona jak `_cmd_batches`: emoji to dwie jednostki UTF-16, więc ścieżki, które
+    według `len()` mieszczą się w limicie, w linii poleceń Windows by go przekroczyły."""
+    from admenot.engine.transfer.state import FileRow
+
+    name = "\U0001f600" * 90  # 90 znaków, 180 jednostek UTF-16
+    rows = [FileRow(f"/sdcard/DCIM/{name}{i:03d}.jpg", "sdcard", 1, 0, f"DCIM/{name}{i:03d}.jpg", False,
+                    "pending", 0) for i in range(150)]
+    assert sum(len(r.remote) + 3 for r in rows) < backup_mod.CMD_MAX_CHARS
+    chunks = backup_mod._chunks(rows)
+    assert len(chunks) > 1
+    for chunk in chunks:
+        assert sum(backup_mod._host_len(r.remote) + 3 for r in chunk) <= backup_mod.CMD_MAX_CHARS

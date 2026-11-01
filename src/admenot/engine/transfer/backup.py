@@ -248,16 +248,30 @@ class _Backup:
 
     # ---- telefonia ----------------------------------------------------------------------
     def _telephony(self, state: State) -> dict[str, CategoryResult]:
-        """Kategorie zakończone `ok` w poprzednim przebiegu nie są eksportowane ponownie."""
+        """Kategorie zakończone `ok` w poprzednim przebiegu nie są eksportowane ponownie — chyba że
+        wznowienie wybrało inne źródło (provider zamiast pliku eksportu albo odwrotnie, albo inny plik
+        eksportu: ścieżka, rozmiar lub mtime z meta `telephony_exports`)."""
         exports = {c.kind: c for c in self.sel.exports if getattr(self.sel, c.kind)}
-        # MMS z providera pomijamy, gdy SMS idzie z pliku (załączników w pliku nie ma)
+        # MMS z providera pomijamy, gdy SMS idzie z pliku (MMS z eksportu są w tym samym pliku)
         wanted = [k for k in TELEPHONY if getattr(self.sel, k) and not (k == "mms" and "sms" in exports)]
         saved = {k: CategoryResult(**v) for k, v in state.get_meta("telephony", {}).items()}
-        todo = [k for k in wanted if k not in saved or saved[k].status != "ok"]
+        files: dict[str, list[Any]] = dict(state.get_meta("telephony_exports", {}))
+
+        def same_source(kind: str) -> bool:
+            choice = exports.get(kind)
+            if choice is None:
+                return saved[kind].source == "phone"
+            return saved[kind].source == "export" and files.get(kind) == [choice.remote, choice.size, choice.mtime]
+
+        todo = [k for k in wanted if k not in saved or saved[k].status != "ok" or not same_source(k)]
         for kind in (k for k in todo if k in exports):
             self._progress("telephony")
-            saved[kind] = self._copy_export(exports[kind])
+            choice = exports[kind]
+            saved[kind] = self._copy_export(choice)
             state.set_meta("telephony", {k: asdict(v) for k, v in saved.items()})
+            # po wyniku: przerwanie między zapisami zostawia stary plik w meta, więc następny raz powtórzy
+            files[kind] = [choice.remote, choice.size, choice.mtime]
+            state.set_meta("telephony_exports", files)
         todo = [k for k in todo if k not in exports]
         if todo:
             self._progress("telephony")
@@ -704,7 +718,7 @@ def _chunks(pend: list[FileRow]) -> list[list[FileRow]]:
             cur, cur_key, cur_bytes, cur_chars = [], None, 0, 0
             continue
         key = (f.remote.rsplit("/", 1)[0], f.local_rel.rsplit("/", 1)[0] if "/" in f.local_rel else "")
-        chars = len(f.remote) + 3
+        chars = _host_len(f.remote) + 3  # jak `_cmd_batches`: jednostki UTF-16 i ukośniki Windows
         if cur and (key != cur_key or len(cur) >= CHUNK_MAX_FILES or cur_bytes + f.size > CHUNK_MAX_BYTES
                     or cur_chars + chars > CMD_MAX_CHARS):
             chunks.append(cur)

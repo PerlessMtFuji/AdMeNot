@@ -461,13 +461,14 @@ export interface InventoryApp {
 /** Rodzaj pliku eksportu: wizytówki .vcf, SMS Backup & Restore (`<smses>`, `<calls>`). */
 export type ExportKind = 'contacts' | 'sms' | 'calls';
 
-/** Plik eksportu znaleziony na telefonie (z `present.inventory_view`). `mtime`: czas lokalny ISO, sekundy;
+/** Plik eksportu znaleziony na telefonie (z `present.inventory_view`). `mtime`: czas lokalny ISO, sekundy
+ *  (null — telefon podał czas spoza zakresu dat, np. ujemny);
  *  `count`: null, gdy plik jest większy niż odczytany nagłówek (liczba będzie znana po pobraniu). */
 export interface ExportFileView {
   remote: string;
   name: string;
   size: number;
-  mtime: string;
+  mtime: string | null;
   count: number | null;
 }
 
