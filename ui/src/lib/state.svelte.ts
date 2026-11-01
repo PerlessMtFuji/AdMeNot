@@ -68,7 +68,7 @@ export interface TransferState {
 export class AppState {
   phase = $state<Phase>('connect');
   screen = $state<Screen>('main');
-  settings = $state<Settings>({ lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system', mirror_auto: false,
+  settings = $state<Settings>({ lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, report_pdf_dir: null, theme: 'system', mirror_auto: false,
     apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false, select_level: 'silence', retention_days: 60,
     check_updates: true, dismissed_update: null, last_run_version: null,
     welcome_version: 1, welcome_current: 1, telemetry: false, telemetry_packages: false, telemetry_id: null,

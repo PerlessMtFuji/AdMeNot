@@ -2248,6 +2248,7 @@ class Api:
             opened = None
         return {"order": number, "html": str(files.html),
                 "pdf": str(files.pdf) if files.pdf else None,
+                "pdf_target": str(files.pdf_target) if files.pdf_target else None,
                 "error": files.pdf_error, "opened": opened}
 
     @_api

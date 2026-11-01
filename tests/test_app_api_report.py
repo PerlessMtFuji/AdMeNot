@@ -43,10 +43,36 @@ def test_report_writes_pdf_and_opens_it(edge, tmp_path):
     reports = tmp_path / "data" / "AdMeNot" / "reports"
     stem = number.replace("/", "-")
     assert r == {"order": number, "html": str(reports / f"{stem}.html"),
-                 "pdf": str(reports / f"{stem}.pdf"), "error": None,
-                 "opened": str(reports / f"{stem}.pdf")}
+                 "pdf": str(reports / f"{stem}.pdf"), "pdf_target": str(reports / f"{stem}.pdf"),
+                 "error": None, "opened": str(reports / f"{stem}.pdf")}
     assert opened == [reports / f"{stem}.pdf"] and len(edge) == 1
     assert "Anna" in (reports / f"{stem}.html").read_text("utf-8")
+
+
+def test_pdf_goes_to_the_chosen_folder_and_survives_order_deletion(edge, tmp_path):
+    api, _, number, opened = _executed()
+    archive = tmp_path / "archiwum" / "protokoly"
+    api.save_settings({"report_pdf_dir": str(archive)})
+    stem = number.replace("/", "-")
+    r = api.report(number)
+    reports = tmp_path / "data" / "AdMeNot" / "reports"
+    assert r["pdf"] == r["pdf_target"] == str(archive / f"{stem}.pdf")
+    assert r["html"] == str(reports / f"{stem}.html")  # HTML roboczy zostaje w danych programu
+    assert opened == [archive / f"{stem}.pdf"]
+    assert api.delete_order(number) == {"deleted": number}
+    assert (archive / f"{stem}.pdf").is_file()  # archiwum serwisu: program go nie sprząta
+    assert not (reports / f"{stem}.html").exists()
+
+
+def test_unreachable_pdf_folder_falls_back_to_html(edge, tmp_path):
+    api, _, number, opened = _executed()
+    blocker = tmp_path / "plik"
+    blocker.write_text("x", "utf-8")  # folder pod plikiem: mkdir zawsze się nie uda
+    api.save_settings({"report_pdf_dir": str(blocker / "pdf")})
+    r = api.report(number)
+    assert r["pdf"] is None and r["error"] == "folder" and r["opened"] == r["html"]
+    assert r["pdf_target"] == str(blocker / "pdf" / f"{number.replace('/', '-')}.pdf")
+    assert edge == []
 
 
 def test_pdf_failure_opens_the_html(monkeypatch):

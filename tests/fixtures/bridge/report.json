@@ -2146,6 +2146,7 @@
     "order": "ZS/2026/0926/01",
     "html": "<tmp>\\data\\AdMeNot\\reports\\ZS-2026-0926-01.html",
     "pdf": "<tmp>\\data\\AdMeNot\\reports\\ZS-2026-0926-01.pdf",
+    "pdf_target": "<tmp>\\data\\AdMeNot\\reports\\ZS-2026-0926-01.pdf",
     "error": null,
     "opened": "<tmp>\\data\\AdMeNot\\reports\\ZS-2026-0926-01.pdf"
    },
@@ -2160,6 +2161,7 @@
     "order": "ZS/2026/0926/01",
     "html": "<tmp>\\data\\AdMeNot\\reports\\ZS-2026-0926-01.html",
     "pdf": null,
+    "pdf_target": "<tmp>\\data\\AdMeNot\\reports\\ZS-2026-0926-01.pdf",
     "error": "locked",
     "opened": "<tmp>\\data\\AdMeNot\\reports\\ZS-2026-0926-01.html"
    },

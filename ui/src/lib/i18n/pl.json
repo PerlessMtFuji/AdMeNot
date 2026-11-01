@@ -292,7 +292,7 @@
     "title": "Historia zleceń", "phone": "Telefon",
     "tabs": "Widok historii", "tab_orders": "Naprawy", "tab_copies": "Kopie danych ({n})", "empty": "Brak zleceń dla tego telefonu.", "none": "Brak zapisanych zleceń.",
     "restore": "Przywróć", "undo_all": "Cofnij całe zlecenie", "resume": "Dokończ",
-    "delete": "Usuń zlecenie", "delete_title": "Usunąć zlecenie {number}?", "delete_text": "Znikną kroki, zrzuty ekranu, protokół i kopie APK tego zlecenia. Zmian na telefonie nie będzie już można cofnąć w AdMeNot.", "delete_confirm": "Usuń",
+    "delete": "Usuń zlecenie", "delete_title": "Usunąć zlecenie {number}?", "delete_text": "Znikną kroki, zrzuty ekranu, protokół i kopie APK tego zlecenia. Zmian na telefonie nie będzie już można cofnąć w AdMeNot.", "delete_pdf_kept": "PDF protokołu w folderze {dir} zostaje — usuń go sam, jeśli trzeba.", "delete_confirm": "Usuń",
     "admin_note": "Cofnięcie nie przywraca uprawnień administratora urządzenia.", "undo_errors": "Nie wszystko udało się cofnąć:",
     "banner": "Zlecenie z {when} nie zostało dokończone",
     "banner_detail": "{name} — wykonano {done} z {total} kroków.",
@@ -358,7 +358,7 @@
     "appearance": "Wygląd", "theme": "Motyw", "theme_system": "System", "theme_light": "Jasny", "theme_dark": "Ciemny", "paths": "Programy i katalogi",
     "title": "Ustawienia", "lang": "Język", "mode": "Tryb domyślny", "mode_simple": "Prosty", "mode_expert": "Ekspercki",
     "adb": "Ścieżka do adb.exe", "adb_hint": "Puste = adb dołączony do programu (a bez niego adb z PATH)", "check": "Sprawdź", "adb_ok": "Działa: {version}", "adb_fail": "Nie działa: {message}",
-    "backups": "Katalog kopii APK", "backups_hint": "Puste = domyślny katalog w %LOCALAPPDATA%\\AdMeNot", "choose": "Wybierz…",
+    "backups": "Katalog kopii APK", "backups_hint": "Puste = domyślny katalog w %LOCALAPPDATA%\\AdMeNot", "report_pdf": "Folder protokołów PDF", "report_pdf_hint": "Puste = katalog programu. PDF-y w wybranym folderze zostają po usunięciu zlecenia.", "choose": "Wybierz…",
     "select_title": "Wybór aplikacji",
     "select_level": "Akcja po zaznaczeniu",
     "select_level_hint": "Dotyczy aplikacji, dla których program nic nie proponuje (np. „Do sprawdzenia”). Aplikacji producenta nie usuwamy domyślnie — dostaną „Wyłącz”.",
@@ -474,7 +474,8 @@
     "pdf_no_browser": "Nie znaleziono przeglądarki Microsoft Edge, która tworzy PDF. Otwarto protokół HTML — wydrukuj go do PDF: {html}",
     "pdf_timeout": "Tworzenie PDF trwało zbyt długo. Otwarto protokół HTML: {html}",
     "pdf_failed": "Nie udało się utworzyć PDF. Otwarto protokół HTML: {html}",
-    "pdf_locked": "Plik {pdf} jest otwarty w innym programie — zamknij go i spróbuj ponownie. Otwarto protokół HTML: {html}"
+    "pdf_locked": "Plik {pdf} jest otwarty w innym programie — zamknij go i spróbuj ponownie. Otwarto protokół HTML: {html}",
+    "pdf_folder": "Nie da się zapisać w folderze {dir} — sprawdź folder protokołów w Ustawieniach. Otwarto protokół HTML: {html}"
   },
   "transfer": {
     "stage": {

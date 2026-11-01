@@ -26,12 +26,19 @@ test('settings: theme, language, mode, adb check, folder and save', async () => 
   await fireEvent.click(screen.getByRole('button', { name: 'Sprawdź' }));
   expect(await screen.findByText(/Działa: Android Debug Bridge/)).toBeTruthy();
   expect(bridge.calls.at(-1)).toEqual({ method: 'check_adb', args: ['C:\\pt\\adb.exe'] });
-  await fireEvent.click(screen.getByRole('button', { name: 'Wybierz…' }));
+  const [chooseBackups, choosePdf] = screen.getAllByRole('button', { name: 'Wybierz…' });
+  await fireEvent.click(chooseBackups);
   await vi.waitFor(() => expect((screen.getByLabelText('Katalog kopii APK') as HTMLInputElement).value)
     .toBe('D:\\AdMeNot\\kopie'));
   await fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
   expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings',
-    args: [{ adb_path: 'C:\\pt\\adb.exe', backups_dir: 'D:\\AdMeNot\\kopie' }] });
+    args: [{ adb_path: 'C:\\pt\\adb.exe', backups_dir: 'D:\\AdMeNot\\kopie', report_pdf_dir: null }] });
+  await fireEvent.click(choosePdf);
+  await vi.waitFor(() => expect((screen.getByLabelText('Folder protokołów PDF') as HTMLInputElement).value)
+    .toBe('D:\\AdMeNot\\kopie'));
+  await fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
+  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings',
+    args: [{ adb_path: 'C:\\pt\\adb.exe', backups_dir: 'D:\\AdMeNot\\kopie', report_pdf_dir: 'D:\\AdMeNot\\kopie' }] });
   expect(await screen.findByText(/Zapisano/)).toBeTruthy();
   await fireEvent.click(screen.getByRole('button', { name: 'English' }));
   await vi.waitFor(() => expect(i18n.lang).toBe('en'));

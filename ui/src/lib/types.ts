@@ -15,6 +15,8 @@ export interface Settings {
   mode: Mode;
   adb_path: string | null;
   backups_dir: string | null;
+  /** Folder na PDF protokołów (archiwum serwisu); null = katalog programu. */
+  report_pdf_dir: string | null;
   theme: Theme;
   mirror_auto: boolean;
   apk_cache_limit_gb: number;
@@ -393,7 +395,9 @@ export interface ReportResult {
   order: string;
   html: string;
   pdf: string | null;
-  error: 'no_browser' | 'timeout' | 'failed' | 'locked' | null;
+  /** Gdzie miał trafić PDF (folder z ustawień albo domyślny), także po błędzie; starsze mosty go nie wysyłają. */
+  pdf_target?: string | null;
+  error: 'no_browser' | 'timeout' | 'failed' | 'locked' | 'folder' | null;
   opened: string | null; // null: zapisany, ale Windows nie ma programu, który go otworzy
 }
 

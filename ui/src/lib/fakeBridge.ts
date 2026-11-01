@@ -90,7 +90,7 @@ export function createFakeBridge(name: string,
   }
   const target = new EventTarget();
   const calls: FakeBridge['calls'] = [];
-  let settings: Settings = { lang: options.lang ?? 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system', mirror_auto: false,
+  let settings: Settings = { lang: options.lang ?? 'pl', mode: 'simple', adb_path: null, backups_dir: null, report_pdf_dir: null, theme: 'system', mirror_auto: false,
     apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false, select_level: 'silence', retention_days: 60,
     check_updates: true, dismissed_update: null, last_run_version: null,
     welcome_version: options.welcome ? null : 1, welcome_current: 1, telemetry: false, telemetry_packages: false,

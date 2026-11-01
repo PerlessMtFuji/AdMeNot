@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { getContext } from 'svelte';
   import { slide } from 'svelte/transition';
+  import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
   import { groupHistory, historyApp, type HistoryAppRow, initial, orderCounts } from '../lib/logic';
   import { DUR, ms } from '../lib/motion';
@@ -19,6 +21,9 @@
     onopenSite: (actionId: number) => void; ondelete: () => void };
   let { order, scanned = [], disabled, openDisabled, onrestore, onrestoreStep, onundoAll, onopenSite, ondelete }: Props = $props();
   let confirming = $state(false);
+  // Folder PDF z ustawień to archiwum serwisu: usunięcie zlecenia go nie sprząta (report/files.py).
+  const ctl = getContext<Controller | undefined>('ctl');
+  const pdfDir = $derived(ctl?.state.settings.report_pdf_dir ?? null);
   let open = $state<string[]>([]);
   let shotsOpen = $state(false);
   const rows = $derived(groupHistory(order.actions));
@@ -117,6 +122,7 @@
 {#if confirming}
   <Dialog title={t('history.delete_title', { number: order.number })} oncancel={() => (confirming = false)}>
     {t('history.delete_text')}
+    {#if pdfDir}<p class="mt-2">{t('history.delete_pdf_kept', { dir: pdfDir })}</p>{/if}
     {#snippet actions()}
       <Button onclick={() => (confirming = false)}>{t('common.cancel')}</Button>
       <Button variant="danger" onclick={() => { confirming = false; ondelete(); }}>{t('history.delete_confirm')}</Button>
