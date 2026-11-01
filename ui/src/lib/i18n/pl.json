@@ -683,6 +683,7 @@
     "finish": "Zakończ",
     "copies_title": "Kopie danych na komputerze",
     "copies_sub": "Ze wszystkich telefonów. Każda kopia znika po 7 dniach, chyba że ją przedłużysz.",
+    "note": { "label": "Notatka serwisanta", "add": "Dodaj notatkę", "edit": "Edytuj", "placeholder": "Np. czego klient potrzebuje, co sprawdzić przy wgrywaniu…" },
     "contents": {
       "contacts": "Kontakty", "sms": "SMS", "mms": "MMS", "calls": "Połączenia", "files": "Pliki",
       "files_photos": "Zdjęcia", "files_videos": "Filmy", "files_downloads": "Pobrane",

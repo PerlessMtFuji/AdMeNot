@@ -1840,7 +1840,9 @@ class Api:
                     chosen: Selection) -> tuple[BackupResult, store.CopyDir]:
         copy = store.find_resumable(device.serial) or store.create_copy(
             device.serial, device, client, self._now())
-        puller = self._puller_factory(self._settings.adb_path, device.serial, adb.tagged("pull"))
+        # Id kopii od razu: serwisant może dopisać notatkę jeszcze w czasie kopiowania.
+        self._emit("transfer:copy", {"copy": self._copy_view(copy.read_meta())})
+        puller =self._puller_factory(self._settings.adb_path, device.serial, adb.tagged("pull"))
         progress, wait_device = self._transfer_events(job, raw, "transfer:progress")
         # Surowy transport (z logiem sesji), nie `ReadOnlyAdb`: silnik opakowuje go sam.
         result = run_backup(adb, puller, device, copy, inventory, chosen, on_progress=progress,
@@ -2075,6 +2077,19 @@ class Api:
         try:
             meta = store.extend(copy_id)
         except OSError:  # meta.json zablokowany przez inny program; ścieżka nie idzie do raportu
+            raise AppError("transfer_in_use") from None
+        return {"copy": self._copy_view(meta)}
+
+    @_api
+    def set_transfer_note(self, copy_id: str, note: str | None) -> dict[str, Any]:
+        """Notatka serwisanta do kopii — w Historii i w czasie kopiowania (`transfer:copy` daje id)."""
+        if not isinstance(copy_id, str):
+            raise AppError("bad_request", "copy_id")
+        if note is not None and (not isinstance(note, str) or len(note.strip()) > store.NOTE_MAX):
+            raise AppError("bad_request", "note")
+        try:
+            meta = store.set_note(copy_id, note)
+        except OSError:  # note.txt zablokowany przez inny program; ścieżka nie idzie do raportu
             raise AppError("transfer_in_use") from None
         return {"copy": self._copy_view(meta)}
 

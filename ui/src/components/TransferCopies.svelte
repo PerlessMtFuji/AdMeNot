@@ -6,6 +6,7 @@
   import { enter, stagger } from '../lib/motion';
   import type { CopyView } from '../lib/types';
   import Button from '../ui/Button.svelte';
+  import CopyNote from './CopyNote.svelte';
   import Dialog from '../ui/Dialog.svelte';
   import Icon from '../ui/Icon.svelte';
   import Pill from '../ui/Pill.svelte';
@@ -61,6 +62,7 @@
           {/if}
           {#if serials(c, true)}<div class="text-sm text-soft">{t('transfer.restore.uploaded_to', { list: serials(c, true) })}</div>{/if}
           {#if serials(c, false)}<div class="text-sm text-warn">{t('transfer.restore.interrupted_on', { list: serials(c, false) })}</div>{/if}
+          <CopyNote copy={c} />
         </div>
         {#if finished(c)}
           <Button variant="secondary" size="sm" disabled={!phoneReady} onclick={() => ctl.planRestore(c.id)}>

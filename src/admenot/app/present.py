@@ -495,6 +495,7 @@ def copy_view(meta: CopyMeta, now: datetime, restoring: str | None = None) -> di
             "expires": meta.expires.isoformat(timespec="seconds"),
             "days_left": max(0, math.ceil(left / 86_400)), "status": meta.status,
             "bytes": meta.bytes, "counts": dict(meta.counts), "selection": dict(meta.selection),
+            "note": copy.read_note(),
             "restores": [{"serial": r.serial,
                           "status": "stopped" if r.status == "running" and restoring != meta.id else r.status,
                           "updated": r.updated, "resumable": r.resumable} for r in restores]}

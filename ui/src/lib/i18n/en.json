@@ -683,6 +683,7 @@
     "finish": "Finish",
     "copies_title": "Data copies on this computer",
     "copies_sub": "From all phones. Each copy is deleted after 7 days unless you extend it.",
+    "note": { "label": "Technician's note", "add": "Add a note", "edit": "Edit", "placeholder": "E.g. what the customer needs, what to check when restoring…" },
     "contents": {
       "contacts": "Contacts", "sms": "SMS", "mms": "MMS", "calls": "Calls", "files": "Files",
       "files_photos": "Photos", "files_videos": "Videos", "files_downloads": "Downloads",

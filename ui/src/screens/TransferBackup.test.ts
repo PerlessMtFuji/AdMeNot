@@ -23,6 +23,15 @@ async function show(phase: 'transfer_backup' | 'transfer_done' = 'transfer_backu
 }
 
 describe('TransferBackup', () => {
+  test('a note can be written while copying, once the bridge announces the copy', async () => {
+    const { bridge } = await show();
+    expect(screen.queryByRole('button', { name: 'Dodaj notatkę' })).toBeNull();
+    bridge.emit('transfer:copy', { copy: { ...COPY, status: 'in_progress', note: 'Z poprzedniej próby' } });
+    await tick();
+    expect(screen.getByRole('region', { name: 'Notatka serwisanta' })).toBeTruthy();
+    expect(screen.getByTestId('copy-note').textContent).toBe('Z poprzedniej próby');
+  });
+
   test('progress shows files, size, stage and the current file', async () => {
     const { bridge } = await show();
     bridge.emit('transfer:progress', { stage: 'files', done_files: 3, total_files: 10, done_bytes: 30, total_bytes: 100,

@@ -148,6 +148,32 @@ def test_extend_transfer(tmp_path):
     assert api.extend_transfer("../x")["error"]["key"] == "bad_request"
 
 
+def test_transfer_note(tmp_path):
+    copy = store.create_copy(SERIAL, _device(), None, NOW)
+    api, _ = _api(_phone(tmp_path))
+    copy_id = copy.read_meta().id
+    assert api.transfers()["copies"][0]["note"] is None
+    view = api.set_transfer_note(copy_id, "  Klient chce tylko zdjęcia z 2025.\nTelefon z pękniętą szybką.  ")
+    assert view["copy"]["note"] == "Klient chce tylko zdjęcia z 2025.\nTelefon z pękniętą szybką."
+    assert api.transfers()["copies"][0]["note"] == view["copy"]["note"]
+    copy.write_meta(copy.read_meta())  # kopia w toku przepisuje meta.json — notatka zostaje
+    assert api.transfers()["copies"][0]["note"] == view["copy"]["note"]
+    assert api.set_transfer_note(copy_id, "")["copy"]["note"] is None
+    assert not (copy.path / store.NOTE).exists()
+    assert api.set_transfer_note(copy_id, "x" * (store.NOTE_MAX + 1))["error"]["key"] == "bad_request"
+    assert api.set_transfer_note(copy_id, 5)["error"]["key"] == "bad_request"
+    assert api.set_transfer_note("../x", "a")["error"]["key"] == "bad_request"
+
+
+def test_backup_announces_its_copy_before_copying(tmp_path):
+    api, rec, _ = _inventoried(tmp_path)
+    api.start_backup(SELECTION)
+    announced = rec.of("transfer:copy")[0]["copy"]
+    assert announced["status"] == "in_progress"
+    assert announced["id"] == rec.of("transfer:done")[0]["copy"]["id"]
+    assert rec.names().index("transfer:copy") < rec.names().index("transfer:progress")
+
+
 def test_delete_transfer(tmp_path):
     copy = store.create_copy(SERIAL, _device(), None, NOW)
     api, _ = _api(_phone(tmp_path))

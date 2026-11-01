@@ -713,6 +713,7 @@ export class Controller {
       s.transfer.waiting = false;
     });
     on('transfer:waiting', () => { s.transfer.waiting = true; });
+    on('transfer:copy', (d) => { s.transfer.copy = d.copy; });
     on('transfer:done', (d) => {
       s.transfer.result = d.result;
       s.transfer.copy = d.copy;
@@ -865,13 +866,15 @@ export class Controller {
     s.error = null;
     // Plik eksportu tylko dla zaznaczonego wiersza (most odrzuca plik przy wyłączonej fladze).
     const exports = Object.fromEntries(Object.entries(sel.exports ?? {}).filter(([k]) => sel[k as ExportKind]));
+    // Przed wywołaniem: `transfer:copy` z wątku kopii może przyjść, zanim wróci odpowiedź.
+    s.transfer.copy = null;
     const r = await this.call(this.api.start_backup({
       contacts: sel.contacts, sms: sel.sms, mms: sel.mms && !exports.sms, calls: sel.calls,
       categories: [...sel.categories], others: [...sel.others], apps: [...sel.apps],
       ...(Object.keys(exports).length ? { exports } : {}),
     }));
     if (!r) return;
-    Object.assign(s.transfer, { progress: null, waiting: false, result: null, copy: null });
+    Object.assign(s.transfer, { progress: null, waiting: false, result: null });
     s.stopping = false;
     s.phase = 'transfer_backup';
     this.setJob(r.job_id, 'backup');
@@ -1015,6 +1018,16 @@ export class Controller {
   async extendTransfer(id: string): Promise<void> {
     const r = await this.call(this.api.extend_transfer(id));
     if (r) this.state.transfer.copies = this.state.transfer.copies.map((c) => (c.id === id ? r.copy : c));
+  }
+
+  /** Zapis notatki do kopii; `true` po udanym zapisie (pole edycji się zamyka). */
+  async setTransferNote(id: string, note: string | null): Promise<boolean> {
+    const r = await this.call(this.api.set_transfer_note(id, note));
+    if (!r) return false;
+    const tr = this.state.transfer;
+    tr.copies = tr.copies.map((c) => (c.id === id ? r.copy : c));
+    if (tr.copy?.id === id) tr.copy = r.copy;
+    return true;
   }
 
   async deleteTransfer(id: string): Promise<void> {

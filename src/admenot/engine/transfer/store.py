@@ -28,6 +28,10 @@ if TYPE_CHECKING:
 KEEP_DAYS = 7
 META = "meta.json"
 VERDICTS = "verdicts.json"
+# Notatka serwisanta poza `meta.json`: kopia w toku przepisuje meta (liczniki, status) i nie może
+# nadpisać notatki dopisanej w tym czasie.
+NOTE = "note.txt"
+NOTE_MAX = 2000  # znaków
 _STAMP_FORMAT = "%Y%m%d-%H%M%S"
 _STAMP = re.compile(r"[0-9]{8}-[0-9]{6}")
 _SAFE_PART = re.compile(r"[A-Za-z0-9_-]+")
@@ -82,6 +86,23 @@ class CopyDir:
     @property
     def meta_path(self) -> Path:
         return self.path / META
+
+    def read_note(self) -> str | None:
+        """Notatka serwisanta; brak pliku albo nieczytelny plik → None (widok kopii się nie psuje)."""
+        try:
+            return (self.path / NOTE).read_text(encoding="utf-8").strip() or None
+        except (OSError, UnicodeDecodeError):
+            return None
+
+    def write_note(self, text: str | None) -> None:
+        """Atomowo jak `write_meta`; pusta notatka usuwa plik."""
+        path = self.path / NOTE
+        if not text:
+            path.unlink(missing_ok=True)
+            return
+        tmp = path.with_name(NOTE + ".tmp")
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, path)
 
     @property
     def state_path(self) -> Path:
@@ -224,6 +245,21 @@ def extend(copy_id: str) -> CopyMeta:
         raise ValueError(f"nieczytelny meta.json kopii: {copy_id!r}") from exc
     meta.expires += timedelta(days=KEEP_DAYS)
     copy.write_meta(meta)
+    meta.id = copy_id
+    return meta
+
+
+def set_note(copy_id: str, text: str | None) -> CopyMeta:
+    """Notatka serwisanta do kopii (także w toku). Za długa → ValueError."""
+    text = (text or "").strip()
+    if len(text) > NOTE_MAX:
+        raise ValueError(f"notatka dłuższa niż {NOTE_MAX} znaków")
+    copy = _resolve(copy_id)
+    try:
+        meta = copy.read_meta()
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise ValueError(f"nieczytelny meta.json kopii: {copy_id!r}") from exc
+    copy.write_note(text or None)
     meta.id = copy_id
     return meta
 

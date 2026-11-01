@@ -535,6 +535,8 @@ export interface CopyView {
   status: 'in_progress' | 'complete' | 'incomplete';
   bytes: number;
   counts: Record<string, number>;
+  /** Notatka serwisanta (`set_transfer_note`); starsze mosty jej nie wysyłają. */
+  note?: string | null;
   /** Wybór zapisany w kopii (pusty, gdy kopia jeszcze nie ruszyła); wznowienie zaczyna od niego. */
   selection?: StoredSelection;
   /** Wgrywania tej kopii na nowe telefony, najnowsze pierwsze; starsze mosty ich nie wysyłają. */
@@ -816,6 +818,8 @@ export interface Api {
   start_backup(selection: TransferSelection): R<{ job_id: string }>;
   transfers(): R<{ copies: CopyView[] }>;
   extend_transfer(copyId: string): R<{ copy: CopyView }>;
+  /** Pusta albo null usuwa notatkę; za długa (>2000 znaków): `bad_request`. */
+  set_transfer_note(copyId: string, note: string | null): R<{ copy: CopyView }>;
   delete_transfer(copyId: string): R<{ deleted: string }>;
   restore_plan(copyId: string, serial: string): R<{ job_id: string }>;
   start_restore(choice: UploadChoiceView): R<{ job_id: string }>;
@@ -863,6 +867,8 @@ export interface EventMap {
   'transfer:inventory': { inventory: InventoryView; resumable: CopyView | null; client: string | null };
   'transfer:progress': TransferProgress;
   'transfer:waiting': Record<string, never>;
+  /** Kopia założona albo wznowiona — zaraz po starcie, przed pierwszym `transfer:progress`. */
+  'transfer:copy': { copy: CopyView };
   'transfer:done': { result: BackupResultView; copy: CopyView };
   'transfer:restore_plan': { plan: RestorePlanView; tel: TelPlanView | null; copy: CopyView; resumable: boolean;
     same_phone_recent: boolean };

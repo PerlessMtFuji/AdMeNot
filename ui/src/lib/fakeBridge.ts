@@ -151,6 +151,12 @@ export function createFakeBridge(name: string,
         Object.assign(copy, { expires, days_left: copy.days_left + 7 });
         return { copy: structuredClone(copy) };
       }
+      case 'set_transfer_note': {
+        const copy = copies.find((c) => c.id === args[0]);
+        if (!copy) return { error: { key: 'bad_request', message: 'copy_id' } };
+        copy.note = typeof args[1] === 'string' && args[1].trim() ? args[1].trim() : null;
+        return { copy: structuredClone(copy) };
+      }
       case 'delete_transfer':
         copies = copies.filter((c) => c.id !== args[0]);
         return { deleted: String(args[0]) };

@@ -56,6 +56,23 @@ describe('TransferCopies', () => {
       'Aplikacje 14']);
   });
 
+  test('a note can be added, edited and cleared', async () => {
+    const env = await show([{ ...COPY, note: null }], null);
+    env.bridge.setCopies([{ ...COPY, note: null }]);
+    await fireEvent.click(screen.getByRole('button', { name: 'Dodaj notatkę' }));
+    const area = screen.getByRole('textbox', { name: 'Notatka serwisanta' });
+    await fireEvent.input(area, { target: { value: '  Tylko zdjęcia z 2025.  ' } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
+    await vi.waitFor(() => expect(screen.getByTestId('copy-note').textContent).toBe('Tylko zdjęcia z 2025.'));
+    expect(env.s.transfer.copies[0].note).toBe('Tylko zdjęcia z 2025.');
+    await fireEvent.click(screen.getByRole('button', { name: 'Edytuj' }));
+    await fireEvent.input(screen.getByRole('textbox', { name: 'Notatka serwisanta' }), { target: { value: ' ' } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Dodaj notatkę' })).toBeTruthy());
+    expect(env.bridge.calls.filter((c) => c.method === 'set_transfer_note').map((c) => c.args))
+      .toEqual([['OLD/1', 'Tylko zdjęcia z 2025.'], ['OLD/1', null]]);
+  });
+
   test('an older copy without per-kind file counts shows the file total', async () => {
     await show([{ ...COPY, counts: { contacts: 5, files: 120 } }], null);
     expect(items()).toEqual(['Kontakty 5', 'Pliki 120']);

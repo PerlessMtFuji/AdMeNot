@@ -1,5 +1,6 @@
 <script lang="ts">
   import { getContext } from 'svelte';
+  import CopyNote from '../components/CopyNote.svelte';
   import DeviceCard from '../components/DeviceCard.svelte';
   import type { Controller } from '../lib/controller';
   import { i18n, t, tp } from '../lib/i18n/index.svelte';
@@ -81,6 +82,7 @@
           {#if p?.current}<div class="mono truncate text-xs text-soft" title={p.current}>{p.current}</div>{/if}
         </div>
       </Card>
+      {@render note()}
       <div>
         <Button disabled={s.stopping || s.job?.kind !== 'backup'} onclick={() => ctl.stopBackup()}>
           {s.stopping ? t('transfer.stopping') : t('transfer.stop')}
@@ -126,10 +128,20 @@
           </div>
         </dl>
       </Card>
+      {@render note()}
       {#if tr.copy}<p class="text-sm text-mut">{tp('transfer.expires', tr.copy.days_left)}</p>{/if}
       <div><Button variant="primary" onclick={() => ctl.leaveTransfer()}>{t('transfer.finish')}</Button></div>
     {/if}
   </main>
+
+  {#snippet note()}
+    {#if tr.copy}
+      <section aria-label={t('transfer.note.label')} class="rounded-2xl card px-5 py-3">
+        <span class="lbl">{t('transfer.note.label')}</span>
+        <CopyNote copy={tr.copy} />
+      </section>
+    {/if}
+  {/snippet}
 
   <SidePanel label={t('phone.subject')}>
     <DeviceCard compact name={name} serial={s.device?.serial ?? s.serial ?? ''} imei={s.device?.imei ?? entry?.imei} image={s.device?.image ?? null}
