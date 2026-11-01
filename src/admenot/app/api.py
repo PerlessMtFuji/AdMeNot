@@ -162,6 +162,7 @@ from admenot.engine.transfer.restore import (
     RestoreResult,
     UploadChoice,
     run_restore,
+    settle_finished,
 )
 from admenot.engine.transfer.restore_plan import UPLOAD_GROUPS, RestorePlan, build_plan
 from admenot.engine.transfer.restore_state import RestoreState, read_restores, restore_state_path
@@ -1917,6 +1918,8 @@ class Api:
             # zapis przez `TelephonyWriteAdb` dopiero przy wgrywaniu.
             tel_plan = build_tel_plan(TelPlanReadAdb(adb), copy, meta, set(TEL_PLAN_KINDS))
             job.check()
+            # przerwane wgrywanie, w którym telefon ma już wszystko: zamykamy stan, żeby Banner wznowienia zniknął
+            settle_finished(copy, device.serial, plan, tel_plan)
             return device, plan, tel_plan
 
         return {"job_id": self._jobs.start("restore_plan", run)}

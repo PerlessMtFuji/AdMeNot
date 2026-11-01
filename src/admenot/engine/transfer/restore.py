@@ -51,14 +51,16 @@ from .restore_plan import (
     Action,
     PlanFile,
     RestorePlan,
+    _apk_selected,
     read_space,
     resolve_conflicts,
     same_file,
     stat_all,
 )
-from .restore_state import RestoreRow, RestoreState, is_own, restore_state_path
+from .restore_state import RestoreRow, RestoreState, is_own, read_restores, restore_state_path
 from .store import CopyDir
 from .telephony import _CONNECTION_KINDS
+from .telplan import TelPlan
 
 MiB = 1024 ** 2
 SMALL_MAX = 16 * MiB  # mniejsze pliki idą równolegle
@@ -559,6 +561,50 @@ def _mark(state: RestoreState, status: str) -> None:
     """Meta `status` i `updated` (ISO-8601 UTC) — dla widoku kopii i Bannera wznowienia."""
     state.set_meta("status", status)
     state.set_meta("updated", datetime.now(UTC).isoformat(timespec="seconds"))
+
+
+def _tel_to_write(tel_plan: TelPlan, kinds: frozenset[str]) -> int:
+    wanted = kinds | ({"mms"} if "sms" in kinds else set())
+    count = {"contacts": len(tel_plan.contacts.write) if tel_plan.contacts is not None else 0,
+             "sms": len(tel_plan.sms), "mms": len(tel_plan.mms), "calls": len(tel_plan.calls)}
+    return sum(n for k, n in count.items() if k in wanted)
+
+
+def settle_finished(copy: CopyDir, serial: str, plan: RestorePlan, tel_plan: TelPlan) -> bool:
+    """Wznowienie, w którym według świeżego planu nie ma już nic do zrobienia (program zamknięty w trakcie
+    zapisu, a telefon ma wszystko), zamyka stan jako zakończony — inaczej Banner wznowienia zostaje na zawsze,
+    bo start jest wyłączony. Wiersze plików w toku kończą jako `done` (są na telefonie); rekordy telefonii,
+    które telefon ma, nie mają wpisu w kolejce, więc wystarczy wyzerować `tel_left`. Zwraca, czy stan zamknięto."""
+    mine = next((r for r in read_restores(copy) if r.serial == serial), None)
+    if mine is None or not mine.resumable:
+        return False
+    state = RestoreState(restore_state_path(copy, serial))
+    try:
+        saved = state.get_meta("choice")
+        try:
+            choice = UploadChoice.from_json(saved) if isinstance(saved, dict) else None
+        except (KeyError, TypeError):
+            choice = None
+        groups = {f.group for f in plan.files} if choice is None else choice.groups
+        apks_on = set() if choice is None else set(choice.apks_on)
+        kinds = TEL_KINDS if choice is None else choice.tel
+        if _tel_to_write(tel_plan, kinds) or any(
+                f.group in groups and f.action != "exists" and _apk_selected(f.apk, apks_on) for f in plan.files):
+            return False
+        planned = {f.remote for f in plan.files}
+        present = {f.remote for f in plan.files if f.action == "exists"}
+        for row in [*state.by_status("pending"), *state.by_status("pushing")]:
+            if row.remote in present:
+                state.update(row.remote, status="done", error=None)
+            else:
+                state.update(row.remote, status="skipped", error="unselected" if row.remote in planned else "missing")
+        state.commit()
+        state.set_meta("tel_left", 0)
+        rows = state.all_files().values()
+        _mark(state, "incomplete" if any(r.status in ("denied", "error") for r in rows) else "complete")
+        return True
+    finally:
+        state.close()
 
 
 def _has(text: str, needles: tuple[str, ...]) -> bool:

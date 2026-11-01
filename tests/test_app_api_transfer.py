@@ -1091,6 +1091,61 @@ def test_files_only_restore_done_has_no_tel_error(tmp_path):
     assert done["tel"] is None and done["tel_error"] is None
 
 
+def _kill_mid_write(copy: store.CopyDir, serial: str = NEW) -> None:
+    """Jak po twardym zamknięciu programu w trakcie zapisu: przebieg `running`, rekordy telefonii w kolejce."""
+    from admenot.engine.transfer.restore_state import RestoreState, restore_state_path
+
+    state = RestoreState(restore_state_path(copy, serial))
+    try:
+        state.set_meta("status", "running")
+        state.set_meta("tel_left", 5)
+        pushed = next(iter(state.all_files()))
+        state.update(pushed, status="pushing")
+        state.commit()
+    finally:
+        state.close()
+
+
+def test_resume_banner_closes_when_phone_already_has_everything(tmp_path, no_tap_wait):
+    from admenot.engine.transfer.restore_state import (
+        RestoreState,
+        read_restores,
+        restore_state_path,
+    )
+
+    api, rec, _host, copy_id = _tel_copied(tmp_path)
+    _planned(api, rec, copy_id)
+    api.start_restore({**CHOICE, "tel": ["sms", "calls"]})
+    copy = store.CopyDir(store.transfers_dir() / copy_id)
+    _kill_mid_write(copy)
+    assert read_restores(copy)[0].resumable is True
+    event = _planned(api, rec, copy_id)  # plan wznowienia: telefon ma już wszystko
+    assert event["resumable"] is False
+    (entry,) = read_restores(copy)
+    assert (entry.status, entry.resumable) == ("complete", False)
+    assert entry.updated is not None
+    state = RestoreState(restore_state_path(copy, NEW))
+    try:
+        assert state.get_meta("tel_left") == 0
+        assert not state.by_status("pushing") and not state.by_status("pending")
+    finally:
+        state.close()
+    assert [e["copy"]["restores"][0]["resumable"] for e in rec.of("transfer:restore_plan")[-1:]] == [False]
+
+
+def test_resume_banner_stays_when_records_are_still_missing(tmp_path, no_tap_wait):
+    from admenot.engine.transfer.restore_state import read_restores
+
+    api, rec, host, copy_id = _tel_copied(tmp_path)
+    _planned(api, rec, copy_id)
+    api.start_restore({**CHOICE, "tel": ["sms", "calls"]})
+    copy = store.CopyDir(store.transfers_dir() / copy_id)
+    _kill_mid_write(copy)
+    host.phone(NEW).storage.providers["sms"] = []  # SMS zniknęły z telefonu: jest co dopisać
+    event = _planned(api, rec, copy_id)
+    assert event["resumable"] is True and read_restores(copy)[0].resumable is True
+
+
 def test_tel_choice_keeps_resume_banner_between_files_and_tel(tmp_path, no_tap_wait, monkeypatch):
     """Program zamknięty po plikach, a przed telefonią: stan i tak daje Banner wznowienia."""
     from admenot.app import api as api_mod
