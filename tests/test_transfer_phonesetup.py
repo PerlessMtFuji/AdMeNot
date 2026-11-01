@@ -220,6 +220,37 @@ def test_appop_prev_not_overwritten_on_resume(tmp_path):
     assert phone.appop == "default"
 
 
+def test_refused_appop_set_leaves_nothing_to_restore(tmp_path):
+    """Telefon nie przyjął `appops set … allow`: tryb nadal jest poprzedni, więc nie ma czego odwracać
+    (sprzątanie, które ponawiałoby tę samą odmowę, nigdy by się nie udało)."""
+    phone, copy, state, adb = _setup(tmp_path, appop="ignore", appop_refused={"allow", "ignore"})
+    set_appop_allow(adb, state)
+    assert phone.appop == "ignore"
+    assert device_changes(state).appop_prev is None
+    assert pending_cleanup([copy], "NEW") == []
+
+
+def test_restore_appop_already_back_is_restored_without_set(tmp_path):
+    """Zapisany poprzedni tryb, a telefon już go ma (np. `set` wcześniej odmówiony albo przywrócony
+    ręcznie): sprzątanie uznaje appop za przywrócone bez `appops set`, którego telefon by odmówił."""
+    phone, copy, state, adb = _setup(tmp_path, appop="ignore", appop_refused={"ignore"})
+    phonesetup._update(state, appop_prev="ignore")
+    res = cleanup(adb, state, lambda r: None, _never)
+    assert res.ok and res.appop_ok
+    assert not any(c.startswith("appops set") for c in phone.commands)
+    assert device_changes(state) == DeviceChanges()
+    assert pending_cleanup([copy], "NEW") == []
+
+
+def test_restore_appop_refused_set_keeps_change_pending(tmp_path):
+    phone, _, state, adb = _setup(tmp_path, appop="default")
+    set_appop_allow(adb, state)
+    assert phone.appop == "allow" and device_changes(state).appop_prev == "default"
+    phone.appop_refused = {"default"}
+    assert not cleanup(adb, state, lambda r: None, _never).appop_ok
+    assert device_changes(state).appop_prev == "default"
+
+
 def test_install_blocked_reports_blocked(tmp_path):
     phone, _, state, adb = _setup(tmp_path, install_blocked=True)
     assert install_companion(adb, state) == "blocked"

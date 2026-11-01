@@ -52,7 +52,8 @@ Telefonia nowego telefonu (Etap 3), w pamięci:
   telefon przechodzi w `offline` w środku paczki (zapisane wiersze zostają, linie wyjścia giną:
   `AdbError("offline")`).
 * `appops get/set com.android.shell WRITE_SMS`: `appop` (`None` = brak wpisu: `No operations.`
-  i `Default mode: <appop_default>`, bez tej linii, gdy `appop_default is None`).
+  i `Default mode: <appop_default>`, bez tej linii, gdy `appop_default is None`); `appop_refused`:
+  tryby, których `appops set` nie ustawia (tryb zostaje, wyjście z komunikatem o odmowie).
 * rola SMS: `role_holders`, `dumpsys role` w formacie OPPO; `cmd role add-role-holder` /
   `remove-role-holder`. `role_needs_tap`: nadanie roli pomocnikowi nic nie zmienia, test „stuka”
   przez `tap_role(pkg)`; `role_restore_needs_tap`: to samo dla oddania roli innej aplikacji i zdjęcia
@@ -146,6 +147,7 @@ class FakeStoragePhone:
         self.records_written = 0
         self.appop: str | None = "default"
         self.appop_default: str | None = "ignore"
+        self.appop_refused: set[str] = set()  # tryby, których `appops set` nie zmienia (odmowa telefonu)
         self.role_holders: list[str] = []
         self.role_needs_tap = False
         self.role_restore_needs_tap = False
@@ -423,6 +425,8 @@ class FakeStoragePhone:
             return f"No operations.\n{default}".encode()
         if head == ["appops", "set"]:
             assert argv[2:4] == ["com.android.shell", "WRITE_SMS"] and len(argv) == 5, argv
+            if argv[4] in self.appop_refused:
+                return b"Security exception: shell cannot change WRITE_SMS\n"
             self.appop = argv[4]
             return b""
         if head == ["cmd", "role"]:

@@ -13,6 +13,7 @@ zapisanemu poprzedniemu posiadaczowi.
 
 from __future__ import annotations
 
+import contextlib
 import re
 import time
 from collections.abc import Callable
@@ -159,13 +160,28 @@ def _uninstall_companion(adb: AdbTransport) -> bool:
 # --------------------------------------------------------------------------------------
 def set_appop_allow(adb: AdbTransport, state: RestoreState) -> None:
     """`WRITE_SMS` shell na `allow` (droga `app_process` dla SMS/MMS); poprzedni tryb zapisany przed
-    zmianą. Przy wznowieniu zapisany tryb zostaje (odczyt pokazywałby już nasze `allow`)."""
-    if device_changes(state).appop_prev is None:
+    zmianą. Przy wznowieniu zapisany tryb zostaje (odczyt pokazywałby już nasze `allow`). Odczyt po
+    `set`: gdy tryb nadal jest poprzedni (telefon odmówił), nie ma czego odwracać — zapis znika od razu."""
+    prev = device_changes(state).appop_prev
+    if prev is None:
         prev = read_appop(adb)
         if prev not in _APPOP_MODES:
             raise AdbError("command_failed", f"unexpected appop mode: {prev[:40]}")
         _update(state, appop_prev=prev)
-    adb.shell("appops set com.android.shell WRITE_SMS allow")
+    try:
+        adb.shell("appops set com.android.shell WRITE_SMS allow")
+    except AdbError as exc:
+        if not _connection(exc):
+            with contextlib.suppress(AdbError):
+                _forget_unchanged_appop(adb, state, prev)
+        raise
+    _forget_unchanged_appop(adb, state, prev)
+
+
+def _forget_unchanged_appop(adb: AdbTransport, state: RestoreState, prev: str) -> None:
+    """Tryb na telefonie równy zapisanemu poprzedniemu: nic do przywrócenia, `appop_prev` czyszczone."""
+    if read_appop(adb) == prev:
+        _update(state, appop_prev=None)
 
 
 def install_companion(adb: AdbTransport, state: RestoreState) -> Literal["ok", "blocked"]:
@@ -275,9 +291,11 @@ def _restore_appop(adb: AdbTransport, state: RestoreState) -> bool:
     if prev not in _APPOP_MODES:
         return False
     try:
-        adb.shell(f"appops set com.android.shell WRITE_SMS {prev}")
+        # Tryb już jest poprzedni (np. `set … allow` telefon odmówił): bez `set`, którego by znów odmówił.
         if read_appop(adb) != prev:
-            return False
+            adb.shell(f"appops set com.android.shell WRITE_SMS {prev}")
+            if read_appop(adb) != prev:
+                return False
     except AdbError:
         return False
     _update(state, appop_prev=None)
