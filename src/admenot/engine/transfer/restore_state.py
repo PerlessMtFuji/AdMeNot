@@ -181,6 +181,17 @@ def device_changes_pending(path: Path) -> bool:
     return found is not None and changes_pending(found[0].get("device_changes"))
 
 
+def copy_cleanup_pending(copy: CopyDir) -> bool:
+    """Któryś stan wgrywania tej kopii (dowolny telefon) ma zmiany telefonu do odwrócenia — kopii nie
+    wolno usunąć, bo zapis tych zmian jest tylko w niej (bez niego sprzątanie przy podłączeniu nie
+    wie, co przywrócić). Także stan bez `serial`/`status`, którego widok kopii nie pokazuje."""
+    try:
+        paths = sorted((copy.path / "restore").glob("*.sqlite"))
+    except OSError:
+        return False
+    return any(device_changes_pending(p) for p in paths)
+
+
 def _summary(path: Path) -> RestoreSummary | None:
     found = _read(path)
     if found is None:

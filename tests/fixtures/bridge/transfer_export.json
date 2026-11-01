@@ -1336,7 +1336,8 @@
          }
         ]
        },
-       "restores": []
+       "restores": [],
+       "cleanup_pending": false
       }
      }
     ],
@@ -1408,7 +1409,8 @@
         }
        ]
       },
-      "restores": []
+      "restores": [],
+      "cleanup_pending": false
      }
     ]
    },

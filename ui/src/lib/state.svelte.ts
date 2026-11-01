@@ -42,6 +42,8 @@ export interface RestoreState {
 
 /** Przywracanie ustawień telefonu po przerwanym wgrywaniu (`phone_cleanup`): `ok` — wynik ostatniej próby. */
 export interface CleanupState {
+  /** Telefon, którego dotyczy sprzątanie (`transfer:cleanup_started`); null — żadnego. */
+  serial: string | null;
   running: boolean;
   ok: boolean | null;
 }
@@ -180,7 +182,7 @@ export class AppState {
   fatalCrash = $state<string | null>(null);
   transfer = $state<TransferState>({ inventory: null, resumable: null, selection: { ...EMPTY_TRANSFER_SELECTION },
     progress: null, waiting: false, result: null, copy: null, copies: [], restore: emptyRestore(),
-    cleanup: { running: false, ok: null } });
+    cleanup: { serial: null, running: false, ok: null } });
 
   get orderRunning(): boolean {
     return this.job !== null && ORDER_KINDS.includes(this.job.kind);

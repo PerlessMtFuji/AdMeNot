@@ -136,6 +136,26 @@ def test_purge_skips_copy_in_use():
     assert used.path.exists() and not other.path.exists()
 
 
+def test_purge_keeps_copy_with_phone_changes_to_undo():
+    """Stan wgrywania z `device_changes` (także bez `serial`/`status`): zapis zmian nowego telefonu
+    jest tylko w kopii, więc kopia po terminie zostaje; po sprzątaniu znika jak inne."""
+    from admenot.engine.transfer.restore_state import RestoreState, restore_state_path
+
+    expired = _copy(now=NOW - timedelta(days=8))
+    expired_id = expired.read_meta().id
+    state = RestoreState(restore_state_path(expired, "NEW"))
+    state.set_meta("device_changes", {"appop_prev": "ignore", "role_prev": None, "companion": False,
+                                      "helper_dir": False})
+    state.close()  # otwarty plik na Windows sam blokowałby usunięcie
+    assert store.purge_expired(NOW, lambda serial: False, lambda copy_id: False) == []
+    assert expired.path.exists()
+    state = RestoreState(restore_state_path(expired, "NEW"))
+    state.set_meta("device_changes", {"appop_prev": None, "role_prev": None, "companion": False,
+                                      "helper_dir": False})
+    state.close()
+    assert store.purge_expired(NOW, lambda serial: False, lambda copy_id: False) == [expired_id]
+
+
 def test_copy_dir_resolves_id_only():
     copy = _copy()
     assert store.copy_dir(copy.read_meta().id).path == copy.path.resolve()

@@ -710,6 +710,7 @@
       "to_phone": "Wgraj na podłączony telefon",
       "uploaded_to": "wgrano na: {list}",
       "interrupted_on": "wgrywanie przerwane: {list}",
+      "cleanup_pending": "Nowy telefon czeka na przywrócenie ustawień — podłącz go, zanim usuniesz tę kopię",
       "planning": "Sprawdzam nowy telefon…",
       "planning_sub": "Liczę wolne miejsce i sprawdzam, które pliki już na nim są. Jeszcze niczego nie wgrywam.",
       "title": "Co wgrać na nowy telefon?",
@@ -936,7 +937,8 @@
     "transfer_in_use": "Plik tej kopii jest otwarty w innym programie (np. w Eksploratorze albo w przeglądarce zdjęć). Zamknij go i spróbuj ponownie.",
     "transfer_phone_full": "Na nowym telefonie skończyło się miejsce. Zwolnij miejsce albo odznacz część danych i wybierz „Wgraj” — wgrane pliki zostaną.",
     "transfer_copy_missing": "Tej kopii nie ma już na komputerze (została usunięta albo przeniesiona).",
-    "transfer_no_plan": "Telefonu z ekranu wgrywania nie ma już przy komputerze. Podłącz go i wybierz kopię jeszcze raz."
+    "transfer_no_plan": "Telefonu z ekranu wgrywania nie ma już przy komputerze. Podłącz go i wybierz kopię jeszcze raz.",
+    "transfer_cleanup_pending": "Tej kopii nie można jeszcze usunąć: nowy telefon nie wrócił do swoich ustawień po przerwanym wgrywaniu. Najpierw podłącz ten telefon, żeby AdMeNot cofnął swoje zmiany."
 
   }
 }

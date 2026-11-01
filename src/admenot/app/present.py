@@ -53,7 +53,7 @@ from admenot.engine.transfer.backup import BackupResult
 from admenot.engine.transfer.inventory import FILE_CATEGORIES, Inventory
 from admenot.engine.transfer.restore import RestoreResult
 from admenot.engine.transfer.restore_plan import UPLOAD_GROUPS, GroupTotals, RestorePlan
-from admenot.engine.transfer.restore_state import read_restores
+from admenot.engine.transfer.restore_state import copy_cleanup_pending, read_restores
 from admenot.engine.transfer.restore_tel import TelResult
 from admenot.engine.transfer.store import CopyDir, CopyMeta
 from admenot.engine.transfer.telplan import TelPlan
@@ -478,9 +478,12 @@ def copy_view(meta: CopyMeta, now: datetime, restoring: str | None = None) -> di
     wgrywania tej kopii na nowe telefony (stany z `<kopia>/restore/`, najnowsze pierwsze) — „wgrano
     na …” i Banner wznowienia wgrywania (`resumable`: ta sama reguła co w `transfer:restore_plan`).
     `restoring`: id kopii, którą właśnie wgrywa zadanie `restore`; stan `running` bez takiego
-    zadania został po twardym zamknięciu programu — pokazujemy go jako `stopped`."""
+    zadania został po twardym zamknięciu programu — pokazujemy go jako `stopped`. `cleanup_pending`:
+    w kopii jest zapis zmian nowego telefonu do odwrócenia — kopii nie da się usunąć, dopóki telefon
+    nie zostanie podłączony (Historia pokazuje ostrzeżenie)."""
     left = (meta.expires - now).total_seconds()
-    restores = read_restores(CopyDir(transfers_dir() / meta.id))
+    copy = CopyDir(transfers_dir() / meta.id)
+    restores = read_restores(copy)
     return {"id": meta.id, "serial": meta.serial, "model": meta.model, "manufacturer": meta.manufacturer,
             "client": meta.client, "created": meta.created.isoformat(timespec="seconds"),
             "expires": meta.expires.isoformat(timespec="seconds"),
@@ -488,7 +491,8 @@ def copy_view(meta: CopyMeta, now: datetime, restoring: str | None = None) -> di
             "bytes": meta.bytes, "counts": dict(meta.counts), "selection": dict(meta.selection),
             "restores": [{"serial": r.serial,
                           "status": "stopped" if r.status == "running" and restoring != meta.id else r.status,
-                          "updated": r.updated, "resumable": r.resumable} for r in restores]}
+                          "updated": r.updated, "resumable": r.resumable} for r in restores],
+            "cleanup_pending": copy_cleanup_pending(copy)}
 
 
 def backup_result_view(r: BackupResult) -> dict[str, Any]:

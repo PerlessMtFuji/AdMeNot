@@ -11,7 +11,7 @@ describe('Connect', () => {
     const env = await setupCtl('clean');
     env.s.devices = [{ serial: 'R58T00TEST', state: 'device', model: 'SM_A145R', name: null, imei: null }];
     env.s.serial = 'R58T00TEST';
-    env.s.transfer.cleanup = { running: true, ok: null };
+    env.s.transfer.cleanup = { serial: 'R58T00TEST', running: true, ok: null };
     render(Connect, { context: new Map([['ctl', env.ctl]]) });
     await tick();
     expect(screen.getByText('Przywracam ustawienia telefonu po przerwanym wgrywaniu…')).toBeTruthy();
@@ -21,11 +21,14 @@ describe('Connect', () => {
     await tick();
     expect(screen.getByText('Na telefonie: wybierz Wiadomości Samsung jako domyślną aplikację SMS')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Pomiń/ })).toBeNull();
-    env.bridge.emit('transfer:cleanup_done', { ok: false });
-    env.bridge.emit('transfer:cleanup_done', { ok: false });
+    env.bridge.emit('transfer:cleanup_done', { ok: false, serial: 'R58T00TEST' });
+    env.bridge.emit('transfer:cleanup_started', { serial: 'R58T00TEST' });  // ponowienie w tle
     await tick();
     expect(screen.getAllByText('Telefon nie wrócił do swoich ustawień')).toHaveLength(1);
-    expect(screen.queryByText(/Przywracam ustawienia/)).toBeNull();
+    expect(screen.queryByText(/Przywracam ustawienia/)).toBeNull();  // bez migania na żółto
+    env.bridge.emit('transfer:cleanup_done', { ok: false, serial: 'R58T00TEST' });
+    await tick();
+    expect(screen.getAllByText('Telefon nie wrócił do swoich ustawień')).toHaveLength(1);
     expect((screen.getByRole('button', { name: 'Skanuj' }) as HTMLButtonElement).disabled).toBe(false);
   });
 

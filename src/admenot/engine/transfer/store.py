@@ -252,11 +252,16 @@ def copy_dir(copy_id: str) -> CopyDir:
 def purge_expired(now: datetime, busy: Callable[[str], bool], busy_copy: Callable[[str], bool]) -> list[str]:
     """Usuwa kopie po terminie. Kopia, której telefon jest zajęty (`busy(serial)`), kopia właśnie
     używana (`busy_copy(id)`, np. wgrywana na nowy telefon) i kopia z nieczytelnym `meta.json`
-    zostają: nie kasujemy tego, czego nie umiemy rozpoznać."""
+    zostają: nie kasujemy tego, czego nie umiemy rozpoznać. Zostaje też kopia ze zmianami nowego
+    telefonu do odwrócenia (`device_changes` w stanie wgrywania): tylko tam jest ich zapis."""
+    from .restore_state import copy_cleanup_pending  # restore_state importuje ten moduł
+
     removed: list[str] = []
     for copy in _copy_dirs():
         meta = _readable(copy)
         if meta is None or meta.expires > now or busy(meta.serial) or busy_copy(meta.id):
+            continue
+        if copy_cleanup_pending(copy):
             continue
         try:
             delete(meta.id)

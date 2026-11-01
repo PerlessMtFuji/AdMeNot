@@ -903,7 +903,7 @@ def test_connect_runs_cleanup_before_scan(tmp_path, no_tap_wait):
     new.on_shell = on_shell
     assert api.list_devices()["error"] is None  # telefon na liście: sprzątanie startuje samo
     assert [(e["key"], e["message"]) for e in during] == [("busy", "phone_cleanup")] * 2
-    assert rec.of("transfer:cleanup_done") == [{"ok": True}]
+    assert rec.of("transfer:cleanup_done") == [{"ok": True, "serial": NEW}]
     assert new.role_holders == [PREV] and new.installed == set()
     state = RestoreState(restore_state_path(copy, NEW))
     try:
@@ -931,7 +931,7 @@ def test_connect_cleanup_waits_for_tap_and_refuses_skip(tmp_path, no_tap_wait):
     api.list_devices()
     assert answers == ["restore_required"]
     assert rec.of("transfer:tap")[0] == {"request": "sms_role_restore", "package": PREV}
-    assert rec.of("transfer:cleanup_done") == [{"ok": True}] and new.installed == set()
+    assert rec.of("transfer:cleanup_done") == [{"ok": True, "serial": NEW}] and new.installed == set()
 
 
 def test_tel_telemetry_has_no_names_or_numbers(tmp_path, no_tap_wait):
@@ -956,6 +956,30 @@ def test_tel_telemetry_has_no_names_or_numbers(tmp_path, no_tap_wait):
 # --- sprzątanie przy podłączeniu: poprawki (przegląd zadania 8, runda 1) ----------------------------
 
 
+def test_copy_with_pending_phone_changes_is_not_deleted(tmp_path, no_tap_wait):
+    """Zapis zmian nowego telefonu jest tylko w kopii: ani „Usuń”, ani termin 7 dni jej nie usuwa,
+    dopóki sprzątanie po podłączeniu telefonu ich nie odwróci."""
+    api, rec, host, copy_id = _tel_copied(tmp_path)
+    copy, new = _leftover_changes(host, copy_id)
+    meta = copy.read_meta()
+    meta.expires = NOW - timedelta(days=1)
+    copy.write_meta(meta)
+    (view,) = api.transfers()["copies"]  # `transfers` najpierw usuwa kopie po terminie
+    assert view["cleanup_pending"] is True and copy.path.exists()
+    assert api.delete_transfer(copy_id)["error"]["key"] == "transfer_cleanup_pending"
+    api._purge_transfers()
+    assert copy.path.exists()
+    api.list_devices()  # telefon podłączony: sprzątanie odwraca zmiany
+    assert rec.of("transfer:cleanup_done")[-1]["ok"] is True and new.role_holders == [PREV]
+    api._purge_transfers()
+    assert not copy.path.exists()
+
+
+def test_copy_view_cleanup_pending_false_without_changes(tmp_path):
+    api, _rec, _host, _copy_id = _copied(tmp_path)
+    assert api.transfers()["copies"][0]["cleanup_pending"] is False
+
+
 @pytest.mark.parametrize("call", ["start_scan", "transfer_inventory", "restore_plan"])
 def test_entry_point_runs_cleanup_missed_while_another_job_ran(tmp_path, no_tap_wait, call):
     """Telefon podłączony w trakcie innego zadania (lista telefonów nie mogła wtedy wystartować
@@ -970,7 +994,7 @@ def test_entry_point_runs_cleanup_missed_while_another_job_ran(tmp_path, no_tap_
 
     err = go()["error"]
     assert (err["key"], err["message"]) == ("busy", "phone_cleanup")
-    assert rec.of("transfer:cleanup_done") == [{"ok": True}] and new.role_holders == [PREV]
+    assert rec.of("transfer:cleanup_done") == [{"ok": True, "serial": NEW}] and new.role_holders == [PREV]
     assert "job_id" in go()
     assert len(rec.of("transfer:cleanup_done")) == 1
 
@@ -992,11 +1016,49 @@ def test_failed_cleanup_is_retried_on_same_connection(tmp_path, no_tap_wait, mon
         return real(*args)
 
     monkeypatch.setattr(api_mod, "cleanup", flaky)
-    for _ in range(4):
+    clock = [0.0]
+    api._clock = lambda: clock[0]
+    for step in (0.0, 5.0, 5.0, 29.0, 1.0, 100.0):  # odczyt listy co chwilę, czas mija między nimi
+        clock[0] += step
         assert api.list_devices()["error"] is None
-    assert len(calls) == 3  # ponowienia w tle; po udanym — już nie
-    assert rec.of("transfer:cleanup_done") == [{"ok": False}, {"ok": False}, {"ok": True}]
+    # ponowienia w tle po 10 s i po 30 s od nieudanej próby, nie co odczyt listy; po udanym — już nie
+    assert len(calls) == 3
+    assert rec.of("transfer:cleanup_done") == [{"ok": False, "serial": NEW}] * 2 + [{"ok": True, "serial": NEW}]
+    assert rec.of("transfer:cleanup_started") == [{"serial": NEW}] * 3
     assert new.role_holders == [PREV]
+
+
+def test_cleanup_gives_up_after_three_tries_until_reconnect(tmp_path, no_tap_wait, monkeypatch):
+    """Sprzątanie, które ciągle się nie udaje: najwyżej 3 próby na podłączenie, potem bez ponowień i bez
+    `busy` dla zadań na tym telefonie (czerwony baner ostrzega); ponowne podłączenie zaczyna od nowa."""
+    from admenot.app import api as api_mod
+    from admenot.engine.transfer.phonesetup import CleanupResult
+
+    api, rec, host, copy_id = _tel_copied(tmp_path)
+    _leftover_changes(host, copy_id)
+    calls = []
+
+    def failing(*args):
+        calls.append(1)
+        return CleanupResult(False, True, False, True)
+
+    monkeypatch.setattr(api_mod, "cleanup", failing)
+    clock = [0.0]
+    api._clock = lambda: clock[0]
+    api.list_devices()
+    err = api.start_scan(NEW)["error"]  # wejście zadania przed limitem: próba od razu, bez odstępu
+    assert (err["key"], err["message"]) == ("busy", "phone_cleanup") and len(calls) == 2
+    for _ in range(5):
+        clock[0] += 60.0
+        api.list_devices()
+    assert len(calls) == 3 and rec.of("transfer:cleanup_done")[-1] == {"ok": False, "serial": NEW}
+    assert "job_id" in api.start_scan(NEW)  # po limicie zadania nie czekają na sprzątanie
+    assert len(calls) == 3
+    host.connected.discard(NEW)
+    api.list_devices()
+    host.connected.add(NEW)
+    api.list_devices()  # ponowne podłączenie: znów automatyczna próba
+    assert len(calls) == 4
 
 
 def test_stopped_cleanup_not_prompted_again_on_same_connection(tmp_path, no_tap_wait, monkeypatch):
@@ -1015,7 +1077,7 @@ def test_stopped_cleanup_not_prompted_again_on_same_connection(tmp_path, no_tap_
     monkeypatch.setattr(api_mod, "cleanup", stopped)
     api.list_devices()
     api.list_devices()
-    assert len(calls) == 1 and rec.of("transfer:cleanup_done") == [{"ok": False}]
+    assert len(calls) == 1 and rec.of("transfer:cleanup_done") == [{"ok": False, "serial": NEW}]
 
 
 def test_cleanup_check_error_logged_once_per_connection(tmp_path, monkeypatch):

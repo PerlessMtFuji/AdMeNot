@@ -165,7 +165,12 @@ from admenot.engine.transfer.restore import (
     settle_finished,
 )
 from admenot.engine.transfer.restore_plan import UPLOAD_GROUPS, RestorePlan, build_plan
-from admenot.engine.transfer.restore_state import RestoreState, read_restores, restore_state_path
+from admenot.engine.transfer.restore_state import (
+    RestoreState,
+    copy_cleanup_pending,
+    read_restores,
+    restore_state_path,
+)
 from admenot.engine.transfer.restore_tel import TelProgress, TelResult, run_tel_restore
 from admenot.engine.transfer.telephony import Stopped as TransferStopped
 from admenot.engine.transfer.telplan import TelPlan, build_tel_plan
@@ -208,6 +213,9 @@ TRANSFER_KINDS = frozenset({"transfer_scan", "backup", "restore_plan", "restore"
 # zadania, które czytają kopię z dysku (sprzątanie: stany wgrywania w katalogach kopii)
 RESTORE_KINDS = frozenset({"restore_plan", "restore", "phone_cleanup"})
 TEL_PLAN_KINDS = frozenset({"contacts", "sms", "mms", "calls"})  # plan telefonii: wszystko, co jest w kopii
+# Odstęp przed kolejnymi automatycznymi próbami sprzątania telefonu (s) w jednym podłączeniu: pierwsza od
+# razu, druga po 10 s, trzecia po 30 s od nieudanej; potem bez ponowień do ponownego podłączenia.
+CLEANUP_BACKOFF = (0.0, 10.0, 30.0)
 SAME_PHONE_RECENT = timedelta(hours=24)  # wgrywanie na telefon, z którego jest świeża kopia: ostrzeżenie
 
 
@@ -442,6 +450,10 @@ class Api:
         self._skip_tap = threading.Event()  # „Pomiń” przy nadaniu roli SMS (`skip_tap`)
         # Telefony sprawdzone pod kątem zmian do odwrócenia w tym podłączeniu (sprzątanie przy podłączeniu).
         self._cleaned: set[str] = set()
+        # Nieudane sprzątanie w tym podłączeniu: telefon → (liczba nieudanych prób, najwcześniej następna
+        # automatyczna próba wg `_clock`). Po `len(CLEANUP_BACKOFF)` próbach koniec ponowień do odłączenia.
+        self._cleanup_tries: dict[str, tuple[int, float]] = {}
+        self._clock = time.monotonic  # podmieniane w testach (odstępy ponowień sprzątania)
         self._check_failed: set[str] = set()  # nieudany odczyt zmian telefonu już zalogowany (to podłączenie)
         # Sprawdzenie i start sprzątania: wątek obserwatora telefonów, `list_devices` i wejścia zadań naraz
         # (RLock: zadanie synchroniczne w testach woła wejścia z wnętrza sprzątania).
@@ -633,6 +645,7 @@ class Api:
         with self._cleanup_lock:
             self._cleaned &= ready  # odłączony: przy następnym podłączeniu sprawdzamy od nowa
             self._check_failed &= ready
+            self._cleanup_tries = {k: v for k, v in self._cleanup_tries.items() if k in ready}
             unchecked = sorted(ready - self._cleaned)
         for serial in unchecked:
             self._cleanup_on_connect(serial)
@@ -667,7 +680,7 @@ class Api:
         if self._jobs.current() is not None:
             return
         try:
-            self._ensure_cleanup(serial)
+            self._ensure_cleanup(serial, auto=True)
         except AppError:  # inne zadanie wystartowało w międzyczasie: spróbujemy przy następnym odczycie
             pass
         except Exception as exc:  # noqa: BLE001 — lista telefonów działa dalej
@@ -677,12 +690,18 @@ class Api:
             if first:  # odczyt co ~2 s: bez tego samego wpisu w logu przy każdym
                 log_exception(exc)
 
-    def _ensure_cleanup(self, serial: str) -> bool:
+    def _ensure_cleanup(self, serial: str, auto: bool = False) -> bool:
         """Sprawdza (raz na podłączenie) zmiany telefonu do odwrócenia i startuje `phone_cleanup`.
         True — sprzątanie wystartowało. Gdy trwa inne zadanie, a zmiany są: `AppError("busy", …)`
-        z JobRunnera i telefon zostaje do sprawdzenia."""
+        z JobRunnera i telefon zostaje do sprawdzenia. Po nieudanym sprzątaniu: najwyżej
+        `len(CLEANUP_BACKOFF)` prób na podłączenie; odczyt listy telefonów (`auto`) czeka odstęp
+        z `CLEANUP_BACKOFF`, wejście zadania nie. Po ostatniej nieudanej próbie nic nie startuje ani nie
+        blokuje zadań na tym telefonie (czerwony baner ostrzega) aż do ponownego podłączenia."""
         with self._cleanup_lock:
             if serial in self._cleaned:
+                return False
+            failed, next_at = self._cleanup_tries.get(serial, (0, 0.0))
+            if failed >= len(CLEANUP_BACKOFF) or (auto and self._clock() < next_at):
                 return False
             copies = []
             for meta in store.list_copies():
@@ -709,6 +728,7 @@ class Api:
     def _phone_cleanup(self, job: Job, serial: str, paths: list[Path]) -> None:
         ok = False
         adb = self._session(serial)
+        self._emit("transfer:cleanup_started", {"serial": serial})
         try:
             with _transfer_errors("phone_cleanup"), device_lock(journal_path(), serial):
                 ok = True
@@ -727,12 +747,18 @@ class Api:
             raise
         finally:
             self._end_tap()
-            if not ok and not job.should_stop():
-                # nieudane (nie zatrzymane przez serwisanta): ponowienie w tle przy następnym odczycie
-                # listy albo wejściu zadania; zatrzymane nie pyta znów w tym podłączeniu
-                with self._cleanup_lock:
+            with self._cleanup_lock:
+                if ok:
+                    self._cleanup_tries.pop(serial, None)
+                elif not job.should_stop():
+                    # nieudane (nie zatrzymane przez serwisanta): ponowienie w tle po odstępie przy odczycie
+                    # listy albo przy wejściu zadania, najwyżej `len(CLEANUP_BACKOFF)` prób na podłączenie;
+                    # zatrzymane nie pyta znów w tym podłączeniu
+                    failed = self._cleanup_tries.get(serial, (0, 0.0))[0] + 1
+                    wait = CLEANUP_BACKOFF[failed] if failed < len(CLEANUP_BACKOFF) else 0.0
+                    self._cleanup_tries[serial] = (failed, self._clock() + wait)
                     self._cleaned.discard(serial)
-            self._emit("transfer:cleanup_done", {"ok": ok})
+            self._emit("transfer:cleanup_done", {"ok": ok, "serial": serial})
 
     def _tap_handler(self, state: RestoreState) -> Callable[[str | None], None]:
         """`on_tap` silnika: zdarzenie `transfer:tap` z prośbą i poprzednią domyślną aplikacją SMS
@@ -1964,6 +1990,7 @@ class Api:
                 self._restore_copy_id = None
                 with self._cleanup_lock:
                     self._cleaned.discard(serial)  # nieudane przywrócenie telefonu: sprzątanie zaraz po zadaniu
+                    self._cleanup_tries.pop(serial, None)  # nowe zmiany telefonu: od nowa pełne ponowienia
             self._emit("transfer:restore_done", {"result": restore_result_view(result), "copy": view,
                                                  "tel": tel_result_view(tel) if tel is not None else None,
                                                  "tel_error": tel_error})
@@ -2053,6 +2080,11 @@ class Api:
         meta = next((m for m in store.list_copies() if m.id == copy_id), None)
         if meta is not None and self._transfer_busy(meta.serial):
             raise AppError("busy", "backup")
+        with contextlib.suppress(ValueError):  # zły identyfikator: odmowę daje `store.delete`
+            if copy_cleanup_pending(store.copy_dir(copy_id)):
+                # zapis zmian nowego telefonu (rola SMS, appop, aplikacja pomocnicza) jest tylko w kopii:
+                # najpierw podłączenie telefonu, żeby program je odwrócił
+                raise AppError("transfer_cleanup_pending")
         try:
             store.delete(copy_id)
         except OSError:  # plik kopii otwarty w innym programie; ścieżka nie idzie do raportu

@@ -534,6 +534,8 @@ export interface CopyView {
   selection?: StoredSelection;
   /** Wgrywania tej kopii na nowe telefony, najnowsze pierwsze; starsze mosty ich nie wysyłają. */
   restores?: CopyRestore[];
+  /** W kopii jest zapis zmian nowego telefonu do odwrócenia: usunąć ją można dopiero po podłączeniu telefonu. */
+  cleanup_pending?: boolean;
 }
 
 /** Stan wgrywania kopii na jeden telefon (`read_restores`). `resumable`: zostały pliki do wgrania. */
@@ -865,8 +867,10 @@ export interface EventMap {
   'transfer:tel_progress': TelProgressView;
   /** `request` null: prośba załatwiona. `package`: poprzednia domyślna aplikacja SMS (null — nieznana). */
   'transfer:tap': { request: TapRequest | null; package: string | null };
-  /** Koniec przywracania ustawień telefonu po przerwanym wgrywaniu; nieudane most ponawia w tle. */
-  'transfer:cleanup_done': { ok: boolean };
+  /** Start przywracania ustawień telefonu `serial` po przerwanym wgrywaniu (także ponowienia w tle). */
+  'transfer:cleanup_started': { serial: string };
+  /** Koniec przywracania ustawień telefonu; nieudane most ponawia w tle (najwyżej 3 próby na podłączenie). */
+  'transfer:cleanup_done': { ok: boolean; serial: string };
   /** `tel`: null dla samych plików albo po błędzie telefonii (`tel_error` — klucz błędu). */
   'transfer:restore_done': { result: RestoreResultView; copy: CopyView; tel?: TelResultView | null; tel_error?: string | null };
 }

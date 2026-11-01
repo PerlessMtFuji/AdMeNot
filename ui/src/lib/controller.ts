@@ -31,9 +31,8 @@ export class Controller {
       const result = await promise;
       if (isApiError(result)) {
         if (result.error.key === 'busy' && result.error.message === 'phone_cleanup') {
-          // Telefon wraca do ustawień sprzed przerwanego wgrywania: baner sprzątania, nie karta błędu.
-          // Most ponawia sprzątanie sam, więc bez przycisku „Spróbuj ponownie”.
-          this.state.transfer.cleanup = { running: true, ok: null };
+          // Telefon wraca do ustawień sprzed przerwanego wgrywania: baner sprzątania (z `transfer:cleanup_started`),
+          // nie karta błędu. Most ponawia sprzątanie sam, więc bez przycisku „Spróbuj ponownie”.
           return null;
         }
         this.state.error = result.error;
@@ -90,6 +89,10 @@ export class Controller {
     }
     const ready = d.devices.filter((e) => e.state === 'device');
     if (!s.serial && ready.length === 1) s.serial = ready[0].serial;
+    // Baner sprzątania dotyczy jednego telefonu: znika z jego odłączeniem albo po wybraniu innego.
+    const c = s.transfer.cleanup;
+    if (c.serial && !ready.some((e) => e.serial === c.serial)) s.transfer.cleanup = { serial: null, running: false, ok: null };
+    else this.dropOtherCleanup();
     const picked = s.serial ? d.devices.find((e) => e.serial === s.serial && e.state === 'device') : undefined;
     if (picked && s.settings.mirror_auto && s.mirror.available && !this.autoMirrored.has(picked.serial)
         && !this.mirrorActive(picked.serial)) {
@@ -274,7 +277,7 @@ export class Controller {
         return;
       }
       if (d.kind === 'phone_cleanup') { // czerwony baner sprzątania mówi, co zrobić ręcznie; most ponawia w tle
-        s.transfer.cleanup = { running: false, ok: false };
+        s.transfer.cleanup = { ...s.transfer.cleanup, running: false, ok: false };
         return;
       }
       if (d.kind === 'update') { // błędy aktualizacji pokazuje okno instalacji, nie karta błędu
@@ -364,6 +367,15 @@ export class Controller {
 
   selectDevice(serial: string): void {
     this.state.serial = serial;
+    this.dropOtherCleanup();
+  }
+
+  /** Wybrany inny telefon: wynik sprzątania poprzedniego znika (trwające zostaje — most do jego końca
+   *  odmawia każdego zadania, więc baner „przywracam” musi być widać). */
+  private dropOtherCleanup(): void {
+    const s = this.state;
+    const c = s.transfer.cleanup;
+    if (c.serial && !c.running && s.serial && s.serial !== c.serial) s.transfer.cleanup = { serial: null, running: false, ok: null };
   }
 
   async startScan(): Promise<void> {
@@ -729,12 +741,15 @@ export class Controller {
       const r = s.transfer.restore;
       r.tap = d.request;
       r.tapPackage = d.package;
-      // Prośba spoza wgrywania przychodzi tylko z przywracania ustawień telefonu po przerwanym wgrywaniu.
-      if (d.request && s.job?.kind !== 'restore') s.transfer.cleanup = { running: true, ok: null };
     });
-    // Nieudane sprzątanie most ponawia co odczyt listy telefonów: ten sam stan, jeden baner (nic się nie piętrzy).
+    // Ponowienie po nieudanej próbie tego samego telefonu zostaje czerwonym banerem (bez migania na żółto).
+    on('transfer:cleanup_started', (d) => {
+      const c = s.transfer.cleanup;
+      s.transfer.cleanup = { serial: d.serial, running: true, ok: c.serial === d.serial ? c.ok : null };
+    });
+    // Nieudane sprzątanie most ponawia w tle (najwyżej 3 razy): ten sam stan, jeden baner (nic się nie piętrzy).
     on('transfer:cleanup_done', (d) => {
-      s.transfer.cleanup = { running: false, ok: d.ok };
+      s.transfer.cleanup = { serial: d.serial, running: false, ok: d.ok };
       s.transfer.restore.tap = null;
     });
     on('transfer:restore_done', (d) => {

@@ -40,6 +40,12 @@ describe('TransferCopies', () => {
     expect(del).toHaveBeenCalledWith('OLD/1');
   });
 
+  test('a copy holding changes to undo on the new phone warns before deleting', async () => {
+    await show([COPY, { ...COPY, id: 'OLD/2', cleanup_pending: true }], null);
+    expect(screen.getAllByText('Nowy telefon czeka na przywrócenie ustawień — podłącz go, zanim usuniesz tę kopię'))
+      .toHaveLength(1);
+  });
+
   test('without a connected phone the upload button is off; an unfinished copy has none', async () => {
     await show([COPY, { ...COPY, id: 'OLD/2', status: 'in_progress', restores: [] }], null);
     const buttons = screen.getAllByRole('button', { name: 'Wgraj na podłączony telefon' }) as HTMLButtonElement[];

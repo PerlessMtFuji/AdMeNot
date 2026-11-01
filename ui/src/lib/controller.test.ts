@@ -3,7 +3,7 @@ import { setupCtl } from '../test-utils';
 import { Controller } from './controller';
 import { CHECKS_SAMPLE, createFakeBridge } from './fakeBridge';
 import { i18n } from './i18n/index.svelte';
-import { actedAfter, actedLevels, needsWelcome, withoutUndone } from './logic';
+import { actedAfter, actedLevels, cleanupBanner, needsWelcome, withoutUndone } from './logic';
 import { AppState } from './state.svelte';
 import type { InventoryView, Settings } from './types';
 
@@ -1476,33 +1476,60 @@ describe('data transfer — uploading a copy', () => {
     const { ctl, s, bridge } = setup('transfer_restore');
     await ctl.init();
     ctl.selectDevice(NEW);
+    bridge.emit('transfer:cleanup_started', { serial: NEW });  // most: start sprzątania przed `busy`
     bridge.failNext('start_scan', 'busy', 'phone_cleanup');
     await ctl.startScan();
     expect(s.phase).toBe('connect');
     expect(s.error).toBeNull();  // nie karta błędu
-    expect(s.transfer.cleanup).toEqual({ running: true, ok: null });
+    expect(s.transfer.cleanup).toEqual({ serial: NEW, running: true, ok: null });
     bridge.emit('transfer:tap', { request: 'sms_role_restore', package: null });
     expect(s.transfer.restore.tap).toBe('sms_role_restore');
-    bridge.emit('transfer:cleanup_done', { ok: false });
-    bridge.emit('transfer:cleanup_done', { ok: false });
-    expect(s.transfer.cleanup).toEqual({ running: false, ok: false });
+    bridge.emit('transfer:cleanup_done', { ok: false, serial: NEW });
+    expect(s.transfer.cleanup).toEqual({ serial: NEW, running: false, ok: false });
     expect(s.transfer.restore.tap).toBeNull();
-    bridge.emit('transfer:cleanup_done', { ok: true });
-    expect(s.transfer.cleanup).toEqual({ running: false, ok: true });
+    // ponowienie w tle: baner zostaje czerwony (bez migania na żółto)
+    bridge.emit('transfer:cleanup_started', { serial: NEW });
+    expect(cleanupBanner(s.transfer.cleanup, s.serial)).toBe('failed');
+    bridge.emit('transfer:cleanup_done', { ok: false, serial: NEW });
+    expect(s.transfer.cleanup).toEqual({ serial: NEW, running: false, ok: false });
+    bridge.emit('transfer:cleanup_started', { serial: NEW });
+    bridge.emit('transfer:cleanup_done', { ok: true, serial: NEW });
+    expect(s.transfer.cleanup).toEqual({ serial: NEW, running: false, ok: true });
     // inne „busy” zostaje zwykłym błędem
     bridge.failNext('start_scan', 'busy', 'restore');
     await ctl.startScan();
     expect(s.error?.key).toBe('busy');
   });
 
-  test('a prompt outside an upload means the phone cleanup is running', async () => {
+  test('a prompt alone does not mean a phone cleanup; the start event does', async () => {
     const { ctl, s, bridge } = setup('transfer_restore');
     await ctl.init();
     bridge.emit('transfer:tap', { request: 'sms_role_restore', package: 'com.samsung.android.messaging' });
-    expect(s.transfer.cleanup.running).toBe(true);
-    expect(s.transfer.restore.tapPackage).toBe('com.samsung.android.messaging');
-    bridge.emit('transfer:cleanup_done', { ok: true });
     expect(s.transfer.cleanup.running).toBe(false);
+    expect(s.transfer.restore.tapPackage).toBe('com.samsung.android.messaging');
+    bridge.emit('transfer:cleanup_started', { serial: NEW });
+    expect(s.transfer.cleanup.running).toBe(true);
+    bridge.emit('transfer:cleanup_done', { ok: true, serial: NEW });
+    expect(s.transfer.cleanup.running).toBe(false);
+  });
+
+  test('a failed cleanup banner belongs to its phone: gone when it disconnects or another phone is picked', async () => {
+    const { ctl, s, bridge } = setup('transfer_restore');
+    await ctl.init();
+    const dev = (serial: string) => ({ serial, state: 'device' as const, model: 'M', name: null, imei: null });
+    bridge.emit('devices', { devices: [dev(NEW), dev('OTHER')], error: null });
+    ctl.selectDevice(NEW);
+    bridge.emit('transfer:cleanup_started', { serial: NEW });
+    bridge.emit('transfer:cleanup_done', { ok: false, serial: NEW });
+    expect(cleanupBanner(s.transfer.cleanup, s.serial)).toBe('failed');
+    ctl.selectDevice('OTHER');
+    expect(cleanupBanner(s.transfer.cleanup, s.serial)).toBeNull();
+    expect(s.transfer.cleanup.serial).toBeNull();
+    ctl.selectDevice(NEW);
+    bridge.emit('transfer:cleanup_started', { serial: NEW });
+    bridge.emit('transfer:cleanup_done', { ok: false, serial: NEW });
+    bridge.emit('devices', { devices: [dev('OTHER')], error: null });
+    expect(s.transfer.cleanup).toEqual({ serial: null, running: false, ok: null });
   });
 
   test('a disconnect during the upload shows the waiting state until progress comes back', async () => {

@@ -1097,7 +1097,8 @@
         "verify_hash": false,
         "exports": []
        },
-       "restores": []
+       "restores": [],
+       "cleanup_pending": false
       }
      }
     ],
@@ -1481,7 +1482,8 @@
         "verify_hash": false,
         "exports": []
        },
-       "restores": []
+       "restores": [],
+       "cleanup_pending": false
       },
       "resumable": false,
       "same_phone_recent": false
@@ -1922,6 +1924,18 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58W20NEW01",
+      "command": "appops get com.android.shell WRITE_SMS",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "WRITE_SMS: allow; time=+1m2s3ms ago\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
       "command": "appops set com.android.shell WRITE_SMS allow",
       "status": "ok",
       "duration": 0.0,
@@ -2176,6 +2190,18 @@
       "command": "appops get com.android.shell WRITE_SMS",
       "status": "ok",
       "duration": 0.0,
+      "output": "WRITE_SMS: allow; time=+1m2s3ms ago\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "appops get com.android.shell WRITE_SMS",
+      "status": "ok",
+      "duration": 0.0,
       "output": "WRITE_SMS: default; time=+1m2s3ms ago\n",
       "tag": null
      }
@@ -2381,7 +2407,8 @@
          "updated": "2026-09-26T12:31:00+00:00",
          "resumable": false
         }
-       ]
+       ],
+       "cleanup_pending": false
       },
       "tel": {
        "kinds": {
@@ -2505,7 +2532,8 @@
         "updated": "2026-09-26T12:31:00+00:00",
         "resumable": false
        }
-      ]
+      ],
+      "cleanup_pending": false
      }
     ]
    },

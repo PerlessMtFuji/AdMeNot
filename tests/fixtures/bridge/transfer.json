@@ -1001,7 +1001,8 @@
         "verify_hash": false,
         "exports": []
        },
-       "restores": []
+       "restores": [],
+       "cleanup_pending": false
       }
      }
     ],
@@ -1061,7 +1062,8 @@
        "verify_hash": false,
        "exports": []
       },
-      "restores": []
+      "restores": [],
+      "cleanup_pending": false
      }
     ]
    },

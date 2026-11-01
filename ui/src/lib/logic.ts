@@ -783,6 +783,16 @@ export function keptUploadChoice(plan: RestorePlanView, prev: UploadChoiceView, 
     verify_hash: prev.verify_hash, tel: prev.tel.filter((k) => (telWrite(tel, k) ?? 0) > 0) };
 }
 
+/** Baner przywracania ustawień telefonu (`phone_cleanup`): `failed` — ostatnia próba się nie udała (zostaje
+ *  czerwony także w czasie ponowienia w tle, bez migania na żółto), `running` — trwa pierwsza próba. Wynik
+ *  dotyczy jednego telefonu: przy wybranym innym nie jest pokazywany; trwające sprzątanie — zawsze (do jego
+ *  końca most odmawia każdego zadania). */
+export function cleanupBanner(c: { serial: string | null; running: boolean; ok: boolean | null },
+  selected: string | null): 'running' | 'failed' | null {
+  if (c.ok === false && (c.running || selected === null || selected === c.serial)) return 'failed';
+  return c.running ? 'running' : null;
+}
+
 /** Wynik telefonii: `error`, gdy telefon nie wrócił do ustawień sprzed wgrywania (rola SMS, pomocnik);
  *  `warn`, gdy coś zostało do ręcznego importu, coś się nie zapisało albo trzeba sprawdzić Wiadomości. */
 export function telOutcome(r: TelResultView): 'ok' | 'warn' | 'error' {
