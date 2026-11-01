@@ -809,7 +809,7 @@
         "visible": "sprawdź w aplikacji Wiadomości",
         "todo_title": "Do zrobienia na telefonie",
         "todo_file": "zainstaluj SMS Backup & Restore, Przywróć, wybierz plik {name} z Pobranych",
-        "todo_contacts": "na telefonie otwarte jest okno importu — wybierz konto i potwierdź"
+        "todo_contacts": "otwórz Kontakty → Importuj, wybierz plik {name} z Pobranych"
       },
       "stages_label": "Etapy wgrywania",
       "stage": {

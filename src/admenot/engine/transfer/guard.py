@@ -304,12 +304,9 @@ class ApkReadAdb:
 # Zapis telefonii (kontakty, SMS, MMS, połączenia) przez pomocnika na nowym telefonie
 # --------------------------------------------------------------------------------------
 _HELPER_PATH = re.compile(r"[A-Za-z0-9._/-]+")  # nazwy wejścia są ASCII, więc bez cytowania
-_VCF_NAME = re.compile(r"[A-Za-z0-9._-]+\.vcf")
-_DIGITS = re.compile(r"[0-9]{1,18}")
 SMS_ROLE = "android.app.role.SMS"
 _APPOP_MODES = ("allow", "default", "ignore", "deny", "foreground")
 _HELPER_PERMISSIONS = ("READ_CONTACTS", "WRITE_CONTACTS", "READ_CALL_LOG", "WRITE_CALL_LOG", "READ_SMS")
-VCF_DIR = "/storage/emulated/0/Download"
 
 
 def safe_helper_target(remote: str) -> str:
@@ -342,12 +339,6 @@ def _helper_input(path: str, base: str) -> str:
 def _account_args_ok(*values: str) -> None:
     if any(not v or "\n" in v or "\r" in v or "\0" in v for v in values):
         raise UnsafeCommand("Niepoprawne dane konta")
-
-
-def _vcf_path(path: str) -> None:
-    directory, _, name = path.rpartition("/")
-    if directory != VCF_DIR or not _VCF_NAME.fullmatch(name):
-        raise UnsafeCommand(f"Niedozwolony plik vCard: {path[:120]!r}")
 
 
 def _fixed_commands(helper) -> frozenset[str]:
@@ -422,23 +413,6 @@ def assert_telephony_write(cmd: str, role_restore: Callable[[], frozenset[str]])
             return
         raise bad
 
-    if (len(t) == 8 and t[:7] == ["am", "start", "-a", "android.intent.action.VIEW", "-t", "text/x-vcard", "-d"]
-            and t[7].startswith("content://media/external/file/")
-            and _DIGITS.fullmatch(t[7].rsplit("/", 1)[1]) and cmd == " ".join(t)):
-        return
-
-    if (len(t) == 8 and t[:7] == ["content", "call", "--uri", "content://media", "--method", "scan_file", "--arg"]
-            and cmd == " ".join(t)):
-        _vcf_path(t[7])
-        return
-
-    if (len(t) == 8 and t[:7] == ["content", "query", "--uri", "content://media/external/file",
-                                  "--projection", "_id", "--where"]):
-        m = re.fullmatch(r"_data='([^']+)'", t[7])
-        if m:
-            _vcf_path(m.group(1))
-            if cmd == f'content query --uri content://media/external/file --projection _id --where "{t[7]}"':
-                return
     raise bad
 
 

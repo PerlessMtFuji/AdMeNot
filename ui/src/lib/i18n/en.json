@@ -809,7 +809,7 @@
         "visible": "check in the Messages app",
         "todo_title": "To do on the phone",
         "todo_file": "install SMS Backup & Restore, tap Restore and choose the file {name} from Downloads",
-        "todo_contacts": "an import window is open on the phone — choose the account and confirm"
+        "todo_contacts": "open Contacts → Import and pick {name} from Downloads"
       },
       "stages_label": "Upload stages",
       "stage": {

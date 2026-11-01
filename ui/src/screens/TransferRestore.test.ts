@@ -90,7 +90,7 @@ describe('TransferRestore', () => {
     s.transfer.restore.telResult = tel({ kinds: { contacts: kind({ manual: 2, path: 'file' }), sms: kind({ visible_warning: true }) },
       manual: [{ kind: 'contacts', name: 'admenot-kontakty.vcf' }] });
     await tick();
-    expect(screen.getByText(/na telefonie otwarte jest okno importu — wybierz konto i potwierdź/)).toBeTruthy();
+    expect(screen.getByText(/otwórz Kontakty → Importuj, wybierz plik admenot-kontakty/)).toBeTruthy();
     expect(screen.getByText(/sprawdź w aplikacji Wiadomości/)).toBeTruthy();
   });
 

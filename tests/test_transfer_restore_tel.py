@@ -304,10 +304,7 @@ def test_install_blocked_goes_to_file(tmp_path):
     remote = r.manual[0].remote
     assert remote.startswith("/sdcard/Download/admenot-kontakty-") and remote.endswith(".vcf")
     assert {c.display for c in read_vcards(phone.local(remote))} == {"Jan Kowalski", "Żaneta Łęcka", "Biuro"}
-    media = "/storage/emulated/0/Download/" + remote.rsplit("/", 1)[1]
-    mid = phone.media_files[media]
-    assert f"am start -a android.intent.action.VIEW -t text/x-vcard -d content://media/external/file/{mid}" \
-        in phone.commands
+    assert not any("scan_file" in c or "text/x-vcard" in c for c in phone.commands)  # tylko plik, bez okna importu
     assert r.kinds["contacts"].path == FILE and r.kinds["sms"].path == AP
     assert _counts(phone) == {**EXPECTED, "contacts": 0}
     assert r.status == "incomplete" and r.cleanup.ok
@@ -586,7 +583,7 @@ def test_manual_step_dropped_after_import(tmp_path):
         st.close()
 
 
-def test_contacts_file_opened_before_role_tap(tmp_path):
+def test_contacts_file_written_before_role_tap(tmp_path):
     copy, phone = _copy(tmp_path), _new(tmp_path, helper_denied={"contacts", "sms", "mms"},
                                         companion_denied={"contacts"}, role_needs_tap=True)
     seen: list[tuple[bool, bool]] = []
@@ -598,7 +595,7 @@ def test_contacts_file_opened_before_role_tap(tmp_path):
             phone.tap_role(PKG)
 
     r = Run(phone, copy)(on_tap=on_tap)
-    assert seen == [(True, True)]  # okno importu kontaktów otwarte, zanim program czeka na stuknięcie
+    assert seen == [(True, False)]  # plik kontaktów leży, zanim program czeka na stuknięcie; żadne okno nie jest otwierane
     assert r.kinds["contacts"].path == FILE and r.kinds["sms"].path == CO
     assert [m.kind for m in r.manual] == ["contacts"] and r.cleanup.ok
 

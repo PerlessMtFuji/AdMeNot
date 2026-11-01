@@ -312,7 +312,7 @@ class _TelRestore:
             if todo[kind]:
                 self._progress(kind, CHAIN[kind][0])
                 self._kind(kind, todo[kind], CHAIN[kind], defer=True)
-        # pliki kategorii bez roli (kontakty + okno importu, połączenia) przed czekaniem na stuknięcie
+        # pliki kategorii bez roli (kontakty, połączenia) przed czekaniem na stuknięcie
         self._write_files(set(self.manual) - ROLE_KINDS)
         for kind, recs, chain in self.deferred:  # rola SMS dopiero po pozostałych kategoriach (§6.2)
             self._kind(kind, recs, chain, defer=False)

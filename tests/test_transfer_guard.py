@@ -337,10 +337,6 @@ _TEL_ALLOWED = [
      "-e account_type com.google -e account_name 'a b@x.pl' pl.admenot.helper/.Runner"),
     "am start -n pl.admenot.helper/.RoleActivity",
     "am start -a android.settings.MANAGE_DEFAULT_APPS_SETTINGS",
-    "am start -a android.intent.action.VIEW -t text/x-vcard -d content://media/external/file/1234",
-    "content call --uri content://media --method scan_file --arg /storage/emulated/0/Download/admenot-1.vcf",
-    ("content query --uri content://media/external/file --projection _id --where "
-     "\"_data='/storage/emulated/0/Download/admenot-1.vcf'\""),
     "dumpsys account",
 ]
 
@@ -457,6 +453,10 @@ def test_tel_guard_install_only_artifact(tmp_path):
     "am start -a android.intent.action.VIEW -t text/x-vcard -d content://media/external/file/12a",
     "am start -a android.intent.action.VIEW -t text/x-vcard -d file:///sdcard/x.vcf",
     "am start -n com.evil/.Main",
+    "am start -a android.intent.action.VIEW -t text/x-vcard -d content://media/external/file/1234",
+    "content call --uri content://media --method scan_file --arg /storage/emulated/0/Download/admenot-1.vcf",
+    ("content query --uri content://media/external/file --projection _id --where "
+     "\"_data='/storage/emulated/0/Download/admenot-1.vcf'\""),
     "content call --uri content://media --method scan_file --arg /sdcard/x.vcf",
     "content call --uri content://media --method scan_file --arg /storage/emulated/0/Download/../x.vcf",
     "content call --uri content://media --method scan_file --arg /storage/emulated/0/Download/a.vcf;id",
