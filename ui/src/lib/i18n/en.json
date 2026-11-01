@@ -522,9 +522,8 @@
       "howto_plain": "Export the data to a file (Contacts → Import/export or an app such as SMS Backup & Restore), save it in the phone’s storage, e.g. in Downloads or a new folder, and click “Scan again”.",
       "files": "Export files on the phone",
       "newest": "newest",
-      "none_fit": "No current one? Export the data to a file and:",
+      "howto_toggle": "No current file? How to make one",
       "rescan": "Scan again",
-      "change": "change file",
       "from_file": "from an export file",
       "count": {
         "one": "{count} from an export file",
@@ -570,10 +569,9 @@
       "other": "{count} files or folders could not be read — they will not be in the copy"
     },
     "unreadable_files_text": "The phone did not allow reading them (e.g. a damaged name or no access). The rest of the data is copied as usual.",
-    "whatsapp_old_title": "The WhatsApp chat backup is older than an hour",
-    "whatsapp_none_title": "There is no WhatsApp chat backup on the phone",
-    "whatsapp_old": "Last chat backup on the phone: {when}. To get the latest messages, on the phone open WhatsApp → Settings → Chats → Chat backup → Back up.",
-    "whatsapp_none": "To copy the messages, on the phone open WhatsApp → Settings → Chats → Chat backup → Back up.",
+    "whatsapp_old_title": "Chat backup from {when} — older than an hour",
+    "whatsapp_none_title": "There is no chat backup on the phone",
+    "whatsapp_howto": "On the phone: WhatsApp → Settings → Chats → Chat backup → Back up",
     "recheck": "Check again",
     "apps_copy": "{count} to copy",
     "apps_skipped": {

@@ -522,9 +522,8 @@
       "howto_plain": "Wyeksportuj dane do pliku (Kontakty → Importuj/eksportuj albo aplikacją typu SMS Backup & Restore), zapisz go w pamięci telefonu, np. w Pobranych albo w nowym folderze, i kliknij „Skanuj ponownie”.",
       "files": "Pliki eksportu na telefonie",
       "newest": "najnowszy",
-      "none_fit": "Brak aktualnego? Wyeksportuj dane do pliku i:",
+      "howto_toggle": "Brak aktualnego pliku? Jak go zrobić",
       "rescan": "Skanuj ponownie",
-      "change": "zmień plik",
       "from_file": "z pliku eksportu",
       "count": {
         "one": "{count} z pliku eksportu",
@@ -570,10 +569,9 @@
       "other": "{count} pliku lub folderu nie dało się odczytać — nie trafią do kopii"
     },
     "unreadable_files_text": "Telefon nie pozwolił ich odczytać (np. uszkodzona nazwa albo brak dostępu). Pozostałe dane kopiują się normalnie.",
-    "whatsapp_old_title": "Kopia czatów WhatsApp jest starsza niż godzina",
-    "whatsapp_none_title": "Na telefonie nie ma kopii czatów WhatsApp",
-    "whatsapp_old": "Ostatnia kopia czatów na telefonie: {when}. Żeby mieć najnowsze wiadomości, na telefonie otwórz WhatsApp → Ustawienia → Czaty → Kopia zapasowa → Utwórz kopię.",
-    "whatsapp_none": "Żeby skopiować wiadomości, na telefonie otwórz WhatsApp → Ustawienia → Czaty → Kopia zapasowa → Utwórz kopię.",
+    "whatsapp_old_title": "Kopia czatów z {when} — starsza niż godzina",
+    "whatsapp_none_title": "Na telefonie nie ma kopii czatów",
+    "whatsapp_howto": "Na telefonie: WhatsApp → Ustawienia → Czaty → Kopia zapasowa → Utwórz kopię",
     "recheck": "Sprawdź ponownie",
     "apps_copy": "{count} do skopiowania",
     "apps_skipped": {

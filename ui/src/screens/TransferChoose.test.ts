@@ -70,8 +70,12 @@ describe('TransferChoose', () => {
 
   test('an old WhatsApp chat backup shows the warning with a re-check', async () => {
     await show({ whatsapp_backup: '2020-01-01T02:00:00' });
-    expect(screen.getByText(/Utwórz kopię/)).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Sprawdź ponownie' })).toBeTruthy();
+    const card = screen.getByRole('checkbox', { name: /WhatsApp/ }).closest('.card') as HTMLElement;
+    const note = within(card).getByTestId('whatsapp-note');
+    expect(within(note).getByText(/^Kopia czatów z .* — starsza niż godzina$/)).toBeTruthy();
+    expect(within(note).getByText(/Utwórz kopię/)).toBeTruthy();
+    expect(within(note).getByRole('button', { name: 'Sprawdź ponownie' })).toBeTruthy();
+    expect(screen.queryByRole('status')).toBeNull();  // już nie osobny baner
   });
 
   const XIAOMI = { serial: 'R58T00TEST', manufacturer: 'Xiaomi', brand: 'Redmi' } as never;
@@ -94,19 +98,22 @@ describe('TransferChoose', () => {
     expect(box.checked).toBe(true);
     expect(box.disabled).toBe(false);
     expect(meta(/Kontakty/)).toContain('3 z pliku eksportu');
-    expect(screen.getByText('kontakty_2026-10-27.vcf', { selector: '[data-testid="export-chosen"] *' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'zmień plik' })).toBeTruthy();
-
-    expect(screen.getByText('Telefon nie pozwolił odczytać kontaktów — użyto pliku eksportu.')).toBeTruthy();
-    expect(screen.getByText(/Xiaomi wpuszcza do tych danych tylko z opcją/)).toBeTruthy();
-    expect(screen.getByText('Pliki eksportu na telefonie')).toBeTruthy();
+    // komunikat, lista plików i „Skanuj ponownie” siedzą w karcie wiersza Kontakty, nie w osobnym banerze
+    const card = screen.getByRole('checkbox', { name: /Kontakty/ }).closest('.card') as HTMLElement;
+    const note = within(card).getByTestId('export-note-contacts');
+    expect(within(note).getByText('Telefon nie pozwolił odczytać kontaktów — użyto pliku eksportu.')).toBeTruthy();
+    expect(within(note).getByRole('radiogroup', { name: 'Pliki eksportu na telefonie' })).toBeTruthy();
+    expect(within(note).getByRole('button', { name: 'Skanuj ponownie' })).toBeTruthy();
+    // instrukcja (z dopiskiem o Xiaomi) zwinięta, gdy jest z czego wybierać
+    const howto = within(note).getByText('Brak aktualnego pliku? Jak go zrobić').closest('details')!;
+    expect(howto.open).toBe(false);
+    expect(within(howto).getByText(/Xiaomi wpuszcza do tych danych tylko z opcją/)).toBeTruthy();
+    expect(screen.queryByText('Na nowym telefonie otworzy się import — wybierzesz konto Google.')).toBeNull();
     const radios = within(screen.getByRole('radiogroup')).getAllByRole('radio') as HTMLInputElement[];
     expect(radios).toHaveLength(3);
     expect(radios[0].checked).toBe(true);
     expect(radios[0].closest('label')!.textContent).toContain('najnowszy');
     expect(radios[1].closest('label')!.textContent).not.toContain('najnowszy');
-    expect(screen.getByText('Brak aktualnego? Wyeksportuj dane do pliku i:')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Skanuj ponownie' })).toBeTruthy();
 
     await fireEvent.click(radios[1]);
     expect(s.transfer.selection.exports?.contacts).toBe('/sdcard/Kopia/contacts.vcf');
@@ -152,7 +159,8 @@ describe('TransferChoose', () => {
   test('denied contacts and messages get a section each', async () => {
     await onXiaomi({ contacts: null, sms: null, mms: null, denied: ['contacts', 'sms'],
       exports: { contacts: THREE, sms: [{ remote: '/sdcard/Backup/sms.xml', name: 'sms.xml', size: 147, mtime: '2026-10-27T20:00:00', count: 60 }] } });
-    expect(screen.getByText('Telefon nie pozwolił odczytać kontaktów i wiadomości — użyto pliku eksportu.')).toBeTruthy();
+    expect(within(screen.getByTestId('export-note-contacts')).getByText('Telefon nie pozwolił odczytać kontaktów — użyto pliku eksportu.')).toBeTruthy();
+    expect(within(screen.getByTestId('export-note-sms')).getByText('Telefon nie pozwolił odczytać wiadomości — użyto pliku eksportu.')).toBeTruthy();
     expect(screen.getAllByRole('radiogroup')).toHaveLength(2);
     expect(meta(/SMS i MMS/)).toContain('60 z pliku eksportu');
   });

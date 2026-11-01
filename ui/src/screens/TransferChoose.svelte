@@ -12,7 +12,7 @@
   import type { Controller } from '../lib/controller';
   import { i18n, t, tp } from '../lib/i18n/index.svelte';
   import { EXPORT_KINDS, exportFiles, formatSize, isXiaomi, modelName, transferNeed, transferTotals, whatsappStale } from '../lib/logic';
-  import type { ExportFileView, ExportKind } from '../lib/types';
+  import type { ExportKind } from '../lib/types';
   import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
@@ -21,7 +21,7 @@
   import Spinner from '../ui/Spinner.svelte';
 
   type Row = { key: string; icon: typeof Users; title: string; meta: string; note?: string; bytes: number | null;
-    checked: boolean; disabled: boolean; kind?: ExportKind; file?: ExportFileView | null };
+    checked: boolean; disabled: boolean; kind?: ExportKind };
 
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
@@ -57,45 +57,31 @@
   }
   const problems = $derived(inv ? EXPORT_KINDS.filter((k) => (k === 'sms' ? inv.sms === null || inv.mms === null : inv[k] === null)) : []);
   const deniedKinds = $derived(problems.filter((k) => inv?.denied?.includes(k)));
-  const failedKinds = $derived(problems.filter((k) => !inv?.denied?.includes(k)));
-  const withFiles = $derived(problems.filter((k) => files(k).length > 0));
   const rescanning = $derived(s.job?.kind === 'transfer_scan');
-  // Zdanie o koncie Mi tylko przy odmowie na Xiaomi; „Bez niej…” w instrukcji odnosi się do niego.
-  const xiaomiNote = $derived(deniedKinds.length > 0 && isXiaomi(s.device));
   /** „kontaktów”, „kontaktów i wiadomości”, „kontaktów, wiadomości i historii połączeń”. */
   function what(kinds: ExportKind[]): string {
     const w = kinds.map((k) => t(`transfer.export.what.${k}`));
     return w.length < 2 ? w.join('') : w.slice(0, -1).join(t('transfer.export.what.sep')) + t('transfer.export.what.and') + w.at(-1);
   }
-  const exportTitle = $derived(deniedKinds.length
-    ? t(deniedKinds.every((k) => !!chosen(k) && rowOn(k)) ? 'transfer.export.title_denied_file' : 'transfer.export.title_denied',
-      { what: what(deniedKinds) })
-    : t('transfer.export.title_failed', { what: what(failedKinds) }));
   // Czas pliku spoza zakresu dat (most daje null): bez daty zamiast „Invalid Date”.
   const fileDate = (iso: string | null) => iso === null ? '' : new Date(iso).toLocaleString(i18n.lang === 'pl' ? 'pl-PL' : 'en-GB',
     { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-  /** „zmień plik”: lista plików w banerze — przewinięcie i fokus na wybranym pliku. */
-  function showFiles(k: ExportKind): void {
-    const list = document.getElementById(`export-files-${k}`);
-    list?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
-    (list?.querySelector<HTMLInputElement>('input:checked') ?? list?.querySelector<HTMLInputElement>('input'))?.focus({ preventScroll: true });
-  }
 
   const phoneRows = $derived.by((): Row[] => {
     if (!inv) return [];
     const messages = inv.sms === null && inv.mms === null ? null : (inv.sms ?? 0) + (inv.mms ?? 0);
-    const smsFile = !readable(inv.sms) && !readable(inv.mms) ? chosen('sms') : null;
+    const smsFile =!readable(inv.sms) && !readable(inv.mms) ? chosen('sms') : null;
     return [
       { key: 'contacts', icon: Users, title: t('transfer.row.contacts'), meta: inv.contacts === null ? fileMeta('contacts') : num(inv.contacts),
         note: chosen('contacts') ? undefined : t('transfer.row.contacts_note'), bytes: null, checked: sel.contacts,
-        disabled: !readable(inv.contacts) && !files('contacts').length, kind: 'contacts', file: chosen('contacts') },
+        disabled: !readable(inv.contacts) && !files('contacts').length, kind: 'contacts' },
       { key: 'sms', icon: MessageSquare, title: t('transfer.row.sms'),
         meta: messages === null ? fileMeta('sms') : count(messages, 'transfer.messages'),
         note: smsFile ? undefined : t('transfer.row.sms_note'), bytes: readable(inv.mms) ? inv.mms_bytes : null, checked: sel.sms || sel.mms,
-        disabled: !readable(inv.sms) && !readable(inv.mms) && !files('sms').length, kind: 'sms', file: smsFile },
+        disabled: !readable(inv.sms) && !readable(inv.mms) && !files('sms').length, kind: 'sms' },
       { key: 'calls', icon: PhoneIcon, title: t('transfer.row.calls'), meta: inv.calls === null ? fileMeta('calls') : num(inv.calls),
-        bytes: null, checked: sel.calls, disabled: !readable(inv.calls) && !files('calls').length, kind: 'calls', file: chosen('calls') },
+        bytes: null, checked: sel.calls, disabled: !readable(inv.calls) && !files('calls').length, kind: 'calls' },
     ];
   });
 
@@ -118,18 +104,13 @@
         <span class="grid h-9 w-9 flex-none place-items-center rounded-xl bg-accent-soft text-accent" aria-hidden="true"><r.icon size={18} /></span>
         <span class="min-w-0 flex-1">
           <span class="block font-bold">{r.title} <span class="ml-1 text-sm font-semibold text-soft">{r.meta}</span></span>
-          {#if r.note}<span class="block text-sm text-mut">{r.note}</span>{/if}
+          <!-- przy problemie z odczytem podpowiedź wiersza ustępuje komunikatowi pod nim -->
+          {#if r.note && !(r.kind && problems.includes(r.kind))}<span class="block text-sm text-mut">{r.note}</span>{/if}
         </span>
       </label>
       <span class="mono flex-none pt-1.5 text-sm text-mut">{r.bytes !== null ? size(r.bytes) : ''}</span>
     </div>
-    {#if r.file && r.kind}
-      {@const kind = r.kind}
-      <div class="mt-0.5 pl-[82px] text-sm text-mut" data-testid="export-chosen">
-        <span class="mono">{r.file.name}</span> ·
-        <button type="button" class="font-semibold text-accent hover:underline" onclick={() => showFiles(kind)}>{t('transfer.export.change')}</button>
-      </div>
-    {/if}
+    {#if r.kind && problems.includes(r.kind)}<div class="mt-1.5 pl-[82px]">{@render exportNote(r.kind)}</div>{/if}
     {#if extra}<div class="mt-2 pl-[76px]">{@render extra()}</div>{/if}
   </div>
 {/snippet}
@@ -160,22 +141,6 @@
 
       <span class="lbl mt-1">{t('transfer.group.phone')}</span>
       {#each phoneRows as r (r.key)}{@render row(r)}{/each}
-      {#if problems.length}
-        <Banner tone="warn" icon="triangle-alert" title={exportTitle}>
-          {#if deniedKinds.length && failedKinds.length}
-            <b class="block text-ink">{t('transfer.export.title_failed', { what: what(failedKinds) })}</b>
-          {/if}
-          {#if xiaomiNote}<p>{t('transfer.export.xiaomi')}</p>{/if}
-          {#each withFiles as k (k)}{@render exportList(k)}{/each}
-          <p class="mt-2">{problems.length > withFiles.length ? t(xiaomiNote ? 'transfer.export.howto' : 'transfer.export.howto_plain')
-            : t('transfer.export.none_fit')}</p>
-          <div class="mt-2">
-            <Button size="sm" disabled={s.job !== null} onclick={() => ctl.rescanTransfer()}>
-              {#if rescanning}<Spinner />{/if}{t('transfer.export.rescan')}
-            </Button>
-          </div>
-        </Banner>
-      {/if}
 
       <span class="lbl mt-2">{t('transfer.group.files')}</span>
       {#if inv.unreadable > 0}
@@ -219,11 +184,47 @@
   </SidePanel>
 </div>
 
-{#snippet exportList(k: ExportKind)}
-  <div id="export-head-{k}" class="mt-2.5 text-xs font-bold text-mut">
-    {t('transfer.export.files')}{problems.length > 1 ? ` · ${t(`transfer.row.${k}`)}` : ''}
+{#snippet inlineNote(text: string)}
+  <p class="flex items-start gap-1.5 text-sm font-semibold text-warn">
+    <span class="mt-0.5 flex-none" aria-hidden="true"><Icon name="triangle-alert" size={14} /></span><span>{text}</span>
+  </p>
+{/snippet}
+
+{#snippet exportNote(k: ExportKind)}
+  {@const list = files(k)}
+  {@const denied = deniedKinds.includes(k)}
+  {@const xiaomi = denied && isXiaomi(s.device)}
+  <div class="flex flex-col gap-1.5" data-testid="export-note-{k}">
+    {@render inlineNote(denied
+      ? t(chosen(k) && rowOn(k) ? 'transfer.export.title_denied_file' : 'transfer.export.title_denied', { what: what([k]) })
+      : t('transfer.export.title_failed', { what: what([k]) }))}
+    <div class="flex flex-col gap-1.5 pl-5 text-sm text-mut">
+      {#if list.length}
+        {@render exportList(k)}
+        <details class="group">
+          <summary class="w-fit cursor-pointer font-semibold text-accent hover:underline">{t('transfer.export.howto_toggle')}</summary>
+          {@render howto(xiaomi)}
+        </details>
+      {:else}
+        {@render howto(xiaomi)}
+      {/if}
+      <button type="button" class="flex w-fit items-center gap-1.5 font-semibold text-accent hover:underline disabled:cursor-default disabled:text-soft disabled:no-underline"
+        disabled={s.job !== null} onclick={() => ctl.rescanTransfer()}>
+        {#if rescanning}<Spinner />{:else}<Icon name="rotate-ccw" size={13} />{/if}{t('transfer.export.rescan')}
+      </button>
+    </div>
   </div>
-  <div role="radiogroup" id="export-files-{k}" aria-labelledby="export-head-{k}" class="mt-1 flex flex-col gap-1">
+{/snippet}
+
+{#snippet howto(xiaomi: boolean)}
+  <div class="mt-1 flex flex-col gap-1">
+    {#if xiaomi}<p>{t('transfer.export.xiaomi')}</p>{/if}
+    <p>{t(xiaomi ? 'transfer.export.howto' : 'transfer.export.howto_plain')}</p>
+  </div>
+{/snippet}
+
+{#snippet exportList(k: ExportKind)}
+  <div role="radiogroup" id="export-files-{k}" aria-label={t('transfer.export.files')} class="flex flex-col gap-0.5">
     {#each files(k) as f, i (f.remote)}
       <label class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm text-ink
         {i === 0 ? 'bg-accent-soft shadow-[inset_3px_0_0_var(--color-accent)]' : 'opacity-75'}">
@@ -242,12 +243,13 @@
 
 {#snippet whatsapp()}
   {@const backup = inv?.whatsapp_backup ?? null}
-  <Banner tone="warn" icon="info" title={backup ? t('transfer.whatsapp_old_title') : t('transfer.whatsapp_none_title')}>
-    {backup ? t('transfer.whatsapp_old', { when: when(backup) }) : t('transfer.whatsapp_none')}
-    {#snippet actions()}
-      <Button size="sm" onclick={() => ctl.recheckWhatsapp()}>{t('transfer.recheck')}</Button>
-    {/snippet}
-  </Banner>
+  <div class="flex flex-col gap-0.5 pl-1.5" data-testid="whatsapp-note">
+    {@render inlineNote(backup ? t('transfer.whatsapp_old_title', { when: when(backup) }) : t('transfer.whatsapp_none_title'))}
+    <p class="pl-5 text-sm text-mut">
+      {t('transfer.whatsapp_howto')} ·
+      <button type="button" class="font-semibold text-accent hover:underline" onclick={() => ctl.recheckWhatsapp()}>{t('transfer.recheck')}</button>
+    </p>
+  </div>
 {/snippet}
 
 {#snippet others()}
