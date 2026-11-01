@@ -522,3 +522,30 @@ def test_tel_guard_allows_everything_helper_writers_issue():
         helper.CompanionWriter(adb, Pusher(), account).write("sms", sms, lambda: None)
     assert any(c.startswith("CLASSPATH=") and "--account" in c for c in cmds)
     assert any(c.startswith("am instrument") and "account_name" in c for c in cmds)
+
+
+# --------------------------------------------------------------------------------------
+# TelPlanReadAdb (plan telefonii na nowym telefonie)
+# --------------------------------------------------------------------------------------
+from admenot.engine.transfer.guard import TelPlanReadAdb
+
+
+def test_tel_plan_read_adb_allows_reads_and_dumpsys_account_only():
+    inner = Recorder()
+    adb = TelPlanReadAdb(inner)
+    assert adb.shell("dumpsys account", timeout=30) == "ok"
+    assert adb.shell("content query --uri content://sms --projection _id" + CONTENT_TAIL) == "ok"
+    assert adb.run(["get-state"]) == "ok"
+    assert [c[1] for c in inner.calls] == [
+        "dumpsys account", "content query --uri content://sms --projection _id" + CONTENT_TAIL, ["get-state"]]
+    for bad in ("dumpsys account; rm -rf /sdcard", "dumpsys role", "dumpsys",
+                "appops set com.android.shell WRITE_SMS allow", "cmd role add-role-holder android.app.role.SMS x.y",
+                "pm uninstall x.y", "dumpsys account --verbose", "content insert --uri content://sms"):
+        with pytest.raises(UnsafeCommand):
+            adb.shell(bad)
+    for args in (["install", "-g", "x.apk"], ["shell", "-T", "dumpsys account"], ["push", "a", "/sdcard/"]):
+        with pytest.raises(UnsafeCommand):
+            adb.run(args)
+    assert len(inner.calls) == 3
+    other = adb.with_serial("B")
+    assert isinstance(other, TelPlanReadAdb) and other.serial == "B"

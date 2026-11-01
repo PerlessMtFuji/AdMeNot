@@ -16,6 +16,7 @@ import sys
 import tempfile
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from unittest import mock
@@ -34,6 +35,7 @@ from admenot.engine.apk import cache as C
 from admenot.engine.device.info import GETPROP
 from admenot.engine.report.pdf import PdfError
 from admenot.engine.settings import save_settings
+from admenot.engine.transfer import helper, phonesetup, restore_tel
 from admenot.engine.transfer.apkcheck import ApkCheck
 
 CLIENT = "Anna K."
@@ -320,20 +322,71 @@ def _transfer_restore(r: Recorder, phone: Any) -> None:
     r.call("transfers")  # Historia: „wgrano na …”
 
 
+RESTORE_TEL_CHOICE = {**RESTORE_CHOICE, "tel": ["contacts", "sms", "calls"]}
+SMS_APP = "com.google.android.apps.messaging"
+
+
+class _FixedNow(datetime):
+    """Zegar silnika telefonii w nagraniu: nazwy plików do ręcznego importu mają w sobie godzinę."""
+
+    @classmethod
+    def now(cls, tz: Any = None) -> datetime:
+        return cls(2026, 9, 26, 14, 31, 0, tzinfo=tz)
+
+
+def _restore_tel_phones(tmp: Path) -> PhoneHost:
+    """Jak `transfer_restore`, a nowy telefon ma pustą telefonię i Wiadomości Google jako domyślną
+    aplikację SMS. SMS-y odmawia zapisać `app_process`, więc idą przez aplikację pomocniczą: ta musi
+    zostać domyślną aplikacją SMS, a na to telefon prosi o stuknięcie (serwisant stuka, gdy pojawi się
+    okno). Rejestru połączeń nie przyjmuje żadna droga z pomocnikiem: plik do ręcznego importu."""
+    host = _restore_phones(tmp)
+    new = host.phone(RESTORE_SERIAL).storage
+    new.telephony = True
+    new.role_holders = [SMS_APP]
+    new.helper_denied = {"sms", "calls"}
+    new.companion_denied = {"calls"}
+    new.role_needs_tap = True
+    (new.root / "sdcard" / "Download").mkdir(parents=True, exist_ok=True)
+
+    def tap_when_asked(command: str) -> None:
+        if command == f"am start -n {helper.PACKAGE}/.RoleActivity":
+            new.tap_role(helper.PACKAGE)
+
+    new.on_shell = tap_when_asked
+    return host
+
+
+def _transfer_restore_tel(r: Recorder, phone: Any) -> None:
+    r.call("list_devices")
+    r.call("transfer_inventory", SERIAL, CLIENT)
+    r.call("start_backup", TRANSFER_SELECTION)
+    copy_id = r.events("transfer:done")[0]["copy"]["id"]
+    with mock.patch("admenot.engine.transfer.restore_plan.load_or_check", _apk_checks):
+        r.call("restore_plan", copy_id, RESTORE_SERIAL)
+    with (mock.patch.object(phonesetup, "_sleep", lambda s: None),
+          mock.patch.object(restore_tel, "datetime", _FixedNow)):
+        r.call("start_restore", RESTORE_TEL_CHOICE)
+    r.call("transfers")  # Historia: „wgrano na …”
+
+
 def _stable_transfer(data: dict[str, Any]) -> dict[str, Any]:
-    """`transfer:progress` i `transfer:restore_progress` są dławione co 0,5 s, więc ich liczba
-    zależy od szybkości komputera: zostaje pierwsze zdarzenie każdego etapu w wywołaniu (to wysyła
-    się zawsze). Czas kopii i wgrywania -> 0, czas zapisu stanu wgrywania -> stały."""
+    """`transfer:progress`, `transfer:restore_progress` i `transfer:tel_progress` są dławione co 0,5 s,
+    więc ich liczba zależy od szybkości komputera: zostaje pierwsze zdarzenie każdego etapu (telefonia:
+    kategorii) w wywołaniu (to wysyła się zawsze). Czas kopii, wgrywania i telefonii -> 0, czas zapisu
+    stanu wgrywania -> stały."""
     for call in data["calls"]:
         seen: set[tuple[str, str]] = set()
         events = []
         for name, detail in call["events"]:
-            if name in ("transfer:progress", "transfer:restore_progress"):
-                if (name, detail["stage"]) in seen:
+            if name in ("transfer:progress", "transfer:restore_progress", "transfer:tel_progress"):
+                stage = detail["kind"] if name == "transfer:tel_progress" else detail["stage"]
+                if (name, stage) in seen:
                     continue
-                seen.add((name, detail["stage"]))
+                seen.add((name, stage))
             if name in ("transfer:done", "transfer:restore_done"):
                 detail["result"]["seconds"] = 0
+                if detail.get("tel"):
+                    detail["tel"]["seconds"] = 0
             events.append([name, detail])
         call["events"] = events
     return _stable_restores(data)
@@ -397,6 +450,8 @@ def record_all() -> dict[str, dict[str, Any]]:
                                                       phone_factory=_export_phone)),
         "transfer_restore": _stable_transfer(_scenario("transfer_restore", _transfer_restore,
                                                        phone_factory=_restore_phones)),
+        "transfer_restore_tel": _stable_transfer(_scenario("transfer_restore_tel", _transfer_restore_tel,
+                                                           phone_factory=_restore_tel_phones)),
         "unauthorized": _scenario("unauthorized", _devices_only(unauthorized)),
         "many": _scenario("many", _devices_only(many)),
         "empty": _scenario("empty", _devices_only("List of devices attached\n\n")),

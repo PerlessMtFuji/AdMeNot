@@ -21,6 +21,7 @@ from admenot.engine.session import ScanReport
 from admenot.engine.transfer.backup import BackupResult, Selection
 from admenot.engine.transfer.restore import RestoreResult, UploadChoice
 from admenot.engine.transfer.restore_plan import UPLOAD_GROUPS
+from admenot.engine.transfer.restore_tel import TelResult
 from admenot.engine.transfer.telephony import CategoryResult
 from admenot.engine.workflow import AppStatus, OrderResult
 
@@ -41,6 +42,7 @@ MAX_MB = 10_000_000  # 10 TB w MB — kopia telefonu; serwer ma ten sam limit `b
 TRANSFER_CATEGORIES = ("contacts", "sms", "mms", "calls", "media", "downloads", "whatsapp",
                        "others", "apps")
 MAX_STREAMS = 8  # serwer: `streams` 1–8
+TEL_CATEGORIES = ("contacts", "sms", "mms", "calls")  # serwer: dokładnie te klucze `tel`/`safety`
 
 
 def _short(value: str | None) -> str:
@@ -183,15 +185,37 @@ def transfer_backup_event(device: DeviceInfo, result: BackupResult,
     }
 
 
+def _restore_status(result: RestoreResult, tel: TelResult | None) -> str:
+    """Stan całego wgrywania: pliki i telefonia (przerwana telefonia → `stopped`)."""
+    if tel is None:
+        return result.status
+    if tel.stopped:
+        return "stopped"
+    return "incomplete" if result.status == "complete" and tel.status == "incomplete" else result.status
+
+
+def _tel_part(tel: TelResult) -> dict[str, Any]:
+    """Liczby telefonii per kategoria (klucze `TEL_CATEGORIES`), bez nazw kont, plików i numerów."""
+    return {
+        "tel": {k: {"written": _count(v.written), "existed": _count(v.existed),
+                    "skipped": _count(v.skipped_synced + v.skipped_messenger), "failed": _count(v.failed),
+                    "manual": _count(v.manual), "path": v.path, "visible_warning": bool(v.visible_warning)}
+                for k, v in tel.kinds.items() if k in TEL_CATEGORIES},
+        "safety": {k: bool(v) for k, v in tel.safety.items() if k in TEL_CATEGORIES},
+        "cleanup_ok": tel.cleanup.ok,
+    }
+
+
 def transfer_restore_event(device: DeviceInfo, result: RestoreResult, choice: UploadChoice,
-                           streams: int) -> dict[str, Any]:
+                           streams: int, tel: TelResult | None = None) -> dict[str, Any]:
     """Wgrywanie kopii na nowy telefon (`device` = telefon docelowy): same liczby i wybrane grupy.
     Bez nazw plików, folderów i pakietów z plików APK — „Inne foldery” to tylko `others`: coś
-    wybrano. Serial telefonu docelowego (`result.target_serial`) też nie wychodzi."""
+    wybrano. Serial telefonu docelowego (`result.target_serial`) też nie wychodzi. Z telefonią (`tel`)
+    dochodzą `tel`, `safety` i `cleanup_ok` — same liczby i flagi, bez nazw kont (adresów e-mail)."""
     groups = {g: g in choice.groups for g in UPLOAD_GROUPS}
     groups["others"] = any(g.startswith("other:") for g in choice.groups)
     return {
-        "device": device_of(device), "status": result.status,
+        "device": device_of(device), "status": _restore_status(result, tel),
         "seconds": _count(result.seconds, MAX_SECONDS),
         "bytes_mb": _count(round(result.bytes / 1_000_000), MAX_MB),
         "files": _count(result.files_done), "exists": _count(result.files_exists),
@@ -201,6 +225,7 @@ def transfer_restore_event(device: DeviceInfo, result: RestoreResult, choice: Up
         "apk_suspicious_skipped": _count(result.apk_suspicious_skipped),
         "streams": min(max(1, int(streams)), MAX_STREAMS), "hashed": result.hashed,
         "media_scan": result.media_scan, "groups": groups,
+        **(_tel_part(tel) if tel is not None else {}),
     }
 
 

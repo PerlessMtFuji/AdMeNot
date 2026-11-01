@@ -727,11 +727,31 @@ def _render(rows: list[dict[str, str | None]], cols: list[str] | None) -> str:
 
 
 _STORAGE_TOOLS = {"find", "stat", "ls", "df", "content", "sha256sum", "mkdir", "head"}
+_TEL_HEADS = (["am", "instrument"], ["dumpsys", "role"], ["dumpsys", "account"], ["rm", "-rf"],
+              ["cmd", "role", "add-role-holder"], ["cmd", "role", "remove-role-holder"])
+_TEL_INTENTS = (f"{helper.PACKAGE}/.RoleActivity", "android.settings.MANAGE_DEFAULT_APPS_SETTINGS", "text/x-vcard")
+
+
+def _telephony_cmd(argv: list[str]) -> bool:
+    """Zapis telefonii (Etap 3) idzie do `FakeStoragePhone`: pomocnik, appop shell, rola SMS, aplikacja
+    pomocnicza, jej katalogi i intencje. Polecenia skanu i naprawy (`--user 0`, `cmd role
+    get-role-holders`, ekrany ustawień) zostają przy `FakePhone`."""
+    if not argv:
+        return False
+    if argv[0].startswith("CLASSPATH=") or any(argv[:len(h)] == h for h in _TEL_HEADS):
+        return True
+    if argv[:2] == ["am", "start"] and any(i in argv for i in _TEL_INTENTS):
+        return True
+    if argv[0] == "appops" and argv[2:3] == ["com.android.shell"]:
+        return True
+    return argv[0] == "pm" and argv[1:2] in (["list"], ["uninstall"], ["grant"]) and helper.PACKAGE in argv
 
 
 class TransferPhone:
     """Telefon do testów mostu kopii: skan aplikacji z `FakePhone` (pakiety, ustawienia), pamięć,
-    providery, APK i `pull` z `FakeStoragePhone`. Jest też `Puller` (puller_factory → ta atrapa)."""
+    providery, APK i `pull` z `FakeStoragePhone`. Jest też `Puller` (puller_factory → ta atrapa).
+    Zapis telefonii (pomocnik, appop shell, rola SMS, `install -g`, intencje roli) też idzie do
+    `FakeStoragePhone` (`_telephony_cmd`)."""
 
     def __init__(self, cli, storage: FakeStoragePhone) -> None:
         self.cli = cli
@@ -750,7 +770,7 @@ class TransferPhone:
         argv = shlex.split(command)
         if argv[:2] == ["pm", "path"] and len(argv) == 3:
             return argv[2] in self.storage.apps
-        return bool(argv) and argv[0] in _STORAGE_TOOLS
+        return (bool(argv) and argv[0] in _STORAGE_TOOLS) or _telephony_cmd(argv)
 
     def shell(self, command: str, timeout: float = 20.0) -> str:
         if self._storage_cmd(command):
@@ -758,7 +778,7 @@ class TransferPhone:
         return self.cli.shell(command, timeout)
 
     def run(self, args: list[str], timeout: float = 20.0) -> str:
-        if args == ["get-state"]:
+        if args == ["get-state"] or args[:2] == ["install", "-g"]:
             return self.storage.run(args, timeout)
         if len(args) == 3 and args[:2] == ["shell", "-T"] and self._storage_cmd(args[2]):
             return self.storage.run(args, timeout)

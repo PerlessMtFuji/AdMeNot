@@ -17,7 +17,8 @@ def _module():
 def test_bridge_fixtures_are_up_to_date():
     fresh = _module().record_all()
     assert set(fresh) == {"adware", "adware-en", "clean", "manual", "disconnect", "report",
-                          "transfer", "transfer_export", "transfer_restore", "unauthorized", "many", "empty"}
+                          "transfer", "transfer_export", "transfer_restore", "transfer_restore_tel",
+                          "unauthorized", "many", "empty"}
     for name, data in fresh.items():
         path = OUT / f"{name}.json"
         assert path.exists(), f"brak {path} — uruchom: python scripts/record_bridge_fixtures.py"
@@ -75,3 +76,19 @@ def test_transfer_restore_scenario_plans_uploads_and_lists():
     assert (result["status"], result["files_renamed"], result["apk_skipped"]) == ("complete", 1, 1)
     listed = data["calls"][-1]["result"]["copies"][0]["restores"]
     assert [(r["serial"], r["status"]) for r in listed] == [(result["target_serial"], "complete")]
+
+
+def test_transfer_restore_tel_scenario_plans_taps_and_reports_manual_import():
+    data = _module().record_all()["transfer_restore_tel"]
+    assert [c["method"] for c in data["calls"]] == ["list_devices", "transfer_inventory", "start_backup",
+                                                    "restore_plan", "start_restore", "transfers"]
+    events = [(name, d) for c in data["calls"] for name, d in c["events"]]
+    plan = next(d for n, d in events if n == "transfer:restore_plan")["tel"]
+    assert (plan["contacts"]["write"], plan["sms"]["write"], plan["calls"]["write"]) == (2, 2, 1)
+    taps = [d["request"] for n, d in events if n == "transfer:tap"]
+    assert taps == ["sms_role_grant", None]
+    tel = next(d for n, d in events if n == "transfer:restore_done")["tel"]
+    assert {k: v["path"] for k, v in tel["kinds"].items()} == {
+        "contacts": "app_process", "sms": "companion", "calls": "file"}
+    assert tel["manual"] == [{"kind": "calls", "name": "admenot-polaczenia-20260926-143100.xml"}]
+    assert tel["cleanup"]["ok"] is True and tel["status"] == "incomplete"

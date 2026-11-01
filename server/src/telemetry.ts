@@ -80,7 +80,12 @@ const MAX_MB = 10_000_000; // 10 TB w MB (telemetry_events.MAX_MB)
 // („Inne foldery” to tylko `others`) i pakietów z plików APK.
 const RESTORE_FIELDS = ["device", "status", "seconds", "bytes_mb", "files", "exists", "renamed", "denied",
   "failed", "unselected", "missing", "apk_skipped", "apk_suspicious_skipped", "streams", "hashed", "media_scan",
-  "groups"] as const;
+  "groups", "tel", "safety", "cleanup_ok"] as const;
+// Telefonia przy wgrywaniu (Etap 3): liczby per kategoria, droga zapisu i flagi — bez nazw kont
+// (adresów e-mail), numerów, treści i nazw plików.
+const TEL_CATEGORIES = ["contacts", "sms", "mms", "calls"] as const;
+const TEL_COUNTS = ["written", "existed", "skipped", "failed", "manual"] as const;
+const TEL_PATHS = ["app_process", "companion", "file", "none"] as const;
 const RESTORE_COUNTS = ["files", "exists", "renamed", "denied", "failed", "unselected", "missing", "apk_skipped",
   "apk_suspicious_skipped"] as const;
 const RESTORE_GROUPS = ["photos", "videos", "downloads", "whatsapp", "others"] as const;
@@ -95,6 +100,39 @@ function flags(v: unknown, keys: readonly string[]): Obj {
     out[k] = (v as Obj)[k];
   }
   return out;
+}
+
+// Obiekt o kluczach z `keys` (podzbiór: tylko wybrane kategorie), każda wartość sprawdzona przez `item`.
+function some(v: unknown, keys: readonly string[], item: (x: unknown) => unknown): Obj {
+  need(isObj(v) && Object.keys(v as Obj).every((k) => keys.includes(k)));
+  const out: Obj = {};
+  for (const k of keys) if (k in (v as Obj)) out[k] = item((v as Obj)[k]);
+  return out;
+}
+
+function telKind(v: unknown): Obj {
+  need(isObj(v) && Object.keys(v as Obj).every((k) => (TEL_COUNTS as readonly string[]).includes(k)
+    || k === "path" || k === "visible_warning"));
+  const t = v as Obj;
+  need(oneOf(t.path, TEL_PATHS) && typeof t.visible_warning === "boolean");
+  const out: Obj = {};
+  for (const k of TEL_COUNTS) {
+    need(int(t[k]));
+    out[k] = t[k];
+  }
+  return { ...out, path: t.path, visible_warning: t.visible_warning };
+}
+
+function bool(v: unknown): boolean {
+  need(typeof v === "boolean");
+  return v as boolean;
+}
+
+// Telefonia przy wgrywaniu: brak wszystkich trzech pól (same pliki, starszy program) → nic.
+function restoreTel(e: Obj): Obj {
+  if (e.tel === undefined && e.safety === undefined && e.cleanup_ok === undefined) return {};
+  return { tel: some(e.tel, TEL_CATEGORIES, telKind), safety: some(e.safety, TEL_CATEGORIES, bool),
+    cleanup_ok: bool(e.cleanup_ok) };
 }
 
 function checks(v: unknown): Obj {
@@ -180,7 +218,7 @@ function body(e: Obj): Obj {
       const out: Obj = { device: device(e.device), status: e.status, seconds: e.seconds, bytes_mb: e.bytes_mb };
       for (const k of RESTORE_COUNTS) out[k] = e[k];
       return { ...out, streams: e.streams, hashed: e.hashed, media_scan: e.media_scan,
-        groups: flags(e.groups, RESTORE_GROUPS) };
+        groups: flags(e.groups, RESTORE_GROUPS), ...restoreTel(e) };
     }
     default:
       throw new Invalid();

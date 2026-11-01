@@ -179,6 +179,48 @@ describe("POST /api/v1/telemetry", () => {
     expect(await rows()).toEqual([]);
   });
 
+  const TEL_KIND = { written: 410, existed: 2, skipped: 30, failed: 0, manual: 0, path: "app_process",
+    visible_warning: false };
+  const TEL = { contacts: TEL_KIND, sms: { ...TEL_KIND, path: "companion", visible_warning: true },
+    mms: { ...TEL_KIND, path: "file", manual: 3 }, calls: { ...TEL_KIND, path: "none", written: 0 } };
+  const withTel = (tel: Record<string, unknown> = TEL, extra: Record<string, unknown> = {}) => restore({
+    tel, safety: { contacts: true, sms: true, mms: false, calls: true }, cleanup_ok: true, ...extra });
+
+  it("transfer_restore z telefonią: przyjęte i zapisane same liczby", async () => {
+    const res = await post([withTel(), withTel({ sms: TEL.sms }, { safety: { sms: false }, cleanup_ok: false })]);
+    expect(res.status).toBe(200);
+    const [first, second] = (await rows()).map((r) => JSON.parse(r.body));
+    expect(first).toMatchObject({ type: "transfer_restore", tel: TEL, cleanup_ok: true,
+      safety: { contacts: true, sms: true, mms: false, calls: true } });
+    expect(second).toMatchObject({ tel: { sms: TEL.sms }, safety: { sms: false }, cleanup_ok: false });
+    expect(Object.keys(second.tel)).toEqual(["sms"]);
+  });
+
+  it("transfer_restore bez telefonii (same pliki) nadal przechodzi", async () => {
+    expect((await post([restore()])).status).toBe(200);
+    const body = JSON.parse((await rows())[0].body);
+    expect(body.tel).toBeUndefined();
+    expect(body.cleanup_ok).toBeUndefined();
+  });
+
+  it.each([
+    ["nieznana droga", withTel({ ...TEL, sms: { ...TEL.sms, path: "x" } })],
+    ["dodatkowe pole account", withTel({ ...TEL, contacts: { ...TEL_KIND, account: "jan@gmail.com" } })],
+    ["kategoria rcs", withTel({ ...TEL, rcs: TEL_KIND })],
+    ["brak pola w kategorii", withTel({ ...TEL, calls: { ...TEL_KIND, manual: undefined } })],
+    ["ujemna liczba", withTel({ ...TEL, sms: { ...TEL.sms, failed: -1 } })],
+    ["liczba ponad limit", withTel({ ...TEL, sms: { ...TEL.sms, written: 100_001 } })],
+    ["visible_warning nie logiczne", withTel({ ...TEL, sms: { ...TEL.sms, visible_warning: 1 } })],
+    ["safety z kategorią rcs", withTel(TEL, { safety: { rcs: true } })],
+    ["safety nie logiczne", withTel(TEL, { safety: { sms: "yes" } })],
+    ["cleanup_ok nie logiczne", withTel(TEL, { cleanup_ok: "ok" })],
+    ["tel nie obiekt", withTel([] as never)],
+    ["dodatkowe pole accounts", withTel(TEL, { accounts: ["jan@gmail.com"] })],
+  ])("transfer_restore z telefonią 400: %s", async (_name, event) => {
+    expect((await post([event])).status).toBe(400);
+    expect(await rows()).toEqual([]);
+  });
+
   it("undo: liczby witryn opcjonalne, domyślnie 0", async () => {
     await post([undo()]);
     expect(JSON.parse((await rows())[0].body)).toMatchObject({ sites: 0, sites_restored: 0 });

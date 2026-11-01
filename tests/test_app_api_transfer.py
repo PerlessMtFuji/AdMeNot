@@ -729,3 +729,225 @@ def test_restore_telemetry_has_no_paths(tmp_path, monkeypatch):
     for name in ("DCIM", "Camera", "a.jpg", "Music", "notes.txt", "Download", "gra.apk", "com.evil.game",
                  "Anna", SERIAL, NEW, "sdcard"):
         assert name not in text, name
+
+
+# --- Etap 3: kontakty, wiadomości i połączenia na nowym telefonie --------------------------------
+
+PREV = "com.google.android.apps.messaging"
+TEL_CHOICE = {**CHOICE, "tel": ["contacts", "sms", "calls"]}
+
+
+@pytest.fixture
+def no_tap_wait(monkeypatch):
+    from admenot.engine.transfer import phonesetup
+
+    monkeypatch.setattr(phonesetup, "_sleep", lambda s: None)
+
+
+def _helper_pkg() -> str:
+    from admenot.engine.transfer import helper
+
+    return helper.PACKAGE
+
+
+def _tel_copied(tmp_path, **kw):
+    """Kopia ze starego telefonu (2 kontakty do zapisu, 2 SMS, 1 połączenie) i nowy telefon z pustą
+    telefonią, na którym Wiadomości Google są domyślną aplikacją SMS."""
+    api, rec, host, copy_id = _copied(tmp_path, **kw)
+    new = host.phone(NEW).storage
+    new.telephony = True
+    new.role_holders = [PREV]
+    (new.root / "sdcard" / "Download").mkdir(parents=True, exist_ok=True)
+    return api, rec, host, copy_id
+
+
+def _on_event(rec, hook):
+    """Woła `hook(nazwa, szczegóły)` po każdym zdarzeniu (zadania w testach są synchroniczne)."""
+    emit = rec.emit
+
+    def emit_and_hook(name, detail=None):
+        emit(name, detail)
+        hook(name, rec.of(name)[-1])
+
+    rec.emit = emit_and_hook
+
+
+def _synced_account(new) -> None:
+    """Na nowym telefonie jest już konto Google `a@b` z kontaktami: kontakt z tego konta przyjdzie
+    z synchronizacji, więc plan go pomija."""
+    new.accounts = [("com.google", "a@b")]
+    new.providers["raw_contacts"] = [{"_id": "1", "contact_id": "1", "deleted": "0",
+                                      "account_type": "com.google", "account_name": "a@b"}]
+    new.providers["contacts"] = [{"_id": "1", "starred": "0", "display_name": "Ktoś inny"}]
+
+
+def test_restore_plan_includes_tel_view(tmp_path):
+    api, rec, host, copy_id = _tel_copied(tmp_path)
+    tel = _planned(api, rec, copy_id)["tel"]
+    assert tel["contacts"] == {"write": 2, "existing": 0, "skipped_synced": [], "skipped_messenger": 0}
+    assert tel["sms"] == {"write": 2, "existing": 0} and tel["calls"] == {"write": 1, "existing": 0}
+    assert tel["mms"] is None  # kopia bez MMS
+    assert tel["phone_has_contacts"] is False
+    assert tel["readable"] == {"contacts": True, "sms": True, "calls": True}
+    new = host.phone(NEW).storage
+    assert new.providers["sms"] == [] and new.installed == set() and new.appop == "default"
+
+
+def test_restore_plan_tel_skips_synced_account(tmp_path):
+    api, rec, host, copy_id = _tel_copied(tmp_path)
+    _synced_account(host.phone(NEW).storage)
+    tel = _planned(api, rec, copy_id)["tel"]
+    assert tel["contacts"]["write"] == 1 and tel["phone_has_contacts"] is True
+    assert tel["contacts"]["skipped_synced"] == [{"account": "a@b", "count": 1}]
+
+
+def test_start_restore_with_tel_completes(tmp_path, no_tap_wait):
+    api, rec, host, copy_id = _tel_copied(tmp_path)
+    _planned(api, rec, copy_id)
+    assert "job_id" in api.start_restore(TEL_CHOICE)
+    done = rec.of("transfer:restore_done")[0]
+    assert done["result"]["status"] == "complete" and done["result"]["files_done"] == 5
+    tel = done["tel"]
+    assert {k: (v["written"], v["path"]) for k, v in tel["kinds"].items()} == {
+        "contacts": (2, "app_process"), "sms": (2, "app_process"), "calls": (1, "app_process")}
+    assert tel["status"] == "complete" and tel["stopped"] is False and tel["manual"] == []
+    assert tel["cleanup"]["ok"] is True and tel["safety"] == {"contacts": True, "sms": True, "calls": True}
+    assert rec.of("transfer:tel_progress")
+    new = host.phone(NEW).storage
+    assert (len(new.providers["contacts"]), len(new.providers["sms"]), len(new.providers["calls"])) == (2, 2, 1)
+    assert new.role_holders == [PREV] and new.appop == "default" and new.tmp_files == set()
+    (entry,) = api.transfers()["copies"][0]["restores"]
+    assert (entry["status"], entry["resumable"]) == ("complete", False)
+    assert api.start_restore({**CHOICE, "tel": ["rcs"]})["error"]["key"] == "bad_request"
+    assert api.start_restore({**CHOICE, "tel": ["mms"]})["error"]["key"] == "bad_request"
+    assert api.start_restore({**CHOICE, "tel": "sms"})["error"]["key"] == "bad_request"
+
+
+def test_tap_event_and_skip(tmp_path, no_tap_wait):
+    api, rec, host, copy_id = _tel_copied(tmp_path)
+    new = host.phone(NEW).storage
+    new.helper_denied = {"sms"}  # SMS przez aplikację pomocniczą: rola SMS, a ta wymaga stuknięcia
+    new.role_needs_tap = True
+    _planned(api, rec, copy_id)
+    assert api.skip_tap()["error"]["key"] == "bad_request"  # nic nie czeka na stuknięcie
+    skipped = []
+
+    def hook(name, detail):
+        if name == "transfer:tap" and detail["request"] == "sms_role_grant":
+            skipped.append(api.skip_tap())
+
+    _on_event(rec, hook)
+    api.start_restore(TEL_CHOICE)
+    assert skipped == [{}]
+    assert rec.of("transfer:tap") == [{"request": "sms_role_grant", "package": PREV},
+                                      {"request": None, "package": PREV}]
+    tel = rec.of("transfer:restore_done")[0]["tel"]
+    assert tel["kinds"]["sms"]["path"] == "file" and tel["kinds"]["sms"]["manual"] == 2
+    assert [m["kind"] for m in tel["manual"]] == ["sms"]
+    assert "/" not in tel["manual"][0]["name"] and tel["manual"][0]["name"].endswith(".xml")
+    assert tel["status"] == "incomplete" and tel["cleanup"]["ok"] is True
+    assert new.role_holders == [PREV] and _helper_pkg() not in new.installed
+
+
+def test_skip_not_allowed_on_role_restore(tmp_path, no_tap_wait):
+    api, rec, host, copy_id = _tel_copied(tmp_path)
+    new = host.phone(NEW).storage
+    new.helper_denied = {"sms"}
+    new.role_restore_needs_tap = True  # rola nie wraca sama z ADB: serwisant stuka w ustawieniach
+    _planned(api, rec, copy_id)
+    answers = []
+
+    def hook(name, detail):
+        if name == "transfer:tap" and detail["request"] == "sms_role_restore":
+            answers.append(api.skip_tap())
+            new.tap_role(PREV)
+
+    _on_event(rec, hook)
+    api.start_restore(TEL_CHOICE)
+    assert [(a["error"]["key"], a["error"]["message"]) for a in answers] == [("bad_request", "restore_required")]
+    tel = rec.of("transfer:restore_done")[0]["tel"]
+    assert tel["kinds"]["sms"]["path"] == "companion" and tel["cleanup"]["ok"] is True
+    assert new.role_holders == [PREV] and _helper_pkg() not in new.installed
+
+
+def _leftover_changes(host, copy_id):
+    """Stan wgrywania po zamknięciu programu w trakcie: rolę SMS i aplikację pomocniczą ma nasz pakiet."""
+    from admenot.engine.transfer.restore_state import RestoreState, restore_state_path
+
+    copy = store.CopyDir(store.transfers_dir() / copy_id)
+    state = RestoreState(restore_state_path(copy, NEW))
+    state.set_meta("serial", NEW)
+    state.set_meta("status", "running")
+    state.set_meta("device_changes", {"appop_prev": None, "role_prev": [PREV], "companion": True,
+                                      "helper_dir": False})
+    state.close()
+    new = host.phone(NEW).storage
+    new.installed = {_helper_pkg()}
+    new.role_holders = [_helper_pkg()]
+    return copy, new
+
+
+def test_connect_runs_cleanup_before_scan(tmp_path, no_tap_wait):
+    from admenot.engine.transfer.phonesetup import device_changes
+    from admenot.engine.transfer.restore_state import RestoreState, restore_state_path
+
+    api, rec, host, copy_id = _tel_copied(tmp_path)
+    copy, new = _leftover_changes(host, copy_id)
+    during = []
+
+    def on_shell(command):
+        if command == "dumpsys role" and not during:
+            during.append(api.start_scan(NEW)["error"])
+            during.append(api.restore_plan(copy_id, NEW)["error"])
+
+    new.on_shell = on_shell
+    assert api.list_devices()["error"] is None  # telefon na liście: sprzątanie startuje samo
+    assert [(e["key"], e["message"]) for e in during] == [("busy", "phone_cleanup")] * 2
+    assert rec.of("transfer:cleanup_done") == [{"ok": True}]
+    assert new.role_holders == [PREV] and new.installed == set()
+    state = RestoreState(restore_state_path(copy, NEW))
+    try:
+        assert not device_changes(state).pending
+    finally:
+        state.close()
+    new.on_shell = None
+    api.list_devices()  # ten sam telefon dalej podłączony: sprzątanie nie startuje drugi raz
+    assert len(rec.of("transfer:cleanup_done")) == 1
+    assert "job_id" in api.start_scan(NEW)
+
+
+def test_connect_cleanup_waits_for_tap_and_refuses_skip(tmp_path, no_tap_wait):
+    api, rec, host, copy_id = _tel_copied(tmp_path)
+    _copy, new = _leftover_changes(host, copy_id)
+    new.role_restore_needs_tap = True
+    answers = []
+
+    def hook(name, detail):
+        if name == "transfer:tap" and detail["request"] == "sms_role_restore":
+            answers.append(api.skip_tap()["error"]["message"])
+            new.tap_role(PREV)
+
+    _on_event(rec, hook)
+    api.list_devices()
+    assert answers == ["restore_required"]
+    assert rec.of("transfer:tap")[0] == {"request": "sms_role_restore", "package": PREV}
+    assert rec.of("transfer:cleanup_done") == [{"ok": True}] and new.installed == set()
+
+
+def test_tel_telemetry_has_no_names_or_numbers(tmp_path, no_tap_wait):
+    api, rec, host, copy_id = _tel_copied(tmp_path)
+    _synced_account(host.phone(NEW).storage)
+    api.set_telemetry(True, True)
+    _planned(api, rec, copy_id)
+    api.start_restore(TEL_CHOICE)
+    assert rec.of("transfer:restore_done")[0]["tel"]["synced_accounts"] == [{"account": "a@b", "count": 1}]
+    events = [json.loads(x) for x in telemetry_path().read_text("utf-8").splitlines()]
+    event = next(e for e in events if e["type"] == "transfer_restore")
+    assert event["status"] == "complete" and event["cleanup_ok"] is True
+    assert event["tel"]["contacts"] == {"written": 1, "existed": 0, "skipped": 1, "failed": 0, "manual": 0,
+                                        "path": "app_process", "visible_warning": False}
+    assert set(event["tel"]) == {"contacts", "sms", "calls"} and set(event["safety"]) == set(event["tel"])
+    text = json.dumps(event, ensure_ascii=False)
+    for secret in ("a@b", "Jan", "Kowalski", "Firma", "biuro@firma.pl", "600100200", "999888777",
+                   "Cześć", "Emoji", PREV, NEW, SERIAL):
+        assert secret not in text, secret

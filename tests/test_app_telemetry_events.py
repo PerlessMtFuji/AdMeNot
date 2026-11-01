@@ -332,3 +332,44 @@ def test_transfer_restore_event_fits_server_limits():
     assert body["seconds"] == 86_400 and body["bytes_mb"] == ev.MAX_MB and body["files"] == ev.MAX_COUNT
     assert body["streams"] == 8 and body["media_scan"] == "skipped"
     assert body["groups"]["others"] is False and body["groups"]["videos"] is True
+
+
+def _tel_result(stopped=False):
+    from admenot.engine.transfer.phonesetup import CleanupResult
+    from admenot.engine.transfer.restore_tel import TelKindResult, TelResult
+    from admenot.engine.transfer.telfile import ManualStep
+
+    kinds = {"contacts": TelKindResult(written=3, existed=1, skipped_synced=4, skipped_messenger=2, failed=0,
+                                       manual=0, path="app_process", visible_warning=False),
+             "sms": TelKindResult(5, 0, 0, 0, 1, 2, "file", True)}
+    return TelResult(kinds, {"contacts": True, "sms": False},
+                     [ManualStep("sms", "/sdcard/Download/AdMeNot-SMS-Jan Kowalski.xml")],
+                     CleanupResult(True, True, False, True), {"jan.kowalski@gmail.com": 4}, 30, stopped)
+
+
+def test_transfer_restore_event_with_tel_has_only_numbers():
+    body = ev.transfer_restore_event(ev._SAMPLE_DEVICE, _restore_result(status="complete"), _upload_choice(), 4,
+                                     _tel_result())
+    assert body["tel"] == {
+        "contacts": {"written": 3, "existed": 1, "skipped": 6, "failed": 0, "manual": 0, "path": "app_process",
+                     "visible_warning": False},
+        "sms": {"written": 5, "existed": 0, "skipped": 0, "failed": 1, "manual": 2, "path": "file",
+                "visible_warning": True}}
+    assert body["safety"] == {"contacts": True, "sms": False} and body["cleanup_ok"] is False
+    assert body["status"] == "incomplete"  # pliki skończone, telefonia z plikiem do ręcznego importu
+    text = json.dumps(body)
+    for name in ("jan.kowalski", "gmail", "Kowalski", "AdMeNot-SMS", "Download"):
+        assert name not in text, name
+
+
+def test_transfer_restore_event_tel_status_and_limits():
+    stopped = ev.transfer_restore_event(ev._SAMPLE_DEVICE, _restore_result(status="complete"), _upload_choice(),
+                                        4, _tel_result(stopped=True))
+    assert stopped["status"] == "stopped"
+    files_only = ev.transfer_restore_event(ev._SAMPLE_DEVICE, _restore_result(), _upload_choice(), 4)
+    assert not {"tel", "safety", "cleanup_ok"} & set(files_only)
+    import dataclasses as dc
+    big = _tel_result()
+    big = dc.replace(big, kinds={"calls": dc.replace(big.kinds["sms"], written=10**9)})
+    body = ev.transfer_restore_event(ev._SAMPLE_DEVICE, _restore_result(), _upload_choice(), 4, big)
+    assert body["tel"]["calls"]["written"] == ev.MAX_COUNT

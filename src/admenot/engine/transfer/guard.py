@@ -168,6 +168,22 @@ class ReadOnlyAdb:
         return self.inner.run_bytes(args, timeout=timeout)
 
 
+ACCOUNTS_CMD = "dumpsys account"
+
+
+class TelPlanReadAdb(ReadOnlyAdb):
+    """`ReadOnlyAdb` + dokładnie `dumpsys account` przez `shell` — odczyt kont nowego telefonu dla planu
+    telefonii (`telplan.build_tel_plan`: kontakty z konta, które się zsynchronizuje, są pomijane)."""
+
+    def with_serial(self, serial: str) -> TelPlanReadAdb:
+        return TelPlanReadAdb(self.inner.with_serial(serial))
+
+    def shell(self, command: str, timeout: float = 20.0) -> str:
+        if command == ACCOUNTS_CMD:
+            return self.inner.shell(command, timeout=timeout)
+        return super().shell(command, timeout=timeout)
+
+
 _APPEND_CMDS = {"stat", "sha256sum", "df", "ls", "getprop", "mkdir", "content"}
 STAT_TAIL = " 2>&1 || true"  # błędy `stat` na stdout, zawsze kod 0 (adb gubi stdout przy kodzie ≠ 0)
 _SCAN_VOLUME = ["content", "call", "--uri", "content://media", "--method", "scan_volume",

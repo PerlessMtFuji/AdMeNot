@@ -228,6 +228,9 @@ class _TelRestore:
             known = st.tel_status(k)
             todo[k] = [r for r in self.records[k] if known.get(r[0]) not in ("done", "manual")]
             self.stats[k].total = len(todo[k])
+        # Banner wznowienia (`read_restores`): do końca przebiegu wszystko z kolejki liczy się jako
+        # niezrobione, także po zamknięciu programu w trakcie
+        st.set_meta("tel_left", sum(len(v) for v in todo.values()))
         stopped = False
         try:
             try:
@@ -546,9 +549,11 @@ class _TelRestore:
         paths = self.state.get_meta("tel_path") or {}
         contacts = self.plan.contacts if "contacts" in self.kinds else None
         kinds: dict[str, TelKindResult] = {}
+        left = 0
         for k in self.kinds:
             known = self.state.tel_status(k)
             cnt = Counter(known.get(rid) for rid, _ in self.records[k])
+            left += len(self.records[k]) - cnt["done"] - cnt["manual"] - cnt["error"]
             sel = contacts if k == "contacts" else None
             kinds[k] = TelKindResult(
                 written=cnt["done"], existed=self.plan.existing.get(k, 0),
@@ -556,6 +561,7 @@ class _TelRestore:
                 skipped_messenger=sel.skipped_messenger if sel else 0,
                 failed=cnt["error"], manual=cnt["manual"], path=paths.get(k, "none"),
                 visible_warning=self.visible.get(k, False))
+        self.state.set_meta("tel_left", left)
         # kroki „do zrobienia” tylko dla kategorii, które nadal mają rekordy do ręcznego importu (plik
         # zaimportowany i plan bez tych rekordów -> krok znika, a przebieg może być `complete`)
         still = {"sms" if k == "mms" else k for k, v in kinds.items() if v.manual}

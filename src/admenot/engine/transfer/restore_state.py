@@ -2,7 +2,8 @@
 
 `<kopia>/restore/<device_dir_name(serial)>.sqlite`: pliki (cel, status, próby), rekordy telefonii
 (`tel`: kategoria, id rekordu, status, droga) i meta `serial`, `choice`, `status`, `updated`,
-`device_changes` (zmiany telefonu do odwrócenia, `phonesetup`). Czyta go też widok kopii
+`device_changes` (zmiany telefonu do odwrócenia, `phonesetup`), `tel_left` (rekordy telefonii
+jeszcze nierozstrzygnięte, `restore_tel`). Czyta go też widok kopii
 (`read_restores`: „wgrano na …”, Banner wznowienia i sprzątania).
 """
 
@@ -147,7 +148,9 @@ class RestoreSummary:
     serial: str
     status: str  # running | complete | incomplete | stopped | klucz `RestoreError`
     updated: str | None  # ISO-8601 UTC
-    resumable: bool  # zostały pliki do wgrania (`pending`/`pushing`) i przebieg nie jest `complete`
+    # zostały pliki do wgrania (`pending`/`pushing`) albo rekordy telefonii (`tel_left`) i przebieg
+    # nie jest `complete`
+    resumable: bool
     cleanup_pending: bool = False  # zostały zmiany telefonu do odwrócenia (`device_changes`)
 
 
@@ -187,7 +190,18 @@ def _summary(path: Path) -> RestoreSummary | None:
     if not isinstance(serial, str) or not isinstance(status, str):
         return None
     return RestoreSummary(serial, status, updated if isinstance(updated, str) else None,
-                          status != "complete" and left > 0, changes_pending(meta.get("device_changes")))
+                          status != "complete" and (left > 0 or _tel_left(meta) > 0),
+                          changes_pending(meta.get("device_changes")))
+
+
+def _tel_left(meta: dict[str, Any]) -> int:
+    """Rekordy telefonii jeszcze nierozstrzygnięte (meta `tel_left`, `restore_tel`). Wybór bez telefonii
+    (wznowienie tylko plików) ich nie liczy; stan bez wyboru (sama telefonia) — liczy."""
+    left = meta.get("tel_left")
+    choice = meta.get("choice")
+    if not isinstance(left, int) or (isinstance(choice, dict) and not choice.get("tel")):
+        return 0
+    return left
 
 
 def read_restores(copy: CopyDir) -> list[RestoreSummary]:

@@ -80,13 +80,20 @@ class UploadChoice:
     groups: frozenset[str]  # ⊆ UPLOAD_GROUPS ∪ {"other:…"}
     apks_on: frozenset[str]  # `remote` podejrzanych APK zaznaczonych przez serwisanta
     verify_hash: bool = False
+    tel: frozenset[str] = frozenset()  # ⊆ TEL_KINDS; `sms` obejmuje MMS (silnik telefonii: `sms` + `mms`)
 
     def to_json(self) -> dict[str, Any]:
-        return {"groups": sorted(self.groups), "apks_on": sorted(self.apks_on), "verify_hash": self.verify_hash}
+        return {"groups": sorted(self.groups), "apks_on": sorted(self.apks_on), "verify_hash": self.verify_hash,
+                "tel": sorted(self.tel)}
 
     @classmethod
     def from_json(cls, data: dict[str, Any]) -> UploadChoice:
-        return cls(frozenset(data["groups"]), frozenset(data["apks_on"]), bool(data.get("verify_hash", False)))
+        """Stan sprzed Etapu 3 nie ma klucza `tel` (wgrywanie samych plików)."""
+        return cls(frozenset(data["groups"]), frozenset(data["apks_on"]), bool(data.get("verify_hash", False)),
+                   frozenset(data.get("tel") or ()))
+
+
+TEL_KINDS = frozenset({"contacts", "sms", "calls"})  # wybór telefonii na ekranie wgrywania
 
 
 @dataclass(frozen=True)

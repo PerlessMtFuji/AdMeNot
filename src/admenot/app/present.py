@@ -54,7 +54,9 @@ from admenot.engine.transfer.inventory import FILE_CATEGORIES, Inventory
 from admenot.engine.transfer.restore import RestoreResult
 from admenot.engine.transfer.restore_plan import UPLOAD_GROUPS, GroupTotals, RestorePlan
 from admenot.engine.transfer.restore_state import read_restores
+from admenot.engine.transfer.restore_tel import TelResult
 from admenot.engine.transfer.store import CopyDir, CopyMeta
+from admenot.engine.transfer.telplan import TelPlan
 from admenot.engine.workflow import OrderPlan, OrderResult
 
 MAX_PROBLEMS = 3
@@ -524,3 +526,35 @@ def restore_plan_view(plan: RestorePlan) -> dict[str, Any]:
 
 def restore_result_view(r: RestoreResult) -> dict[str, Any]:
     return asdict(r)
+
+
+def _accounts(counts: Mapping[str, int]) -> list[dict[str, Any]]:
+    """Konta (adresy e-mail) z liczbą pominiętych kontaktów — tylko do UI, nigdy do telemetrii."""
+    return [{"account": a, "count": n} for a, n in sorted(counts.items())]
+
+
+def tel_plan_view(p: TelPlan) -> dict[str, Any]:
+    """Telefonia na ekranie wgrywania: ile rekordów każdej kategorii trafi na telefon (`write`) i ile już
+    na nim jest (`existing`). Kategoria, której nie ma w kopii, to `None`. `readable`: kategorie, których
+    telefon nie dał odczytać, nie mają `existing` (duplikatom zapobiega wtedy stan wgrywania)."""
+    src, c = p.sources, p.contacts
+    contacts = None if src.contacts is None or c is None else {
+        "write": len(c.write), "existing": p.existing.get("contacts", 0),
+        "skipped_synced": _accounts(c.skipped_synced), "skipped_messenger": c.skipped_messenger}
+
+    def kind(present: object, records: list[Any], name: str) -> dict[str, int] | None:
+        return None if present is None else {"write": len(records), "existing": p.existing.get(name, 0)}
+
+    return {"contacts": contacts, "sms": kind(src.sms, p.sms, "sms"), "mms": kind(src.mms, p.mms, "mms"),
+            "calls": kind(src.calls, p.calls, "calls"), "phone_has_contacts": p.phone_has_contacts,
+            "readable": dict(p.readable)}
+
+
+def tel_result_view(r: TelResult) -> dict[str, Any]:
+    """Wynik telefonii: liczby per kategoria, kopia bezpieczeństwa, pliki do ręcznego importu (sama nazwa
+    pliku w `Pobranych`), przywrócenie telefonu (`cleanup.ok`) i konta pominiętych kontaktów (tylko UI)."""
+    return {"kinds": {k: asdict(v) for k, v in r.kinds.items()}, "safety": dict(r.safety),
+            "manual": [{"kind": m.kind, "name": m.remote.rsplit("/", 1)[-1]} for m in r.manual],
+            "cleanup": {**asdict(r.cleanup), "ok": r.cleanup.ok},
+            "synced_accounts": _accounts(r.synced_accounts), "seconds": r.seconds, "stopped": r.stopped,
+            "status": r.status}

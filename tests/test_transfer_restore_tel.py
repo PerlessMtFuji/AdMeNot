@@ -402,6 +402,20 @@ def test_stop_mid_run_cleans_up(tmp_path):
         st.close()
 
 
+def test_stopped_tel_run_is_resumable_in_copy_view(tmp_path):
+    """Przerwana telefonia (bez plików w kolejce) daje Banner wznowienia; skończona — już nie."""
+    from admenot.engine.transfer.restore_state import read_restores
+
+    copy, phone = _copy(tmp_path), _new(tmp_path)
+    r = Run(phone, copy)(should_stop=lambda: bool(phone.providers["contacts"]))
+    assert r.stopped
+    (entry,) = read_restores(copy)
+    assert (entry.serial, entry.status, entry.resumable) == ("NEW", "stopped", True)
+    assert Run(phone, copy)().status == "complete"
+    (entry,) = read_restores(copy)
+    assert (entry.status, entry.resumable) == ("complete", False)
+
+
 def test_stop_keeps_pending_when_role_not_restored(tmp_path):
     copy, phone = _copy(tmp_path), _new(tmp_path, helper_denied={"sms", "mms"}, role_restore_needs_tap=True)
     stop = {"now": False}

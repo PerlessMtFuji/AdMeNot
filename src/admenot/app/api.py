@@ -48,6 +48,8 @@ from admenot.app.present import (
     result_view,
     scan_view,
     step_view,
+    tel_plan_view,
+    tel_result_view,
 )
 from admenot.app.telemetry_events import (
     repair_event,
@@ -136,7 +138,7 @@ from admenot.engine.transfer.backup import (
     run_backup,
 )
 from admenot.engine.transfer.exports import EXPORT_KINDS
-from admenot.engine.transfer.guard import AppendOnlyAdb, ReadOnlyAdb
+from admenot.engine.transfer.guard import AppendOnlyAdb, ReadOnlyAdb, TelPlanReadAdb
 from admenot.engine.transfer.inventory import (
     FILE_CATEGORIES,
     Inventory,
@@ -144,10 +146,17 @@ from admenot.engine.transfer.inventory import (
     refresh_inventory,
     whatsapp_backup_time,
 )
+from admenot.engine.transfer.phonesetup import (
+    cleanup,
+    device_changes,
+    pending_cleanup,
+    telephony_adb,
+)
 from admenot.engine.transfer.puller import Puller, RealPuller
 from admenot.engine.transfer.pusher import Pusher, RealPusher
 from admenot.engine.transfer.restore import (
     STREAMS,
+    TEL_KINDS,
     RestoreError,
     RestoreProgress,
     RestoreResult,
@@ -156,7 +165,9 @@ from admenot.engine.transfer.restore import (
 )
 from admenot.engine.transfer.restore_plan import UPLOAD_GROUPS, RestorePlan, build_plan
 from admenot.engine.transfer.restore_state import RestoreState, read_restores, restore_state_path
+from admenot.engine.transfer.restore_tel import TelProgress, TelResult, run_tel_restore
 from admenot.engine.transfer.telephony import Stopped as TransferStopped
+from admenot.engine.transfer.telplan import TelPlan, build_tel_plan
 from admenot.engine.workflow import (
     OrderInterrupted,
     OrderResult,
@@ -192,8 +203,10 @@ _SHARE_ID = re.compile(r"[A-Za-z0-9-]{1,64}")
 SHOWN_MAX = 200  # pamiętane kody kontrolne pokazane klientom w tej sesji; najstarsze odpadają
 TRANSFER_PURGE_S = 24 * 3600.0  # kopie danych po terminie: sprawdzane też w trakcie pracy okna
 TRANSFER_PROGRESS_S = 0.5  # dławienie zdarzeń `transfer:progress`
-TRANSFER_KINDS = frozenset({"transfer_scan", "backup", "restore_plan", "restore"})
-RESTORE_KINDS = frozenset({"restore_plan", "restore"})  # zadania, które czytają kopię z dysku
+TRANSFER_KINDS = frozenset({"transfer_scan", "backup", "restore_plan", "restore", "phone_cleanup"})
+# zadania, które czytają kopię z dysku (sprzątanie: stany wgrywania w katalogach kopii)
+RESTORE_KINDS = frozenset({"restore_plan", "restore", "phone_cleanup"})
+TEL_PLAN_KINDS = frozenset({"contacts", "sms", "mms", "calls"})  # plan telefonii: wszystko, co jest w kopii
 SAME_PHONE_RECENT = timedelta(hours=24)  # wgrywanie na telefon, z którego jest świeża kopia: ostrzeżenie
 
 
@@ -279,12 +292,13 @@ def _selection(value: Any, inventory: Inventory) -> Selection:
 
 def _upload_choice(value: Any, plan: RestorePlan) -> UploadChoice:
     """Wybór z ekranu wgrywania: grupy (`UPLOAD_GROUPS` albo `other:<folder>` z planu), zaznaczone
-    podejrzane APK (tylko pliki APK z planu) i sumy SHA-256. Nieznana grupa albo plik → odmowa."""
+    podejrzane APK (tylko pliki APK z planu), sumy SHA-256 i telefonia (`tel` ⊆ `TEL_KINDS`, brak =
+    bez telefonii; `sms` obejmuje MMS). Nieznana grupa, plik albo kategoria → odmowa."""
     if not isinstance(value, dict):
         raise AppError("bad_request", "choice")
     lists: dict[str, frozenset[str]] = {}
-    for key in ("groups", "apks_on"):
-        items = value.get(key)
+    for key in ("groups", "apks_on", "tel"):
+        items = value.get(key, [] if key == "tel" else None)
         if not isinstance(items, list) or not all(isinstance(i, str) for i in items):
             raise AppError("bad_request", "choice")
         lists[key] = frozenset(items)
@@ -293,9 +307,9 @@ def _upload_choice(value: Any, plan: RestorePlan) -> UploadChoice:
         raise AppError("bad_request", "choice")
     known = set(UPLOAD_GROUPS) | {g for g in plan.groups if g.startswith("other:")}
     apks = {f.remote for f in plan.files if f.apk is not None}
-    if not lists["groups"] <= known or not lists["apks_on"] <= apks:
+    if not lists["groups"] <= known or not lists["apks_on"] <= apks or not lists["tel"] <= TEL_KINDS:
         raise AppError("bad_request", "choice")
-    return UploadChoice(lists["groups"], lists["apks_on"], verify)
+    return UploadChoice(lists["groups"], lists["apks_on"], verify, lists["tel"])
 
 
 @contextlib.contextmanager
@@ -418,9 +432,15 @@ class Api:
         self._transfer: tuple[DeviceInfo, Inventory, str | None] | None = None
         self._backup_serial: str | None = None  # telefon, którego kopia właśnie trwa
         self._pusher_factory = pusher_factory
-        # Ostatni plan wgrywania: (nowy telefon, kopia, plan) — z niego startuje wgrywanie.
-        self._restore: tuple[DeviceInfo, store.CopyDir, RestorePlan] | None = None
+        # Ostatni plan wgrywania: (nowy telefon, kopia, plan plików, plan telefonii) — z niego startuje
+        # wgrywanie.
+        self._restore: tuple[DeviceInfo, store.CopyDir, RestorePlan, TelPlan] | None = None
         self._restore_copy_id: str | None = None  # kopia czytana przez plan albo wgrywanie
+        # Prośba o stuknięcie na telefonie (`transfer:tap`): „sms_role_grant” | „sms_role_restore” | None.
+        self._tap_request: str | None = None
+        self._skip_tap = threading.Event()  # „Pomiń” przy nadaniu roli SMS (`skip_tap`)
+        # Telefony sprawdzone pod kątem zmian do odwrócenia w tym podłączeniu (sprzątanie przy podłączeniu).
+        self._cleaned: set[str] = set()
         self._purge_stop = threading.Event()
         self._clean_screenshots()
         self._purge_old_data()
@@ -605,6 +625,9 @@ class Api:
         ready = {e.serial for e in entries if e.state == "device"}
         for serial in set(self._identities) - ready:
             self._identities.pop(serial, None)  # odłączony: przy następnym podłączeniu czytamy od nowa
+        self._cleaned &= ready  # odłączony: przy następnym podłączeniu sprawdzamy od nowa
+        for serial in sorted(ready - self._cleaned):
+            self._cleanup_on_connect(serial)
         devices = []
         for e in entries:
             name, imei, image = self._identity(e.serial) if e.serial in ready else (None, None, None)
@@ -626,6 +649,63 @@ class Api:
     def _remember(self, device: DeviceInfo, match: PhoneMatch | None) -> None:
         card = device_card(device, match)
         self._identities[device.serial] = (card["name"], device.imei, card["image"] or None)
+
+    def _cleanup_on_connect(self, serial: str) -> None:
+        """Telefon pojawił się na liście: zmiany telefonu zostawione przez przerwane wgrywanie (rola SMS,
+        appop, aplikacja pomocnicza) odwracamy najpierw, przed skanem i czymkolwiek innym (spec Etapu 3
+        §4) — zadanie `phone_cleanup`; do jego końca każde inne zadanie dostaje `busy`. Gdy trwa inne
+        zadanie, sprawdzamy przy następnym odczycie listy. Błąd tu nie psuje listy telefonów."""
+        if self._jobs.current() is not None:
+            return
+        try:
+            copies = []
+            for meta in store.list_copies():
+                with contextlib.suppress(ValueError, OSError):
+                    copies.append(store.copy_dir(meta.id))
+            paths = pending_cleanup(copies, serial)
+            self._cleaned.add(serial)
+            if paths:
+                self._jobs.start("phone_cleanup", lambda job: self._phone_cleanup(job, serial, paths))
+        except AppError:  # inne zadanie wystartowało w międzyczasie: spróbujemy przy następnym odczycie
+            self._cleaned.discard(serial)
+        except Exception as exc:  # noqa: BLE001 — lista telefonów działa dalej
+            log_exception(exc)
+
+    def _phone_cleanup(self, job: Job, serial: str, paths: list[Path]) -> None:
+        ok = True
+        adb = self._session(serial)
+        try:
+            with _transfer_errors("phone_cleanup"), device_lock(journal_path(), serial):
+                for path in paths:
+                    if job.should_stop():
+                        ok = False
+                        break
+                    state = RestoreState(path)
+                    try:
+                        res = cleanup(telephony_adb(adb, state), state, self._tap_handler(state), job.should_stop)
+                    finally:
+                        state.close()
+                    ok = ok and res.ok
+        finally:
+            self._end_tap()
+        self._emit("transfer:cleanup_done", {"ok": ok})
+
+    def _tap_handler(self, state: RestoreState) -> Callable[[str | None], None]:
+        """`on_tap` silnika: zdarzenie `transfer:tap` z prośbą i poprzednią domyślną aplikacją SMS
+        (`role_prev[0]` ze stanu wgrywania; UI pokazuje jej nazwę)."""
+
+        def on_tap(request: str | None) -> None:
+            if request == "sms_role_grant":
+                self._skip_tap.clear()
+            self._tap_request = request
+            prev = device_changes(state).role_prev
+            self._emit("transfer:tap", {"request": request, "package": prev[0] if prev else None})
+
+        return on_tap
+
+    def _end_tap(self) -> None:
+        self._tap_request = None
+        self._skip_tap.clear()
 
     # --- ustawienia i telefony --------------------------------------------------------------
 
@@ -1682,20 +1762,22 @@ class Api:
         return result, copy
 
     def _transfer_events(self, job: Job, raw: AdbTransport, event: str,
-                         ) -> tuple[Callable[[Progress | RestoreProgress], None], Callable[[], None]]:
-        """(`on_progress`, `wait_device`) dla silnika kopii i wgrywania. Postęp idzie zdarzeniem
-        `event`, dławiony do jednego na `TRANSFER_PROGRESS_S` w obrębie etapu (nowy etap — od
-        razu). `wait_device` odpytuje `get-state` surowym transportem (`raw`, bez wpisu w logu co
-        sekundę) i raz wysyła `transfer:waiting`."""
+                         ) -> tuple[Callable[[Progress | RestoreProgress | TelProgress], None],
+                                    Callable[[], None]]:
+        """(`on_progress`, `wait_device`) dla silnika kopii, wgrywania i telefonii. Postęp idzie
+        zdarzeniem `event`, dławiony do jednego na `TRANSFER_PROGRESS_S` w obrębie etapu (telefonia:
+        kategorii; nowy etap — od razu). `wait_device` odpytuje `get-state` surowym transportem (`raw`,
+        bez wpisu w logu co sekundę) i raz wysyła `transfer:waiting`."""
         last: dict[str, Any] = {"at": None, "stage": None, "p": None}
 
-        def progress(p: Progress | RestoreProgress) -> None:
+        def progress(p: Progress | RestoreProgress | TelProgress) -> None:
             last["p"] = p
             now = time.monotonic()
-            if (last["stage"] == p.stage and last["at"] is not None
+            stage = p.kind if isinstance(p, TelProgress) else p.stage
+            if (last["stage"] == stage and last["at"] is not None
                     and now - last["at"] < TRANSFER_PROGRESS_S):
                 return
-            last["at"], last["stage"] = now, p.stage
+            last["at"], last["stage"] = now, stage
             self._emit(event, asdict(p))
 
         def wait_device() -> None:
@@ -1724,8 +1806,9 @@ class Api:
     @_api
     def restore_plan(self, copy_id: str, serial: str) -> dict[str, Any]:
         """Plan wgrywania kopii na telefon `serial`: co już jest, co trafi obok jako „(z kopii)”,
-        ocena APK i miejsce. Na telefon idą tylko odczyty (`AppendOnlyAdb`); stan wgrywania tej
-        kopii na ten telefon (jeśli jest) daje cele własnych niedokończonych plików."""
+        ocena APK i miejsce, a dla telefonii (`tel`) — ile kontaktów, wiadomości i połączeń telefon
+        jeszcze potrzebuje. Na telefon idą tylko odczyty (`AppendOnlyAdb`, `TelPlanReadAdb`); stan
+        wgrywania tej kopii na ten telefon (jeśli jest) daje cele własnych niedokończonych plików."""
         if not isinstance(copy_id, str):
             raise AppError("bad_request", "copy_id")
         if not isinstance(serial, str) or not serial.strip():
@@ -1745,20 +1828,21 @@ class Api:
             self._restore_copy_id = copy_id
             try:
                 with _transfer_errors("restore_plan"):
-                    device, plan = plan_on(job)
+                    device, plan, tel_plan = plan_on(job)
                     view = self._copy_view(copy.read_meta())  # kopia zniknęła → błąd kopii
             finally:
                 self._restore_copy_id = None
-            self._restore = (device, copy, plan)
+            self._restore = (device, copy, plan, tel_plan)
             mine = next((r for r in read_restores(copy) if r.serial == device.serial), None)
             self._emit("transfer:restore_plan", {
                 "plan": restore_plan_view(plan),
+                "tel": tel_plan_view(tel_plan),
                 "copy": view,
                 "resumable": mine is not None and mine.resumable,
                 "same_phone_recent": (meta.serial == device.serial
                                       and self._now() - meta.created < SAME_PHONE_RECENT)})
 
-        def plan_on(job: Job) -> tuple[DeviceInfo, RestorePlan]:
+        def plan_on(job: Job) -> tuple[DeviceInfo, RestorePlan, TelPlan]:
             device = read_device_info(adb)
             crash.note_device(device.serial, device.manufacturer, device.model, device.android_release)
             match = self._provider.match(device)
@@ -1777,7 +1861,11 @@ class Api:
             except TransferStopped:
                 raise Stopped from None
             job.check()
-            return device, plan
+            # Telefonia: same odczyty (`content query` przez strażnika odczytu + `dumpsys account`);
+            # zapis przez `TelephonyWriteAdb` dopiero przy wgrywaniu.
+            tel_plan = build_tel_plan(TelPlanReadAdb(adb), copy, meta, set(TEL_PLAN_KINDS))
+            job.check()
+            return device, plan, tel_plan
 
         return {"job_id": self._jobs.start("restore_plan", run)}
 
@@ -1788,7 +1876,7 @@ class Api:
         state = self._restore
         if state is None:
             raise AppError("transfer_no_plan")
-        device, copy, plan = state
+        device, copy, plan, tel_plan = state
         serial = device.serial
         if serial not in {e.serial for e in list_devices(self._host) if e.state == "device"}:
             raise AppError("transfer_no_plan", serial)
@@ -1800,15 +1888,20 @@ class Api:
 
         def run(job: Job) -> None:
             self._restore_copy_id = copy_id
+            tel: TelResult | None = None
             try:
                 with _transfer_errors("restore"), device_lock(journal_path(), serial):
                     result = self._run_restore(job, adb, raw, device, copy, plan, chosen)
+                    if chosen.tel and result.status != "stopped":  # zatrzymane pliki: telefonia czeka
+                        tel = self._run_tel(job, adb, raw, device, copy, tel_plan, chosen.tel)
                     view = self._copy_view(copy.read_meta())  # kopia zniknęła → błąd kopii
             finally:
                 self._restore_copy_id = None
-            self._emit("transfer:restore_done", {"result": restore_result_view(result), "copy": view})
+                self._cleaned.discard(serial)  # nieudane przywrócenie telefonu: sprzątanie zaraz po zadaniu
+            self._emit("transfer:restore_done", {"result": restore_result_view(result), "copy": view,
+                                                 "tel": tel_result_view(tel) if tel is not None else None})
             telemetry.record("transfer_restore",
-                             lambda _packages: transfer_restore_event(device, result, chosen, STREAMS))
+                             lambda _packages: transfer_restore_event(device, result, chosen, STREAMS, tel))
 
         return {"job_id": self._jobs.start("restore", run)}
 
@@ -1818,6 +1911,36 @@ class Api:
         progress, wait_device = self._transfer_events(job, raw, "transfer:restore_progress")
         return run_restore(AppendOnlyAdb(adb), pusher, device, copy, plan, chosen, on_progress=progress,
                            should_stop=job.should_stop, wait_device=wait_device, streams=STREAMS)
+
+    def _run_tel(self, job: Job, adb: SessionLogAdb, raw: AdbTransport, device: DeviceInfo,
+                 copy: store.CopyDir, tel_plan: TelPlan, kinds: frozenset[str]) -> TelResult:
+        """Kontakty, wiadomości i połączenia po plikach. Odczyty (kopia bezpieczeństwa, klucze, widoczność)
+        przez strażnika odczytu; zmiany telefonu i zapisy przez `TelephonyWriteAdb` z rolą SMS oddawaną
+        tylko zapisanemu poprzedniemu posiadaczowi. Postęp: `transfer:tel_progress`."""
+        pusher = self._pusher_factory(self._settings.adb_path, device.serial, adb.tagged("push"))
+        progress, wait_device = self._transfer_events(job, raw, "transfer:tel_progress")
+        wanted = kinds | ({"mms"} if "sms" in kinds else set())  # `sms` z ekranu obejmuje MMS (silnik: osobno)
+        state = RestoreState(restore_state_path(copy, device.serial))
+        try:
+            return run_tel_restore(
+                telephony_adb(adb, state), ReadOnlyAdb(adb), pusher, device, copy, tel_plan, frozenset(wanted),
+                state, on_progress=progress, should_stop=job.should_stop, wait_device=wait_device,
+                on_tap=self._tap_handler(state), skip_tap=self._skip_tap.is_set)
+        finally:
+            self._end_tap()
+            state.close()
+
+    @_api
+    def skip_tap(self) -> dict[str, Any]:
+        """„Pomiń” przy prośbie o domyślną aplikację SMS: wiadomości pójdą do pliku do ręcznego importu.
+        Oddania roli poprzedniej aplikacji pominąć nie wolno (telefon zostałby z naszą aplikacją SMS)."""
+        request = self._tap_request
+        if request == "sms_role_restore":
+            raise AppError("bad_request", "restore_required")
+        if request != "sms_role_grant":
+            raise AppError("bad_request", "no_tap")
+        self._skip_tap.set()
+        return {}
 
     @_api
     def transfers(self) -> dict[str, Any]:
