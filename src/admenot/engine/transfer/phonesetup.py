@@ -2,8 +2,10 @@
 
 Program zmienia na nowym telefonie najwyżej cztery rzeczy: appop `WRITE_SMS` dla shell, posiadacza roli
 SMS, zainstalowaną aplikację pomocniczą i katalog pomocnika `/data/local/tmp/admenot`. Każdą zapisuje
-w meta `device_changes` stanu wgrywania (z commitem) **przed** poleceniem, które ją wprowadza, więc
-po zamknięciu programu albo wyrwanym kablu `cleanup` przy następnym podłączeniu wie, co odwrócić.
+w zapisie telefonu poza kopią (`PhoneRecord`, `phone_changes/<telefon>.json`) i w meta `device_changes`
+stanu wgrywania (z commitem) **przed** poleceniem, które ją wprowadza, więc po zamknięciu programu,
+wyrwanym kablu albo usunięciu kopii `cleanup` przy następnym podłączeniu wie, co odwrócić. Odczyt łączy
+oba zapisy (`merge_changes`), więc stan sprzed zapisu poza kopią też się liczy.
 `cleanup` jest idempotentne: każdy krok potwierdzony odczytem z telefonu czyści swoje pole.
 
 Posiadacza roli SMS czytamy z `dumpsys role` (`cmd role get-role-holders` nie ma na Androidzie 13/MIUI).
@@ -24,11 +26,18 @@ from typing import Literal
 from ..adb.transport import AdbError, AdbTransport
 from . import helper
 from .guard import _APPOP_MODES, SMS_ROLE, STAT_TAIL, TelephonyWriteAdb, q
-from .restore_state import RestoreState, device_changes_pending, restore_state_path
+from .restore_state import (
+    CHANGES_KEY,
+    PhoneRecord,
+    RestoreState,
+    device_changes_pending,
+    merge_changes,
+    restore_state_path,
+)
 from .store import CopyDir
 
 TAP_POLL = 2  # s — odpytywanie roli, gdy czekamy na stuknięcie na telefonie
-META_KEY = "device_changes"
+META_KEY = CHANGES_KEY
 APPOP_GET = "appops get com.android.shell WRITE_SMS"
 INSTALL_TIMEOUT = 180.0
 _CONNECTION_KINDS = {"offline", "no_device", "unauthorized", "adb_missing"}
@@ -38,6 +47,8 @@ _REFUSED = ("INSTALL_FAILED_", "Failure [", "canceled by user")
 _sleep = time.sleep  # podmieniane w testach
 
 OnTap = Callable[[str | None], None]  # "sms_role_grant" | "sms_role_restore" | None (koniec prośby)
+# Gdzie leżą zmiany telefonu: stan wgrywania (z zapisem telefonu obok) albo sam zapis telefonu (kopii już nie ma)
+Changes = RestoreState | PhoneRecord
 
 
 @dataclass(frozen=True)
@@ -69,19 +80,38 @@ class CleanupResult:
 # --------------------------------------------------------------------------------------
 # Stan
 # --------------------------------------------------------------------------------------
-def device_changes(state: RestoreState) -> DeviceChanges:
+def _record_of(state: Changes) -> PhoneRecord | None:
+    return None if isinstance(state, PhoneRecord) else PhoneRecord.of_state(state.path)
+
+
+def device_changes(state: Changes) -> DeviceChanges:
+    """Zapis telefonu połączony z meta stanu (pole, które coś mówi, wygrywa)."""
+    record = _record_of(state)
     raw = state.get_meta(META_KEY) or {}
+    if record is not None:
+        raw = merge_changes(record.get_meta(META_KEY), raw)
     role = raw.get("role_prev")
     return DeviceChanges(raw.get("appop_prev"), None if role is None else tuple(role),
                          bool(raw.get("companion")), bool(raw.get("helper_dir")))
 
 
-def _save(state: RestoreState, changes: DeviceChanges) -> None:
-    state.set_meta(META_KEY, asdict(changes))  # `set_meta` robi commit
+def _save(state: Changes, changes: DeviceChanges) -> None:
+    """Najpierw zapis telefonu poza kopią (atomowo; nic do odwrócenia → plik usunięty), potem meta stanu
+    (`set_meta` robi commit). Błąd zapisu → wyjątek przed poleceniem, które zmienia telefon."""
+    value = asdict(changes)
+    record = _record_of(state)
+    if record is not None:
+        record.set_meta(META_KEY, value)
+    state.set_meta(META_KEY, value)
 
 
-def _update(state: RestoreState, **fields) -> None:
+def _update(state: Changes, **fields) -> None:
     _save(state, replace(device_changes(state), **fields))
+
+
+def open_changes(path: Path) -> Changes:
+    """Ścieżka z `pending_cleanup`: stan wgrywania (`.sqlite`) albo sam zapis telefonu (`.json`)."""
+    return PhoneRecord(path) if path.suffix == ".json" else RestoreState(path)
 
 
 def mark_helper_dir(state: RestoreState) -> None:
@@ -90,15 +120,20 @@ def mark_helper_dir(state: RestoreState) -> None:
         _update(state, helper_dir=True)
 
 
-def telephony_adb(inner: AdbTransport, state: RestoreState) -> TelephonyWriteAdb:
+def telephony_adb(inner: AdbTransport, state: Changes) -> TelephonyWriteAdb:
     """Strażnik zapisu telefonii: oddać rolę SMS wolno tylko zapisanemu poprzedniemu posiadaczowi."""
     return TelephonyWriteAdb(inner, role_restore=lambda: frozenset(device_changes(state).role_prev or ()))
 
 
 def pending_cleanup(copies: list[CopyDir], serial: str) -> list[Path]:
-    """Stany wgrywania tego telefonu, w których zostały zmiany telefonu do odwrócenia."""
-    paths = [restore_state_path(c, serial) for c in copies]
-    return [p for p in paths if device_changes_pending(p)]
+    """Stany wgrywania tego telefonu, w których zostały zmiany telefonu do odwrócenia (każdy czyta też
+    zapis telefonu), a bez takich stanów — sam zapis telefonu, gdy coś w nim zostało (kopia usunięta)."""
+    paths = [p for p in (restore_state_path(c, serial) for c in copies) if device_changes_pending(p)]
+    if not paths:
+        record = PhoneRecord.for_serial(serial)
+        if record.pending:
+            paths.append(record.path)
+    return paths
 
 
 # --------------------------------------------------------------------------------------
@@ -260,7 +295,7 @@ def _wait_role(adb: AdbTransport, prev: tuple[str, ...], on_tap: OnTap,
         on_tap(None)
 
 
-def _restore_role(adb: AdbTransport, state: RestoreState, on_tap: OnTap,
+def _restore_role(adb: AdbTransport, state: Changes, on_tap: OnTap,
                   should_stop: Callable[[], bool]) -> bool:
     changes = device_changes(state)
     prev = changes.role_prev
@@ -284,7 +319,7 @@ def _restore_role(adb: AdbTransport, state: RestoreState, on_tap: OnTap,
     return True
 
 
-def _restore_appop(adb: AdbTransport, state: RestoreState) -> bool:
+def _restore_appop(adb: AdbTransport, state: Changes) -> bool:
     prev = device_changes(state).appop_prev
     if prev is None:
         return True
@@ -302,7 +337,7 @@ def _restore_appop(adb: AdbTransport, state: RestoreState) -> bool:
     return True
 
 
-def _remove_companion(adb: AdbTransport, state: RestoreState, role_ok: bool) -> bool:
+def _remove_companion(adb: AdbTransport, state: Changes, role_ok: bool) -> bool:
     if not device_changes(state).companion:
         return True
     if not role_ok:  # odinstalowanie posiadacza roli oddałoby ją systemowi, nie poprzedniej aplikacji
@@ -316,7 +351,7 @@ def _remove_companion(adb: AdbTransport, state: RestoreState, role_ok: bool) -> 
     return True
 
 
-def _remove_helper_dir(adb: AdbTransport, state: RestoreState) -> bool:
+def _remove_helper_dir(adb: AdbTransport, state: Changes) -> bool:
     if not device_changes(state).helper_dir:
         return True
     try:
@@ -330,7 +365,7 @@ def _remove_helper_dir(adb: AdbTransport, state: RestoreState) -> bool:
     return True
 
 
-def cleanup(adb: AdbTransport, state: RestoreState, on_tap: OnTap,
+def cleanup(adb: AdbTransport, state: Changes, on_tap: OnTap,
             should_stop: Callable[[], bool]) -> CleanupResult:
     """Odwraca zapisane zmiany: rola SMS (czekanie na stuknięcie bez limitu, przerywane `should_stop`),
     appop, odinstalowanie aplikacji pomocniczej (dopiero po potwierdzonej roli), katalog pomocnika.

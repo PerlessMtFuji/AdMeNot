@@ -5,9 +5,12 @@ Wszystkie polecenia idą przez prawdziwego strażnika `TelephonyWriteAdb` opakow
 
 from __future__ import annotations
 
+import shutil
+
 import pytest
 from faketransfer import FakeStoragePhone
 
+from admenot.engine.paths import device_dir_name, phone_changes_dir
 from admenot.engine.transfer import helper, phonesetup
 from admenot.engine.transfer.phonesetup import (
     DeviceChanges,
@@ -15,6 +18,7 @@ from admenot.engine.transfer.phonesetup import (
     device_changes,
     install_companion,
     mark_helper_dir,
+    open_changes,
     pending_cleanup,
     read_appop,
     set_appop_allow,
@@ -22,7 +26,12 @@ from admenot.engine.transfer.phonesetup import (
     take_sms_role,
     telephony_adb,
 )
-from admenot.engine.transfer.restore_state import RestoreState, read_restores, restore_state_path
+from admenot.engine.transfer.restore_state import (
+    RestoreState,
+    keep_copy_changes,
+    read_restores,
+    restore_state_path,
+)
 from admenot.engine.transfer.store import CopyDir
 
 PREV = "com.google.android.apps.messaging"
@@ -157,6 +166,59 @@ def test_cleanup_after_crash_restores_role(tmp_path):
     assert PKG not in phone.installed and phone.tmp_files == set()
     assert pending_cleanup([copy], "NEW") == []
     assert not read_restores(copy)[0].cleanup_pending
+
+
+def _record(serial: str = "NEW"):
+    return phone_changes_dir() / f"{device_dir_name(serial)}.json"
+
+
+def test_changes_are_recorded_per_phone_outside_the_copy(tmp_path):
+    """Zapis zmian telefonu leży też poza kopią (`phone_changes/<telefon>.json`): usunięta kopia nie
+    zabiera go ze sobą, sprzątanie przy podłączeniu czyta go stamtąd i na końcu usuwa."""
+    phone, copy, state, adb = _setup(tmp_path, appop="default")
+    set_appop_allow(adb, state)
+    assert install_companion(adb, state) == "ok"
+    assert take_sms_role(adb, state, lambda r: None, _never, _never) == "ok"
+    _with_helper_dir(phone, adb, state)
+    assert _record().is_file()
+    state.close()
+    shutil.rmtree(copy.path)  # kopia usunięta przed sprzątaniem
+
+    (path,) = pending_cleanup([], "NEW")
+    assert path == _record() and pending_cleanup([], "OTHER") == []
+    record = open_changes(path)
+    assert device_changes(record) == DeviceChanges("default", (PREV,), True, True)
+    assert cleanup(telephony_adb(phone, record), record, lambda r: None, _never).ok
+    assert phone.role_holders == [PREV] and phone.appop == "default"
+    assert PKG not in phone.installed and phone.tmp_files == set()
+    assert not _record().exists() and pending_cleanup([], "NEW") == []
+
+
+def test_state_and_record_merge_so_nothing_is_forgotten(tmp_path):
+    """Stan sprzed zapisu poza kopią (zmiany tylko w kopii) i zapis telefonu z innego wgrywania: sprzątanie
+    widzi obie listy i czyści obie."""
+    phone, copy, state, adb = _setup(tmp_path)
+    assert install_companion(adb, state) == "ok"
+    assert take_sms_role(adb, state, lambda r: None, _never, _never) == "ok"
+    state.set_meta("device_changes", {"appop_prev": "default", "role_prev": None, "companion": False,
+                                      "helper_dir": False})  # stary stan: tylko w kopii
+    phone.appop = "allow"
+    assert device_changes(state) == DeviceChanges("default", (PREV,), True, False)
+    assert pending_cleanup([copy], "NEW") == [restore_state_path(copy, "NEW")]  # zapis telefonu pokrywa stan
+    assert cleanup(telephony_adb(phone, state), state, lambda r: None, _never).ok
+    assert phone.role_holders == [PREV] and phone.appop == "default" and PKG not in phone.installed
+    assert not _record().exists() and pending_cleanup([copy], "NEW") == []
+
+
+def test_keep_copy_changes_moves_old_states_to_the_phone_record(tmp_path):
+    _phone, copy, state, _adb = _setup(tmp_path)
+    state.set_meta("device_changes", {"appop_prev": None, "role_prev": [PREV], "companion": True,
+                                      "helper_dir": False})
+    state.close()
+    keep_copy_changes(copy)
+    record = open_changes(_record())
+    assert device_changes(record) == DeviceChanges(None, (PREV,), True, False)
+    keep_copy_changes(CopyDir(tmp_path / "missing"))  # kopia bez stanów: nic
 
 
 def test_cleanup_waits_for_tap_until_role_restored(tmp_path, monkeypatch):

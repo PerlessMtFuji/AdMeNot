@@ -230,8 +230,14 @@ def extend(copy_id: str) -> CopyMeta:
 
 def delete(copy_id: str) -> None:
     """Najpierw dane, na końcu `meta.json` i pusty katalog. Błąd w połowie (np. zablokowany plik)
-    zostawia `meta.json`, więc kopia nadal jest widoczna i następne usunięcie ją dokończy."""
-    path = _resolve(copy_id).path
+    zostawia `meta.json`, więc kopia nadal jest widoczna i następne usunięcie ją dokończy.
+    Przedtem zmiany nowych telefonów zapisane tylko w stanach wgrywania kopii trafiają do zapisu
+    telefonu poza kopią (`restore_state.keep_copy_changes`); nieudany zapis (OSError) — kopia zostaje."""
+    from .restore_state import keep_copy_changes  # restore_state importuje ten moduł
+
+    copy = _resolve(copy_id)
+    keep_copy_changes(copy)
+    path = copy.path
     for child in list(path.iterdir()):
         if child.name == META:
             continue
@@ -252,16 +258,12 @@ def copy_dir(copy_id: str) -> CopyDir:
 def purge_expired(now: datetime, busy: Callable[[str], bool], busy_copy: Callable[[str], bool]) -> list[str]:
     """Usuwa kopie po terminie. Kopia, której telefon jest zajęty (`busy(serial)`), kopia właśnie
     używana (`busy_copy(id)`, np. wgrywana na nowy telefon) i kopia z nieczytelnym `meta.json`
-    zostają: nie kasujemy tego, czego nie umiemy rozpoznać. Zostaje też kopia ze zmianami nowego
-    telefonu do odwrócenia (`device_changes` w stanie wgrywania): tylko tam jest ich zapis."""
-    from .restore_state import copy_cleanup_pending  # restore_state importuje ten moduł
-
+    zostają: nie kasujemy tego, czego nie umiemy rozpoznać. Zmiany nowego telefonu do odwrócenia
+    nie giną z kopią (`delete`)."""
     removed: list[str] = []
     for copy in _copy_dirs():
         meta = _readable(copy)
         if meta is None or meta.expires > now or busy(meta.serial) or busy_copy(meta.id):
-            continue
-        if copy_cleanup_pending(copy):
             continue
         try:
             delete(meta.id)

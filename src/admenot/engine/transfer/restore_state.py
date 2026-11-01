@@ -2,7 +2,8 @@
 
 `<kopia>/restore/<device_dir_name(serial)>.sqlite`: pliki (cel, status, próby), rekordy telefonii
 (`tel`: kategoria, id rekordu, status, droga) i meta `serial`, `choice`, `status`, `updated`,
-`device_changes` (zmiany telefonu do odwrócenia, `phonesetup`), `tel_left` (rekordy telefonii
+`device_changes` (zmiany telefonu do odwrócenia, `phonesetup`; ich główny zapis to `PhoneRecord` poza
+kopią, meta stanu jest jego kopią i zapisem stanów sprzed niego), `tel_left` (rekordy telefonii
 jeszcze nierozstrzygnięte, `restore_tel`), `scanned` (liczba plików `done` przy ostatnim udanym skanie
 galerii, `restore`). Czyta go też widok kopii
 (`read_restores`: „wgrano na …”, Banner wznowienia i sprzątania).
@@ -11,17 +12,19 @@ galerii, `restore`). Czyta go też widok kopii
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from admenot.engine.paths import device_dir_name
+from admenot.engine.paths import device_dir_name, phone_changes_dir
 
 from .store import CopyDir
 
 READ_TIMEOUT = 1.0  # s — odczyt stanu dla widoku kopii
+CHANGES_KEY = "device_changes"
 # Powody nieudanej próby po `push` — pod celem może leżeć nasz niedokończony plik.
 OWN_PARTIAL = frozenset({"interrupted", "disconnect", "push_failed", "hash_mismatch"})
 
@@ -182,15 +185,87 @@ def device_changes_pending(path: Path) -> bool:
     return found is not None and changes_pending(found[0].get("device_changes"))
 
 
-def copy_cleanup_pending(copy: CopyDir) -> bool:
-    """Któryś stan wgrywania tej kopii (dowolny telefon) ma zmiany telefonu do odwrócenia — kopii nie
-    wolno usunąć, bo zapis tych zmian jest tylko w niej (bez niego sprzątanie przy podłączeniu nie
-    wie, co przywrócić). Także stan bez `serial`/`status`, którego widok kopii nie pokazuje."""
+def merge_changes(first: Any, second: Any) -> dict[str, Any]:
+    """Dwa zapisy `device_changes` tego samego telefonu w jeden: pole z `first`, gdy coś mówi
+    (różne od `None`/`False`), inaczej z `second` — żadna zmiana do odwrócenia nie ginie."""
+    a = first if isinstance(first, dict) else {}
+    b = second if isinstance(second, dict) else {}
+    return {k: a[k] if a.get(k) is not None and a.get(k) is not False else b.get(k)
+            for k in dict.fromkeys([*a, *b])}
+
+
+def _atomic_write(path: Path, text: str) -> None:
+    """Plik tymczasowy obok, `fsync` i `os.replace`: zapis jest cały albo go nie ma."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    with open(tmp, "w", encoding="utf-8") as fh:
+        fh.write(text)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, path)
+
+
+class PhoneRecord:
+    """Zapis zmian jednego nowego telefonu poza kopiami: `phone_changes/<device_dir_name(serial)>.json`
+    (`paths.phone_changes_dir`), `{"device_changes": {...}}`. `phonesetup` pisze go razem z meta stanu
+    wgrywania i usuwa, gdy nic nie zostało do odwrócenia; sprzątanie przy podłączeniu czyta go także
+    wtedy, gdy kopii już nie ma. Interfejs meta jak `RestoreState` (`get_meta`/`set_meta`/`close`)."""
+
+    def __init__(self, path: Path):
+        self.path = path
+
+    @classmethod
+    def for_serial(cls, serial: str) -> PhoneRecord:
+        return cls(phone_changes_dir() / f"{device_dir_name(serial)}.json")
+
+    @classmethod
+    def of_state(cls, path: Path) -> PhoneRecord:
+        """Zapis telefonu stanu `path` (`<kopia>/restore/<device_dir_name(serial)>.sqlite`)."""
+        return cls(phone_changes_dir() / f"{path.stem}.json")
+
+    def get_meta(self, key: str, default: Any = None) -> Any:
+        try:
+            data = json.loads(self.path.read_text("utf-8"))
+        except FileNotFoundError:
+            return default
+        except (OSError, ValueError):  # zapis jest atomowy; zablokowany plik: spróbujemy następnym razem
+            return default
+        return data.get(key, default) if isinstance(data, dict) else default
+
+    def set_meta(self, key: str, value: Any) -> None:
+        if key != CHANGES_KEY:
+            raise ValueError(key)
+        if changes_pending(value):
+            _atomic_write(self.path, json.dumps({CHANGES_KEY: value}, ensure_ascii=False))
+        else:
+            self.path.unlink(missing_ok=True)
+
+    @property
+    def pending(self) -> bool:
+        return changes_pending(self.get_meta(CHANGES_KEY))
+
+    def close(self) -> None:
+        pass
+
+
+def keep_copy_changes(copy: CopyDir) -> None:
+    """Przed usunięciem kopii: zmiany telefonów zapisane tylko w jej stanach wgrywania (stany sprzed
+    zapisu poza kopią, także bez `serial`/`status`) dopisujemy do zapisu telefonu. Nieudany zapis →
+    OSError: kopia zostaje. Stanu nieczytelnego (uszkodzony plik) i tak nie odczytamy — pomijamy go
+    (wgrywana kopia, której stan bywa zablokowany, nie trafia tu: usunięcie odmawia `busy`)."""
     try:
         paths = sorted((copy.path / "restore").glob("*.sqlite"))
     except OSError:
-        return False
-    return any(device_changes_pending(p) for p in paths)
+        return
+    for path in paths:
+        found = _read(path)
+        if found is None:
+            continue
+        changes = found[0].get(CHANGES_KEY)
+        if not changes_pending(changes):
+            continue
+        record = PhoneRecord.of_state(path)
+        record.set_meta(CHANGES_KEY, merge_changes(record.get_meta(CHANGES_KEY), changes))
 
 
 def _summary(path: Path) -> RestoreSummary | None:

@@ -710,7 +710,6 @@
       "to_phone": "Upload to the connected phone",
       "uploaded_to": "uploaded to: {list}",
       "interrupted_on": "upload interrupted: {list}",
-      "cleanup_pending": "The new phone is waiting for its settings back — connect it before deleting this copy",
       "planning": "Checking the new phone…",
       "planning_sub": "Reading the free space and which files are already there. Nothing is uploaded yet.",
       "title": "What to upload to the new phone?",
@@ -937,8 +936,7 @@
     "transfer_in_use": "A file of this copy is open in another program (e.g. File Explorer or a photo viewer). Close it and try again.",
     "transfer_phone_full": "The new phone ran out of space. Free up space or untick some of the data and choose “Upload” — uploaded files stay.",
     "transfer_copy_missing": "This copy is no longer on this computer (it was deleted or moved).",
-    "transfer_no_plan": "The phone from the upload screen is no longer connected. Connect it and choose the copy again.",
-    "transfer_cleanup_pending": "This copy can't be deleted yet: the new phone didn't get its settings back after an interrupted upload. Connect that phone first so AdMeNot can undo its changes."
+    "transfer_no_plan": "The phone from the upload screen is no longer connected. Connect it and choose the copy again."
 
   }
 }

@@ -43,7 +43,6 @@
           </div>
           {#if serials(c, true)}<div class="text-sm text-soft">{t('transfer.restore.uploaded_to', { list: serials(c, true) })}</div>{/if}
           {#if serials(c, false)}<div class="text-sm text-warn">{t('transfer.restore.interrupted_on', { list: serials(c, false) })}</div>{/if}
-          {#if c.cleanup_pending}<div class="text-sm font-semibold text-warn">{t('transfer.restore.cleanup_pending')}</div>{/if}
         </div>
         {#if finished(c)}
           <Button variant="secondary" size="sm" disabled={!phoneReady} onclick={() => ctl.planRestore(c.id)}>

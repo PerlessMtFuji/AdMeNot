@@ -147,8 +147,10 @@ from admenot.engine.transfer.inventory import (
     whatsapp_backup_time,
 )
 from admenot.engine.transfer.phonesetup import (
+    Changes,
     cleanup,
     device_changes,
+    open_changes,
     pending_cleanup,
     telephony_adb,
 )
@@ -169,7 +171,6 @@ from admenot.engine.transfer.restore import (
 from admenot.engine.transfer.restore_plan import UPLOAD_GROUPS, RestorePlan, build_plan
 from admenot.engine.transfer.restore_state import (
     RestoreState,
-    copy_cleanup_pending,
     read_restores,
     restore_state_path,
 )
@@ -738,7 +739,7 @@ class Api:
                     if job.should_stop():
                         ok = False
                         break
-                    state = RestoreState(path)
+                    state = open_changes(path)  # stan wgrywania albo sam zapis telefonu (kopia usunięta)
                     try:
                         res = cleanup(telephony_adb(adb, state), state, self._tap_handler(state), job.should_stop)
                     finally:
@@ -762,7 +763,7 @@ class Api:
                     self._cleaned.discard(serial)
             self._emit("transfer:cleanup_done", {"ok": ok, "serial": serial})
 
-    def _tap_handler(self, state: RestoreState) -> Callable[[str | None], None]:
+    def _tap_handler(self, state: Changes) -> Callable[[str | None], None]:
         """`on_tap` silnika: zdarzenie `transfer:tap` z prośbą i poprzednią domyślną aplikacją SMS
         (`role_prev[0]` ze stanu wgrywania; UI pokazuje jej nazwę)."""
 
@@ -2080,13 +2081,8 @@ class Api:
         meta = next((m for m in store.list_copies() if m.id == copy_id), None)
         if meta is not None and self._transfer_busy(meta.serial):
             raise AppError("busy", "backup")
-        with contextlib.suppress(ValueError):  # zły identyfikator: odmowę daje `store.delete`
-            if copy_cleanup_pending(store.copy_dir(copy_id)):
-                # zapis zmian nowego telefonu (rola SMS, appop, aplikacja pomocnicza) jest tylko w kopii:
-                # najpierw podłączenie telefonu, żeby program je odwrócił
-                raise AppError("transfer_cleanup_pending")
         try:
-            store.delete(copy_id)
+            store.delete(copy_id)  # zmiany nowego telefonu zostają w zapisie telefonu poza kopią
         except OSError:  # plik kopii otwarty w innym programie; ścieżka nie idzie do raportu
             raise AppError("transfer_in_use") from None
         return {"deleted": copy_id}

@@ -136,10 +136,11 @@ def test_purge_skips_copy_in_use():
     assert used.path.exists() and not other.path.exists()
 
 
-def test_purge_keeps_copy_with_phone_changes_to_undo():
-    """Stan wgrywania z `device_changes` (także bez `serial`/`status`): zapis zmian nowego telefonu
-    jest tylko w kopii, więc kopia po terminie zostaje; po sprzątaniu znika jak inne."""
-    from admenot.engine.transfer.restore_state import RestoreState, restore_state_path
+def test_purge_moves_phone_changes_out_of_the_copy_first():
+    """Stan wgrywania z `device_changes` tylko w kopii (także bez `serial`/`status`): przed usunięciem
+    kopii po terminie zmiany trafiają do zapisu telefonu poza kopią, więc sprzątanie je znajdzie."""
+    from admenot.engine.paths import phone_changes_dir
+    from admenot.engine.transfer.restore_state import PhoneRecord, RestoreState, restore_state_path
 
     expired = _copy(now=NOW - timedelta(days=8))
     expired_id = expired.read_meta().id
@@ -147,13 +148,29 @@ def test_purge_keeps_copy_with_phone_changes_to_undo():
     state.set_meta("device_changes", {"appop_prev": "ignore", "role_prev": None, "companion": False,
                                       "helper_dir": False})
     state.close()  # otwarty plik na Windows sam blokowałby usunięcie
-    assert store.purge_expired(NOW, lambda serial: False, lambda copy_id: False) == []
-    assert expired.path.exists()
-    state = RestoreState(restore_state_path(expired, "NEW"))
-    state.set_meta("device_changes", {"appop_prev": None, "role_prev": None, "companion": False,
+    assert store.purge_expired(NOW, lambda serial: False, lambda copy_id: False) == [expired_id]
+    assert not expired.path.exists()
+    record = PhoneRecord(phone_changes_dir() / f"{device_dir_name('NEW')}.json")
+    assert record.pending and record.get_meta("device_changes")["appop_prev"] == "ignore"
+
+
+def test_delete_keeps_the_copy_when_phone_changes_cannot_be_saved(monkeypatch):
+    from admenot.engine.transfer import restore_state
+    from admenot.engine.transfer.restore_state import RestoreState, restore_state_path
+
+    copy = _copy()
+    state = RestoreState(restore_state_path(copy, "NEW"))
+    state.set_meta("device_changes", {"appop_prev": "ignore", "role_prev": None, "companion": False,
                                       "helper_dir": False})
     state.close()
-    assert store.purge_expired(NOW, lambda serial: False, lambda copy_id: False) == [expired_id]
+
+    def locked(*_a, **_k):
+        raise PermissionError("locked")
+
+    monkeypatch.setattr(restore_state, "_atomic_write", locked)
+    with pytest.raises(OSError):
+        store.delete(copy.read_meta().id)
+    assert copy.path.exists() and restore_state_path(copy, "NEW").is_file()
 
 
 def test_copy_dir_resolves_id_only():

@@ -956,28 +956,58 @@ def test_tel_telemetry_has_no_names_or_numbers(tmp_path, no_tap_wait):
 # --- sprzątanie przy podłączeniu: poprawki (przegląd zadania 8, runda 1) ----------------------------
 
 
-def test_copy_with_pending_phone_changes_is_not_deleted(tmp_path, no_tap_wait):
-    """Zapis zmian nowego telefonu jest tylko w kopii: ani „Usuń”, ani termin 7 dni jej nie usuwa,
-    dopóki sprzątanie po podłączeniu telefonu ich nie odwróci."""
+def _recorded_changes(host, copy_id):
+    """Jak `_leftover_changes`, ale zapisane tak jak robi to wgrywanie (`phonesetup`): w kopii i w zapisie
+    telefonu poza kopią; do tego appop shell zmieniony na `allow`."""
+    from admenot.engine.transfer import phonesetup
+    from admenot.engine.transfer.restore_state import RestoreState, restore_state_path
+
+    copy = store.CopyDir(store.transfers_dir() / copy_id)
+    state = RestoreState(restore_state_path(copy, NEW))
+    state.set_meta("serial", NEW)
+    state.set_meta("status", "running")
+    phonesetup._save(state, phonesetup.DeviceChanges("default", (PREV,), True, False))
+    state.close()
+    new = host.phone(NEW).storage
+    new.installed = {_helper_pkg()}
+    new.role_holders = [_helper_pkg()]
+    new.appop = "allow"
+    return copy, new
+
+
+@pytest.mark.parametrize("how", ["delete", "purge"])
+@pytest.mark.parametrize("leftover", ["recorded", "in_copy_only"])
+def test_deleted_copy_keeps_phone_changes_and_cleanup_still_runs(tmp_path, no_tap_wait, how, leftover):
+    """Zapis zmian nowego telefonu nie ginie z kopią („Usuń” albo termin 7 dni): po podłączeniu telefonu
+    sprzątanie i tak oddaje rolę SMS, przywraca appop i odinstalowuje aplikację pomocniczą. Stan sprzed
+    zapisu poza kopią (`in_copy_only`) przenosimy do zapisu telefonu przed usunięciem kopii."""
+    from admenot.engine.paths import device_dir_name, phone_changes_dir
+
     api, rec, host, copy_id = _tel_copied(tmp_path)
-    copy, new = _leftover_changes(host, copy_id)
-    meta = copy.read_meta()
-    meta.expires = NOW - timedelta(days=1)
-    copy.write_meta(meta)
-    (view,) = api.transfers()["copies"]  # `transfers` najpierw usuwa kopie po terminie
-    assert view["cleanup_pending"] is True and copy.path.exists()
-    assert api.delete_transfer(copy_id)["error"]["key"] == "transfer_cleanup_pending"
-    api._purge_transfers()
-    assert copy.path.exists()
-    api.list_devices()  # telefon podłączony: sprzątanie odwraca zmiany
-    assert rec.of("transfer:cleanup_done")[-1]["ok"] is True and new.role_holders == [PREV]
-    api._purge_transfers()
+    if leftover == "recorded":
+        copy, new = _recorded_changes(host, copy_id)
+    else:
+        copy, new = _leftover_changes(host, copy_id)
+        new.appop = "default"  # stan w kopii nie zmieniał appop
+    if how == "delete":
+        assert api.delete_transfer(copy_id) == {"deleted": copy_id}
+    else:
+        meta = copy.read_meta()
+        meta.expires = NOW - timedelta(days=1)
+        copy.write_meta(meta)
+        assert api.transfers()["copies"] == []  # `transfers` najpierw usuwa kopie po terminie
     assert not copy.path.exists()
+    record = phone_changes_dir() / f"{device_dir_name(NEW)}.json"
+    assert record.is_file()
+    api.list_devices()  # telefon podłączony: sprzątanie z zapisu telefonu
+    assert rec.of("transfer:cleanup_done") == [{"ok": True, "serial": NEW}]
+    assert new.role_holders == [PREV] and new.installed == set() and new.appop == "default"
+    assert not record.exists()
 
 
-def test_copy_view_cleanup_pending_false_without_changes(tmp_path):
+def test_copy_view_has_no_cleanup_flag(tmp_path):
     api, _rec, _host, _copy_id = _copied(tmp_path)
-    assert api.transfers()["copies"][0]["cleanup_pending"] is False
+    assert "cleanup_pending" not in api.transfers()["copies"][0]
 
 
 @pytest.mark.parametrize("call", ["start_scan", "transfer_inventory", "restore_plan"])

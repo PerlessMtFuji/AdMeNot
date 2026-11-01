@@ -41,6 +41,12 @@ def device_dir_name(serial: str) -> str:
     return f"{readable}-{hashlib.sha256(serial.encode('utf-8')).hexdigest()[:12]}"
 
 
+def phone_changes_dir() -> Path:
+    """Zapis zmian nowych telefonów do odwrócenia (przenoszenie danych, Etap 3), po jednym pliku na
+    telefon `<device_dir_name(serial)>.json` — poza kopiami, więc usunięcie kopii go nie zabiera."""
+    return data_dir() / "phone_changes"
+
+
 def settings_path() -> Path:
     return data_dir() / "settings.json"
 

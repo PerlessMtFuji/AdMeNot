@@ -535,8 +535,6 @@ export interface CopyView {
   selection?: StoredSelection;
   /** Wgrywania tej kopii na nowe telefony, najnowsze pierwsze; starsze mosty ich nie wysyłają. */
   restores?: CopyRestore[];
-  /** W kopii jest zapis zmian nowego telefonu do odwrócenia: usunąć ją można dopiero po podłączeniu telefonu. */
-  cleanup_pending?: boolean;
 }
 
 /** Stan wgrywania kopii na jeden telefon (`read_restores`). `resumable`: zostały pliki do wgrania. */

@@ -12,7 +12,7 @@ export const ERROR_KEYS = ['adb_missing', 'unauthorized', 'offline', 'disconnect
   'logo_size', 'internal', 'mirror_missing', 'mirror_failed', 'unknown_screenshot', 'shot_limit',
   'data_too_new', 'retired', 'unknown_crash', 'device_busy', 'plan_changed',
   'transfer_no_inventory', 'transfer_disk_full', 'transfer_wrong_device', 'transfer_too_many_disconnects', 'transfer_failed',
-  'transfer_in_use', 'transfer_phone_full', 'transfer_copy_missing', 'transfer_no_plan', 'transfer_cleanup_pending'] as const;
+  'transfer_in_use', 'transfer_phone_full', 'transfer_copy_missing', 'transfer_no_plan'] as const;
 // Błędy wgrywania kopii, których wspólny z kopią tekst mówi o kopii — dla zadań wgrywania `transfer.restore.error.*`.
 export const RESTORE_ERROR_KEYS = ['transfer_wrong_device', 'transfer_too_many_disconnects', 'transfer_failed'] as const;
 export const RESTORE_JOB_KINDS = ['restore_plan', 'restore'] as const;
