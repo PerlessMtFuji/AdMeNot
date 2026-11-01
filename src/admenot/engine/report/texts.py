@@ -84,8 +84,7 @@ TEXTS: dict[str, dict[str, Any]] = {
         },
         "recommendations_title": "Zalecenia",
         "recommendations": {
-            "unfinished": "Nie wszystko udało się naprawić: {apps}. "
-                          "Przynieś telefon ponownie do serwisu.",
+            "unfinished": "Nie wszystko udało się naprawić: {apps}.",
             "review_left": "Na telefonie zostały aplikacje oznaczone do sprawdzenia: {apps}. "
                            "Jeśli ich nie używasz, odinstaluj je.",
             "review_left_many": "Aplikacje oznaczone wyżej (razem: {count}): jeśli ich nie "
@@ -182,8 +181,7 @@ TEXTS: dict[str, dict[str, Any]] = {
         },
         "recommendations_title": "Recommendations",
         "recommendations": {
-            "unfinished": "Not everything could be fixed: {apps}. "
-                          "Bring the phone back to the service.",
+            "unfinished": "Not everything could be fixed: {apps}.",
             "review_left": "Apps marked for review remain on the phone: {apps}. "
                            "If you do not use them, uninstall them.",
             "review_left_many": "Apps marked above ({count} in total): if you do not use them, "
