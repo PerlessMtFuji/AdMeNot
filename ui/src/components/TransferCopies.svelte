@@ -29,8 +29,10 @@
     'files_whatsapp', 'files_others', 'apps'] as const;
   const num = (n: number) => new Intl.NumberFormat(i18n.lang === 'pl' ? 'pl-PL' : 'en-US').format(n);
   function contents(c: CopyView): { key: string; n: number }[] {
-    const keys: string[] = [...CONTENTS];
-    if (!keys.some((k) => k.startsWith('files_') && c.counts[k])) keys.splice(4, 5, 'files');
+    const perKind = CONTENTS.some((k) => k.startsWith('files_') && c.counts[k]);
+    // bez liczników według rodzaju: łączne „Pliki” w miejscu pierwszego z nich
+    const keys = CONTENTS.flatMap((k): string[] => (!k.startsWith('files_') || perKind ? [k]
+      : k === CONTENTS.find((x) => x.startsWith('files_')) ? ['files'] : []));
     return keys.filter((k) => (c.counts[k] ?? 0) > 0).map((k) => ({ key: k, n: c.counts[k] }));
   }
 

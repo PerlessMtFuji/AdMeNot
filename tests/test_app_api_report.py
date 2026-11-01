@@ -64,6 +64,15 @@ def test_pdf_goes_to_the_chosen_folder_and_survives_order_deletion(edge, tmp_pat
     assert not (reports / f"{stem}.html").exists()
 
 
+def test_pdf_folder_setting_is_checked_before_saving(tmp_path):
+    api, _ = make_api(make_cli_phone())
+    reports = tmp_path / "data" / "AdMeNot" / "reports"
+    for bad in ("protokoly", str(reports)):
+        r = api.save_settings({"report_pdf_dir": bad})
+        assert r["error"]["key"] == "bad_request" and r["error"]["message"] == "report_pdf_dir"
+    assert api.get_settings()["report_pdf_dir"] is None
+
+
 def test_unreachable_pdf_folder_falls_back_to_html(edge, tmp_path):
     api, _, number, opened = _executed()
     blocker = tmp_path / "plik"
@@ -71,6 +80,7 @@ def test_unreachable_pdf_folder_falls_back_to_html(edge, tmp_path):
     api.save_settings({"report_pdf_dir": str(blocker / "pdf")})
     r = api.report(number)
     assert r["pdf"] is None and r["error"] == "folder" and r["opened"] == r["html"]
+    assert [str(p) for p in opened] == [r["html"]]
     assert r["pdf_target"] == str(blocker / "pdf" / f"{number.replace('/', '-')}.pdf")
     assert edge == []
 

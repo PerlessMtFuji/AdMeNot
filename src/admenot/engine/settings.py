@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from admenot.engine.oplock import try_lock, unlock
-from admenot.engine.paths import settings_path
+from admenot.engine.paths import reports_dir, settings_path
 
 LANGS = ("pl", "en")
 MODES = ("simple", "expert")
@@ -214,6 +214,19 @@ def _save(path: Path, update: Callable[[dict[str, Any]], None]) -> None:
         _write(path, data)
 
 
+def archive_dir_ok(value: str) -> bool:
+    """Folder PDF to archiwum serwisu: tylko ścieżka bezwzględna (względna zależałaby od katalogu
+    startu programu) i nie katalog `reports` programu — stamtąd usunięcie zlecenia kasuje protokoły."""
+    path = Path(value)
+    if not path.is_absolute():
+        return False
+    try:
+        same = os.path.normcase(path.resolve()) == os.path.normcase(reports_dir().resolve())
+    except OSError:  # niedostępny dysk sieciowy: nie blokujemy zapisu, błąd wyjdzie przy protokole
+        same = False
+    return not same
+
+
 def _valid(key: str, value: Any) -> bool:
     if key == "donate_count":
         return isinstance(value, int) and not isinstance(value, bool) and value >= 0
@@ -244,6 +257,8 @@ def _valid(key: str, value: Any) -> bool:
         return value in APK_MODES
     if key == "retention_days":
         return value is None or (type(value) is int and value in RETENTION_DAYS)
+    if key == "report_pdf_dir" and isinstance(value, str) and value.strip():
+        return archive_dir_ok(value.strip())
     return value is None or (isinstance(value, str) and value.strip() != "")
 
 

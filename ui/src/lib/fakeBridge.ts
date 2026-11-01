@@ -179,6 +179,10 @@ export function createFakeBridge(name: string,
       case 'save_settings': {
         const changes = args[0] as Partial<Settings>;
         if ((changes.apk_cache_limit_gb ?? 0) > 120) return { error: { key: 'bad_request', message: 'apk_cache_limit_gb' } };
+        // jak most: folder PDF tylko jako ścieżka bezwzględna (litera dysku albo udział sieciowy)
+        if (changes.report_pdf_dir && !/^([A-Za-z]:[\\/]|\\\\)/.test(changes.report_pdf_dir)) {
+          return { error: { key: 'bad_request', message: 'report_pdf_dir' } };
+        }
         settings = { ...settings, ...changes };
         return { ...settings };
       }

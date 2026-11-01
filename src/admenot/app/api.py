@@ -113,6 +113,7 @@ from admenot.engine.settings import (
     LogoError,
     ServiceInfo,
     SettingsTooNew,
+    archive_dir_ok,
     check_logo,
     effective_lang,
     load_service,
@@ -849,6 +850,9 @@ class Api:
                 too_big = False
             if too_big:
                 raise AppError("bad_request", "apk_cache_limit_gb")
+        pdf_dir = changes.get("report_pdf_dir")
+        if isinstance(pdf_dir, str) and pdf_dir.strip() and not archive_dir_ok(pdf_dir.strip()):
+            raise AppError("bad_request", "report_pdf_dir")  # UI pokazuje to przy polu
         self._settings = save_settings(dict(changes))
         if "lang" in changes:
             self._lang = effective_lang(self._settings)
@@ -1842,7 +1846,7 @@ class Api:
             device.serial, device, client, self._now())
         # Id kopii od razu: serwisant może dopisać notatkę jeszcze w czasie kopiowania.
         self._emit("transfer:copy", {"copy": self._copy_view(copy.read_meta())})
-        puller =self._puller_factory(self._settings.adb_path, device.serial, adb.tagged("pull"))
+        puller = self._puller_factory(self._settings.adb_path, device.serial, adb.tagged("pull"))
         progress, wait_device = self._transfer_events(job, raw, "transfer:progress")
         # Surowy transport (z logiem sesji), nie `ReadOnlyAdb`: silnik opakowuje go sam.
         result = run_backup(adb, puller, device, copy, inventory, chosen, on_progress=progress,

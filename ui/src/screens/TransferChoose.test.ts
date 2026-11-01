@@ -102,7 +102,7 @@ describe('TransferChoose', () => {
     const card = screen.getByRole('checkbox', { name: /Kontakty/ }).closest('.card') as HTMLElement;
     const note = within(card).getByTestId('export-note-contacts');
     expect(within(note).getByText('Telefon nie pozwolił odczytać kontaktów — użyto pliku eksportu.')).toBeTruthy();
-    expect(within(note).getByRole('radiogroup', { name: 'Pliki eksportu na telefonie' })).toBeTruthy();
+    expect(within(note).getByRole('radiogroup', { name: 'Pliki eksportu na telefonie · Kontakty' })).toBeTruthy();
     expect(within(note).getByRole('button', { name: 'Skanuj ponownie' })).toBeTruthy();
     // instrukcja (z dopiskiem o Xiaomi) zwinięta, gdy jest z czego wybierać
     const howto = within(note).getByText('Brak aktualnego pliku? Jak go zrobić').closest('details')!;

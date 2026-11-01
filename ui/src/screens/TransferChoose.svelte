@@ -67,11 +67,10 @@
   const fileDate = (iso: string | null) => iso === null ? '' : new Date(iso).toLocaleString(i18n.lang === 'pl' ? 'pl-PL' : 'en-GB',
     { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-
   const phoneRows = $derived.by((): Row[] => {
     if (!inv) return [];
     const messages = inv.sms === null && inv.mms === null ? null : (inv.sms ?? 0) + (inv.mms ?? 0);
-    const smsFile =!readable(inv.sms) && !readable(inv.mms) ? chosen('sms') : null;
+    const smsFile = !readable(inv.sms) && !readable(inv.mms) ? chosen('sms') : null;
     return [
       { key: 'contacts', icon: Users, title: t('transfer.row.contacts'), meta: inv.contacts === null ? fileMeta('contacts') : num(inv.contacts),
         note: chosen('contacts') ? undefined : t('transfer.row.contacts_note'), bytes: null, checked: sel.contacts,
@@ -224,7 +223,7 @@
 {/snippet}
 
 {#snippet exportList(k: ExportKind)}
-  <div role="radiogroup" id="export-files-{k}" aria-label={t('transfer.export.files')} class="flex flex-col gap-0.5">
+  <div role="radiogroup" id="export-files-{k}" aria-label={`${t('transfer.export.files')} · ${t(`transfer.row.${k}`)}`} class="flex flex-col gap-0.5">
     {#each files(k) as f, i (f.remote)}
       <label class="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm text-ink
         {i === 0 ? 'bg-accent-soft shadow-[inset_3px_0_0_var(--color-accent)]' : 'opacity-75'}">

@@ -29,6 +29,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "pdf_failed": "Nie udało się utworzyć PDF. Protokół HTML: {html}",
         "pdf_locked": "Plik {pdf} jest otwarty w innym programie — zamknij go i spróbuj "
                       "ponownie. Protokół HTML: {html}",
+        "pdf_folder": "Nie da się zapisać PDF w {pdf} — sprawdź folder protokołów "
+                      "(ustawienie report_pdf_dir). Protokół HTML: {html}",
     },
     "en": {
         "service_empty": "No service details. Set them: admenot service --name \"…\" "
@@ -47,6 +49,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "pdf_failed": "Could not create the PDF. HTML report: {html}",
         "pdf_locked": "File {pdf} is open in another program — close it and try again. "
                       "HTML report: {html}",
+        "pdf_folder": "Cannot save the PDF to {pdf} — check the PDF report folder "
+                      "(setting report_pdf_dir). HTML report: {html}",
     },
 }
 
@@ -97,7 +101,7 @@ def cmd_report(args: argparse.Namespace, lang: str) -> int:
         print(_m(lang, "saved_html", path=files.html))
         return 0
     if files.pdf is None:
-        pdf = files.html.with_suffix(".pdf")
+        pdf = files.pdf_target or files.html.with_suffix(".pdf")  # folder z ustawień ≠ folder HTML
         print(_m(lang, f"pdf_{files.pdf_error}", pdf=pdf, html=files.html), file=sys.stderr)
         return 6
     print(_m(lang, "saved", path=files.pdf))
