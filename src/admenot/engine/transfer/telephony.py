@@ -75,14 +75,39 @@ def failure_result(exc: Exception) -> CategoryResult:
 # --------------------------------------------------------------------------------------
 # Parser wyjścia `content query`
 # --------------------------------------------------------------------------------------
+_ERROR_LINE = re.compile(r"^(?:Error while accessing provider|(?:java\.lang\.|android\.)[\w.$]*Exception\b)",
+                         re.MULTILINE)
+
+
+def _drop_preamble(text: str) -> str:
+    """Linie przed pierwszym `Row: 0 ` albo `No result found` (ostrzeżenia na stderr) pomijamy; gdy
+    żadnego z nich nie ma, tekst zostaje bez zmian (to błąd, który pokaże wywołujący)."""
+    if text.startswith("Row: 0 ") or text.lstrip().startswith("No result found"):
+        return text
+    for marker in ("\nRow: 0 ", "\nNo result found"):
+        i = text.find(marker)
+        if i != -1:
+            return text[i + 1:]
+    return text
+
+
 def parse_content_rows(text: str, columns: list[str]) -> list[dict[str, str | None]]:
     """Parsuje wyjście 'Row: N col=val, col=val' przy ZNANEJ kolejności kolumn (projekcja).
 
     Wiersze mogą zawierać znaki nowej linii i przecinki – dlatego kolejny wiersz
     rozpoznajemy po dokładnym '\\nRow: {k+1} ', a wartości po ', {następna_kolumna}='.
     Kolumnę z najbardziej „dowolnym” tekstem (body, name, data1) dawaj zawsze na koniec.
+
+    Wyjście idzie z ` 2>&1`, więc trafia tu też stderr: linia błędu providera (`Error while accessing
+    provider`, `java.lang.…Exception`, `android.…Exception`) na początku linii gdziekolwiek — także po
+    wierszach, gdy kursor padł w połowie — to błąd kategorii, nigdy ślad stosu w ostatniej kolumnie.
+    Inne linie przed `Row: 0 ` (np. `WARNING: linker: …`) pomijamy.
     """
     text = text.replace("\r\n", "\n")
+    if m := _ERROR_LINE.search(text):
+        tail = text[m.start():]
+        raise ContentQueryError(tail.strip()[:600], is_denied(tail[:600]))
+    text = _drop_preamble(text)
     if not text.strip() or text.lstrip().startswith("No result found"):
         return []
     if not text.startswith("Row: 0 "):

@@ -554,6 +554,21 @@ def test_missing_part_file_does_not_crash(tmp_path):
         st.close()
 
 
+def test_mms_addr_read_error_sends_mms_to_file_not_phone(tmp_path):
+    """Odczyt adresów jednej MMS na nowym telefonie padł: klucze MMS nieznane, więc nic nie idzie na
+    telefon na ślepo (możliwy duplikat) — MMS trafiają do pliku do ręcznego importu."""
+    copy, phone = _copy(tmp_path), _new(tmp_path)
+    phone.providers["mms"].append({"_id": "900", "thread_id": "1", "date": "1600000000", "msg_box": "1"})
+    phone.mms_addrs["900"] = [{"type": "137", "address": "+48500500500"}]
+    phone.deny_uris.add("content://mms/900/addr")
+    r = Run(phone, copy)()
+    assert len(phone.providers["mms"]) == 1  # tylko ta, która już była
+    assert r.kinds["mms"].path == FILE and r.kinds["mms"].manual == 1 and r.kinds["mms"].written == 0
+    assert len(phone.providers["sms"]) == 5  # SMS-y idą normalnie
+    (step,) = r.manual  # plik wiadomości (SMS i MMS) do ręcznego importu
+    assert len(read_mms_xml(phone.local(step.remote), None)) == 1
+
+
 def test_unreadable_after_disconnect_goes_to_file(tmp_path):
     """R17: urwana paczka SMS na telefonie, którego nie da się odczytać -> nic nie wraca na telefon."""
     copy = _copy(tmp_path)

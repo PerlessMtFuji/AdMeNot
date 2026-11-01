@@ -58,6 +58,42 @@ def test_parser_rejects_garbage_and_flags_denial():
     assert err.value.denied
 
 
+def test_parser_provider_error_after_rows_is_an_error_not_data():
+    """` 2>&1`: kursor padł po dwóch wierszach — stderr doklejony za ostatnim wierszem nie może trafić
+    do ostatniej kolumny jako treść SMS-a."""
+    cols = ["_id", "address", "body"]
+    out = ("Row: 0 _id=1, address=+48600100200, body=Cześć\n"
+           "Row: 1 _id=2, address=+48600100201, body=Do jutra\n"
+           "Error while accessing provider:sms\n"
+           "java.lang.IllegalStateException: Couldn't read row 2, col 0 from CursorWindow.  Make sure the "
+           "Cursor is initialized correctly before accessing data from it.\n"
+           "\tat android.database.CursorWindow.nativeGetString(Native Method)\n"
+           "\tat com.android.commands.content.Content$QueryCommand.onExecute(Content.java:640)\n")
+    with pytest.raises(ContentQueryError) as err:
+        parse_content_rows(out, cols)
+    assert not err.value.denied
+    trace = out.replace("Error while accessing provider:sms\n", "")  # sam ślad stosu, bez nagłówka
+    with pytest.raises(ContentQueryError):
+        parse_content_rows(trace, cols)
+    denied = ("Row: 0 _id=1, address=+48600100200, body=Cześć\r\n"
+              "android.os.ParcelableException: java.lang.SecurityException: Permission Denial: reading "
+              "com.android.providers.telephony.SmsProvider\r\n")
+    with pytest.raises(ContentQueryError) as err:
+        parse_content_rows(denied, cols)
+    assert err.value.denied
+
+
+def test_parser_drops_warnings_before_the_first_row():
+    cols = ["_id", "body"]
+    warn = ('WARNING: linker: Warning: unable to normalize "$ORIGIN/../lib64" (ignoring)\n'
+            "WARNING: linker: Warning: \"/system/bin/content\" unused DT entry: DT_RPATH\n")
+    rows = parse_content_rows(warn + "Row: 0 _id=1, body=Ala\nRow: 1 _id=2, body=Ola\n", cols)
+    assert [r["body"] for r in rows] == ["Ala", "Ola"]
+    assert parse_content_rows(warn + "No result found.\n", cols) == []
+    with pytest.raises(ContentQueryError):
+        parse_content_rows(warn, cols)  # same ostrzeżenia, bez wierszy: błąd, nie zero wierszy
+
+
 def test_vcard_fold():
     line = "NOTE:" + "ż" * 100
     folded = vc_fold(line)

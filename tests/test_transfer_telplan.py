@@ -312,6 +312,21 @@ def test_plan_filters_existing_sms_calls_mms(tmp_path):
     assert plan.contacts is None and plan.local_account is None
 
 
+def test_plan_mms_addr_error_makes_mms_unreadable(tmp_path):
+    """Błąd odczytu adresów jednej MMS na nowym telefonie: klucze MMS nieznane (klucz bez adresów nigdy by
+    się nie zgodził), więc kategoria jest nieczytelna, a nie „nic z tego nie ma na telefonie”."""
+    from admenot.engine.transfer.telplan import phone_has
+
+    copy = _copy(tmp_path, mms=True)
+    phone = _new_phone(tmp_path)
+    write_provider(phone.root, "content://mms", [{"_id": "5", "date": "1700000100", "msg_box": "1"}],
+                   ["_id", "date", "msg_box"])
+    phone.deny_uris.add("content://mms/5/addr")
+    plan = build_tel_plan(phone, copy, _meta(), {"mms"})
+    assert plan.readable == {"mms": False} and len(plan.mms) == 2
+    assert phone_has(phone, "mms") is None
+
+
 def test_plan_unreadable_new_phone_filters_nothing(tmp_path):
     copy = _copy(tmp_path, sms=True)
     phone = _new_phone(tmp_path)

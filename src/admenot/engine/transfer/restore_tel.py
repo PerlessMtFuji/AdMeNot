@@ -311,13 +311,21 @@ class _TelRestore:
     def _write_all(self, todo: dict[str, list[Rec]]) -> None:
         for kind in self.kinds:
             if todo[kind]:
-                self._progress(kind, CHAIN[kind][0])
-                self._kind(kind, todo[kind], CHAIN[kind], defer=True)
+                chain = self._chain(kind)
+                self._progress(kind, chain[0])
+                self._kind(kind, todo[kind], chain, defer=True)
         # pliki kategorii bez roli (kontakty, połączenia) przed czekaniem na stuknięcie
         self._write_files(set(self.manual) - ROLE_KINDS)
         for kind, recs, chain in self.deferred:  # rola SMS dopiero po pozostałych kategoriach (§6.2)
             self._kind(kind, recs, chain, defer=False)
         self._write_files(set(self.manual))
+
+    def _chain(self, kind: str) -> tuple[str, ...]:
+        """Drogi kategorii. MMS, których kluczy plan nie odczytał z telefonu (odmowa albo błąd odczytu
+        adresów), nie idą na telefon na ślepo — od razu plik do ręcznego importu."""
+        if kind == "mms" and self.plan.readable.get("mms") is False:
+            return (FILE,)
+        return CHAIN[kind]
 
     def _kind(self, kind: str, records: list[Rec], chain: tuple[str, ...], *, defer: bool) -> None:
         """Rekordy przechodzą drogi po kolei: następna dostaje te, których poprzednia nie zapisała

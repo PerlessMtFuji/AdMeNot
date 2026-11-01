@@ -3,7 +3,9 @@
 Czyta to, co jest już na nowym telefonie (kontakty, SMS, MMS, połączenia), stosuje klucze duplikatów
 i wybiera konta kontaktów do pominięcia. Niczego nie zapisuje na telefonie — tylko `content query`
 i `dumpsys account`. Odmowa odczytu kategorii (`readable[kind] = False`) niczego nie odfiltrowuje:
-duplikatom przy wznowieniu zapobiega i tak stan per rekord.
+duplikatom przy wznowieniu zapobiega i tak stan per rekord. Wyjątek: MMS bez odczytanych kluczy
+(także po błędzie odczytu adresów którejś wiadomości) nie trafiają na telefon, tylko do pliku
+(`restore_tel`).
 """
 
 from __future__ import annotations
@@ -279,6 +281,8 @@ def _keys_from_phone(adb: AdbTransport, uri: str, col_sets: list[list[str]], key
 
 
 def _mms_keys_from_phone(adb: AdbTransport, need_addrs: bool) -> set[tuple] | None:
+    """Klucze MMS z telefonu; `None` = nie dało się ich odczytać — także gdy padł odczyt adresów
+    którejkolwiek wiadomości (klucz bez adresów nigdy by się nie zgodził i MMS poszłyby drugi raz)."""
     try:
         _, rows = tel.query_with_fallback(adb, "content://mms", MMS_HEADER_COLS)
     except tel.ContentQueryError:
@@ -290,7 +294,7 @@ def _mms_keys_from_phone(adb: AdbTransport, need_addrs: bool) -> set[tuple] | No
         try:
             addrs = tel.content_query(adb, f"content://mms/{r['_id']}/addr", MMS_ADDR_COLS)
         except tel.ContentQueryError:
-            addrs = []
+            return None
         keys.add(mms_key_row(r, addrs))
     return keys
 
