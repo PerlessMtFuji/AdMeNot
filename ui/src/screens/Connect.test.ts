@@ -202,6 +202,18 @@ describe('Connect', () => {
     expect(within(radios[1].closest('label')!).getByText('wybrany')).toBeTruthy();
   });
 
+  test('several phones, none picked: no tools, scan disabled, a hint says to pick one', async () => {
+    const { s } = await renderWith(Connect, 'many');
+    s.serial = null;
+    await tick();
+    expect(screen.queryByRole('button', { name: 'Zrzut ekranu' })).toBeNull();
+    expect(screen.getByText(/^Wybierz telefon z listy/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Skanuj' }) as HTMLButtonElement).disabled).toBe(true);
+    await fireEvent.click(screen.getAllByRole('radio')[0]);
+    expect(screen.queryByText(/^Wybierz telefon z listy/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Zrzut ekranu' })).toBeTruthy();
+  });
+
   test('several phones: a screen view running on the other phone is marked in its row', async () => {
     const { s } = await renderWith(Connect, 'many');
     const radios = screen.getAllByRole('radio') as HTMLInputElement[];

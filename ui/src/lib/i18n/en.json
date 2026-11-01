@@ -73,7 +73,7 @@
     "sub": { "none": "Use a USB cable that carries data (not a charge-only one).", "unauthorized": "A prompt appeared on the phone — tap “Allow”.", "offline": "The phone does not respond. Unplug the cable and plug it in again.", "ready": "The phone is ready to scan.", "many": "Several phones are connected — choose one.", "adb_missing": "Point to adb.exe in the settings." },
     "check": { "label": "Connection status", "cable": "USB cable", "auth": "Permission on the phone", "model": "Model read" },
     "devices": { "one": "Phones ({count}) — pick the one you work with", "few": "Phones ({count}) — pick the one you work with", "many": "Phones ({count}) — pick the one you work with", "other": "Phones ({count}) — pick the one you work with" },
-    "selected": "selected", "mirror_on": "screen view on", "tools_for": "{name} {serial}",
+    "selected": "selected", "mirror_on": "screen view on", "pick_first": "Pick a phone from the list to use screen view, take a screenshot or start a scan.", "tools_for": "{name} {serial}",
     "phone_dialog": "Allow USB debugging?",
     "phone_allow": "Allow",
     "guide_title": "How to turn on USB debugging",

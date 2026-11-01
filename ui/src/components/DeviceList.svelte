@@ -30,9 +30,11 @@
         <PhoneThumb image={d.image ?? null} name={nameOf(d)} compact />
         <span class="min-w-0 flex-1">
           <span class="block truncate font-bold">{nameOf(d)}</span>
-          <span class="block truncate text-sm text-mut">
-            {[d.android ? `Android ${d.android}` : '', d.imei ? `IMEI ${d.imei}` : ''].filter(Boolean).join(' · ')}
-          </span>
+          {#if d.android || d.imei}
+            <span class="block truncate text-sm text-mut">
+              {[d.android ? `Android ${d.android}` : '', d.imei ? `IMEI ${d.imei}` : ''].filter(Boolean).join(' · ')}
+            </span>
+          {/if}
           <span class="mono block truncate text-2xs text-soft">{d.serial}</span>
         </span>
         {#if on}<Pill tone="accent">{t('connect.selected')}</Pill>
@@ -48,5 +50,8 @@
       <span class="pt-1.5 text-sm font-semibold text-mut">{nameOf(selected)} <span class="mono text-2xs text-soft">{selected.serial}</span>:</span>
       {#key selected.serial}<MirrorControls serial={selected.serial} name={nameOf(selected)} />{/key}
     </section>
+  {:else}
+    <!-- nic nie wybrano (start albo wybrany telefon odłączony): narzędzia i „Skanuj” czekają na wybór -->
+    <p class="pl-1 text-sm text-mut">{t('connect.pick_first')}</p>
   {/if}
 </div>
