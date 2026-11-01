@@ -34,6 +34,9 @@ log = logging.getLogger(__name__)
 
 # Błędy połączenia nie są błędem kategorii — przechodzą wyżej (kopia czeka na telefon).
 _CONNECTION_KINDS = {"offline", "no_device", "unauthorized", "adb_missing"}
+# Kategorie telefonii silnika, w tej kolejności (kopia, plan, wgrywanie, statystyki). Worker ma własną
+# kopię listy (dozwolone klucze `tel`/`safety`).
+TEL_CATEGORIES: tuple[str, ...] = ("contacts", "sms", "mms", "calls")
 
 
 class ContentQueryError(Exception):

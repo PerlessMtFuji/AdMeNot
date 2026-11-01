@@ -1125,6 +1125,33 @@ def test_cleanup_check_not_run_twice_concurrently(tmp_path, monkeypatch):
     assert calls.count(NEW) == 1
 
 
+def test_restore_of_a_deleted_copy_does_not_recreate_it(tmp_path, no_tap_wait):
+    """U7: kopia usunięta z dysku między planem a „Wgraj” — zapis `tel_left` nie zakłada jej katalogu
+    na nowo (pusty katalog z samym stanem wgrywania), wgrywanie kończy się błędem kopii."""
+    import shutil
+
+    api, rec, _host, copy_id = _tel_copied(tmp_path)
+    _planned(api, rec, copy_id)
+    copy = store.CopyDir(store.transfers_dir() / copy_id)
+    shutil.rmtree(copy.path)
+    api.start_restore(TEL_CHOICE)
+    assert rec.of("job:error")[-1]["key"] == "transfer_copy_missing"
+    assert not copy.path.exists()
+
+
+def test_tel_record_counts_have_one_definition():
+    """U8: `sms` z ekranu obejmuje MMS — jedna funkcja liczy rekordy dla mostu, silnika i zamykania stanu."""
+    from admenot.engine.transfer.restore import engine_tel_kinds, tel_records_to_write
+    from admenot.engine.transfer.telplan import ContactSelection, TelPlan
+    from admenot.engine.transfer.telrecords import TelSources
+
+    plan = TelPlan(TelSources(None, None, None, None), ContactSelection([object()] * 2, {}, 0),  # type: ignore[list-item]
+                   [object()] * 3, [object()] * 4, [object()] * 5, {}, False, {}, None)  # type: ignore[list-item]
+    assert engine_tel_kinds({"sms"}) == {"sms", "mms"} and engine_tel_kinds({"calls"}) == {"calls"}
+    assert tel_records_to_write(plan, frozenset({"contacts", "sms"})) == {"contacts": 2, "sms": 3, "mms": 4}
+    assert tel_records_to_write(plan, frozenset({"calls"})) == {"calls": 5}
+
+
 def test_tel_error_after_files_still_reports_files(tmp_path, no_tap_wait, monkeypatch):
     from admenot.app import api as api_mod
 

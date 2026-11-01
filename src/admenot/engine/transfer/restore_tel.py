@@ -52,7 +52,7 @@ from .phonesetup import (
     take_sms_role,
 )
 from .pusher import Pusher
-from .restore import RestoreError
+from .restore import RestoreError, engine_tel_kinds
 from .restore_state import RestoreState
 from .store import CopyDir
 from .telephony import Stopped, export_telephony
@@ -65,7 +65,7 @@ AP, CO, FILE = "app_process", "companion", "file"
 # Wynik spike'u (Task 1): `app_process` zapisał każdą kategorię na OPPO; łańcuch bez zmian.
 CHAIN: dict[str, tuple[str, ...]] = {"contacts": (AP, CO, FILE), "sms": (AP, CO, FILE),
                                      "mms": (AP, CO, FILE), "calls": (AP, CO, FILE)}
-ORDER = ("contacts", "sms", "mms", "calls")
+ORDER = tel.TEL_CATEGORIES
 BATCH = 500  # rekordów na jedno uruchomienie pomocnika
 ROLE_KINDS = frozenset({"sms", "mms"})  # droga `companion` wymaga roli SMS
 CONVERSATIONS_URI = "content://mms-sms/conversations?simple=true"
@@ -179,7 +179,7 @@ class _TelRestore:
         self.plan, self.state = plan, state
         self.on_progress, self.should_stop, self.wait_device = on_progress, should_stop, wait_device
         self.on_tap, self.skip_tap, self.writers = on_tap, skip_tap, writers
-        want = set(kinds) | ({"mms"} if "sms" in kinds else set())
+        want = engine_tel_kinds(kinds)
         src = plan.sources
         present = {"contacts": src.contacts is not None and plan.contacts is not None,
                    "sms": src.sms is not None, "mms": src.mms is not None, "calls": src.calls is not None}

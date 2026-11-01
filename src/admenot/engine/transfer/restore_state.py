@@ -3,7 +3,8 @@
 `<kopia>/restore/<device_dir_name(serial)>.sqlite`: pliki (cel, status, próby), rekordy telefonii
 (`tel`: kategoria, id rekordu, status, droga) i meta `serial`, `choice`, `status`, `updated`,
 `device_changes` (zmiany telefonu do odwrócenia, `phonesetup`), `tel_left` (rekordy telefonii
-jeszcze nierozstrzygnięte, `restore_tel`). Czyta go też widok kopii
+jeszcze nierozstrzygnięte, `restore_tel`), `scanned` (liczba plików `done` przy ostatnim udanym skanie
+galerii, `restore`). Czyta go też widok kopii
 (`read_restores`: „wgrano na …”, Banner wznowienia i sprzątania).
 """
 

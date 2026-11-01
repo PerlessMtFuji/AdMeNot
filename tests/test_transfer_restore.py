@@ -640,3 +640,167 @@ def test_files_complete_with_tel_still_to_run_is_resumable(tmp_path):
         state.close()
     (entry,) = read_restores(copy)
     assert entry.resumable is False
+
+
+# ---- settle_finished: wznowienie, w którym nie ma już nic do zrobienia (T10-M1…M5, U6) ----------------
+def _no_tel(contacts: int = 0):
+    from admenot.engine.transfer.telplan import ContactSelection, TelPlan
+    from admenot.engine.transfer.telrecords import ContactRecord, TelSources
+
+    write = [ContactRecord(f"c{i}", f"Osoba {i}", False, (), ()) for i in range(contacts)]
+    return TelPlan(TelSources("vcf" if contacts else None, None, None, None),
+                   ContactSelection(write, {}, 0) if contacts else None, [], [], [], {}, False, {}, None)
+
+
+def _interrupted(copy: store.CopyDir, rows: list[RestoreRow], *, choice: UploadChoice | None = None,
+                 status: str = "stopped", **meta) -> None:
+    """Stan przerwanego wgrywania na `NEW`: wiersze plików, wybór i meta jak po zamkniętym programie."""
+    state = RestoreState(restore_state_path(copy, "NEW"))
+    try:
+        state.set_meta("serial", "NEW")
+        state.set_meta("status", status)
+        if choice is not None:
+            state.set_meta("choice", choice.to_json())
+        for key, value in meta.items():
+            state.set_meta(key, value)
+        for r in rows:
+            state.insert(r)
+        state.commit()
+    finally:
+        state.close()
+
+
+def _row(remote: str, status: str, error: str | None = None, *, target: str | None = None, size: int = 1,
+         grp: str = "photos") -> RestoreRow:
+    return RestoreRow(remote, target or remote, grp, size, MTIME, status, 0, error)
+
+
+def _settle(new: FakeStoragePhone, copy: store.CopyDir, tel=None, sdk: int = 30) -> bool:
+    return rs.settle_finished(copy, "NEW", _plan(new, copy), tel or _no_tel(), AppendOnlyAdb(new), sdk)
+
+
+def test_settle_rows_like_reconcile_and_scans_the_gallery(tmp_path):
+    """Plan widzi wszystko jako „już jest”: nasz plik (`pushing`, `pending` po przerwanej próbie) → `done`,
+    cudzy (`pending` bez śladu naszego pliku) → `exists`; pliki `done` bez skanu po nich → skan galerii."""
+    copy = _copy(tmp_path)
+    new = _new(tmp_path, OLD)
+    _interrupted(copy, [
+        _row("/sdcard/DCIM/Camera/IMG.JPG", "done"),
+        _row("/sdcard/DCIM/Camera/VID.MP4", "pushing"),
+        _row("/sdcard/DCIM/x.heic", "pending", "interrupted"),
+        _row("/sdcard/DCIM/plik", "pending"),
+        _row("/sdcard/Download/c.pdf", "pending")], choice=UploadChoice(ALL, frozenset()))
+    assert _settle(new, copy) is True
+    rows = _rows(copy)
+    assert {r: rows[r].status for r in rows} == {
+        "/sdcard/DCIM/Camera/IMG.JPG": "done", "/sdcard/DCIM/Camera/VID.MP4": "done",
+        "/sdcard/DCIM/x.heic": "done", "/sdcard/DCIM/plik": "exists", "/sdcard/Download/c.pdf": "exists"}
+    assert new.scans == 1 and _meta(copy, rs.SCANNED) == 3
+    assert _meta(copy, "status") == "complete" and _meta(copy, "tel_left") == 0
+
+
+def test_settle_skips_scan_when_one_ran_after_the_done_files(tmp_path):
+    copy = _copy(tmp_path)
+    new = _new(tmp_path, OLD)
+    _interrupted(copy, [_row("/sdcard/DCIM/Camera/IMG.JPG", "done"), _row("/sdcard/DCIM/plik", "pending")],
+                 choice=UploadChoice(ALL, frozenset()), scanned=1)
+    assert _settle(new, copy) is True
+    assert new.scans == 0
+
+
+def test_settle_on_old_android_does_not_scan(tmp_path):
+    copy = _copy(tmp_path)
+    new = _new(tmp_path, OLD)
+    _interrupted(copy, [_row("/sdcard/DCIM/Camera/VID.MP4", "pushing")], choice=UploadChoice(ALL, frozenset()))
+    assert _settle(new, copy, sdk=28) is True
+    assert new.scans == 0 and _meta(copy, rs.SCANNED) is None
+
+
+def test_run_restore_records_the_scan(tmp_path):
+    copy = _copy(tmp_path)
+    new = _new(tmp_path)
+    assert _run(new, copy, _plan(new, copy)).media_scan == "done"
+    assert _meta(copy, rs.SCANNED) == 5
+
+
+def test_settle_denied_or_error_rows_close_incomplete(tmp_path):
+    copy = _copy(tmp_path)
+    new = _new(tmp_path, OLD)
+    _interrupted(copy, [_row("/sdcard/DCIM/plik", "denied", "denied"),
+                        _row("/sdcard/DCIM/x.heic", "error", "push_failed"),
+                        _row("/sdcard/Download/c.pdf", "pending")], choice=UploadChoice(ALL, frozenset()))
+    assert _settle(new, copy) is True
+    assert _meta(copy, "status") == "incomplete"
+
+
+def test_settle_without_saved_choice_falls_back_to_every_group(tmp_path):
+    """Stan bez zapisanego wyboru (program zamknięty przed jego zapisem): liczy się każda grupa planu, więc
+    plik, którego telefon nie ma, zostawia stan do wznowienia."""
+    copy = _copy(tmp_path)
+    new = _new(tmp_path, {k: v for k, v in OLD.items() if k != "Download/c.pdf"})
+    _interrupted(copy, [_row("/sdcard/DCIM/plik", "pending")])
+    assert _settle(new, copy) is False
+    assert _rows(copy)["/sdcard/DCIM/plik"].status == "pending"
+    new_all = _new(tmp_path / "b", OLD)
+    copy_all = _copy(tmp_path / "b")
+    _interrupted(copy_all, [_row("/sdcard/DCIM/plik", "pending")])
+    assert _settle(new_all, copy_all) is True
+
+
+def test_settle_unselected_groups_and_apks_are_skipped_with_their_reason(tmp_path, monkeypatch):
+    _apks(monkeypatch, {"/sdcard/Download/evil.apk": ("malicious", False),
+                        "/sdcard/Download/odd.apk": ("suspicious", False),
+                        "/sdcard/Download/ok.APK": ("clean", True),
+                        "/sdcard/DCIM/bundle.xapk": ("unknown", True)})
+    copy = _copy(tmp_path, APK_FILES)
+    on_phone = {k: v for k, v in APK_FILES.items() if k not in ("Download/evil.apk", "Download/odd.apk",
+                                                                  "DCIM/Camera/VID.MP4")}
+    new = _new(tmp_path, on_phone)
+    plan = _plan(new, copy)
+    video = next(f for f in plan.files if f.remote == "/sdcard/DCIM/Camera/VID.MP4")
+    groups = frozenset(UPLOAD_GROUPS) - {video.group}
+    _interrupted(copy, [_row("/sdcard/Download/evil.apk", "pending", grp="downloads"),
+                        _row("/sdcard/Download/odd.apk", "pushing", grp="downloads"),
+                        _row("/sdcard/DCIM/Camera/VID.MP4", "pending", grp=video.group)],
+                 choice=UploadChoice(groups, frozenset()))
+    assert _settle(new, copy) is True
+    rows = _rows(copy)
+    assert (rows["/sdcard/Download/evil.apk"].status, rows["/sdcard/Download/evil.apk"].error) == (
+        "skipped", "apk_malicious")
+    odd = rows["/sdcard/Download/odd.apk"]
+    assert (odd.status, odd.error, odd.own) == ("skipped", "apk_suspicious", True)  # pod celem nasz plik
+    vid = rows["/sdcard/DCIM/Camera/VID.MP4"]
+    assert (vid.status, vid.error, vid.own) == ("skipped", "unselected", False)
+
+
+def test_settle_row_whose_file_left_the_copy_keeps_its_own_mark(tmp_path):
+    """T10-M2: `pushing` pliku, którego nie ma już w kopii → `skipped`/`missing` z `own` (jak `_reconcile`),
+    żeby nasz niedokończony plik pod celem nie został uznany za cudzy."""
+    copy = _copy(tmp_path)
+    new = _new(tmp_path, OLD)
+    _interrupted(copy, [_row("/sdcard/DCIM/gone.jpg", "pushing"), _row("/sdcard/DCIM/old.jpg", "pending")],
+                 choice=UploadChoice(ALL, frozenset()))
+    assert _settle(new, copy) is True
+    rows = _rows(copy)
+    assert (rows["/sdcard/DCIM/gone.jpg"].status, rows["/sdcard/DCIM/gone.jpg"].error,
+            rows["/sdcard/DCIM/gone.jpg"].own) == ("skipped", "missing", True)
+    assert (rows["/sdcard/DCIM/old.jpg"].status, rows["/sdcard/DCIM/old.jpg"].own) == ("skipped", False)
+
+
+def test_settle_keeps_state_while_contacts_are_still_missing(tmp_path):
+    copy = _copy(tmp_path)
+    new = _new(tmp_path, OLD)
+    _interrupted(copy, [_row("/sdcard/DCIM/plik", "pending")],
+                 choice=UploadChoice(ALL, frozenset(), tel=frozenset({"contacts"})), tel_left=2)
+    assert _settle(new, copy, tel=_no_tel(contacts=2)) is False
+    assert _meta(copy, "tel_left") == 2 and _meta(copy, "status") == "stopped"
+    assert _settle(new, copy, tel=_no_tel()) is True  # kontakty już są na telefonie
+
+
+def test_settle_leaves_a_non_resumable_state_untouched(tmp_path):
+    copy = _copy(tmp_path)
+    new = _new(tmp_path, OLD)
+    _interrupted(copy, [_row("/sdcard/DCIM/plik", "done")], choice=UploadChoice(ALL, frozenset()),
+                 status="complete", updated="2026-10-01T10:00:00+00:00")
+    assert _settle(new, copy) is False
+    assert new.scans == 0 and _meta(copy, "updated") == "2026-10-01T10:00:00+00:00"

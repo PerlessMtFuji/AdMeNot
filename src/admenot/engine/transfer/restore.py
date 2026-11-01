@@ -72,6 +72,7 @@ HASH_TIMEOUT = 3600  # s na paczkę `sha256sum`
 _DENIED = ("permission denied", "read-only file system")
 _NO_TOOL = ("not found", "inaccessible")
 _SDCARD_PATH = re.compile(r"/sdcard/[^'\"\n:]+")
+SCANNED = "scanned"  # meta: liczba plików `done` przy ostatnim udanym skanie galerii
 
 Status = Literal["complete", "incomplete", "stopped"]
 MediaScan = Literal["done", "failed", "restart", "skipped"]
@@ -206,7 +207,10 @@ class _Restore:
                 raise
             cnt = Counter(r.status for r in state.all_files().values())
             bad = cnt["pending"] + cnt["pushing"] + cnt["error"] + cnt["denied"]
-            result = self._result(state, "incomplete" if bad else "complete", self._scan(cnt["done"] > 0), t0)
+            scan = self._scan(cnt["done"] > 0)
+            if scan == "done":
+                state.set_meta(SCANNED, cnt["done"])
+            result = self._result(state, "incomplete" if bad else "complete", scan, t0)
             _mark(state, result.status)
             return result
         finally:
@@ -532,14 +536,9 @@ class _Restore:
         """Skan galerii tylko, gdy w stanie jest plik wgrany (`done`) — kopia samej telefonii go nie robi."""
         if not pushed:
             return "skipped"
-        if self.device.sdk < 29:
-            return "restart"
-        self._progress("scan")
-        try:
-            self.adb.shell(SCAN_VOLUME_CMD, timeout=SCAN_TIMEOUT)
-        except AdbError:
-            return "failed"
-        return "done"
+        if self.device.sdk >= 29:  # starszy Android: bez skanu (galeria po restarcie)
+            self._progress("scan")
+        return scan_media(self.adb, self.device.sdk)
 
     def _result(self, state: RestoreState, status: Status, media_scan: MediaScan,
                 t0: float) -> RestoreResult:
@@ -563,18 +562,50 @@ def _mark(state: RestoreState, status: str) -> None:
     state.set_meta("updated", datetime.now(UTC).isoformat(timespec="seconds"))
 
 
-def _tel_to_write(tel_plan: TelPlan, kinds: frozenset[str]) -> int:
-    wanted = kinds | ({"mms"} if "sms" in kinds else set())
+def scan_media(adb: AdbTransport, sdk: int) -> MediaScan:
+    """Skan galerii (`scan_volume`; `adb` — `guard.AppendOnlyAdb`). Android < 10 nie ma `scan_volume`:
+    galeria odświeży się po restarcie (`restart`)."""
+    if sdk < 29:
+        return "restart"
+    try:
+        adb.shell(SCAN_VOLUME_CMD, timeout=SCAN_TIMEOUT)
+    except AdbError:
+        return "failed"
+    return "done"
+
+
+def tel_records_to_write(tel_plan: TelPlan, kinds: frozenset[str] | set[str]) -> dict[str, int]:
+    """Rekordy telefonii planu do zapisu w kategoriach silnika. `kinds` z ekranu wgrywania: `sms` obejmuje
+    też MMS (silnik telefonii pisze je osobno, jako `mms`)."""
+    wanted = engine_tel_kinds(kinds)
     count = {"contacts": len(tel_plan.contacts.write) if tel_plan.contacts is not None else 0,
              "sms": len(tel_plan.sms), "mms": len(tel_plan.mms), "calls": len(tel_plan.calls)}
-    return sum(n for k, n in count.items() if k in wanted)
+    return {k: n for k, n in count.items() if k in wanted}
 
 
-def settle_finished(copy: CopyDir, serial: str, plan: RestorePlan, tel_plan: TelPlan) -> bool:
+def engine_tel_kinds(kinds: frozenset[str] | set[str]) -> frozenset[str]:
+    """Wybór telefonii z ekranu (`contacts`/`sms`/`calls`) → kategorie silnika (`sms` → `sms` + `mms`)."""
+    return frozenset(kinds) | ({"mms"} if "sms" in kinds else frozenset())
+
+
+def _skip_reason(f: PlanFile, groups: set[str] | frozenset[str], apks_on: set[str]) -> str:
+    """Powód pominięcia pliku spoza wyboru — jak `_Restore._initial`."""
+    if f.group not in groups:
+        return "unselected"
+    if f.apk is not None and f.apk.outcome == "malicious":
+        return "apk_malicious"
+    return "apk_suspicious"
+
+
+def settle_finished(copy: CopyDir, serial: str, plan: RestorePlan, tel_plan: TelPlan,
+                    adb: AdbTransport, sdk: int) -> bool:
     """Wznowienie, w którym według świeżego planu nie ma już nic do zrobienia (program zamknięty w trakcie
     zapisu, a telefon ma wszystko), zamyka stan jako zakończony — inaczej Banner wznowienia zostaje na zawsze,
-    bo start jest wyłączony. Wiersze plików w toku kończą jako `done` (są na telefonie); rekordy telefonii,
-    które telefon ma, nie mają wpisu w kolejce, więc wystarczy wyzerować `tel_left`. Zwraca, czy stan zamknięto."""
+    bo start jest wyłączony. Wiersze plików w toku rozstrzygamy jak `_reconcile`: plan widzi je jako „już
+    są” — nasz plik pod tym celem to `done`, cudzy `exists`; reszta `skipped` (z `own`, gdy pod celem może
+    leżeć nasz plik). Rekordy telefonii, które telefon ma, nie mają wpisu w kolejce, więc wystarczy
+    wyzerować `tel_left`. Pliki `done` bez skanu galerii po nich (meta `scanned`: liczba `done` przy
+    ostatnim udanym skanie) — skan tu, przez `adb` (`guard.AppendOnlyAdb`). Zwraca, czy stan zamknięto."""
     mine = next((r for r in read_restores(copy) if r.serial == serial), None)
     if mine is None or not mine.resumable:
         return False
@@ -588,19 +619,28 @@ def settle_finished(copy: CopyDir, serial: str, plan: RestorePlan, tel_plan: Tel
         groups = {f.group for f in plan.files} if choice is None else choice.groups
         apks_on = set() if choice is None else set(choice.apks_on)
         kinds = TEL_KINDS if choice is None else choice.tel
-        if _tel_to_write(tel_plan, kinds) or any(
+        if sum(tel_records_to_write(tel_plan, kinds).values()) or any(
                 f.group in groups and f.action != "exists" and _apk_selected(f.apk, apks_on) for f in plan.files):
             return False
-        planned = {f.remote for f in plan.files}
-        present = {f.remote for f in plan.files if f.action == "exists"}
+        files = {f.remote: f for f in plan.files}
         for row in [*state.by_status("pending"), *state.by_status("pushing")]:
-            if row.remote in present:
-                state.update(row.remote, status="done", error=None)
+            f = files.get(row.remote)
+            own = is_own(row)
+            if f is None:  # plik zniknął z kopii
+                state.update(row.remote, status="skipped", error="missing", own=int(own))
+            elif f.action == "exists":
+                mine_there = own and row.target == f.target
+                state.update(row.remote, status="done" if mine_there else "exists", error=None)
             else:
-                state.update(row.remote, status="skipped", error="unselected" if row.remote in planned else "missing")
+                state.update(row.remote, status="skipped", error=_skip_reason(f, groups, apks_on),
+                             own=int(own and row.target == f.target))
         state.commit()
         state.set_meta("tel_left", 0)
         rows = state.all_files().values()
+        done = sum(1 for r in rows if r.status == "done")
+        scanned = state.get_meta(SCANNED)
+        if done > (scanned if isinstance(scanned, int) else 0) and scan_media(adb, sdk) == "done":
+            state.set_meta(SCANNED, done)
         _mark(state, "incomplete" if any(r.status in ("denied", "error") for r in rows) else "complete")
         return True
     finally:

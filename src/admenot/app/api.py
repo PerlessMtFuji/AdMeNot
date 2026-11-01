@@ -161,8 +161,10 @@ from admenot.engine.transfer.restore import (
     RestoreProgress,
     RestoreResult,
     UploadChoice,
+    engine_tel_kinds,
     run_restore,
     settle_finished,
+    tel_records_to_write,
 )
 from admenot.engine.transfer.restore_plan import UPLOAD_GROUPS, RestorePlan, build_plan
 from admenot.engine.transfer.restore_state import (
@@ -172,6 +174,7 @@ from admenot.engine.transfer.restore_state import (
     restore_state_path,
 )
 from admenot.engine.transfer.restore_tel import TelProgress, TelResult, run_tel_restore
+from admenot.engine.transfer.telephony import TEL_CATEGORIES
 from admenot.engine.transfer.telephony import Stopped as TransferStopped
 from admenot.engine.transfer.telplan import TelPlan, build_tel_plan
 from admenot.engine.workflow import (
@@ -212,7 +215,6 @@ TRANSFER_PROGRESS_S = 0.5  # dławienie zdarzeń `transfer:progress`
 TRANSFER_KINDS = frozenset({"transfer_scan", "backup", "restore_plan", "restore", "phone_cleanup"})
 # zadania, które czytają kopię z dysku (sprzątanie: stany wgrywania w katalogach kopii)
 RESTORE_KINDS = frozenset({"restore_plan", "restore", "phone_cleanup"})
-TEL_PLAN_KINDS = frozenset({"contacts", "sms", "mms", "calls"})  # plan telefonii: wszystko, co jest w kopii
 # Odstęp przed kolejnymi automatycznymi próbami sprzątania telefonu (s) w jednym podłączeniu: pierwsza od
 # razu, druga po 10 s, trzecia po 30 s od nieudanej; potem bez ponowień do ponownego podłączenia.
 CLEANUP_BACKOFF = (0.0, 10.0, 30.0)
@@ -1942,10 +1944,10 @@ class Api:
             job.check()
             # Telefonia: same odczyty (`content query` przez strażnika odczytu + `dumpsys account`);
             # zapis przez `TelephonyWriteAdb` dopiero przy wgrywaniu.
-            tel_plan = build_tel_plan(TelPlanReadAdb(adb), copy, meta, set(TEL_PLAN_KINDS))
+            tel_plan = build_tel_plan(TelPlanReadAdb(adb), copy, meta, set(TEL_CATEGORIES))
             job.check()
             # przerwane wgrywanie, w którym telefon ma już wszystko: zamykamy stan, żeby Banner wznowienia zniknął
-            settle_finished(copy, device.serial, plan, tel_plan)
+            settle_finished(copy, device.serial, plan, tel_plan, AppendOnlyAdb(adb), device.sdk)
             return device, plan, tel_plan
 
         return {"job_id": self._jobs.start("restore_plan", run)}
@@ -2004,12 +2006,10 @@ class Api:
                           kinds: frozenset[str]) -> None:
         """Przed plikami: rekordy wybranej telefonii w `tel_left`, żeby program zamknięty po plikach
         (stan `complete`), a przed telefonią zostawił Banner wznowienia. Przebieg telefonii nadpisuje
-        tę liczbę swoją kolejką, a na końcu wynikiem."""
-        wanted = kinds | ({"mms"} if "sms" in kinds else set())
-        count = {"contacts": len(tel_plan.contacts.write) if tel_plan.contacts is not None else 0,
-                 "sms": len(tel_plan.sms), "mms": len(tel_plan.mms), "calls": len(tel_plan.calls)}
-        left = sum(n for k, n in count.items() if k in wanted)
-        if not left:
+        tę liczbę swoją kolejką, a na końcu wynikiem. Kopii usuniętej w międzyczasie nie odtwarzamy
+        (stan założyłby jej katalog na nowo) — wgrywanie i tak skończy się `copy_missing`."""
+        left = sum(tel_records_to_write(tel_plan, kinds).values())
+        if not left or not copy.files_dir.is_dir():
             return
         state = RestoreState(restore_state_path(copy, serial))
         try:
@@ -2031,11 +2031,11 @@ class Api:
         tylko zapisanemu poprzedniemu posiadaczowi. Postęp: `transfer:tel_progress`."""
         pusher = self._pusher_factory(self._settings.adb_path, device.serial, adb.tagged("push"))
         progress, wait_device = self._transfer_events(job, raw, "transfer:tel_progress")
-        wanted = kinds | ({"mms"} if "sms" in kinds else set())  # `sms` z ekranu obejmuje MMS (silnik: osobno)
+        wanted = engine_tel_kinds(kinds)  # `sms` z ekranu obejmuje MMS (silnik: osobno)
         state = RestoreState(restore_state_path(copy, device.serial))
         try:
             return run_tel_restore(
-                telephony_adb(adb, state), ReadOnlyAdb(adb), pusher, device, copy, tel_plan, frozenset(wanted),
+                telephony_adb(adb, state), ReadOnlyAdb(adb), pusher, device, copy, tel_plan, wanted,
                 state, on_progress=progress, should_stop=job.should_stop, wait_device=wait_device,
                 on_tap=self._tap_handler(state), skip_tap=self._skip_tap.is_set)
         finally:

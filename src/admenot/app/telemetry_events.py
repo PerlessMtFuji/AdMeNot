@@ -23,7 +23,10 @@ from admenot.engine.transfer.phonesetup import CleanupResult
 from admenot.engine.transfer.restore import RestoreResult, UploadChoice
 from admenot.engine.transfer.restore_plan import UPLOAD_GROUPS
 from admenot.engine.transfer.restore_tel import TelKindResult, TelResult
-from admenot.engine.transfer.telephony import CategoryResult
+from admenot.engine.transfer.telephony import (  # serwer: dokładnie te klucze `tel`/`safety`
+    TEL_CATEGORIES,
+    CategoryResult,
+)
 from admenot.engine.workflow import AppStatus, OrderResult
 
 MAX_PACKAGES = 200
@@ -43,7 +46,6 @@ MAX_MB = 10_000_000  # 10 TB w MB — kopia telefonu; serwer ma ten sam limit `b
 TRANSFER_CATEGORIES = ("contacts", "sms", "mms", "calls", "media", "downloads", "whatsapp",
                        "others", "apps")
 MAX_STREAMS = 8  # serwer: `streams` 1–8
-TEL_CATEGORIES = ("contacts", "sms", "mms", "calls")  # serwer: dokładnie te klucze `tel`/`safety`
 
 
 def _short(value: str | None) -> str:

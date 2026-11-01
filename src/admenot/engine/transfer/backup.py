@@ -43,7 +43,7 @@ from .inventory import Inventory
 from .puller import Puller
 from .state import FileRow, State
 from .store import KEEP_DAYS, CopyDir
-from .telephony import _CONNECTION_KINDS, CategoryResult, Stopped, export_telephony
+from .telephony import _CONNECTION_KINDS, TEL_CATEGORIES, CategoryResult, Stopped, export_telephony
 from .winpath import PathPlanner
 
 CHUNK_MAX_FILES = 200
@@ -55,7 +55,7 @@ SPACE_MARGIN = 64 * 1024 ** 2  # zapas na dysku ponad rozmiar paczki / eksportu 
 MMS_FACTOR = 2.4  # załączniki jako pliki + te same dane w base64 w mms.xml
 MANIFEST = "manifest.csv"
 APK_TMP = ".apk-tmp"  # pobrane APK przed sprawdzeniem; usuwany po etapie aplikacji
-TELEPHONY = ("contacts", "sms", "mms", "calls")
+TELEPHONY = TEL_CATEGORIES
 EXPORT_NAMES: dict[str, str] = {"contacts": "contacts.vcf", "sms": "sms.xml", "calls": "calls.xml"}
 _GONE = ("no such file", "does not exist")  # `stat`/`sha256sum`: pliku na pewno nie ma
 _NO_TOOL = ("not found", "inaccessible")  # `sha256sum` niedostępne na telefonie
