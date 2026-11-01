@@ -74,8 +74,11 @@ describe('TransferRestore', () => {
     expect(screen.getByText('Kontakty i wiadomości wgrane, ale nie wszystko się udało')).toBeTruthy();
     const table = screen.getByRole('table');
     expect([...table.querySelectorAll('th')].map((th) => th.textContent?.trim())).toEqual(
-      ['Kategoria', 'Wgrano', 'Już były', 'Pominięte', 'Błędy', 'Sposób']);
+      ['Kategoria', 'Wgrano', 'Już były', 'Pominięte', 'Błędy', 'Do importu', 'Sposób']);
     expect(table.textContent).toMatch(/plik do importu/);
+    const smsCells = [...screen.getByText('SMS', { selector: 'td' }).closest('tr')!.querySelectorAll('td')]
+      .map((td) => td.textContent?.trim());
+    expect(smsCells.slice(0, 6)).toEqual(['SMS', '0', '1', '0', '0', '300']);  // rekordy z pliku do importu widać w wierszu
     expect(screen.getByText('Do zrobienia na telefonie')).toBeTruthy();
     expect(screen.getByText(/zainstaluj SMS Backup & Restore, Przywróć, wybierz plik admenot-sms-20260926-143100\.xml z Pobranych/))
       .toBeTruthy();

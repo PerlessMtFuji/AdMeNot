@@ -183,7 +183,7 @@
           <table class="w-full text-sm">
             <thead>
               <tr class="text-left text-mut">
-                {#each ['kind', 'written', 'existed', 'skipped', 'failed', 'path'] as c (c)}
+                {#each ['kind', 'written', 'existed', 'skipped', 'failed', 'manual', 'path'] as c (c)}
                   <th class="px-5 py-2 font-semibold {c === 'kind' || c === 'path' ? '' : 'text-right'}">{t(`transfer.restore.tel.col.${c}`)}</th>
                 {/each}
               </tr>
@@ -196,6 +196,7 @@
                   <td class="px-5 py-2 text-right">{num(row.existed)}</td>
                   <td class="px-5 py-2 text-right">{num(row.skipped_synced + row.skipped_messenger)}</td>
                   <td class="px-5 py-2 text-right {row.failed ? 'font-semibold text-warn' : ''}">{num(row.failed)}</td>
+                  <td class="px-5 py-2 text-right">{num(row.manual)}</td>
                   <td class="px-5 py-2">{t(`transfer.restore.tel.path.${row.path}`)}{#if row.visible_warning}<span
                     class="block font-semibold text-warn">{t('transfer.restore.tel.visible')}</span>{/if}</td>
                 </tr>

@@ -791,6 +791,7 @@
           "existed": "Już były",
           "skipped": "Pominięte",
           "failed": "Błędy",
+          "manual": "Do importu",
           "path": "Sposób"
         },
         "kind": {
