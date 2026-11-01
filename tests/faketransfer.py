@@ -60,7 +60,8 @@ Telefonia nowego telefonu (Etap 3), w pamięci:
 * aplikacje: `installed` (`pm list packages`, `pm uninstall` — odinstalowanie posiadacza roli SMS
   zostawia rolę pustą, `adb install -g <apk>` z `host_commands`; `install_blocked` -> `Failure
   [INSTALL_FAILED_USER_RESTRICTED: …]`, ponowna instalacja -> `INSTALL_FAILED_ALREADY_EXISTS`).
-  Instalacja zakłada katalog wejścia `helper.COMPANION_IN`, odinstalowanie usuwa `Android/data/<pakiet>`.
+  Instalacja nie zakłada katalogu wejścia `helper.COMPANION_IN` (jak prawdziwy telefon: `push` do
+  `.../in/` bez wcześniejszego `mkdir -p` kończy się błędem), odinstalowanie usuwa `Android/data/<pakiet>`.
 * `accounts: list[(typ, nazwa)]` dla `dumpsys account`; `tmp_files`: pliki pod `/data/local/tmp/admenot`
   (lokalnie `root/data_local_tmp/admenot`, `mkdir -p`, `push`, `stat`, `sha256sum`, `rm -rf`).
 * droga 3 (plik do importu): `content call --uri content://media --method scan_file --arg
@@ -474,8 +475,7 @@ class FakeStoragePhone:
             raise AdbError("command_failed", f"adb: failed to install {args[2]}: Failure "
                                              f"[INSTALL_FAILED_ALREADY_EXISTS: Attempt to re-install "
                                              f"{helper.PACKAGE} without first uninstalling.]")
-        self.installed.add(helper.PACKAGE)
-        self.local(helper.COMPANION_IN).mkdir(parents=True, exist_ok=True)
+        self.installed.add(helper.PACKAGE)  # `Android/data/<pakiet>` nie istnieje do pierwszego `mkdir -p`
         return "Performing Streamed Install\nSuccess\n"
 
     def _uninstall(self, package: str) -> bytes:
@@ -696,7 +696,8 @@ class FakeStoragePhone:
                 dest = self.local(target)
                 if not dest.parent.is_dir():
                     lines.append(f"adb: error: failed to copy '{src}' to '{target}': "
-                                 "remote couldn't create file: No such file or directory")
+                                 "remote couldn't create file: "
+                                 + ("Is a directory" if remote.endswith("/") else "No such file or directory"))
                     continue
                 data = src.read_bytes()
                 if self.fail_after_push_files is not None and len(self.pushed) >= self.fail_after_push_files:

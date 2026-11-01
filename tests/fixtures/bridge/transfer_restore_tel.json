@@ -2054,6 +2054,18 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58W20NEW01",
+      "command": "mkdir -p /sdcard/Android/data/pl.admenot.helper/files/in",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
       "command": "mkdir -p /sdcard/Download",
       "status": "ok",
       "duration": 0.0,
@@ -2132,6 +2144,18 @@
       "status": "ok",
       "duration": 0.0,
       "output": "INSTRUMENTATION_STATUS: line=OK 6a96deed7420669d2e5fdaad1b15e33b22ac5138\nINSTRUMENTATION_STATUS_CODE: 1\nINSTRUMENTATION_STATUS: line=OK 8df8d41d6dd5f1007305ca298d9fa08bd59278db\nINSTRUMENTATION_STATUS_CODE: 1\nINSTRUMENTATION_STATUS: line=DONE 2 0\nINSTRUMENTATION_STATUS_CODE: 1\nINSTRUMENTATION_RESULT: done=1\nINSTRUMENTATION_CODE: -1\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "mkdir -p /sdcard/Android/data/pl.admenot.helper/files/in",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
       "tag": null
      }
     ],

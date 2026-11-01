@@ -327,6 +327,7 @@ _TEL_ALLOWED = [
     *(f"pm grant pl.admenot.helper android.permission.{p}"
       for p in ("READ_CONTACTS", "WRITE_CONTACTS", "READ_CALL_LOG", "WRITE_CALL_LOG", "READ_SMS")),
     "pm uninstall pl.admenot.helper",
+    f"mkdir -p {helper.COMPANION_IN}",
     "dumpsys role",
     f"cmd role add-role-holder android.app.role.SMS {_PKG}",
     f"cmd role add-role-holder android.app.role.SMS {_SAVED}",
@@ -368,6 +369,10 @@ def test_tel_guard_allows_append_only_shell_T_and_install():
     "rm /sdcard/a",
     "rm -rf /sdcard",
     "mkdir -p /data/local/tmp/other",
+    f"mkdir -p {helper.COMPANION_IN}; rm -rf /sdcard",
+    f"mkdir -p {helper.COMPANION_IN} /data/local/tmp/other",
+    "mkdir -p /data/data/pl.admenot.helper/files/in",
+    f"mkdir {helper.COMPANION_IN}",
 ])
 def test_tel_guard_rejects_rm_elsewhere(cmd):
     adb, rec = _tel()

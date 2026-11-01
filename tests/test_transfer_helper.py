@@ -169,6 +169,26 @@ def test_companion_writer_flow():
                                 f"{helper.COMPANION_IN}/input.jsonl pl.admenot.helper/.Runner")
 
 
+def test_companion_writer_creates_input_folder_before_push():
+    # Fresh install: `Android/data/<pkg>` does not exist, so a push to `.../in/` fails with
+    # "Is a directory" unless `mkdir -p` ran first.
+    order: list[str] = []
+
+    class Adb(FakeAdb):
+        def shell(self, command, timeout=20.0):
+            order.append(command)
+            return super().shell(command, timeout)
+
+    class Pusher(FakePusher):
+        def push(self, locals_, remote, should_stop, tick):
+            order.append("push " + remote)
+            return super().push(locals_, remote, should_stop, tick)
+
+    adb = Adb({"am instrument": "INSTRUMENTATION_STATUS: line=DONE 0 0\n"})
+    helper.CompanionWriter(adb, Pusher(), None).write("sms", [("a1", _sms("x"))], lambda: None)
+    assert order[:2] == [f"mkdir -p {helper.COMPANION_IN}", f"push {helper.COMPANION_IN}/"]
+
+
 def test_artifacts_match_sums():
     for name in ("dex", "apk"):
         path, digest = helper.artifact(name)

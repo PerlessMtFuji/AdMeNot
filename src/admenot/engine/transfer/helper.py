@@ -262,6 +262,9 @@ class CompanionWriter:
               on_line: Callable[[], None]) -> WriteOutcome:
         with tempfile.TemporaryDirectory(prefix="admenot-helper-") as tmp:
             path = encode(kind, records, Path(tmp))
+            # Świeża instalacja nie ma jeszcze `Android/data/<pakiet>`; bez tego push kończy się
+            # "Is a directory".
+            self.adb.shell(f"mkdir -p {COMPANION_IN}")
             _push(self.pusher, sorted(Path(tmp).iterdir()), COMPANION_IN + "/")
             cmd = (f"am instrument -w -r -e cmd write -e input {COMPANION_IN}/{path.name}"
                    + _account_args(self.account,
