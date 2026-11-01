@@ -433,6 +433,23 @@ def test_stopped_skips_media_scan(tmp_path, sdk):
     assert (res.status, res.media_scan, new.scans) == ("stopped", "skipped", 0)
 
 
+def test_no_file_pushed_skips_media_scan(tmp_path):
+    """Kopia tylko telefonii (żadna grupa plików niewybrana): bez skanu galerii (6-9 s na telefonie)."""
+    copy = _copy(tmp_path)
+    new = _new(tmp_path)
+    res = _run(new, copy, _plan(new, copy), UploadChoice(frozenset(), frozenset()))
+    assert (res.status, res.files_done, res.media_scan, new.scans) == ("complete", 0, "skipped", 0)
+
+
+def test_rerun_after_pushed_files_still_scans(tmp_path):
+    """Wznowienie, w którym nic nowego nie poszło, ale wcześniej pliki trafiły na telefon: skan zostaje."""
+    copy = _copy(tmp_path)
+    new = _new(tmp_path)
+    _run(new, copy, _plan(new, copy))
+    res = _run(new, copy, _plan(new, copy, taken=True))
+    assert (res.status, res.media_scan, new.scans) == ("complete", "done", 2)
+
+
 def test_android9_asks_restart(tmp_path):
     copy = _copy(tmp_path)
     new = _new(tmp_path)

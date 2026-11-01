@@ -923,6 +923,7 @@ describe('uploading a copy to the new phone', () => {
     expect(restoreOutcome(r({ files_failed: 1 }))).toBe('warn');
     expect(restoreOutcome(r({ files_missing: 1 }))).toBe('warn');
     expect(restoreOutcome(r({ media_scan: 'failed' }))).toBe('scan');
+    expect(restoreOutcome(r({ media_scan: 'skipped', files_done: 0 }))).toBe('ok');  // sama telefonia: bez skanu galerii
     expect(restoreOutcome(r({ media_scan: 'restart' }))).toBe('ok');  // Android < 10: osobny baner o restarcie
     expect(restoreOutcome(r({ media_scan: 'failed', files_denied: 1 }))).toBe('warn');
     expect(restoreOutcome(r({ status: 'incomplete' }))).toBe('warn');

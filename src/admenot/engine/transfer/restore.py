@@ -204,7 +204,7 @@ class _Restore:
                 raise
             cnt = Counter(r.status for r in state.all_files().values())
             bad = cnt["pending"] + cnt["pushing"] + cnt["error"] + cnt["denied"]
-            result = self._result(state, "incomplete" if bad else "complete", self._scan(), t0)
+            result = self._result(state, "incomplete" if bad else "complete", self._scan(cnt["done"] > 0), t0)
             _mark(state, result.status)
             return result
         finally:
@@ -526,7 +526,10 @@ class _Restore:
         return self.expected[remote]
 
     # ---- koniec ---------------------------------------------------------------------------
-    def _scan(self) -> Literal["done", "failed", "restart"]:
+    def _scan(self, pushed: bool) -> MediaScan:
+        """Skan galerii tylko, gdy w stanie jest plik wgrany (`done`) — kopia samej telefonii go nie robi."""
+        if not pushed:
+            return "skipped"
         if self.device.sdk < 29:
             return "restart"
         self._progress("scan")
