@@ -1,5 +1,5 @@
 import { CATEGORY_ORDER } from './categories';
-import type { AppView, BackupResultView, Category, CopyView, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferProgress, TransferSelection, InventoryView, ExportFileView, ExportKind, StoredSelection, RestorePlanView, RestoreResultView, UndoSite, UploadChoiceView, UploadGroup, UpdateView, UserWait, Verdict } from './types';
+import type { AppView, BackupResultView, Category, CopyView, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferProgress, TransferSelection, InventoryView, ExportFileView, ExportKind, StoredSelection, RestorePlanView, RestoreResultView, TelKind, TelPlanView, TelResultView, UndoSite, UploadChoiceView, UploadGroup, UpdateView, UserWait, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done'
   | 'transfer_choose' | 'transfer_backup' | 'transfer_done'
@@ -752,23 +752,54 @@ export function restoreResumable(copies: CopyView[], serial: string | null): Cop
   return [...copies].sort(newest).find((c) => (c.restores ?? []).some((r) => r.serial === serial && r.resumable)) ?? null;
 }
 
-/** Wszystkie grupy z plikami i wszystkie inne foldery kopii (każdy był w niej wybrany); podejrzane APK odznaczone. */
-export function defaultUploadChoice(plan: RestorePlanView): UploadChoiceView {
+/** Wiersze telefonii na ekranie wgrywania, w kolejności wgrywania. */
+export const TEL_KINDS: readonly TelKind[] = ['contacts', 'sms', 'calls'];
+
+/** Ile rekordów wiersza trafi na telefon (`sms` z MMS); null — kategorii nie ma w kopii. */
+export function telWrite(tel: TelPlanView | null, kind: TelKind): number | null {
+  if (!tel) return null;
+  if (kind === 'sms') return tel.sms || tel.mms ? (tel.sms?.write ?? 0) + (tel.mms?.write ?? 0) : null;
+  return tel[kind]?.write ?? null;
+}
+
+/** Wszystkie grupy z plikami i wszystkie inne foldery kopii (każdy był w niej wybrany); podejrzane APK odznaczone;
+ *  każda kategoria telefonii, w której jest co wgrać. */
+export function defaultUploadChoice(plan: RestorePlanView, tel: TelPlanView | null = null): UploadChoiceView {
   return {
     groups: [...UPLOAD_GROUPS.filter((g) => (plan.groups[g]?.files ?? 0) > 0),
       ...plan.others.filter((o) => o.files > 0).map((o) => otherGroup(o.name))],
     apks_on: [],
     verify_hash: false,
+    tel: TEL_KINDS.filter((k) => (telWrite(tel, k) ?? 0) > 0),
   };
 }
 
-/** Wybór serwisanta przeniesiony na nowy plan (np. po braku miejsca): tylko grupy i podejrzane APK, które nowy
- *  plan jeszcze ma. */
-export function keptUploadChoice(plan: RestorePlanView, prev: UploadChoiceView): UploadChoiceView {
+/** Wybór serwisanta przeniesiony na nowy plan (np. po braku miejsca): tylko grupy, podejrzane APK i telefonia,
+ *  które nowy plan jeszcze ma. */
+export function keptUploadChoice(plan: RestorePlanView, prev: UploadChoiceView, tel: TelPlanView | null = null): UploadChoiceView {
   const groups = new Set([...UPLOAD_GROUPS.filter((g) => g in plan.groups), ...plan.others.map((o) => otherGroup(o.name))]);
   const apks = new Set(plan.apks.filter((a) => a.outcome !== 'malicious' && !a.default_on).map((a) => a.remote));
   return { groups: prev.groups.filter((g) => groups.has(g)), apks_on: prev.apks_on.filter((a) => apks.has(a)),
-    verify_hash: prev.verify_hash };
+    verify_hash: prev.verify_hash, tel: prev.tel.filter((k) => (telWrite(tel, k) ?? 0) > 0) };
+}
+
+/** Wynik telefonii: `error`, gdy telefon nie wrócił do ustawień sprzed wgrywania (rola SMS, pomocnik);
+ *  `warn`, gdy coś zostało do ręcznego importu, coś się nie zapisało albo trzeba sprawdzić Wiadomości. */
+export function telOutcome(r: TelResultView): 'ok' | 'warn' | 'error' {
+  if (!r.cleanup.ok) return 'error';
+  const kinds = Object.values(r.kinds);
+  if (r.stopped || r.manual.length > 0 || kinds.some((k) => k.failed > 0 || k.manual > 0 || k.visible_warning)) return 'warn';
+  return 'ok';
+}
+
+/** Znane domyślne aplikacje SMS (pakiet → klucz `transfer.tel.sms_app.*`); inne pokazujemy pakietem. */
+const SMS_APPS: Record<string, string> = {
+  'com.google.android.apps.messaging': 'google', 'com.samsung.android.messaging': 'samsung',
+  'com.android.mms': 'mms', 'com.android.messaging': 'aosp',
+};
+
+export function smsAppKey(pkg: string | null): string | null {
+  return pkg ? SMS_APPS[pkg] ?? null : null;
 }
 
 /** Ta sama reguła co `RestorePlan.need/fits` w silniku. Sumy grup mają już APK według domyślnego wyboru

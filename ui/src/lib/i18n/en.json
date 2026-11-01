@@ -759,11 +759,84 @@
       },
       "later_title": "Later in the program",
       "later": {
-        "sms": "SMS and MMS",
-        "calls": "Call history",
-        "contacts": "Contacts",
         "apps": "Apps",
         "whatsapp": "Restoring WhatsApp chats"
+      },
+      "section_tel": "Contacts and messages",
+      "tel": {
+        "contacts": "Contacts",
+        "sms": "SMS and MMS",
+        "calls": "Call history",
+        "to_write": "to upload: {count}",
+        "synced": {
+          "one": "{count} contact will come from the {account} account after sync",
+          "few": "{count} contacts will come from the {account} account after sync",
+          "many": "{count} contacts will come from the {account} account after sync",
+          "other": "{count} contacts will come from the {account} account after sync"
+        },
+        "messenger": {
+          "one": "skipped {count} contact from messaging apps",
+          "few": "skipped {count} contacts from messaging apps",
+          "many": "skipped {count} contacts from messaging apps",
+          "other": "skipped {count} contacts from messaging apps"
+        },
+        "duplicates": "The phone already has contacts — duplicates are possible",
+        "done_ok": "Contacts and messages uploaded",
+        "done_warn": "Contacts and messages uploaded, but not everything worked",
+        "done_warn_text": "Details in the table below.",
+        "error_title": "Could not upload contacts and messages",
+        "col": {
+          "kind": "Category",
+          "written": "Uploaded",
+          "existed": "Already there",
+          "skipped": "Skipped",
+          "failed": "Errors",
+          "path": "Method"
+        },
+        "kind": {
+          "contacts": "Contacts",
+          "sms": "SMS",
+          "mms": "MMS",
+          "calls": "Calls"
+        },
+        "path": {
+          "app_process": "directly",
+          "companion": "via the helper app",
+          "file": "file to import",
+          "none": "—"
+        },
+        "visible": "check in the Messages app",
+        "todo_title": "To do on the phone",
+        "todo_file": "install SMS Backup & Restore, tap Restore and choose the file {name} from Downloads",
+        "todo_contacts": "an import window is open on the phone — choose the account and confirm"
+      },
+      "stages_label": "Upload stages",
+      "stage": {
+        "files": "Files",
+        "contacts": "Contacts",
+        "messages": "Messages",
+        "calls": "Calls"
+      },
+      "tel_progress": "{done} of {total}",
+      "tap": {
+        "grant": "On the phone: confirm AdMeNot as the SMS app for the upload",
+        "grant_text": "Without it, messages go to a file for manual import.",
+        "skip": "Skip (leave a file to import)",
+        "restore": "On the phone: choose {app} as the default SMS app",
+        "restore_text": "The phone must go back to its previous SMS app — this step cannot be skipped."
+      },
+      "sms_app": {
+        "google": "Google Messages",
+        "samsung": "Samsung Messages",
+        "mms": "Messages",
+        "aosp": "Messages",
+        "previous": "the previous SMS app"
+      },
+      "cleanup": {
+        "running": "Restoring the phone's settings after an interrupted upload…",
+        "running_text": "Scanning and data transfer will be available when this finishes.",
+        "failed": "The phone did not return to its settings",
+        "failed_text": "On the phone open Settings → Apps → Default apps → SMS app and choose {app}. Then uninstall AdMeNot Helper (Settings → Apps)."
       },
       "next_version": "in a later version",
       "panel": "Space on the new phone",

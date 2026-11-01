@@ -4,6 +4,7 @@
   import DeviceCard from '../components/DeviceCard.svelte';
   import InterruptedBanner from '../components/InterruptedBanner.svelte';
   import MirrorControls from '../components/MirrorControls.svelte';
+  import PhoneCleanup from '../components/PhoneCleanup.svelte';
   import PhoneStage from '../components/PhoneStage.svelte';
   import UsbGuide from '../components/UsbGuide.svelte';
   import type { Controller } from '../lib/controller';
@@ -29,6 +30,8 @@
   const restoring = $derived(link === 'ready' || link === 'many' ? restoreResumable(s.transfer.copies, s.serial) : null);
   const offer = $derived(link === 'ready' || link === 'many' ? restoreOffer(s.transfer.copies, s.serial, new Date()) : null);
   // Ręczne wgrywanie: dowolna skończona kopia, także stara albo już wgrana (baner proponuje tylko świeżą).
+  // Telefon wraca do ustawień sprzed przerwanego wgrywania: do końca most odmówi każdego zadania (`busy`).
+  const cleaning = $derived(s.transfer.cleanup.running);
   const anyCopy = $derived(s.transfer.copies.some((c) => c.status === 'complete' || c.status === 'incomplete'));
   const when = (iso: string) => new Date(iso).toLocaleString(i18n.lang === 'pl' ? 'pl-PL' : 'en-GB',
     { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -59,26 +62,27 @@
   </div>
 
   <div class="flex min-w-0 flex-1 flex-col gap-4">
+    <PhoneCleanup />
     {#if s.interrupted.length}<InterruptedBanner orders={s.interrupted} />{/if}
     {#if resumable}
       <Banner tone="info" icon="rotate-ccw" title={t('transfer.resume_title', { when: when(resumable.created) })}>
         {t('transfer.resume_text')}
         {#snippet actions()}
-          <Button variant="primary" size="sm" onclick={() => ctl.startTransfer(true)}>{t('transfer.resume')}</Button>
+          <Button variant="primary" size="sm" disabled={cleaning} onclick={() => ctl.startTransfer(true)}>{t('transfer.resume')}</Button>
         {/snippet}
       </Banner>
     {:else if restoring}
       <Banner tone="info" icon="rotate-ccw" title={t('transfer.restore.resume_title')}>
         {t('transfer.restore.resume_text', source(restoring))}
         {#snippet actions()}
-          <Button variant="primary" size="sm" onclick={() => ctl.planRestore(restoring.id)}>{t('transfer.restore.resume')}</Button>
+          <Button variant="primary" size="sm" disabled={cleaning} onclick={() => ctl.planRestore(restoring.id)}>{t('transfer.restore.resume')}</Button>
         {/snippet}
       </Banner>
     {:else if offer}
       <Banner tone="info" icon="smartphone" title={t('transfer.restore.offer_title', source(offer))}>
         {t('transfer.restore.offer_text')}
         {#snippet actions()}
-          <Button variant="primary" size="sm" onclick={() => ctl.planRestore(offer.id)}>{t('transfer.restore.upload')}</Button>
+          <Button variant="primary" size="sm" disabled={cleaning} onclick={() => ctl.planRestore(offer.id)}>{t('transfer.restore.upload')}</Button>
           <Button size="sm" onclick={otherCopy}>{t('transfer.restore.other_copy')}</Button>
         {/snippet}
       </Banner>
@@ -110,13 +114,13 @@
             </label>
           {/if}
         {/each}
-        <form class="flex gap-2" onsubmit={(e) => { e.preventDefault(); void ctl.startScan(); }}>
+        <form class="flex gap-2" onsubmit={(e) => { e.preventDefault(); if (!cleaning) void ctl.startScan(); }}>
           <input class="field flex-1 rounded-xl px-3.5 py-2.5" bind:value={s.client}
             placeholder={t('connect.client_placeholder')} aria-label={t('connect.client_label')} maxlength="80" />
-          <Button type="submit" variant="primary" size="lg" disabled={!s.serial}>{t('connect.scan')}</Button>
-          <Button variant="secondary" size="lg" disabled={!s.serial} onclick={() => ctl.startTransfer()}>{t('transfer.start')}</Button>
+          <Button type="submit" variant="primary" size="lg" disabled={!s.serial || cleaning}>{t('connect.scan')}</Button>
+          <Button variant="secondary" size="lg" disabled={!s.serial || cleaning} onclick={() => ctl.startTransfer()}>{t('transfer.start')}</Button>
           {#if anyCopy}
-            <Button variant="secondary" size="lg" disabled={!s.serial} onclick={otherCopy}>{t('transfer.restore.pick')}</Button>
+            <Button variant="secondary" size="lg" disabled={!s.serial || cleaning} onclick={otherCopy}>{t('transfer.restore.pick')}</Button>
           {/if}
         </form>
       </div>

@@ -759,11 +759,84 @@
       },
       "later_title": "Później w programie",
       "later": {
-        "sms": "SMS i MMS",
-        "calls": "Historia połączeń",
-        "contacts": "Kontakty",
         "apps": "Aplikacje",
         "whatsapp": "Przywracanie czatów WhatsApp"
+      },
+      "section_tel": "Kontakty i wiadomości",
+      "tel": {
+        "contacts": "Kontakty",
+        "sms": "SMS i MMS",
+        "calls": "Historia połączeń",
+        "to_write": "do wgrania: {count}",
+        "synced": {
+          "one": "{count} kontakt przyjdzie z konta {account} po synchronizacji",
+          "few": "{count} kontakty przyjdą z konta {account} po synchronizacji",
+          "many": "{count} kontaktów przyjdzie z konta {account} po synchronizacji",
+          "other": "{count} kontaktu przyjdzie z konta {account} po synchronizacji"
+        },
+        "messenger": {
+          "one": "pominięto {count} kontakt z komunikatorów",
+          "few": "pominięto {count} kontakty z komunikatorów",
+          "many": "pominięto {count} kontaktów z komunikatorów",
+          "other": "pominięto {count} kontaktu z komunikatorów"
+        },
+        "duplicates": "Na telefonie są już kontakty — możliwe duplikaty",
+        "done_ok": "Kontakty i wiadomości wgrane",
+        "done_warn": "Kontakty i wiadomości wgrane, ale nie wszystko się udało",
+        "done_warn_text": "Szczegóły w tabeli poniżej.",
+        "error_title": "Nie udało się wgrać kontaktów i wiadomości",
+        "col": {
+          "kind": "Kategoria",
+          "written": "Wgrano",
+          "existed": "Już były",
+          "skipped": "Pominięte",
+          "failed": "Błędy",
+          "path": "Sposób"
+        },
+        "kind": {
+          "contacts": "Kontakty",
+          "sms": "SMS",
+          "mms": "MMS",
+          "calls": "Połączenia"
+        },
+        "path": {
+          "app_process": "bezpośrednio",
+          "companion": "przez aplikację pomocniczą",
+          "file": "plik do importu",
+          "none": "—"
+        },
+        "visible": "sprawdź w aplikacji Wiadomości",
+        "todo_title": "Do zrobienia na telefonie",
+        "todo_file": "zainstaluj SMS Backup & Restore, Przywróć, wybierz plik {name} z Pobranych",
+        "todo_contacts": "na telefonie otwarte jest okno importu — wybierz konto i potwierdź"
+      },
+      "stages_label": "Etapy wgrywania",
+      "stage": {
+        "files": "Pliki",
+        "contacts": "Kontakty",
+        "messages": "Wiadomości",
+        "calls": "Połączenia"
+      },
+      "tel_progress": "{done} z {total}",
+      "tap": {
+        "grant": "Na telefonie: potwierdź AdMeNot jako aplikację SMS na czas wgrywania",
+        "grant_text": "Bez tego wiadomości trafią do pliku do ręcznego importu.",
+        "skip": "Pomiń (zostawię plik do importu)",
+        "restore": "Na telefonie: wybierz {app} jako domyślną aplikację SMS",
+        "restore_text": "Telefon musi wrócić do poprzedniej aplikacji SMS — tego kroku nie da się pominąć."
+      },
+      "sms_app": {
+        "google": "Wiadomości Google",
+        "samsung": "Wiadomości Samsung",
+        "mms": "Wiadomości",
+        "aosp": "Wiadomości",
+        "previous": "poprzednią aplikację SMS"
+      },
+      "cleanup": {
+        "running": "Przywracam ustawienia telefonu po przerwanym wgrywaniu…",
+        "running_text": "Skanowanie i przenoszenie danych będą dostępne, gdy to się skończy.",
+        "failed": "Telefon nie wrócił do swoich ustawień",
+        "failed_text": "Na telefonie otwórz Ustawienia → Aplikacje → Aplikacje domyślne → Aplikacja SMS i wybierz {app}. Potem odinstaluj AdMeNot Helper (Ustawienia → Aplikacje)."
       },
       "next_version": "w kolejnej wersji",
       "panel": "Miejsce na nowym telefonie",

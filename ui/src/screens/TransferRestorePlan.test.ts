@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { describe, expect, test } from 'vitest';
 import { defaultUploadChoice } from '../lib/logic';
-import type { CopyView, RestoreApk, RestorePlanView } from '../lib/types';
+import type { CopyView, RestoreApk, RestorePlanView, TelPlanView } from '../lib/types';
 import { setupCtl } from '../test-utils';
 import TransferRestorePlan from './TransferRestorePlan.svelte';
 
@@ -21,12 +21,20 @@ const PLAN: RestorePlanView = {
   space: { free: 10 * GiB, total: 64 * GiB }, reserve: GiB, missing: 0,
 };
 
-async function show(over: { plan?: Partial<RestorePlanView>; copy?: Partial<CopyView>; sameRecent?: boolean } = {}) {
+const TEL: TelPlanView = {
+  contacts: { write: 12, existing: 4, skipped_synced: [{ account: 'anna@gmail.com', count: 40 }], skipped_messenger: 5 },
+  sms: { write: 300, existing: 0 }, mms: { write: 20, existing: 0 }, calls: null, phone_has_contacts: false,
+  readable: { contacts: true, sms: true, calls: true },
+};
+
+async function show(over: { plan?: Partial<RestorePlanView>; copy?: Partial<CopyView>; sameRecent?: boolean;
+  tel?: TelPlanView | null } = {}) {
   const env = await setupCtl('transfer_restore');
   env.s.phase = 'transfer_restore_plan';
   env.s.serial = 'R58W20NEW01';
   const plan = { ...PLAN, ...over.plan };
-  Object.assign(env.s.transfer.restore, { plan, copy: { ...COPY, ...over.copy }, choice: defaultUploadChoice(plan),
+  const tel = over.tel === undefined ? TEL : over.tel;
+  Object.assign(env.s.transfer.restore, { plan, tel, copy: { ...COPY, ...over.copy }, choice: defaultUploadChoice(plan, tel),
     sameRecent: over.sameRecent ?? false });
   const view = render(TransferRestorePlan, { context: new Map([['ctl', env.ctl]]) });
   await tick();
@@ -64,12 +72,44 @@ describe('TransferRestorePlan', () => {
     expect(s.transfer.restore.choice.apks_on).toEqual(['/sdcard/Download/gra.apk']);
   });
 
-  test('later steps are greyed out "in the next version" without checkboxes', async () => {
+  test('later steps (apps, WhatsApp chats) are greyed out "in the next version" without checkboxes', async () => {
     await show();
     const later = screen.getByRole('region', { name: 'Później w programie' });
     expect(later.querySelectorAll('input').length).toBe(0);
-    expect(later.textContent).toMatch(/SMS/);
+    expect(later.textContent).toMatch(/Aplikacje/);
+    expect(later.textContent).not.toMatch(/SMS|Kontakty/);
     expect(later.textContent).toMatch(/w kolejnej wersji/);
+  });
+
+  test('contacts and messages: counts, synced accounts, messenger contacts; a kind missing from the copy is hidden', async () => {
+    const { s } = await show();
+    const tel = screen.getByRole('region', { name: 'Kontakty i wiadomości' });
+    expect(tel.textContent).toMatch(/do wgrania: 12/);
+    expect(tel.textContent).toMatch(/już na telefonie: 4/);
+    expect(tel.textContent).toMatch(/do wgrania: 320/);  // SMS z MMS
+    expect(screen.getByText('40 kontaktów przyjdzie z konta anna@gmail.com po synchronizacji')).toBeTruthy();
+    expect(screen.getByText('pominięto 5 kontaktów z komunikatorów')).toBeTruthy();
+    expect(screen.queryByRole('checkbox', { name: /Historia połączeń/ })).toBeNull();
+    expect(screen.queryByText(/możliwe duplikaty/)).toBeNull();
+    expect(s.transfer.restore.choice.tel).toEqual(['contacts', 'sms']);
+    await fireEvent.click(screen.getByRole('checkbox', { name: /SMS i MMS/ }));
+    expect(s.transfer.restore.choice.tel).toEqual(['contacts']);
+  });
+
+  test('contacts already on the phone: an info banner about duplicates', async () => {
+    await show({ tel: { ...TEL, phone_has_contacts: true } });
+    expect(screen.getByText('Na telefonie są już kontakty — możliwe duplikaty')).toBeTruthy();
+  });
+
+  test('only contacts and messages ticked: the upload can start without files', async () => {
+    const { s } = await show({ plan: { groups: {}, others: [], apks: [] } });
+    expect(s.transfer.restore.choice.groups).toEqual([]);
+    expect((screen.getByRole('button', { name: /^Wgraj/ }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  test('a copy without telephony has no contacts and messages section', async () => {
+    await show({ tel: null });
+    expect(screen.queryByRole('region', { name: 'Kontakty i wiadomości' })).toBeNull();
   });
 
   test('the same phone as the copy, copied recently: a dialog with focus on "No"', async () => {

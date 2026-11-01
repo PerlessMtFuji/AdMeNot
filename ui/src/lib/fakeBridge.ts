@@ -32,7 +32,7 @@ export function scenarioNames(): string[] {
 export type FakeBridge = Bridge & {
   setCrashes(reports: CrashSummary[], startup: string[]): void;
   failNextCrashSend(key: string): void;
-  failNext(method: string, key: string): void;  // następne wywołanie `method` zwraca błąd `key`
+  failNext(method: string, key: string, message?: string): void;  // następne wywołanie `method` zwraca błąd `key`
   setChecks(checks: DeviceCheck[]): void;  // co zwróci następny `recheck_site_notifications` (i kolejne skany)
   setCopies(copies: CopyView[]): void;  // kopie danych na komputerze (`transfers` bez nagrania w scenariuszu)
   calls: { method: string; args: unknown[] }[];
@@ -103,7 +103,7 @@ export function createFakeBridge(name: string,
   let crashes: CrashSummary[] = [];
   let crashStartup: string[] = [];
   let failSend: string | null = null;
-  const failures = new Map<string, string>();
+  const failures = new Map<string, { key: string; message: string }>();
   let checks: DeviceCheck[] | null = options.checks ? structuredClone(options.checks) : null;
   let checksChanged = false; // odpytywanie w tle (`whenDebugging`) dostaje odczyt tylko po zmianie
   let copies: CopyView[] = [];
@@ -154,6 +154,8 @@ export function createFakeBridge(name: string,
       case 'delete_transfer':
         copies = copies.filter((c) => c.id !== args[0]);
         return { deleted: String(args[0]) };
+      case 'skip_tap':
+        return {};
       case 'transfer_whatsapp':
         return { whatsapp_backup: '2026-09-26T14:29:00' };
       case 'transfer_rescan': {
@@ -362,7 +364,7 @@ export function createFakeBridge(name: string,
     const failure = failures.get(method);
     if (failure) {
       failures.delete(method);
-      return { error: { key: failure, message: '' } };
+      return { error: { ...failure } };
     }
     const queue = queues.get(method);
     if (!queue || queue.length === 0) return fallback(method, args);
@@ -394,7 +396,7 @@ export function createFakeBridge(name: string,
     emit: (event, detail) => dispatch(event, detail),
     setCrashes: (reports, startup) => { crashes = [...reports]; crashStartup = [...startup]; },
     failNextCrashSend: (key) => { failSend = key; },
-    failNext: (method, key) => { failures.set(method, key); },
+    failNext: (method, key, message = '') => { failures.set(method, { key, message }); },
     setChecks: (next) => { checks = structuredClone(next); checksChanged = true; },
     setCopies: (next) => { copies = structuredClone(next); },
   };

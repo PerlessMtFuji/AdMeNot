@@ -19,9 +19,10 @@ from admenot.engine.device.info import DeviceInfo
 from admenot.engine.journal.db import Action
 from admenot.engine.session import ScanReport
 from admenot.engine.transfer.backup import BackupResult, Selection
+from admenot.engine.transfer.phonesetup import CleanupResult
 from admenot.engine.transfer.restore import RestoreResult, UploadChoice
 from admenot.engine.transfer.restore_plan import UPLOAD_GROUPS
-from admenot.engine.transfer.restore_tel import TelResult
+from admenot.engine.transfer.restore_tel import TelKindResult, TelResult
 from admenot.engine.transfer.telephony import CategoryResult
 from admenot.engine.workflow import AppStatus, OrderResult
 
@@ -266,7 +267,14 @@ def sample() -> dict[str, list[dict[str, Any]]]:
                             files_renamed=3, files_denied=0, files_failed=0, files_unselected=0,
                             apk_skipped=1, apk_suspicious_skipped=0, bytes=37_900_000_000, seconds=1840,
                             hashed=False, media_scan="done", files_missing=0)
-    upload = UploadChoice(groups=frozenset({"photos", "videos", "downloads", "whatsapp"}), apks_on=frozenset())
+    upload = UploadChoice(groups=frozenset({"photos", "videos", "downloads", "whatsapp"}), apks_on=frozenset(),
+                          tel=frozenset({"contacts", "sms", "calls"}))
+    # Telefonia: same liczby, droga zapisu i flaga widoczności — bez kont, numerów i nazw plików.
+    tel = TelResult(kinds={"contacts": TelKindResult(380, 12, 20, 6, 0, 0, "app_process", False),
+                           "sms": TelKindResult(1830, 0, 0, 0, 0, 0, "companion", False),
+                           "calls": TelKindResult(640, 0, 0, 0, 0, 0, "app_process", False)},
+                    safety={"contacts": True, "sms": True, "calls": True}, manual=[],
+                    cleanup=CleanupResult(True, True, True, True), synced_accounts={}, seconds=95)
     out: dict[str, list[dict[str, Any]]] = {}
     for name, packages in (("basic", False), ("packages", True)):
         bodies = [("start", start_body("simple")), ("scan", _sample_scan(packages)),
@@ -275,6 +283,6 @@ def sample() -> dict[str, list[dict[str, Any]]]:
                   ("undo", undo_event(_SAMPLE_DEVICE, ["com.wlive.forecast"], [], 2, packages,
                                     sites=2, sites_restored=1)),
                   ("transfer_backup", transfer_backup_event(_SAMPLE_DEVICE, backup, chosen)),
-                  ("transfer_restore", transfer_restore_event(_SAMPLE_DEVICE, restore, upload, 4))]
+                  ("transfer_restore", transfer_restore_event(_SAMPLE_DEVICE, restore, upload, 4, tel))]
         out[name] = [{**common(SAMPLE_INSTALL, t, now, "pl"), **body} for t, body in bodies]
     return out

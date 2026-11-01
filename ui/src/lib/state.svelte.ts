@@ -1,7 +1,7 @@
 import { SvelteSet } from 'svelte/reactivity';
 import { actedLevels, type ActedLog, type OpenGroups, type Phase } from './logic';
 import type {
-  ApiErrorBody, ApkEstimate, BackupResultView, CopyView, InventoryView, RestorePlanView, RestoreProgressView, RestoreResultView, TransferProgress, TransferSelection, UploadChoiceView, ApkQuestion, Category, ConsoleEntry, DeviceEntry, EtaView, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
+  ApiErrorBody, ApkEstimate, BackupResultView, CopyView, InventoryView, RestorePlanView, RestoreProgressView, RestoreResultView, TapRequest, TelPlanView, TelProgressView, TelResultView, TransferProgress, TransferSelection, UploadChoiceView, ApkQuestion, Category, ConsoleEntry, DeviceEntry, EtaView, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
   PlanView, Question, ReportResult, ScanView, Settings, ShareState, ShotsView, ShotView, StepEvent, UndoDone, UndoSite, UpdateView, UserWait, Verdict, WhoView,
 } from './types';
 
@@ -13,7 +13,8 @@ export const EMPTY_TRANSFER_SELECTION: TransferSelection = {
 };
 
 export const emptyRestore = (): RestoreState => ({ plan: null, copy: null,
-  choice: { groups: [], apks_on: [], verify_hash: false }, progress: null, result: null, sameRecent: false, resumable: false });
+  choice: { groups: [], apks_on: [], verify_hash: false, tel: [] }, progress: null, result: null, sameRecent: false,
+  resumable: false, tel: null, telProgress: null, telResult: null, telError: null, tap: null, tapPackage: null });
 
 /** Wgrywanie kopii na nowy telefon: plan z mostu, wybór serwisanta, postęp i wynik. */
 export interface RestoreState {
@@ -27,6 +28,22 @@ export interface RestoreState {
   sameRecent: boolean;
   /** Na tym telefonie jest przerwane wgrywanie tej kopii — „Wgraj” je wznowi. */
   resumable: boolean;
+  /** Kontakty, wiadomości i połączenia z kopii (null — kopia bez telefonii albo plan jeszcze nie przyszedł). */
+  tel: TelPlanView | null;
+  telProgress: TelProgressView | null;
+  telResult: TelResultView | null;
+  /** Klucz błędu telefonii po plikach (`tel_error`): wynik plików zostaje, telefonia ma własny baner. */
+  telError: string | null;
+  /** Prośba o stuknięcie na telefonie (`transfer:tap`) — także w czasie przywracania ustawień telefonu. */
+  tap: TapRequest | null;
+  /** Poprzednia domyślna aplikacja SMS (pakiet), której oddajemy rolę. */
+  tapPackage: string | null;
+}
+
+/** Przywracanie ustawień telefonu po przerwanym wgrywaniu (`phone_cleanup`): `ok` — wynik ostatniej próby. */
+export interface CleanupState {
+  running: boolean;
+  ok: boolean | null;
 }
 
 /** Przenoszenie danych: inwentarz starego telefonu, wybór, postęp kopii i kopie na komputerze. */
@@ -43,6 +60,7 @@ export interface TransferState {
   copy: CopyView | null;
   copies: CopyView[];
   restore: RestoreState;
+  cleanup: CleanupState;
 }
 
 export class AppState {
@@ -161,7 +179,8 @@ export class AppState {
   crashError = $state<ApiErrorBody | null>(null);
   fatalCrash = $state<string | null>(null);
   transfer = $state<TransferState>({ inventory: null, resumable: null, selection: { ...EMPTY_TRANSFER_SELECTION },
-    progress: null, waiting: false, result: null, copy: null, copies: [], restore: emptyRestore() });
+    progress: null, waiting: false, result: null, copy: null, copies: [], restore: emptyRestore(),
+    cleanup: { running: false, ok: null } });
 
   get orderRunning(): boolean {
     return this.job !== null && ORDER_KINDS.includes(this.job.kind);

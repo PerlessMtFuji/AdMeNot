@@ -30,7 +30,8 @@ export const PLURAL_KEYS = ['results.title', 'results.safe', 'expert.days', 'pan
   'shot.count', 'apk_cache.estimate', 'checks.to_fix', 'checks.picked', 'history.sites_restored',
   'undo.done_collapsed', 'transfer.apps_skipped', 'transfer.apps_suspicious', 'transfer.files', 'transfer.messages',
   'transfer.folders', 'transfer.categories', 'transfer.progress_files', 'transfer.expires', 'transfer.days_left',
-  'transfer.unreadable_files', 'transfer.restore.missing', 'transfer.restore.apk_skipped'] as const;
+  'transfer.unreadable_files', 'transfer.restore.missing', 'transfer.restore.apk_skipped', 'transfer.restore.tel.synced',
+  'transfer.restore.tel.messenger'] as const;
 
 
 class I18n {

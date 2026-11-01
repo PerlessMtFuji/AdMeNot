@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import fixture from '../../../tests/fixtures/bridge/transfer_restore.json';
-import type { CopyView, InventoryView, RestoreApk, RestorePlanView, RestoreResultView } from './types';
+import type { CopyView, InventoryView, RestoreApk, RestorePlanView, RestoreResultView, TelKindResultView, TelPlanView, TelResultView } from './types';
 import {
   backupOutcome,
   defaultUploadChoice,
@@ -8,6 +8,7 @@ import {
   restoreOffer,
   restoreOutcome,
   restoreResumable,
+  telOutcome,
   uploadNeed,
   changedVerdicts,
   defaultTransferSelection,
@@ -787,7 +788,7 @@ describe('data transfer', () => {
 describe('uploading a copy to the new phone', () => {
   const FIXTURE = (fixture as { calls: { method: string; events: unknown[][] }[] }).calls;
   const recorded = FIXTURE.find((c) => c.method === 'restore_plan')!.events
-    .find(([name]) => name === 'transfer:restore_plan')![1] as { plan: RestorePlanView };
+    .find(([name]) => name === 'transfer:restore_plan')![1] as { plan: RestorePlanView; tel: TelPlanView };
   const restore = (serial: string, status: string, resumable: boolean) => ({ serial, status, updated: null, resumable });
   const copy = (id: string, serial: string, status: CopyView['status'], created: string,
     restores: CopyView['restores'] = []): CopyView => ({
@@ -841,14 +842,40 @@ describe('uploading a copy to the new phone', () => {
     delete groups.whatsapp;  // grupy bez plików mogą nie przyjść
     const plan: RestorePlanView = { ...recorded.plan, groups,
       others: [...recorded.plan.others, { name: '', files: 2, bytes: 5, exists: 0, rename: 0 }] };
-    expect(defaultUploadChoice(plan)).toEqual({ groups: ['photos', 'downloads', 'other:Music', 'other:'], apks_on: [], verify_hash: false });
+    expect(defaultUploadChoice(plan)).toEqual({ groups: ['photos', 'downloads', 'other:Music', 'other:'], apks_on: [],
+      verify_hash: false, tel: [] });
+  });
+
+  test('default choice ticks every telephony category with something to write; SMS counts MMS too', () => {
+    const tel = recorded.tel;  // kontakty 2, SMS 2, połączenia 1
+    expect(defaultUploadChoice(recorded.plan, tel).tel).toEqual(['contacts', 'sms', 'calls']);
+    const some: TelPlanView = { ...tel, contacts: { ...tel.contacts!, write: 0, existing: 2 }, sms: null,
+      mms: { write: 3, existing: 0 }, calls: null };
+    expect(defaultUploadChoice(recorded.plan, some).tel).toEqual(['sms']);
+    expect(defaultUploadChoice(recorded.plan, null).tel).toEqual([]);
+  });
+
+  test('telephony outcome: error when the phone was not cleaned up, warn for manual, failed or a visible warning', () => {
+    const kind = (over: Partial<TelKindResultView> = {}): TelKindResultView => ({ written: 2, existed: 0, skipped_synced: 0,
+      skipped_messenger: 0, failed: 0, manual: 0, path: 'app_process', visible_warning: false, ...over });
+    const cleanup = { role_ok: true, appop_ok: true, companion_removed: true, helper_removed: true, ok: true };
+    const r = (over: Partial<TelResultView> = {}): TelResultView => ({ kinds: { contacts: kind(), sms: kind() }, safety: {},
+      manual: [], cleanup, synced_accounts: [], seconds: 1, stopped: false, status: 'complete', ...over });
+    expect(telOutcome(r())).toBe('ok');
+    expect(telOutcome(r({ manual: [{ kind: 'sms', name: 'admenot-sms.xml' }] }))).toBe('warn');
+    expect(telOutcome(r({ kinds: { sms: kind({ failed: 1 }) } }))).toBe('warn');
+    expect(telOutcome(r({ kinds: { sms: kind({ visible_warning: true }) } }))).toBe('warn');
+    expect(telOutcome(r({ manual: [{ kind: 'sms', name: 'x.xml' }], cleanup: { ...cleanup, role_ok: false, ok: false } })))
+      .toBe('error');
   });
 
   test('a kept choice keeps only groups and suspicious APK files the new plan still has', () => {
     const plan = recorded.plan;
     expect(keptUploadChoice(plan, { groups: ['photos', 'other:Music', 'other:Gone', 'videos'],
-      apks_on: ['/sdcard/Download/gra.apk', '/sdcard/Download/szybki-cleaner.apk', '/sdcard/x.apk'], verify_hash: true }))
-      .toEqual({ groups: ['photos', 'other:Music', 'videos'], apks_on: ['/sdcard/Download/gra.apk'], verify_hash: true });
+      apks_on: ['/sdcard/Download/gra.apk', '/sdcard/Download/szybki-cleaner.apk', '/sdcard/x.apk'], verify_hash: true,
+      tel: ['contacts', 'calls'] }, { ...recorded.tel, calls: null }))
+      .toEqual({ groups: ['photos', 'other:Music', 'videos'], apks_on: ['/sdcard/Download/gra.apk'], verify_hash: true,
+        tel: ['contacts'] });
   });
 
   test('upload need mirrors RestorePlan.need: group totals already hold default APKs, suspicious only when ticked', () => {
@@ -860,7 +887,7 @@ describe('uploading a copy to the new phone', () => {
       .toBe(5000 + 504 + 800 + 400 + 902);
     // podejrzany zaznaczony w odznaczonej grupie nie liczy się
     expect(uploadNeed(plan, { ...all, groups: ['photos'], apks_on: ['/sdcard/Download/gra.apk'] }).need).toBe(5000);
-    expect(uploadNeed(plan, { groups: [], apks_on: [], verify_hash: false }).need).toBe(0);
+    expect(uploadNeed(plan, { groups: [], apks_on: [], verify_hash: false, tel: [] }).need).toBe(0);
   });
 
   test('upload need: clean APK bytes are not counted twice, a ticked one already on the phone adds nothing', () => {
@@ -869,15 +896,15 @@ describe('uploading a copy to the new phone', () => {
     const plan: RestorePlanView = { groups: { downloads: { files: 3, bytes: 100, exists: 2, rename: 0 } }, others: [],
       apks: [apk('a.apk', 'clean', true), apk('b.apk', 'suspicious', false, 'exists'), apk('c.apk', 'unknown', true, 'exists')],
       space: { free: 10_000, total: null }, reserve: 1_000, missing: 0 };
-    expect(uploadNeed(plan, { groups: ['downloads'], apks_on: ['b.apk'], verify_hash: false }).need).toBe(100);
+    expect(uploadNeed(plan, { groups: ['downloads'], apks_on: ['b.apk'], verify_hash: false, tel: [] }).need).toBe(100);
   });
 
   test('fits keeps the reserve free and reports what is missing', () => {
     const plan: RestorePlanView = { groups: { photos: { files: 1, bytes: 9_000, exists: 0, rename: 0 },
       videos: { files: 1, bytes: 3_000, exists: 0, rename: 0 } }, others: [], apks: [],
       space: { free: 10_000, total: 20_000 }, reserve: 1_000, missing: 0 };
-    expect(uploadNeed(plan, { groups: ['photos'], apks_on: [], verify_hash: false })).toEqual({ need: 9_000, fits: true, missing: 0 });
-    expect(uploadNeed(plan, { groups: ['photos', 'videos'], apks_on: [], verify_hash: false }))
+    expect(uploadNeed(plan, { groups: ['photos'], apks_on: [], verify_hash: false, tel: [] })).toEqual({ need: 9_000, fits: true, missing: 0 });
+    expect(uploadNeed(plan, { groups: ['photos', 'videos'], apks_on: [], verify_hash: false, tel: [] }))
       .toEqual({ need: 12_000, fits: false, missing: 3_000 });
   });
 

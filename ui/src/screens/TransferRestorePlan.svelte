@@ -4,12 +4,15 @@
   import Folder from '@lucide/svelte/icons/folder';
   import ImageIcon from '@lucide/svelte/icons/image';
   import MessageCircle from '@lucide/svelte/icons/message-circle';
+  import MessageSquare from '@lucide/svelte/icons/message-square';
+  import Phone from '@lucide/svelte/icons/phone';
+  import Users from '@lucide/svelte/icons/users';
   import { getContext, type Snippet } from 'svelte';
   import DeviceCard from '../components/DeviceCard.svelte';
   import type { Controller } from '../lib/controller';
   import { i18n, t, tp } from '../lib/i18n/index.svelte';
-  import { formatSize, modelName, otherGroup, UPLOAD_GROUPS, uploadNeed } from '../lib/logic';
-  import type { CopyView, RestoreApk, UploadGroup, UploadTotals } from '../lib/types';
+  import { formatSize, modelName, otherGroup, TEL_KINDS, telWrite, UPLOAD_GROUPS, uploadNeed } from '../lib/logic';
+  import type { CopyView, RestoreApk, TelKind, UploadGroup, UploadTotals } from '../lib/types';
   import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
   import Dialog from '../ui/Dialog.svelte';
@@ -31,7 +34,7 @@
   const name = $derived(s.device?.name ?? entry?.name ?? modelName(entry?.model ?? null));
   const crumb = $derived([s.client.trim(), name, t('transfer.mode')].filter(Boolean).join(' · '));
   const serial = $derived(s.device?.serial ?? s.serial ?? '');
-  const blocked = $derived(!need || !need.fits || choice.groups.length === 0 || s.job !== null);
+  const blocked = $derived(!need || !need.fits || (choice.groups.length === 0 && choice.tel.length === 0) || s.job !== null);
   // Ten sam telefon co w kopii (kopia < 24 h): pytanie z domyślnym „Nie”; „Tak” zostawia ekran wyboru.
   let sameConfirmed = $state(false);
 
@@ -57,6 +60,21 @@
     return { key: 'others', icon: Folder, title: t('transfer.restore.group.others'),
       totals: { files: sum('files'), bytes: sum('bytes'), exists: sum('exists'), rename: sum('rename') },
       checked: plan.others.some((o) => choice.groups.includes(otherGroup(o.name))) };
+  });
+
+  // Kontakty, SMS (z MMS) i połączenia z kopii; kategorii, której w kopii nie ma, nie pokazujemy.
+  const TEL_ICONS: Record<TelKind, typeof Folder> = { contacts: Users, sms: MessageSquare, calls: Phone };
+  const telRows = $derived.by(() => {
+    const tel = r.tel;
+    if (!tel) return [];
+    return TEL_KINDS.flatMap((kind) => {
+      const write = telWrite(tel, kind);
+      if (write === null) return [];
+      // telefon, który nie dał się odczytać, nie mówi, ile już na nim jest (duplikatom zapobiega stan wgrywania)
+      const existing = tel.readable[kind] === false ? 0
+        : kind === 'sms' ? (tel.sms?.existing ?? 0) + (tel.mms?.existing ?? 0) : tel[kind]?.existing ?? 0;
+      return [{ kind, icon: TEL_ICONS[kind], write, existing, checked: choice.tel.includes(kind) }];
+    });
   });
 
   const incompleteParts = $derived.by(() => {
@@ -168,10 +186,44 @@
         </div>
       {/if}
 
+      {#if telRows.length}
+        <section aria-label={t('transfer.restore.section_tel')} class="mt-2 flex flex-col gap-3">
+          <span class="lbl">{t('transfer.restore.section_tel')}</span>
+          {#if r.tel?.phone_has_contacts}
+            <Banner tone="info" icon="info" title={t('transfer.restore.tel.duplicates')} />
+          {/if}
+          {#each telRows as row (row.kind)}
+            <div class="rounded-2xl card px-4 py-3 transition-opacity duration-150 {row.checked ? '' : 'opacity-70'}">
+              <label class="flex min-w-0 items-start gap-3.5 {row.write ? 'cursor-pointer' : ''}">
+                <input type="checkbox" class="mt-2.5 h-[18px] w-[18px] flex-none accent-[var(--color-accent)]" checked={row.checked}
+                  disabled={row.write === 0} onchange={() => ctl.toggleTel(row.kind)} />
+                <span class="grid h-9 w-9 flex-none place-items-center rounded-xl bg-accent-soft text-accent" aria-hidden="true"><row.icon size={18} /></span>
+                <span class="min-w-0 flex-1">
+                  <span class="block font-bold">{t(`transfer.restore.tel.${row.kind}`)}</span>
+                  <span class="block text-sm text-mut">{[
+                    t('transfer.restore.tel.to_write', { count: num(row.write) }),
+                    row.existing ? t('transfer.restore.exists', { count: num(row.existing) }) : '',
+                  ].filter(Boolean).join(' · ')}</span>
+                  {#if row.kind === 'contacts' && r.tel?.contacts}
+                    {#each r.tel.contacts.skipped_synced as a (a.account)}
+                      <span class="block text-sm text-mut">{tp('transfer.restore.tel.synced', a.count, { count: num(a.count), account: a.account })}</span>
+                    {/each}
+                    {#if r.tel.contacts.skipped_messenger}
+                      <span class="block text-sm text-mut">{tp('transfer.restore.tel.messenger', r.tel.contacts.skipped_messenger,
+                        { count: num(r.tel.contacts.skipped_messenger) })}</span>
+                    {/if}
+                  {/if}
+                </span>
+              </label>
+            </div>
+          {/each}
+        </section>
+      {/if}
+
       <section aria-label={t('transfer.restore.later_title')} class="mt-2 flex flex-col gap-1.5">
         <span class="lbl">{t('transfer.restore.later_title')}</span>
         <ul class="flex flex-col gap-1 rounded-2xl border border-dashed border-line px-4 py-3 text-sm text-soft">
-          {#each ['sms', 'calls', 'contacts', 'apps', 'whatsapp'] as k (k)}
+          {#each ['apps', 'whatsapp'] as k (k)}
             <li class="flex items-center justify-between gap-3">
               <span>{t(`transfer.restore.later.${k}`)}</span><span class="text-xs">{t('transfer.restore.next_version')}</span>
             </li>

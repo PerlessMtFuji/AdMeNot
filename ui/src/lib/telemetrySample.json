@@ -159,7 +159,42 @@
         "downloads": true,
         "whatsapp": true,
         "others": false
-      }
+      },
+      "tel": {
+        "contacts": {
+          "written": 380,
+          "existed": 12,
+          "skipped": 26,
+          "failed": 0,
+          "manual": 0,
+          "path": "app_process",
+          "visible_warning": false
+        },
+        "sms": {
+          "written": 1830,
+          "existed": 0,
+          "skipped": 0,
+          "failed": 0,
+          "manual": 0,
+          "path": "companion",
+          "visible_warning": false
+        },
+        "calls": {
+          "written": 640,
+          "existed": 0,
+          "skipped": 0,
+          "failed": 0,
+          "manual": 0,
+          "path": "app_process",
+          "visible_warning": false
+        }
+      },
+      "safety": {
+        "contacts": true,
+        "sms": true,
+        "calls": true
+      },
+      "cleanup_ok": true
     }
   ],
   "packages": [
@@ -355,7 +390,42 @@
         "downloads": true,
         "whatsapp": true,
         "others": false
-      }
+      },
+      "tel": {
+        "contacts": {
+          "written": 380,
+          "existed": 12,
+          "skipped": 26,
+          "failed": 0,
+          "manual": 0,
+          "path": "app_process",
+          "visible_warning": false
+        },
+        "sms": {
+          "written": 1830,
+          "existed": 0,
+          "skipped": 0,
+          "failed": 0,
+          "manual": 0,
+          "path": "companion",
+          "visible_warning": false
+        },
+        "calls": {
+          "written": 640,
+          "existed": 0,
+          "skipped": 0,
+          "failed": 0,
+          "manual": 0,
+          "path": "app_process",
+          "visible_warning": false
+        }
+      },
+      "safety": {
+        "contacts": true,
+        "sms": true,
+        "calls": true
+      },
+      "cleanup_ok": true
     }
   ]
 }

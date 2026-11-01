@@ -7,6 +7,28 @@ import Connect from './Connect.svelte';
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe('Connect', () => {
+  test('phone cleanup running: a warning, scan and transfer disabled, the role prompt shown; a failure stays one banner', async () => {
+    const env = await setupCtl('clean');
+    env.s.devices = [{ serial: 'R58T00TEST', state: 'device', model: 'SM_A145R', name: null, imei: null }];
+    env.s.serial = 'R58T00TEST';
+    env.s.transfer.cleanup = { running: true, ok: null };
+    render(Connect, { context: new Map([['ctl', env.ctl]]) });
+    await tick();
+    expect(screen.getByText('Przywracam ustawienia telefonu po przerwanym wgrywaniu…')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Skanuj' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Przenieś dane' }) as HTMLButtonElement).disabled).toBe(true);
+    env.bridge.emit('transfer:tap', { request: 'sms_role_restore', package: 'com.samsung.android.messaging' });
+    await tick();
+    expect(screen.getByText('Na telefonie: wybierz Wiadomości Samsung jako domyślną aplikację SMS')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Pomiń/ })).toBeNull();
+    env.bridge.emit('transfer:cleanup_done', { ok: false });
+    env.bridge.emit('transfer:cleanup_done', { ok: false });
+    await tick();
+    expect(screen.getAllByText('Telefon nie wrócił do swoich ustawień')).toHaveLength(1);
+    expect(screen.queryByText(/Przywracam ustawienia/)).toBeNull();
+    expect((screen.getByRole('button', { name: 'Skanuj' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   test('no phone: title, waiting stage, open guide with maker tabs, no scan button', async () => {
     const { container } = await renderWith(Connect, 'empty');
     expect(screen.getByRole('heading', { name: 'Podłącz telefon' })).toBeTruthy();

@@ -588,7 +588,85 @@ export interface UploadChoiceView {
   /** `remote` zaznaczonych podejrzanych APK. */
   apks_on: string[];
   verify_hash: boolean;
+  /** Telefonia do wgrania (`sms` obejmuje MMS); brak = bez telefonii. */
+  tel: TelKind[];
 }
+
+// --- przenoszenie danych: kontakty, wiadomości i połączenia (present.tel_plan_view / tel_result_view)
+
+/** Wiersz wyboru telefonii na ekranie wgrywania; `sms` obejmuje MMS. */
+export type TelKind = 'contacts' | 'sms' | 'calls';
+/** Kategoria w planie i wyniku (silnik prowadzi MMS osobno). */
+export type TelCategory = 'contacts' | 'sms' | 'mms' | 'calls';
+
+export interface TelKindPlan {
+  /** Ile rekordów trafi na telefon. */
+  write: number;
+  /** Ile już na nim jest (0, gdy telefon nie dał odczytać — patrz `readable`). */
+  existing: number;
+}
+
+export interface TelContactsPlan extends TelKindPlan {
+  /** Kontakty z kont synchronizowanych: przyjdą same po zalogowaniu (adres konta tylko na ekranie). */
+  skipped_synced: { account: string; count: number }[];
+  /** Kontakty z komunikatorów (WhatsApp, Telegram…): pominięte. */
+  skipped_messenger: number;
+}
+
+/** Kategoria, której nie ma w kopii, to `null`. */
+export interface TelPlanView {
+  contacts: TelContactsPlan | null;
+  sms: TelKindPlan | null;
+  mms: TelKindPlan | null;
+  calls: TelKindPlan | null;
+  phone_has_contacts: boolean;
+  readable: Partial<Record<TelKind, boolean>>;
+}
+
+/** Droga zapisu: pomocnik jako shell, aplikacja pomocnicza (rola SMS), plik do ręcznego importu. */
+export type TelPath = 'app_process' | 'companion' | 'file' | 'none';
+
+export interface TelKindResultView {
+  written: number;
+  existed: number;
+  skipped_synced: number;
+  skipped_messenger: number;
+  failed: number;
+  manual: number;
+  path: TelPath;
+  /** Zapisane, ale aplikacja Wiadomości może ich nie pokazywać — do sprawdzenia na telefonie. */
+  visible_warning: boolean;
+}
+
+export interface TelCleanupView {
+  role_ok: boolean;
+  appop_ok: boolean;
+  companion_removed: boolean;
+  helper_removed: boolean;
+  ok: boolean;
+}
+
+export interface TelResultView {
+  kinds: Partial<Record<TelCategory, TelKindResultView>>;
+  safety: Partial<Record<TelCategory, boolean>>;
+  /** Pliki do ręcznego importu: sama nazwa pliku w `Pobranych`. */
+  manual: { kind: TelCategory; name: string }[];
+  cleanup: TelCleanupView;
+  synced_accounts: { account: string; count: number }[];
+  seconds: number;
+  stopped: boolean;
+  status: 'complete' | 'incomplete';
+}
+
+export interface TelProgressView {
+  kind: TelCategory;
+  done: number;
+  total: number;
+  path: TelPath;
+}
+
+/** Prośba o stuknięcie na telefonie: nadanie roli SMS na czas wgrywania albo jej oddanie poprzedniej aplikacji. */
+export type TapRequest = 'sms_role_grant' | 'sms_role_restore';
 
 export interface RestoreProgressView {
   stage: 'plan' | 'files' | 'scan';
@@ -736,6 +814,9 @@ export interface Api {
   delete_transfer(copyId: string): R<{ deleted: string }>;
   restore_plan(copyId: string, serial: string): R<{ job_id: string }>;
   start_restore(choice: UploadChoiceView): R<{ job_id: string }>;
+  /** „Pomiń” przy prośbie o rolę SMS: wiadomości idą do pliku. Odmowa: `restore_required` (oddania roli
+   *  nie wolno pominąć) albo `no_tap` (nic nie czeka). */
+  skip_tap(): R<Record<string, never>>;
 }
 
 export interface EventMap {
@@ -778,9 +859,16 @@ export interface EventMap {
   'transfer:progress': TransferProgress;
   'transfer:waiting': Record<string, never>;
   'transfer:done': { result: BackupResultView; copy: CopyView };
-  'transfer:restore_plan': { plan: RestorePlanView; copy: CopyView; resumable: boolean; same_phone_recent: boolean };
+  'transfer:restore_plan': { plan: RestorePlanView; tel: TelPlanView | null; copy: CopyView; resumable: boolean;
+    same_phone_recent: boolean };
   'transfer:restore_progress': RestoreProgressView;
-  'transfer:restore_done': { result: RestoreResultView; copy: CopyView };
+  'transfer:tel_progress': TelProgressView;
+  /** `request` null: prośba załatwiona. `package`: poprzednia domyślna aplikacja SMS (null — nieznana). */
+  'transfer:tap': { request: TapRequest | null; package: string | null };
+  /** Koniec przywracania ustawień telefonu po przerwanym wgrywaniu; nieudane most ponawia w tle. */
+  'transfer:cleanup_done': { ok: boolean };
+  /** `tel`: null dla samych plików albo po błędzie telefonii (`tel_error` — klucz błędu). */
+  'transfer:restore_done': { result: RestoreResultView; copy: CopyView; tel?: TelResultView | null; tel_error?: string | null };
 }
 
 export type EventName = keyof EventMap;

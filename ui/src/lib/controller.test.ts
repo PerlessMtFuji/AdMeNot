@@ -1376,7 +1376,8 @@ describe('data transfer — uploading a copy', () => {
     expect(s.transfer.restore.sameRecent).toBe(false);
     expect(s.transfer.restore.resumable).toBe(false);
     expect(s.transfer.restore.choice).toEqual({ groups: ['photos', 'downloads', 'whatsapp', 'other:Music'], apks_on: [],
-      verify_hash: false });
+      verify_hash: false, tel: ['contacts', 'sms', 'calls'] });
+    expect(s.transfer.restore.tel?.contacts?.write).toBe(2);
     await vi.waitFor(() => expect(s.job).toBeNull());
   });
 
@@ -1406,12 +1407,102 @@ describe('data transfer — uploading a copy', () => {
     await ctl.startRestore();
     expect(s.phase).toBe('transfer_restore');
     expect(bridge.calls.find((c) => c.method === 'start_restore')?.args[0]).toEqual({
-      groups: ['photos', 'videos', 'downloads', 'whatsapp', 'other:Music'], apks_on: [], verify_hash: false });
+      groups: ['photos', 'videos', 'downloads', 'whatsapp', 'other:Music'], apks_on: [], verify_hash: false,
+      tel: ['contacts', 'sms', 'calls'] });
     await vi.waitFor(() => expect(s.phase).toBe('transfer_restored'));
     expect(s.transfer.restore.result?.files_renamed).toBe(1);
     expect(s.transfer.restore.progress?.stage).toBe('scan');
     // „wgrano na …” w Historii od razu, bez ponownego odczytu kopii
     expect(s.transfer.copies.find((c) => c.id === COPY_ID)?.restores?.[0]?.serial).toBe(NEW);
+  });
+
+  test('toggleTel unticks and ticks a telephony row; a row with nothing to write stays off', async () => {
+    const { ctl, s } = await planned();
+    ctl.toggleTel('sms');
+    expect(s.transfer.restore.choice.tel).toEqual(['contacts', 'calls']);
+    ctl.toggleTel('sms');
+    expect(s.transfer.restore.choice.tel).toEqual(['contacts', 'sms', 'calls']);
+    ctl.toggleTel('calls');
+    s.transfer.restore.tel = { ...s.transfer.restore.tel!, calls: null };
+    ctl.toggleTel('calls');
+    expect(s.transfer.restore.choice.tel).toEqual(['contacts', 'sms']);
+  });
+
+  test('telephony run: progress, the on-phone prompt, skipping it and the result with the files', async () => {
+    const env = setup('transfer_restore_tel');
+    await env.ctl.init();
+    env.ctl.selectDevice(NEW);
+    await env.ctl.loadTransfers();
+    await env.ctl.planRestore(COPY_ID);
+    await vi.waitFor(() => expect(env.s.transfer.restore.plan).not.toBeNull());
+    const { ctl, s, bridge } = env;
+    await ctl.startRestore();
+    await vi.waitFor(() => expect(s.phase).toBe('transfer_restored'));
+    expect(s.transfer.restore.telProgress?.kind).toBe('calls');
+    expect(s.transfer.restore.telResult?.manual).toEqual([{ kind: 'calls', name: 'admenot-polaczenia-20260926-143100.xml' }]);
+    expect(s.transfer.restore.telError).toBeNull();
+    expect(s.transfer.restore.tap).toBeNull();  // prośba z nagrania została załatwiona
+    expect(s.transfer.cleanup.running).toBe(false);  // prośba w czasie wgrywania to nie sprzątanie
+    // prośba o rolę SMS: „Pomiń” woła most i chowa baner
+    bridge.emit('transfer:tap', { request: 'sms_role_grant', package: 'com.google.android.apps.messaging' });
+    expect(s.transfer.restore.tap).toBe('sms_role_grant');
+    await ctl.skipTap();
+    expect(bridge.calls.at(-1)).toEqual({ method: 'skip_tap', args: [] });
+    expect(s.transfer.restore.tap).toBeNull();
+    // oddania roli pominąć się nie da: nic nie idzie do mostu, baner zostaje
+    bridge.emit('transfer:tap', { request: 'sms_role_restore', package: 'com.google.android.apps.messaging' });
+    const calls = bridge.calls.length;
+    await ctl.skipTap();
+    expect(bridge.calls.length).toBe(calls);
+    expect(s.transfer.restore.tap).toBe('sms_role_restore');
+    bridge.emit('transfer:tap', { request: null, package: 'com.google.android.apps.messaging' });
+    expect(s.transfer.restore.tap).toBeNull();
+  });
+
+  test('a telephony error after the files keeps the files result and the error key', async () => {
+    const { s, bridge } = await planned();
+    s.phase = 'transfer_restore';
+    const done = { status: 'complete', target_serial: NEW, files_done: 1, files_exists: 0, files_renamed: 0, files_denied: 0,
+      files_failed: 0, files_unselected: 0, apk_skipped: 0, apk_suspicious_skipped: 0, bytes: 1, seconds: 1, hashed: false,
+      media_scan: 'done', files_missing: 0 } as const;
+    bridge.emit('transfer:restore_done', { result: done, copy: JSON.parse(JSON.stringify(s.transfer.restore.copy)), tel: null, tel_error: 'disconnected' });
+    expect(s.phase).toBe('transfer_restored');
+    expect(s.transfer.restore.result?.files_done).toBe(1);
+    expect(s.transfer.restore.telError).toBe('disconnected');
+    expect(s.error).toBeNull();
+  });
+
+  test('phone cleanup: busy calls show the cleanup notice, a prompt during it, one notice for repeated failures', async () => {
+    const { ctl, s, bridge } = setup('transfer_restore');
+    await ctl.init();
+    ctl.selectDevice(NEW);
+    bridge.failNext('start_scan', 'busy', 'phone_cleanup');
+    await ctl.startScan();
+    expect(s.phase).toBe('connect');
+    expect(s.error).toBeNull();  // nie karta błędu
+    expect(s.transfer.cleanup).toEqual({ running: true, ok: null });
+    bridge.emit('transfer:tap', { request: 'sms_role_restore', package: null });
+    expect(s.transfer.restore.tap).toBe('sms_role_restore');
+    bridge.emit('transfer:cleanup_done', { ok: false });
+    bridge.emit('transfer:cleanup_done', { ok: false });
+    expect(s.transfer.cleanup).toEqual({ running: false, ok: false });
+    expect(s.transfer.restore.tap).toBeNull();
+    bridge.emit('transfer:cleanup_done', { ok: true });
+    expect(s.transfer.cleanup).toEqual({ running: false, ok: true });
+    // inne „busy” zostaje zwykłym błędem
+    bridge.failNext('start_scan', 'busy', 'restore');
+    await ctl.startScan();
+    expect(s.error?.key).toBe('busy');
+  });
+
+  test('a prompt outside an upload means the phone cleanup is running', async () => {
+    const { ctl, s, bridge } = setup('transfer_restore');
+    await ctl.init();
+    bridge.emit('transfer:tap', { request: 'sms_role_restore', package: 'com.samsung.android.messaging' });
+    expect(s.transfer.cleanup.running).toBe(true);
+    expect(s.transfer.restore.tapPackage).toBe('com.samsung.android.messaging');
+    bridge.emit('transfer:cleanup_done', { ok: true });
+    expect(s.transfer.cleanup.running).toBe(false);
   });
 
   test('a disconnect during the upload shows the waiting state until progress comes back', async () => {

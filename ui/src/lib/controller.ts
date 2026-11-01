@@ -1,10 +1,10 @@
 import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
-import { actedAfter, changedVerdicts, defaultSelection, defaultUploadChoice, keptUploadChoice, otherGroup, resumableCopy, UPLOAD_GROUPS, resumeSelection, rescanSelection, TRANSFER_CATEGORIES, transferNeed, transferTotals, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
+import { actedAfter, changedVerdicts, defaultSelection, defaultUploadChoice, keptUploadChoice, otherGroup, TEL_KINDS, telWrite, resumableCopy, UPLOAD_GROUPS, resumeSelection, rescanSelection, TRANSFER_CATEGORIES, transferNeed, transferTotals, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
 import { EMPTY_TRANSFER_SELECTION, emptyRestore, type AppState } from './state.svelte';
 import { applyTheme } from './theme';
 import type {
-  ApiError, AppView, CacheUsage, ExportKind, TransferCategory, EtaView, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, TelemetrySample, Theme, UploadChoiceView, Verdict,
+  ApiError, AppView, CacheUsage, ExportKind, TransferCategory, EtaView, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, TelKind, TelemetrySample, Theme, UploadChoiceView, Verdict,
 } from './types';
 
 const CONSOLE_LIMIT = 500;
@@ -30,6 +30,12 @@ export class Controller {
     try {
       const result = await promise;
       if (isApiError(result)) {
+        if (result.error.key === 'busy' && result.error.message === 'phone_cleanup') {
+          // Telefon wraca do ustawień sprzed przerwanego wgrywania: baner sprzątania, nie karta błędu.
+          // Most ponawia sprzątanie sam, więc bez przycisku „Spróbuj ponownie”.
+          this.state.transfer.cleanup = { running: true, ok: null };
+          return null;
+        }
         this.state.error = result.error;
         return null;
       }
@@ -267,6 +273,10 @@ export class Controller {
         void this.openPlan();
         return;
       }
+      if (d.kind === 'phone_cleanup') { // czerwony baner sprzątania mówi, co zrobić ręcznie; most ponawia w tle
+        s.transfer.cleanup = { running: false, ok: false };
+        return;
+      }
       if (d.kind === 'update') { // błędy aktualizacji pokazuje okno instalacji, nie karta błędu
         s.updateError = d;
         s.updateProgress = null;
@@ -324,6 +334,7 @@ export class Controller {
     on('job:end', (d) => {
       this.ended.add(d.job_id);
       if (d.kind === 'update') s.updateProgress = null;
+      if (d.kind === 'phone_cleanup') s.transfer.cleanup = { ...s.transfer.cleanup, running: false };
       if (s.job?.id === d.job_id) s.job = null;
       if (d.kind === 'transfer_scan') this.continueResume();
     });
@@ -701,16 +712,34 @@ export class Controller {
       if (s.phase !== 'transfer_restore_plan') return; // serwisant już wyszedł z ekranu wgrywania
       const kept = this.replanChoice;
       this.replanChoice = null;
-      Object.assign(s.transfer.restore, { plan: d.plan, copy: d.copy,
-        choice: kept ? keptUploadChoice(d.plan, kept) : defaultUploadChoice(d.plan),
+      const tel = d.tel ?? null;
+      Object.assign(s.transfer.restore, { plan: d.plan, copy: d.copy, tel,
+        choice: kept ? keptUploadChoice(d.plan, kept, tel) : defaultUploadChoice(d.plan, tel),
         resumable: d.resumable, sameRecent: d.same_phone_recent });
     });
     on('transfer:restore_progress', (d) => {
       s.transfer.restore.progress = d;
       s.transfer.waiting = false;
     });
+    on('transfer:tel_progress', (d) => {
+      s.transfer.restore.telProgress = d;
+      s.transfer.waiting = false;
+    });
+    on('transfer:tap', (d) => {
+      const r = s.transfer.restore;
+      r.tap = d.request;
+      r.tapPackage = d.package;
+      // Prośba spoza wgrywania przychodzi tylko z przywracania ustawień telefonu po przerwanym wgrywaniu.
+      if (d.request && s.job?.kind !== 'restore') s.transfer.cleanup = { running: true, ok: null };
+    });
+    // Nieudane sprzątanie most ponawia co odczyt listy telefonów: ten sam stan, jeden baner (nic się nie piętrzy).
+    on('transfer:cleanup_done', (d) => {
+      s.transfer.cleanup = { running: false, ok: d.ok };
+      s.transfer.restore.tap = null;
+    });
     on('transfer:restore_done', (d) => {
-      Object.assign(s.transfer.restore, { result: d.result, copy: d.copy });
+      Object.assign(s.transfer.restore, { result: d.result, copy: d.copy, telResult: d.tel ?? null,
+        telError: d.tel_error ?? null, tap: null });
       s.transfer.copies = s.transfer.copies.map((c) => (c.id === d.copy.id ? d.copy : c));
       s.transfer.waiting = false;
       s.stopping = false;
@@ -914,15 +943,41 @@ export class Controller {
     r.choice = { ...r.choice, apks_on: on.includes(remote) ? on.filter((x) => x !== remote) : [...on, remote] };
   }
 
+  /** Wiersz telefonii (kontakty, SMS z MMS, połączenia); bez rekordów do wgrania nie da się go zaznaczyć. */
+  toggleTel(kind: TelKind): void {
+    const r = this.state.transfer.restore;
+    if (!TEL_KINDS.includes(kind) || !((telWrite(r.tel, kind) ?? 0) > 0)) return;
+    const on = new Set(r.choice.tel);
+    if (!on.delete(kind)) on.add(kind);
+    r.choice = { ...r.choice, tel: TEL_KINDS.filter((k) => on.has(k)) };
+  }
+
+  /** „Pomiń (zostawię plik do importu)” przy prośbie o rolę SMS: wiadomości trafią do pliku. Oddania roli
+   *  poprzedniej aplikacji pominąć się nie da (most odmawia `bad_request`/`restore_required` — baner zostaje);
+   *  `no_tap` — prośba już minęła. */
+  async skipTap(): Promise<void> {
+    const r = this.state.transfer.restore;
+    if (r.tap !== 'sms_role_grant') return;
+    try {
+      const res = await this.api.skip_tap();
+      const reason = isApiError(res) && res.error.key === 'bad_request' ? res.error.message : null;
+      if (!isApiError(res) || reason === 'no_tap') r.tap = null;
+      else if (reason !== 'restore_required') this.state.error = res.error;
+    } catch (e) {
+      this.state.error = { key: 'internal', message: String(e) };
+    }
+  }
+
   /** Wgrywanie wybranych plików; przerwane wgrywanie tej kopii na ten telefon most wznawia sam. */
   async startRestore(): Promise<void> {
     const s = this.state;
     const choice = s.transfer.restore.choice;
     s.error = null;
     const r = await this.call(this.api.start_restore({ groups: [...choice.groups], apks_on: [...choice.apks_on],
-      verify_hash: choice.verify_hash }));
+      verify_hash: choice.verify_hash, tel: [...choice.tel] }));
     if (!r) return;
-    Object.assign(s.transfer.restore, { progress: null, result: null });
+    Object.assign(s.transfer.restore, { progress: null, result: null, telProgress: null, telResult: null, telError: null,
+      tap: null });
     s.transfer.waiting = false;
     s.stopping = false;
     s.phase = 'transfer_restore';
