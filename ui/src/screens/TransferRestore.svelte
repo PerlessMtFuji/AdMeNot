@@ -25,18 +25,22 @@
   const num = (n: number) => new Intl.NumberFormat(i18n.lang === 'pl' ? 'pl-PL' : 'en-US').format(n);
   const size = (bytes: number) => formatSize(bytes, i18n.lang);
   const tp_ = $derived(r.telProgress);
-  const value = $derived(tp_ ? (tp_.total > 0 ? tp_.done / tp_.total : 0)
+  // Kopia bezpieczeństwa nowego telefonu (minuty, bez liczników): pasek bez procentów zamiast 0 %.
+  const value = $derived(tp_?.kind === 'safety' ? null : tp_ ? (tp_.total > 0 ? tp_.done / tp_.total : 0)
     : !p ? 0 : p.total_bytes > 0 ? p.done_bytes / p.total_bytes : p.total_files > 0 ? p.done_files / p.total_files : 0);
 
   // Etapy: Pliki → Kontakty → Wiadomości → Połączenia (tylko wybrane); telefonia idzie po plikach.
-  type Stage = 'files' | 'contacts' | 'messages' | 'calls';
+  type Stage = 'files' | 'safety' | 'contacts' | 'messages' | 'calls';
   const stageOf = (k: TelCategory): Stage => (k === 'sms' || k === 'mms' ? 'messages' : k);
   const stages = $derived.by((): { key: Stage; state: 'done' | 'current' | 'todo' }[] => {
-    const list: Stage[] = [...(r.choice.groups.length ? ['files' as const] : []),
-      ...r.choice.tel.map((k) => stageOf(k))];
-    if (list.length < 2) return [];
-    // Kopia bezpieczeństwa nowego telefonu idzie tuż przed pierwszą kategorią telefonii.
-    const cur: Stage = !tp_ ? 'files' : tp_.kind === 'safety' ? (list.includes('files') ? list[1] : list[0]) : stageOf(tp_.kind);
+    const files: Stage[] = r.choice.groups.length ? ['files'] : [];
+    const tel: Stage[] = r.choice.tel.map((k) => stageOf(k));
+    // Kopia bezpieczeństwa nowego telefonu idzie tuż przed pierwszą kategorią telefonii: w trakcie jest
+    // osobnym bieżącym etapem (nie „Kontakty”).
+    const safety = tp_?.kind === 'safety';
+    const list: Stage[] = [...files, ...(safety ? ['safety' as const] : []), ...tel];
+    if (files.length + tel.length < 2) return [];
+    const cur: Stage = !tp_ ? 'files' : tp_.kind === 'safety' ? 'safety' : stageOf(tp_.kind);
     const at = Math.max(0, list.indexOf(cur));
     return list.map((key, i) => ({ key, state: i < at ? 'done' : i === at ? 'current' : 'todo' }));
   });

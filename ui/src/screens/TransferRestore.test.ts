@@ -50,8 +50,18 @@ describe('TransferRestore', () => {
     await tick();
     expect(screen.getByText('Etap: Kopia bezpieczeństwa nowego telefonu')).toBeTruthy();
     expect(screen.queryByText(/0 z 0/)).toBeNull();
+    // osobny bieżący etap (nie „Kontakty”) i pasek bez procentów zamiast 0 % przez minuty eksportu
     const stages = screen.getByRole('list', { name: 'Etapy wgrywania' });
-    expect([...stages.querySelectorAll('li')].map((li) => li.dataset.state)).toEqual(['done', 'current', 'todo']);
+    expect([...stages.querySelectorAll('li')].map((li) => [li.textContent?.trim(), li.dataset.state])).toEqual([
+      ['Pliki', 'done'], ['Kopia bezpieczeństwa nowego telefonu', 'current'], ['Kontakty', 'todo'], ['Wiadomości', 'todo']]);
+    const bar = screen.getByRole('progressbar');
+    expect(bar.getAttribute('aria-valuenow')).toBeNull();
+    expect(bar.hasAttribute('data-indeterminate')).toBe(true);
+    bridge.emit('transfer:tel_progress', { kind: 'contacts', done: 1, total: 4, path: 'app_process' });
+    await tick();
+    expect([...stages.querySelectorAll('li')].map((li) => [li.textContent?.trim(), li.dataset.state])).toEqual([
+      ['Pliki', 'done'], ['Kontakty', 'current'], ['Wiadomości', 'todo']]);
+    expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('25');
   });
 
   test('asking for the SMS role: a warning with "Skip" that calls the bridge', async () => {
