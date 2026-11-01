@@ -35,10 +35,12 @@
     const list: Stage[] = [...(r.choice.groups.length ? ['files' as const] : []),
       ...r.choice.tel.map((k) => stageOf(k))];
     if (list.length < 2) return [];
-    const at = Math.max(0, list.indexOf(tp_ ? stageOf(tp_.kind) : 'files'));
+    // Kopia bezpieczeństwa nowego telefonu idzie tuż przed pierwszą kategorią telefonii.
+    const cur: Stage = !tp_ ? 'files' : tp_.kind === 'safety' ? (list.includes('files') ? list[1] : list[0]) : stageOf(tp_.kind);
+    const at = Math.max(0, list.indexOf(cur));
     return list.map((key, i) => ({ key, state: i < at ? 'done' : i === at ? 'current' : 'todo' }));
   });
-  const stageLabel = $derived(tp_ ? t(`transfer.restore.stage.${stageOf(tp_.kind)}`)
+  const stageLabel = $derived(tp_ ? t(`transfer.restore.stage.${tp_.kind === 'safety' ? 'safety' : stageOf(tp_.kind)}`)
     : p ? t(`transfer.restore.phase.${p.stage}`) : null);
 
   // Telefonia w wyniku: tabela kategorii, kroki do zrobienia na telefonie i stan sprzątania.
@@ -98,7 +100,9 @@
           {/if}
           <Progress {value} label={t('transfer.restore.progress_label')} />
           {#if tp_}
-            <div class="text-sm text-mut">{t('transfer.restore.tel_progress', { done: num(tp_.done), total: num(tp_.total) })}</div>
+            {#if tp_.kind !== 'safety'}
+              <div class="text-sm text-mut">{t('transfer.restore.tel_progress', { done: num(tp_.done), total: num(tp_.total) })}</div>
+            {/if}
           {:else if p && p.total_files > 0}
             <div class="flex flex-wrap justify-between gap-2 text-sm text-mut">
               <span>{tp('transfer.progress_files', p.total_files, { done: num(p.done_files), count: num(p.total_files) })}</span>
@@ -173,7 +177,7 @@
           <Banner tone="warn" icon="smartphone" title={t('transfer.restore.tel.todo_title')}>
             <ul class="mt-1 flex flex-col gap-1">
               {#each tel.manual as m (m.kind + m.name)}
-                <li><b>{t(`transfer.restore.tel.kind.${m.kind}`)}:</b> {m.kind === 'contacts' ? t('transfer.restore.tel.todo_contacts')
+                <li><b>{t(`transfer.restore.tel.kind.${m.kind}`)}:</b> {m.kind === 'contacts' ? t('transfer.restore.tel.todo_contacts', { name: m.name })
                   : t('transfer.restore.tel.todo_file', { name: m.name })}</li>
               {/each}
             </ul>

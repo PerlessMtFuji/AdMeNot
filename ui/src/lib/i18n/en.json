@@ -816,7 +816,8 @@
         "files": "Files",
         "contacts": "Contacts",
         "messages": "Messages",
-        "calls": "Calls"
+        "calls": "Calls",
+        "safety": "Backing up the new phone"
       },
       "tel_progress": "{done} of {total}",
       "tap": {

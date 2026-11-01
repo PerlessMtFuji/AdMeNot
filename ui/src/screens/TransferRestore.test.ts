@@ -43,6 +43,17 @@ describe('TransferRestore', () => {
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('20');
   });
 
+  test('safety backup of the new phone gets its own stage label and no counter', async () => {
+    const { s, bridge } = await show();
+    s.transfer.restore.choice = { groups: ['photos'], apks_on: [], verify_hash: false, tel: ['contacts', 'sms'] };
+    bridge.emit('transfer:tel_progress', { kind: 'safety', done: 0, total: 0, path: 'none' });
+    await tick();
+    expect(screen.getByText('Etap: Kopia bezpieczeństwa nowego telefonu')).toBeTruthy();
+    expect(screen.queryByText(/0 z 0/)).toBeNull();
+    const stages = screen.getByRole('list', { name: 'Etapy wgrywania' });
+    expect([...stages.querySelectorAll('li')].map((li) => li.dataset.state)).toEqual(['done', 'current', 'todo']);
+  });
+
   test('asking for the SMS role: a warning with "Skip" that calls the bridge', async () => {
     const { bridge } = await show();
     bridge.emit('transfer:tap', { request: 'sms_role_grant', package: 'com.google.android.apps.messaging' });

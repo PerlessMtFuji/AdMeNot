@@ -816,7 +816,8 @@
         "files": "Pliki",
         "contacts": "Kontakty",
         "messages": "Wiadomości",
-        "calls": "Połączenia"
+        "calls": "Połączenia",
+        "safety": "Kopia bezpieczeństwa nowego telefonu"
       },
       "tel_progress": "{done} z {total}",
       "tap": {

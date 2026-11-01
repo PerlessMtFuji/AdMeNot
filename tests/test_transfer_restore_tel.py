@@ -213,7 +213,7 @@ def test_all_via_app_process(tmp_path):
         assert set(st.tel_status("sms").values()) == {"done"} and len(st.tel_status("sms")) == 5
     finally:
         st.close()
-    assert {p.kind for p in run.progress} == set(EXPECTED)
+    assert {p.kind for p in run.progress} == {*EXPECTED, "safety"}
     assert run.progress[-1] == rt.TelProgress("calls", 4, 4, AP)
 
 
@@ -341,6 +341,19 @@ def test_safety_backup_written_once(tmp_path, monkeypatch):
         assert st.get_meta("safety_done") == dict.fromkeys(EXPECTED, True)
     finally:
         st.close()
+
+
+def test_safety_backup_announces_its_stage(tmp_path):
+    """Eksport telefonii nowego telefonu trwa minuty: przed nim idzie osobny etap `safety`, tylko gdy eksport rusza."""
+    copy, phone = _copy(tmp_path), _new(tmp_path)
+    run = Run(phone, copy)
+    run()
+    kinds = [p.kind for p in run.progress]
+    assert kinds[0] == "safety" and kinds.count("safety") == 1
+    assert run.progress[0] == rt.TelProgress("safety", 0, 0, "none")
+    before = len(run.progress)
+    run()  # kopia bezpieczeństwa już jest: żadnego nowego etapu
+    assert all(p.kind != "safety" for p in run.progress[before:])
 
 
 def test_safety_backup_before_first_write(tmp_path):

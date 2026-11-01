@@ -80,7 +80,7 @@ Rec = tuple[str, Any]  # (id rekordu, rekord z `telrecords`)
 
 @dataclass(frozen=True)
 class TelProgress:
-    kind: str
+    kind: str  # kategoria albo `safety` (kopia bezpieczeństwa nowego telefonu, bez licznika)
     done: int
     total: int
     path: str
@@ -297,6 +297,7 @@ class _TelRestore:
         done: dict[str, bool] = dict(self.state.get_meta("safety_done") or {})
         need = [k for k in self.kinds if k not in done]
         if need:
+            self.on_progress(TelProgress("safety", 0, 0, "none"))  # eksport trwa minuty: UI pokazuje osobny etap
             out = self.copy.path / "restore" / f"{device_dir_name(self.device.serial)}-safety"
             res = self._retry(lambda: export_telephony(
                 self.read_adb, out, contacts="contacts" in need, sms="sms" in need, calls="calls" in need,

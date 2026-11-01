@@ -659,7 +659,7 @@ export interface TelResultView {
 }
 
 export interface TelProgressView {
-  kind: TelCategory;
+  kind: TelCategory | 'safety';  // `safety`: kopia bezpieczeństwa nowego telefonu (done/total = 0)
   done: number;
   total: number;
   path: TelPath;
