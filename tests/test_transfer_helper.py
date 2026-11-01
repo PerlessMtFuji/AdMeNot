@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -203,21 +204,51 @@ def test_sources_not_newer_than_artifacts():
 
 def _writer_method(name: str) -> str:
     src = (ROOT / "android" / "helper" / "src" / "pl" / "admenot" / "helper" / "Writer.java").read_text("utf-8")
-    start = src.index(f"void {name}(")
-    return src[start:src.index("\n    }\n", start)]
+    m = re.search(r"\n    [\w<>, ]+ " + name + r"\([^\n;]*\{\n", src)  # a method declaration, not a call
+    assert m, name
+    return src[m.start():src.index("\n    }\n", m.start())]
 
 
-def test_writer_inserts_sms_one_by_one_and_checks_the_uri():
-    """SmsProvider nie ma własnego `bulkInsert` (domyślny: pętla `insert()` bez transakcji), więc po
-    wyjątku w połowie paczki ponowienie zdublowałoby SMS-y: SMS idą po jednym z `null_uri` przy `null`;
-    połączenia zostają przy transakcyjnym `bulkInsert`."""
+def test_writer_bulk_inserts_sms_and_verifies_what_was_stored():
+    """SmsProvider nie ma własnego `bulkInsert` (domyślny: pętla `insert()` bez transakcji), a `insert`
+    po jednym był ~4× wolniejszy (OPPO: 66 s zamiast 13–17 s na 500 SMS). SMS idą więc `bulkInsert`,
+    a potem helper czyta wiersze z `_id` > największego sprzed paczki i dopasowuje je po
+    (address, date, type, body); tylko nieznalezione wstawia po jednym (`null_uri` przy `null`).
+    Połączenia zostają przy transakcyjnym `bulkInsert`."""
     flush = _writer_method("flush")
-    assert 'if (sms) oneByOne(uri, ids, vals, "null_uri");' in flush
+    assert "if (sms) flushSms(ids, vals);" in flush
     assert "else flushBulk(uri, ids, vals);" in flush
     bulk = _writer_method("bulk")
     assert "flushBulk" not in bulk and "flush(uri, ids, vals, sms)" in bulk
+
+    sms = _writer_method("flushSms")
+    # 1. maxId przed paczką, 2. bulkInsert, 3. odczyt nowych wierszy, 4. brakujące po jednym
+    order = [sms.index(s) for s in ("maxSmsId()", "t.bulkInsert(SMS", "storedSince(maxId)",
+                                    'oneByOne(SMS, missIds, missVals, "null_uri")')]
+    assert order == sorted(order)
+    assert "if (isDenial(e)) throw new Denied();" in sms  # odmowa z bulkInsert jak dotąd
+    # appop "ignore": mniej wierszy niż wysłano i nic nowego w tabeli → DENIED
+    assert "n < ids.size() && found.isEmpty()) throw new Denied();" in sms
+    assert "smsKey(vals.get(i))" in sms
+
+    newest = _writer_method("maxSmsId")
+    assert '"_id DESC"' in newest and "return 0;" in newest  # pusta tabela → 0
+    since = _writer_method("storedSince")
+    assert '"_id > ?"' in since
+    for col in ('"address"', '"date"', '"type"', '"body"'):
+        assert col in since
+    key = _writer_method("smsKey")
+    for col in ('"address"', '"date"', '"type"', '"body"'):
+        assert col in key
+
     one = _writer_method("oneByOne")
     assert "errId(ids.get(i), nullCode)" in one and "rejected(u)) throw new Denied()" in one
+
+
+def test_writer_bulk_calls_keep_the_transactional_fallback():
+    flush = _writer_method("flushBulk")
+    assert 'oneByOne(uri, ids, vals, "insert_null")' in flush
+    assert "if (n < ids.size()) throw new Denied();" in flush
 
 
 def test_build_without_keystore_leaves_shipped_artifacts(tmp_path, monkeypatch):

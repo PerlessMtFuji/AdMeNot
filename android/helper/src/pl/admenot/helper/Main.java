@@ -163,8 +163,19 @@ public final class Main {
             return (ContentProviderResult[]) call(authority, "applyBatch", authority, ops);
         }
 
-        @Override public Cursor query(Uri uri, String[] projection) throws Exception {
-            return (Cursor) call(uri.getAuthority(), "query", uri, projection, new Bundle(), null);
+        @Override public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs,
+                                      String sortOrder) throws Exception {
+            // ContentResolver.QUERY_ARG_SQL_*: ContentProvider.query(Bundle) hands them to the old-style query
+            Bundle args = new Bundle();
+            if (selection != null) args.putString("android:query-arg-sql-selection", selection);
+            if (selectionArgs != null) args.putStringArray("android:query-arg-sql-selection-args", selectionArgs);
+            if (sortOrder != null) args.putString("android:query-arg-sql-sort-order", sortOrder);
+            try {
+                return (Cursor) call(uri.getAuthority(), "query", uri, projection, args, null); // SDK 26+
+            } catch (NoSuchMethodException e) {
+                return (Cursor) call(uri.getAuthority(), "query", uri, projection, selection, selectionArgs,
+                        sortOrder, null);
+            }
         }
 
         @Override public OutputStream openOutput(Uri uri) throws Exception {

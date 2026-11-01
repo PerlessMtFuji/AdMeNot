@@ -17,7 +17,9 @@ interface Target {
 
     ContentProviderResult[] applyBatch(String authority, ArrayList<ContentProviderOperation> ops) throws Exception;
 
-    Cursor query(Uri uri, String[] projection) throws Exception;
+    /** selection, selectionArgs and sortOrder may be null. */
+    Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder)
+            throws Exception;
 
     OutputStream openOutput(Uri uri) throws Exception;
 

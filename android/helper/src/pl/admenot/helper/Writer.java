@@ -13,15 +13,18 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Writes one input file through a Target and reports per line:
  * OK id | ERR id code | DENIED | DONE ok err (FAIL code when the input itself is unusable).
  * The first SecurityException, an insert rejected by appop ("ignore" drops SMS silently) or a
- * bulkInsert that stores fewer rows than sent gives DENIED and nothing more is written.
+ * bulkInsert that stores fewer rows than sent (for SMS: and nothing new in the table) gives DENIED
+ * and nothing more is written.
  */
 final class Writer {
     interface Out { void line(String s); }
@@ -104,17 +107,107 @@ final class Writer {
 
     private void errId(String id, String code) { err++; out.line("ERR " + id + " " + code); }
 
-    // ---------- SMS: insert one by one; calls: bulkInsert ----------
+    // ---------- SMS: verified bulkInsert; calls: bulkInsert ----------
+
+    /** SMS go through flushSms (verified bulkInsert); CallLogProvider's bulkInsert is transactional. */
+    private void flush(Uri uri, List<String> ids, List<ContentValues> vals, boolean sms) throws Exception {
+        if (sms) flushSms(ids, vals);
+        else flushBulk(uri, ids, vals);
+    }
 
     /**
      * SmsProvider has no bulkInsert override: the default loops insert() without a transaction, so a
-     * failure in the middle leaves part of the batch stored and a retry would duplicate it, and a row
-     * whose insert() returned null would count as written. SMS therefore go one insert per row with the
-     * returned Uri checked. CallLogProvider's bulkInsert is transactional, so calls keep it.
+     * failure in the middle leaves part of the batch stored, and a row whose insert() returned null is
+     * still counted. One insert per row is safe but about 4x slower (66 s instead of 13-17 s per 500
+     * SMS on an OPPO with ~23k SMS), so the batch goes through bulkInsert and is then verified:
+     * 1. maxId = the highest _id in content://sms before the batch (empty table: 0);
+     * 2. bulkInsert the batch;
+     * 3. read the rows with _id > maxId and match them to the batch by (address, date, type, body);
+     *    each stored row confirms one batch row (OK). Extra stored rows with the same key (e.g. the
+     *    SMS app received such a message meanwhile) are ignored, so those batch rows are just OK;
+     * 4. a batch row not found (bulkInsert stored fewer, or threw a non-denial exception) is inserted
+     *    alone with its Uri checked (null: ERR id null_uri, appop "/0": DENIED).
+     * Denial stays as before: a SecurityException, or appop "ignore" (bulkInsert returns fewer rows
+     * and nothing new appears with _id > maxId) gives DENIED. A failed verification query stops the
+     * run (FAIL) rather than guess what was stored.
      */
-    private void flush(Uri uri, List<String> ids, List<ContentValues> vals, boolean sms) throws Exception {
-        if (sms) oneByOne(uri, ids, vals, "null_uri");
-        else flushBulk(uri, ids, vals);
+    private void flushSms(List<String> ids, List<ContentValues> vals) throws Exception {
+        long maxId = maxSmsId();
+        int n = -1;
+        try {
+            n = t.bulkInsert(SMS, vals.toArray(new ContentValues[0]));
+        } catch (Exception e) {
+            if (isDenial(e)) throw new Denied();
+            // not a denial: part of the batch may be stored, the verification below finds which
+        }
+        Map<String, Integer> found = storedSince(maxId);
+        if (n >= 0 && n < ids.size() && found.isEmpty()) throw new Denied();
+        List<String> missIds = new ArrayList<>();
+        List<ContentValues> missVals = new ArrayList<>();
+        for (int i = 0; i < ids.size(); i++) {
+            String key = smsKey(vals.get(i));
+            Integer left = found.get(key);
+            if (left != null && left > 0) {
+                found.put(key, left - 1);
+                okId(ids.get(i));
+            } else {
+                missIds.add(ids.get(i));
+                missVals.add(vals.get(i));
+            }
+        }
+        if (!missIds.isEmpty()) oneByOne(SMS, missIds, missVals, "null_uri");
+    }
+
+    /** The highest _id in content://sms, 0 for an empty table. */
+    private long maxSmsId() throws Exception {
+        Cursor c = smsQuery(new String[]{"_id"}, null, null, "_id DESC");
+        try {
+            if (!c.moveToFirst()) return 0;
+            return c.getLong(0);
+        } finally {
+            c.close();
+        }
+    }
+
+    /** Keys (address, date, type, body) of the SMS rows with _id > maxId, with their counts. */
+    private Map<String, Integer> storedSince(long maxId) throws Exception {
+        Cursor c = smsQuery(new String[]{"address", "date", "type", "body"},
+                "_id > ?", new String[]{Long.toString(maxId)}, null);
+        Map<String, Integer> found = new HashMap<>();
+        try {
+            while (c.moveToNext()) {
+                String key = key(c.isNull(0) ? null : c.getString(0), c.getLong(1), c.getInt(2),
+                        c.isNull(3) ? null : c.getString(3));
+                Integer had = found.get(key);
+                found.put(key, had == null ? 1 : had + 1);
+            }
+        } finally {
+            c.close();
+        }
+        return found;
+    }
+
+    private Cursor smsQuery(String[] projection, String selection, String[] args, String sort) throws Exception {
+        Cursor c;
+        try {
+            c = t.query(SMS, projection, selection, args, sort);
+        } catch (Exception e) {
+            if (isDenial(e)) throw new Denied();
+            throw e;
+        }
+        if (c == null) throw new IllegalStateException("sms_query_null");
+        return c;
+    }
+
+    static String smsKey(ContentValues v) {
+        Long date = v.getAsLong("date");
+        Integer type = v.getAsInteger("type");
+        return key(v.getAsString("address"), date == null ? 0 : date, type == null ? 0 : type,
+                v.getAsString("body"));
+    }
+
+    static String key(String address, long date, int type, String body) {
+        return address + '\u0001' + date + '\u0001' + type + '\u0001' + body;
     }
 
     private void bulk(JsonLines in, Uri uri, boolean sms) throws Exception {
@@ -387,7 +480,7 @@ final class Writer {
         if (recipients.isEmpty()) throw new MmsWriteError("no_address");
         Uri.Builder b = Uri.parse("content://mms-sms/threadID").buildUpon();
         for (String a : recipients) b.appendQueryParameter("recipient", a);
-        Cursor c = t.query(b.build(), new String[]{"_id"});
+        Cursor c = t.query(b.build(), new String[]{"_id"}, null, null, null);
         try {
             if (c == null || !c.moveToFirst()) throw new MmsWriteError("no_thread");
             return c.getLong(0);

@@ -73,8 +73,9 @@ public final class Runner extends Instrumentation {
             return cr.applyBatch(authority, ops);
         }
 
-        @Override public Cursor query(Uri uri, String[] projection) {
-            return cr.query(uri, projection, null, null, null);
+        @Override public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs,
+                                      String sortOrder) {
+            return cr.query(uri, projection, selection, selectionArgs, sortOrder);
         }
 
         @Override public OutputStream openOutput(Uri uri) throws Exception { return cr.openOutputStream(uri); }
