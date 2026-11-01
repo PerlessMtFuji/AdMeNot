@@ -697,15 +697,21 @@ class Api:
         """Sprawdza (raz na podłączenie) zmiany telefonu do odwrócenia i startuje `phone_cleanup`.
         True — sprzątanie wystartowało. Gdy trwa inne zadanie, a zmiany są: `AppError("busy", …)`
         z JobRunnera i telefon zostaje do sprawdzenia. Po nieudanym sprzątaniu: najwyżej
-        `len(CLEANUP_BACKOFF)` prób na podłączenie; odczyt listy telefonów (`auto`) czeka odstęp
-        z `CLEANUP_BACKOFF`, wejście zadania nie. Po ostatniej nieudanej próbie nic nie startuje ani nie
-        blokuje zadań na tym telefonie (czerwony baner ostrzega) aż do ponownego podłączenia."""
+        `len(CLEANUP_BACKOFF)` prób na podłączenie, każda po odstępie z `CLEANUP_BACKOFF`. W odstępie
+        odczyt listy telefonów (`auto`) nic nie robi, a wejście zadania dostaje `AppError("busy",
+        "phone_cleanup")` bez nowej próby (szybkie kliknięcia nie zużywają prób; baner już jest). Po
+        ostatniej nieudanej próbie nic nie startuje ani nie blokuje zadań na tym telefonie (czerwony baner
+        ostrzega) aż do ponownego podłączenia."""
         with self._cleanup_lock:
             if serial in self._cleaned:
                 return False
             failed, next_at = self._cleanup_tries.get(serial, (0, 0.0))
-            if failed >= len(CLEANUP_BACKOFF) or (auto and self._clock() < next_at):
+            if failed >= len(CLEANUP_BACKOFF):
                 return False
+            if self._clock() < next_at:
+                if auto:
+                    return False
+                raise AppError("busy", "phone_cleanup")
             copies = []
             for meta in store.list_copies():
                 with contextlib.suppress(ValueError, OSError):

@@ -1076,8 +1076,8 @@ def test_cleanup_gives_up_after_three_tries_until_reconnect(tmp_path, no_tap_wai
     clock = [0.0]
     api._clock = lambda: clock[0]
     api.list_devices()
-    err = api.start_scan(NEW)["error"]  # wejście zadania przed limitem: próba od razu, bez odstępu
-    assert (err["key"], err["message"]) == ("busy", "phone_cleanup") and len(calls) == 2
+    err = api.start_scan(NEW)["error"]  # wejście zadania w odstępie: `busy`, bez nowej próby
+    assert (err["key"], err["message"]) == ("busy", "phone_cleanup") and len(calls) == 1
     for _ in range(5):
         clock[0] += 60.0
         api.list_devices()
@@ -1089,6 +1089,43 @@ def test_cleanup_gives_up_after_three_tries_until_reconnect(tmp_path, no_tap_wai
     host.connected.add(NEW)
     api.list_devices()  # ponowne podłączenie: znów automatyczna próba
     assert len(calls) == 4
+
+
+def test_job_entries_during_backoff_do_not_use_up_cleanup_tries(tmp_path, no_tap_wait, monkeypatch):
+    """Trzy szybkie kliknięcia po nieudanym sprzątaniu: każde dostaje `busy/phone_cleanup` (baner już jest),
+    ale żadne nie startuje próby — 3 próby zostają przy swoich odstępach (10 s, 30 s)."""
+    from admenot.app import api as api_mod
+    from admenot.engine.transfer.phonesetup import CleanupResult
+
+    api, rec, host, copy_id = _tel_copied(tmp_path)
+    _leftover_changes(host, copy_id)
+    calls = []
+
+    def failing(*args):
+        calls.append(1)
+        return CleanupResult(False, True, False, True)
+
+    monkeypatch.setattr(api_mod, "cleanup", failing)
+    clock = [0.0]
+    api._clock = lambda: clock[0]
+    api.list_devices()
+    assert len(calls) == 1
+    for call in (lambda: api.start_scan(NEW), lambda: api.transfer_inventory(NEW),
+                 lambda: api.restore_plan(copy_id, NEW)):
+        clock[0] += 1.0
+        err = call()["error"]
+        assert (err["key"], err["message"]) == ("busy", "phone_cleanup")
+    assert len(calls) == 1
+    clock[0] = 10.0  # po odstępie wejście zadania startuje drugą próbę
+    err = api.start_scan(NEW)["error"]
+    assert (err["key"], err["message"]) == ("busy", "phone_cleanup") and len(calls) == 2
+    clock[0] = 20.0
+    assert api.start_scan(NEW)["error"]["message"] == "phone_cleanup" and len(calls) == 2
+    clock[0] = 40.0
+    api.list_devices()
+    assert len(calls) == 3
+    assert "job_id" in api.start_scan(NEW)  # po limicie zadania nie czekają
+    assert rec.of("transfer:cleanup_started") == [{"serial": NEW}] * 3
 
 
 def test_stopped_cleanup_not_prompted_again_on_same_connection(tmp_path, no_tap_wait, monkeypatch):
