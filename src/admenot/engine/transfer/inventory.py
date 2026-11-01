@@ -8,6 +8,7 @@ a korzeń, który mimo to zawodzi, liczymy do „nieczytelnych”.
 
 from __future__ import annotations
 
+import posixpath
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -32,6 +33,18 @@ FILE_CATEGORIES: dict[str, tuple[str, ...]] = {
         "WhatsApp Business",
     ),
 }
+
+VIDEO_EXT = frozenset({".mp4", ".mov", ".3gp", ".3g2", ".mkv", ".webm", ".avi", ".m4v", ".ts", ".mts",
+                       ".m2ts", ".wmv", ".flv"})
+
+
+def upload_group(category: str, remote: str) -> str:
+    """Kategoria kopii → grupa wgrywania; `media` dzielone po rozszerzeniu (nieznane → zdjęcia)."""
+    if category == "media":
+        return "videos" if posixpath.splitext(remote)[1].lower() in VIDEO_EXT else "photos"
+    return category
+
+
 JUNK_DIRS = (".thumbnails", ".Thumbnails", ".Trash", ".trash", ".Statuses", ".cache")
 JUNK_PREFIXES = (".trashed-", ".pending-")
 EXCLUDED_TOP = {"Android"}

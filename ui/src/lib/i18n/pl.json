@@ -683,6 +683,11 @@
     "finish": "Zakończ",
     "copies_title": "Kopie danych na komputerze",
     "copies_sub": "Ze wszystkich telefonów. Każda kopia znika po 7 dniach, chyba że ją przedłużysz.",
+    "contents": {
+      "contacts": "Kontakty", "sms": "SMS", "mms": "MMS", "calls": "Połączenia", "files": "Pliki",
+      "files_photos": "Zdjęcia", "files_videos": "Filmy", "files_downloads": "Pobrane",
+      "files_whatsapp": "WhatsApp", "files_others": "Inne foldery", "apps": "Aplikacje"
+    },
     "days_left": {
       "one": "został {count} dzień",
       "few": "zostały {count} dni",

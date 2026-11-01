@@ -11,6 +11,8 @@ const COPY: CopyView = { id: 'OLD/1', serial: 'OLD', model: 'SM-A145R', manufact
     { serial: 'NEW2', status: 'stopped', updated: null, resumable: true },
     { serial: 'NEW4', status: 'incomplete', updated: null, resumable: false }] };  // ani „wgrano”, ani „przerwane”
 
+const items = () => [...screen.getByTestId('copy-contents').children].map((e) => e.textContent?.trim());
+
 async function show(copies: CopyView[], serial: string | null) {
   const env = await setupCtl('clean');
   env.s.transfer.copies = copies;
@@ -45,5 +47,17 @@ describe('TransferCopies', () => {
     const buttons = screen.getAllByRole('button', { name: 'Wgraj na podłączony telefon' }) as HTMLButtonElement[];
     expect(buttons).toHaveLength(1);
     expect(buttons[0].disabled).toBe(true);
+  });
+
+  test('lists what the copy holds, per kind, skipping zeros', async () => {
+    await show([{ ...COPY, counts: { contacts: 312, sms: 1204, mms: 0, calls: 88, files: 1582, files_failed: 2,
+      files_photos: 1530, files_videos: 40, files_downloads: 12, apps: 14 } }], null);
+    expect(items()).toEqual(['Kontakty 312', 'SMS 1204', 'Połączenia 88', 'Zdjęcia 1530', 'Filmy 40', 'Pobrane 12',
+      'Aplikacje 14']);
+  });
+
+  test('an older copy without per-kind file counts shows the file total', async () => {
+    await show([{ ...COPY, counts: { contacts: 5, files: 120 } }], null);
+    expect(items()).toEqual(['Kontakty 5', 'Pliki 120']);
   });
 });

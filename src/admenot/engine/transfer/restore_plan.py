@@ -28,13 +28,12 @@ from admenot.engine.adb.transport import AdbError, AdbTransport
 from .apkcheck import BUNDLE_EXT, ApkCheck, load_or_check
 from .backup import _cmd_batches
 from .guard import STAT_TAIL, q, safe_target
+from .inventory import VIDEO_EXT, upload_group  # noqa: F401  (VIDEO_EXT: dawne miejsce)
 from .state import FileRow, State
 from .store import CopyDir
 from .telephony import Stopped
 
 UPLOAD_GROUPS = ("photos", "videos", "downloads", "whatsapp")  # oraz "other:<folder>" z kopii
-VIDEO_EXT = frozenset({".mp4", ".mov", ".3gp", ".3g2", ".mkv", ".webm", ".avi", ".m4v", ".ts", ".mts",
-                       ".m2ts", ".wmv", ".flv"})
 GiB = 1024 ** 3
 MTIME_TOLERANCE = 2  # s
 ALT_ROUND = 5  # nazwy zastępcze sprawdzane jednym `stat` na plik i rundę
@@ -107,13 +106,6 @@ class RestorePlan:
 
     def fits(self, groups: set[str], apk_on: set[str]) -> bool:
         return self.need(groups, apk_on) + self.reserve <= self.space.free
-
-
-def upload_group(category: str, remote: str) -> str:
-    """Kategoria kopii → grupa wgrywania; `media` dzielone po rozszerzeniu (nieznane → zdjęcia)."""
-    if category == "media":
-        return "videos" if posixpath.splitext(remote)[1].lower() in VIDEO_EXT else "photos"
-    return category
 
 
 def alt_name(target: str, n: int) -> str:

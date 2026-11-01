@@ -39,7 +39,7 @@ from admenot.engine.device.info import DeviceInfo
 
 from .exports import ExportFormatError, ExportKind, count_export
 from .guard import ApkReadAdb, ReadOnlyAdb, UnsafeCommand, q
-from .inventory import Inventory
+from .inventory import Inventory, upload_group
 from .puller import Puller
 from .state import FileRow, State
 from .store import KEEP_DAYS, CopyDir
@@ -668,6 +668,13 @@ class _Backup:
                   "apps_skipped": sum(1 for a in apps.values() if a.get("status") == "skipped"),
                   "unreadable": self.inventory.unreadable,
                   **{k: v.count for k, v in tel.items()}}
+        # Skopiowane pliki według grupy wgrywania (Historia: „Zdjęcia 1 530 · Filmy 40 …”);
+        # foldery spoza kategorii razem jako `files_others`.
+        for r in rows:
+            if r.status == "done":
+                group = upload_group(r.root, r.remote)
+                key = "files_others" if group.startswith("other:") else f"files_{group}"
+                counts[key] = counts.get(key, 0) + 1
         if self.sel.verify_hash:
             counts["size_only"] = sum(1 for r in rows if r.status == "done" and not r.sha256)
         return counts

@@ -1302,7 +1302,11 @@
         "apps_skipped": 0,
         "unreadable": 0,
         "contacts": 3,
-        "sms": 2
+        "sms": 2,
+        "files_photos": 2,
+        "files_downloads": 1,
+        "files_others": 1,
+        "files_whatsapp": 1
        },
        "selection": {
         "contacts": true,
@@ -1374,7 +1378,11 @@
        "apps_skipped": 0,
        "unreadable": 0,
        "contacts": 3,
-       "sms": 2
+       "sms": 2,
+       "files_photos": 2,
+       "files_downloads": 1,
+       "files_others": 1,
+       "files_whatsapp": 1
       },
       "selection": {
        "contacts": true,

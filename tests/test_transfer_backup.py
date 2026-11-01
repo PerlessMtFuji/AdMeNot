@@ -130,6 +130,8 @@ def test_full_copy_layout(tmp_path):
     meta = copy.read_meta()
     assert meta.status == "complete"
     assert meta.counts["files"] == 3 and meta.bytes == res.bytes
+    assert (meta.counts["files_photos"], meta.counts["files_downloads"]) == (2, 1)
+    assert "files_videos" not in meta.counts and "files_whatsapp" not in meta.counts
     assert meta.selection["categories"] == ["downloads", "media"]
     assert {p.stage for p in progress} >= {"telephony", "files"}
     assert progress[-1].done_files == 3 and progress[-1].total_files == 3

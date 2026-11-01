@@ -683,6 +683,11 @@
     "finish": "Finish",
     "copies_title": "Data copies on this computer",
     "copies_sub": "From all phones. Each copy is deleted after 7 days unless you extend it.",
+    "contents": {
+      "contacts": "Contacts", "sms": "SMS", "mms": "MMS", "calls": "Calls", "files": "Files",
+      "files_photos": "Photos", "files_videos": "Videos", "files_downloads": "Downloads",
+      "files_whatsapp": "WhatsApp", "files_others": "Other folders", "apps": "Apps"
+    },
     "days_left": {
       "one": "{count} day left",
       "few": "{count} days left",

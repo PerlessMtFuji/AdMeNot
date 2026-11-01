@@ -22,6 +22,17 @@
   const serials = (c: CopyView, done: boolean) => (c.restores ?? [])
     .filter((r) => (done ? r.status === 'complete' : r.resumable)).map((r) => r.serial).join(', ');
 
+  // Zawartość kopii z `counts`: „Kontakty 312 · SMS 1 204 · Zdjęcia 1 530 …” (tylko niezerowe).
+  // Kopie sprzed liczników według grup (`files_*`) mają tylko łączne `files`.
+  const CONTENTS = ['contacts', 'sms', 'mms', 'calls', 'files_photos', 'files_videos', 'files_downloads',
+    'files_whatsapp', 'files_others', 'apps'] as const;
+  const num = (n: number) => new Intl.NumberFormat(i18n.lang === 'pl' ? 'pl-PL' : 'en-US').format(n);
+  function contents(c: CopyView): { key: string; n: number }[] {
+    const keys: string[] = [...CONTENTS];
+    if (!keys.some((k) => k.startsWith('files_') && c.counts[k])) keys.splice(4, 5, 'files');
+    return keys.filter((k) => (c.counts[k] ?? 0) > 0).map((k) => ({ key: k, n: c.counts[k] }));
+  }
+
   const title = (c: CopyView) => `${c.manufacturer} ${c.model}`.trim();
   const date = (iso: string) => new Date(iso).toLocaleString(i18n.lang === 'pl' ? 'pl-PL' : 'en-GB',
     { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -41,6 +52,13 @@
             {[c.client, date(c.created), formatSize(c.bytes, i18n.lang)].filter(Boolean).join(' · ')}
             · <span class={c.days_left <= 1 ? 'font-semibold text-warn' : ''}>{tp('transfer.days_left', c.days_left)}</span>
           </div>
+          {#if contents(c).length}
+            <div class="flex flex-wrap gap-x-3 text-sm text-mut" data-testid="copy-contents">
+              {#each contents(c) as item (item.key)}
+                <span>{t(`transfer.contents.${item.key}`)} <b class="font-semibold text-ink">{num(item.n)}</b></span>
+              {/each}
+            </div>
+          {/if}
           {#if serials(c, true)}<div class="text-sm text-soft">{t('transfer.restore.uploaded_to', { list: serials(c, true) })}</div>{/if}
           {#if serials(c, false)}<div class="text-sm text-warn">{t('transfer.restore.interrupted_on', { list: serials(c, false) })}</div>{/if}
         </div>

@@ -1076,7 +1076,11 @@
         "unreadable": 0,
         "contacts": 2,
         "sms": 2,
-        "calls": 1
+        "calls": 1,
+        "files_photos": 2,
+        "files_downloads": 3,
+        "files_others": 1,
+        "files_whatsapp": 1
        },
        "selection": {
         "contacts": true,
@@ -1460,7 +1464,11 @@
         "unreadable": 0,
         "contacts": 2,
         "sms": 2,
-        "calls": 1
+        "calls": 1,
+        "files_photos": 2,
+        "files_downloads": 3,
+        "files_others": 1,
+        "files_whatsapp": 1
        },
        "selection": {
         "contacts": true,
@@ -2377,7 +2385,11 @@
         "unreadable": 0,
         "contacts": 2,
         "sms": 2,
-        "calls": 1
+        "calls": 1,
+        "files_photos": 2,
+        "files_downloads": 3,
+        "files_others": 1,
+        "files_whatsapp": 1
        },
        "selection": {
         "contacts": true,
@@ -2501,7 +2513,11 @@
        "unreadable": 0,
        "contacts": 2,
        "sms": 2,
-       "calls": 1
+       "calls": 1,
+       "files_photos": 2,
+       "files_downloads": 3,
+       "files_others": 1,
+       "files_whatsapp": 1
       },
       "selection": {
        "contacts": true,
