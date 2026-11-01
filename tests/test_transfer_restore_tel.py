@@ -723,5 +723,33 @@ def test_messages_xml_skips_missing_part_file(tmp_path):
     assert [p.text for p in got.parts] == ["Zdjęcie z wakacji"]
 
 
+def test_manual_messages_file_streams_attachment_base64(tmp_path, monkeypatch):
+    """U5: plik do ręcznego importu zapisywany strumieniem — duży załącznik idzie do base64 kawałkami,
+    nigdy w całości w pamięci; plik na telefonie odczytuje się z tym samym załącznikiem."""
+    import base64
+
+    from admenot.engine.transfer import mms as mms_mod
+    from admenot.engine.transfer.telfile import write_manual_files
+
+    copy = _copy(tmp_path)
+    phone = _new(tmp_path)
+    plan = build_tel_plan(phone, copy, copy.read_meta(), {"sms", "mms"})
+    big = bytes(range(256)) * (12 * 1024)  # 3 MiB
+    img = next(p for p in plan.mms[0].parts if p.file is not None)
+    img.file.write_bytes(big)
+    real, sizes = base64.b64encode, []
+
+    def spy(data, *args):
+        sizes.append(len(data))
+        return real(data, *args)
+
+    monkeypatch.setattr(base64, "b64encode", spy)
+    (step,) = write_manual_files(phone, phone, {"sms": plan.sms, "mms": plan.mms}, "20261101-120000")
+    assert sizes and max(sizes) <= mms_mod.B64_CHUNK
+    monkeypatch.setattr(base64, "b64encode", real)
+    (got,) = read_mms_xml(phone.local(step.remote), None)
+    assert next(p for p in got.parts if p.file is not None).file.read_bytes() == big
+
+
 def test_manual_step_shape():
     assert ManualStep("sms", "/sdcard/Download/x.xml").kind == "sms"

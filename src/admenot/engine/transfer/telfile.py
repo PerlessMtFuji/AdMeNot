@@ -7,7 +7,7 @@ celowo — serwisant albo klient importuje je ręcznie (Kontakty → Importuj), 
 
 from __future__ import annotations
 
-import base64
+import io
 import re
 import tempfile
 import time
@@ -15,11 +15,11 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TextIO
 
 from ..adb.transport import AdbTransport
 from . import telephony as tel
-from .mms import message_address
+from .mms import message_address, write_b64
 from .pusher import Pusher
 from .telrecords import CallRecord, ContactRecord, MmsRecord, SmsRecord
 
@@ -58,7 +58,8 @@ def _attrs(pairs: list[tuple[str, str | None]]) -> str:
     return " ".join(f'{k}="{tel.xml_attr(v)}"' for k, v in pairs)
 
 
-def _mms_element(r: MmsRecord) -> list[str]:
+def _write_mms(out: TextIO, r: MmsRecord) -> None:
+    """Jeden `<mms>`; załączniki strumieniem base64 z pliku (`mms.write_b64`), bez całości w pamięci."""
     addrs = [{"address": a, "type": str(t)} for a, t in r.addrs]
     pairs: list[tuple[str, str | None]] = [
         ("date", str(r.date)), ("date_sent", str(r.date_sent)), ("msg_box", str(r.msg_box)),
@@ -66,37 +67,45 @@ def _mms_element(r: MmsRecord) -> list[str]:
         ("m_type", "132" if r.msg_box == 1 else "128"), ("ct_t", "application/vnd.wap.multipart.related"),
         ("sub", r.subject), ("address", message_address(str(r.msg_box), addrs)),
         ("readable_date", tel.readable(str(r.date))), ("contact_name", "(Unknown)")]
-    out = [f"  <mms {_attrs(pairs)}>", "    <parts>"]
+    out.write(f"  <mms {_attrs(pairs)}>\n    <parts>\n")
     for p in r.parts:
         seq = "-1" if p.content_type.split(";")[0].strip().lower() == "application/smil" else "0"
         part = _attrs([("seq", seq), ("ct", p.content_type), ("name", p.name), ("chset", "106" if p.text else None),
                        ("text", p.text)])
-        data = ""
-        if p.file is not None:
-            try:
-                blob = p.file.read_bytes()
-            except OSError:  # plik załącznika zniknął z kopii: wiadomość bez tej części, ale jest
-                continue
-            data = f' data="{base64.b64encode(blob).decode("ascii")}"'
-        out.append(f"      <part {part}{data} />")
-    out += ["    </parts>", "    <addrs>"]
-    out += [f"      <addr {_attrs([('address', a), ('type', str(t)), ('charset', '106')])} />"
-            for a, t in r.addrs]
-    out += ["    </addrs>", "  </mms>"]
-    return out
+        if p.file is None:
+            out.write(f"      <part {part} />\n")
+            continue
+        try:
+            fh = p.file.open("rb")
+        except OSError:  # plik załącznika zniknął z kopii: wiadomość bez tej części, ale jest
+            continue
+        with fh:
+            out.write(f'      <part {part} data="')
+            write_b64(out, fh)
+            out.write('" />\n')
+    out.write("    </parts>\n    <addrs>\n")
+    out.writelines(f"      <addr {_attrs([('address', a), ('type', str(t)), ('charset', '106')])} />\n"
+                   for a, t in r.addrs)
+    out.write("    </addrs>\n  </mms>\n")
 
 
-def messages_xml(sms: list[SmsRecord], mms: list[MmsRecord]) -> str:
-    """SMS i MMS w jednym pliku SB&R (SB&R przywraca oba z jednego `<smses>`)."""
+def write_messages_xml(out: TextIO, sms: list[SmsRecord], mms: list[MmsRecord]) -> None:
+    """SMS i MMS w jednym pliku SB&R (SB&R przywraca oba z jednego `<smses>`), zapisywane strumieniem."""
     sms_lines = [line for line in tel.build_sms_xml([_sms_row(r) for r in sms], {}).split("\n")
                  if line.startswith("  <sms ")]
     head = (f'<smses count="{len(sms) + len(mms)}" backup_set="{uuid.uuid4()}" '
             f'backup_date="{int(time.time() * 1000)}" type="full">')
-    out = [_HEAD, _COMMENT, head, *sms_lines]
+    out.write("\n".join([_HEAD, _COMMENT, head, *sms_lines]) + "\n")
     for r in mms:
-        out += _mms_element(r)
-    out.append("</smses>")
-    return "\n".join(out) + "\n"
+        _write_mms(out, r)
+    out.write("</smses>\n")
+
+
+def messages_xml(sms: list[SmsRecord], mms: list[MmsRecord]) -> str:
+    """`write_messages_xml` do napisu (testy, małe pliki)."""
+    buf = io.StringIO()
+    write_messages_xml(buf, sms, mms)
+    return buf.getvalue()
 
 
 def calls_xml(calls: list[CallRecord]) -> str:
@@ -133,14 +142,14 @@ def write_manual_files(adb: AdbTransport, pusher: Pusher, kinds_records: dict[st
     `ManualFileError` przy nieudanym `push`; `AdbError` rozłączenia przechodzi wyżej."""
     if not _STAMP.fullmatch(stamp):
         raise ValueError(f"bad stamp {stamp!r}")
-    builders: list[tuple[ManualKind, Callable[[], str]]] = []
+    builders: list[tuple[ManualKind, Callable[[TextIO], object]]] = []
     sms, mms = kinds_records.get("sms") or [], kinds_records.get("mms") or []
     if kinds_records.get("contacts"):
-        builders.append(("contacts", lambda: contacts_vcf(kinds_records["contacts"])))
-    if sms or mms:
-        builders.append(("sms", lambda: messages_xml(sms, mms)))
+        builders.append(("contacts", lambda out: out.write(contacts_vcf(kinds_records["contacts"]))))
+    if sms or mms:  # MMS z załącznikami: strumieniem do pliku, nie cały base64 w pamięci
+        builders.append(("sms", lambda out: write_messages_xml(out, sms, mms)))
     if kinds_records.get("calls"):
-        builders.append(("calls", lambda: calls_xml(kinds_records["calls"])))
+        builders.append(("calls", lambda out: out.write(calls_xml(kinds_records["calls"]))))
     if not builders:
         return []
     steps: list[ManualStep] = []
@@ -149,7 +158,8 @@ def write_manual_files(adb: AdbTransport, pusher: Pusher, kinds_records: dict[st
         for kind, build in builders:
             name = NAMES[kind].format(stamp=stamp)
             local = Path(tmp) / name
-            local.write_text(build(), encoding="utf-8", newline="")
+            with local.open("w", encoding="utf-8", newline="") as out:
+                build(out)
             remote = f"{DOWNLOAD}/{name}"
             res = pusher.push([local], remote, _never, _noop)
             if res.rc != 0:
