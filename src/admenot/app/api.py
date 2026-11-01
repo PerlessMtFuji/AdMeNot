@@ -431,7 +431,7 @@ class Api:
         self._incident_lock = threading.Lock()
         self._pick_file_fn: Callable[[], str | None] | None = None
         self._open_order: dict[str, int] = {}  # telefon → zlecenie, do którego idą nowe zrzuty
-        self._identities: dict[str, tuple[str | None, str | None, str | None]] = {}  # → (nazwa, IMEI, obrazek)
+        self._identities: dict[str, tuple[str | None, str | None, str | None, str | None]] = {}  # → (nazwa, IMEI, obrazek, Android)
         self._pending: dict[str, list[int]] = {}  # telefon → zrzuty czekające na zlecenie
         self._shots_lock = threading.Lock()  # chroni _open_order/_pending; nigdy pod adb/screencap
         self._share_upload = share_upload
@@ -655,25 +655,27 @@ class Api:
             self._cleanup_on_connect(serial)
         devices = []
         for e in entries:
-            name, imei, image = self._identity(e.serial) if e.serial in ready else (None, None, None)
+            name, imei, image, android = (self._identity(e.serial) if e.serial in ready
+                                          else (None, None, None, None))
             devices.append({"serial": e.serial, "state": e.state, "model": e.model,
-                            "name": name, "imei": imei, "image": image})
+                            "name": name, "imei": imei, "image": image, "android": android})
         return {"devices": devices, "error": None}
 
-    def _identity(self, serial: str) -> tuple[str | None, str | None, str | None]:
+    def _identity(self, serial: str) -> tuple[str | None, str | None, str | None, str | None]:
         """Nazwa handlowa, IMEI i obrazek telefonu już na ekranie podłączenia — raz na podłączenie, nie co
         odpytanie (zdarzenie `devices` idzie tylko przy zmianie, więc obrazek leci raz)."""
         if serial not in self._identities:
             try:
                 device = read_device_info(self._session(serial))
             except AdbError:
-                return None, None, None  # np. telefon jeszcze się nie odblokował: spróbujemy przy następnym
+                return None, None, None, None  # np. telefon jeszcze się nie odblokował: spróbujemy przy następnym
             self._remember(device, self._provider.match(device))
         return self._identities[serial]
 
     def _remember(self, device: DeviceInfo, match: PhoneMatch | None) -> None:
         card = device_card(device, match)
-        self._identities[device.serial] = (card["name"], device.imei, card["image"] or None)
+        self._identities[device.serial] = (card["name"], device.imei, card["image"] or None,
+                                           device.android_release or None)
 
     def _cleanup_on_connect(self, serial: str) -> None:
         """Telefon pojawił się na liście: zmiany telefonu zostawione przez przerwane wgrywanie (rola SMS,

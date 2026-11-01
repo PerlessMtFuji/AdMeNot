@@ -2,6 +2,7 @@
   import { getContext, onMount } from 'svelte';
   import ConnectChecklist from '../components/ConnectChecklist.svelte';
   import DeviceCard from '../components/DeviceCard.svelte';
+  import DeviceList from '../components/DeviceList.svelte';
   import InterruptedBanner from '../components/InterruptedBanner.svelte';
   import MirrorControls from '../components/MirrorControls.svelte';
   import PhoneCleanup from '../components/PhoneCleanup.svelte';
@@ -93,27 +94,17 @@
       </Banner>
     {:else if link === 'ready' || link === 'many'}
       <div class="flex flex-col gap-2.5" in:enter>
-        {#each ready as d (d.serial)}
-          {#if ready.length > 1}
-            <!-- Wiele telefonów: przyciski podglądu/zrzutu NIE mogą być potomkami <label>, bo klik
-                 byłby przekazany do radia (zmieniałby wybrane urządzenie) — renderujemy je jako
-                 rodzeństwo pod etykietą, wciąż wizualnie pod kartą tego telefonu. -->
-            <div class="flex flex-col gap-2">
-              <label class="block cursor-pointer rounded-2xl {s.serial === d.serial ? 'ring-2 ring-accent' : ''}">
-                <input class="sr-only" type="radio" name="device" checked={s.serial === d.serial}
-                  aria-label="{d.name ?? modelName(d.model)} {d.serial}" onchange={() => ctl.selectDevice(d.serial)} />
-                <DeviceCard name={d.name ?? modelName(d.model)} details={t('connect.title.ready')} serial={d.serial} imei={d.imei} image={d.image} connected />
-              </label>
-              <div class="pl-[80px]"><MirrorControls serial={d.serial} name={d.name ?? modelName(d.model)} /></div>
-            </div>
-          {:else}
+        {#if ready.length > 1}
+          <DeviceList devices={ready} />
+        {:else}
+          {#each ready as d (d.serial)}
             <label class="block cursor-pointer rounded-2xl">
               <DeviceCard name={d.name ?? modelName(d.model)} details={t('connect.title.ready')} serial={d.serial} imei={d.imei} image={d.image} connected>
                 <MirrorControls serial={d.serial} name={d.name ?? modelName(d.model)} />
               </DeviceCard>
             </label>
-          {/if}
-        {/each}
+          {/each}
+        {/if}
         <form class="flex gap-2" onsubmit={(e) => { e.preventDefault(); if (!cleaning) void ctl.startScan(); }}>
           <input class="field flex-1 rounded-xl px-3.5 py-2.5" bind:value={s.client}
             placeholder={t('connect.client_placeholder')} aria-label={t('connect.client_label')} maxlength="80" />

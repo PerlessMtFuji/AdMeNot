@@ -1,0 +1,52 @@
+<script lang="ts">
+  import { getContext } from 'svelte';
+  import type { Controller } from '../lib/controller';
+  import { t, tp } from '../lib/i18n/index.svelte';
+  import { modelName } from '../lib/logic';
+  import type { DeviceEntry } from '../lib/types';
+  import Pill from '../ui/Pill.svelte';
+  import MirrorControls from './MirrorControls.svelte';
+  import PhoneThumb from './PhoneThumb.svelte';
+
+  // Kilka podłączonych telefonów: jedna lista wyboru (wiersze z numerem seryjnym i Androidem, bo stary
+  // i nowy telefon klienta bywają tym samym modelem) i jeden zestaw podglądu/zrzutu dla wybranego.
+  let { devices }: { devices: DeviceEntry[] } = $props();
+  const ctl = getContext<Controller>('ctl');
+  const s = ctl.state;
+  const nameOf = (d: DeviceEntry) => d.name ?? modelName(d.model);
+  const selected = $derived(devices.find((d) => d.serial === s.serial) ?? null);
+  const mirrorOn = (d: DeviceEntry) => s.mirror.serial === d.serial && (s.mirror.state === 'starting' || s.mirror.state === 'running');
+</script>
+
+<div class="flex flex-col gap-3">
+  <div role="radiogroup" aria-labelledby="device-list-label" class="overflow-hidden rounded-2xl card">
+    <div id="device-list-label" class="lbl px-4 pt-3 pb-2">{tp('connect.devices', devices.length, { count: devices.length })}</div>
+    {#each devices as d, i (d.serial)}
+      {@const on = s.serial === d.serial}
+      <label class="flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors duration-150
+        {i ? 'border-t border-line' : ''} {on ? 'bg-accent-soft shadow-[inset_3px_0_0_var(--color-accent)]' : 'hover:bg-neutral-soft'}">
+        <input type="radio" name="device" class="h-4 w-4 flex-none accent-[var(--color-accent)]" checked={on}
+          aria-label="{nameOf(d)} {d.serial}" onchange={() => ctl.selectDevice(d.serial)} />
+        <PhoneThumb image={d.image ?? null} name={nameOf(d)} compact />
+        <span class="min-w-0 flex-1">
+          <span class="block truncate font-bold">{nameOf(d)}</span>
+          <span class="block truncate text-sm text-mut">
+            {[d.android ? `Android ${d.android}` : '', d.imei ? `IMEI ${d.imei}` : ''].filter(Boolean).join(' · ')}
+          </span>
+          <span class="mono block truncate text-2xs text-soft">{d.serial}</span>
+        </span>
+        {#if on}<Pill tone="accent">{t('connect.selected')}</Pill>
+        {:else if mirrorOn(d)}<Pill tone="warn">{t('connect.mirror_on')}</Pill>{/if}
+      </label>
+    {/each}
+  </div>
+  {#if selected}
+    <!-- Podgląd i zrzut raz, z nazwą telefonu, którego dotyczą; poza <label>, żeby klik nie zmieniał wyboru. -->
+    <!-- Numer seryjny w etykiecie: dwa telefony tego samego modelu inaczej by się nie różniły. -->
+    <section aria-label={t('connect.tools_for', { name: nameOf(selected), serial: selected.serial })}
+      class="flex flex-wrap items-start gap-x-3 gap-y-1.5 pl-1">
+      <span class="pt-1.5 text-sm font-semibold text-mut">{nameOf(selected)} <span class="mono text-2xs text-soft">{selected.serial}</span>:</span>
+      {#key selected.serial}<MirrorControls serial={selected.serial} name={nameOf(selected)} />{/key}
+    </section>
+  {/if}
+</div>

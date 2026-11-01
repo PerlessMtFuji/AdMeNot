@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/svelte';
+import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import { renderWith, setupCtl } from '../test-utils';
@@ -16,7 +16,7 @@ describe('Connect', () => {
     await tick();
     expect(screen.getByText('Przywracam ustawienia telefonu po przerwanym wgrywaniu…')).toBeTruthy();
     expect((screen.getByRole('button', { name: 'Skanuj' }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole('button', { name: 'Przenieś dane' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Kopiuj dane' }) as HTMLButtonElement).disabled).toBe(true);
     env.bridge.emit('transfer:tap', { request: 'sms_role_restore', package: 'com.samsung.android.messaging' });
     await tick();
     expect(screen.getByText('Na telefonie: wybierz Wiadomości Samsung jako domyślną aplikację SMS')).toBeTruthy();
@@ -183,20 +183,34 @@ describe('Connect', () => {
     expect(bridge.calls.at(-1)).toEqual({ method: 'start_scan', args: ['HT7A1B2C3', 'Jan'] });
   });
 
-  test('several phones: the screenshot button for the second phone does not steal the selection', async () => {
+  test('several phones: one set of screen tools, for the selected phone', async () => {
     const { s, bridge } = await renderWith(Connect, 'many');
-    const before = s.serial;
-    const shotButtons = screen.getAllByRole('button', { name: 'Zrzut ekranu' });
-    expect(shotButtons).toHaveLength(2);
+    const radios = screen.getAllByRole('radio') as HTMLInputElement[];
+    await fireEvent.click(radios[1]);
+    await tick();
+    const shot = screen.getByRole('button', { name: 'Zrzut ekranu' });  // jeden, nie po jednym na telefon
     // Przyciski podglądu/zrzutu nie mogą być potomkami <label> (klik trafiałby do radia).
-    for (const button of shotButtons) expect(button.closest('label')).toBeNull();
-    await fireEvent.click(shotButtons[1]);
+    expect(shot.closest('label')).toBeNull();
+    const tools = shot.closest('section')!;
+    expect(tools.getAttribute('aria-label')).toBe('samsung SM-A145R HT7A1B2C3');
+    await fireEvent.click(shot);
     await flush();
     await tick();
     expect(bridge.calls.at(-1)).toEqual({ method: 'screenshot', args: ['HT7A1B2C3'] });
-    expect(s.serial).toBe(before);
+    expect(s.serial).toBe('HT7A1B2C3');
+    expect(radios.map((r) => r.checked)).toEqual([false, true]);
+    expect(within(radios[1].closest('label')!).getByText('wybrany')).toBeTruthy();
+  });
+
+  test('several phones: a screen view running on the other phone is marked in its row', async () => {
+    const { s } = await renderWith(Connect, 'many');
     const radios = screen.getAllByRole('radio') as HTMLInputElement[];
-    expect(radios.map((r) => r.checked)).toEqual([before === 'R58T00TEST', before === 'HT7A1B2C3']);
+    await fireEvent.click(radios[0]);
+    s.mirror.serial = 'HT7A1B2C3';
+    s.mirror.state = 'running';
+    await tick();
+    expect(within(radios[1].closest('label')!).getByText('podgląd włączony')).toBeTruthy();
+    expect(within(radios[0].closest('label')!).queryByText('podgląd włączony')).toBeNull();
   });
 
   test('one ready phone: connected card with scan; adb missing points to settings', async () => {

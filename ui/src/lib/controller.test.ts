@@ -1666,7 +1666,7 @@ describe('data transfer — resuming', () => {
     await vi.waitFor(() => expect(s.job).toBeNull());
     expect(s.phase).toBe('transfer_choose');
     expect(bridge.calls.some((c) => c.method === 'start_backup')).toBe(false);
-    // zwykłe „Przenieś dane” nigdy nie rusza samo
+    // zwykłe „Kopiuj dane” nigdy nie rusza samo
     await ctl.startTransfer();
     await vi.waitFor(() => expect(s.job).toBeNull());
     expect(bridge.calls.some((c) => c.method === 'start_backup')).toBe(false);

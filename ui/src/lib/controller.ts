@@ -769,7 +769,7 @@ export class Controller {
       waiting: false, result: null, copy: null, restore: emptyRestore() });
   }
 
-  /** „Przenieś dane” na ekranie Połącz: inwentarz wybranego telefonu, potem ekran wyboru. `resume` („Wznów”
+  /** „Kopiuj dane” na ekranie Połącz: inwentarz wybranego telefonu, potem ekran wyboru. `resume` („Wznów”
    *  z banera): po inwentarzu kopia rusza od razu z zapisanym wyborem — patrz `continueResume`. */
   async startTransfer(resume = false): Promise<void> {
     const s = this.state;
