@@ -131,9 +131,11 @@ final class Writer {
      *    non-denial exception) match the new rows to the batch by (address, date, type, body); each
      *    stored row confirms one batch row (OK), extra stored rows with the same key are ignored. The
      *    unmatched rows are inserted alone (Uri checked: null gives ERR id null_uri, appop "/0" DENIED)
-     *    only when they explain the gap exactly (unmatched == batch size - newCount); else the keys are
-     *    unreliable on this provider and nothing more is inserted: each unmatched row gets
-     *    ERR id unverified (the PC sends those to the manual import file, never to another route).
+     *    only when they explain the gap exactly (unmatched == batch size - newCount) and, when bulkInsert
+     *    returned a count n, no more of them than bulkInsert said it did not store (unmatched <= batch
+     *    size - n: n == size with nothing visible means reads are hidden, not that nothing was written).
+     *    Else nothing more is inserted: each unmatched row gets ERR id unverified (the PC sends those
+     *    to the manual import file, never to another route).
      * Denial stays as before: a SecurityException, or appop "ignore" (bulkInsert returns fewer rows
      * and nothing new appears with _id > maxId) gives DENIED. A failed verification query stops the
      * run (FAIL) rather than guess what was stored.
@@ -170,7 +172,9 @@ final class Writer {
             }
         }
         if (missIds.isEmpty()) return;
-        if (missIds.size() == ids.size() - newCount) oneByOne(SMS, missIds, missVals, "null_uri");
+        boolean gapExplained = missIds.size() == ids.size() - newCount;
+        boolean notStored = n < 0 || missIds.size() <= ids.size() - n; // n < 0: bulkInsert threw, no count
+        if (gapExplained && notStored) oneByOne(SMS, missIds, missVals, "null_uri");
         else for (String id : missIds) errId(id, UNVERIFIED);
     }
 

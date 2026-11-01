@@ -239,7 +239,11 @@ def test_writer_bulk_inserts_sms_and_verifies_what_was_stored():
     count = sms.index("if (!threw && newCount == ids.size()) {")
     assert count < sms.index("smsKey(vals.get(i))")
     # pojedyncze wstawienia tylko, gdy brakujące wyjaśniają lukę dokładnie; inaczej `ERR id unverified`
-    assert ('if (missIds.size() == ids.size() - newCount) oneByOne(SMS, missIds, missVals, "null_uri");\n'
+    assert "boolean gapExplained = missIds.size() == ids.size() - newCount;" in sms
+    # bulkInsert zwrócił liczbę: po jednym najwyżej tyle, ile według niego nie zapisał (n == size przy
+    # niewidocznych odczytach nie może zdublować całej paczki)
+    assert "boolean notStored = n < 0 || missIds.size() <= ids.size() - n;" in sms
+    assert ('if (gapExplained && notStored) oneByOne(SMS, missIds, missVals, "null_uri");\n'
             "        else for (String id : missIds) errId(id, UNVERIFIED);") in sms
     assert 'static final String UNVERIFIED = "unverified";' in _writer_source()
 
