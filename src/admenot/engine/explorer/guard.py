@@ -74,7 +74,11 @@ def assert_explorer(cmd: str) -> None:
         if not rest.startswith(("ls ", "content query ")):
             raise UnsafeCommand(f"Przyrostek dozwolony tylko po 'ls' i 'content query': {cmd[:120]}")
         cmd = rest
-    words = _unquoted_view(cmd).split()
+    view = _unquoted_view(cmd)
+    # `str.split()` i `shlex.split` inaczej tną słowa (NBSP, \x0b,  …) — poza apostrofami tylko zwykła spacja.
+    if any(ch.isspace() and ch != " " for ch in view):
+        raise UnsafeCommand(f"Niedozwolony biały znak poza cudzysłowem: {cmd[:120]!r}")
+    words = view.split()
     if not words or words[0] not in _ALLOWED_CMDS:
         raise UnsafeCommand(f"Polecenie spoza allowlisty: {cmd[:120]}")
     try:
@@ -82,6 +86,8 @@ def assert_explorer(cmd: str) -> None:
     except ValueError:
         raise UnsafeCommand(f"Nieczytelne polecenie: {cmd[:120]}") from None
     bad = UnsafeCommand(f"Niedozwolona postać polecenia: {cmd[:120]}")
+    if not t or t[0] != words[0]:
+        raise bad
     name = t[0]
 
     if name == "find":
@@ -136,6 +142,8 @@ def assert_explorer(cmd: str) -> None:
         if len(t) != 3 or t[1] != "-f":
             raise bad
         _tmp_path(t[2])
+    else:
+        raise bad
 
 
 def _assert_dd(t: list[str], bad: UnsafeCommand) -> None:

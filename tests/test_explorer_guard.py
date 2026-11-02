@@ -112,6 +112,9 @@ def test_allows_writes_under_sdcard(cmd):
     "content call --uri content://media --method scan_file --arg '/data/a.jpg'",
     "reboot",
     "sha256sum /data/x",
+    "rm\xa0-rf\xa0/sdcard",
+    "rm\x0b-rf /sdcard/x",
+    "head x",
 ])
 def test_refuses(cmd):
     with pytest.raises(UnsafeCommand):
