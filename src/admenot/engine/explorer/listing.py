@@ -12,7 +12,7 @@ from admenot.engine.adb.transport import AdbError
 from admenot.engine.explorer.guard import ExplorerAdb
 from admenot.engine.transfer.guard import CONTENT_TAIL, q
 
-__all__ = ["Entry", "ListError", "ListResult", "folder_label", "list_dir", "locked_paths"]
+__all__ = ["Entry", "ListError", "ListResult", "folder_label", "list_dir", "list_error", "locked_paths"]
 
 LIST_TIMEOUT = 120.0
 _SDCARD = "/sdcard"
@@ -64,7 +64,7 @@ def folder_label(path: str, apps: Mapping[str, str]) -> str | None:
     return apps.get(package)
 
 
-def _list_error(exc: AdbError) -> ListError:
+def list_error(exc: AdbError) -> ListError:
     if exc.kind in _OFFLINE_KINDS:
         return ListError("offline")
     low = exc.message.lower()
@@ -80,6 +80,8 @@ def _is_denied(adb: ExplorerAdb, folder: str) -> bool:
     try:
         out = adb.shell(f"ls {q(folder + '/')}{CONTENT_TAIL}")
     except AdbError as exc:
+        if exc.kind in _OFFLINE_KINDS:
+            raise list_error(exc) from exc
         return "permission denied" in exc.message.lower()
     return "permission denied" in out.lower()
 
@@ -92,13 +94,13 @@ def list_dir(adb: ExplorerAdb, path: str, *, sdk: int = 0, apps: Mapping[str, st
             f"find {q(base + '/')} -mindepth 1 -maxdepth 1 -exec stat -c '%f|%s|%Y|%n' {{}} +",
             timeout=LIST_TIMEOUT)
     except AdbError as exc:
-        raise _list_error(exc) from exc
-    # Rekord zaczyna się od `tryb|rozmiar|mtime|<folder>/`; reszta to ciąg dalszy nazwy z nową linią.
+        raise list_error(exc) from exc
+    # Rekord zaczyna się od `tryb|rozmiar|mtime|<folder>/`; reszta to ciąg dalszy nazwy z nową linią (także pusta linia po nazwie kończącej się `\n`).
     records: list[list[str]] = []
-    for line in out.split("\n"):
+    for line in out.removesuffix("\n").split("\n"):
         if _RECORD.match(line) and line.split("|", 3)[3].startswith(base + "/"):
             records.append([line])
-        elif records and line:
+        elif records:
             records[-1].append(line)
     candidates = locked_paths(sdk)
     labels = apps or {}
@@ -110,7 +112,10 @@ def list_dir(adb: ExplorerAdb, path: str, *, sdk: int = 0, apps: Mapping[str, st
             continue
         mode_s, size_s, mtime_s, full = rec[0].split("|", 3)
         name = full[len(base) + 1:]
-        if "/" in name or name.startswith("."):
+        if "/" in name:
+            skipped += 1
+            continue
+        if name.startswith("."):
             continue
         is_dir = stat.S_ISDIR(int(mode_s, 16))
         child = f"{base}/{name}"

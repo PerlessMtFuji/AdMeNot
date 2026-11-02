@@ -271,6 +271,9 @@ class FakeStoragePhone:
         if expr[:4] == ["-mindepth", "1", "-maxdepth", "1"]:  # listing folderu eksploratora
             assert expr[4:] == ["-exec", "stat", "-c", "%f|%s|%Y|%n", "{}", "+"] and len(roots) == 1, args
             return self._list(roots[0])
+        if expr == ["-type", "f"]:  # zliczanie plików miejsca: jedna ścieżka na linię
+            assert len(roots) == 1, args
+            return self._list_files(roots[0])
         prune_paths: set[str] = set()
         prune_names: set[str] = set()
         j = 0
@@ -320,6 +323,20 @@ class FakeStoragePhone:
             out.append(f"{0x41f9 if p.is_dir() else 0x81b0:x}|{4096 if p.is_dir() else st.st_size}"
                        f"|{int(st.st_mtime)}|{prefix}{p.name}")
         out += [f"81b0|{size}|{mtime}|{prefix}{name}" for name, size, mtime in self.listing_extra.get(prefix[:-1], [])]
+        return ("\n".join(out) + "\n").encode("utf-8") if out else b""
+
+    def _list_files(self, remote: str) -> bytes:
+        """`find '<folder>/' -type f`: wszystkie pliki rekurencyjnie (też ukryte), pojedynczy `/` w ścieżkach."""
+        if any(remote.startswith(p) for p in self.deny_list_prefixes):
+            raise AdbError("command_failed", f"find: '{remote}': Permission denied")
+        base = self.local(remote)
+        if not base.is_dir():
+            raise AdbError("command_failed", f"find: '{remote}': No such file or directory")
+        prefix = remote.rstrip("/")
+        out = [f"{prefix}/{p.relative_to(base).as_posix()}" for p in sorted(base.rglob("*")) if p.is_file()]
+        for folder, extra in self.listing_extra.items():
+            if (folder + "/").startswith(prefix + "/"):
+                out += [f"{folder}/{name}" for name, _, _ in extra]
         return ("\n".join(out) + "\n").encode("utf-8") if out else b""
 
     def _ls(self, args: list[str]) -> bytes:

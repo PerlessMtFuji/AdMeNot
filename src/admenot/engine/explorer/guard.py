@@ -91,10 +91,13 @@ def assert_explorer(cmd: str) -> None:
     name = t[0]
 
     if name == "find":
-        if (len(t) != 12 or t[2:] != ["-mindepth", "1", "-maxdepth", "1", "-exec", "stat", "-c",
+        if len(t) == 4 and t[2:] == ["-type", "f"]:  # zliczanie plików miejsca: wyłącznie ta postać
+            safe_read_path(t[1])
+        elif (len(t) != 12 or t[2:] != ["-mindepth", "1", "-maxdepth", "1", "-exec", "stat", "-c",
                                       _STAT_FORMAT, "{}", "+"]):
             raise bad
-        safe_read_path(t[1])
+        else:
+            safe_read_path(t[1])
     elif name == "stat":
         if len(t) < 4 or t[1] != "-c" or t[2] != _STAT_FORMAT:
             raise bad

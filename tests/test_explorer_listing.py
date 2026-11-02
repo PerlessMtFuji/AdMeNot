@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from faketransfer import FakeStoragePhone
 
+from admenot.engine.adb.transport import AdbError
 from admenot.engine.explorer.guard import ExplorerAdb
 from admenot.engine.explorer.listing import ListError, folder_label, list_dir, locked_paths
 from admenot.engine.explorer.places import Place, count_place, find_places
@@ -189,11 +190,53 @@ def test_count_place_counts_recursively_visible_files(phone, adb):
     assert count_place(adb, Place("music", "/sdcard/Music", None, "music")) == 3
 
 
-def test_count_place_skips_denied_folders(phone, adb):
-    put(phone, "/sdcard/Android/a.txt")
-    put(phone, "/sdcard/Android/data/b.txt")
+def test_count_place_is_one_call_and_skips_hidden_components(phone, adb):
+    put(phone, "/sdcard/Music/.hidden/d.mp3")
+    put(phone, "/sdcard/Music/Album/.nomedia")
+    put(phone, "/sdcard/Music/Album/e.mp3")
+    put(phone, "/sdcard/Music/f.mp3")
+    phone.commands.clear()
+    assert count_place(adb, Place("music", "/sdcard/Music", None, "music")) == 2
+    assert phone.commands == ["find /sdcard/Music/ -type f"]
+
+
+def test_count_place_denied_raises_list_error(phone, adb):
+    mkdir(phone, "/sdcard/Android/data")
     phone.deny_list_prefixes = {"/sdcard/Android/data/"}
-    assert count_place(adb, Place("all", "/sdcard/Android", None, "phone")) == 1
+    with pytest.raises(ListError) as exc:
+        count_place(adb, Place("x", "/sdcard/Android/data", None, "phone"))
+    assert exc.value.kind == "denied"
+
+
+def test_list_dir_trailing_newline_name_is_skipped(phone, adb):
+    put(phone, "/sdcard/root/ok.txt")
+    phone.listing_extra["/sdcard/root"] = [("ends\n", 7, 1)]
+    res = list_dir(adb, "/sdcard/root")
+    assert [e.name for e in res.entries] == ["ok.txt"]
+    assert res.skipped == 1
+
+
+def test_find_places_offline_is_list_error(phone, adb):
+    phone.online = False
+    with pytest.raises(ListError) as exc:
+        find_places(adb)
+    assert exc.value.kind == "offline"
+
+
+def test_locked_probe_offline_is_list_error(phone, adb):
+    mkdir(phone, "/sdcard/Android/data")
+    original = phone.on_shell
+
+    def go_offline(command: str) -> None:
+        if command.startswith("ls "):
+            phone.online = False
+            raise AdbError("offline", "device offline")
+
+    phone.on_shell = go_offline
+    with pytest.raises(ListError) as exc:
+        list_dir(adb, "/sdcard/Android", sdk=33)
+    assert exc.value.kind == "offline"
+    phone.on_shell = original
 
 
 def test_fake_streaming_commands(phone, adb):
