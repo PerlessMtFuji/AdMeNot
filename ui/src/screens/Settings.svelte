@@ -17,8 +17,10 @@
   const s = ctl.state;
   let adbPath = $state(s.settings.adb_path ?? '');
   let backups = $state(s.settings.backups_dir ?? '');
+  let pdfDir = $state(s.settings.report_pdf_dir ?? '');
   let check = $state<{ ok: boolean; text: string } | null>(null);
   let saved = $state(false);
+  let pdfBad = $state(false);
   let warning = $state(false);
   let idCopied = $state(false);
   // Odmowa schowka nie może trafić do `unhandledrejection` (main.ts przełączyłby UI w „fatal”).
@@ -96,10 +98,19 @@
     if (r?.path) backups = r.path;
   }
 
+  async function choosePdf() {
+    const r = await ctl.pickFolder();
+    if (r?.path) pdfDir = r.path;
+  }
+
   async function savePaths() {
     saved = false;
-    const r = await ctl.saveSettings({ adb_path: adbPath.trim() || null, backups_dir: backups.trim() || null });
+    const r = await ctl.saveSettings({ adb_path: adbPath.trim() || null, backups_dir: backups.trim() || null,
+                                      report_pdf_dir: pdfDir.trim() || null });
     saved = r !== null;
+    // Zły folder PDF: komunikat przy polu zamiast ogólnej karty błędu (jak limit pamięci podręcznej).
+    pdfBad = r === null && s.error?.key === 'bad_request' && s.error.message === 'report_pdf_dir';
+    if (pdfBad) s.error = null;
   }
 
   // `checked` jest jednokierunkowe: po nieudanym zapisie pole wraca do zapisanego stanu.
@@ -142,6 +153,15 @@
           <Button onclick={choose}>{t('settings.choose')}</Button>
         </div>
         <span class="text-xs text-mut">{t('settings.backups_hint')}</span>
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="font-semibold" for="report-pdf-dir">{t('settings.report_pdf')}</label>
+        <div class="flex gap-2">
+          <input id="report-pdf-dir" class={INPUT} bind:value={pdfDir} />
+          <Button onclick={choosePdf}>{t('settings.choose')}</Button>
+        </div>
+        {#if pdfBad}<span class="flex items-center gap-1.5 text-sm text-bad"><Icon name="x" />{t('settings.report_pdf_bad')}</span>{/if}
+        <span class="text-xs text-mut">{t('settings.report_pdf_hint')}</span>
       </div>
       <div class="flex items-center gap-3">
         <Button variant="primary" onclick={savePaths}>{t('common.save')}</Button>

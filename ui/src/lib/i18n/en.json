@@ -72,6 +72,8 @@
     "title": { "none": "Connect the phone", "unauthorized": "Confirm on the phone", "offline": "Unplug and reconnect the cable", "ready": "Connected", "many": "Choose a phone", "adb_missing": "adb not found" },
     "sub": { "none": "Use a USB cable that carries data (not a charge-only one).", "unauthorized": "A prompt appeared on the phone — tap “Allow”.", "offline": "The phone does not respond. Unplug the cable and plug it in again.", "ready": "The phone is ready to scan.", "many": "Several phones are connected — choose one.", "adb_missing": "Point to adb.exe in the settings." },
     "check": { "label": "Connection status", "cable": "USB cable", "auth": "Permission on the phone", "model": "Model read" },
+    "devices": { "one": "Phones ({count}) — pick the one you work with", "few": "Phones ({count}) — pick the one you work with", "many": "Phones ({count}) — pick the one you work with", "other": "Phones ({count}) — pick the one you work with" },
+    "selected": "selected", "mirror_on": "screen view on", "pick_first": "Pick a phone from the list to use screen view, take a screenshot or start a scan.", "tools_for": "{name} {id}",
     "phone_dialog": "Allow USB debugging?",
     "phone_allow": "Allow",
     "guide_title": "How to turn on USB debugging",
@@ -135,7 +137,7 @@
   },
   "scan": { "title": "Scanning the phone", "sub": "This takes a few seconds. Keep the cable connected.", "steps": "Scan stages", "stage": { "identify": "Identifying the phone…", "packages": "Reading the app list…", "collectors": "Collecting app behavior data…", "score": "Rating the apps…", "apk": "Analyzing APK files…" } },
   "phone": {
-    "subject": "Device", "serial": "S/N", "patch": "Patch"
+    "subject": "Device", "serial": "S/N", "patch": "Patch", "copy_imei": "Copy IMEI", "imei_copied": "IMEI copied"
   },
   "diag": { "title": "Find the ad source", "back": "Back" },
   "who": {
@@ -264,6 +266,8 @@
       "scan": "After a scan: phone manufacturer, model and Android version, number of apps per rating, scan time, APK analysis result.",
       "repair": "After a repair: how many apps were silenced, disabled and removed, how many the program flagged, how many failed and the error codes.",
       "undo": "After an undo: how many apps were restored and how many days after the repair.",
+      "transfer_backup": "After copying an old phone's data: phone manufacturer, model and Android version, outcome, duration, size in MB, number of copied and failed files and apps, which kinds of data were selected — no folder, file or app names.",
+      "transfer_restore": "After uploading a copy to a new phone: the new phone's manufacturer, model and Android version, outcome, duration, size in MB, numbers of files uploaded, already present, saved alongside, refused by Android, failed, skipped and missing from the copy, number of skipped APK files (harmful and suspicious), number of parallel transfers, how files were checked, whether the gallery was refreshed, which kinds of files were selected — no folder, file or app names.",
       "packages": "With the second consent: package names of apps the program flagged or you selected, with the rating and your decision.",
       "never": "Never: serial number, IMEI, customer name, order number, shop details, screenshots, names of apps rated safe and left untouched."
     },
@@ -287,9 +291,10 @@
   },
   "history": {
     "manual": "by hand",
-    "title": "Order history", "phone": "Phone", "empty": "No orders for this phone.", "none": "No saved orders.",
+    "title": "Order history", "phone": "Phone",
+    "tabs": "History view", "tab_orders": "Repairs", "tab_copies": "Data copies ({n})", "empty": "No orders for this phone.", "none": "No saved orders.",
     "restore": "Restore", "undo_all": "Undo the whole order", "resume": "Finish",
-    "delete": "Delete order", "delete_title": "Delete order {number}?", "delete_text": "Its steps, screenshots, report and APK copies will be removed. Changes on the phone can no longer be undone in AdMeNot.", "delete_confirm": "Delete",
+    "delete": "Delete order", "delete_title": "Delete order {number}?", "delete_text": "Its steps, screenshots, report and APK copies will be removed. Changes on the phone can no longer be undone in AdMeNot.", "delete_pdf_kept": "The PDF report in {dir} stays — delete it yourself if needed.", "delete_confirm": "Delete",
     "admin_note": "Undo does not restore device admin rights.", "undo_errors": "Not everything could be undone:",
     "banner": "The order from {when} was not finished",
     "banner_detail": "{name} — {done} of {total} steps done.",
@@ -355,7 +360,7 @@
     "appearance": "Appearance", "theme": "Theme", "theme_system": "System", "theme_light": "Light", "theme_dark": "Dark", "paths": "Programs and folders",
     "title": "Settings", "lang": "Language", "mode": "Default mode", "mode_simple": "Simple", "mode_expert": "Expert",
     "adb": "Path to adb.exe", "adb_hint": "Empty = adb bundled with the program (or adb from PATH without it)", "check": "Check", "adb_ok": "Works: {version}", "adb_fail": "Does not work: {message}",
-    "backups": "APK backup folder", "backups_hint": "Empty = default folder in %LOCALAPPDATA%\\AdMeNot", "choose": "Choose…",
+    "backups": "APK backup folder", "backups_hint": "Empty = default folder in %LOCALAPPDATA%\\AdMeNot", "report_pdf": "PDF report folder", "report_pdf_hint": "Empty = the program folder. A chosen folder gets only the PDF, which stays when the order is deleted; the working HTML stays in the program.", "report_pdf_bad": "Enter a full folder path (e.g. D:\\Reports), other than the program folder.", "choose": "Choose…",
     "select_title": "Choosing apps",
     "select_level": "Action when an app is selected",
     "select_level_hint": "Applies to apps the program proposes nothing for (e.g. “Review”). Manufacturer apps are not removed by default — they get “Disable”.",
@@ -471,7 +476,436 @@
     "pdf_no_browser": "Microsoft Edge, which creates the PDF, was not found. Opened the HTML report — print it to PDF: {html}",
     "pdf_timeout": "Creating the PDF took too long. Opened the HTML report: {html}",
     "pdf_failed": "Could not create the PDF. Opened the HTML report: {html}",
-    "pdf_locked": "File {pdf} is open in another program — close it and try again. Opened the HTML report: {html}"
+    "pdf_locked": "File {pdf} is open in another program — close it and try again. Opened the HTML report: {html}",
+    "pdf_folder": "Can't save to the folder {dir} — check the PDF report folder in Settings. Opened the HTML report: {html}"
+  },
+  "transfer": {
+    "stage": {
+      "old_phone": "Old phone",
+      "copy": "Copy",
+      "new_phone": "New phone",
+      "upload": "Upload",
+      "report": "Report"
+    },
+    "start": "Copy data",
+    "mode": "data transfer",
+    "reading": "Checking what is on the phone…",
+    "reading_sub": "Counting files, messages and apps. Nothing is changed on this phone.",
+    "title": "What should be copied from the old phone?",
+    "sub": "The selected data goes to this computer, then to the new phone. Nothing is changed on this phone.",
+    "group": {
+      "phone": "Phone",
+      "files": "Files",
+      "apps": "Apps"
+    },
+    "row": {
+      "contacts": "Contacts",
+      "contacts_note": "The new phone opens an import — you pick the Google account.",
+      "sms": "SMS and MMS",
+      "sms_note": "Including MMS attachments. RCS chats (“chat” in Google Messages) can't be copied over USB.",
+      "calls": "Call history",
+      "media": "Photos and videos",
+      "media_note": "Camera, screenshots, Pictures, Movies",
+      "downloads": "Downloads and documents",
+      "downloads_note": "Download, Documents",
+      "whatsapp": "WhatsApp",
+      "whatsapp_note": "chats and media",
+      "others": "Other folders",
+      "root": "Files in the main folder",
+      "apps": "Apps",
+      "apps_note": "Only the apps, without their data and sign-ins."
+    },
+    "export": {
+      "title_denied": "The phone did not allow reading {what}.",
+      "title_denied_file": "The phone did not allow reading {what} — an export file is used.",
+      "title_failed": "Could not read {what}.",
+      "xiaomi": "Xiaomi allows access to this data only with “USB debugging (Security settings)” in Developer options, which requires a Mi account.",
+      "howto": "Without it, export {steps}, save the file in the phone’s storage, e.g. in Downloads or a new folder, and click “Check again”.",
+      "howto_plain": "Export {steps}, save the file in the phone’s storage, e.g. in Downloads or a new folder, and click “Check again”.",
+      "steps": {
+        "contacts": "the contacts to a .vcf file in the Contacts app (Import/export → Export)",
+        "sms": "the messages to a file with an app such as SMS Backup & Restore",
+        "calls": "the call history to a file with an app such as SMS Backup & Restore"
+      },
+      "files": "Export files on the phone",
+      "newest": "newest",
+      "howto_toggle": "No current file? How to make one",
+      "from_file": "from an export file",
+      "count": {
+        "one": "{count} from an export file",
+        "few": "{count} from an export file",
+        "many": "{count} from an export file",
+        "other": "{count} from an export file"
+      },
+      "what": {
+        "contacts": "contacts",
+        "sms": "messages",
+        "calls": "call history",
+        "and": " and ",
+        "sep": ", "
+      },
+      "items": {
+        "contacts": {
+          "one": "{count} contact",
+          "few": "{count} contacts",
+          "many": "{count} contacts",
+          "other": "{count} contacts"
+        },
+        "sms": {
+          "one": "{count} message",
+          "few": "{count} messages",
+          "many": "{count} messages",
+          "other": "{count} messages"
+        },
+        "calls": {
+          "one": "{count} call",
+          "few": "{count} calls",
+          "many": "{count} calls",
+          "other": "{count} calls"
+        }
+      }
+    },
+    "unavailable": "unavailable",
+    "unreadable": "The phone did not allow reading this data.",
+    "xiaomi_hint": "On Xiaomi, Redmi and POCO phones, turn on “USB debugging (Security settings)” in Developer options, then choose “Copy data” again. If the copy is already done, select only the missing data, e.g. SMS and contacts — the rest does not need to be copied again.",
+    "unreadable_files": {
+      "one": "{count} file or folder could not be read — it will not be in the copy",
+      "few": "{count} files or folders could not be read — they will not be in the copy",
+      "many": "{count} files or folders could not be read — they will not be in the copy",
+      "other": "{count} files or folders could not be read — they will not be in the copy"
+    },
+    "unreadable_files_text": "The phone did not allow reading them (e.g. a damaged name or no access). The rest of the data is copied as usual.",
+    "whatsapp_old_title": "Chat backup from {when} — older than an hour",
+    "whatsapp_none_title": "There is no chat backup on the phone",
+    "whatsapp_howto": "On the phone: WhatsApp → Settings → Chats → Chat backup → Back up",
+    "recheck": "Check again",
+    "apps_copy": "{count} to copy",
+    "apps_skipped": {
+      "one": "{count} skipped: harmful",
+      "few": "{count} skipped: harmful",
+      "many": "{count} skipped: harmful",
+      "other": "{count} skipped: harmful"
+    },
+    "apps_suspicious": {
+      "one": "{count} suspicious — unticked",
+      "few": "{count} suspicious — unticked",
+      "many": "{count} suspicious — unticked",
+      "other": "{count} suspicious — unticked"
+    },
+    "suspicious": "suspicious",
+    "show_list": "Show list",
+    "hide_list": "Hide list",
+    "files": {
+      "one": "{count} file",
+      "few": "{count} files",
+      "many": "{count} files",
+      "other": "{count} files"
+    },
+    "messages": {
+      "one": "{count} message",
+      "few": "{count} messages",
+      "many": "{count} messages",
+      "other": "{count} messages"
+    },
+    "folders": {
+      "one": "{count} folder",
+      "few": "{count} folders",
+      "many": "{count} folders",
+      "other": "{count} folders"
+    },
+    "categories": {
+      "one": "{count} category",
+      "few": "{count} categories",
+      "many": "{count} categories",
+      "other": "{count} categories"
+    },
+    "panel": "Copy on this computer",
+    "size": "Size",
+    "eta": "Estimated time",
+    "eta_value": "about {min} min",
+    "free": "Free disk space",
+    "no_space": "Not enough disk space on this computer for this copy.",
+    "privacy": "The copy contains the customer's private data. It is deleted automatically after 7 days — change that in History.",
+    "begin": "Start copy",
+    "resume_title": "Resume the interrupted copy from {when}",
+    "resume_text": "Files already copied stay — the program finishes the rest.",
+    "resume": "Resume",
+    "copying": "Copying data from the old phone",
+    "copying_sub": "Keep the phone connected. If the cable disconnects, the copy waits and then continues.",
+    "phase": {
+      "telephony": "Contacts, messages and calls",
+      "files": "Files",
+      "apps": "Apps",
+      "verify": "Checking the copy"
+    },
+    "stage_label": "Stage: {stage}",
+    "progress_label": "Copy progress",
+    "progress_files": {
+      "one": "{done} of {count} file",
+      "few": "{done} of {count} files",
+      "many": "{done} of {count} files",
+      "other": "{done} of {count} files"
+    },
+    "progress_apps": {
+      "one": "{done} of {count} app",
+      "few": "{done} of {count} apps",
+      "many": "{done} of {count} apps",
+      "other": "{done} of {count} apps"
+    },
+    "progress_size": "{done} of {total}",
+    "starting": "Preparing the copy…",
+    "waiting": "Phone disconnected — reconnect it and the copy will continue",
+    "stop": "Stop",
+    "stopping": "Stopping…",
+    "done_heading": "Copy of the old phone",
+    "done_ok": "Copy ready and verified — you can disconnect the old phone",
+    "done_warn": "Copy ready, but not everything could be copied",
+    "done_warn_text": "The data marked below is not in the copy.",
+    "done_stopped": "Copy stopped",
+    "done_stopped_text": "Copied files stay on this computer. To finish, connect this phone and choose “Copy data”.",
+    "sum": {
+      "contacts": "Contacts",
+      "sms": "SMS",
+      "mms": "MMS",
+      "calls": "Calls",
+      "files": "Files",
+      "apps": "Apps",
+      "size": "Size",
+      "failed": "failed: {count}",
+      "tel_failed": "failed",
+      "addresses_missing": "without addresses: {count}",
+      "attachments_missing": "without attachments: {count}",
+      "export_changed": "the export file changed since the scan — scan again",
+      "export_invalid": "the export file is damaged"
+    },
+    "expires": {
+      "one": "The copy is deleted from this computer in {count} day — change that in History.",
+      "few": "The copy is deleted from this computer in {count} days — change that in History.",
+      "many": "The copy is deleted from this computer in {count} days — change that in History.",
+      "other": "The copy is deleted from this computer in {count} days — change that in History."
+    },
+    "finish": "Finish",
+    "copies_title": "Data copies on this computer",
+    "copies_sub": "From all phones. Each copy is deleted after 7 days unless you extend it.",
+    "note": { "label": "Technician's note", "add": "Add a note", "edit": "Edit", "placeholder": "E.g. what the customer needs, what to check when restoring…" },
+    "contents": {
+      "contacts": "Contacts", "sms": "SMS", "mms": "MMS", "calls": "Calls", "files": "Files",
+      "files_photos": "Photos", "files_videos": "Videos", "files_downloads": "Downloads",
+      "files_whatsapp": "WhatsApp", "files_others": "Other folders", "apps": "Apps"
+    },
+    "days_left": {
+      "one": "{count} day left",
+      "few": "{count} days left",
+      "many": "{count} days left",
+      "other": "{count} days left"
+    },
+    "extend": "Extend",
+    "delete": "Delete now",
+    "delete_title": "Delete the copy {name}?",
+    "delete_text": "The customer's data in this copy is removed from this computer. This can't be undone.",
+    "delete_confirm": "Delete",
+    "status": {
+      "in_progress": "unfinished",
+      "incomplete": "incomplete",
+      "complete": "complete"
+    },
+    "restore": {
+      "offer_title": "Upload the copy of {phone} ({details})?",
+      "offer_text": "Files from the copy go to this phone. Nothing on it is overwritten.",
+      "upload": "Upload",
+      "other_copy": "Another copy",
+      "pick": "Upload a copy",
+      "resume_title": "Resume the interrupted upload",
+      "resume_text": "Copy of {phone} ({details}). Uploaded files stay — the program finishes the rest.",
+      "resume": "Resume",
+      "to_phone": "Upload to the connected phone",
+      "uploaded_to": "uploaded to: {list}",
+      "interrupted_on": "upload interrupted: {list}",
+      "planning": "Checking the new phone…",
+      "planning_sub": "Reading the free space and which files are already there. Nothing is uploaded yet.",
+      "title": "What to upload to the new phone?",
+      "sub": "Copy of {phone} ({details}). Nothing is overwritten — a different file with the same name is saved beside it as “(z kopii)”.",
+      "same_title": "This is the phone the copy was made from",
+      "same_text": "The copy is less than 24 hours old, so these files are most likely already on this phone. Upload anyway?",
+      "same_no": "No",
+      "same_yes": "Yes, upload",
+      "incomplete_title": "The copy is incomplete",
+      "incomplete_text": "Missing from the copy: {list}. What is in it will be uploaded.",
+      "incomplete_unknown": "Some data didn't make it into the copy. What is in it will be uploaded.",
+      "incomplete_files": "failed files: {count}",
+      "incomplete_apps": "failed apps: {count}",
+      "incomplete_unreadable": "unreadable files: {count}",
+      "missing": {
+        "one": "{count} file of the copy is no longer on this computer — it won't be uploaded",
+        "few": "{count} files of the copy are no longer on this computer — they won't be uploaded",
+        "many": "{count} files of the copy are no longer on this computer — they won't be uploaded",
+        "other": "{count} files of the copy are no longer on this computer — they won't be uploaded"
+      },
+      "missing_text": "Something like an antivirus may have removed them. The rest uploads normally.",
+      "resumable": "The interrupted upload will be finished — files already uploaded stay on the phone.",
+      "group": {
+        "photos": "Photos",
+        "videos": "Videos",
+        "downloads": "Downloads and documents",
+        "whatsapp": "WhatsApp",
+        "others": "Other folders"
+      },
+      "note": {
+        "photos": "Camera, screenshots, Pictures",
+        "videos": "Camera videos, Movies",
+        "downloads": "Download, Documents",
+        "whatsapp": "WhatsApp files — chats are restored in the app"
+      },
+      "exists": "already on the phone: {count}",
+      "rename": "saved beside: {count}",
+      "section_files": "Files",
+      "section_apks": "APK files",
+      "apks_note": "App installers from the copy, assessed on this computer. Harmful ones are never uploaded.",
+      "apk": {
+        "clean": "checked",
+        "suspicious_off": "suspicious — unticked",
+        "suspicious_on": "suspicious — ticked",
+        "malicious": "skipped as harmful",
+        "unknown": "can't be assessed"
+      },
+      "later_title": "Later in the program",
+      "later": {
+        "apps": "Apps",
+        "whatsapp": "Restoring WhatsApp chats"
+      },
+      "section_tel": "Contacts and messages",
+      "tel": {
+        "contacts": "Contacts",
+        "sms": "SMS and MMS",
+        "calls": "Call history",
+        "to_write": "to upload: {count}",
+        "synced": {
+          "one": "{count} contact will come from the {account} account after sync",
+          "few": "{count} contacts will come from the {account} account after sync",
+          "many": "{count} contacts will come from the {account} account after sync",
+          "other": "{count} contacts will come from the {account} account after sync"
+        },
+        "messenger": {
+          "one": "skipped {count} contact from messaging apps",
+          "few": "skipped {count} contacts from messaging apps",
+          "many": "skipped {count} contacts from messaging apps",
+          "other": "skipped {count} contacts from messaging apps"
+        },
+        "duplicates": "The phone already has contacts — duplicates are possible",
+        "done_ok": "Contacts and messages uploaded",
+        "done_warn": "Contacts and messages uploaded, but not everything worked",
+        "done_warn_text": "Details in the table below.",
+        "error_title": "Could not upload contacts and messages",
+        "col": {
+          "kind": "Category",
+          "written": "Uploaded",
+          "existed": "Already there",
+          "skipped": "Skipped",
+          "failed": "Errors",
+          "manual": "To import",
+          "path": "Method"
+        },
+        "kind": {
+          "contacts": "Contacts",
+          "sms": "SMS",
+          "mms": "MMS",
+          "calls": "Calls"
+        },
+        "path": {
+          "app_process": "directly",
+          "companion": "via the helper app",
+          "file": "file to import",
+          "none": "—"
+        },
+        "visible": "check in the Messages app",
+        "todo_title": "To do on the phone",
+        "todo_file": "install SMS Backup & Restore, tap Restore and choose the file {name} from Downloads",
+        "todo_contacts": "open Contacts → Import and pick {name} from Downloads"
+      },
+      "stages_label": "Upload stages",
+      "stage": {
+        "files": "Files",
+        "contacts": "Contacts",
+        "messages": "Messages",
+        "calls": "Calls",
+        "safety": "Backing up the new phone"
+      },
+      "tel_progress": "{done} of {total}",
+      "tap": {
+        "grant": "On the phone: confirm AdMeNot as the SMS app for the upload",
+        "grant_text": "Without it, messages go to a file for manual import.",
+        "skip": "Skip (leave a file to import)",
+        "restore": "On the phone: choose {app} as the default SMS app",
+        "restore_text": "The phone must go back to its previous SMS app — this step cannot be skipped."
+      },
+      "sms_app": {
+        "google": "Google Messages",
+        "samsung": "Samsung Messages",
+        "mms": "Messages",
+        "aosp": "Messages",
+        "previous": "the previous SMS app"
+      },
+      "cleanup": {
+        "running": "Restoring the phone's settings after an interrupted upload…",
+        "running_text": "Scanning and data transfer will be available when this finishes.",
+        "failed": "The phone did not return to its settings",
+        "failed_text": "On the phone open Settings → Apps → Default apps → SMS app and choose {app}. Then uninstall AdMeNot Helper (Settings → Apps)."
+      },
+      "next_version": "in a later version",
+      "panel": "Space on the new phone",
+      "space_label": "Used space and files to upload",
+      "to_upload": "To upload",
+      "free": "Free",
+      "reserve": "Reserve left free",
+      "left": "{size} will be left free",
+      "no_space": "{size} short on the new phone — untick some of the data",
+      "begin": "Upload",
+      "uploading": "Uploading files to the new phone",
+      "uploading_sub": "Don't disconnect the phone. If the cable comes loose, the upload waits and then continues.",
+      "phase": {
+        "plan": "Preparing",
+        "files": "Files",
+        "scan": "Refreshing the gallery"
+      },
+      "progress_label": "Upload progress",
+      "starting": "Preparing the upload…",
+      "waiting": "Phone disconnected — reconnect it and the upload will continue",
+      "done_heading": "Upload to the new phone",
+      "done_ok": "Files uploaded",
+      "done_warn": "Files uploaded, but not everything worked",
+      "done_warn_text": "Details below. Files that couldn't be uploaded stay in the copy on this computer.",
+      "done_stopped": "Upload stopped",
+      "done_stopped_text": "Uploaded files stay on the phone. To finish, connect this phone and choose “Resume” next to the copy.",
+      "restart": "Restart the phone so the gallery sees the files",
+      "restart_text": "This Android version doesn't refresh the gallery by itself. The files are already on the phone.",
+      "scan_failed": "Files uploaded, but the gallery may not see them until the phone restarts",
+      "scan_failed_text": "The phone didn't refresh its gallery. The files are there — if the gallery doesn't show them, restart the phone.",
+      "sum": {
+        "done": "Uploaded",
+        "exists": "Already on the phone",
+        "size": "Size",
+        "checked": "Check",
+        "checked_size": "size checked",
+        "checked_hash": "checksums verified",
+        "renamed": "saved beside as “(z kopii)”: {count}",
+        "denied": "Android refused to save: {count}",
+        "failed": "failed to upload: {count}",
+        "missing": "missing from the copy on this computer: {count}",
+        "unselected": "unticked by the technician: {count}",
+        "suspicious": "suspicious APK files skipped: {count}"
+      },
+      "apk_skipped": {
+        "one": "skipped {count} file assessed as harmful",
+        "few": "skipped {count} files assessed as harmful",
+        "many": "skipped {count} files assessed as harmful",
+        "other": "skipped {count} files assessed as harmful"
+      },
+      "error": {
+        "transfer_wrong_device": "A different phone is connected than the one being uploaded to. Connect the right phone and choose “Upload” again — uploaded files stay.",
+        "transfer_too_many_disconnects": "The phone disconnected too often. Check the cable and choose “Upload” again — uploaded files stay.",
+        "transfer_failed": "The upload failed. Try again — files already uploaded stay on the phone."
+      }
+    }
   },
   "error": {
     "retired": "This version of AdMeNot is withdrawn — changes to phones are blocked until you update.",
@@ -504,6 +938,16 @@
     "unknown_crash": "This report no longer exists.",
     "shot_limit": "You can choose at most 8 screenshots for the report.",
     "device_busy": "Another AdMeNot window or the CLI is running an order on this phone. Wait until it finishes.",
-    "data_too_new": "The program data comes from a newer version of AdMeNot — update the program."
+    "data_too_new": "The program data comes from a newer version of AdMeNot — update the program.",
+    "transfer_no_inventory": "The phone from the copy screen is no longer connected. Connect it and choose “Copy data” again.",
+    "transfer_disk_full": "Not enough disk space on this computer. Free up space and start the copy again — files already copied stay.",
+    "transfer_wrong_device": "A different phone is connected than the one being copied. Connect the right phone and start the copy again.",
+    "transfer_too_many_disconnects": "The phone disconnected too often. Check the cable and start the copy again — files already copied stay.",
+    "transfer_failed": "The copy failed. Files already copied stay — start the copy again.",
+    "transfer_in_use": "A file of this copy is open in another program (e.g. File Explorer or a photo viewer). Close it and try again.",
+    "transfer_phone_full": "The new phone ran out of space. Free up space or untick some of the data and choose “Upload” — uploaded files stay.",
+    "transfer_copy_missing": "This copy is no longer on this computer (it was deleted or moved).",
+    "transfer_no_plan": "The phone from the upload screen is no longer connected. Connect it and choose the copy again."
+
   }
 }

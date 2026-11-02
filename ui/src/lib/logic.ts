@@ -1,7 +1,9 @@
 import { CATEGORY_ORDER } from './categories';
-import type { AppView, Category, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, UndoSite, UpdateView, UserWait, Verdict } from './types';
+import type { AppView, BackupResultView, Category, CopyView, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferProgress, TransferSelection, InventoryView, ExportFileView, ExportKind, StoredSelection, RestorePlanView, RestoreResultView, TelKind, TelPlanView, TelResultView, UndoSite, UploadChoiceView, UploadGroup, UpdateView, UserWait, Verdict } from './types';
 
-export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done';
+export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done'
+  | 'transfer_choose' | 'transfer_backup' | 'transfer_done'
+  | 'transfer_restore_plan' | 'transfer_restore' | 'transfer_restored';
 export type StageState = 'done' | 'now' | 'todo';
 
 export function defaultSelection(apps: AppView[]): Record<string, Level> {
@@ -101,6 +103,8 @@ export function stageStates(phase: Phase, scanStage: string | null, reported = f
       return ['done', 'done', 'done', 'now', 'todo'];
     case 'done':
       return ['done', 'done', 'done', 'done', reported ? 'done' : 'now'];
+    default: // przenoszenie danych ma własne etapy (transferStages)
+      return ['now', 'todo', 'todo', 'todo', 'todo'];
   }
 }
 
@@ -543,4 +547,290 @@ export function offeredFixes(checks: DeviceCheck[]): string[] {
 /** Kontrole do pokazania w sekcji: nieodczytane (`unrecognized`) idą do linii uwag, nie do sekcji. */
 export function shownChecks(scan: ScanView | null): DeviceCheck[] {
   return (scan?.device_checks ?? []).filter((c) => c.state !== 'unrecognized');
+}
+
+// --- przenoszenie danych ---------------------------------------------------------------------
+
+export const TRANSFER_CATEGORIES: readonly TransferCategory[] = ['media', 'downloads', 'whatsapp'];
+const TRANSFER_RATE = 25 * 1024 ** 2; // B/s — zgrubnie, kopia przez USB 2.0 / adb pull
+const readable = (n: number | null): boolean => n !== null && n > 0;
+
+export const EXPORT_KINDS: readonly ExportKind[] = ['contacts', 'sms', 'calls'];
+
+/** Pliki eksportu rodzaju, najnowsze pierwsze — tylko gdy telefon nie dał odczytać tej kategorii. */
+export function exportFiles(inv: InventoryView, kind: ExportKind): ExportFileView[] {
+  return inv[kind] === null ? inv.exports?.[kind] ?? [] : [];
+}
+
+type ExportChoice = Partial<Record<ExportKind, string>>;
+
+/** Domyślny plik eksportu: najnowszy z każdego rodzaju. */
+export function exportDefaults(inv: InventoryView): ExportChoice {
+  const out: ExportChoice = {};
+  for (const k of EXPORT_KINDS) {
+    const first = exportFiles(inv, k)[0];
+    if (first) out[k] = first.remote;
+  }
+  return out;
+}
+
+/** Plik po ponownym skanie: wybór serwisanta zostaje tylko, gdy był inny niż najnowszy i nadal jest na liście;
+ *  w przeciwnym razie najnowszy (np. świeżo wyeksportowany). */
+export function keptExport(prev: ExportChoice, prevInv: InventoryView, inv: InventoryView): ExportChoice {
+  const out: ExportChoice = {};
+  for (const k of EXPORT_KINDS) {
+    const files = exportFiles(inv, k);
+    if (!files.length) continue;
+    const p = prev[k];
+    const kept = p !== undefined && p !== exportFiles(prevInv, k)[0]?.remote && files.some((f) => f.remote === p);
+    out[k] = kept ? p : files[0].remote;
+  }
+  return out;
+}
+
+/** Wszystko, co telefon dał odczytać, poza innymi folderami i aplikacjami odznaczonymi przez silnik (podejrzane).
+ *  Kategoria, której telefon nie dał odczytać, a jest dla niej plik eksportu — z najnowszego pliku (SMS bez MMS). */
+export function defaultTransferSelection(inv: InventoryView): TransferSelection {
+  const exports = exportDefaults(inv);
+  return {
+    contacts: readable(inv.contacts) || !!exports.contacts, sms: readable(inv.sms) || !!exports.sms,
+    mms: readable(inv.mms) && !exports.sms, calls: readable(inv.calls) || !!exports.calls,
+    categories: TRANSFER_CATEGORIES.filter((c) => (inv.categories[c]?.files ?? 0) > 0),
+    others: [],
+    apps: inv.apps.filter((a) => a.default_on).map((a) => a.package),
+    exports,
+  };
+}
+
+/** Wybór przerwanej kopii (wznowienie dokłada do niej i nadpisuje jej wybór), zawężony do tego, co telefon
+ *  ma teraz; kopia bez zapisanego wyboru — wybór domyślny. Zapisany plik eksportu zostaje, jeśli nadal jest
+ *  na liście, inaczej najnowszy. */
+export function resumeSelection(inv: InventoryView, stored: StoredSelection | undefined): TransferSelection {
+  if (!stored || !Object.keys(stored).length) return defaultTransferSelection(inv);
+  const others = new Set(inv.others.map((o) => o.name));
+  const apps = new Set(inv.apps.map((a) => a.package));
+  const exports: ExportChoice = {};
+  for (const k of EXPORT_KINDS) {
+    const files = exportFiles(inv, k);
+    // także dla odznaczonej kategorii: zaznaczenie wiersza ma od razu plik do skopiowania
+    if (!files.length) continue;
+    const was = stored.exports?.find((e) => e.kind === k)?.remote;
+    exports[k] = files.some((f) => f.remote === was) ? was : files[0].remote;
+  }
+  return {
+    contacts: !!stored.contacts && (readable(inv.contacts) || !!exports.contacts),
+    sms: !!stored.sms && (readable(inv.sms) || !!exports.sms),
+    mms: !!stored.mms && readable(inv.mms) && !exports.sms,
+    calls: !!stored.calls && (readable(inv.calls) || !!exports.calls),
+    categories: TRANSFER_CATEGORIES.filter((c) => (stored.categories ?? []).includes(c) && (inv.categories[c]?.files ?? 0) > 0),
+    others: (stored.others ?? []).filter((o) => others.has(o)),
+    apps: (stored.apps ?? []).filter((p) => apps.has(p)),
+    exports,
+  };
+}
+
+/** Wybór po „Sprawdź ponownie”: zaznaczenia serwisanta zostają (zawężone do tego, co telefon ma teraz), plik
+ *  eksportu według `keptExport`; kategoria, dla której pierwszy plik eksportu właśnie się pojawił, jest zaznaczana. */
+export function rescanSelection(prev: TransferSelection, prevInv: InventoryView, inv: InventoryView): TransferSelection {
+  const exports = keptExport(prev.exports ?? {}, prevInv, inv);
+  const flag = (k: ExportKind): boolean => {
+    const has = readable(inv[k]) || !!exports[k];
+    const had = readable(prevInv[k]) || exportFiles(prevInv, k).length > 0;
+    return has && (had ? prev[k] : true);
+  };
+  const narrowed = resumeSelection(inv, { ...prev, exports: undefined });
+  return { ...narrowed, contacts: flag('contacts'), sms: flag('sms'), mms: prev.mms && readable(inv.mms) && !exports.sms,
+    calls: flag('calls'), exports };
+}
+
+/** Xiaomi, Redmi i POCO ukrywają odczyt SMS-ów i kontaktów za osobnym przełącznikiem w opcjach programisty. */
+export function isXiaomi(device: { manufacturer?: string; brand?: string } | null | undefined): boolean {
+  return /xiaomi|redmi|poco/i.test(`${device?.manufacturer ?? ''} ${device?.brand ?? ''}`);
+}
+
+/** MMS na dysku: załączniki jako pliki + te same dane w base64 w mms.xml (jak `MMS_FACTOR` w silniku). */
+export const MMS_FACTOR = 2.4;
+
+/** Rozmiar zaznaczonych danych, liczba zaznaczonych wierszy ekranu (SMS i MMS to jeden) i czas w minutach.
+ *  Aplikacje liczą się tylko z rozmiarem z inwentarza — dziś go nie ma (`bytes: null`), więc ich nie wliczamy. */
+export function transferTotals(inv: InventoryView, sel: TransferSelection): { bytes: number; categories: number; etaMin: number } {
+  const others = new Set(sel.others);
+  const apps = new Set(sel.apps);
+  const bytes = (sel.mms ? Math.round(inv.mms_bytes * MMS_FACTOR) : 0)
+    + sel.categories.reduce((n, c) => n + (inv.categories[c]?.bytes ?? 0), 0)
+    + inv.others.filter((o) => others.has(o.name)).reduce((n, o) => n + o.bytes, 0)
+    + inv.apps.filter((a) => apps.has(a.package)).reduce((n, a) => n + (a.bytes ?? 0), 0);
+  const categories = [sel.contacts, sel.sms || sel.mms, sel.calls].filter(Boolean).length + sel.categories.length
+    + (sel.others.length ? 1 : 0) + (sel.apps.length ? 1 : 0);
+  return { bytes, categories, etaMin: Math.max(1, Math.round(bytes / TRANSFER_RATE / 60)) };
+}
+
+/** Szacowany rozmiar kopii jednej aplikacji (base + splity) — inwentarz nie zna rozmiarów aplikacji, a bez nich
+ *  pasek dochodzi do 100% na plikach, choć APK jeszcze się kopiują. Próba 2026-10-25: 35 aplikacji, 3,3 GB. */
+export const APK_ESTIMATE = 100 * 1024 ** 2;
+
+/** Postęp kopii 0–1: bajty plików plus aplikacje po `APK_ESTIMATE`; bez bajtów — liczba plików i aplikacji. */
+export function transferProgress(p: TransferProgress | null): number {
+  if (!p) return 0;
+  const doneApps = p.done_apps ?? 0;
+  const totalApps = p.total_apps ?? 0;
+  if (p.total_bytes > 0) {
+    return (p.done_bytes + doneApps * APK_ESTIMATE) / (p.total_bytes + totalApps * APK_ESTIMATE);
+  }
+  const total = p.total_files + totalApps;
+  return total > 0 ? (p.done_files + doneApps) / total : 0;
+}
+
+/** Etapy przenoszenia: stary telefon, kopia, nowy telefon, wgrywanie, protokół. */
+export function transferStages(phase: Phase): StageState[] {
+  switch (phase) {
+    case 'transfer_choose':
+    case 'transfer_backup':
+      return ['done', 'now', 'todo', 'todo', 'todo'];
+    case 'transfer_done':
+    case 'transfer_restore_plan':
+      return ['done', 'done', 'now', 'todo', 'todo'];
+    case 'transfer_restore':
+      return ['done', 'done', 'done', 'now', 'todo'];
+    case 'transfer_restored':
+      return ['done', 'done', 'done', 'done', 'todo'];
+    default:
+      return ['now', 'todo', 'todo', 'todo', 'todo'];
+  }
+}
+
+export const isTransferPhase = (phase: Phase): boolean => phase.startsWith('transfer_');
+
+/** Kopia czatów WhatsApp starsza niż godzina (albo jej brak): serwisant powinien zrobić nową na telefonie. */
+export function whatsappStale(iso: string | null, now: Date): boolean {
+  return iso === null || now.getTime() - new Date(iso).getTime() > 3_600_000;
+}
+
+/** Zielone „gotowe i sprawdzone” tylko dla pełnej kopii ze wszystkimi danymi telefonu i bez plików,
+ *  których skan nie odczytał (`unreadable` z `copy.counts`). */
+export function backupOutcome(r: BackupResultView, unreadable = 0): 'ok' | 'warn' | 'stopped' {
+  if (r.status === 'stopped') return 'stopped';
+  if (r.status !== 'complete' || unreadable > 0 || Object.values(r.telephony).some((c) => c.status !== 'ok')) return 'warn';
+  return 'ok';
+}
+
+/** Kopia do wznowienia: najnowsza niedokończona tego egzemplarza (numer seryjny, nie model), jak `find_resumable`
+ *  w mostku. `copies` przychodzą najnowsze pierwsze. */
+export function resumableCopy(copies: CopyView[], serial: string | null): CopyView | null {
+  return (serial && copies.find((c) => c.status === 'in_progress' && c.serial === serial)) || null;
+}
+
+/** Ile miejsca potrzeba jeszcze na kopię: przy wznowieniu tylko reszta (skopiowane już leży na dysku,
+ *  a wolne miejsce zmalało właśnie o nie). Prawdziwą strażą jest sprawdzanie przed każdą paczką w silniku. */
+export function transferNeed(selectedBytes: number, resumable: { bytes: number } | null): number {
+  return Math.max(0, selectedBytes - (resumable?.bytes ?? 0));
+}
+
+// --- przenoszenie danych: wgrywanie kopii na nowy telefon ----------------------------------------
+
+export const UPLOAD_GROUPS: readonly UploadGroup[] = ['photos', 'videos', 'downloads', 'whatsapp'];
+export const otherGroup = (name: string): string => `other:${name}`;
+const finished = (c: CopyView): boolean => c.status === 'complete' || c.status === 'incomplete';
+const newest = (a: CopyView, b: CopyView): number => b.created.localeCompare(a.created);
+
+/** Świeża kopia: młodsza niż 24 h (ta sama heurystyka co ostrzeżenie „ten sam telefon”). Starsze — z Historii. */
+export const OFFER_MAX_AGE_MS = 24 * 3_600_000;
+
+/** Propozycja na ekranie Połącz: najnowsza świeża skończona kopia innego telefonu niż podłączony (pełna przed
+ *  niepełną). Kopia już w całości wgrana na ten telefon nie wraca jako propozycja. */
+export function restoreOffer(copies: CopyView[], serial: string | null, now: Date): CopyView | null {
+  if (!serial) return null;
+  const fresh = (c: CopyView) => now.getTime() - new Date(c.created).getTime() < OFFER_MAX_AGE_MS;
+  const candidates = copies.filter((c) => finished(c) && c.serial !== serial && fresh(c)
+    && !(c.restores ?? []).some((r) => r.serial === serial && r.status === 'complete')).sort(newest);
+  return candidates.find((c) => c.status === 'complete') ?? candidates[0] ?? null;
+}
+
+/** Kopia z przerwanym wgrywaniem na ten telefon (flaga `resumable` z mostu: zostały pliki do wgrania). */
+export function restoreResumable(copies: CopyView[], serial: string | null): CopyView | null {
+  if (!serial) return null;
+  return [...copies].sort(newest).find((c) => (c.restores ?? []).some((r) => r.serial === serial && r.resumable)) ?? null;
+}
+
+/** Wiersze telefonii na ekranie wgrywania, w kolejności wgrywania. */
+export const TEL_KINDS: readonly TelKind[] = ['contacts', 'sms', 'calls'];
+
+/** Ile rekordów wiersza trafi na telefon (`sms` z MMS); null — kategorii nie ma w kopii. */
+export function telWrite(tel: TelPlanView | null, kind: TelKind): number | null {
+  if (!tel) return null;
+  if (kind === 'sms') return tel.sms || tel.mms ? (tel.sms?.write ?? 0) + (tel.mms?.write ?? 0) : null;
+  return tel[kind]?.write ?? null;
+}
+
+/** Wszystkie grupy z plikami i wszystkie inne foldery kopii (każdy był w niej wybrany); podejrzane APK odznaczone;
+ *  każda kategoria telefonii, w której jest co wgrać. */
+export function defaultUploadChoice(plan: RestorePlanView, tel: TelPlanView | null = null): UploadChoiceView {
+  return {
+    groups: [...UPLOAD_GROUPS.filter((g) => (plan.groups[g]?.files ?? 0) > 0),
+      ...plan.others.filter((o) => o.files > 0).map((o) => otherGroup(o.name))],
+    apks_on: [],
+    verify_hash: false,
+    tel: TEL_KINDS.filter((k) => (telWrite(tel, k) ?? 0) > 0),
+  };
+}
+
+/** Wybór serwisanta przeniesiony na nowy plan (np. po braku miejsca): tylko grupy, podejrzane APK i telefonia,
+ *  które nowy plan jeszcze ma. */
+export function keptUploadChoice(plan: RestorePlanView, prev: UploadChoiceView, tel: TelPlanView | null = null): UploadChoiceView {
+  const groups = new Set([...UPLOAD_GROUPS.filter((g) => g in plan.groups), ...plan.others.map((o) => otherGroup(o.name))]);
+  const apks = new Set(plan.apks.filter((a) => a.outcome !== 'malicious' && !a.default_on).map((a) => a.remote));
+  return { groups: prev.groups.filter((g) => groups.has(g)), apks_on: prev.apks_on.filter((a) => apks.has(a)),
+    verify_hash: prev.verify_hash, tel: prev.tel.filter((k) => (telWrite(tel, k) ?? 0) > 0) };
+}
+
+/** Baner przywracania ustawień telefonu (`phone_cleanup`): `failed` — ostatnia próba się nie udała (zostaje
+ *  czerwony także w czasie ponowienia w tle, bez migania na żółto), `running` — trwa pierwsza próba. Wynik
+ *  dotyczy jednego telefonu: przy wybranym innym nie jest pokazywany; trwające sprzątanie — zawsze (do jego
+ *  końca most odmawia każdego zadania). */
+export function cleanupBanner(c: { serial: string | null; running: boolean; ok: boolean | null },
+  selected: string | null): 'running' | 'failed' | null {
+  if (c.ok === false && (c.running || selected === null || selected === c.serial)) return 'failed';
+  return c.running ? 'running' : null;
+}
+
+/** Wynik telefonii: `error`, gdy telefon nie wrócił do ustawień sprzed wgrywania (rola SMS, pomocnik);
+ *  `warn`, gdy coś zostało do ręcznego importu, coś się nie zapisało albo trzeba sprawdzić Wiadomości. */
+export function telOutcome(r: TelResultView): 'ok' | 'warn' | 'error' {
+  if (!r.cleanup.ok) return 'error';
+  const kinds = Object.values(r.kinds);
+  if (r.stopped || r.manual.length > 0 || kinds.some((k) => k.failed > 0 || k.manual > 0 || k.visible_warning)) return 'warn';
+  return 'ok';
+}
+
+/** Znane domyślne aplikacje SMS (pakiet → klucz `transfer.tel.sms_app.*`); inne pokazujemy pakietem. */
+const SMS_APPS: Record<string, string> = {
+  'com.google.android.apps.messaging': 'google', 'com.samsung.android.messaging': 'samsung',
+  'com.android.mms': 'mms', 'com.android.messaging': 'aosp',
+};
+
+export function smsAppKey(pkg: string | null): string | null {
+  return pkg ? SMS_APPS[pkg] ?? null : null;
+}
+
+/** Ta sama reguła co `RestorePlan.need/fits` w silniku. Sumy grup mają już APK według domyślnego wyboru
+ *  (czyste i „nie do oceny”), bez szkodliwych i bez podejrzanych — dokładamy tylko zaznaczone podejrzane
+ *  (`default_on` fałsz, nie szkodliwe), których jeszcze nie ma na telefonie. `missing`: ile brakuje do zapasu. */
+export function uploadNeed(plan: RestorePlanView, choice: UploadChoiceView): { need: number; fits: boolean; missing: number } {
+  const groups = new Set(choice.groups);
+  const on = new Set(choice.apks_on);
+  const base = UPLOAD_GROUPS.filter((g) => groups.has(g)).reduce((n, g) => n + (plan.groups[g]?.bytes ?? 0), 0)
+    + plan.others.filter((o) => groups.has(otherGroup(o.name))).reduce((n, o) => n + o.bytes, 0);
+  const ticked = plan.apks.filter((a) => groups.has(a.group) && a.action !== 'exists' && a.outcome !== 'malicious'
+    && !a.default_on && on.has(a.remote)).reduce((n, a) => n + a.bytes, 0);
+  const need = base + ticked;
+  const missing = Math.max(0, need + plan.reserve - plan.space.free);
+  return { need, fits: missing === 0, missing };
+}
+
+/** Zielone „Pliki wgrane”, gdy wszystkie pliki weszły — także na Androidzie < 10 (`restart`: osobny baner
+ *  z prośbą o restart). `scan`: pliki weszły, tylko galeria się nie odświeżyła (własny tekst, nie ogólna porażka). */
+export function restoreOutcome(r: RestoreResultView): 'ok' | 'scan' | 'warn' | 'stopped' {
+  if (r.status === 'stopped') return 'stopped';
+  if (r.status !== 'complete' || r.files_denied > 0 || r.files_failed > 0 || r.files_missing > 0) return 'warn';
+  return r.media_scan === 'failed' ? 'scan' : 'ok';
 }

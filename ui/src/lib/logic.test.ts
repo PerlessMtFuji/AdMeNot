@@ -1,6 +1,30 @@
 import { describe, expect, test } from 'vitest';
+import fixture from '../../../tests/fixtures/bridge/transfer_restore.json';
+import type { CopyView, InventoryView, RestoreApk, RestorePlanView, RestoreResultView, TelKindResultView, TelPlanView, TelResultView } from './types';
 import {
+  backupOutcome,
+  defaultUploadChoice,
+  keptUploadChoice,
+  restoreOffer,
+  restoreOutcome,
+  restoreResumable,
+  telOutcome,
+  uploadNeed,
   changedVerdicts,
+  defaultTransferSelection,
+  exportDefaults,
+  keptExport,
+  rescanSelection,
+  isXiaomi,
+  APK_ESTIMATE,
+  resumableCopy,
+  transferProgress,
+  resumeSelection,
+  transferNeed,
+  transferStages,
+  transferTotals,
+
+  whatsappStale,
   dayKey,
   groupHistory,
   siteState,
@@ -50,6 +74,8 @@ import {
   manualRows,
   stableEta,
 } from './logic';
+
+const MB = 1024 ** 2;
 import { CHECKS_SAMPLE } from './fakeBridge';
 import type { AppView, Category, Level, PlanApp, PlanView, StepEvent, Finding, ScanView, Settings, UpdateView } from './types';
 
@@ -580,5 +606,327 @@ describe('phone checks', () => {
     const undone = groupHistory([action(1, 'fix', 'channel', 'x'), { ...action(2, 'silence', 'notif', null), status: 'undone' }]);
     expect(undone[0].state).toBe('restored');
     expect(undone[0].canRestore).toBe(false);
+  });
+});
+
+describe('data transfer', () => {
+  const inv = (over: Partial<InventoryView> = {}): InventoryView => ({
+    contacts: 2, sms: 5, mms: 1, mms_bytes: 3000, calls: 4,
+    categories: { media: { files: 2, bytes: 5000 }, downloads: { files: 0, bytes: 0 }, whatsapp: { files: 1, bytes: 800 } },
+    others: [{ name: '', files: 1, bytes: 10 }, { name: 'Music', files: 1, bytes: 400 }],
+    apps: [
+      { package: 'a.ok', label: 'A', verdict: 'safe', default_on: true, bytes: null },
+      { package: 'b.sus', label: 'B', verdict: 'suspicious', default_on: false, bytes: null },
+    ],
+    skipped_apps: [{ package: 'c.bad', label: 'C' }],
+    whatsapp_backup: null, storage: null, free_pc: 10 ** 12, unreadable: 0, denied: [], exports: {}, ...over,
+  });
+
+  test('default selection: everything readable, no other folders, suspicious apps off', () => {
+    expect(defaultTransferSelection(inv())).toEqual({
+      contacts: true, sms: true, mms: true, calls: true, categories: ['media', 'whatsapp'], others: [], apps: ['a.ok'], exports: {},
+    });
+  });
+
+  test('unreadable or empty phone data starts unticked', () => {
+    const sel = defaultTransferSelection(inv({ sms: null, mms: 0, contacts: null }));
+    expect([sel.contacts, sel.sms, sel.mms, sel.calls]).toEqual([false, false, false, true]);
+  });
+
+  test('totals sum the selected bytes and count the ticked rows', () => {
+    const data = inv();
+    const sel = defaultTransferSelection(data);
+    // kontakty, SMS i MMS, połączenia, zdjęcia, WhatsApp, aplikacje; MMS na dysku × 2,4 (jak w silniku)
+    expect(transferTotals(data, sel)).toEqual({ bytes: 3000 * 2.4 + 5000 + 800, categories: 6, etaMin: 1 });
+    const more = { ...sel, mms: false, sms: false, others: ['Music', ''], apps: [] };
+    expect(transferTotals(data, more)).toEqual({ bytes: 5000 + 800 + 410, categories: 5, etaMin: 1 });
+  });
+
+  test('ETA assumes 25 MB/s and never drops below a minute', () => {
+    const big = inv({ categories: { media: { files: 1, bytes: 25 * 1024 ** 2 * 60 * 10 }, downloads: { files: 0, bytes: 0 },
+      whatsapp: { files: 0, bytes: 0 } } });
+    expect(transferTotals(big, defaultTransferSelection(big)).etaMin).toBe(10);
+  });
+
+  test('a resumed copy starts from its stored selection, narrowed to what the phone still has', () => {
+    const data = inv();
+    expect(resumeSelection(data, undefined)).toEqual(defaultTransferSelection(data));
+    expect(resumeSelection(data, {})).toEqual(defaultTransferSelection(data));
+    expect(resumeSelection(data, { contacts: false, sms: true, mms: false, calls: true,
+      categories: ['downloads', 'media'], others: ['Music', 'Gone'], apps: ['b.sus', 'x.removed'] })).toEqual({
+      contacts: false, sms: true, mms: false, calls: true, categories: ['media'], others: ['Music'], apps: ['b.sus'], exports: {} });
+    expect(resumeSelection(inv({ sms: null }), { sms: true }).sms).toBe(false);
+  });
+
+  const file = (remote: string, count: number | null = 3) =>
+    ({ remote, name: remote.split('/').at(-1)!, size: 100, mtime: '2026-10-27T20:41:00', count });
+  const denied = (contacts: string[], sms: string[] = []) => inv({
+    contacts: null, sms: sms.length ? null : 5, mms: sms.length ? null : 1, denied: sms.length ? ['contacts', 'sms'] : ['contacts'],
+    exports: { contacts: contacts.map((r) => file(r)), ...(sms.length ? { sms: sms.map((r) => file(r)) } : {}) },
+  });
+
+  test('export defaults: the newest file of each kind', () => {
+    expect(exportDefaults(inv())).toEqual({});
+    expect(exportDefaults(denied(['/sdcard/new.vcf', '/sdcard/old.vcf'], ['/sdcard/sms.xml'])))
+      .toEqual({ contacts: '/sdcard/new.vcf', sms: '/sdcard/sms.xml' });
+  });
+
+  test('a denied category with an export file starts ticked from the newest file; SMS from a file has no MMS', () => {
+    const sel = defaultTransferSelection(denied(['/sdcard/new.vcf', '/sdcard/old.vcf'], ['/sdcard/sms.xml']));
+    expect([sel.contacts, sel.sms, sel.mms, sel.calls]).toEqual([true, true, false, true]);
+    expect(sel.exports).toEqual({ contacts: '/sdcard/new.vcf', sms: '/sdcard/sms.xml' });
+    expect(defaultTransferSelection(denied([])).contacts).toBe(false);
+  });
+
+  test('after a rescan the newest file wins unless the technician picked an older one that is still there', () => {
+    const before = denied(['/sdcard/a.vcf', '/sdcard/b.vcf']);
+    const newer = denied(['/sdcard/new.vcf', '/sdcard/a.vcf', '/sdcard/b.vcf']);
+    // wybrany był najnowszy — pojawił się nowszy
+    expect(keptExport({ contacts: '/sdcard/a.vcf' }, before, newer)).toEqual({ contacts: '/sdcard/new.vcf' });
+    // wybrany starszy plik nadal jest na liście
+    expect(keptExport({ contacts: '/sdcard/b.vcf' }, before, newer)).toEqual({ contacts: '/sdcard/b.vcf' });
+    // wybrany plik zniknął
+    expect(keptExport({ contacts: '/sdcard/b.vcf' }, before, denied(['/sdcard/new.vcf', '/sdcard/a.vcf'])))
+      .toEqual({ contacts: '/sdcard/new.vcf' });
+    // pierwszy plik po ponownym skanie
+    expect(keptExport({}, denied([]), newer)).toEqual({ contacts: '/sdcard/new.vcf' });
+    expect(keptExport({ contacts: '/sdcard/a.vcf' }, before, denied([]))).toEqual({});
+  });
+
+  test('a rescan keeps the other choices and ticks a category whose first export file just appeared', () => {
+    const before = denied([]);
+    const prev = { ...defaultTransferSelection(before), calls: false, categories: ['media' as const] };
+    const sel = rescanSelection(prev, before, denied(['/sdcard/new.vcf']));
+    expect(sel).toEqual({ ...prev, contacts: true, exports: { contacts: '/sdcard/new.vcf' } });
+    // odznaczony wiersz z plikiem zostaje odznaczony
+    const had = denied(['/sdcard/a.vcf']);
+    const off = { ...defaultTransferSelection(had), contacts: false };
+    expect(rescanSelection(off, had, denied(['/sdcard/new.vcf', '/sdcard/a.vcf'])).contacts).toBe(false);
+  });
+
+  test('a resumed copy reuses its stored export file when it is still offered, else the newest', () => {
+    const data = denied(['/sdcard/new.vcf', '/sdcard/old.vcf']);
+    const stored = (remote: string) => ({ contacts: true, exports: [{ kind: 'contacts' as const, remote, size: 1, mtime: 1 }] });
+    expect(resumeSelection(data, stored('/sdcard/old.vcf')).exports).toEqual({ contacts: '/sdcard/old.vcf' });
+    expect(resumeSelection(data, stored('/sdcard/gone.vcf')).exports).toEqual({ contacts: '/sdcard/new.vcf' });
+    expect(resumeSelection(data, stored('/sdcard/old.vcf')).contacts).toBe(true);
+  });
+
+  test('a resumed copy with an unticked category still has its export file ready for ticking', () => {
+    const data = denied(['/sdcard/new.vcf'], ['/sdcard/sms.xml']);
+    const sel = resumeSelection(data, { contacts: false, sms: false, mms: false, calls: true });
+    expect([sel.contacts, sel.sms]).toEqual([false, false]);
+    expect(sel.exports).toEqual({ contacts: '/sdcard/new.vcf', sms: '/sdcard/sms.xml' });
+  });
+
+  test('copy progress counts apps with an estimated size, so copied files alone do not fill the bar', () => {
+    const p = (done_files: number, done_bytes: number, done_apps: number, total_apps: number) =>
+      ({ stage: 'files', done_files, total_files: 10, done_bytes, total_bytes: 1000 * MB, current: '', done_apps, total_apps }) as const;
+    expect(transferProgress(null)).toBe(0);
+    expect(transferProgress(p(5, 500 * MB, 0, 0))).toBeCloseTo(0.5);
+    expect(transferProgress(p(10, 1000 * MB, 0, 10))).toBeCloseTo(1000 / (1000 + 10 * APK_ESTIMATE / MB));
+    expect(transferProgress(p(10, 1000 * MB, 10, 10))).toBe(1);
+    // same aplikacje, bez plików: liczba aplikacji
+    expect(transferProgress({ ...p(0, 0, 3, 4), total_files: 0, total_bytes: 0 })).toBeCloseTo(0.75);
+    // starszy most bez liczników aplikacji
+    expect(transferProgress({ stage: 'files', done_files: 2, total_files: 4, done_bytes: 0, total_bytes: 0, current: '' } as never))
+      .toBeCloseTo(0.5);
+  });
+
+  test('the copy to resume is the newest unfinished one of this very phone, not just the same model', () => {
+    const copy = (id: string, serial: string, status: 'in_progress' | 'complete' | 'incomplete') =>
+      ({ id, serial, model: 'SM-A137F', status }) as never;
+    const copies = [copy('A/3', 'A', 'complete'), copy('B/2', 'B', 'in_progress'), copy('A/2', 'A', 'in_progress'),
+      copy('A/1', 'A', 'in_progress')];
+    expect(resumableCopy(copies, 'A')?.id).toBe('A/2');
+    expect(resumableCopy(copies, 'C')).toBeNull();
+    expect(resumableCopy(copies, null)).toBeNull();
+    expect(resumableCopy([copy('A/1', 'A', 'incomplete')], 'A')).toBeNull();
+  });
+
+  test('Xiaomi, Redmi and POCO phones are recognised by maker or brand', () => {
+    expect(isXiaomi({ manufacturer: 'Xiaomi' })).toBe(true);
+    expect(isXiaomi({ manufacturer: 'unknown', brand: 'POCO' })).toBe(true);
+    expect(isXiaomi({ manufacturer: 'samsung', brand: 'samsung' })).toBe(false);
+    expect(isXiaomi(null)).toBe(false);
+  });
+
+  test('transfer stages follow the transfer phases', () => {
+    expect(transferStages('transfer_choose')).toEqual(['done', 'now', 'todo', 'todo', 'todo']);
+    expect(transferStages('transfer_backup')).toEqual(['done', 'now', 'todo', 'todo', 'todo']);
+    expect(transferStages('transfer_done')).toEqual(['done', 'done', 'now', 'todo', 'todo']);
+  });
+
+  test('a WhatsApp chat backup older than an hour (or missing) needs a fresh one', () => {
+    const now = new Date('2026-10-25T14:00:00');
+    expect(whatsappStale(null, now)).toBe(true);
+    expect(whatsappStale('2026-10-25T12:30:00', now)).toBe(true);
+    expect(whatsappStale('2026-10-25T13:30:00', now)).toBe(false);
+  });
+
+  test('backup verdict: only a complete copy with all phone data is clean', () => {
+    const r = (status: 'complete' | 'incomplete' | 'stopped', sms: 'ok' | 'unavailable' | 'failed' = 'ok') => ({
+      status, copy_id: 'x', files_done: 1, files_failed: 0, apps_done: 0, apps_failed: 0, bytes: 1, seconds: 1,
+      telephony: { contacts: { status: 'ok' as const, count: 1 }, sms: { status: sms, count: 0 } } });
+    expect(backupOutcome(r('complete'))).toBe('ok');
+    expect(backupOutcome(r('complete', 'unavailable'))).toBe('warn');
+    expect(backupOutcome(r('complete', 'failed'))).toBe('warn');
+    expect(backupOutcome(r('incomplete'))).toBe('warn');
+    expect(backupOutcome(r('stopped'))).toBe('stopped');
+    // pliki, których skan nie odczytał, nie trafiły do kopii — nie zielone
+    expect(backupOutcome(r('complete'), 2)).toBe('warn');
+    expect(backupOutcome(r('stopped'), 2)).toBe('stopped');
+  });
+
+  test('resuming needs space only for what is not copied yet', () => {
+    expect(transferNeed(10_000, null)).toBe(10_000);
+    expect(transferNeed(10_000, { bytes: 7_000 })).toBe(3_000);
+    expect(transferNeed(10_000, { bytes: 12_000 })).toBe(0);
+  });
+});
+
+describe('uploading a copy to the new phone', () => {
+  const FIXTURE = (fixture as { calls: { method: string; events: unknown[][] }[] }).calls;
+  const recorded = FIXTURE.find((c) => c.method === 'restore_plan')!.events
+    .find(([name]) => name === 'transfer:restore_plan')![1] as { plan: RestorePlanView; tel: TelPlanView };
+  const restore = (serial: string, status: string, resumable: boolean) => ({ serial, status, updated: null, resumable });
+  const copy = (id: string, serial: string, status: CopyView['status'], created: string,
+    restores: CopyView['restores'] = []): CopyView => ({
+    id, serial, model: 'M', manufacturer: 'm', client: null, created, expires: created, days_left: 7, status, bytes: 1,
+    counts: {}, restores });
+
+  test('the offer is the newest finished copy of another phone, complete before incomplete', () => {
+    const copies = [
+      copy('NEW/3', 'NEW', 'complete', '2026-10-26T12:00:00'),  // kopia podłączonego telefonu
+      copy('B/2', 'B', 'in_progress', '2026-10-26T11:00:00'),   // niedokończona
+      copy('C/1', 'C', 'incomplete', '2026-10-26T10:00:00'),
+      copy('D/1', 'D', 'complete', '2026-10-25T14:00:00'),
+      copy('A/1', 'A', 'complete', '2026-10-25T15:00:00'),
+    ];
+    const now = new Date('2026-10-26T13:00:00');
+    expect(restoreOffer(copies, 'NEW', now)?.id).toBe('A/1');
+    expect(restoreOffer([copies[2]], 'NEW', now)?.id).toBe('C/1');
+    expect(restoreOffer(copies.slice(0, 2), 'NEW', now)).toBeNull();
+    expect(restoreOffer(copies, null, now)).toBeNull();
+    expect(restoreOffer([], 'NEW', now)).toBeNull();
+  });
+
+  test('only a fresh copy (under 24 h) is offered; older ones stay in History', () => {
+    const one = [copy('A/1', 'A', 'complete', '2026-10-26T12:00:00')];
+    expect(restoreOffer(one, 'NEW', new Date('2026-10-26T13:00:00'))?.id).toBe('A/1');  // 1 h
+    expect(restoreOffer(one, 'NEW', new Date('2026-10-27T13:00:00'))).toBeNull();       // 25 h
+  });
+
+  test('a copy already fully uploaded to this phone is not offered again', () => {
+    const copies = [copy('A/2', 'A', 'complete', '2026-10-26T10:00:00', [restore('NEW', 'complete', false)]),
+      copy('A/1', 'A', 'complete', '2026-10-25T20:00:00')];
+    const now = new Date('2026-10-26T12:00:00');
+    expect(restoreOffer(copies, 'NEW', now)?.id).toBe('A/1');
+    expect(restoreOffer(copies, 'OTHER', now)?.id).toBe('A/2');
+  });
+
+  test('an interrupted upload is resumable only from the per-phone resumable flag', () => {
+    const copies = [
+      copy('A/2', 'A', 'complete', '2026-10-26T10:00:00', [restore('NEW', 'stopped', false)]),  // nic do wgrania
+      copy('A/1', 'A', 'complete', '2026-10-25T10:00:00', [restore('OTHER', 'stopped', true), restore('NEW', 'phone_full', true)]),
+    ];
+    expect(restoreResumable(copies, 'NEW')?.id).toBe('A/1');
+    expect(restoreResumable(copies, 'OTHER')?.id).toBe('A/1');
+    expect(restoreResumable(copies, 'THIRD')).toBeNull();
+    expect(restoreResumable(copies, null)).toBeNull();
+    expect(restoreResumable([copy('X/1', 'X', 'complete', '2026-10-25T10:00:00', undefined)], 'NEW')).toBeNull();
+  });
+
+  test('default choice: every group with files and every other folder, no suspicious APK', () => {
+    const groups = { ...recorded.plan.groups };
+    delete groups.whatsapp;  // grupy bez plików mogą nie przyjść
+    const plan: RestorePlanView = { ...recorded.plan, groups,
+      others: [...recorded.plan.others, { name: '', files: 2, bytes: 5, exists: 0, rename: 0 }] };
+    expect(defaultUploadChoice(plan)).toEqual({ groups: ['photos', 'downloads', 'other:Music', 'other:'], apks_on: [],
+      verify_hash: false, tel: [] });
+  });
+
+  test('default choice ticks every telephony category with something to write; SMS counts MMS too', () => {
+    const tel = recorded.tel;  // kontakty 2, SMS 2, połączenia 1
+    expect(defaultUploadChoice(recorded.plan, tel).tel).toEqual(['contacts', 'sms', 'calls']);
+    const some: TelPlanView = { ...tel, contacts: { ...tel.contacts!, write: 0, existing: 2 }, sms: null,
+      mms: { write: 3, existing: 0 }, calls: null };
+    expect(defaultUploadChoice(recorded.plan, some).tel).toEqual(['sms']);
+    expect(defaultUploadChoice(recorded.plan, null).tel).toEqual([]);
+  });
+
+  test('telephony outcome: error when the phone was not cleaned up, warn for manual, failed or a visible warning', () => {
+    const kind = (over: Partial<TelKindResultView> = {}): TelKindResultView => ({ written: 2, existed: 0, skipped_synced: 0,
+      skipped_messenger: 0, failed: 0, manual: 0, path: 'app_process', visible_warning: false, ...over });
+    const cleanup = { role_ok: true, appop_ok: true, companion_removed: true, helper_removed: true, ok: true };
+    const r = (over: Partial<TelResultView> = {}): TelResultView => ({ kinds: { contacts: kind(), sms: kind() }, safety: {},
+      manual: [], cleanup, synced_accounts: [], seconds: 1, stopped: false, status: 'complete', ...over });
+    expect(telOutcome(r())).toBe('ok');
+    expect(telOutcome(r({ manual: [{ kind: 'sms', name: 'admenot-sms.xml' }] }))).toBe('warn');
+    expect(telOutcome(r({ kinds: { sms: kind({ failed: 1 }) } }))).toBe('warn');
+    expect(telOutcome(r({ kinds: { sms: kind({ visible_warning: true }) } }))).toBe('warn');
+    expect(telOutcome(r({ manual: [{ kind: 'sms', name: 'x.xml' }], cleanup: { ...cleanup, role_ok: false, ok: false } })))
+      .toBe('error');
+  });
+
+  test('a kept choice keeps only groups and suspicious APK files the new plan still has', () => {
+    const plan = recorded.plan;
+    expect(keptUploadChoice(plan, { groups: ['photos', 'other:Music', 'other:Gone', 'videos'],
+      apks_on: ['/sdcard/Download/gra.apk', '/sdcard/Download/szybki-cleaner.apk', '/sdcard/x.apk'], verify_hash: true,
+      tel: ['contacts', 'calls'] }, { ...recorded.tel, calls: null }))
+      .toEqual({ groups: ['photos', 'other:Music', 'videos'], apks_on: ['/sdcard/Download/gra.apk'], verify_hash: true,
+        tel: ['contacts'] });
+  });
+
+  test('upload need mirrors RestorePlan.need: group totals already hold default APKs, suspicious only when ticked', () => {
+    const plan = recorded.plan;  // downloads: 504 B; oba APK (902 podejrzany, 702 szkodliwy) są poza tą sumą
+    const all = defaultUploadChoice(plan);
+    expect(uploadNeed(plan, all)).toEqual({ need: 5000 + 504 + 800 + 400, fits: true, missing: 0 });
+    // podejrzany zaznaczony: +902; szkodliwy nigdy, nawet gdyby przyszedł w apks_on
+    expect(uploadNeed(plan, { ...all, apks_on: ['/sdcard/Download/gra.apk', '/sdcard/Download/szybki-cleaner.apk'] }).need)
+      .toBe(5000 + 504 + 800 + 400 + 902);
+    // podejrzany zaznaczony w odznaczonej grupie nie liczy się
+    expect(uploadNeed(plan, { ...all, groups: ['photos'], apks_on: ['/sdcard/Download/gra.apk'] }).need).toBe(5000);
+    expect(uploadNeed(plan, { groups: [], apks_on: [], verify_hash: false, tel: [] }).need).toBe(0);
+  });
+
+  test('upload need: clean APK bytes are not counted twice, a ticked one already on the phone adds nothing', () => {
+    const apk = (remote: string, outcome: RestoreApk['outcome'], default_on: boolean, action: RestoreApk['action'] = 'push'): RestoreApk =>
+      ({ remote, name: remote, group: 'downloads', bytes: 100, action, outcome, level: 'static', default_on });
+    const plan: RestorePlanView = { groups: { downloads: { files: 3, bytes: 100, exists: 2, rename: 0 } }, others: [],
+      apks: [apk('a.apk', 'clean', true), apk('b.apk', 'suspicious', false, 'exists'), apk('c.apk', 'unknown', true, 'exists')],
+      space: { free: 10_000, total: null }, reserve: 1_000, missing: 0 };
+    expect(uploadNeed(plan, { groups: ['downloads'], apks_on: ['b.apk'], verify_hash: false, tel: [] }).need).toBe(100);
+  });
+
+  test('fits keeps the reserve free and reports what is missing', () => {
+    const plan: RestorePlanView = { groups: { photos: { files: 1, bytes: 9_000, exists: 0, rename: 0 },
+      videos: { files: 1, bytes: 3_000, exists: 0, rename: 0 } }, others: [], apks: [],
+      space: { free: 10_000, total: 20_000 }, reserve: 1_000, missing: 0 };
+    expect(uploadNeed(plan, { groups: ['photos'], apks_on: [], verify_hash: false, tel: [] })).toEqual({ need: 9_000, fits: true, missing: 0 });
+    expect(uploadNeed(plan, { groups: ['photos', 'videos'], apks_on: [], verify_hash: false, tel: [] }))
+      .toEqual({ need: 12_000, fits: false, missing: 3_000 });
+  });
+
+  test('transfer stages for the upload phases', () => {
+    expect(transferStages('transfer_restore_plan')).toEqual(['done', 'done', 'now', 'todo', 'todo']);
+    expect(transferStages('transfer_restore')).toEqual(['done', 'done', 'done', 'now', 'todo']);
+    expect(transferStages('transfer_restored')).toEqual(['done', 'done', 'done', 'done', 'todo']);
+  });
+
+  test('upload outcome: green when every file went in; a failed gallery scan has its own outcome', () => {
+    const r = (over: Partial<RestoreResultView> = {}): RestoreResultView => ({ status: 'complete', target_serial: 'N', files_done: 5,
+      files_exists: 0, files_renamed: 1, files_denied: 0, files_failed: 0, files_unselected: 0, apk_skipped: 1,
+      apk_suspicious_skipped: 0, bytes: 1, seconds: 1, hashed: false, media_scan: 'done', files_missing: 0, ...over });
+    expect(restoreOutcome(r())).toBe('ok');
+    expect(restoreOutcome(r({ files_denied: 2 }))).toBe('warn');
+    expect(restoreOutcome(r({ files_failed: 1 }))).toBe('warn');
+    expect(restoreOutcome(r({ files_missing: 1 }))).toBe('warn');
+    expect(restoreOutcome(r({ media_scan: 'failed' }))).toBe('scan');
+    expect(restoreOutcome(r({ media_scan: 'skipped', files_done: 0 }))).toBe('ok');  // sama telefonia: bez skanu galerii
+    expect(restoreOutcome(r({ media_scan: 'restart' }))).toBe('ok');  // Android < 10: osobny baner o restarcie
+    expect(restoreOutcome(r({ media_scan: 'failed', files_denied: 1 }))).toBe('warn');
+    expect(restoreOutcome(r({ status: 'incomplete' }))).toBe('warn');
+    expect(restoreOutcome(r({ status: 'stopped', media_scan: 'skipped' }))).toBe('stopped');
   });
 });

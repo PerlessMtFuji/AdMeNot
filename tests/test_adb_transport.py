@@ -50,6 +50,17 @@ def test_real_adb_missing_binary(monkeypatch, tmp_path):
     assert exc.value.kind == "adb_missing"
 
 
+def test_real_adb_command_line_too_long_is_not_missing_adb(monkeypatch):
+    """WinError 206 przychodzi jako FileNotFoundError — to nie brak adb, tylko za długie polecenie."""
+    def too_long(cmd, **kw):
+        raise OSError(2, "The filename or extension is too long", None, 206)
+
+    monkeypatch.setattr(transport, "_run_capped", too_long)
+    with pytest.raises(AdbError) as exc:
+        RealAdb(adb_path="adb.exe").shell("stat x")
+    assert exc.value.kind == "command_failed"
+
+
 def test_real_adb_prefers_the_bundled_adb(monkeypatch, tmp_path):
     directory = tmp_path / "assets" / "tools" / "scrcpy"
     directory.mkdir(parents=True)

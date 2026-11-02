@@ -28,6 +28,18 @@ const blindRepair = () => common("repair", {
 });
 const undo = () => common("undo", { device: DEVICE, apps: 1, failed: 0, age_days: 2, packages: null });
 const start = () => common("start", { mode: "simple" });
+const CATEGORIES = { contacts: true, sms: true, mms: false, calls: true, media: true, downloads: false,
+  whatsapp: true, others: false, apps: true };
+const transfer = (extra: Record<string, unknown> = {}) => common("transfer_backup", {
+  device: DEVICE, status: "complete", seconds: 2710, bytes_mb: 38400, files: 5230, files_failed: 0,
+  apps: 12, apps_failed: 0, categories: CATEGORIES, ...extra,
+});
+const GROUPS = { photos: true, videos: true, downloads: false, whatsapp: true, others: false };
+const restore = (extra: Record<string, unknown> = {}) => common("transfer_restore", {
+  device: DEVICE, status: "complete", seconds: 1800, bytes_mb: 31000, files: 5100, exists: 120, renamed: 3,
+  denied: 0, failed: 0, unselected: 40, missing: 0, apk_skipped: 1, apk_suspicious_skipped: 1, streams: 4,
+  hashed: false, media_scan: "done", groups: GROUPS, ...extra,
+});
 
 async function post(events: unknown[], raw?: string): Promise<Response> {
   return exports.default.fetch(new Request(BASE + "/api/v1/telemetry", {
@@ -113,6 +125,100 @@ describe("POST /api/v1/telemetry", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, stored: 4 });
     expect((await rows()).map((r) => r.type)).toEqual(["start", "scan", "repair", "undo"]);
+  });
+
+  it("transfer_backup: przyjęte i zapisane same liczby oraz flagi", async () => {
+    const res = await post([transfer(), transfer({ status: "stopped", bytes_mb: 600_000 })]);
+    expect(res.status).toBe(200);
+    const [first, second] = (await rows()).map((r) => JSON.parse(r.body));
+    expect(first).toMatchObject({ type: "transfer_backup", status: "complete", files: 5230, categories: CATEGORIES });
+    expect(second).toMatchObject({ status: "stopped", bytes_mb: 600_000 });
+  });
+
+  it.each([
+    ["dodatkowe pole path", transfer({ path: "DCIM/Camera" })],
+    ["nieznany status", transfer({ status: "x" })],
+    ["nazwa folderu w categories", transfer({ categories: { ...CATEGORIES, Music: true } })],
+    ["liczba zamiast flagi", transfer({ categories: { ...CATEGORIES, sms: 1 } })],
+    ["brak flagi", transfer({ categories: { contacts: true } })],
+    ["ujemna liczba plików", transfer({ files: -1 })],
+    ["seconds ponad dobę", transfer({ seconds: 86_401 })],
+    ["bytes_mb ponad limit", transfer({ bytes_mb: 10_000_001 })],
+    ["brak urządzenia", transfer({ device: undefined })],
+  ])("transfer_backup 400: %s", async (_name, event) => {
+    expect((await post([event])).status).toBe(400);
+    expect(await rows()).toEqual([]);
+  });
+
+  it("transfer_restore: przyjęte i zapisane same liczby oraz flagi grup", async () => {
+    const res = await post([restore(), restore({ status: "stopped", media_scan: "skipped", streams: 1, hashed: true })]);
+    expect(res.status).toBe(200);
+    const [first, second] = (await rows()).map((r) => JSON.parse(r.body));
+    expect(first).toMatchObject({ type: "transfer_restore", status: "complete", files: 5100, exists: 120,
+      missing: 0, streams: 4, media_scan: "done", groups: GROUPS });
+    expect(second).toMatchObject({ status: "stopped", media_scan: "skipped", streams: 1, hashed: true });
+  });
+
+  it.each([
+    ["dodatkowe pole path", restore({ path: "DCIM/Camera" })],
+    ["nieznany media_scan", restore({ media_scan: "x" })],
+    ["streams ponad 8", restore({ streams: 99 })],
+    ["streams 0", restore({ streams: 0 })],
+    ["nieznany status", restore({ status: "phone_full" })],
+    ["nazwa folderu w groups", restore({ groups: { ...GROUPS, "other:Music": true } })],
+    ["brak grupy", restore({ groups: { photos: true } })],
+    ["liczba zamiast flagi", restore({ groups: { ...GROUPS, photos: 1 } })],
+    ["hashed nie logiczne", restore({ hashed: "no" })],
+    ["ujemna liczba", restore({ denied: -1 })],
+    ["brak missing", restore({ missing: undefined })],
+    ["seconds ponad dobę", restore({ seconds: 86_401 })],
+    ["bytes_mb ponad limit", restore({ bytes_mb: 10_000_001 })],
+    ["brak urządzenia", restore({ device: undefined })],
+  ])("transfer_restore 400: %s", async (_name, event) => {
+    expect((await post([event])).status).toBe(400);
+    expect(await rows()).toEqual([]);
+  });
+
+  const TEL_KIND = { written: 410, existed: 2, skipped: 30, failed: 0, manual: 0, path: "app_process",
+    visible_warning: false };
+  const TEL = { contacts: TEL_KIND, sms: { ...TEL_KIND, path: "companion", visible_warning: true },
+    mms: { ...TEL_KIND, path: "file", manual: 3 }, calls: { ...TEL_KIND, path: "none", written: 0 } };
+  const withTel = (tel: Record<string, unknown> = TEL, extra: Record<string, unknown> = {}) => restore({
+    tel, safety: { contacts: true, sms: true, mms: false, calls: true }, cleanup_ok: true, ...extra });
+
+  it("transfer_restore z telefonią: przyjęte i zapisane same liczby", async () => {
+    const res = await post([withTel(), withTel({ sms: TEL.sms }, { safety: { sms: false }, cleanup_ok: false })]);
+    expect(res.status).toBe(200);
+    const [first, second] = (await rows()).map((r) => JSON.parse(r.body));
+    expect(first).toMatchObject({ type: "transfer_restore", tel: TEL, cleanup_ok: true,
+      safety: { contacts: true, sms: true, mms: false, calls: true } });
+    expect(second).toMatchObject({ tel: { sms: TEL.sms }, safety: { sms: false }, cleanup_ok: false });
+    expect(Object.keys(second.tel)).toEqual(["sms"]);
+  });
+
+  it("transfer_restore bez telefonii (same pliki) nadal przechodzi", async () => {
+    expect((await post([restore()])).status).toBe(200);
+    const body = JSON.parse((await rows())[0].body);
+    expect(body.tel).toBeUndefined();
+    expect(body.cleanup_ok).toBeUndefined();
+  });
+
+  it.each([
+    ["nieznana droga", withTel({ ...TEL, sms: { ...TEL.sms, path: "x" } })],
+    ["dodatkowe pole account", withTel({ ...TEL, contacts: { ...TEL_KIND, account: "jan@gmail.com" } })],
+    ["kategoria rcs", withTel({ ...TEL, rcs: TEL_KIND })],
+    ["brak pola w kategorii", withTel({ ...TEL, calls: { ...TEL_KIND, manual: undefined } })],
+    ["ujemna liczba", withTel({ ...TEL, sms: { ...TEL.sms, failed: -1 } })],
+    ["liczba ponad limit", withTel({ ...TEL, sms: { ...TEL.sms, written: 100_001 } })],
+    ["visible_warning nie logiczne", withTel({ ...TEL, sms: { ...TEL.sms, visible_warning: 1 } })],
+    ["safety z kategorią rcs", withTel(TEL, { safety: { rcs: true } })],
+    ["safety nie logiczne", withTel(TEL, { safety: { sms: "yes" } })],
+    ["cleanup_ok nie logiczne", withTel(TEL, { cleanup_ok: "ok" })],
+    ["tel nie obiekt", withTel([] as never)],
+    ["dodatkowe pole accounts", withTel(TEL, { accounts: ["jan@gmail.com"] })],
+  ])("transfer_restore z telefonią 400: %s", async (_name, event) => {
+    expect((await post([event])).status).toBe(400);
+    expect(await rows()).toEqual([]);
   });
 
   it("undo: liczby witryn opcjonalne, domyślnie 0", async () => {

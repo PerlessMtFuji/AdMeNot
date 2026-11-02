@@ -21,7 +21,8 @@
     {#if last.opened === null}
       <span class="text-xs text-warn">{t('report.not_opened', { path: last.pdf ?? last.html })}</span>
     {:else if last.error}
-      <span class="text-xs text-warn">{t(`report.pdf_${last.error}`, { pdf: last.html.replace(/\.html$/, '.pdf'), html: last.html })}</span>
+      <span class="text-xs text-warn">{t(`report.pdf_${last.error}`, { pdf: last.pdf_target ?? last.html.replace(/\.html$/, '.pdf'),
+        dir: (last.pdf_target ?? '').replace(/[\\/][^\\/]*$/, ''), html: last.html })}</span>
     {:else}
       <span class="mono flex items-center gap-1 text-xs text-ok"><Icon name="check" size={13} />{t('report.opened', { path: last.pdf ?? last.html })}</span>
     {/if}

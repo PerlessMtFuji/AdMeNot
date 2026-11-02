@@ -18,6 +18,15 @@ from admenot.engine.apk.timing import Eta
 from admenot.engine.device.info import DeviceInfo
 from admenot.engine.journal.db import Action
 from admenot.engine.session import ScanReport
+from admenot.engine.transfer.backup import BackupResult, Selection
+from admenot.engine.transfer.phonesetup import CleanupResult
+from admenot.engine.transfer.restore import RestoreResult, UploadChoice
+from admenot.engine.transfer.restore_plan import UPLOAD_GROUPS
+from admenot.engine.transfer.restore_tel import TelKindResult, TelResult
+from admenot.engine.transfer.telephony import (  # serwer: dokładnie te klucze `tel`/`safety`
+    TEL_CATEGORIES,
+    CategoryResult,
+)
 from admenot.engine.workflow import AppStatus, OrderResult
 
 MAX_PACKAGES = 200
@@ -33,6 +42,10 @@ SHORT = 64
 MAX_COUNT = 100_000
 MAX_SECONDS = 86_400
 MAX_SCORE = 1000
+MAX_MB = 10_000_000  # 10 TB w MB — kopia telefonu; serwer ma ten sam limit `bytes_mb`
+TRANSFER_CATEGORIES = ("contacts", "sms", "mms", "calls", "media", "downloads", "whatsapp",
+                       "others", "apps")
+MAX_STREAMS = 8  # serwer: `streams` 1–8
 
 
 def _short(value: str | None) -> str:
@@ -156,6 +169,72 @@ def undo_event(device: DeviceInfo, apps: list[str], failed: list[str], age_days:
     }
 
 
+def transfer_backup_event(device: DeviceInfo, result: BackupResult,
+                          selection: Selection) -> dict[str, Any]:
+    """Zakończona kopia starego telefonu: same liczby i wybrane rodzaje danych. Bez nazw folderów,
+    plików i pakietów (`others`/`apps` to tylko „coś wybrano”)."""
+    chosen = {"contacts": selection.contacts, "sms": selection.sms, "mms": selection.mms,
+              "calls": selection.calls, "media": "media" in selection.categories,
+              "downloads": "downloads" in selection.categories,
+              "whatsapp": "whatsapp" in selection.categories,
+              "others": bool(selection.others), "apps": bool(selection.apps)}
+    return {
+        "device": device_of(device), "status": result.status,
+        "seconds": _count(result.seconds, MAX_SECONDS),
+        "bytes_mb": _count(round(result.bytes / 1_000_000), MAX_MB),
+        "files": _count(result.files_done), "files_failed": _count(result.files_failed),
+        "apps": _count(result.apps_done), "apps_failed": _count(result.apps_failed),
+        "categories": {k: bool(chosen[k]) for k in TRANSFER_CATEGORIES},
+    }
+
+
+def _restore_status(result: RestoreResult, tel: TelResult | None, tel_failed: bool = False) -> str:
+    """Stan całego wgrywania: pliki i telefonia (przerwana telefonia → `stopped`; błąd telefonii po
+    skończonych plikach → `incomplete`)."""
+    if tel is None:
+        return "incomplete" if tel_failed and result.status == "complete" else result.status
+    if tel.stopped:
+        return "stopped"
+    return "incomplete" if result.status == "complete" and tel.status == "incomplete" else result.status
+
+
+def _tel_part(tel: TelResult) -> dict[str, Any]:
+    """Liczby telefonii per kategoria (klucze `TEL_CATEGORIES`), bez nazw kont, plików i numerów."""
+    return {
+        "tel": {k: {"written": _count(v.written), "existed": _count(v.existed),
+                    "skipped": _count(v.skipped_synced + v.skipped_messenger), "failed": _count(v.failed),
+                    "manual": _count(v.manual), "path": v.path, "visible_warning": bool(v.visible_warning)}
+                for k, v in tel.kinds.items() if k in TEL_CATEGORIES},
+        "safety": {k: bool(v) for k, v in tel.safety.items() if k in TEL_CATEGORIES},
+        "cleanup_ok": tel.cleanup.ok,
+    }
+
+
+def transfer_restore_event(device: DeviceInfo, result: RestoreResult, choice: UploadChoice,
+                           streams: int, tel: TelResult | None = None,
+                           tel_failed: bool = False) -> dict[str, Any]:
+    """Wgrywanie kopii na nowy telefon (`device` = telefon docelowy): same liczby i wybrane grupy.
+    Bez nazw plików, folderów i pakietów z plików APK — „Inne foldery” to tylko `others`: coś
+    wybrano. Serial telefonu docelowego (`result.target_serial`) też nie wychodzi. Z telefonią (`tel`)
+    dochodzą `tel`, `safety` i `cleanup_ok` — same liczby i flagi, bez nazw kont (adresów e-mail).
+    `tel_failed`: telefonia przerwana błędem po plikach (bez wyniku telefonii) — stan `incomplete`."""
+    groups = {g: g in choice.groups for g in UPLOAD_GROUPS}
+    groups["others"] = any(g.startswith("other:") for g in choice.groups)
+    return {
+        "device": device_of(device), "status": _restore_status(result, tel, tel_failed),
+        "seconds": _count(result.seconds, MAX_SECONDS),
+        "bytes_mb": _count(round(result.bytes / 1_000_000), MAX_MB),
+        "files": _count(result.files_done), "exists": _count(result.files_exists),
+        "renamed": _count(result.files_renamed), "denied": _count(result.files_denied),
+        "failed": _count(result.files_failed), "unselected": _count(result.files_unselected),
+        "missing": _count(result.files_missing), "apk_skipped": _count(result.apk_skipped),
+        "apk_suspicious_skipped": _count(result.apk_suspicious_skipped),
+        "streams": min(max(1, int(streams)), MAX_STREAMS), "hashed": result.hashed,
+        "media_scan": result.media_scan, "groups": groups,
+        **(_tel_part(tel) if tel is not None else {}),
+    }
+
+
 _SAMPLE_DEVICE = DeviceInfo(serial="-", brand="OPPO", manufacturer="OPPO", model="CPH2483",
                             device="-", market_name=None, android_release="14", sdk=34,
                             security_patch=None, uptime_s=0.0, local_now=datetime(2026, 10, 10))
@@ -180,12 +259,32 @@ def sample() -> dict[str, list[dict[str, Any]]]:
     result = OrderResult(order=None, apps=[AppStatus("com.clean.pro.boost", "ok"),  # type: ignore[arg-type]
                                            AppStatus("com.wlive.forecast", "ok")], stopped=False)
     verdicts = {"com.clean.pro.boost": "malicious", "com.wlive.forecast": "review"}
+    backup = BackupResult(status="complete", copy_id="-", telephony={"contacts": CategoryResult("ok", 412)},
+                          files_done=5230, files_failed=0, apps_done=12, apps_failed=0,
+                          bytes=38_400_000_000, seconds=2710)
+    chosen = Selection(contacts=True, sms=True, mms=False, calls=True,
+                       categories=frozenset({"media", "whatsapp"}), others=frozenset(),
+                       apps=frozenset({"-"}))
+    restore = RestoreResult(status="complete", target_serial="-", files_done=5108, files_exists=120,
+                            files_renamed=3, files_denied=0, files_failed=0, files_unselected=0,
+                            apk_skipped=1, apk_suspicious_skipped=0, bytes=37_900_000_000, seconds=1840,
+                            hashed=False, media_scan="done", files_missing=0)
+    upload = UploadChoice(groups=frozenset({"photos", "videos", "downloads", "whatsapp"}), apks_on=frozenset(),
+                          tel=frozenset({"contacts", "sms", "calls"}))
+    # Telefonia: same liczby, droga zapisu i flaga widoczności — bez kont, numerów i nazw plików.
+    tel = TelResult(kinds={"contacts": TelKindResult(380, 12, 20, 6, 0, 0, "app_process", False),
+                           "sms": TelKindResult(1830, 0, 0, 0, 0, 0, "companion", False),
+                           "calls": TelKindResult(640, 0, 0, 0, 0, 0, "app_process", False)},
+                    safety={"contacts": True, "sms": True, "calls": True}, manual=[],
+                    cleanup=CleanupResult(True, True, True, True), synced_accounts={}, seconds=95)
     out: dict[str, list[dict[str, Any]]] = {}
     for name, packages in (("basic", False), ("packages", True)):
         bodies = [("start", start_body("simple")), ("scan", _sample_scan(packages)),
                   ("repair", repair_event(_SAMPLE_DEVICE, "ab12cd34", plans, verdicts, result,
                                           None, packages)),
                   ("undo", undo_event(_SAMPLE_DEVICE, ["com.wlive.forecast"], [], 2, packages,
-                                    sites=2, sites_restored=1))]
+                                    sites=2, sites_restored=1)),
+                  ("transfer_backup", transfer_backup_event(_SAMPLE_DEVICE, backup, chosen)),
+                  ("transfer_restore", transfer_restore_event(_SAMPLE_DEVICE, restore, upload, 4, tel))]
         out[name] = [{**common(SAMPLE_INSTALL, t, now, "pl"), **body} for t, body in bodies]
     return out

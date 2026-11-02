@@ -1,0 +1,87 @@
+import { fireEvent, render, screen } from '@testing-library/svelte';
+import { tick } from 'svelte';
+import { describe, expect, test, vi } from 'vitest';
+import type { CopyView } from '../lib/types';
+import { setupCtl } from '../test-utils';
+import TransferCopies from './TransferCopies.svelte';
+
+const COPY: CopyView = { id: 'OLD/1', serial: 'OLD', model: 'SM-A145R', manufacturer: 'samsung', client: 'Anna K.',
+  created: '2026-10-25T14:30:00', expires: '2026-11-01T14:30:00', days_left: 7, status: 'complete', bytes: 10, counts: {},
+  restores: [{ serial: 'NEW1', status: 'complete', updated: null, resumable: false },
+    { serial: 'NEW2', status: 'stopped', updated: null, resumable: true },
+    { serial: 'NEW4', status: 'incomplete', updated: null, resumable: false }] };  // ani „wgrano”, ani „przerwane”
+
+const items = () => [...screen.getByTestId('copy-contents').children].map((e) => e.textContent?.trim());
+
+async function show(copies: CopyView[], serial: string | null) {
+  const env = await setupCtl('clean');
+  env.s.transfer.copies = copies;
+  env.s.devices = serial ? [{ serial, state: 'device', model: 'M', name: null, imei: null }] : [];
+  env.s.serial = serial;
+  render(TransferCopies, { context: new Map([['ctl', env.ctl]]) });
+  await tick();
+  return env;
+}
+
+describe('TransferCopies', () => {
+  test('a finished copy can be uploaded to the connected phone and lists where it went', async () => {
+    const env = await show([COPY], 'NEW3');
+    expect(screen.getByText('wgrano na: NEW1')).toBeTruthy();
+    expect(screen.getByText('wgrywanie przerwane: NEW2')).toBeTruthy();
+    const plan = vi.spyOn(env.ctl, 'planRestore').mockResolvedValue();
+    await fireEvent.click(screen.getByRole('button', { name: 'Wgraj na podłączony telefon' }));
+    expect(plan).toHaveBeenCalledWith('OLD/1');
+  });
+
+  test('phones the copy went to are named by IMEI when the bridge knows it', async () => {
+    await show([{ ...COPY, restores: [{ serial: 'NEW1', imei: '861485069821024', status: 'complete', updated: null, resumable: false },
+      { serial: 'NEW2', imei: null, status: 'stopped', updated: null, resumable: true }] }], null);
+    expect(screen.getByText('wgrano na: IMEI 861485069821024')).toBeTruthy();
+    expect(screen.getByText('wgrywanie przerwane: NEW2')).toBeTruthy();
+  });
+
+  test('deleting a copy asks first, then deletes that copy', async () => {
+    const env = await show([COPY], null);
+    const del = vi.spyOn(env.ctl, 'deleteTransfer').mockResolvedValue();
+    await fireEvent.click(screen.getByRole('button', { name: 'Usuń teraz' }));
+    expect(del).not.toHaveBeenCalled();
+    await fireEvent.click(screen.getByRole('button', { name: 'Usuń' }));
+    expect(del).toHaveBeenCalledWith('OLD/1');
+  });
+
+  test('without a connected phone the upload button is off; an unfinished copy has none', async () => {
+    await show([COPY, { ...COPY, id: 'OLD/2', status: 'in_progress', restores: [] }], null);
+    const buttons = screen.getAllByRole('button', { name: 'Wgraj na podłączony telefon' }) as HTMLButtonElement[];
+    expect(buttons).toHaveLength(1);
+    expect(buttons[0].disabled).toBe(true);
+  });
+
+  test('lists what the copy holds, per kind, skipping zeros', async () => {
+    await show([{ ...COPY, counts: { contacts: 312, sms: 1204, mms: 0, calls: 88, files: 1582, files_failed: 2,
+      files_photos: 1530, files_videos: 40, files_downloads: 12, apps: 14 } }], null);
+    expect(items()).toEqual(['Kontakty 312', 'SMS 1204', 'Połączenia 88', 'Zdjęcia 1530', 'Filmy 40', 'Pobrane 12',
+      'Aplikacje 14']);
+  });
+
+  test('a note can be added, edited and cleared', async () => {
+    const env = await show([{ ...COPY, note: null }], null);
+    env.bridge.setCopies([{ ...COPY, note: null }]);
+    await fireEvent.click(screen.getByRole('button', { name: 'Dodaj notatkę' }));
+    const area = screen.getByRole('textbox', { name: 'Notatka serwisanta' });
+    await fireEvent.input(area, { target: { value: '  Tylko zdjęcia z 2025.  ' } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
+    await vi.waitFor(() => expect(screen.getByTestId('copy-note').textContent).toBe('Tylko zdjęcia z 2025.'));
+    expect(env.s.transfer.copies[0].note).toBe('Tylko zdjęcia z 2025.');
+    await fireEvent.click(screen.getByRole('button', { name: 'Edytuj' }));
+    await fireEvent.input(screen.getByRole('textbox', { name: 'Notatka serwisanta' }), { target: { value: ' ' } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Dodaj notatkę' })).toBeTruthy());
+    expect(env.bridge.calls.filter((c) => c.method === 'set_transfer_note').map((c) => c.args))
+      .toEqual([['OLD/1', 'Tylko zdjęcia z 2025.'], ['OLD/1', null]]);
+  });
+
+  test('an older copy without per-kind file counts shows the file total', async () => {
+    await show([{ ...COPY, counts: { contacts: 5, files: 120 } }], null);
+    expect(items()).toEqual(['Kontakty 5', 'Pliki 120']);
+  });
+});

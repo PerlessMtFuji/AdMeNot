@@ -1,6 +1,6 @@
 // Atrapa mostu: odtwarza scenariusze nagrane z prawdziwego Api (scripts/record_bridge_fixtures.py).
 import type { Bridge } from './bridge';
-import type { Api, CrashSummary, DeviceCheck, EventMap, EventName, Lang, PlanView, ScanView, ServiceInfo, Settings, ShotView, TelemetrySample, UpdateView } from './types';
+import type { Api, CopyView, CrashSummary, DeviceCheck, EventMap, EventName, Lang, PlanView, ScanView, ServiceInfo, Settings, ShotView, TelemetrySample, UpdateView } from './types';
 // Wynik `telemetry_events.sample()` z Pythona (Task 7 planu kroku H) — ten sam kształt co prawdziwe zdarzenia.
 import SAMPLE from './telemetrySample.json';
 
@@ -32,8 +32,9 @@ export function scenarioNames(): string[] {
 export type FakeBridge = Bridge & {
   setCrashes(reports: CrashSummary[], startup: string[]): void;
   failNextCrashSend(key: string): void;
-  failNext(method: string, key: string): void;  // następne wywołanie `method` zwraca błąd `key`
+  failNext(method: string, key: string, message?: string): void;  // następne wywołanie `method` zwraca błąd `key`
   setChecks(checks: DeviceCheck[]): void;  // co zwróci następny `recheck_site_notifications` (i kolejne skany)
+  setCopies(copies: CopyView[]): void;  // kopie danych na komputerze (`transfers` bez nagrania w scenariuszu)
   calls: { method: string; args: unknown[] }[];
   emit<K extends EventName>(name: K, detail: EventMap[K]): void;
 };
@@ -89,7 +90,7 @@ export function createFakeBridge(name: string,
   }
   const target = new EventTarget();
   const calls: FakeBridge['calls'] = [];
-  let settings: Settings = { lang: options.lang ?? 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system', mirror_auto: false,
+  let settings: Settings = { lang: options.lang ?? 'pl', mode: 'simple', adb_path: null, backups_dir: null, report_pdf_dir: null, theme: 'system', mirror_auto: false,
     apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false, select_level: 'silence', retention_days: 60,
     check_updates: true, dismissed_update: null, last_run_version: null,
     welcome_version: options.welcome ? null : 1, welcome_current: 1, telemetry: false, telemetry_packages: false,
@@ -102,9 +103,10 @@ export function createFakeBridge(name: string,
   let crashes: CrashSummary[] = [];
   let crashStartup: string[] = [];
   let failSend: string | null = null;
-  const failures = new Map<string, string>();
+  const failures = new Map<string, { key: string; message: string }>();
   let checks: DeviceCheck[] | null = options.checks ? structuredClone(options.checks) : null;
   let checksChanged = false; // odpytywanie w tle (`whenDebugging`) dostaje odczyt tylko po zmianie
+  let copies: CopyView[] = [];
   let planCode = 'K7F3'; // kod ostatniego podglądu planu: udostępnienie liczy ten sam plan
   const SHOT_IMAGE = 'data:image/svg+xml,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="200"><rect width="90" height="200" rx="8" fill="#1f2937"/>'
@@ -136,6 +138,40 @@ export function createFakeBridge(name: string,
 
   const fallback = (method: string, args: unknown[]): unknown => {
     switch (method) {
+      case 'transfers':
+        return { copies: structuredClone(copies) };
+      case 'extend_transfer': {
+        const copy = copies.find((c) => c.id === args[0]);
+        if (!copy) return { error: { key: 'bad_request', message: 'copy_id' } };
+        // jak most: +7 dni od obecnej daty wygaśnięcia, czas lokalny bez strefy
+        const d = new Date(copy.expires);
+        d.setDate(d.getDate() + 7);
+        const p = (n: number) => String(n).padStart(2, '0');
+        const expires = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+        Object.assign(copy, { expires, days_left: copy.days_left + 7 });
+        return { copy: structuredClone(copy) };
+      }
+      case 'set_transfer_note': {
+        const copy = copies.find((c) => c.id === args[0]);
+        if (!copy) return { error: { key: 'bad_request', message: 'copy_id' } };
+        copy.note = typeof args[1] === 'string' && args[1].trim() ? args[1].trim() : null;
+        return { copy: structuredClone(copy) };
+      }
+      case 'delete_transfer':
+        copies = copies.filter((c) => c.id !== args[0]);
+        return { deleted: String(args[0]) };
+      case 'skip_tap':
+        return {};
+      case 'transfer_whatsapp':
+        return { whatsapp_backup: '2026-09-26T14:29:00' };
+      case 'transfer_rescan': {
+        // Scenariusz bez nagranego ponownego skanu: ten sam odczyt co `transfer_inventory`.
+        const events = data.calls.find((c) => c.method === 'transfer_inventory')?.events ?? [];
+        const end = events.find(([event]) => event === 'job:end')?.[1] as { job_id: string } | undefined;
+        if (!end) return { error: { key: 'transfer_no_inventory', message: '' } };
+        replay(events);
+        return { job_id: end.job_id };
+      }
       case 'delete_order':
         return { deleted: String(args[0]) };
       case 'get_settings':
@@ -143,6 +179,10 @@ export function createFakeBridge(name: string,
       case 'save_settings': {
         const changes = args[0] as Partial<Settings>;
         if ((changes.apk_cache_limit_gb ?? 0) > 120) return { error: { key: 'bad_request', message: 'apk_cache_limit_gb' } };
+        // jak most: folder PDF tylko jako ścieżka bezwzględna (litera dysku albo udział sieciowy)
+        if (changes.report_pdf_dir && !/^([A-Za-z]:[\\/]|\\\\)/.test(changes.report_pdf_dir)) {
+          return { error: { key: 'bad_request', message: 'report_pdf_dir' } };
+        }
         settings = { ...settings, ...changes };
         return { ...settings };
       }
@@ -334,7 +374,7 @@ export function createFakeBridge(name: string,
     const failure = failures.get(method);
     if (failure) {
       failures.delete(method);
-      return { error: { key: failure, message: '' } };
+      return { error: { ...failure } };
     }
     const queue = queues.get(method);
     if (!queue || queue.length === 0) return fallback(method, args);
@@ -366,7 +406,8 @@ export function createFakeBridge(name: string,
     emit: (event, detail) => dispatch(event, detail),
     setCrashes: (reports, startup) => { crashes = [...reports]; crashStartup = [...startup]; },
     failNextCrashSend: (key) => { failSend = key; },
-    failNext: (method, key) => { failures.set(method, key); },
+    failNext: (method, key, message = '') => { failures.set(method, { key, message }); },
     setChecks: (next) => { checks = structuredClone(next); checksChanged = true; },
+    setCopies: (next) => { copies = structuredClone(next); },
   };
 }

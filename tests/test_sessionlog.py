@@ -28,6 +28,20 @@ def test_session_log_wraps_host_commands_and_serial(tmp_path):
     assert (tmp_path / "x.log").read_text("utf-8").rstrip().endswith("\thost:devices -l")
 
 
+def test_session_log_file_has_no_client_file_names_but_console_does(tmp_path):
+    """Plik logu (90 dni) bez nazw plików klienta; konsola na żywo dostaje polecenie bez zmian."""
+    seen = []
+    cmd = "stat -c '%s|%Y|%n' '/sdcard/DCIM/Wakacje w Zakopanem.jpg' /sdcard/Download/faktura.pdf"
+    adb = SessionLogAdb(FakeAdb({cmd: ""}, serial="S1"), tmp_path / "x.log", on_command=seen.append)
+    adb.shell(cmd)
+    adb.tagged("pull").note(r"open C:\Users\Jan\AppData\Local\AdMeNot\transfers\S1\x\files\DCIM\a.jpg")
+    text = (tmp_path / "x.log").read_text("utf-8")
+    for leak in ("Zakopanem", "faktura", "DCIM", "Download"):
+        assert leak not in text, text
+    assert "stat -c '%s|%Y|%n' '/sdcard/<path>' /sdcard/<path>" in text
+    assert seen[0]["command"] == cmd
+
+
 def test_session_log_path_is_per_day(tmp_path):
     assert session_log_path(tmp_path, datetime(2026, 9, 26, 23, 59)) == tmp_path / "2026-09-26.log"
 
@@ -92,3 +106,18 @@ def test_notification_dump_with_content_reaches_the_console_as_size_only(tmp_pat
     adb.tagged("console").shell(cmd)  # wpisany ręcznie w konsoli: serwisant widzi wynik
     assert seen[0]["output"] == f"<{len(dump.encode())} B>"
     assert seen[1]["output"] == dump
+
+
+def test_account_dump_hidden_in_console(tmp_path):
+    """`dumpsys account` (plan telefonii) wypisuje adresy e-mail kont klienta: konsola ich nie dostaje."""
+    seen = []
+    dump = "Accounts: 1\n  Account {name=jan.kowalski@gmail.com, type=com.google}\n"
+    cmd = "dumpsys account"
+    adb = SessionLogAdb(FakeAdb({cmd: dump, f"-T {cmd}": dump}, serial="S1"), tmp_path / "l.log",
+                        on_command=seen.append)
+    assert adb.shell(cmd) == dump  # program dostaje pełny zrzut
+    adb.run(["shell", "-T", cmd])
+    adb.tagged("console").shell(cmd)  # wpisany ręcznie w konsoli: serwisant widzi wynik
+    assert [e["output"] for e in seen[:2]] == ["", ""]
+    assert seen[2]["output"] == dump
+    assert "kowalski" not in (tmp_path / "l.log").read_text("utf-8")

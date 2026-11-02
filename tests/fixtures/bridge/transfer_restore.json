@@ -1,0 +1,1980 @@
+{
+ "name": "transfer_restore",
+ "calls": [
+  {
+   "method": "list_devices",
+   "args": [],
+   "result": {
+    "devices": [
+     {
+      "serial": "R58T00TEST",
+      "state": "device",
+      "model": "SM_A145R",
+      "name": "samsung SM-A145R",
+      "imei": null,
+      "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9Ii0xNiAtMTYgMTU2IDI3MiIgd2lkdGg9IjE1NiIgaGVpZ2h0PSIyNzIiPgogIDx0aXRsZT5UZWxlZm9uPC90aXRsZT4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iYm9keSIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMzYTQ1NTgiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIuNTUiIHN0b3AtY29sb3I9IiMxZjI5MzciLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMTExODI3Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJlZGdlIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzk0YTNiOCIgc3RvcC1vcGFjaXR5PSIuOSIvPgogICAgICA8c3RvcCBvZmZzZXQ9Ii41IiBzdG9wLWNvbG9yPSIjNDc1NTY5IiBzdG9wLW9wYWNpdHk9Ii41Ii8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBiMTIyMCIgc3RvcC1vcGFjaXR5PSIuOSIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ic2NyZWVuIiB4MT0iMCIgeTE9IjAiIHgyPSIuMzUiIHkyPSIxIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNjM2NmYxIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iLjUiIHN0b3AtY29sb3I9IiMzNzMwYTMiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPHJhZGlhbEdyYWRpZW50IGlkPSJnbG93QSIgY3g9Ii4yIiBjeT0iLjIyIiByPSIuNiI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2E1YjRmYyIgc3RvcC1vcGFjaXR5PSIuNzUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTViNGZjIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgIDwvcmFkaWFsR3JhZGllbnQ+CiAgICA8cmFkaWFsR3JhZGllbnQgaWQ9Imdsb3dCIiBjeD0iLjkiIGN5PSIuNzgiIHI9Ii41NSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzIyZDNlZSIgc3RvcC1vcGFjaXR5PSIuNDUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMjJkM2VlIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgIDwvcmFkaWFsR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdsYXJlIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMCI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2ZmZiIgc3RvcC1vcGFjaXR5PSIuMTYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjZmZmIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXAiPjxyZWN0IHg9IjkiIHk9IjkiIHdpZHRoPSIxMDIiIGhlaWdodD0iMjIyIiByeD0iMTMiLz48L2NsaXBQYXRoPgogIDwvZGVmcz4KICA8IS0tIHByenljaXNraSBib2N6bmUgLS0+CiAgPHJlY3QgeD0iMTE3IiB5PSI1OCIgd2lkdGg9IjQiIGhlaWdodD0iMjIiIHJ4PSIxLjUiIGZpbGw9IiMzMzQxNTUiLz4KICA8cmVjdCB4PSIxMTciIHk9IjkwIiB3aWR0aD0iNCIgaGVpZ2h0PSI0MCIgcng9IjEuNSIgZmlsbD0iIzMzNDE1NSIvPgogIDwhLS0gb2J1ZG93YSAtLT4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iMTE2IiBoZWlnaHQ9IjIzNiIgcng9IjE5IiBmaWxsPSJ1cmwoI2JvZHkpIi8+CiAgPHJlY3QgeD0iMi43NSIgeT0iMi43NSIgd2lkdGg9IjExNC41IiBoZWlnaHQ9IjIzNC41IiByeD0iMTguMjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0idXJsKCNlZGdlKSIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICA8IS0tIGVrcmFuIC0tPgogIDxnIGNsaXAtcGF0aD0idXJsKCNjbGlwKSI+CiAgICA8cmVjdCB4PSI5IiB5PSI5IiB3aWR0aD0iMTAyIiBoZWlnaHQ9IjIyMiIgZmlsbD0idXJsKCNzY3JlZW4pIi8+CiAgICA8cmVjdCB4PSI5IiB5PSI5IiB3aWR0aD0iMTAyIiBoZWlnaHQ9IjIyMiIgZmlsbD0idXJsKCNnbG93QSkiLz4KICAgIDxyZWN0IHg9IjkiIHk9IjkiIHdpZHRoPSIxMDIiIGhlaWdodD0iMjIyIiBmaWxsPSJ1cmwoI2dsb3dCKSIvPgogICAgPHBhdGggZD0iTTkgOWg2Mkw5IDE1MHoiIGZpbGw9InVybCgjZ2xhcmUpIi8+CiAgPC9nPgogIDxyZWN0IHg9IjkuNSIgeT0iOS41IiB3aWR0aD0iMTAxIiBoZWlnaHQ9IjIyMSIgcng9IjEyLjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLW9wYWNpdHk9Ii4zNSIvPgogIDwhLS0gYXBhcmF0IHByemVkbmkgaSBwYXNlayBnZXN0w7N3IC0tPgogIDxjaXJjbGUgY3g9IjYwIiBjeT0iMjAiIHI9IjMuNCIgZmlsbD0iIzBiMTAyMCIvPgogIDxjaXJjbGUgY3g9IjYxIiBjeT0iMTkiIHI9IjEiIGZpbGw9IiM0NzU1NjkiLz4KICA8cmVjdCB4PSI0NCIgeT0iMjIyIiB3aWR0aD0iMzIiIGhlaWdodD0iMi42IiByeD0iMS4zIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41NSIvPgo8L3N2Zz4K",
+      "android": "14"
+     },
+     {
+      "serial": "R58W20NEW01",
+      "state": "device",
+      "model": "SM_A145R",
+      "name": "samsung SM-A546B",
+      "imei": null,
+      "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9Ii0xNiAtMTYgMTU2IDI3MiIgd2lkdGg9IjE1NiIgaGVpZ2h0PSIyNzIiPgogIDx0aXRsZT5UZWxlZm9uPC90aXRsZT4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iYm9keSIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMzYTQ1NTgiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIuNTUiIHN0b3AtY29sb3I9IiMxZjI5MzciLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMTExODI3Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJlZGdlIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzk0YTNiOCIgc3RvcC1vcGFjaXR5PSIuOSIvPgogICAgICA8c3RvcCBvZmZzZXQ9Ii41IiBzdG9wLWNvbG9yPSIjNDc1NTY5IiBzdG9wLW9wYWNpdHk9Ii41Ii8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBiMTIyMCIgc3RvcC1vcGFjaXR5PSIuOSIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ic2NyZWVuIiB4MT0iMCIgeTE9IjAiIHgyPSIuMzUiIHkyPSIxIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNjM2NmYxIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iLjUiIHN0b3AtY29sb3I9IiMzNzMwYTMiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPHJhZGlhbEdyYWRpZW50IGlkPSJnbG93QSIgY3g9Ii4yIiBjeT0iLjIyIiByPSIuNiI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2E1YjRmYyIgc3RvcC1vcGFjaXR5PSIuNzUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTViNGZjIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgIDwvcmFkaWFsR3JhZGllbnQ+CiAgICA8cmFkaWFsR3JhZGllbnQgaWQ9Imdsb3dCIiBjeD0iLjkiIGN5PSIuNzgiIHI9Ii41NSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzIyZDNlZSIgc3RvcC1vcGFjaXR5PSIuNDUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMjJkM2VlIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgIDwvcmFkaWFsR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdsYXJlIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMCI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2ZmZiIgc3RvcC1vcGFjaXR5PSIuMTYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjZmZmIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXAiPjxyZWN0IHg9IjkiIHk9IjkiIHdpZHRoPSIxMDIiIGhlaWdodD0iMjIyIiByeD0iMTMiLz48L2NsaXBQYXRoPgogIDwvZGVmcz4KICA8IS0tIHByenljaXNraSBib2N6bmUgLS0+CiAgPHJlY3QgeD0iMTE3IiB5PSI1OCIgd2lkdGg9IjQiIGhlaWdodD0iMjIiIHJ4PSIxLjUiIGZpbGw9IiMzMzQxNTUiLz4KICA8cmVjdCB4PSIxMTciIHk9IjkwIiB3aWR0aD0iNCIgaGVpZ2h0PSI0MCIgcng9IjEuNSIgZmlsbD0iIzMzNDE1NSIvPgogIDwhLS0gb2J1ZG93YSAtLT4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iMTE2IiBoZWlnaHQ9IjIzNiIgcng9IjE5IiBmaWxsPSJ1cmwoI2JvZHkpIi8+CiAgPHJlY3QgeD0iMi43NSIgeT0iMi43NSIgd2lkdGg9IjExNC41IiBoZWlnaHQ9IjIzNC41IiByeD0iMTguMjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0idXJsKCNlZGdlKSIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICA8IS0tIGVrcmFuIC0tPgogIDxnIGNsaXAtcGF0aD0idXJsKCNjbGlwKSI+CiAgICA8cmVjdCB4PSI5IiB5PSI5IiB3aWR0aD0iMTAyIiBoZWlnaHQ9IjIyMiIgZmlsbD0idXJsKCNzY3JlZW4pIi8+CiAgICA8cmVjdCB4PSI5IiB5PSI5IiB3aWR0aD0iMTAyIiBoZWlnaHQ9IjIyMiIgZmlsbD0idXJsKCNnbG93QSkiLz4KICAgIDxyZWN0IHg9IjkiIHk9IjkiIHdpZHRoPSIxMDIiIGhlaWdodD0iMjIyIiBmaWxsPSJ1cmwoI2dsb3dCKSIvPgogICAgPHBhdGggZD0iTTkgOWg2Mkw5IDE1MHoiIGZpbGw9InVybCgjZ2xhcmUpIi8+CiAgPC9nPgogIDxyZWN0IHg9IjkuNSIgeT0iOS41IiB3aWR0aD0iMTAxIiBoZWlnaHQ9IjIyMSIgcng9IjEyLjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLW9wYWNpdHk9Ii4zNSIvPgogIDwhLS0gYXBhcmF0IHByemVkbmkgaSBwYXNlayBnZXN0w7N3IC0tPgogIDxjaXJjbGUgY3g9IjYwIiBjeT0iMjAiIHI9IjMuNCIgZmlsbD0iIzBiMTAyMCIvPgogIDxjaXJjbGUgY3g9IjYxIiBjeT0iMTkiIHI9IjEiIGZpbGw9IiM0NzU1NjkiLz4KICA8cmVjdCB4PSI0NCIgeT0iMjIyIiB3aWR0aD0iMzIiIGhlaWdodD0iMi42IiByeD0iMS4zIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41NSIvPgo8L3N2Zz4K",
+      "android": "14"
+     }
+    ],
+    "error": null
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cat /proc/uptime",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "280000.12 500000.00\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "cat /proc/uptime",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "280000.12 500000.00\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "date \"+%Y-%m-%d %H:%M:%S\"",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "2026-09-26 14:00:00\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "date \"+%Y-%m-%d %H:%M:%S\"",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "2026-09-26 14:00:00\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "getprop",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "[ro.product.brand]: [samsung]\n[ro.product.manufacturer]: [samsung]\n[ro.product.model]: [SM-A145R]\n[ro.product.device]: [a14]\n[ro.build.version.release]: [14]\n[ro.build.version.sdk]: [34]\n[ro.build.version.security_patch]: [2026-07-01]\n[ro.serialno]: [R58T00TEST]\n[persist.sys.device_name]: [Telefon Anny]\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "getprop",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "[ro.product.brand]: [samsung]\n[ro.product.manufacturer]: [samsung]\n[ro.product.model]: [SM-A546B]\n[ro.product.device]: [a54x]\n[ro.build.version.release]: [14]\n[ro.build.version.sdk]: [34]\n[ro.build.version.security_patch]: [2026-07-01]\n[ro.serialno]: [R58W20NEW01]\n[persist.sys.device_name]: [Nowy telefon Anny]\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "service call iphonesubinfo 1 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 1 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "service call iphonesubinfo 1 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 1 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "service call iphonesubinfo 2 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 2 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "service call iphonesubinfo 2 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 2 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "service call iphonesubinfo 3 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 3 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "service call iphonesubinfo 3 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 3 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "service call iphonesubinfo 4 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 4 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "service call iphonesubinfo 4 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 4 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "settings get --user 0 secure android_id",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "null\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "settings get --user 0 secure android_id",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "null\n",
+      "tag": null
+     }
+    ]
+   ]
+  },
+  {
+   "method": "transfer_inventory",
+   "args": [
+    "R58T00TEST",
+    "Anna K."
+   ],
+   "result": {
+    "job_id": "job-1"
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cat /proc/uptime",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "280000.12 500000.00\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "date \"+%Y-%m-%d %H:%M:%S\"",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "2026-09-26 14:00:00\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "getprop",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "[ro.product.brand]: [samsung]\n[ro.product.manufacturer]: [samsung]\n[ro.product.model]: [SM-A145R]\n[ro.product.device]: [a14]\n[ro.build.version.release]: [14]\n[ro.build.version.sdk]: [34]\n[ro.build.version.security_patch]: [2026-07-01]\n[ro.serialno]: [R58T00TEST]\n[persist.sys.device_name]: [Telefon Anny]\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "service call iphonesubinfo 1 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 1 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "service call iphonesubinfo 2 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 2 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "service call iphonesubinfo 3 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 3 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "service call iphonesubinfo 4 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 4 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "settings get --user 0 secure android_id",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "null\n",
+      "tag": null
+     }
+    ],
+    [
+     "scan:device",
+     {
+      "device": {
+       "serial": "R58T00TEST",
+       "name": "samsung SM-A145R",
+       "brand": "samsung",
+       "manufacturer": "samsung",
+       "model": "SM-A145R",
+       "market_name": null,
+       "android": "14",
+       "sdk": 34,
+       "patch": "2026-07-01",
+       "uptime_s": 280000.12,
+       "imei": null,
+       "match": {
+        "confidence": "none",
+        "step": "no_db",
+        "matched": null
+       },
+       "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9Ii0xNiAtMTYgMTU2IDI3MiIgd2lkdGg9IjE1NiIgaGVpZ2h0PSIyNzIiPgogIDx0aXRsZT5UZWxlZm9uPC90aXRsZT4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iYm9keSIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMzYTQ1NTgiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIuNTUiIHN0b3AtY29sb3I9IiMxZjI5MzciLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMTExODI3Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJlZGdlIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzk0YTNiOCIgc3RvcC1vcGFjaXR5PSIuOSIvPgogICAgICA8c3RvcCBvZmZzZXQ9Ii41IiBzdG9wLWNvbG9yPSIjNDc1NTY5IiBzdG9wLW9wYWNpdHk9Ii41Ii8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBiMTIyMCIgc3RvcC1vcGFjaXR5PSIuOSIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ic2NyZWVuIiB4MT0iMCIgeTE9IjAiIHgyPSIuMzUiIHkyPSIxIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNjM2NmYxIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iLjUiIHN0b3AtY29sb3I9IiMzNzMwYTMiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPHJhZGlhbEdyYWRpZW50IGlkPSJnbG93QSIgY3g9Ii4yIiBjeT0iLjIyIiByPSIuNiI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2E1YjRmYyIgc3RvcC1vcGFjaXR5PSIuNzUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTViNGZjIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgIDwvcmFkaWFsR3JhZGllbnQ+CiAgICA8cmFkaWFsR3JhZGllbnQgaWQ9Imdsb3dCIiBjeD0iLjkiIGN5PSIuNzgiIHI9Ii41NSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzIyZDNlZSIgc3RvcC1vcGFjaXR5PSIuNDUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMjJkM2VlIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgIDwvcmFkaWFsR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdsYXJlIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMCI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2ZmZiIgc3RvcC1vcGFjaXR5PSIuMTYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjZmZmIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXAiPjxyZWN0IHg9IjkiIHk9IjkiIHdpZHRoPSIxMDIiIGhlaWdodD0iMjIyIiByeD0iMTMiLz48L2NsaXBQYXRoPgogIDwvZGVmcz4KICA8IS0tIHByenljaXNraSBib2N6bmUgLS0+CiAgPHJlY3QgeD0iMTE3IiB5PSI1OCIgd2lkdGg9IjQiIGhlaWdodD0iMjIiIHJ4PSIxLjUiIGZpbGw9IiMzMzQxNTUiLz4KICA8cmVjdCB4PSIxMTciIHk9IjkwIiB3aWR0aD0iNCIgaGVpZ2h0PSI0MCIgcng9IjEuNSIgZmlsbD0iIzMzNDE1NSIvPgogIDwhLS0gb2J1ZG93YSAtLT4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iMTE2IiBoZWlnaHQ9IjIzNiIgcng9IjE5IiBmaWxsPSJ1cmwoI2JvZHkpIi8+CiAgPHJlY3QgeD0iMi43NSIgeT0iMi43NSIgd2lkdGg9IjExNC41IiBoZWlnaHQ9IjIzNC41IiByeD0iMTguMjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0idXJsKCNlZGdlKSIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICA8IS0tIGVrcmFuIC0tPgogIDxnIGNsaXAtcGF0aD0idXJsKCNjbGlwKSI+CiAgICA8cmVjdCB4PSI5IiB5PSI5IiB3aWR0aD0iMTAyIiBoZWlnaHQ9IjIyMiIgZmlsbD0idXJsKCNzY3JlZW4pIi8+CiAgICA8cmVjdCB4PSI5IiB5PSI5IiB3aWR0aD0iMTAyIiBoZWlnaHQ9IjIyMiIgZmlsbD0idXJsKCNnbG93QSkiLz4KICAgIDxyZWN0IHg9IjkiIHk9IjkiIHdpZHRoPSIxMDIiIGhlaWdodD0iMjIyIiBmaWxsPSJ1cmwoI2dsb3dCKSIvPgogICAgPHBhdGggZD0iTTkgOWg2Mkw5IDE1MHoiIGZpbGw9InVybCgjZ2xhcmUpIi8+CiAgPC9nPgogIDxyZWN0IHg9IjkuNSIgeT0iOS41IiB3aWR0aD0iMTAxIiBoZWlnaHQ9IjIyMSIgcng9IjEyLjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLW9wYWNpdHk9Ii4zNSIvPgogIDwhLS0gYXBhcmF0IHByemVkbmkgaSBwYXNlayBnZXN0w7N3IC0tPgogIDxjaXJjbGUgY3g9IjYwIiBjeT0iMjAiIHI9IjMuNCIgZmlsbD0iIzBiMTAyMCIvPgogIDxjaXJjbGUgY3g9IjYxIiBjeT0iMTkiIHI9IjEiIGZpbGw9IiM0NzU1NjkiLz4KICA8cmVjdCB4PSI0NCIgeT0iMjIyIiB3aWR0aD0iMzIiIGhlaWdodD0iMi42IiByeD0iMS4zIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41NSIvPgo8L3N2Zz4K"
+      }
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "appops get com.clean.pro.boost",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Uid mode: SYSTEM_ALERT_WINDOW: allow\nPOST_NOTIFICATION: allow\n  null=[\n    Access: [bg-s] 2026-09-26 13:50:00.000 (-10m0s0ms)\n  ]\nSYSTEM_ALERT_WINDOW: allow\n  null=[\n    Access: [bg-s] 2026-09-26 13:55:48.123 (-4m11s877ms)\n  ]\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "appops get com.whatsapp",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "POST_NOTIFICATION: allow\n  null=[\n    Access: [top-s] 2026-09-26 13:00:00.000 (-1h0m0s0ms)\n  ]\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "appops get com.wlive.forecast",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "POST_NOTIFICATION: allow; time=+2m ago\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.HOME",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n  com.sec.android.app.launcher/com.android.launcher3.uioverrides.QuickstepLauncher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cmd package query-activities --brief -a android.intent.action.MAIN -c android.intent.category.LAUNCHER",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n  com.whatsapp/.Main\npriority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n  com.wlive.forecast/com.wlive.forecast.MainActivity\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cmd package query-receivers --brief -a android.intent.action.BOOT_COMPLETED",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "priority=0\n  com.clean.pro.boost/.BootReceiver\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cmd role get-role-holders android.app.role.BROWSER",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "com.android.chrome\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cmd role get-role-holders android.app.role.HOME",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "com.sec.android.app.launcher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cmd role get-role-holders android.app.role.SMS",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "com.google.android.apps.messaging\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "content query --uri content://call_log/calls --projection _id 2>&1",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "content query --uri content://com.android.contacts/contacts --projection _id 2>&1",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "content query --uri content://mms --projection _id:m_size 2>&1",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "content query --uri content://sms --projection _id 2>&1",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "df -k /sdcard/",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Filesystem 1K-blocks Used Available Use% Mounted on\n/dev/fuse 120000000 50000000 70000000 42% /storage/emulated\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys alarm",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Current Alarm Manager state:\n  Alarm Stats:\n  u0a301:com.clean.pro.boost +1m2s running, 600 wakeups:\n    +1m2s 600 wakes 600 alarms, last -2m1s12ms:\n      *walarm*:com.clean.pro.boost/.AdReceiver\n  u0a250:com.whatsapp +3s running, 20 wakeups:\n    +3s 20 wakes 25 alarms, last -1h2m:\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys device_policy",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Current Device Policy Manager state:\n  User 0:\n    Enabled Device Admins (User 0, provisioningState: 0):\n      com.clean.pro.boost/.AdminReceiver:\n        uid=10001\n    mPasswordOwner=-1\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys notification",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Current Notification Manager state:\n  Notification List:\n    NotificationRecord(0x0a1: pkg=com.clean.pro.boost user=UserHandle{0} id=7 tag=null importance=4 key=0|com.clean.pro.boost|7|null|10301: Notification(channel=ads))\n      uid=10301 userId=0\n      fullscreenIntent=PendingIntent{5f3: android.os.BinderProxy@1}\n      tickerText=null\n    NotificationRecord(0x0b2: pkg=com.whatsapp user=UserHandle{0} id=1 tag=null importance=4 key=0|com.whatsapp|1|null|10250: Notification(channel=msg))\n      uid=10250 userId=0\n      fullscreenIntent=null\n      tickerText=Anna: hej, jutro o 10? pisz na anna.k@example.com\n  Snoozed notifications:\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys notification --noredact",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "<129 B>",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys notification --package admenot.none",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Current Notification Manager state (filtered to 'admenot.none'):\n  Notification List:\n  Notification listeners:\n    Allowed notification listeners:\n      com.whatsapp/com.whatsapp.NotificationListener (user: 0 isPrimary: true)\n    Has user set:\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys package packages",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Packages:\n  Package [com.clean.pro.boost] (b1a2c3):\n    userId=10301\n    versionCode=7 minSdk=24 targetSdk=33\n    firstInstallTime=2026-09-20 10:00:00\n    lastUpdateTime=2026-09-20 10:00:00\n    installerPackageName=com.android.chrome\n    requested permissions:\n      android.permission.INTERNET\n      android.permission.SYSTEM_ALERT_WINDOW\n      android.permission.RECEIVE_BOOT_COMPLETED\n      android.permission.QUERY_ALL_PACKAGES\n      android.permission.USE_FULL_SCREEN_INTENT\n      android.permission.POST_NOTIFICATIONS\n    install permissions:\n      android.permission.INTERNET: granted=true\n      android.permission.RECEIVE_BOOT_COMPLETED: granted=true\n      android.permission.QUERY_ALL_PACKAGES: granted=true\n    User 0: ceDataInode=1 installed=true enabled=0\n      runtime permissions:\n        android.permission.POST_NOTIFICATIONS: granted=true, flags=[ USER_SET ]\n  Package [com.whatsapp] (c1):\n    versionCode=242000 minSdk=21 targetSdk=34\n    firstInstallTime=2025-01-10 09:00:00\n    installerPackageName=com.android.vending\n    requested permissions:\n      android.permission.POST_NOTIFICATIONS\n  Package [com.wlive.forecast] (d1):\n    versionCode=31 minSdk=23 targetSdk=34\n    firstInstallTime=2026-06-01 12:00:00\n    installerPackageName=com.android.vending\n    requested permissions:\n      android.permission.POST_NOTIFICATIONS\n  Package [com.sec.android.app.launcher] (e1):\n    versionCode=150000 minSdk=34 targetSdk=34\n    firstInstallTime=2008-12-31 16:00:00\n    installerPackageName=null\n    requested permissions:\n      android.permission.QUERY_ALL_PACKAGES\n\nHidden system packages:\n  Package [com.sec.android.app.launcher] (f1):\n    versionCode=1\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "dumpsys usagestats",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "user=0\n  In-memory daily stats\n    events\n      time=\"2026-09-26 13:59:00\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:56:10\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:53:20\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:50:30\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:47:40\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:44:50\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:42:00\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:39:10\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:36:20\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:33:30\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:30:40\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:27:50\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:25:00\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:22:10\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:19:20\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:16:30\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:13:40\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:10:50\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:08:00\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:05:10\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 13:02:20\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:59:30\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:56:40\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:53:50\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:51:00\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:48:10\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:45:20\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:42:30\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:39:40\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:36:50\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:34:00\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:31:10\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:28:20\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:25:30\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:22:40\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:19:50\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:17:00\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:14:10\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:11:20\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:08:30\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:05:40\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:02:50\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 12:00:00\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 11:57:10\" type=NOTIFICATION_INTERRUPTION package=com.wlive.forecast\n      time=\"2026-09-26 11:54:20\" type=NOTIFICATION",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "find -H /sdcard -maxdepth 1 -type f -exec stat -c '%s|%Y|%n' {} +",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "10|1700000000|/sdcard/notes.txt\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "find -H /sdcard/Android/media/com.whatsapp/WhatsApp/Databases -name 'msgstore*.db.crypt*' -type f -exec stat -c '%s|%Y|%n' {} +",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "find: /sdcard/Android/media/com.whatsapp/WhatsApp/Databases: No such file or directory",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "find -H /sdcard/DCIM /sdcard/Download /sdcard/WhatsApp /sdcard/Music -name .thumbnails -prune -o -name .Thumbnails -prune -o -name .Trash -prune -o -name .trash -prune -o -name .Statuses -prune -o -name .cache -prune -o -type f -exec stat -c '%s|%Y|%n' {} +",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "2000|1700000000|/sdcard/DCIM/Camera/IMG_0002.jpg\n3000|1700000000|/sdcard/DCIM/Camera/IMG_0001.jpg\n400|1700000000|/sdcard/Music/song.mp3\n504|1700000000|/sdcard/Download/faktura.pdf\n702|1700000000|/sdcard/Download/szybki-cleaner.apk\n800|1700000000|/sdcard/WhatsApp/Media/WhatsApp Images/IMG-1.jpg\n902|1700000000|/sdcard/Download/gra.apk\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "find -H /sdcard/WhatsApp/Databases -name 'msgstore*.db.crypt*' -type f -exec stat -c '%s|%Y|%n' {} +",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "find: /sdcard/WhatsApp/Databases: No such file or directory",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "ls -1 /sdcard",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "DCIM\nDownload\nMusic\nnotes.txt\nWhatsApp\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "ls -1 /sdcard/Android/media/com.whatsapp",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "ls: /sdcard/Android/media/com.whatsapp: No such file or directory",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "ls -1 /sdcard/Android/media/com.whatsapp.w4b",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "ls: /sdcard/Android/media/com.whatsapp.w4b: No such file or directory",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm list packages -d --user 0",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm list packages -f -i -U --user 0",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "package:/data/app/~~Rg8wIz5ZcWJ2cUNYmbzZ2w==/com.clean.pro.boost-a1B2==/base.apk=com.clean.pro.boost  installer=com.android.chrome uid:10301\npackage:/data/app/~~x9==/com.whatsapp-q==/base.apk=com.whatsapp  installer=com.android.vending uid:10250\npackage:/data/app/~~y7==/com.wlive.forecast-z==/base.apk=com.wlive.forecast  installer=com.android.vending uid:10260\npackage:/system/priv-app/TouchWizHome/TouchWizHome.apk=com.sec.android.app.launcher  installer=null uid:10090\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm list packages -s --user 0",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "package:com.sec.android.app.launcher\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm list users",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Users:\n\tUserInfo{0:Owner:c13} running\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "settings get secure enabled_accessibility_services",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "null\n",
+      "tag": null
+     }
+    ],
+    [
+     "transfer:inventory",
+     {
+      "inventory": {
+       "contacts": 2,
+       "sms": 2,
+       "mms": null,
+       "mms_bytes": 0,
+       "calls": 1,
+       "categories": {
+        "media": {
+         "files": 2,
+         "bytes": 5000
+        },
+        "downloads": {
+         "files": 3,
+         "bytes": 2108
+        },
+        "whatsapp": {
+         "files": 1,
+         "bytes": 800
+        }
+       },
+       "others": [
+        {
+         "name": "",
+         "files": 1,
+         "bytes": 10
+        },
+        {
+         "name": "Music",
+         "files": 1,
+         "bytes": 400
+        }
+       ],
+       "apps": [
+        {
+         "package": "com.wlive.forecast",
+         "label": "com.wlive.forecast",
+         "verdict": "review",
+         "default_on": true,
+         "bytes": null
+        },
+        {
+         "package": "com.whatsapp",
+         "label": "com.whatsapp",
+         "verdict": "safe",
+         "default_on": true,
+         "bytes": null
+        }
+       ],
+       "skipped_apps": [
+        {
+         "package": "com.clean.pro.boost",
+         "label": "com.clean.pro.boost"
+        }
+       ],
+       "whatsapp_backup": null,
+       "storage": {
+        "used": 51200000000,
+        "total": 122880000000
+       },
+       "free_pc": 536870912000,
+       "unreadable": 0,
+       "denied": [],
+       "exports": {}
+      },
+      "resumable": null,
+      "client": "Anna K."
+     }
+    ],
+    [
+     "job:end",
+     {
+      "job_id": "job-1",
+      "kind": "transfer_scan"
+     }
+    ]
+   ]
+  },
+  {
+   "method": "start_backup",
+   "args": [
+    {
+     "contacts": true,
+     "sms": true,
+     "mms": false,
+     "calls": true,
+     "categories": [
+      "media",
+      "downloads",
+      "whatsapp"
+     ],
+     "others": [
+      "Music"
+     ],
+     "apps": [
+      "com.whatsapp"
+     ]
+    }
+   ],
+   "result": {
+    "job_id": "job-2"
+   },
+   "events": [
+    [
+     "transfer:copy",
+     {
+      "copy": {
+       "id": "R58T00TEST-90fae0b8e3f0/20260926-143000",
+       "serial": "R58T00TEST",
+       "model": "SM-A145R",
+       "manufacturer": "samsung",
+       "client": "Anna K.",
+       "created": "2026-09-26T14:30:00",
+       "expires": "2026-10-03T14:30:00",
+       "days_left": 7,
+       "status": "in_progress",
+       "bytes": 0,
+       "counts": {},
+       "selection": {},
+       "note": null,
+       "restores": []
+      }
+     }
+    ],
+    [
+     "transfer:progress",
+     {
+      "stage": "telephony",
+      "done_files": 0,
+      "total_files": 0,
+      "done_bytes": 0,
+      "total_bytes": 0,
+      "current": "",
+      "done_apps": 0,
+      "total_apps": 1
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "content query --uri content://call_log/calls --projection _id:number:date:duration:type:presentation:subscription_id:name --sort 'date ASC' 2>&1",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "content query --uri content://com.android.contacts/contacts --projection _id:starred:display_name 2>&1",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "content query --uri content://com.android.contacts/data --projection contact_id:raw_contact_id:mimetype:is_primary:data2:data3:data4:data5:data6:data7:data8:data9:data10:data1 2>&1",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "content query --uri content://com.android.contacts/raw_contacts --projection _id:contact_id:deleted:account_type:account_name 2>&1",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "content query --uri content://sms --projection _id:address:date:type:read:status:body --sort 'date ASC' 2>&1",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "content query --uri content://sms --projection _id:thread_id:address:date:date_sent:type:read:status:locked:sub_id:protocol:service_center:subject:body --sort 'date ASC' 2>&1",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "transfer:progress",
+     {
+      "stage": "files",
+      "done_files": 0,
+      "total_files": 7,
+      "done_bytes": 0,
+      "total_bytes": 8308,
+      "current": "",
+      "done_apps": 0,
+      "total_apps": 1
+     }
+    ],
+    [
+     "transfer:progress",
+     {
+      "stage": "apps",
+      "done_files": 7,
+      "total_files": 7,
+      "done_bytes": 8308,
+      "total_bytes": 8308,
+      "current": "com.whatsapp",
+      "done_apps": 0,
+      "total_apps": 1
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "host:pull /data/app/~~fake==/com.whatsapp-1/base.apk <tmp>\\data\\AdMeNot\\transfers\\R58T00TEST-90fae0b8e3f0\\20260926-143000\\.apk-tmp\\com.whatsapp\\.part-X\\base.apk",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "/data/app/~~fake==/com.whatsapp-1/base.apk: 1 file pulled\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm path com.whatsapp",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "package:/data/app/~~fake==/com.whatsapp-1/base.apk\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm path com.whatsapp",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "package:/data/app/~~fake==/com.whatsapp-1/base.apk\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "sha256sum '/data/app/~~fake==/com.whatsapp-1/base.apk'",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "5674c333cf98b7428fc89244006e6358a921d6c476c41e5474efd0d81dcfbc4c  /data/app/~~fake==/com.whatsapp-1/base.apk\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "sha256sum '/data/app/~~fake==/com.whatsapp-1/base.apk'",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "5674c333cf98b7428fc89244006e6358a921d6c476c41e5474efd0d81dcfbc4c  /data/app/~~fake==/com.whatsapp-1/base.apk\n",
+      "tag": null
+     }
+    ],
+    [
+     "transfer:done",
+     {
+      "result": {
+       "status": "complete",
+       "copy_id": "R58T00TEST-90fae0b8e3f0/20260926-143000",
+       "files_done": 7,
+       "files_failed": 0,
+       "apps_done": 1,
+       "apps_failed": 0,
+       "bytes": 8319,
+       "seconds": 0,
+       "telephony": {
+        "contacts": {
+         "status": "ok",
+         "count": 2,
+         "error": null,
+         "source": "phone"
+        },
+        "sms": {
+         "status": "ok",
+         "count": 2,
+         "error": null,
+         "source": "phone"
+        },
+        "calls": {
+         "status": "ok",
+         "count": 1,
+         "error": null,
+         "source": "phone"
+        }
+       }
+      },
+      "copy": {
+       "id": "R58T00TEST-90fae0b8e3f0/20260926-143000",
+       "serial": "R58T00TEST",
+       "model": "SM-A145R",
+       "manufacturer": "samsung",
+       "client": "Anna K.",
+       "created": "2026-09-26T14:30:00",
+       "expires": "2026-10-03T14:30:00",
+       "days_left": 7,
+       "status": "complete",
+       "bytes": 8319,
+       "counts": {
+        "files": 7,
+        "files_failed": 0,
+        "files_skipped": 0,
+        "apps": 1,
+        "apps_failed": 0,
+        "apps_skipped": 0,
+        "unreadable": 0,
+        "contacts": 2,
+        "sms": 2,
+        "calls": 1,
+        "files_photos": 2,
+        "files_downloads": 3,
+        "files_others": 1,
+        "files_whatsapp": 1
+       },
+       "selection": {
+        "contacts": true,
+        "sms": true,
+        "mms": false,
+        "calls": true,
+        "categories": [
+         "downloads",
+         "media",
+         "whatsapp"
+        ],
+        "others": [
+         "Music"
+        ],
+        "apps": [
+         "com.whatsapp"
+        ],
+        "verify_hash": false,
+        "exports": []
+       },
+       "note": null,
+       "restores": []
+      }
+     }
+    ],
+    [
+     "job:end",
+     {
+      "job_id": "job-2",
+      "kind": "backup"
+     }
+    ]
+   ]
+  },
+  {
+   "method": "transfers",
+   "args": [],
+   "result": {
+    "copies": [
+     {
+      "id": "R58T00TEST-90fae0b8e3f0/20260926-143000",
+      "serial": "R58T00TEST",
+      "model": "SM-A145R",
+      "manufacturer": "samsung",
+      "client": "Anna K.",
+      "created": "2026-09-26T14:30:00",
+      "expires": "2026-10-03T14:30:00",
+      "days_left": 7,
+      "status": "complete",
+      "bytes": 8319,
+      "counts": {
+       "files": 7,
+       "files_failed": 0,
+       "files_skipped": 0,
+       "apps": 1,
+       "apps_failed": 0,
+       "apps_skipped": 0,
+       "unreadable": 0,
+       "contacts": 2,
+       "sms": 2,
+       "calls": 1,
+       "files_photos": 2,
+       "files_downloads": 3,
+       "files_others": 1,
+       "files_whatsapp": 1
+      },
+      "selection": {
+       "contacts": true,
+       "sms": true,
+       "mms": false,
+       "calls": true,
+       "categories": [
+        "downloads",
+        "media",
+        "whatsapp"
+       ],
+       "others": [
+        "Music"
+       ],
+       "apps": [
+        "com.whatsapp"
+       ],
+       "verify_hash": false,
+       "exports": []
+      },
+      "note": null,
+      "restores": []
+     }
+    ]
+   },
+   "events": []
+  },
+  {
+   "method": "restore_plan",
+   "args": [
+    "R58T00TEST-90fae0b8e3f0/20260926-143000",
+    "R58W20NEW01"
+   ],
+   "result": {
+    "job_id": "job-3"
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "cat /proc/uptime",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "280000.12 500000.00\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "date \"+%Y-%m-%d %H:%M:%S\"",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "2026-09-26 14:00:00\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "getprop",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "[ro.product.brand]: [samsung]\n[ro.product.manufacturer]: [samsung]\n[ro.product.model]: [SM-A546B]\n[ro.product.device]: [a54x]\n[ro.build.version.release]: [14]\n[ro.build.version.sdk]: [34]\n[ro.build.version.security_patch]: [2026-07-01]\n[ro.serialno]: [R58W20NEW01]\n[persist.sys.device_name]: [Nowy telefon Anny]\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "service call iphonesubinfo 1 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 1 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "service call iphonesubinfo 2 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 2 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "service call iphonesubinfo 3 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 3 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "service call iphonesubinfo 4 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 4 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "settings get --user 0 secure android_id",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "null\n",
+      "tag": null
+     }
+    ],
+    [
+     "scan:device",
+     {
+      "device": {
+       "serial": "R58W20NEW01",
+       "name": "samsung SM-A546B",
+       "brand": "samsung",
+       "manufacturer": "samsung",
+       "model": "SM-A546B",
+       "market_name": null,
+       "android": "14",
+       "sdk": 34,
+       "patch": "2026-07-01",
+       "uptime_s": 280000.12,
+       "imei": null,
+       "match": {
+        "confidence": "none",
+        "step": "no_db",
+        "matched": null
+       },
+       "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9Ii0xNiAtMTYgMTU2IDI3MiIgd2lkdGg9IjE1NiIgaGVpZ2h0PSIyNzIiPgogIDx0aXRsZT5UZWxlZm9uPC90aXRsZT4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iYm9keSIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMzYTQ1NTgiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIuNTUiIHN0b3AtY29sb3I9IiMxZjI5MzciLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMTExODI3Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJlZGdlIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzk0YTNiOCIgc3RvcC1vcGFjaXR5PSIuOSIvPgogICAgICA8c3RvcCBvZmZzZXQ9Ii41IiBzdG9wLWNvbG9yPSIjNDc1NTY5IiBzdG9wLW9wYWNpdHk9Ii41Ii8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBiMTIyMCIgc3RvcC1vcGFjaXR5PSIuOSIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ic2NyZWVuIiB4MT0iMCIgeTE9IjAiIHgyPSIuMzUiIHkyPSIxIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNjM2NmYxIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iLjUiIHN0b3AtY29sb3I9IiMzNzMwYTMiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPHJhZGlhbEdyYWRpZW50IGlkPSJnbG93QSIgY3g9Ii4yIiBjeT0iLjIyIiByPSIuNiI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2E1YjRmYyIgc3RvcC1vcGFjaXR5PSIuNzUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTViNGZjIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgIDwvcmFkaWFsR3JhZGllbnQ+CiAgICA8cmFkaWFsR3JhZGllbnQgaWQ9Imdsb3dCIiBjeD0iLjkiIGN5PSIuNzgiIHI9Ii41NSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzIyZDNlZSIgc3RvcC1vcGFjaXR5PSIuNDUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMjJkM2VlIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgIDwvcmFkaWFsR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdsYXJlIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMCI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2ZmZiIgc3RvcC1vcGFjaXR5PSIuMTYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjZmZmIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXAiPjxyZWN0IHg9IjkiIHk9IjkiIHdpZHRoPSIxMDIiIGhlaWdodD0iMjIyIiByeD0iMTMiLz48L2NsaXBQYXRoPgogIDwvZGVmcz4KICA8IS0tIHByenljaXNraSBib2N6bmUgLS0+CiAgPHJlY3QgeD0iMTE3IiB5PSI1OCIgd2lkdGg9IjQiIGhlaWdodD0iMjIiIHJ4PSIxLjUiIGZpbGw9IiMzMzQxNTUiLz4KICA8cmVjdCB4PSIxMTciIHk9IjkwIiB3aWR0aD0iNCIgaGVpZ2h0PSI0MCIgcng9IjEuNSIgZmlsbD0iIzMzNDE1NSIvPgogIDwhLS0gb2J1ZG93YSAtLT4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iMTE2IiBoZWlnaHQ9IjIzNiIgcng9IjE5IiBmaWxsPSJ1cmwoI2JvZHkpIi8+CiAgPHJlY3QgeD0iMi43NSIgeT0iMi43NSIgd2lkdGg9IjExNC41IiBoZWlnaHQ9IjIzNC41IiByeD0iMTguMjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0idXJsKCNlZGdlKSIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICA8IS0tIGVrcmFuIC0tPgogIDxnIGNsaXAtcGF0aD0idXJsKCNjbGlwKSI+CiAgICA8cmVjdCB4PSI5IiB5PSI5IiB3aWR0aD0iMTAyIiBoZWlnaHQ9IjIyMiIgZmlsbD0idXJsKCNzY3JlZW4pIi8+CiAgICA8cmVjdCB4PSI5IiB5PSI5IiB3aWR0aD0iMTAyIiBoZWlnaHQ9IjIyMiIgZmlsbD0idXJsKCNnbG93QSkiLz4KICAgIDxyZWN0IHg9IjkiIHk9IjkiIHdpZHRoPSIxMDIiIGhlaWdodD0iMjIyIiBmaWxsPSJ1cmwoI2dsb3dCKSIvPgogICAgPHBhdGggZD0iTTkgOWg2Mkw5IDE1MHoiIGZpbGw9InVybCgjZ2xhcmUpIi8+CiAgPC9nPgogIDxyZWN0IHg9IjkuNSIgeT0iOS41IiB3aWR0aD0iMTAxIiBoZWlnaHQ9IjIyMSIgcng9IjEyLjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLW9wYWNpdHk9Ii4zNSIvPgogIDwhLS0gYXBhcmF0IHByemVkbmkgaSBwYXNlayBnZXN0w7N3IC0tPgogIDxjaXJjbGUgY3g9IjYwIiBjeT0iMjAiIHI9IjMuNCIgZmlsbD0iIzBiMTAyMCIvPgogIDxjaXJjbGUgY3g9IjYxIiBjeT0iMTkiIHI9IjEiIGZpbGw9IiM0NzU1NjkiLz4KICA8cmVjdCB4PSI0NCIgeT0iMjIyIiB3aWR0aD0iMzIiIGhlaWdodD0iMi42IiByeD0iMS4zIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41NSIvPgo8L3N2Zz4K"
+      }
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "content query --uri content://call_log/calls --projection _id:number:date:duration:type:name 2>&1",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "content query --uri content://call_log/calls --projection _id:number:date:duration:type:presentation:subscription_id:name 2>&1",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "content query --uri content://com.android.contacts/contacts --projection _id:starred:display_name 2>&1",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "content query --uri content://sms --projection _id:address:date:type:read:status:body 2>&1",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "content query --uri content://sms --projection _id:thread_id:address:date:date_sent:type:read:status:locked:sub_id:protocol:service_center:subject:body 2>&1",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "df -k /sdcard/",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Filesystem 1K-blocks Used Available Use% Mounted on\n/dev/fuse 120000000 50000000 70000000 42% /storage/emulated\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "stat -c '%s|%Y|%n' '/sdcard/DCIM/Camera/IMG_0001 (z kopii).jpg' '/sdcard/DCIM/Camera/IMG_0001 (z kopii 2).jpg' '/sdcard/DCIM/Camera/IMG_0001 (z kopii 3).jpg' '/sdcard/DCIM/Camera/IMG_0001 (z kopii 4).jpg' '/sdcard/DCIM/Camera/IMG_0001 (z kopii 5).jpg' 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "stat: '/sdcard/DCIM/Camera/IMG_0001 (z kopii).jpg': No such file or directory\nstat: '/sdcard/DCIM/Camera/IMG_0001 (z kopii 2).jpg': No such file or directory\nstat: '/sdcard/DCIM/Camera/IMG_0001 (z kopii 3).jpg': No such file or directory\nstat: '/sdcard/DCIM/Camera/IMG_0001 (z kopii 4).jpg': No such file or directory\nstat: '/sdcard/DCIM/Camera/IMG_0001 (z kopii 5).jpg': No such file or directory\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "stat -c '%s|%Y|%n' /sdcard/DCIM/Camera/IMG_0001.jpg /sdcard/DCIM/Camera/IMG_0002.jpg /sdcard/Download/faktura.pdf /sdcard/Download/gra.apk /sdcard/Download/szybki-cleaner.apk /sdcard/Music/song.mp3 '/sdcard/WhatsApp/Media/WhatsApp Images/IMG-1.jpg' 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "28|1700000000|/sdcard/DCIM/Camera/IMG_0001.jpg\nstat: '/sdcard/DCIM/Camera/IMG_0002.jpg': No such file or directory\nstat: '/sdcard/Download/faktura.pdf': No such file or directory\nstat: '/sdcard/Download/gra.apk': No such file or directory\nstat: '/sdcard/Download/szybki-cleaner.apk': No such file or directory\nstat: '/sdcard/Music/song.mp3': No such file or directory\nstat: '/sdcard/WhatsApp/Media/WhatsApp Images/IMG-1.jpg': No such file or directory\n",
+      "tag": null
+     }
+    ],
+    [
+     "transfer:restore_plan",
+     {
+      "plan": {
+       "groups": {
+        "photos": {
+         "files": 2,
+         "bytes": 5000,
+         "exists": 0,
+         "rename": 1
+        },
+        "videos": {
+         "files": 0,
+         "bytes": 0,
+         "exists": 0,
+         "rename": 0
+        },
+        "downloads": {
+         "files": 3,
+         "bytes": 504,
+         "exists": 0,
+         "rename": 0
+        },
+        "whatsapp": {
+         "files": 1,
+         "bytes": 800,
+         "exists": 0,
+         "rename": 0
+        }
+       },
+       "others": [
+        {
+         "name": "Music",
+         "files": 1,
+         "bytes": 400,
+         "exists": 0,
+         "rename": 0
+        }
+       ],
+       "apks": [
+        {
+         "remote": "/sdcard/Download/gra.apk",
+         "name": "gra.apk",
+         "group": "downloads",
+         "bytes": 902,
+         "action": "push",
+         "outcome": "suspicious",
+         "level": "static",
+         "default_on": false
+        },
+        {
+         "remote": "/sdcard/Download/szybki-cleaner.apk",
+         "name": "szybki-cleaner.apk",
+         "group": "downloads",
+         "bytes": 702,
+         "action": "push",
+         "outcome": "malicious",
+         "level": "ioc",
+         "default_on": false
+        }
+       ],
+       "space": {
+        "free": 71680000000,
+        "total": 122880000000
+       },
+       "reserve": 6144000000,
+       "missing": 0
+      },
+      "tel": {
+       "contacts": {
+        "write": 2,
+        "existing": 0,
+        "skipped_synced": [],
+        "skipped_messenger": 0
+       },
+       "sms": {
+        "write": 2,
+        "existing": 0
+       },
+       "mms": null,
+       "calls": {
+        "write": 1,
+        "existing": 0
+       },
+       "phone_has_contacts": false,
+       "readable": {
+        "contacts": false,
+        "sms": false,
+        "calls": false
+       }
+      },
+      "copy": {
+       "id": "R58T00TEST-90fae0b8e3f0/20260926-143000",
+       "serial": "R58T00TEST",
+       "model": "SM-A145R",
+       "manufacturer": "samsung",
+       "client": "Anna K.",
+       "created": "2026-09-26T14:30:00",
+       "expires": "2026-10-03T14:30:00",
+       "days_left": 7,
+       "status": "complete",
+       "bytes": 8319,
+       "counts": {
+        "files": 7,
+        "files_failed": 0,
+        "files_skipped": 0,
+        "apps": 1,
+        "apps_failed": 0,
+        "apps_skipped": 0,
+        "unreadable": 0,
+        "contacts": 2,
+        "sms": 2,
+        "calls": 1,
+        "files_photos": 2,
+        "files_downloads": 3,
+        "files_others": 1,
+        "files_whatsapp": 1
+       },
+       "selection": {
+        "contacts": true,
+        "sms": true,
+        "mms": false,
+        "calls": true,
+        "categories": [
+         "downloads",
+         "media",
+         "whatsapp"
+        ],
+        "others": [
+         "Music"
+        ],
+        "apps": [
+         "com.whatsapp"
+        ],
+        "verify_hash": false,
+        "exports": []
+       },
+       "note": null,
+       "restores": []
+      },
+      "resumable": false,
+      "same_phone_recent": false
+     }
+    ],
+    [
+     "job:end",
+     {
+      "job_id": "job-3",
+      "kind": "restore_plan"
+     }
+    ]
+   ]
+  },
+  {
+   "method": "start_restore",
+   "args": [
+    {
+     "groups": [
+      "photos",
+      "videos",
+      "downloads",
+      "whatsapp",
+      "other:Music"
+     ],
+     "apks_on": [],
+     "verify_hash": false
+    }
+   ],
+   "result": {
+    "job_id": "job-4"
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "mkdir -p /sdcard/DCIM/Camera /sdcard/Download /sdcard/Music '/sdcard/WhatsApp/Media/WhatsApp Images'",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "transfer:restore_progress",
+     {
+      "stage": "files",
+      "done_files": 0,
+      "total_files": 5,
+      "done_bytes": 0,
+      "total_bytes": 6704,
+      "current": ""
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "df -k /sdcard/",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Filesystem 1K-blocks Used Available Use% Mounted on\n/dev/fuse 120000000 50000000 70000000 42% /storage/emulated\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "df -k /sdcard/",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Filesystem 1K-blocks Used Available Use% Mounted on\n/dev/fuse 120000000 50000000 70000000 42% /storage/emulated\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "df -k /sdcard/",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Filesystem 1K-blocks Used Available Use% Mounted on\n/dev/fuse 120000000 50000000 70000000 42% /storage/emulated\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "df -k /sdcard/",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Filesystem 1K-blocks Used Available Use% Mounted on\n/dev/fuse 120000000 50000000 70000000 42% /storage/emulated\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "df -k /sdcard/",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Filesystem 1K-blocks Used Available Use% Mounted on\n/dev/fuse 120000000 50000000 70000000 42% /storage/emulated\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "stat -c '%s|%Y|%n' '/sdcard/DCIM/Camera/IMG_0001 (z kopii).jpg' 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "stat: '/sdcard/DCIM/Camera/IMG_0001 (z kopii).jpg': No such file or directory\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "stat -c '%s|%Y|%n' '/sdcard/DCIM/Camera/IMG_0001 (z kopii).jpg' 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "3000|1700000000|/sdcard/DCIM/Camera/IMG_0001 (z kopii).jpg\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "stat -c '%s|%Y|%n' '/sdcard/WhatsApp/Media/WhatsApp Images/IMG-1.jpg' 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "stat: '/sdcard/WhatsApp/Media/WhatsApp Images/IMG-1.jpg': No such file or directory\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "stat -c '%s|%Y|%n' '/sdcard/WhatsApp/Media/WhatsApp Images/IMG-1.jpg' 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "800|1700000000|/sdcard/WhatsApp/Media/WhatsApp Images/IMG-1.jpg\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "stat -c '%s|%Y|%n' /sdcard/DCIM/Camera/IMG_0002.jpg 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "stat: '/sdcard/DCIM/Camera/IMG_0002.jpg': No such file or directory\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "stat -c '%s|%Y|%n' /sdcard/DCIM/Camera/IMG_0002.jpg 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "2000|1700000000|/sdcard/DCIM/Camera/IMG_0002.jpg\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "stat -c '%s|%Y|%n' /sdcard/Download/faktura.pdf 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "stat: '/sdcard/Download/faktura.pdf': No such file or directory\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "stat -c '%s|%Y|%n' /sdcard/Download/faktura.pdf 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "504|1700000000|/sdcard/Download/faktura.pdf\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "stat -c '%s|%Y|%n' /sdcard/Music/song.mp3 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "stat: '/sdcard/Music/song.mp3': No such file or directory\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "stat -c '%s|%Y|%n' /sdcard/Music/song.mp3 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "400|1700000000|/sdcard/Music/song.mp3\n",
+      "tag": null
+     }
+    ],
+    [
+     "transfer:restore_progress",
+     {
+      "stage": "scan",
+      "done_files": 5,
+      "total_files": 5,
+      "done_bytes": 6704,
+      "total_bytes": 6704,
+      "current": ""
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "content call --uri content://media --method scan_volume --arg external_primary",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "Result: Bundle[{}]\n",
+      "tag": null
+     }
+    ],
+    [
+     "transfer:restore_done",
+     {
+      "result": {
+       "status": "complete",
+       "target_serial": "R58W20NEW01",
+       "files_done": 5,
+       "files_exists": 0,
+       "files_renamed": 1,
+       "files_denied": 0,
+       "files_failed": 0,
+       "files_unselected": 0,
+       "apk_skipped": 1,
+       "apk_suspicious_skipped": 1,
+       "bytes": 6704,
+       "seconds": 0,
+       "hashed": false,
+       "media_scan": "done",
+       "files_missing": 0
+      },
+      "copy": {
+       "id": "R58T00TEST-90fae0b8e3f0/20260926-143000",
+       "serial": "R58T00TEST",
+       "model": "SM-A145R",
+       "manufacturer": "samsung",
+       "client": "Anna K.",
+       "created": "2026-09-26T14:30:00",
+       "expires": "2026-10-03T14:30:00",
+       "days_left": 7,
+       "status": "complete",
+       "bytes": 8319,
+       "counts": {
+        "files": 7,
+        "files_failed": 0,
+        "files_skipped": 0,
+        "apps": 1,
+        "apps_failed": 0,
+        "apps_skipped": 0,
+        "unreadable": 0,
+        "contacts": 2,
+        "sms": 2,
+        "calls": 1,
+        "files_photos": 2,
+        "files_downloads": 3,
+        "files_others": 1,
+        "files_whatsapp": 1
+       },
+       "selection": {
+        "contacts": true,
+        "sms": true,
+        "mms": false,
+        "calls": true,
+        "categories": [
+         "downloads",
+         "media",
+         "whatsapp"
+        ],
+        "others": [
+         "Music"
+        ],
+        "apps": [
+         "com.whatsapp"
+        ],
+        "verify_hash": false,
+        "exports": []
+       },
+       "note": null,
+       "restores": [
+        {
+         "serial": "R58W20NEW01",
+         "imei": null,
+         "status": "complete",
+         "updated": "2026-09-26T12:31:00+00:00",
+         "resumable": false
+        }
+       ]
+      },
+      "tel": null,
+      "tel_error": null
+     }
+    ],
+    [
+     "job:end",
+     {
+      "job_id": "job-4",
+      "kind": "restore"
+     }
+    ]
+   ]
+  },
+  {
+   "method": "transfers",
+   "args": [],
+   "result": {
+    "copies": [
+     {
+      "id": "R58T00TEST-90fae0b8e3f0/20260926-143000",
+      "serial": "R58T00TEST",
+      "model": "SM-A145R",
+      "manufacturer": "samsung",
+      "client": "Anna K.",
+      "created": "2026-09-26T14:30:00",
+      "expires": "2026-10-03T14:30:00",
+      "days_left": 7,
+      "status": "complete",
+      "bytes": 8319,
+      "counts": {
+       "files": 7,
+       "files_failed": 0,
+       "files_skipped": 0,
+       "apps": 1,
+       "apps_failed": 0,
+       "apps_skipped": 0,
+       "unreadable": 0,
+       "contacts": 2,
+       "sms": 2,
+       "calls": 1,
+       "files_photos": 2,
+       "files_downloads": 3,
+       "files_others": 1,
+       "files_whatsapp": 1
+      },
+      "selection": {
+       "contacts": true,
+       "sms": true,
+       "mms": false,
+       "calls": true,
+       "categories": [
+        "downloads",
+        "media",
+        "whatsapp"
+       ],
+       "others": [
+        "Music"
+       ],
+       "apps": [
+        "com.whatsapp"
+       ],
+       "verify_hash": false,
+       "exports": []
+      },
+      "note": null,
+      "restores": [
+       {
+        "serial": "R58W20NEW01",
+        "imei": null,
+        "status": "complete",
+        "updated": "2026-09-26T12:31:00+00:00",
+        "resumable": false
+       }
+      ]
+     }
+    ]
+   },
+   "events": []
+  }
+ ]
+}

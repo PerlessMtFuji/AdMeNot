@@ -6,6 +6,7 @@
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Clock from '@lucide/svelte/icons/clock';
+  import Copy from '@lucide/svelte/icons/copy';
   import Download from '@lucide/svelte/icons/download';
   import Eye from '@lucide/svelte/icons/eye';
   import FileText from '@lucide/svelte/icons/file-text';
@@ -44,7 +45,7 @@
     history: HistoryIcon, settings: SettingsIcon, plus: Plus, pause: Pause, 'qr-code': QrCode, smartphone: Smartphone,
     'shield-x': ShieldX, 'shield-alert': ShieldAlert, 'shield-user': ShieldUser, 'scan-search': ScanSearch,
     'file-text': FileText, camera: Camera, 'screen-share': ScreenShare, 'screen-share-off': ScreenShareOff,
-    heart: Heart,
+    heart: Heart, copy: Copy,
   } as const;
   export type IconName = keyof typeof ICONS;
 </script>

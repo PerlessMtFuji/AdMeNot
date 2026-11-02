@@ -145,7 +145,8 @@ def test_sample_and_privacy_link():
     opened = []
     api, _ = make_api(make_cli_phone(), open_url=opened.append)
     sample = api.telemetry_sample()
-    assert {e["type"] for e in sample["basic"]} == {"start", "scan", "repair", "undo"}
+    assert {e["type"] for e in sample["basic"]} == {"start", "scan", "repair", "undo", "transfer_backup",
+                                                    "transfer_restore"}
     api.open_privacy()
     assert opened == ["https://admenot.perlessmtfuji.workers.dev/pl/privacy"]
 

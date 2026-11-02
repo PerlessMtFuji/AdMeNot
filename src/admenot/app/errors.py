@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import traceback
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -44,10 +45,14 @@ def error_payload(exc: BaseException) -> dict[str, Any]:
     return {"key": "internal", "message": f"{type(exc).__name__}: {exc}"}
 
 
-def log_exception(exc: BaseException) -> Path:
+def log_exception(exc: BaseException, scrub: Callable[[str], str] | None = None) -> Path:
+    """Traceback do `app-<dzień>.log`; `scrub` czyści tekst przed zapisem (np. ścieżki plików
+    klienta przy błędach kopii danych)."""
     path = logs_dir() / f"app-{datetime.now():%Y-%m-%d}.log"
     path.parent.mkdir(parents=True, exist_ok=True)
     text = "".join(traceback.format_exception(exc))
+    if scrub is not None:
+        text = scrub(text)
     with path.open("a", encoding="utf-8") as fh:
         fh.write(f"--- {datetime.now().isoformat(timespec='seconds')}\n{text}\n")
     return path

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getContext } from 'svelte';
   import type { Controller } from '../lib/controller';
-  import { ERROR_KEYS, t } from '../lib/i18n/index.svelte';
+  import { ERROR_KEYS, RESTORE_ERROR_KEYS, RESTORE_JOB_KINDS, t } from '../lib/i18n/index.svelte';
   import { enter } from '../lib/motion';
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
@@ -11,6 +11,11 @@
   const s = ctl.state;
   const known: readonly string[] = ERROR_KEYS;
   const key = $derived(s.error && known.includes(s.error.key) ? s.error.key : 'internal');
+  // Wspólne z kopią klucze („rozpocznij kopię jeszcze raz”) przy wgrywaniu mają własny tekst.
+  const restoreKeys: readonly string[] = RESTORE_ERROR_KEYS;
+  const restoreKinds: readonly string[] = RESTORE_JOB_KINDS;
+  const text = $derived(restoreKeys.includes(key) && restoreKinds.includes(s.error?.kind ?? '')
+    ? `transfer.restore.error.${key}` : `error.${key}`);
   // Telefon jak na karcie urządzenia: nazwa, a obok IMEI (zapas: numer seryjny), żeby rozróżnić dwa takie same modele.
   const device = $derived.by(() => {
     const e = s.error;
@@ -34,7 +39,7 @@
   <div role="alert" in:enter class="flex items-start gap-3 rounded-2xl border border-bad/30 bg-bad-soft px-4 py-3">
     <span class="mt-0.5 text-bad"><Icon name="triangle-alert" size={16} /></span>
     <div class="min-w-0 flex-1">
-      <b class="text-ink">{t(`error.${key}`, { device })}</b>
+      <b class="text-ink">{t(text, { device })}</b>
       {#if s.error.message && key !== 'wrong_device' && key !== 'device_mismatch'}
         <div class="mono mt-1 text-xs break-words text-mut">{s.error.message}</div>
       {/if}

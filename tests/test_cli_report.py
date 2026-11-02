@@ -9,7 +9,7 @@ from admenot.engine.adb.fake import FakeAdb
 from admenot.engine.journal.db import Journal
 from admenot.engine.paths import journal_path
 from admenot.engine.report.pdf import PdfError
-from admenot.engine.settings import ServiceInfo, load_service
+from admenot.engine.settings import ServiceInfo, load_service, save_settings
 
 
 @pytest.fixture(autouse=True)
@@ -137,6 +137,26 @@ def test_report_pdf_failure_keeps_html(capsys, monkeypatch, data_dir, key, text)
     err = capsys.readouterr().err
     html = data_dir / "AdMeNot" / "reports" / f"{number.replace('/', '-')}.html"
     assert text in err and str(html) in err and html.is_file()
+
+
+def test_report_follows_the_pdf_folder_setting(capsys, edge, data_dir):
+    number = fixed_order(capsys)
+    archive = data_dir / "archiwum"
+    save_settings({"report_pdf_dir": str(archive)})
+    assert main(["report", "--order", number], host=no_phone()) == 0
+    pdf = archive / f"{number.replace('/', '-')}.pdf"
+    assert str(pdf) in capsys.readouterr().out and pdf.is_file()
+
+
+def test_report_unreachable_pdf_folder_names_it(capsys, edge, data_dir):
+    number = fixed_order(capsys)
+    blocker = data_dir / "plik"
+    blocker.write_text("x", "utf-8")  # folder pod plikiem: mkdir zawsze się nie uda
+    save_settings({"report_pdf_dir": str(blocker / "pdf")})
+    assert main(["report", "--order", number], host=no_phone()) == 6
+    err = capsys.readouterr().err
+    assert "Nie da się zapisać PDF" in err and str(blocker / "pdf") in err
+    assert edge.calls == []
 
 
 def test_report_for_order_from_before_plan_6(capsys, edge, data_dir):

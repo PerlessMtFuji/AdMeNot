@@ -3,9 +3,10 @@
   import Console from '../components/Console.svelte';
   import CrashBanner from '../components/CrashBanner.svelte';
   import ErrorCard from '../components/ErrorCard.svelte';
+  import PhoneCleanup from '../components/PhoneCleanup.svelte';
   import UpdateBanner from '../components/UpdateBanner.svelte';
   import type { Controller } from '../lib/controller';
-  import { updateBanner } from '../lib/logic';
+  import { cleanupBanner, updateBanner } from '../lib/logic';
   import StepRail from './StepRail.svelte';
 
   let { children }: { children: Snippet } = $props();
@@ -18,6 +19,10 @@
     {#if updateBanner(s.update, s.updatedSeen)}<div class="px-6 pt-4"><UpdateBanner /></div>{/if}
     {#if !updateBanner(s.update, s.updatedSeen) && s.crashStartup.length > 0}<div class="px-6 pt-4"><CrashBanner /></div>{/if}
     {#if s.error}<div class="px-6 pt-4"><ErrorCard /></div>{/if}
+    <!-- przywracanie ustawień telefonu widać na każdym ekranie; Połącz pokazuje je u siebie -->
+    {#if cleanupBanner(s.transfer.cleanup, s.serial) && !(s.screen === 'main' && s.phase === 'connect')}
+      <div class="flex flex-col gap-2 px-6 pt-4"><PhoneCleanup /></div>
+    {/if}
     <div class="flex min-h-0 min-w-0 flex-1">{@render children()}</div>
     {#if s.settings.mode === 'expert' && s.consoleOpen && s.screen === 'main'}<Console />{/if}
   </div>

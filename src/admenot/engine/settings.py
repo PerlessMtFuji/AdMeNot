@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from admenot.engine.oplock import try_lock, unlock
-from admenot.engine.paths import settings_path
+from admenot.engine.paths import reports_dir, settings_path
 
 LANGS = ("pl", "en")
 MODES = ("simple", "expert")
@@ -34,7 +34,7 @@ SELECT_LEVELS = ("silence", "disable", "remove")  # poziomy akcji (actions/plann
 APK_MODES = ("ask", "full", "manual")  # co po szybkim skanie: pytać, pełna analiza APK, tryb ręczny
 RETENTION_DAYS = (30, 60, 90, 180, 365)  # okres przechowywania zleceń do wyboru; None = nie usuwaj
 DEFAULT_RETENTION_DAYS = 60  # RODO: domyślnie ograniczone przechowywanie danych klientów
-KEYS = ("lang", "mode", "adb_path", "backups_dir", "theme", "mirror_auto",
+KEYS = ("lang", "mode", "adb_path", "backups_dir", "report_pdf_dir", "theme", "mirror_auto",
         "apk_cache_limit_gb", "apk_cache_clear_after_repair", "select_level",
         "check_updates", "dismissed_update", "last_run_version", "retention_days",
         "apk_mode_default")
@@ -75,6 +75,7 @@ class Settings:
     mode: str = "simple"
     adb_path: str | None = None
     backups_dir: str | None = None
+    report_pdf_dir: str | None = None  # None = katalog reports w danych programu (report/files.py)
     theme: str = "system"
     mirror_auto: bool = False
     apk_cache_limit_gb: int = 10  # górna granica; działa tyle, ile mieści dysk (apk/cache.py)
@@ -213,6 +214,19 @@ def _save(path: Path, update: Callable[[dict[str, Any]], None]) -> None:
         _write(path, data)
 
 
+def archive_dir_ok(value: str) -> bool:
+    """Folder PDF to archiwum serwisu: tylko ścieżka bezwzględna (względna zależałaby od katalogu
+    startu programu) i nie katalog `reports` programu — stamtąd usunięcie zlecenia kasuje protokoły."""
+    path = Path(value)
+    if not path.is_absolute():
+        return False
+    try:
+        same = os.path.normcase(path.resolve()) == os.path.normcase(reports_dir().resolve())
+    except OSError:  # niedostępny dysk sieciowy: nie blokujemy zapisu, błąd wyjdzie przy protokole
+        same = False
+    return not same
+
+
 def _valid(key: str, value: Any) -> bool:
     if key == "donate_count":
         return isinstance(value, int) and not isinstance(value, bool) and value >= 0
@@ -243,6 +257,8 @@ def _valid(key: str, value: Any) -> bool:
         return value in APK_MODES
     if key == "retention_days":
         return value is None or (type(value) is int and value in RETENTION_DAYS)
+    if key == "report_pdf_dir" and isinstance(value, str) and value.strip():
+        return archive_dir_ok(value.strip())
     return value is None or (isinstance(value, str) and value.strip() != "")
 
 

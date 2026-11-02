@@ -60,6 +60,15 @@ def test_bad_values_in_file_are_ignored_and_rejected_on_save():
         S.save_settings({"colour": "red"})
 
 
+def test_report_pdf_dir_must_be_absolute_and_not_the_program_reports(data_dir):
+    archive = data_dir / "archiwum"
+    assert S.save_settings({"report_pdf_dir": str(archive)}).report_pdf_dir == str(archive)
+    for bad in ("protokoly", str(reports_dir()), str(reports_dir()).upper() + "\\"):
+        with pytest.raises(ValueError):
+            S.save_settings({"report_pdf_dir": bad})
+    assert S.save_settings({"report_pdf_dir": None}).report_pdf_dir is None
+
+
 def test_backups_dir_follows_the_setting(data_dir):
     assert backups_dir() == data_dir / "AdMeNot" / "backups"
     S.save_settings({"backups_dir": str(data_dir / "kopie")})

@@ -1,17 +1,74 @@
 import { SvelteSet } from 'svelte/reactivity';
 import { actedLevels, type ActedLog, type OpenGroups, type Phase } from './logic';
 import type {
-  ApiErrorBody, ApkEstimate, ApkQuestion, Category, ConsoleEntry, DeviceEntry, EtaView, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
+  ApiErrorBody, ApkEstimate, BackupResultView, CopyView, InventoryView, RestorePlanView, RestoreProgressView, RestoreResultView, TapRequest, TelPlanView, TelProgressView, TelResultView, TransferProgress, TransferSelection, UploadChoiceView, ApkQuestion, Category, ConsoleEntry, DeviceEntry, EtaView, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
   PlanView, Question, ReportResult, ScanView, Settings, ShareState, ShotsView, ShotView, StepEvent, UndoDone, UndoSite, UpdateView, UserWait, Verdict, WhoView,
 } from './types';
 
 export type Screen = 'main' | 'history' | 'settings';
 const ORDER_KINDS = ['exec', 'resume', 'undo'];
 
+export const EMPTY_TRANSFER_SELECTION: TransferSelection = {
+  contacts: false, sms: false, mms: false, calls: false, categories: [], others: [], apps: [],
+};
+
+export const emptyRestore = (): RestoreState => ({ plan: null, copy: null,
+  choice: { groups: [], apks_on: [], verify_hash: false, tel: [] }, progress: null, result: null, sameRecent: false,
+  resumable: false, tel: null, telProgress: null, telResult: null, telError: null, tap: null, tapPackage: null });
+
+/** Wgrywanie kopii na nowy telefon: plan z mostu, wybór serwisanta, postęp i wynik. */
+export interface RestoreState {
+  plan: RestorePlanView | null;
+  /** Wgrywana kopia (zanim przyjdzie plan — z listy kopii). */
+  copy: CopyView | null;
+  choice: UploadChoiceView;
+  progress: RestoreProgressView | null;
+  result: RestoreResultView | null;
+  /** Ten sam telefon co w kopii i kopia młodsza niż 24 h — ostrzeżenie, domyślnie „Nie”. */
+  sameRecent: boolean;
+  /** Na tym telefonie jest przerwane wgrywanie tej kopii — „Wgraj” je wznowi. */
+  resumable: boolean;
+  /** Kontakty, wiadomości i połączenia z kopii (null — kopia bez telefonii albo plan jeszcze nie przyszedł). */
+  tel: TelPlanView | null;
+  telProgress: TelProgressView | null;
+  telResult: TelResultView | null;
+  /** Klucz błędu telefonii po plikach (`tel_error`): wynik plików zostaje, telefonia ma własny baner. */
+  telError: string | null;
+  /** Prośba o stuknięcie na telefonie (`transfer:tap`) — także w czasie przywracania ustawień telefonu. */
+  tap: TapRequest | null;
+  /** Poprzednia domyślna aplikacja SMS (pakiet), której oddajemy rolę. */
+  tapPackage: string | null;
+}
+
+/** Przywracanie ustawień telefonu po przerwanym wgrywaniu (`phone_cleanup`): `ok` — wynik ostatniej próby. */
+export interface CleanupState {
+  /** Telefon, którego dotyczy sprzątanie (`transfer:cleanup_started`); null — żadnego. */
+  serial: string | null;
+  running: boolean;
+  ok: boolean | null;
+}
+
+/** Przenoszenie danych: inwentarz starego telefonu, wybór, postęp kopii i kopie na komputerze. */
+export interface TransferState {
+  inventory: InventoryView | null;
+  /** Niedokończona kopia tego telefonu (start_backup ją wznowi). */
+  resumable: CopyView | null;
+  selection: TransferSelection;
+  progress: TransferProgress | null;
+  /** Telefon odłączony w trakcie kopii albo wgrywania — most czeka na ponowne podłączenie. */
+  waiting: boolean;
+  result: BackupResultView | null;
+  /** Kopia z `transfer:done` (ile dni do usunięcia). */
+  copy: CopyView | null;
+  copies: CopyView[];
+  restore: RestoreState;
+  cleanup: CleanupState;
+}
+
 export class AppState {
   phase = $state<Phase>('connect');
   screen = $state<Screen>('main');
-  settings = $state<Settings>({ lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, theme: 'system', mirror_auto: false,
+  settings = $state<Settings>({ lang: 'pl', mode: 'simple', adb_path: null, backups_dir: null, report_pdf_dir: null, theme: 'system', mirror_auto: false,
     apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false, select_level: 'silence', retention_days: 60,
     check_updates: true, dismissed_update: null, last_run_version: null,
     welcome_version: 1, welcome_current: 1, telemetry: false, telemetry_packages: false, telemetry_id: null,
@@ -83,6 +140,8 @@ export class AppState {
   }
   disconnectedOrder = $state<string | null>(null);
   history = $state<HistoryView | null>(null);
+  /** Zakładka Historii: naprawy wybranego telefonu albo kopie danych wszystkich telefonów. */
+  historyTab = $state<'orders' | 'copies'>('orders');
   undoSteps = $state<StepEvent[]>([]);
   undoResult = $state<UndoDone | null>(null);
   /** Kolejka witryn bieżącego cofania (`undo:sites`); null — cofanie nie ma ekranów witryn. */
@@ -121,6 +180,9 @@ export class AppState {
   crashSent = $state<string | null>(null);
   crashError = $state<ApiErrorBody | null>(null);
   fatalCrash = $state<string | null>(null);
+  transfer = $state<TransferState>({ inventory: null, resumable: null, selection: { ...EMPTY_TRANSFER_SELECTION },
+    progress: null, waiting: false, result: null, copy: null, copies: [], restore: emptyRestore(),
+    cleanup: { serial: null, running: false, ok: null } });
 
   get orderRunning(): boolean {
     return this.job !== null && ORDER_KINDS.includes(this.job.kind);

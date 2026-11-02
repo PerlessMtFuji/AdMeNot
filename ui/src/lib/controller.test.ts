@@ -3,9 +3,9 @@ import { setupCtl } from '../test-utils';
 import { Controller } from './controller';
 import { CHECKS_SAMPLE, createFakeBridge } from './fakeBridge';
 import { i18n } from './i18n/index.svelte';
-import { actedAfter, actedLevels, needsWelcome, withoutUndone } from './logic';
+import { actedAfter, actedLevels, cleanupBanner, needsWelcome, withoutUndone } from './logic';
 import { AppState } from './state.svelte';
-import type { Settings } from './types';
+import type { InventoryView, Settings } from './types';
 
 function setup(scenario: string) {
   const bridge = createFakeBridge(scenario, { delay: 0 });
@@ -1086,5 +1086,612 @@ describe('phone checks and site fixes', () => {
     const { s, bridge } = await scanned();
     bridge.emit('exec:done', { order: 'ZS/1', status: 'done', status_label: '', stopped: false, apps: [], firefox_debugging: true });
     expect(s.result?.firefox_debugging).toBe(true);
+  });
+});
+
+describe('data transfer', () => {
+  async function chosen() {
+    const env = setup('transfer');
+    await env.ctl.init();
+    env.s.client = 'Anna K.';
+    await env.ctl.startTransfer();
+    await vi.waitFor(() => expect(env.s.transfer.inventory).not.toBeNull());
+    return env;
+  }
+
+  test('startTransfer reads the inventory for the picked phone and opens the copy screen', async () => {
+    const { s, bridge } = await chosen();
+    expect(bridge.calls.find((c) => c.method === 'transfer_inventory')?.args).toEqual(['R58T00TEST', 'Anna K.']);
+    expect(s.phase).toBe('transfer_choose');
+    expect(s.device?.serial).toBe('R58T00TEST');
+    expect(s.transfer.selection).toEqual({ contacts: true, sms: true, mms: false, calls: true,
+      categories: ['media', 'downloads', 'whatsapp'], others: [], apps: ['com.wlive.forecast', 'com.whatsapp'], exports: {} });
+    await vi.waitFor(() => expect(s.job).toBeNull());
+  });
+
+  test('toggles change the selection', async () => {
+    const { ctl, s } = await chosen();
+    ctl.toggleTransfer('downloads');
+    expect(s.transfer.selection.categories).toEqual(['media', 'whatsapp']);
+    ctl.toggleTransfer('sms');
+    expect([s.transfer.selection.sms, s.transfer.selection.mms]).toEqual([false, false]);
+    ctl.toggleTransfer('sms');
+    expect([s.transfer.selection.sms, s.transfer.selection.mms]).toEqual([true, false]); // MMS: telefon ich nie podał
+    ctl.toggleTransferOther('Music');
+    ctl.toggleTransferOther('');
+    expect(s.transfer.selection.others).toEqual(['Music', '']);
+    ctl.toggleTransfer('others');
+    expect(s.transfer.selection.others).toEqual([]);
+    ctl.toggleTransfer('others');
+    expect(s.transfer.selection.others).toEqual(['', 'Music']);
+    ctl.toggleTransferApp('com.wlive.forecast');
+    expect(s.transfer.selection.apps).toEqual(['com.whatsapp']);
+    ctl.toggleTransfer('apps');
+    expect(s.transfer.selection.apps).toEqual([]);
+    ctl.toggleTransfer('apps');
+    expect(s.transfer.selection.apps).toEqual(['com.wlive.forecast', 'com.whatsapp']);
+  });
+
+  test('startBackup sends the engine selection and the done event shows the result', async () => {
+    const { ctl, s, bridge } = await chosen();
+    ctl.toggleTransferApp('com.wlive.forecast');
+    ctl.toggleTransferOther('Music');
+    await ctl.startBackup();
+    expect(s.phase).toBe('transfer_backup');
+    const sent = bridge.calls.find((c) => c.method === 'start_backup')?.args[0] as Record<string, unknown>;
+    expect(Object.keys(sent).sort()).toEqual(['apps', 'calls', 'categories', 'contacts', 'mms', 'others', 'sms']);
+    expect(sent).toEqual({ contacts: true, sms: true, mms: false, calls: true,
+      categories: ['media', 'downloads', 'whatsapp'], others: ['Music'], apps: ['com.whatsapp'] });
+    await vi.waitFor(() => expect(s.phase).toBe('transfer_done'));
+    expect(s.transfer.result?.status).toBe('complete');
+    expect(s.transfer.copy?.days_left).toBe(7);
+    expect(s.transfer.progress?.stage).toBe('apps');
+  });
+
+  test('waiting for the phone, then progress clears the notice', async () => {
+    const { s, bridge } = await chosen();
+    s.phase = 'transfer_backup';
+    bridge.emit('transfer:waiting', {});
+    expect(s.transfer.waiting).toBe(true);
+    bridge.emit('transfer:progress', { stage: 'files', done_files: 1, total_files: 2, done_bytes: 1, total_bytes: 2, current: 'DCIM/a.jpg' });
+    expect(s.transfer.waiting).toBe(false);
+    expect(s.transfer.progress?.current).toBe('DCIM/a.jpg');
+  });
+
+  test('stopping asks the bridge to stop the backup job and ends as a stopped copy', async () => {
+    const { ctl, s, bridge } = await chosen();
+    s.phase = 'transfer_backup';
+    ctl.setJob('job-9', 'backup');
+    s.transfer.waiting = true;
+    await ctl.stopBackup();
+    expect(s.stopping).toBe(true);
+    expect(bridge.calls.at(-1)).toEqual({ method: 'stop', args: ['job-9'] });
+    bridge.emit('transfer:done', { result: { status: 'stopped', copy_id: 'x', telephony: {}, files_done: 0, files_failed: 0,
+      apps_done: 0, apps_failed: 0, bytes: 0, seconds: 1 }, copy: { id: 'x', serial: 'S', model: 'M', manufacturer: 'm', client: null,
+      created: '2026-10-25T10:00:00', expires: '2026-11-01T10:00:00', days_left: 7, status: 'in_progress', bytes: 0, counts: {} } });
+    expect(s.phase).toBe('transfer_done');
+    expect(s.stopping).toBe(false);
+    expect(s.transfer.waiting).toBe(false);
+    expect(s.transfer.result?.status).toBe('stopped');
+  });
+
+  test('a backup job error lands on the error card and returns to the choice', async () => {
+    const { s, bridge } = await chosen();
+    s.phase = 'transfer_backup';
+    s.transfer.waiting = true;
+    bridge.emit('job:error', { job_id: 'job-2', kind: 'backup', key: 'transfer_disk_full', message: '' });
+    expect(s.error?.key).toBe('transfer_disk_full');
+    expect(s.phase).toBe('transfer_choose');
+    expect(s.transfer.waiting).toBe(false);
+  });
+
+  test('an inventory error returns to connect', async () => {
+    const { ctl, s, bridge } = setup('transfer');
+    await ctl.init();
+    s.phase = 'transfer_choose';
+    bridge.emit('job:error', { job_id: 'job-1', kind: 'transfer_scan', key: 'timeout', message: '' });
+    expect(s.phase).toBe('connect');
+    expect(s.error?.key).toBe('timeout');
+  });
+
+  test('start_backup refused without an inventory stays on the choice with the error', async () => {
+    const { ctl, s, bridge } = await chosen();
+    bridge.failNext('start_backup', 'transfer_no_inventory');
+    await ctl.startBackup();
+    expect(s.phase).toBe('transfer_choose');
+    expect(s.error?.key).toBe('transfer_no_inventory');
+  });
+
+  test('re-checking the WhatsApp backup updates the inventory', async () => {
+    const { ctl, s } = await chosen();
+    expect(s.transfer.inventory?.whatsapp_backup).toBeNull();
+    await ctl.recheckWhatsapp();
+    expect(s.transfer.inventory?.whatsapp_backup).toBe('2026-09-26T14:29:00');
+  });
+
+  test('copies: load, extend, delete', async () => {
+    const { ctl, s, bridge } = setup('empty');
+    await ctl.init();
+    bridge.setCopies([{ id: 'S/1', serial: 'S', model: 'M', manufacturer: 'm', client: 'Anna', created: '2026-10-25T10:00:00',
+      expires: '2026-11-01T10:00:00', days_left: 7, status: 'complete', bytes: 10, counts: {} }]);
+    await ctl.loadTransfers();
+    expect(s.transfer.copies).toHaveLength(1);
+    await ctl.extendTransfer('S/1');
+    expect(s.transfer.copies[0].days_left).toBe(14);
+    expect(s.transfer.copies[0].expires).toBe('2026-11-08T10:00:00');
+    await ctl.deleteTransfer('S/1');
+    expect(s.transfer.copies).toEqual([]);
+  });
+
+  test('a refused delete (copy in use) keeps the copy and shows the error', async () => {
+    const { ctl, s, bridge } = setup('transfer');
+    await ctl.init();
+    s.transfer.copies = [{ id: 'S/1' } as never];
+    bridge.failNext('delete_transfer', 'busy');
+    await ctl.deleteTransfer('S/1');
+    expect(s.transfer.copies).toHaveLength(1);
+    expect(s.error?.key).toBe('busy');
+  });
+
+  test('opening the history loads the copies', async () => {
+    const { ctl, bridge } = setup('transfer');
+    await ctl.init();
+    await ctl.openHistory();
+    expect(bridge.calls.some((c) => c.method === 'transfers')).toBe(true);
+  });
+
+  test('leaving the transfer goes back to connect', async () => {
+    const { ctl, s } = await chosen();
+    ctl.leaveTransfer();
+    expect(s.phase).toBe('connect');
+    expect(s.transfer.inventory).toBeNull();
+  });
+});
+
+describe('data transfer — export files', () => {
+  const NEWEST = '/sdcard/Kopia/kontakty.vcf';
+  const OLDER = '/sdcard/Kopia/kontakty-stare.vcf';
+  const SMS = '/sdcard/Backup/sms.xml';
+
+  async function chosen() {
+    const env = setup('transfer_export');
+    await env.ctl.init();
+    env.s.client = 'Anna K.';
+    await env.ctl.startTransfer();
+    await vi.waitFor(() => expect(env.s.transfer.inventory).not.toBeNull());
+    await vi.waitFor(() => expect(env.s.job).toBeNull());
+    return env;
+  }
+
+  test('denied contacts and SMS with export files start ticked from the newest files', async () => {
+    const { s } = await chosen();
+    expect(s.transfer.selection.contacts).toBe(true);
+    expect(s.transfer.selection.sms).toBe(true);
+    expect(s.transfer.selection.mms).toBe(false);
+    expect(s.transfer.selection.exports).toEqual({ contacts: NEWEST, sms: SMS });
+  });
+
+  test('choosing another file changes the selection', async () => {
+    const { ctl, s } = await chosen();
+    ctl.chooseExport('contacts', OLDER);
+    expect(s.transfer.selection.exports?.contacts).toBe(OLDER);
+    expect(s.transfer.selection.contacts).toBe(true);
+  });
+
+  test('startBackup sends the chosen export files, without MMS', async () => {
+    const { ctl, bridge } = await chosen();
+    ctl.chooseExport('contacts', OLDER);
+    await ctl.startBackup();
+    const sent = bridge.calls.find((c) => c.method === 'start_backup')?.args[0] as Record<string, unknown>;
+    expect(sent.exports).toEqual({ contacts: OLDER, sms: SMS });
+    expect(sent).toMatchObject({ contacts: true, sms: true, mms: false });
+  });
+
+  test('an unticked category sends no export file', async () => {
+    const { ctl, bridge } = await chosen();
+    ctl.toggleTransfer('contacts');
+    await ctl.startBackup();
+    const sent = bridge.calls.find((c) => c.method === 'start_backup')?.args[0] as Record<string, unknown>;
+    expect(sent.contacts).toBe(false);
+    expect(sent.exports).toEqual({ sms: SMS });
+  });
+
+  test('rescan asks the bridge, keeps an older picked file and the other choices', async () => {
+    const { ctl, s, bridge } = await chosen();
+    ctl.chooseExport('contacts', OLDER);
+    ctl.toggleTransfer('downloads');
+    ctl.toggleTransferOther('Music');
+    const before = s.transfer.selection;
+    await ctl.rescanTransfer();
+    expect(bridge.calls.at(-1)?.method).toBe('transfer_rescan');
+    expect(s.job?.kind).toBe('transfer_scan');
+    await vi.waitFor(() => expect(s.job).toBeNull());
+    expect(s.phase).toBe('transfer_choose');
+    expect(s.transfer.selection).toEqual(before);
+    expect(s.transfer.selection.exports?.contacts).toBe(OLDER);
+  });
+
+  test('rescan moves from the newest file to an even newer one', async () => {
+    const { ctl, s, bridge } = await chosen();
+    const inv = JSON.parse(JSON.stringify(s.transfer.inventory)) as InventoryView;
+    const newer = { remote: '/sdcard/Download/kontakty-nowe.vcf', name: 'kontakty-nowe.vcf', size: 200,
+      mtime: '2023-11-15T10:00:00', count: 4 };
+    await ctl.rescanTransfer();
+    await vi.waitFor(() => expect(s.job).toBeNull());
+    bridge.emit('transfer:inventory', { inventory: { ...inv, exports: { ...inv.exports, contacts: [newer, ...inv.exports.contacts!] } },
+      resumable: null, client: 'Anna K.' });
+    expect(s.transfer.selection.exports?.contacts).toBe(newer.remote);
+  });
+
+  test('resuming a copy with contacts and SMS unticked: ticking them uses the export files', async () => {
+    const { ctl, s, bridge } = setup('transfer_export');
+    await ctl.init();
+    s.phase = 'transfer_choose';
+    const event = (await import('../../../tests/fixtures/bridge/transfer_export.json')).default.calls
+      .find((c) => c.method === 'transfer_inventory')!.events.find(([name]) => name === 'transfer:inventory')![1] as never;
+    bridge.emit('transfer:inventory', { ...(event as object), resumable: { id: 'S/1', serial: 'R58T00TEST', model: 'SM-A145R',
+      manufacturer: 'samsung', client: null, created: '2026-10-24T14:20:00', expires: '2026-10-31T14:20:00', days_left: 6,
+      status: 'in_progress', bytes: 0, counts: {}, selection: { contacts: false, sms: false, mms: false, calls: true,
+        categories: ['media'], others: [], apps: [] } } } as never);
+    expect([s.transfer.selection.contacts, s.transfer.selection.sms]).toEqual([false, false]);
+    ctl.toggleTransfer('contacts');
+    ctl.toggleTransfer('sms');
+    expect(s.transfer.selection.exports).toEqual({ contacts: NEWEST, sms: SMS });
+    expect([s.transfer.selection.contacts, s.transfer.selection.sms, s.transfer.selection.mms]).toEqual([true, true, false]);
+    await ctl.startBackup();
+    const sent = bridge.calls.find((c) => c.method === 'start_backup')?.args[0] as Record<string, unknown>;
+    expect(sent.exports).toEqual({ contacts: NEWEST, sms: SMS });
+  });
+
+  test('a failed rescan keeps the choice screen and its selection', async () => {
+    const { ctl, s, bridge } = await chosen();
+    const before = s.transfer.selection;
+    await ctl.rescanTransfer();
+    bridge.emit('job:error', { job_id: 'job-2', kind: 'transfer_scan', key: 'timeout', message: '' });
+    expect(s.phase).toBe('transfer_choose');
+    expect(s.transfer.selection).toEqual(before);
+    expect(s.error?.key).toBe('timeout');
+  });
+});
+
+describe('data transfer — uploading a copy', () => {
+  const COPY_ID = 'R58T00TEST-90fae0b8e3f0/20260926-143000';
+  const NEW = 'R58W20NEW01';
+
+  async function planned() {
+    const env = setup('transfer_restore');
+    await env.ctl.init();
+    env.ctl.selectDevice(NEW);
+    await env.ctl.loadTransfers();
+    await env.ctl.planRestore(COPY_ID);
+    await vi.waitFor(() => expect(env.s.transfer.restore.plan).not.toBeNull());
+    return env;
+  }
+
+  test('planRestore asks for the plan of this copy on the picked phone and opens the upload screen', async () => {
+    const { s, bridge } = await planned();
+    expect(bridge.calls.find((c) => c.method === 'restore_plan')?.args).toEqual([COPY_ID, NEW]);
+    expect(s.phase).toBe('transfer_restore_plan');
+    expect(s.transfer.restore.copy?.id).toBe(COPY_ID);
+    expect(s.transfer.restore.sameRecent).toBe(false);
+    expect(s.transfer.restore.resumable).toBe(false);
+    expect(s.transfer.restore.choice).toEqual({ groups: ['photos', 'downloads', 'whatsapp', 'other:Music'], apks_on: [],
+      verify_hash: false, tel: ['contacts', 'sms', 'calls'] });
+    expect(s.transfer.restore.tel?.contacts?.write).toBe(2);
+    await vi.waitFor(() => expect(s.job).toBeNull());
+  });
+
+  test('toggles change the upload choice; a harmful APK cannot be ticked', async () => {
+    const { ctl, s } = await planned();
+    ctl.toggleUploadGroup('photos');
+    expect(s.transfer.restore.choice.groups).toEqual(['downloads', 'whatsapp', 'other:Music']);
+    ctl.toggleUploadGroup('photos');
+    expect(s.transfer.restore.choice.groups).toEqual(['photos', 'downloads', 'whatsapp', 'other:Music']);
+    ctl.toggleUploadGroup('others');
+    expect(s.transfer.restore.choice.groups).toEqual(['photos', 'downloads', 'whatsapp']);
+    ctl.toggleUploadGroup('others');
+    expect(s.transfer.restore.choice.groups).toContain('other:Music');
+    ctl.toggleUploadGroup('unknown');
+    expect(s.transfer.restore.choice.groups).toHaveLength(4);
+    ctl.toggleUploadApk('/sdcard/Download/gra.apk');
+    expect(s.transfer.restore.choice.apks_on).toEqual(['/sdcard/Download/gra.apk']);
+    ctl.toggleUploadApk('/sdcard/Download/szybki-cleaner.apk');
+    expect(s.transfer.restore.choice.apks_on).toEqual(['/sdcard/Download/gra.apk']);
+    ctl.toggleUploadApk('/sdcard/Download/gra.apk');
+    expect(s.transfer.restore.choice.apks_on).toEqual([]);
+  });
+
+  test('startRestore sends the choice and the done event shows the result', async () => {
+    const { ctl, s, bridge } = await planned();
+    ctl.toggleUploadGroup('videos');  // pusta grupa: zaznaczenie i tak przechodzi do mostu
+    await ctl.startRestore();
+    expect(s.phase).toBe('transfer_restore');
+    expect(bridge.calls.find((c) => c.method === 'start_restore')?.args[0]).toEqual({
+      groups: ['photos', 'videos', 'downloads', 'whatsapp', 'other:Music'], apks_on: [], verify_hash: false,
+      tel: ['contacts', 'sms', 'calls'] });
+    await vi.waitFor(() => expect(s.phase).toBe('transfer_restored'));
+    expect(s.transfer.restore.result?.files_renamed).toBe(1);
+    expect(s.transfer.restore.progress?.stage).toBe('scan');
+    // „wgrano na …” w Historii od razu, bez ponownego odczytu kopii
+    expect(s.transfer.copies.find((c) => c.id === COPY_ID)?.restores?.[0]?.serial).toBe(NEW);
+  });
+
+  test('toggleTel unticks and ticks a telephony row; a row with nothing to write stays off', async () => {
+    const { ctl, s } = await planned();
+    ctl.toggleTel('sms');
+    expect(s.transfer.restore.choice.tel).toEqual(['contacts', 'calls']);
+    ctl.toggleTel('sms');
+    expect(s.transfer.restore.choice.tel).toEqual(['contacts', 'sms', 'calls']);
+    ctl.toggleTel('calls');
+    s.transfer.restore.tel = { ...s.transfer.restore.tel!, calls: null };
+    ctl.toggleTel('calls');
+    expect(s.transfer.restore.choice.tel).toEqual(['contacts', 'sms']);
+  });
+
+  test('telephony run: progress, the on-phone prompt, skipping it and the result with the files', async () => {
+    const env = setup('transfer_restore_tel');
+    await env.ctl.init();
+    env.ctl.selectDevice(NEW);
+    await env.ctl.loadTransfers();
+    await env.ctl.planRestore(COPY_ID);
+    await vi.waitFor(() => expect(env.s.transfer.restore.plan).not.toBeNull());
+    const { ctl, s, bridge } = env;
+    await ctl.startRestore();
+    await vi.waitFor(() => expect(s.phase).toBe('transfer_restored'));
+    expect(s.transfer.restore.telProgress?.kind).toBe('calls');
+    expect(s.transfer.restore.telResult?.manual).toEqual([{ kind: 'calls', name: 'admenot-polaczenia-20260926-143100.xml' }]);
+    expect(s.transfer.restore.telError).toBeNull();
+    expect(s.transfer.restore.tap).toBeNull();  // prośba z nagrania została załatwiona
+    expect(s.transfer.cleanup.running).toBe(false);  // prośba w czasie wgrywania to nie sprzątanie
+    // prośba o rolę SMS: „Pomiń” woła most i chowa baner
+    bridge.emit('transfer:tap', { request: 'sms_role_grant', package: 'com.google.android.apps.messaging' });
+    expect(s.transfer.restore.tap).toBe('sms_role_grant');
+    await ctl.skipTap();
+    expect(bridge.calls.at(-1)).toEqual({ method: 'skip_tap', args: [] });
+    expect(s.transfer.restore.tap).toBeNull();
+    // oddania roli pominąć się nie da: nic nie idzie do mostu, baner zostaje
+    bridge.emit('transfer:tap', { request: 'sms_role_restore', package: 'com.google.android.apps.messaging' });
+    const calls = bridge.calls.length;
+    await ctl.skipTap();
+    expect(bridge.calls.length).toBe(calls);
+    expect(s.transfer.restore.tap).toBe('sms_role_restore');
+    bridge.emit('transfer:tap', { request: null, package: 'com.google.android.apps.messaging' });
+    expect(s.transfer.restore.tap).toBeNull();
+  });
+
+  test('a telephony error after the files keeps the files result and the error key', async () => {
+    const { s, bridge } = await planned();
+    s.phase = 'transfer_restore';
+    const done = { status: 'complete', target_serial: NEW, files_done: 1, files_exists: 0, files_renamed: 0, files_denied: 0,
+      files_failed: 0, files_unselected: 0, apk_skipped: 0, apk_suspicious_skipped: 0, bytes: 1, seconds: 1, hashed: false,
+      media_scan: 'done', files_missing: 0 } as const;
+    bridge.emit('transfer:restore_done', { result: done, copy: JSON.parse(JSON.stringify(s.transfer.restore.copy)), tel: null, tel_error: 'disconnected' });
+    expect(s.phase).toBe('transfer_restored');
+    expect(s.transfer.restore.result?.files_done).toBe(1);
+    expect(s.transfer.restore.telError).toBe('disconnected');
+    expect(s.error).toBeNull();
+  });
+
+  test('phone cleanup: busy calls show the cleanup notice, a prompt during it, one notice for repeated failures', async () => {
+    const { ctl, s, bridge } = setup('transfer_restore');
+    await ctl.init();
+    ctl.selectDevice(NEW);
+    bridge.emit('transfer:cleanup_started', { serial: NEW });  // most: start sprzątania przed `busy`
+    bridge.failNext('start_scan', 'busy', 'phone_cleanup');
+    await ctl.startScan();
+    expect(s.phase).toBe('connect');
+    expect(s.error).toBeNull();  // nie karta błędu
+    expect(s.transfer.cleanup).toEqual({ serial: NEW, running: true, ok: null });
+    bridge.emit('transfer:tap', { request: 'sms_role_restore', package: null });
+    expect(s.transfer.restore.tap).toBe('sms_role_restore');
+    bridge.emit('transfer:cleanup_done', { ok: false, serial: NEW });
+    expect(s.transfer.cleanup).toEqual({ serial: NEW, running: false, ok: false });
+    expect(s.transfer.restore.tap).toBeNull();
+    // ponowienie w tle: baner zostaje czerwony (bez migania na żółto)
+    bridge.emit('transfer:cleanup_started', { serial: NEW });
+    expect(cleanupBanner(s.transfer.cleanup, s.serial)).toBe('failed');
+    bridge.emit('transfer:cleanup_done', { ok: false, serial: NEW });
+    expect(s.transfer.cleanup).toEqual({ serial: NEW, running: false, ok: false });
+    bridge.emit('transfer:cleanup_started', { serial: NEW });
+    bridge.emit('transfer:cleanup_done', { ok: true, serial: NEW });
+    expect(s.transfer.cleanup).toEqual({ serial: NEW, running: false, ok: true });
+    // inne „busy” zostaje zwykłym błędem
+    bridge.failNext('start_scan', 'busy', 'restore');
+    await ctl.startScan();
+    expect(s.error?.key).toBe('busy');
+  });
+
+  test('a prompt alone does not mean a phone cleanup; the start event does', async () => {
+    const { ctl, s, bridge } = setup('transfer_restore');
+    await ctl.init();
+    bridge.emit('transfer:tap', { request: 'sms_role_restore', package: 'com.samsung.android.messaging' });
+    expect(s.transfer.cleanup.running).toBe(false);
+    expect(s.transfer.restore.tapPackage).toBe('com.samsung.android.messaging');
+    bridge.emit('transfer:cleanup_started', { serial: NEW });
+    expect(s.transfer.cleanup.running).toBe(true);
+    bridge.emit('transfer:cleanup_done', { ok: true, serial: NEW });
+    expect(s.transfer.cleanup.running).toBe(false);
+  });
+
+  test('a failed cleanup banner belongs to its phone: gone when it disconnects or another phone is picked', async () => {
+    const { ctl, s, bridge } = setup('transfer_restore');
+    await ctl.init();
+    const dev = (serial: string) => ({ serial, state: 'device' as const, model: 'M', name: null, imei: null });
+    bridge.emit('devices', { devices: [dev(NEW), dev('OTHER')], error: null });
+    ctl.selectDevice(NEW);
+    bridge.emit('transfer:cleanup_started', { serial: NEW });
+    bridge.emit('transfer:cleanup_done', { ok: false, serial: NEW });
+    expect(cleanupBanner(s.transfer.cleanup, s.serial)).toBe('failed');
+    ctl.selectDevice('OTHER');
+    expect(cleanupBanner(s.transfer.cleanup, s.serial)).toBeNull();
+    expect(s.transfer.cleanup.serial).toBeNull();
+    ctl.selectDevice(NEW);
+    bridge.emit('transfer:cleanup_started', { serial: NEW });
+    bridge.emit('transfer:cleanup_done', { ok: false, serial: NEW });
+    bridge.emit('devices', { devices: [dev('OTHER')], error: null });
+    expect(s.transfer.cleanup).toEqual({ serial: null, running: false, ok: null });
+  });
+
+  test('a disconnect during the upload shows the waiting state until progress comes back', async () => {
+    const { s, bridge } = await planned();
+    s.phase = 'transfer_restore';
+    bridge.emit('transfer:waiting', {});
+    expect(s.transfer.waiting).toBe(true);
+    bridge.emit('transfer:restore_progress', { stage: 'files', done_files: 1, total_files: 2, done_bytes: 1, total_bytes: 2,
+      current: 'DCIM/a.jpg' });
+    expect(s.transfer.waiting).toBe(false);
+    expect(s.transfer.restore.progress?.current).toBe('DCIM/a.jpg');
+  });
+
+  test('stopRestore stops the upload job', async () => {
+    const { ctl, s, bridge } = await planned();
+    s.phase = 'transfer_restore';
+    ctl.setJob('job-4', 'restore');
+    await ctl.stopRestore();
+    expect(s.stopping).toBe(true);
+    expect(bridge.calls.at(-1)).toEqual({ method: 'stop', args: ['job-4'] });
+  });
+
+  test('phone full during the upload: error kept, a fresh plan keeps the technician choice', async () => {
+    const { ctl, s, bridge } = await planned();
+    ctl.toggleUploadGroup('whatsapp');
+    ctl.toggleUploadApk('/sdcard/Download/gra.apk');
+    const choice = JSON.parse(JSON.stringify(s.transfer.restore.choice));
+    s.phase = 'transfer_restore';
+    s.transfer.waiting = true;
+    s.stopping = true;
+    const before = bridge.calls.filter((c) => c.method === 'restore_plan').length;
+    bridge.emit('job:error', { job_id: 'job-4', kind: 'restore', key: 'transfer_phone_full', message: '' });
+    expect(s.error?.key).toBe('transfer_phone_full');
+    expect(s.phase).toBe('transfer_restore_plan');
+    expect(s.transfer.restore.plan).toBeNull();  // stary plan ma nieaktualne miejsce
+    expect([s.transfer.waiting, s.stopping]).toEqual([false, false]);
+    await vi.waitFor(() => expect(s.transfer.restore.plan).not.toBeNull());
+    const calls = bridge.calls.filter((c) => c.method === 'restore_plan');
+    expect(calls).toHaveLength(before + 1);
+    expect(calls.at(-1)?.args).toEqual([COPY_ID, NEW]);
+    expect(s.transfer.restore.choice).toEqual(choice);
+    expect(s.error?.key).toBe('transfer_phone_full');
+  });
+
+  test('other upload errors go back to the stored plan without asking for a new one', async () => {
+    const { s, bridge } = await planned();
+    s.phase = 'transfer_restore';
+    const before = bridge.calls.filter((c) => c.method === 'restore_plan').length;
+    bridge.emit('job:error', { job_id: 'job-4', kind: 'restore', key: 'transfer_too_many_disconnects', message: '' });
+    expect(s.phase).toBe('transfer_restore_plan');
+    expect(s.transfer.restore.plan).not.toBeNull();
+    expect(s.transfer.restore.resumable).toBe(true);
+    await flush();
+    expect(bridge.calls.filter((c) => c.method === 'restore_plan')).toHaveLength(before);
+  });
+
+  test('a failed plan goes back to the connect screen', async () => {
+    const { ctl, s, bridge } = setup('transfer_restore');
+    await ctl.init();
+    ctl.selectDevice(NEW);
+    bridge.failNext('restore_plan', 'bad_request');
+    await ctl.planRestore(COPY_ID);
+    expect(s.phase).toBe('connect');
+    expect(s.error?.key).toBe('bad_request');
+    s.phase = 'transfer_restore_plan';
+    bridge.emit('job:error', { job_id: 'job-3', kind: 'restore_plan', key: 'transfer_copy_missing', message: '' });
+    expect(s.phase).toBe('connect');
+    expect(s.transfer.restore.plan).toBeNull();
+    expect(s.error?.key).toBe('transfer_copy_missing');
+  });
+
+  test('planRestore needs a picked phone', async () => {
+    const { ctl, s, bridge } = setup('transfer_restore');
+    await ctl.init();
+    await ctl.planRestore(COPY_ID);
+    expect(bridge.calls.some((c) => c.method === 'restore_plan')).toBe(false);
+    expect(s.phase).toBe('connect');
+  });
+
+  test('leaving after the upload goes back to connect and forgets the plan', async () => {
+    const { ctl, s } = await planned();
+    ctl.leaveTransfer();
+    expect(s.phase).toBe('connect');
+    expect(s.transfer.restore.plan).toBeNull();
+    expect(s.transfer.restore.choice.groups).toEqual([]);
+  });
+});
+
+describe('data transfer — resuming', () => {
+  const RESUMABLE = { id: 'R58T00TEST-x/20260925-100000', serial: 'R58T00TEST', model: 'SM-A145R', manufacturer: 'samsung', client: 'Anna K.',
+    created: '2026-09-25T10:00:00', expires: '2026-10-02T10:00:00', days_left: 6, status: 'in_progress' as const, bytes: 0,
+    counts: {} };
+
+  test('the inventory of a phone with an interrupted copy starts from that copy\'s selection', async () => {
+    const { ctl, s, bridge } = setup('transfer');
+    await ctl.init();
+    s.phase = 'transfer_choose';
+    const event = (await import('../../../tests/fixtures/bridge/transfer.json')).default.calls
+      .find((c) => c.method === 'transfer_inventory')!.events.find(([name]) => name === 'transfer:inventory')![1] as never;
+    bridge.emit('transfer:inventory', { ...(event as object), resumable: { ...RESUMABLE, selection: {
+      contacts: true, sms: false, mms: false, calls: false, categories: ['media'], others: ['Music', 'Gone'],
+      apps: ['com.whatsapp'], verify_hash: false } as never } } as never);
+    expect(s.transfer.selection).toEqual({ contacts: true, sms: false, mms: false, calls: false, categories: ['media'],
+      others: ['Music'], apps: ['com.whatsapp'], exports: {} });
+    await ctl.startBackup();
+    expect(bridge.calls.find((c) => c.method === 'start_backup')?.args[0]).toEqual({ contacts: true, sms: false, mms: false,
+      calls: false, categories: ['media'], others: ['Music'], apps: ['com.whatsapp'] });
+  });
+
+  test('"Resume" on the connect screen continues the copy straight after reading the phone', async () => {
+    const { ctl, s, bridge } = setup('transfer');
+    await ctl.init();
+    // słuchacz po kontrolerze: telefon ma przerwaną kopię (nagranie jej nie ma)
+    bridge.on('transfer:inventory', () => {
+      s.transfer.resumable = RESUMABLE;
+      s.transfer.selection = { ...s.transfer.selection, sms: false, apps: [] };
+    });
+    await ctl.startTransfer(true);
+    await vi.waitFor(() => expect(bridge.calls.some((c) => c.method === 'start_backup')).toBe(true));
+    expect(bridge.calls.find((c) => c.method === 'start_backup')?.args[0]).toMatchObject({ sms: false, apps: [] });
+  });
+
+  test('"Resume" stays on the choose screen when the copy cannot go on (gone, no space)', async () => {
+    const { ctl, s, bridge } = setup('transfer');
+    await ctl.init();
+    await ctl.startTransfer(true);  // nagranie: kopii do wznowienia już nie ma
+    await vi.waitFor(() => expect(s.job).toBeNull());
+    expect(s.phase).toBe('transfer_choose');
+    bridge.on('transfer:inventory', (d) => {
+      s.transfer.resumable = RESUMABLE;
+      s.transfer.inventory = { ...d.inventory, free_pc: 0 };
+    });
+    await ctl.startTransfer(true);
+    await vi.waitFor(() => expect(s.job).toBeNull());
+    expect(s.phase).toBe('transfer_choose');
+    expect(bridge.calls.some((c) => c.method === 'start_backup')).toBe(false);
+    // zwykłe „Kopiuj dane” nigdy nie rusza samo
+    await ctl.startTransfer();
+    await vi.waitFor(() => expect(s.job).toBeNull());
+    expect(bridge.calls.some((c) => c.method === 'start_backup')).toBe(false);
+  });
+
+  test('re-ticking apps selects every app when none is on by default', async () => {
+    const { ctl, s } = setup('transfer');
+    await ctl.init();
+    s.transfer.inventory = { apps: [{ package: 'a', label: 'A', verdict: 'suspicious', default_on: false, bytes: null }],
+      others: [] } as never;
+    ctl.toggleTransfer('apps');
+    expect(s.transfer.selection.apps).toEqual(['a']);
+    ctl.toggleTransfer('apps');
+    expect(s.transfer.selection.apps).toEqual([]);
+  });
+
+  test('after a backup error the interrupted copy is offered for resuming', async () => {
+    const { ctl, s, bridge } = setup('empty');
+    await ctl.init();
+    s.phase = 'transfer_backup';
+    s.device = { serial: 'R58T00TEST', manufacturer: 'samsung', model: 'SM-A145R' } as never;
+    // ten sam model, inny egzemplarz: wznowić można tylko kopię tego telefonu
+    bridge.setCopies([{ ...RESUMABLE, id: 'OTHER/20260925-100000', serial: 'OTHER' }, RESUMABLE]);
+    bridge.emit('job:error', { job_id: 'job-2', kind: 'backup', key: 'transfer_disk_full', message: '' });
+    await vi.waitFor(() => expect(s.transfer.resumable?.id).toBe(RESUMABLE.id));
+    expect(s.phase).toBe('transfer_choose');
   });
 });

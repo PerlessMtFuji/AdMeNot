@@ -23,6 +23,19 @@ test('error card: translated key, serial, log path, dismiss', async () => {
   expect(s.error).toBeNull();
 });
 
+test('a disconnect error of an upload talks about the upload, the same key of a copy about the copy', async () => {
+  const { s } = await renderWith(ErrorCard);
+  s.error = { key: 'transfer_too_many_disconnects', message: '', kind: 'restore', job_id: 'j' } as never;
+  await tick();
+  expect(screen.getByRole('alert').textContent).toContain('wybierz „Wgraj” jeszcze raz');
+  s.error = { key: 'transfer_too_many_disconnects', message: '', kind: 'backup', job_id: 'j' } as never;
+  await tick();
+  expect(screen.getByRole('alert').textContent).toContain('rozpocznij kopię jeszcze raz');
+  s.error = { key: 'transfer_phone_full', message: '', kind: 'restore', job_id: 'j' } as never;
+  await tick();
+  expect(screen.getByRole('alert').textContent).toContain('Na nowym telefonie skończyło się miejsce');
+});
+
 test('fatal error offers a restart', async () => {
   const { s } = await renderWith(ErrorCard, 'empty', { fatal: true });
   s.fatal = 'TypeError: boom';

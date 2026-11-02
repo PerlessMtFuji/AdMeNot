@@ -1,12 +1,15 @@
 """Log techniczny sesji (spec §7.5): polecenia ADB, status i czas — bez wyjścia poleceń.
 
 GUI dostaje każde polecenie na żywo (`on_command`, z wyjściem obciętym do OUTPUT_LIMIT) dla
-konsoli ADB — bez wyjścia zrzutu powiadomień z treścią (`--noredact`), o ile serwisant nie wpisał
-go sam. Polecenia wpisane w konsoli mają `tag="console"` i prefiks `console:` w logu.
+konsoli ADB — bez wyjścia zrzutu powiadomień z treścią (`--noredact`), danych z providerów (`content`)
+i listy kont (`dumpsys account`), o ile serwisant nie wpisał go sam. Polecenia wpisane w konsoli
+mają `tag="console"` i prefiks `console:` w logu.
+W pliku logu ścieżki plików klienta (`/sdcard/…`, katalog kopii) są zwinięte (`client_paths`).
 """
 
 from __future__ import annotations
 
+import re
 import threading
 import time
 from collections.abc import Callable
@@ -15,10 +18,16 @@ from pathlib import Path
 from typing import Any
 
 from admenot.engine.adb.transport import AdbError, AdbTransport
+from admenot.engine.clientpaths import client_paths
 
 _LOCK = threading.Lock()  # kolektory wołają adb z wielu wątków naraz
 OUTPUT_LIMIT = 4096
 _PRIVATE = "--noredact"  # zrzut powiadomień z tytułami i treścią
+# Dane klienta z providerów (kontakty, SMS, połączenia, MMS) — `content query` / `content read`,
+# także w postaci `host:shell -T …` i `host:exec-out …`.
+_CONTENT = re.compile(r"^(?:host:(?:shell -T |exec-out ))?content (?:query|read)(?:\s|$)")
+# Konta na telefonie (plan telefonii): `dumpsys account` wypisuje adresy e-mail klienta.
+_ACCOUNTS = re.compile(r"^(?:host:(?:shell -T |exec-out ))?dumpsys account(?:\s|$)")
 
 OnCommand = Callable[[dict[str, Any]], None]
 
@@ -81,12 +90,17 @@ class SessionLogAdb:
         duration = time.perf_counter() - start
         stamp = self._now().isoformat(timespec="seconds")
         shown = f"{self.tag}:{what}" if self.tag else what
-        line = f"{stamp}\t{self.serial}\t{status}\t{duration:.2f}s\t{shown}\n"
+        # Plik logu (trzymany dłużej niż kopia danych) bez nazw plików i folderów klienta;
+        # konsola na żywo (`on_command`) dostaje polecenie bez zmian.
+        line = f"{stamp}\t{self.serial}\t{status}\t{duration:.2f}s\t{client_paths(shown)}\n"
         with _LOCK, self.path.open("a", encoding="utf-8") as fh:
             fh.write(line)
         if self.on_command is not None:
             if _PRIVATE in what and status == "ok" and self.tag != "console":  # treść powiadomień klienta
                 output = f"<{len(output.encode())} B>"
+            elif (_CONTENT.match(what) or _ACCOUNTS.match(what)) and status == "ok" \
+                    and self.tag != "console":
+                output = ""  # kontakty, wiadomości i konta klienta nie trafiają do konsoli
             self.on_command({"time": stamp, "serial": self.serial, "command": what,
                              "status": status, "duration": round(duration, 2),
                              "output": output[:OUTPUT_LIMIT], "tag": self.tag})

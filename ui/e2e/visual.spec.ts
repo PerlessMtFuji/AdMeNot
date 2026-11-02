@@ -36,6 +36,11 @@ for (const theme of ['light', 'dark'] as const) {
       await page.goto('/?scenario=adware');
       await expect(page.getByRole('heading', { name: 'Połączono' })).toBeVisible();
       await expect(page).toHaveScreenshot(`connect-ready-${theme}.png`);
+      await page.goto('/?scenario=many');  // dwa telefony tego samego modelu: lista wyboru i jeden zestaw narzędzi
+      await expect(page.getByRole('heading', { name: 'Wybierz telefon' })).toBeVisible();
+      await page.getByRole('radio').first().check();
+      await expect(page.getByRole('button', { name: 'Zrzut ekranu' })).toBeVisible();
+      await expect(page).toHaveScreenshot(`connect-many-${theme}.png`);
     });
 
     test('scan', async ({ page }) => {

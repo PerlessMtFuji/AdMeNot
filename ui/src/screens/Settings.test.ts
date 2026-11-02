@@ -26,13 +26,28 @@ test('settings: theme, language, mode, adb check, folder and save', async () => 
   await fireEvent.click(screen.getByRole('button', { name: 'Sprawdź' }));
   expect(await screen.findByText(/Działa: Android Debug Bridge/)).toBeTruthy();
   expect(bridge.calls.at(-1)).toEqual({ method: 'check_adb', args: ['C:\\pt\\adb.exe'] });
-  await fireEvent.click(screen.getByRole('button', { name: 'Wybierz…' }));
+  const [chooseBackups, choosePdf] = screen.getAllByRole('button', { name: 'Wybierz…' });
+  await fireEvent.click(chooseBackups);
   await vi.waitFor(() => expect((screen.getByLabelText('Katalog kopii APK') as HTMLInputElement).value)
     .toBe('D:\\AdMeNot\\kopie'));
   await fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
   expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings',
-    args: [{ adb_path: 'C:\\pt\\adb.exe', backups_dir: 'D:\\AdMeNot\\kopie' }] });
+    args: [{ adb_path: 'C:\\pt\\adb.exe', backups_dir: 'D:\\AdMeNot\\kopie', report_pdf_dir: null }] });
+  await fireEvent.click(choosePdf);
+  await vi.waitFor(() => expect((screen.getByLabelText('Folder protokołów PDF') as HTMLInputElement).value)
+    .toBe('D:\\AdMeNot\\kopie'));
+  await fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
+  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings',
+    args: [{ adb_path: 'C:\\pt\\adb.exe', backups_dir: 'D:\\AdMeNot\\kopie', report_pdf_dir: 'D:\\AdMeNot\\kopie' }] });
   expect(await screen.findByText(/Zapisano/)).toBeTruthy();
+  // ścieżka względna: komunikat przy polu, nie ogólna karta błędu
+  await fireEvent.input(screen.getByLabelText('Folder protokołów PDF'), { target: { value: 'protokoly' } });
+  await fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
+  expect(await screen.findByText(/Podaj pełną ścieżkę folderu/)).toBeTruthy();
+  expect(s.error).toBeNull();
+  await fireEvent.input(screen.getByLabelText('Folder protokołów PDF'), { target: { value: 'D:\\AdMeNot\\kopie' } });
+  await fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
+  await vi.waitFor(() => expect(screen.queryByText(/Podaj pełną ścieżkę folderu/)).toBeNull());
   await fireEvent.click(screen.getByRole('button', { name: 'English' }));
   await vi.waitFor(() => expect(i18n.lang).toBe('en'));
   await tick();

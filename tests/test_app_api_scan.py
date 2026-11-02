@@ -47,7 +47,7 @@ def test_list_devices_and_adb_missing():
     api, _ = make_api(phone)
     assert api.list_devices() == {"devices": [{"serial": SERIAL, "state": "device",
                                                "model": "SM_A145R", "name": "samsung SM-A145R",
-                                               "imei": None, "image": image_uri(SILHOUETTE)}],
+                                               "imei": None, "image": image_uri(SILHOUETTE), "android": "14"}],
                                   "error": None}
     phone.host["devices -l"] = AdbError("adb_missing", "adb not found")
     assert api.list_devices() == {"devices": [], "error": "adb_missing"}

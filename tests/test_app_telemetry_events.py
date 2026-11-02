@@ -122,9 +122,12 @@ def test_undo_targets_do_not_fail_an_app_for_skipped_or_timed_out_sites():
 
 def test_sample_uses_the_same_shapes():
     s = ev.sample()
-    assert [e["type"] for e in s["basic"]] == ["start", "scan", "repair", "undo"]
-    assert all(e["packages"] is None for e in s["basic"] if e["type"] != "start")
-    assert all(e["packages"] for e in s["packages"] if e["type"] != "start")
+    assert [e["type"] for e in s["basic"]] == ["start", "scan", "repair", "undo", "transfer_backup",
+                                              "transfer_restore"]
+    no_packages = ("start", "transfer_backup", "transfer_restore")  # zdarzenia bez listy pakietów
+    assert all(e["packages"] is None for e in s["basic"] if e["type"] not in no_packages)
+    assert all(e["packages"] for e in s["packages"] if e["type"] not in no_packages)
+    assert all("packages" not in e for e in s["basic"] + s["packages"] if e["type"] in no_packages)
     assert all(e["install"] == ev.SAMPLE_INSTALL for e in s["basic"] + s["packages"])
 
 
@@ -248,3 +251,125 @@ def test_repair_event_does_not_count_a_browser_with_only_a_site_fix_as_a_failed_
         AppStatus("com.a", "ok"), AppStatus("com.android.chrome", "failed", errors=["user_timeout"])])
     body = ev.repair_event(ev._SAMPLE_DEVICE, "s", plans, {}, result, None, False)
     assert body["levels"]["silence"] == 1 and body["failed"] == 0 and body["errors"] == []
+
+
+def _backup_result(**kw):
+    from admenot.engine.transfer.backup import BackupResult
+    from admenot.engine.transfer.telephony import CategoryResult
+
+    opts = {"status": "incomplete", "copy_id": "R58T00TEST_ab12/20261025-120000",
+            "telephony": {"sms": CategoryResult("ok", 3)}, "files_done": 10, "files_failed": 2,
+            "apps_done": 1, "apps_failed": 1, "bytes": 2_600_000, "seconds": 75}
+    opts.update(kw)
+    return BackupResult(**opts)
+
+
+def _selection(**kw):
+    from admenot.engine.transfer.backup import Selection
+
+    opts = {"contacts": False, "sms": True, "mms": False, "calls": False,
+            "categories": frozenset({"media"}), "others": frozenset({"Music", ""}),
+            "apps": frozenset({"com.whatsapp"})}
+    opts.update(kw)
+    return Selection(**opts)
+
+
+def test_transfer_backup_event_has_only_numbers_and_flags():
+    body = ev.transfer_backup_event(ev._SAMPLE_DEVICE, _backup_result(), _selection())
+    assert body == {
+        "device": {"manufacturer": "OPPO", "model": "CPH2483", "android": "14"},
+        "status": "incomplete", "seconds": 75, "bytes_mb": 3, "files": 10, "files_failed": 2,
+        "apps": 1, "apps_failed": 1,
+        "categories": {"contacts": False, "sms": True, "mms": False, "calls": False, "media": True,
+                       "downloads": False, "whatsapp": False, "others": True, "apps": True}}
+    text = json.dumps(body)
+    assert "Music" not in text and "com.whatsapp" not in text and "R58T00TEST" not in text
+
+
+def test_transfer_backup_event_fits_server_limits():
+    body = ev.transfer_backup_event(
+        ev._SAMPLE_DEVICE, _backup_result(seconds=10**7, bytes=10**20, files_done=10**9),
+        _selection(others=frozenset(), apps=frozenset()))
+    assert body["seconds"] == 86_400 and body["bytes_mb"] == ev.MAX_MB
+    assert body["files"] == ev.MAX_COUNT
+    assert body["categories"]["others"] is False and body["categories"]["apps"] is False
+
+
+def _restore_result(**kw):
+    from admenot.engine.transfer.restore import RestoreResult
+
+    opts = {"status": "incomplete", "target_serial": "R58NEW00001", "files_done": 40, "files_exists": 3,
+            "files_renamed": 2, "files_denied": 1, "files_failed": 1, "files_unselected": 7,
+            "apk_skipped": 1, "apk_suspicious_skipped": 2, "bytes": 2_600_000, "seconds": 75,
+            "hashed": False, "media_scan": "done", "files_missing": 4}
+    opts.update(kw)
+    return RestoreResult(**opts)
+
+
+def _upload_choice(groups=("photos", "whatsapp", "other:Music"), apks_on=("/sdcard/Download/gra.apk",)):
+    from admenot.engine.transfer.restore import UploadChoice
+
+    return UploadChoice(frozenset(groups), frozenset(apks_on))
+
+
+def test_transfer_restore_event_has_only_numbers_and_flags():
+    body = ev.transfer_restore_event(ev._SAMPLE_DEVICE, _restore_result(), _upload_choice(), 4)
+    assert body == {
+        "device": {"manufacturer": "OPPO", "model": "CPH2483", "android": "14"},
+        "status": "incomplete", "seconds": 75, "bytes_mb": 3, "files": 40, "exists": 3, "renamed": 2,
+        "denied": 1, "failed": 1, "unselected": 7, "missing": 4, "apk_skipped": 1,
+        "apk_suspicious_skipped": 2, "streams": 4, "hashed": False, "media_scan": "done",
+        "groups": {"photos": True, "videos": False, "downloads": False, "whatsapp": True, "others": True}}
+    text = json.dumps(body)
+    for name in ("Music", "gra.apk", "Download", "sdcard", "R58NEW00001"):
+        assert name not in text, name
+
+
+def test_transfer_restore_event_fits_server_limits():
+    body = ev.transfer_restore_event(
+        ev._SAMPLE_DEVICE, _restore_result(seconds=10**7, bytes=10**20, files_done=10**9, media_scan="skipped"),
+        _upload_choice(groups=("videos",)), 99)
+    assert body["seconds"] == 86_400 and body["bytes_mb"] == ev.MAX_MB and body["files"] == ev.MAX_COUNT
+    assert body["streams"] == 8 and body["media_scan"] == "skipped"
+    assert body["groups"]["others"] is False and body["groups"]["videos"] is True
+
+
+def _tel_result(stopped=False):
+    from admenot.engine.transfer.phonesetup import CleanupResult
+    from admenot.engine.transfer.restore_tel import TelKindResult, TelResult
+    from admenot.engine.transfer.telfile import ManualStep
+
+    kinds = {"contacts": TelKindResult(written=3, existed=1, skipped_synced=4, skipped_messenger=2, failed=0,
+                                       manual=0, path="app_process", visible_warning=False),
+             "sms": TelKindResult(5, 0, 0, 0, 1, 2, "file", True)}
+    return TelResult(kinds, {"contacts": True, "sms": False},
+                     [ManualStep("sms", "/sdcard/Download/AdMeNot-SMS-Jan Kowalski.xml")],
+                     CleanupResult(True, True, False, True), {"jan.kowalski@gmail.com": 4}, 30, stopped)
+
+
+def test_transfer_restore_event_with_tel_has_only_numbers():
+    body = ev.transfer_restore_event(ev._SAMPLE_DEVICE, _restore_result(status="complete"), _upload_choice(), 4,
+                                     _tel_result())
+    assert body["tel"] == {
+        "contacts": {"written": 3, "existed": 1, "skipped": 6, "failed": 0, "manual": 0, "path": "app_process",
+                     "visible_warning": False},
+        "sms": {"written": 5, "existed": 0, "skipped": 0, "failed": 1, "manual": 2, "path": "file",
+                "visible_warning": True}}
+    assert body["safety"] == {"contacts": True, "sms": False} and body["cleanup_ok"] is False
+    assert body["status"] == "incomplete"  # pliki skończone, telefonia z plikiem do ręcznego importu
+    text = json.dumps(body)
+    for name in ("jan.kowalski", "gmail", "Kowalski", "AdMeNot-SMS", "Download"):
+        assert name not in text, name
+
+
+def test_transfer_restore_event_tel_status_and_limits():
+    stopped = ev.transfer_restore_event(ev._SAMPLE_DEVICE, _restore_result(status="complete"), _upload_choice(),
+                                        4, _tel_result(stopped=True))
+    assert stopped["status"] == "stopped"
+    files_only = ev.transfer_restore_event(ev._SAMPLE_DEVICE, _restore_result(), _upload_choice(), 4)
+    assert not {"tel", "safety", "cleanup_ok"} & set(files_only)
+    import dataclasses as dc
+    big = _tel_result()
+    big = dc.replace(big, kinds={"calls": dc.replace(big.kinds["sms"], written=10**9)})
+    body = ev.transfer_restore_event(ev._SAMPLE_DEVICE, _restore_result(), _upload_choice(), 4, big)
+    assert body["tel"]["calls"]["written"] == ev.MAX_COUNT

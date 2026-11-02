@@ -1,0 +1,379 @@
+"""Zmiany nowego telefonu na czas zapisu telefonii i ich odwracanie (spec Etapu 3 §4, §6.2).
+
+Program zmienia na nowym telefonie najwyżej cztery rzeczy: appop `WRITE_SMS` dla shell, posiadacza roli
+SMS, zainstalowaną aplikację pomocniczą i katalog pomocnika `/data/local/tmp/admenot`. Każdą zapisuje
+w zapisie telefonu poza kopią (`PhoneRecord`, `phone_changes/<telefon>.json`) i w meta `device_changes`
+stanu wgrywania (z commitem) **przed** poleceniem, które ją wprowadza, więc po zamknięciu programu,
+wyrwanym kablu albo usunięciu kopii `cleanup` przy następnym podłączeniu wie, co odwrócić. Odczyt łączy
+oba zapisy (`merge_changes`), więc stan sprzed zapisu poza kopią też się liczy.
+`cleanup` jest idempotentne: każdy krok potwierdzony odczytem z telefonu czyści swoje pole.
+
+Posiadacza roli SMS czytamy z `dumpsys role` (`cmd role get-role-holders` nie ma na Androidzie 13/MIUI).
+Polecenia idą przez `guard.TelephonyWriteAdb` (`telephony_adb`), który przepuszcza oddanie roli tylko
+zapisanemu poprzedniemu posiadaczowi.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import re
+import time
+from collections.abc import Callable
+from dataclasses import asdict, dataclass, replace
+from pathlib import Path
+from typing import Literal
+
+from ..adb.transport import AdbError, AdbTransport
+from . import helper
+from .guard import _APPOP_MODES, SMS_ROLE, STAT_TAIL, TelephonyWriteAdb, q
+from .restore_state import (
+    CHANGES_KEY,
+    PhoneRecord,
+    RestoreState,
+    device_changes_pending,
+    merge_changes,
+    restore_state_path,
+)
+from .store import CopyDir
+
+TAP_POLL = 2  # s — odpytywanie roli, gdy czekamy na stuknięcie na telefonie
+META_KEY = CHANGES_KEY
+APPOP_GET = "appops get com.android.shell WRITE_SMS"
+INSTALL_TIMEOUT = 180.0
+_CONNECTION_KINDS = {"offline", "no_device", "unauthorized", "adb_missing"}
+_APPOP_LINE = re.compile(r"^\s*WRITE_SMS:\s*([a-z]+)")
+_DEFAULT_MODE = re.compile(r"^\s*Default mode:\s*([a-z]+)")
+_REFUSED = ("INSTALL_FAILED_", "Failure [", "canceled by user")
+_sleep = time.sleep  # podmieniane w testach
+
+OnTap = Callable[[str | None], None]  # "sms_role_grant" | "sms_role_restore" | None (koniec prośby)
+# Gdzie leżą zmiany telefonu: stan wgrywania (z zapisem telefonu obok) albo sam zapis telefonu (kopii już nie ma)
+Changes = RestoreState | PhoneRecord
+
+
+@dataclass(frozen=True)
+class DeviceChanges:
+    """Zmiany telefonu do odwrócenia; `None`/`False` = nie zmienialiśmy (albo już odwrócone)."""
+
+    appop_prev: str | None = None  # tryb `WRITE_SMS` shell sprzed zmiany (jawnie przywracany)
+    role_prev: tuple[str, ...] | None = None  # posiadacze roli SMS sprzed zmiany; `()` = brak
+    companion: bool = False  # aplikacja pomocnicza mogła zostać zainstalowana
+    helper_dir: bool = False  # mogło powstać `/data/local/tmp/admenot`
+
+    @property
+    def pending(self) -> bool:
+        return self != DeviceChanges()
+
+
+@dataclass(frozen=True)
+class CleanupResult:
+    role_ok: bool
+    appop_ok: bool
+    companion_removed: bool
+    helper_removed: bool
+
+    @property
+    def ok(self) -> bool:
+        return self.role_ok and self.appop_ok and self.companion_removed and self.helper_removed
+
+
+# --------------------------------------------------------------------------------------
+# Stan
+# --------------------------------------------------------------------------------------
+def _record_of(state: Changes) -> PhoneRecord | None:
+    return None if isinstance(state, PhoneRecord) else PhoneRecord.of_state(state.path)
+
+
+def device_changes(state: Changes) -> DeviceChanges:
+    """Zapis telefonu połączony z meta stanu (pole, które coś mówi, wygrywa)."""
+    record = _record_of(state)
+    raw = state.get_meta(META_KEY) or {}
+    if record is not None:
+        raw = merge_changes(record.get_meta(META_KEY), raw)
+    role = raw.get("role_prev")
+    return DeviceChanges(raw.get("appop_prev"), None if role is None else tuple(role),
+                         bool(raw.get("companion")), bool(raw.get("helper_dir")))
+
+
+def _save(state: Changes, changes: DeviceChanges) -> None:
+    """Najpierw zapis telefonu poza kopią (atomowo; nic do odwrócenia → plik usunięty), potem meta stanu
+    (`set_meta` robi commit). Błąd zapisu → wyjątek przed poleceniem, które zmienia telefon."""
+    value = asdict(changes)
+    record = _record_of(state)
+    if record is not None:
+        record.set_meta(META_KEY, value)
+    state.set_meta(META_KEY, value)
+
+
+def _update(state: Changes, **fields) -> None:
+    _save(state, replace(device_changes(state), **fields))
+
+
+def open_changes(path: Path) -> Changes:
+    """Ścieżka z `pending_cleanup`: stan wgrywania (`.sqlite`) albo sam zapis telefonu (`.json`)."""
+    return PhoneRecord(path) if path.suffix == ".json" else RestoreState(path)
+
+
+def mark_helper_dir(state: RestoreState) -> None:
+    """Przed pierwszym `mkdir -p` katalogu pomocnika (`AppProcessWriter`)."""
+    if not device_changes(state).helper_dir:
+        _update(state, helper_dir=True)
+
+
+def telephony_adb(inner: AdbTransport, state: Changes) -> TelephonyWriteAdb:
+    """Strażnik zapisu telefonii: oddać rolę SMS wolno tylko zapisanemu poprzedniemu posiadaczowi."""
+    return TelephonyWriteAdb(inner, role_restore=lambda: frozenset(device_changes(state).role_prev or ()))
+
+
+def pending_cleanup(copies: list[CopyDir], serial: str) -> list[Path]:
+    """Stany wgrywania tego telefonu, w których zostały zmiany telefonu do odwrócenia (każdy czyta też
+    zapis telefonu), a bez takich stanów — sam zapis telefonu, gdy coś w nim zostało (kopia usunięta)."""
+    paths = [p for p in (restore_state_path(c, serial) for c in copies) if device_changes_pending(p)]
+    if not paths:
+        record = PhoneRecord.for_serial(serial)
+        try:
+            pending = record.pending
+        except OSError:  # zapis jest, ale nieczytelny: sprzątanie spróbuje (i się nie uda — limit prób)
+            pending = True
+        if pending:
+            paths.append(record.path)
+    return paths
+
+
+# --------------------------------------------------------------------------------------
+# Odczyty
+# --------------------------------------------------------------------------------------
+def parse_role_holders(dumpsys: str, role: str = SMS_ROLE) -> tuple[str, ...]:
+    """Posiadacze roli z `dumpsys role`: sekcja `name=<rola>` (pierwszy użytkownik), linie `holders=`."""
+    holders: list[str] = []
+    inside = False
+    for raw in dumpsys.replace("\r\n", "\n").split("\n"):
+        line = raw.strip()
+        if line.startswith("name="):
+            if inside:
+                break
+            inside = line == f"name={role}"
+        elif inside and line.startswith("}"):
+            break
+        elif inside and line.startswith("holders="):
+            holders += [h.strip() for h in line.removeprefix("holders=").split(",") if h.strip()]
+    return tuple(holders)
+
+
+def sms_role_holders(adb: AdbTransport) -> tuple[str, ...]:
+    return parse_role_holders(adb.shell("dumpsys role", timeout=30))
+
+
+def read_appop(adb: AdbTransport) -> str:
+    """Tryb `WRITE_SMS` shell: wpis `WRITE_SMS: <tryb>`, a bez wpisu („No operations.”) tryb domyślny
+    z linii `Default mode:` (OPPO: `ignore`); `default` tylko, gdy nie ma żadnej z nich."""
+    default = None
+    for line in adb.shell(APPOP_GET).replace("\r\n", "\n").split("\n"):
+        if m := _APPOP_LINE.match(line):
+            return m.group(1)
+        if default is None and (m := _DEFAULT_MODE.match(line)):
+            default = m.group(1)
+    return default or "default"
+
+
+def _installed(adb: AdbTransport) -> bool:
+    out = adb.shell(f"pm list packages {helper.PACKAGE}")
+    return any(line.strip() == f"package:{helper.PACKAGE}" for line in out.splitlines())
+
+
+def _connection(exc: AdbError) -> bool:
+    return exc.kind in _CONNECTION_KINDS
+
+
+def _uninstall_companion(adb: AdbTransport) -> bool:
+    """`pm uninstall` aplikacji pomocniczej, ale nigdy, gdy jest posiadaczem roli SMS (odczyt tuż przed):
+    odinstalowanie posiadacza zostawiłoby telefon bez aplikacji SMS. `False` = odmowa."""
+    if helper.PACKAGE in sms_role_holders(adb):
+        return False
+    adb.shell(f"pm uninstall {helper.PACKAGE}")
+    return True
+
+
+# --------------------------------------------------------------------------------------
+# Zmiany
+# --------------------------------------------------------------------------------------
+def set_appop_allow(adb: AdbTransport, state: RestoreState) -> None:
+    """`WRITE_SMS` shell na `allow` (droga `app_process` dla SMS/MMS); poprzedni tryb zapisany przed
+    zmianą. Przy wznowieniu zapisany tryb zostaje (odczyt pokazywałby już nasze `allow`). Odczyt po
+    `set`: gdy tryb nadal jest poprzedni (telefon odmówił), nie ma czego odwracać — zapis znika od razu."""
+    prev = device_changes(state).appop_prev
+    if prev is None:
+        prev = read_appop(adb)
+        if prev not in _APPOP_MODES:
+            raise AdbError("command_failed", f"unexpected appop mode: {prev[:40]}")
+        _update(state, appop_prev=prev)
+    try:
+        adb.shell("appops set com.android.shell WRITE_SMS allow")
+    except AdbError as exc:
+        if not _connection(exc):
+            with contextlib.suppress(AdbError):
+                _forget_unchanged_appop(adb, state, prev)
+        raise
+    _forget_unchanged_appop(adb, state, prev)
+
+
+def _forget_unchanged_appop(adb: AdbTransport, state: RestoreState, prev: str) -> None:
+    """Tryb na telefonie równy zapisanemu poprzedniemu: nic do przywrócenia, `appop_prev` czyszczone."""
+    if read_appop(adb) == prev:
+        _update(state, appop_prev=None)
+
+
+def install_companion(adb: AdbTransport, state: RestoreState) -> Literal["ok", "blocked"]:
+    """Instaluje aplikację pomocniczą (`install -g`: uprawnienia od razu). APK sprawdzany najpierw na
+    komputerze (`HelperBroken` przy złym SHA-256). Pozostałość po awarii najpierw odinstalowana.
+    `blocked`: telefon odmówił instalacji (np. Xiaomi bez „Instaluj przez USB”) albo pozostałość ma
+    rolę SMS (nie odinstalowujemy posiadacza roli)."""
+    apk, _ = helper.artifact("apk")
+    if not device_changes(state).companion:
+        _update(state, companion=True)
+    if _installed(adb) and not _uninstall_companion(adb):
+        return "blocked"  # pozostałość z rolą SMS: nie ruszamy, sprzątanie najpierw odda rolę
+    try:
+        out = adb.run(["install", "-g", str(apk)], timeout=INSTALL_TIMEOUT)
+    except AdbError as exc:
+        if not _connection(exc) and any(m in exc.message for m in _REFUSED):
+            return "blocked"
+        raise
+    if any(m in out for m in _REFUSED) or not _installed(adb):
+        return "blocked"
+    return "ok"
+
+
+def take_sms_role(adb: AdbTransport, state: RestoreState, on_tap: OnTap, should_stop: Callable[[], bool],
+                  skip_tap: Callable[[], bool]) -> Literal["ok", "skipped"]:
+    """Aplikacja pomocnicza jako domyślna aplikacja SMS. Poprzedni posiadacz zapisany przed zmianą (przy
+    wznowieniu zostaje zapisany wcześniej). Gdy `add-role-holder` nie wystarcza, systemowe okno
+    i czekanie na stuknięcie co `TAP_POLL` s; `skip_tap()` (albo `should_stop()`) -> `skipped`."""
+    if device_changes(state).role_prev is None:
+        _update(state, role_prev=tuple(h for h in sms_role_holders(adb) if h != helper.PACKAGE))
+    try:
+        try:
+            adb.shell(f"cmd role add-role-holder {SMS_ROLE} {helper.PACKAGE}")
+        except AdbError as exc:
+            if _connection(exc):
+                raise
+        if helper.PACKAGE in sms_role_holders(adb):
+            return "ok"
+        adb.shell(f"am start -n {helper.PACKAGE}/.RoleActivity")
+        on_tap("sms_role_grant")
+        while True:
+            if skip_tap() or should_stop():
+                return "skipped"
+            _sleep(TAP_POLL)
+            if helper.PACKAGE in sms_role_holders(adb):
+                return "ok"
+    finally:
+        on_tap(None)
+
+
+# --------------------------------------------------------------------------------------
+# Sprzątanie
+# --------------------------------------------------------------------------------------
+def _role_restored(holders: tuple[str, ...], prev: tuple[str, ...]) -> bool:
+    if helper.PACKAGE in holders:
+        return False
+    return not prev or prev[0] in holders
+
+
+def _wait_role(adb: AdbTransport, prev: tuple[str, ...], on_tap: OnTap,
+               should_stop: Callable[[], bool]) -> bool:
+    """Rola nie wróciła z ADB: systemowe okno domyślnych aplikacji i czekanie na stuknięcie bez limitu
+    (wariant B), aż odczyt pokaże przywróconą rolę; `should_stop()` przerywa (`False`)."""
+    if _role_restored(sms_role_holders(adb), prev):
+        return True
+    adb.shell("am start -a android.settings.MANAGE_DEFAULT_APPS_SETTINGS")
+    on_tap("sms_role_restore")
+    try:
+        while True:
+            if should_stop():
+                return False
+            _sleep(TAP_POLL)
+            if _role_restored(sms_role_holders(adb), prev):
+                return True
+    finally:
+        on_tap(None)
+
+
+def _restore_role(adb: AdbTransport, state: Changes, on_tap: OnTap,
+                  should_stop: Callable[[], bool]) -> bool:
+    changes = device_changes(state)
+    prev = changes.role_prev
+    try:
+        if prev is None:
+            # Nie zmienialiśmy roli w tym stanie, ale pozostałość (inna kopia, zgubiony stan) może ją mieć:
+            # przed odinstalowaniem rola musi przejść do innej aplikacji (stuknięcie, bez `add-role-holder`,
+            # bo nie wiemy, komu ją oddać).
+            return not changes.companion or _wait_role(adb, (), on_tap, should_stop)
+        try:
+            adb.shell(f"cmd role add-role-holder {SMS_ROLE} {prev[0]}" if prev
+                      else f"cmd role remove-role-holder {SMS_ROLE} {helper.PACKAGE}")
+        except AdbError as exc:
+            if _connection(exc):
+                return False
+        if not _wait_role(adb, prev, on_tap, should_stop):
+            return False
+    except AdbError:
+        return False
+    _update(state, role_prev=None)
+    return True
+
+
+def _restore_appop(adb: AdbTransport, state: Changes) -> bool:
+    prev = device_changes(state).appop_prev
+    if prev is None:
+        return True
+    if prev not in _APPOP_MODES:
+        return False
+    try:
+        # Tryb już jest poprzedni (np. `set … allow` telefon odmówił): bez `set`, którego by znów odmówił.
+        if read_appop(adb) != prev:
+            adb.shell(f"appops set com.android.shell WRITE_SMS {prev}")
+            if read_appop(adb) != prev:
+                return False
+    except AdbError:
+        return False
+    _update(state, appop_prev=None)
+    return True
+
+
+def _remove_companion(adb: AdbTransport, state: Changes, role_ok: bool) -> bool:
+    if not device_changes(state).companion:
+        return True
+    if not role_ok:  # odinstalowanie posiadacza roli oddałoby ją systemowi, nie poprzedniej aplikacji
+        return False
+    try:
+        if _installed(adb) and (not _uninstall_companion(adb) or _installed(adb)):
+            return False
+    except AdbError:
+        return False
+    _update(state, companion=False)
+    return True
+
+
+def _remove_helper_dir(adb: AdbTransport, state: Changes) -> bool:
+    if not device_changes(state).helper_dir:
+        return True
+    try:
+        adb.shell(f"rm -rf {helper.HELPER_DIR}")
+        out = adb.shell("stat -c " + q("%s|%Y|%n") + " " + q(helper.HELPER_DIR) + STAT_TAIL)
+    except AdbError:
+        return False
+    if "No such file or directory" not in out:
+        return False
+    _update(state, helper_dir=False)
+    return True
+
+
+def cleanup(adb: AdbTransport, state: Changes, on_tap: OnTap,
+            should_stop: Callable[[], bool]) -> CleanupResult:
+    """Odwraca zapisane zmiany: rola SMS (czekanie na stuknięcie bez limitu, przerywane `should_stop`),
+    appop, odinstalowanie aplikacji pomocniczej (dopiero po potwierdzonej roli), katalog pomocnika.
+    Nieudany krok zostawia swoje pole w `device_changes` do następnego podłączenia."""
+    role_ok = _restore_role(adb, state, on_tap, should_stop)
+    return CleanupResult(role_ok, _restore_appop(adb, state), _remove_companion(adb, state, role_ok),
+                         _remove_helper_dir(adb, state))

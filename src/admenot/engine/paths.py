@@ -26,6 +26,11 @@ def backups_dir() -> Path:
     return Path(custom) if custom else data_dir() / "backups"
 
 
+def transfers_dir() -> Path:
+    """Kopie danych starych telefonów (przenoszenie danych), każda w `<telefon>/<RRRRMMDD-GGMMSS>`."""
+    return data_dir() / "transfers"
+
+
 def device_dir_name(serial: str) -> str:
     """Nazwa katalogu telefonu: czytelny początek numeru + skrót całego numeru.
 
@@ -34,6 +39,12 @@ def device_dir_name(serial: str) -> str:
     """
     readable = re.sub(r"[^A-Za-z0-9_-]", "_", serial)[:32].strip("_") or "device"
     return f"{readable}-{hashlib.sha256(serial.encode('utf-8')).hexdigest()[:12]}"
+
+
+def phone_changes_dir() -> Path:
+    """Zapis zmian nowych telefonów do odwrócenia (przenoszenie danych, Etap 3), po jednym pliku na
+    telefon `<device_dir_name(serial)>.json` — poza kopiami, więc usunięcie kopii go nie zabiera."""
+    return data_dir() / "phone_changes"
 
 
 def settings_path() -> Path:

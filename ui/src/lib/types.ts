@@ -15,6 +15,8 @@ export interface Settings {
   mode: Mode;
   adb_path: string | null;
   backups_dir: string | null;
+  /** Folder na PDF protokołów (archiwum serwisu); null = katalog programu. */
+  report_pdf_dir: string | null;
   theme: Theme;
   mirror_auto: boolean;
   apk_cache_limit_gb: number;
@@ -82,6 +84,7 @@ export interface DeviceEntry {
   name?: string | null; // nazwa handlowa z bazy telefonów (Api._identity); brak → kod modelu
   imei?: string | null;
   image?: string | null; // zdjęcie z bazy telefonów (albo sylwetka) jako data URI, jak w PhoneCard
+  android?: string | null; // wersja Androida (lista kilku telefonów); starsze mosty jej nie wysyłają
 }
 
 export interface DevicesPayload {
@@ -393,7 +396,9 @@ export interface ReportResult {
   order: string;
   html: string;
   pdf: string | null;
-  error: 'no_browser' | 'timeout' | 'failed' | 'locked' | null;
+  /** Gdzie miał trafić PDF (folder z ustawień albo domyślny), także po błędzie; starsze mosty go nie wysyłają. */
+  pdf_target?: string | null;
+  error: 'no_browser' | 'timeout' | 'failed' | 'locked' | 'folder' | null;
   opened: string | null; // null: zapisany, ale Windows nie ma programu, który go otworzy
 }
 
@@ -425,6 +430,8 @@ export type AdbSource = 'settings' | 'bundled' | 'path' | 'missing';
 export interface ApiErrorBody {
   key: string;
   message: string;
+  /** Rodzaj zadania (`job:error`), np. `restore` — wybiera tekst błędu wgrywania. */
+  kind?: string;
   /** Lokalny raport błędu do wysłania (internal). */
   crash?: string;
   serial?: string;
@@ -443,6 +450,298 @@ export interface ApiError {
 }
 
 export type JobError = ApiErrorBody & { job_id: string; kind: string };
+
+// --- przenoszenie danych: kopia starego telefonu (present.inventory_view / copy_view / backup_result_view)
+
+export type TransferCategory = 'media' | 'downloads' | 'whatsapp';
+
+export interface InventoryApp {
+  package: string;
+  label: string;
+  verdict: Verdict;
+  default_on: boolean;
+  bytes: number | null; // nieznany przed kopią
+}
+
+/** Rodzaj pliku eksportu: wizytówki .vcf, SMS Backup & Restore (`<smses>`, `<calls>`). */
+export type ExportKind = 'contacts' | 'sms' | 'calls';
+
+/** Plik eksportu znaleziony na telefonie (z `present.inventory_view`). `mtime`: czas lokalny ISO, sekundy
+ *  (null — telefon podał czas spoza zakresu dat, np. ujemny);
+ *  `count`: null, gdy plik jest większy niż odczytany nagłówek (liczba będzie znana po pobraniu). */
+export interface ExportFileView {
+  remote: string;
+  name: string;
+  size: number;
+  mtime: string | null;
+  count: number | null;
+}
+
+export interface InventoryView {
+  /** null: telefon nie pozwolił odczytać (np. Xiaomi bez „Debugowanie USB (ustawienia zabezpieczeń)”). */
+  contacts: number | null;
+  sms: number | null;
+  mms: number | null;
+  mms_bytes: number;
+  calls: number | null;
+  categories: Record<TransferCategory, { files: number; bytes: number }>;
+  /** Folder `""` to luźne pliki w głównym folderze telefonu. */
+  others: { name: string; files: number; bytes: number }[];
+  apps: InventoryApp[];
+  /** Szkodliwe — nie kopiujemy ich APK. */
+  skipped_apps: { package: string; label: string }[];
+  whatsapp_backup: string | null;
+  storage: { used: number; total: number } | null;
+  free_pc: number;
+  unreadable: number;
+  /** Kategorie, których odczytu telefon odmówił (nie zwykły błąd). */
+  denied: ExportKind[];
+  /** Pliki eksportu dla kategorii, których telefon nie dał odczytać — najnowsze pierwsze. */
+  exports: Partial<Record<ExportKind, ExportFileView[]>>;
+}
+
+/** Wybór wysyłany do `start_backup` (Selection z silnika). */
+export interface TransferSelection {
+  contacts: boolean;
+  sms: boolean;
+  mms: boolean;
+  calls: boolean;
+  categories: TransferCategory[];
+  others: string[];
+  apps: string[];
+  /** Wybrany plik eksportu (rodzaj → `remote`); most bierze tylko rodzaje z włączoną flagą. */
+  exports?: Partial<Record<ExportKind, string>>;
+}
+
+/** Plik eksportu zapisany w wyborze kopii (`copy.selection.exports`). `mtime`: sekundy od epoki. */
+export interface StoredExport {
+  kind: ExportKind;
+  remote: string;
+  size: number;
+  mtime: number;
+}
+
+/** Wybór zapisany w kopii — pliki eksportu jako lista, nie jak w `start_backup`. */
+export type StoredSelection = Partial<Omit<TransferSelection, 'exports'>> & { verify_hash?: boolean; exports?: StoredExport[] };
+
+export interface CopyView {
+  id: string;
+  serial: string;
+  model: string;
+  manufacturer: string;
+  client: string | null;
+  created: string;
+  expires: string;
+  days_left: number;
+  status: 'in_progress' | 'complete' | 'incomplete';
+  bytes: number;
+  counts: Record<string, number>;
+  /** Notatka serwisanta (`set_transfer_note`); starsze mosty jej nie wysyłają. */
+  note?: string | null;
+  /** Wybór zapisany w kopii (pusty, gdy kopia jeszcze nie ruszyła); wznowienie zaczyna od niego. */
+  selection?: StoredSelection;
+  /** Wgrywania tej kopii na nowe telefony, najnowsze pierwsze; starsze mosty ich nie wysyłają. */
+  restores?: CopyRestore[];
+}
+
+/** Stan wgrywania kopii na jeden telefon (`read_restores`). `resumable`: zostały pliki do wgrania. */
+export interface CopyRestore {
+  serial: string;
+  /** IMEI telefonu docelowego (zapisany przy wgrywaniu albo z podłączonego telefonu); null — pokazujemy numer seryjny. */
+  imei?: string | null;
+  /** running | complete | incomplete | stopped albo klucz błędu (np. `phone_full`). */
+  status: string;
+  updated: string | null;
+  resumable: boolean;
+}
+
+// --- przenoszenie danych: wgrywanie kopii na nowy telefon (present.restore_plan_view / restore_result_view)
+
+export type UploadGroup = 'photos' | 'videos' | 'downloads' | 'whatsapp';
+
+export interface UploadTotals {
+  files: number;
+  /** Do wgrania: bez plików „już są”, z APK według domyślnego wyboru (szkodliwe i podejrzane poza sumą). */
+  bytes: number;
+  exists: number;
+  rename: number;
+}
+
+export interface RestoreApk {
+  remote: string;
+  name: string;
+  /** `photos`… albo `other:<folder>`. */
+  group: string;
+  bytes: number;
+  action: 'push' | 'exists' | 'rename';
+  outcome: 'clean' | 'suspicious' | 'malicious' | 'unknown';
+  level: 'installed' | 'ioc' | 'static' | 'none';
+  default_on: boolean;
+}
+
+export interface RestorePlanView {
+  /** Grupa bez plików może nie przyjść. */
+  groups: Partial<Record<UploadGroup, UploadTotals>>;
+  /** Foldery „Inne” z kopii; `""` = luźne pliki w folderze głównym. */
+  others: ({ name: string } & UploadTotals)[];
+  apks: RestoreApk[];
+  space: { free: number; total: number | null };
+  reserve: number;
+  /** Pliki kopii, których nie ma już na komputerze — nie zostaną wgrane. */
+  missing: number;
+}
+
+/** Wybór wysyłany do `start_restore` (UploadChoice z silnika). */
+export interface UploadChoiceView {
+  /** `photos`… albo `other:<folder>`. */
+  groups: string[];
+  /** `remote` zaznaczonych podejrzanych APK. */
+  apks_on: string[];
+  verify_hash: boolean;
+  /** Telefonia do wgrania (`sms` obejmuje MMS); brak = bez telefonii. */
+  tel: TelKind[];
+}
+
+// --- przenoszenie danych: kontakty, wiadomości i połączenia (present.tel_plan_view / tel_result_view)
+
+/** Wiersz wyboru telefonii na ekranie wgrywania; `sms` obejmuje MMS. */
+export type TelKind = 'contacts' | 'sms' | 'calls';
+/** Kategoria w planie i wyniku (silnik prowadzi MMS osobno). */
+export type TelCategory = 'contacts' | 'sms' | 'mms' | 'calls';
+
+export interface TelKindPlan {
+  /** Ile rekordów trafi na telefon. */
+  write: number;
+  /** Ile już na nim jest (0, gdy telefon nie dał odczytać — patrz `readable`). */
+  existing: number;
+}
+
+export interface TelContactsPlan extends TelKindPlan {
+  /** Kontakty z kont synchronizowanych: przyjdą same po zalogowaniu (adres konta tylko na ekranie). */
+  skipped_synced: { account: string; count: number }[];
+  /** Kontakty z komunikatorów (WhatsApp, Telegram…): pominięte. */
+  skipped_messenger: number;
+}
+
+/** Kategoria, której nie ma w kopii, to `null`. */
+export interface TelPlanView {
+  contacts: TelContactsPlan | null;
+  sms: TelKindPlan | null;
+  mms: TelKindPlan | null;
+  calls: TelKindPlan | null;
+  phone_has_contacts: boolean;
+  readable: Partial<Record<TelKind, boolean>>;
+}
+
+/** Droga zapisu: pomocnik jako shell, aplikacja pomocnicza (rola SMS), plik do ręcznego importu. */
+export type TelPath = 'app_process' | 'companion' | 'file' | 'none';
+
+export interface TelKindResultView {
+  written: number;
+  existed: number;
+  skipped_synced: number;
+  skipped_messenger: number;
+  failed: number;
+  manual: number;
+  path: TelPath;
+  /** Zapisane, ale aplikacja Wiadomości może ich nie pokazywać — do sprawdzenia na telefonie. */
+  visible_warning: boolean;
+}
+
+export interface TelCleanupView {
+  role_ok: boolean;
+  appop_ok: boolean;
+  companion_removed: boolean;
+  helper_removed: boolean;
+  ok: boolean;
+}
+
+export interface TelResultView {
+  kinds: Partial<Record<TelCategory, TelKindResultView>>;
+  safety: Partial<Record<TelCategory, boolean>>;
+  /** Pliki do ręcznego importu: sama nazwa pliku w `Pobranych`. */
+  manual: { kind: TelCategory; name: string }[];
+  cleanup: TelCleanupView;
+  synced_accounts: { account: string; count: number }[];
+  seconds: number;
+  stopped: boolean;
+  status: 'complete' | 'incomplete';
+}
+
+export interface TelProgressView {
+  kind: TelCategory | 'safety';  // `safety`: kopia bezpieczeństwa nowego telefonu (done/total = 0)
+  done: number;
+  total: number;
+  path: TelPath;
+}
+
+/** Prośba o stuknięcie na telefonie: nadanie roli SMS na czas wgrywania albo jej oddanie poprzedniej aplikacji. */
+export type TapRequest = 'sms_role_grant' | 'sms_role_restore';
+
+export interface RestoreProgressView {
+  stage: 'plan' | 'files' | 'scan';
+  done_files: number;
+  total_files: number;
+  done_bytes: number;
+  total_bytes: number;
+  current: string;
+}
+
+export interface RestoreResultView {
+  status: 'complete' | 'incomplete' | 'stopped';
+  target_serial: string;
+  files_done: number;
+  files_exists: number;
+  /** Wgrane obok jako „(z kopii)”. */
+  files_renamed: number;
+  files_denied: number;
+  files_failed: number;
+  files_unselected: number;
+  /** Ocenione jako szkodliwe — nigdy nie wgrywane. */
+  apk_skipped: number;
+  apk_suspicious_skipped: number;
+  bytes: number;
+  seconds: number;
+  hashed: boolean;
+  /** `skipped`: przebieg się nie skończył (skan zrobi wznowienie) — wtedy bez prośby o restart. */
+  media_scan: 'done' | 'failed' | 'restart' | 'skipped';
+  files_missing: number;
+}
+
+export type TransferStage = 'telephony' | 'files' | 'apps' | 'verify';
+
+export interface TransferProgress {
+  stage: TransferStage;
+  done_files: number;
+  total_files: number;
+  done_bytes: number;
+  total_bytes: number;
+  current: string;
+  /** Aplikacje już obsłużone (także nieudane) i wybrane; starsze mosty ich nie wysyłają. */
+  done_apps?: number;
+  total_apps?: number;
+}
+
+export interface TelephonyResult {
+  status: 'ok' | 'unavailable' | 'failed';
+  count: number;
+  /** np. `addresses_missing:3,attachments_missing:1`, `export_changed`, `export_invalid`; starsze widoki go nie mają. */
+  error?: string | null;
+  /** Skąd dane: z telefonu albo z pliku eksportu; starsze widoki go nie mają. */
+  source?: 'phone' | 'export';
+}
+
+export interface BackupResultView {
+  status: 'complete' | 'incomplete' | 'stopped';
+  copy_id: string;
+  telephony: Record<string, TelephonyResult>;
+  files_done: number;
+  files_failed: number;
+  apps_done: number;
+  apps_failed: number;
+  bytes: number;
+  seconds: number;
+}
 
 type R<T> = Promise<T | ApiError>;
 
@@ -515,6 +814,21 @@ export interface Api {
   send_crash(id: string, include_adb: boolean, comment: string): R<{ sent_id: string }>;
   discard_crash(id: string): R<Record<string, never>>;
   quit(): R<{ ok: boolean; closing_after_step?: boolean }>;
+  transfer_inventory(serial: string, client: string | null): R<{ job_id: string }>;
+  transfer_whatsapp(): R<{ whatsapp_backup: string | null }>;
+  /** Ponowny odczyt telefonu (np. po eksporcie kontaktów do pliku) — wynik jak `transfer_inventory`. */
+  transfer_rescan(): R<{ job_id: string }>;
+  start_backup(selection: TransferSelection): R<{ job_id: string }>;
+  transfers(): R<{ copies: CopyView[] }>;
+  extend_transfer(copyId: string): R<{ copy: CopyView }>;
+  /** Pusta albo null usuwa notatkę; za długa (>2000 znaków): `bad_request`. */
+  set_transfer_note(copyId: string, note: string | null): R<{ copy: CopyView }>;
+  delete_transfer(copyId: string): R<{ deleted: string }>;
+  restore_plan(copyId: string, serial: string): R<{ job_id: string }>;
+  start_restore(choice: UploadChoiceView): R<{ job_id: string }>;
+  /** „Pomiń” przy prośbie o rolę SMS: wiadomości idą do pliku. Odmowa: `restore_required` (oddania roli
+   *  nie wolno pominąć) albo `no_tap` (nic nie czeka). */
+  skip_tap(): R<Record<string, never>>;
 }
 
 export interface EventMap {
@@ -553,6 +867,24 @@ export interface EventMap {
   'mirror:warning': { serial: string; code: 'control_blocked' | 'stay_awake_blocked' };
   'incident:state': { recording: boolean; seconds: number };
   'incident:done': IncidentDone;
+  'transfer:inventory': { inventory: InventoryView; resumable: CopyView | null; client: string | null };
+  'transfer:progress': TransferProgress;
+  'transfer:waiting': Record<string, never>;
+  /** Kopia założona albo wznowiona — zaraz po starcie, przed pierwszym `transfer:progress`. */
+  'transfer:copy': { copy: CopyView };
+  'transfer:done': { result: BackupResultView; copy: CopyView };
+  'transfer:restore_plan': { plan: RestorePlanView; tel: TelPlanView | null; copy: CopyView; resumable: boolean;
+    same_phone_recent: boolean };
+  'transfer:restore_progress': RestoreProgressView;
+  'transfer:tel_progress': TelProgressView;
+  /** `request` null: prośba załatwiona. `package`: poprzednia domyślna aplikacja SMS (null — nieznana). */
+  'transfer:tap': { request: TapRequest | null; package: string | null };
+  /** Start przywracania ustawień telefonu `serial` po przerwanym wgrywaniu (także ponowienia w tle). */
+  'transfer:cleanup_started': { serial: string };
+  /** Koniec przywracania ustawień telefonu; nieudane most ponawia w tle (najwyżej 3 próby na podłączenie). */
+  'transfer:cleanup_done': { ok: boolean; serial: string };
+  /** `tel`: null dla samych plików albo po błędzie telefonii (`tel_error` — klucz błędu). */
+  'transfer:restore_done': { result: RestoreResultView; copy: CopyView; tel?: TelResultView | null; tel_error?: string | null };
 }
 
 export type EventName = keyof EventMap;

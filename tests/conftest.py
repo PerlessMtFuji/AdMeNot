@@ -201,6 +201,13 @@ def _accept_risk(monkeypatch):
     monkeypatch.setenv("ADMENOT_ACCEPT_RISK", "1")
 
 
+@pytest.fixture(autouse=True)
+def _private_data_dir(monkeypatch, tmp_path_factory):
+    """Dane programu (np. zapis zmian telefonu `phone_changes/`) nigdy w prawdziwym %LOCALAPPDATA%;
+    testy ustawiające własny `LOCALAPPDATA` nadpisują ten katalog."""
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path_factory.mktemp("localappdata")))
+
+
 @pytest.fixture
 def scan_report(monkeypatch, tmp_path):
     """Raport szybkiego skanu telefonu z fakephone (bez analizy APK)."""

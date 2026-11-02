@@ -2,14 +2,19 @@
   import { getContext } from 'svelte';
   import type { Controller } from '../lib/controller';
   import { t } from '../lib/i18n/index.svelte';
-  import { type StageState, stageStates } from '../lib/logic';
+  import { isTransferPhase, type StageState, stageStates, transferStages } from '../lib/logic';
   import Icon from './Icon.svelte';
   import logo from '../assets/admenot.svg';
 
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
-  const STAGES = ['connect', 'read', 'analyze', 'fix', 'report'] as const;
-  const states = $derived(stageStates(s.phase, s.scanStage, !!(s.result && s.reports[s.result.order])));
+  const REPAIR = ['connect', 'read', 'analyze', 'fix', 'report'].map((k) => `stage.${k}`);
+  const TRANSFER = ['old_phone', 'copy', 'new_phone', 'upload', 'report'].map((k) => `transfer.stage.${k}`);
+  // Przenoszenie danych ma własne etapy; poza nim — etapy naprawy.
+  const transfer = $derived(isTransferPhase(s.phase));
+  const stages = $derived(transfer ? TRANSFER : REPAIR);
+  const states = $derived(transfer ? transferStages(s.phase)
+    : stageStates(s.phase, s.scanStage, !!(s.result && s.reports[s.result.order])));
   const expert = $derived(s.settings.mode === 'expert');
   const ITEM: Record<StageState, string> = {
     now: 'rail-now font-bold text-accent', done: 'text-ink', todo: 'text-soft',
@@ -29,13 +34,13 @@
   </div>
   {#if s.screen === 'main'}
     <ol aria-label={t('stage.label')} class="flex flex-col gap-0.5">
-      {#each STAGES as stage, i (stage)}
-        <li aria-current={states[i] === 'now' ? 'step' : undefined} title={t(`stage.${stage}`)}
+      {#each stages as stage, i (stage)}
+        <li aria-current={states[i] === 'now' ? 'step' : undefined} title={t(stage)}
           class="flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm transition-colors duration-300 max-[1200px]:justify-center max-[1200px]:px-0 {ITEM[states[i]]}">
           <span class="grid h-[22px] w-[22px] place-items-center rounded-full text-2xs font-bold transition duration-300 {DOT[states[i]]}">
             {#if states[i] === 'done'}<Icon name="check" size={13} strokeWidth={3} />{:else}{i + 1}{/if}
           </span>
-          <span class="max-[1200px]:sr-only">{t(`stage.${stage}`)}</span>
+          <span class="max-[1200px]:sr-only">{t(stage)}</span>
         </li>
       {/each}
     </ol>
