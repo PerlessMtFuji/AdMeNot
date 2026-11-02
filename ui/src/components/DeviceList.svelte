@@ -5,6 +5,7 @@
   import { modelName } from '../lib/logic';
   import type { DeviceEntry } from '../lib/types';
   import Pill from '../ui/Pill.svelte';
+  import CopyImei from './CopyImei.svelte';
   import MirrorControls from './MirrorControls.svelte';
   import PhoneThumb from './PhoneThumb.svelte';
 
@@ -34,7 +35,10 @@
         <span class="min-w-0 flex-1">
           <span class="block truncate font-bold">{nameOf(d)}</span>
           {#if d.android}<span class="block truncate text-sm text-mut">Android {d.android}</span>{/if}
-          <span class="mono block truncate text-2xs text-soft" title={idTitle(d)}>{idOf(d)}</span>
+          <span class="flex min-w-0 items-center gap-1">
+            <span class="mono truncate text-2xs text-soft" title={idTitle(d)}>{idOf(d)}</span>
+            {#if d.imei}<CopyImei imei={d.imei} />{/if}
+          </span>
         </span>
         {#if on}<Pill tone="accent">{t('connect.selected')}</Pill>
         {:else if mirrorOn(d)}<Pill tone="warn">{t('connect.mirror_on')}</Pill>{/if}

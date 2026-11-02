@@ -1,12 +1,13 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { t } from '../lib/i18n/index.svelte';
+  import CopyImei from './CopyImei.svelte';
   import PhoneThumb from './PhoneThumb.svelte';
 
   type Props = { name: string; details: string; serial: string; imei?: string | null; image?: string | null;
-    compact?: boolean; scanning?: boolean; connected?: boolean; children?: Snippet };
+    compact?: boolean; scanning?: boolean; connected?: boolean; copyImei?: boolean; children?: Snippet };
   let { name, details, serial, imei = null, image = null, compact = false, scanning = false, connected = false,
-    children }: Props = $props();
+    copyImei = false, children }: Props = $props();
 </script>
 
 <!-- W wąskim panelu bocznym dzieci (przyciski podglądu, baner) idą pod miniaturę, na całą szerokość. -->
@@ -19,7 +20,11 @@
         {details}{#if connected}{' · '}<span class="text-ok">● USB</span>{/if}
       </div>
       <!-- IMEI zamiast numeru seryjnego adb, gdy telefon pozwala go odczytać (jak w protokole) -->
-      <div class="mono truncate text-2xs text-soft" title={imei ? `${t('phone.serial')}: ${serial}` : t('phone.serial')}>{imei ? `IMEI ${imei}` : serial}</div>
+      <!-- `copyImei`: przycisk kopiowania (krok 1 — numer trafia np. do zlecenia w systemie serwisu) -->
+      <div class="flex min-w-0 items-center gap-1">
+        <span class="mono truncate text-2xs text-soft" title={imei ? `${t('phone.serial')}: ${serial}` : t('phone.serial')}>{imei ? `IMEI ${imei}` : serial}</span>
+        {#if copyImei && imei}<CopyImei {imei} />{/if}
+      </div>
       {#if children && !compact}<div class="mt-2.5">{@render children()}</div>{/if}
     </div>
   </div>

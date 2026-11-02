@@ -55,6 +55,39 @@ describe('Connect', () => {
     await tick();
     expect(screen.getByText('SM A145R')).toBeTruthy();
     expect(screen.getByText('R58T00TEST')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Kopiuj IMEI' })).toBeNull();  // bez IMEI nie ma czego kopiować
+  });
+
+  test('the IMEI of a ready phone can be copied to the clipboard', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+    onTestFinished(() => { vi.unstubAllGlobals(); });
+    const env = await setupCtl('clean');
+    env.s.devices = [{ serial: 'R58T00TEST', state: 'device', model: 'SM_A145R', name: 'Samsung Galaxy A14', imei: '499001200000004' }];
+    render(Connect, { context: new Map([['ctl', env.ctl]]) });
+    await tick();
+    await fireEvent.click(screen.getByRole('button', { name: 'Kopiuj IMEI' }));
+    await flush();
+    expect(writeText).toHaveBeenCalledWith('499001200000004');  // same cyfry, bez „IMEI ”
+    expect(screen.getByRole('status').textContent).toBe('Skopiowano IMEI');
+  });
+
+  test('several phones: copying an IMEI from a row does not change the selected phone', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+    onTestFinished(() => { vi.unstubAllGlobals(); });
+    const { s } = await renderWith(Connect, 'many');
+    s.devices = [
+      { serial: 'A1', state: 'device', model: 'CPH2271', name: 'Oppo A16s', imei: '861580056585051', android: '12' },
+      { serial: 'B2', state: 'device', model: '22101316G', name: 'Xiaomi Redmi Note 12 Pro', imei: '861485069821024', android: '13' },
+    ];
+    s.serial = 'A1';
+    await tick();
+    const rows = (screen.getAllByRole('radio') as HTMLInputElement[]).map((r) => r.closest('label')!);
+    await fireEvent.click(within(rows[1]).getByRole('button', { name: 'Kopiuj IMEI' }));
+    await flush();
+    expect(writeText).toHaveBeenCalledWith('861485069821024');
+    expect(s.serial).toBe('A1');
   });
 
   test('a phone with an interrupted data copy is offered resuming it right after connecting', async () => {

@@ -137,7 +137,7 @@
   },
   "scan": { "title": "Scanning the phone", "sub": "This takes a few seconds. Keep the cable connected.", "steps": "Scan stages", "stage": { "identify": "Identifying the phone…", "packages": "Reading the app list…", "collectors": "Collecting app behavior data…", "score": "Rating the apps…", "apk": "Analyzing APK files…" } },
   "phone": {
-    "subject": "Device", "serial": "S/N", "patch": "Patch"
+    "subject": "Device", "serial": "S/N", "patch": "Patch", "copy_imei": "Copy IMEI", "imei_copied": "IMEI copied"
   },
   "diag": { "title": "Find the ad source", "back": "Back" },
   "who": {

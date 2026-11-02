@@ -137,7 +137,7 @@
   },
   "scan": { "title": "Skanuję telefon", "sub": "To potrwa kilkanaście sekund. Nie odłączaj kabla.", "steps": "Etapy skanowania", "stage": { "identify": "Rozpoznaję telefon…", "packages": "Czytam listę aplikacji…", "collectors": "Zbieram dane o zachowaniu aplikacji…", "score": "Oceniam aplikacje…", "apk": "Analizuję pliki APK…" } },
   "phone": {
-    "subject": "Przedmiot zlecenia", "serial": "S/N", "patch": "Poprawka"
+    "subject": "Przedmiot zlecenia", "serial": "S/N", "patch": "Poprawka", "copy_imei": "Kopiuj IMEI", "imei_copied": "Skopiowano IMEI"
   },
   "diag": { "title": "Znajdź źródło reklamy", "back": "Wróć" },
   "who": {

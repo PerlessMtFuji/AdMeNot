@@ -99,7 +99,7 @@
         {:else}
           {#each ready as d (d.serial)}
             <label class="block cursor-pointer rounded-2xl">
-              <DeviceCard name={d.name ?? modelName(d.model)} details={t('connect.title.ready')} serial={d.serial} imei={d.imei} image={d.image} connected>
+              <DeviceCard name={d.name ?? modelName(d.model)} details={t('connect.title.ready')} serial={d.serial} imei={d.imei} image={d.image} connected copyImei>
                 <MirrorControls serial={d.serial} name={d.name ?? modelName(d.model)} />
               </DeviceCard>
             </label>
