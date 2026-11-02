@@ -86,8 +86,10 @@ def _is_denied(adb: ExplorerAdb, folder: str) -> bool:
     return "permission denied" in out.lower()
 
 
-def list_dir(adb: ExplorerAdb, path: str, *, sdk: int = 0, apps: Mapping[str, str] | None = None) -> ListResult:
-    """Zawartość folderu `path` (bez ukrytych). Nazwy z nową linią są pomijane i liczone w `skipped`."""
+def list_dir(adb: ExplorerAdb, path: str, *, sdk: int = 0, apps: Mapping[str, str] | None = None,
+             include_hidden: bool = False) -> ListResult:
+    """Zawartość folderu `path` (domyślnie bez ukrytych; `include_hidden` — do wiernej kopii folderu).
+    Nazwy z nową linią są pomijane i liczone w `skipped`."""
     base = path.rstrip("/")
     try:
         out = adb.shell(
@@ -115,7 +117,7 @@ def list_dir(adb: ExplorerAdb, path: str, *, sdk: int = 0, apps: Mapping[str, st
         if "/" in name:
             skipped += 1
             continue
-        if name.startswith("."):
+        if name.startswith(".") and not include_hidden:
             continue
         is_dir = stat.S_ISDIR(int(mode_s, 16))
         child = f"{base}/{name}"

@@ -249,3 +249,11 @@ def test_fake_streaming_commands(phone, adb):
     assert phone.local("/sdcard/d/x.txt").read_bytes() == b"old"
     adb.shell("mv -n /sdcard/d/.admenot-0123456789ab.part /sdcard/d/y.txt")
     assert phone.local("/sdcard/d/y.txt").read_bytes() == b"new"
+
+
+def test_list_dir_include_hidden(phone, adb):
+    put(phone, "/sdcard/root/.hidden")
+    put(phone, "/sdcard/root/shown.txt")
+    assert [e.name for e in list_dir(adb, "/sdcard/root").entries] == ["shown.txt"]
+    names = {e.name for e in list_dir(adb, "/sdcard/root", include_hidden=True).entries}
+    assert names == {".hidden", "shown.txt"}
