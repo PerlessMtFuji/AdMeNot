@@ -20,8 +20,9 @@
   const phoneReady = $derived(!!s.serial && s.devices.some((d) => d.serial === s.serial && d.state === 'device') && s.job === null);
   const finished = (c: CopyView) => c.status === 'complete' || c.status === 'incomplete';
   // „wgrano na”: wgrywanie skończone w całości (jak w `restoreOffer`); „przerwane”: da się wznowić (`resumable`).
+  // Telefon jak wszędzie: IMEI, a numer seryjny tylko, gdy IMEI nie ma.
   const serials = (c: CopyView, done: boolean) => (c.restores ?? [])
-    .filter((r) => (done ? r.status === 'complete' : r.resumable)).map((r) => r.serial).join(', ');
+    .filter((r) => (done ? r.status === 'complete' : r.resumable)).map((r) => (r.imei ? `IMEI ${r.imei}` : r.serial)).join(', ');
 
   // Zawartość kopii z `counts`: „Kontakty 312 · SMS 1 204 · Zdjęcia 1 530 …” (tylko niezerowe).
   // Kopie sprzed liczników według grup (`files_*`) mają tylko łączne `files`.

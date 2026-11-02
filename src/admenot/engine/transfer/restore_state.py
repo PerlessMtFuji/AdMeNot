@@ -1,7 +1,7 @@
 """Stan wgrywania kopii na nowy telefon — SQLite osobno dla każdego telefonu docelowego.
 
 `<kopia>/restore/<device_dir_name(serial)>.sqlite`: pliki (cel, status, próby), rekordy telefonii
-(`tel`: kategoria, id rekordu, status, droga) i meta `serial`, `choice`, `status`, `updated`,
+(`tel`: kategoria, id rekordu, status, droga) i meta `serial`, `imei` (gdy telefon go podał), `choice`, `status`, `updated`,
 `device_changes` (zmiany telefonu do odwrócenia, `phonesetup`; ich główny zapis to `PhoneRecord` poza
 kopią, meta stanu jest jego kopią i zapisem stanów sprzed niego), `tel_left` (rekordy telefonii
 jeszcze nierozstrzygnięte, `restore_tel`), `scanned` (liczba plików `done` przy ostatnim udanym skanie
@@ -156,6 +156,7 @@ class RestoreSummary:
     # wybranej telefonii (`tel_left`)
     resumable: bool
     cleanup_pending: bool = False  # zostały zmiany telefonu do odwrócenia (`device_changes`)
+    imei: str | None = None  # IMEI telefonu docelowego; stany sprzed tego pola i telefony bez odczytu: None
 
 
 def _read(path: Path, strict: bool = False) -> tuple[dict[str, Any], int] | None:
@@ -296,7 +297,8 @@ def _summary(path: Path) -> RestoreSummary | None:
                           # `complete` z `tel_left`: pliki skończone, a wybranej telefonii jeszcze nie
                           # było (program zamknięty między etapami; most zapisuje `tel_left` przed plikami)
                           (status != "complete" and left > 0) or _tel_left(meta) > 0,
-                          changes_pending(meta.get("device_changes")))
+                          changes_pending(meta.get("device_changes")),
+                          meta["imei"] if isinstance(meta.get("imei"), str) else None)
 
 
 def _tel_left(meta: dict[str, Any]) -> int:

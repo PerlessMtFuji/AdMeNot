@@ -33,6 +33,13 @@ describe('TransferCopies', () => {
     expect(plan).toHaveBeenCalledWith('OLD/1');
   });
 
+  test('phones the copy went to are named by IMEI when the bridge knows it', async () => {
+    await show([{ ...COPY, restores: [{ serial: 'NEW1', imei: '861485069821024', status: 'complete', updated: null, resumable: false },
+      { serial: 'NEW2', imei: null, status: 'stopped', updated: null, resumable: true }] }], null);
+    expect(screen.getByText('wgrano na: IMEI 861485069821024')).toBeTruthy();
+    expect(screen.getByText('wgrywanie przerwane: NEW2')).toBeTruthy();
+  });
+
   test('deleting a copy asks first, then deletes that copy', async () => {
     const env = await show([COPY], null);
     const del = vi.spyOn(env.ctl, 'deleteTransfer').mockResolvedValue();

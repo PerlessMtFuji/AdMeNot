@@ -2439,6 +2439,7 @@
        "restores": [
         {
          "serial": "R58W20NEW01",
+         "imei": null,
          "status": "incomplete",
          "updated": "2026-09-26T12:31:00+00:00",
          "resumable": false
@@ -2568,6 +2569,7 @@
       "restores": [
        {
         "serial": "R58W20NEW01",
+        "imei": null,
         "status": "incomplete",
         "updated": "2026-09-26T12:31:00+00:00",
         "resumable": false

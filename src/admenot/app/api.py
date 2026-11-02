@@ -556,8 +556,15 @@ class Api:
         job = self._jobs.current()
         return self._restore_copy_id if job is not None and job.kind == "restore" else None
 
-    def _copy_view(self, meta: store.CopyMeta) -> dict[str, Any]:
-        return copy_view(meta, self._now(), self._restoring())
+    def _copy_view(self, meta: store.CopyMeta, now: datetime | None = None,
+                   restoring: str | None = None) -> dict[str, Any]:
+        """`now`/`restoring` podaje lista kopii (jeden odczyt na całą listę); domyślnie bieżące."""
+        view = copy_view(meta, now or self._now(), restoring if now else self._restoring())
+        # Wgrywania sprzed zapisu IMEI w stanie: IMEI z podłączonego telefonu, gdy już go odczytaliśmy.
+        for r in view["restores"]:
+            if r["imei"] is None and r["serial"] in self._identities:
+                r["imei"] = self._identities[r["serial"]][1]
+        return view
 
     def _bind_order(self, journal: Journal, serial: str, order_id: int) -> None:
         with self._shots_lock:
@@ -2074,7 +2081,7 @@ class Api:
         self._purge_transfers()
         now = self._now()
         restoring = self._restoring()
-        return {"copies": [copy_view(m, now, restoring) for m in store.list_copies()]}
+        return {"copies": [self._copy_view(m, now, restoring) for m in store.list_copies()]}
 
     @_api
     def extend_transfer(self, copy_id: str) -> dict[str, Any]:

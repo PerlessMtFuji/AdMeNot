@@ -547,6 +547,8 @@ export interface CopyView {
 /** Stan wgrywania kopii na jeden telefon (`read_restores`). `resumable`: zostały pliki do wgrania. */
 export interface CopyRestore {
   serial: string;
+  /** IMEI telefonu docelowego (zapisany przy wgrywaniu albo z podłączonego telefonu); null — pokazujemy numer seryjny. */
+  imei?: string | null;
   /** running | complete | incomplete | stopped albo klucz błędu (np. `phone_full`). */
   status: string;
   updated: string | null;

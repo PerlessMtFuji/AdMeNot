@@ -73,7 +73,7 @@
     "sub": { "none": "Użyj kabla USB, który przesyła dane (nie tylko ładuje).", "unauthorized": "Na ekranie telefonu pojawiło się okno — stuknij „Zezwól”.", "offline": "Telefon nie odpowiada. Odłącz kabel i podłącz go ponownie.", "ready": "Telefon jest gotowy do skanowania.", "many": "Podłączono kilka telefonów — wybierz jeden.", "adb_missing": "Wskaż adb.exe w ustawieniach." },
     "check": { "label": "Stan połączenia", "cable": "Kabel USB", "auth": "Zgoda na telefonie", "model": "Odczyt modelu" },
     "devices": { "one": "Telefony ({count}) — wybierz, z którym pracujesz", "few": "Telefony ({count}) — wybierz, z którym pracujesz", "many": "Telefony ({count}) — wybierz, z którym pracujesz", "other": "Telefony ({count}) — wybierz, z którym pracujesz" },
-    "selected": "wybrany", "mirror_on": "podgląd włączony", "pick_first": "Wybierz telefon z listy — wtedy włączysz podgląd ekranu, zrobisz zrzut albo zaczniesz skan.", "tools_for": "{name} {serial}",
+    "selected": "wybrany", "mirror_on": "podgląd włączony", "pick_first": "Wybierz telefon z listy — wtedy włączysz podgląd ekranu, zrobisz zrzut albo zaczniesz skan.", "tools_for": "{name} {id}",
     "phone_dialog": "Zezwolić na debugowanie USB?",
     "phone_allow": "Zezwól",
     "guide_title": "Jak włączyć debugowanie USB",

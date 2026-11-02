@@ -603,6 +603,30 @@ def test_start_restore_completes(tmp_path):
     assert again["resumable"] is False and again["plan"]["groups"]["photos"]["exists"] == 2
 
 
+def test_restore_records_the_new_phone_imei(tmp_path, monkeypatch):
+    # „wgrano na …” w Historii pokazuje IMEI nowego telefonu (zapisany w stanie wgrywania), nie numer seryjny
+    monkeypatch.setattr("admenot.engine.device.info.read_imei", lambda adb: "861485069821024")
+    api, rec, _, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+    assert "job_id" in api.start_restore(CHOICE)
+    api._identities.clear()  # po ponownym uruchomieniu programu: IMEI tylko ze stanu wgrywania
+    (entry,) = api.transfers()["copies"][0]["restores"]
+    assert (entry["serial"], entry["imei"]) == (NEW, "861485069821024")
+
+
+def test_older_restore_without_imei_takes_it_from_the_connected_phone(tmp_path):
+    from admenot.engine.transfer.restore_state import RestoreState, restore_state_path
+
+    api, _, _, copy_id = _copied(tmp_path)
+    state = RestoreState(restore_state_path(store.CopyDir(store.transfers_dir() / copy_id), NEW))
+    state.set_meta("serial", NEW)
+    state.set_meta("status", "complete")
+    state.close()
+    assert api.transfers()["copies"][0]["restores"][0]["imei"] is None
+    api._identities[NEW] = ("Oppo A16s", "861580056585051", None, "12")
+    assert api.transfers()["copies"][0]["restores"][0]["imei"] == "861580056585051"
+
+
 def test_restore_resume_offered(tmp_path):
     from admenot.engine.transfer.restore_state import RestoreRow, RestoreState, restore_state_path
 
@@ -617,7 +641,7 @@ def test_restore_resume_offered(tmp_path):
     state.close()
     event = _planned(api, rec, copy_id)
     assert event["resumable"] is True
-    assert event["copy"]["restores"] == [{"serial": NEW, "status": "stopped",
+    assert event["copy"]["restores"] == [{"serial": NEW, "imei": None, "status": "stopped",
                                           "updated": "2026-09-26T12:00:00+00:00", "resumable": True}]
     assert _planned(api, rec, copy_id, SERIAL)["resumable"] is False  # stan innego telefonu
 

@@ -189,6 +189,8 @@ class _Restore:
             if state.get_meta("serial", self.device.serial) != self.device.serial:
                 raise RestoreError("wrong_device")
             state.set_meta("serial", self.device.serial)
+            if self.device.imei:  # do „wgrano na …” w Historii; bez odczytu zostaje numer seryjny
+                state.set_meta("imei", self.device.imei)
             state.set_meta("choice", self.choice.to_json())
             _mark(state, "running")
             try:

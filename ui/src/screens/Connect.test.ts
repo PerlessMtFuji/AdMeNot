@@ -202,6 +202,25 @@ describe('Connect', () => {
     expect(within(radios[1].closest('label')!).getByText('wybrany')).toBeTruthy();
   });
 
+  test('several phones: rows and the tools bar name each phone by IMEI, the serial only as a fallback', async () => {
+    const { s } = await renderWith(Connect, 'many');
+    s.devices = [
+      { serial: '79SSSW6PDMEMCI6S', state: 'device', model: 'CPH2271', name: 'Oppo A16s', imei: '861580056585051', android: '12' },
+      { serial: 'nz7pukyxcu8t4d6l', state: 'device', model: '22101316G', name: 'Xiaomi Redmi Note 12 Pro', imei: null, android: '13' },
+    ];
+    s.serial = '79SSSW6PDMEMCI6S';
+    await tick();
+    const [oppo, xiaomi] = (screen.getAllByRole('radio') as HTMLInputElement[]).map((r) => r.closest('label')!);
+    expect(within(oppo).getByText('IMEI 861580056585051').getAttribute('title')).toBe('S/N: 79SSSW6PDMEMCI6S');
+    expect(within(oppo).getByText('Android 12')).toBeTruthy();
+    expect(oppo.textContent).not.toContain('79SSSW6PDMEMCI6S');
+    expect(within(xiaomi).getByText('nz7pukyxcu8t4d6l')).toBeTruthy();  // bez IMEI: numer seryjny
+    const tools = screen.getByRole('button', { name: 'Zrzut ekranu' }).closest('section')!;
+    expect(tools.getAttribute('aria-label')).toBe('Oppo A16s IMEI 861580056585051');
+    expect(within(tools).getByText('IMEI 861580056585051')).toBeTruthy();
+    expect(tools.textContent).not.toContain('79SSSW6PDMEMCI6S');
+  });
+
   test('several phones, none picked: no tools, scan disabled, a hint says to pick one', async () => {
     const { s } = await renderWith(Connect, 'many');
     s.serial = null;
