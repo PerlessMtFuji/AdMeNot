@@ -92,6 +92,11 @@
   const othersBytes = $derived(inv?.others.reduce((n, o) => n + o.bytes, 0) ?? 0);
   const suspicious = $derived(inv?.apps.filter((a) => a.verdict === 'suspicious').length ?? 0);
   const waOld = $derived(!!inv && inv.categories.whatsapp.files > 0 && whatsappStale(inv.whatsapp_backup, new Date()));
+  let waChecking = $state(false);
+  async function recheckWhatsapp() {
+    waChecking = true;
+    try { await ctl.recheckWhatsapp(); } finally { waChecking = false; }
+  }
 </script>
 
 {#snippet row(r: Row, extra?: Snippet)}
@@ -202,24 +207,30 @@
         {@render exportList(k)}
         <details class="group">
           <summary class="w-fit cursor-pointer font-semibold text-accent hover:underline">{t('transfer.export.howto_toggle')}</summary>
-          {@render howto(xiaomi)}
+          {@render howto(k, xiaomi)}
         </details>
       {:else}
-        {@render howto(xiaomi)}
+        {@render howto(k, xiaomi)}
       {/if}
-      <button type="button" class="flex w-fit items-center gap-1.5 font-semibold text-accent hover:underline disabled:cursor-default disabled:text-soft disabled:no-underline"
-        disabled={s.job !== null} onclick={() => ctl.rescanTransfer()}>
-        {#if rescanning}<Spinner />{:else}<Icon name="rotate-ccw" size={13} />{/if}{t('transfer.export.rescan')}
-      </button>
+      {@render recheck(() => ctl.rescanTransfer(), s.job !== null, rescanning)}
     </div>
   </div>
 {/snippet}
 
-{#snippet howto(xiaomi: boolean)}
+<!-- Instrukcja tylko dla danych z tego wiersza: kontakty to .vcf z aplikacji Kontakty, SMS i połączenia — SMS Backup & Restore. -->
+{#snippet howto(k: ExportKind, xiaomi: boolean)}
   <div class="mt-1 flex flex-col gap-1">
     {#if xiaomi}<p>{t('transfer.export.xiaomi')}</p>{/if}
-    <p>{t(xiaomi ? 'transfer.export.howto' : 'transfer.export.howto_plain')}</p>
+    <p>{t(xiaomi ? 'transfer.export.howto' : 'transfer.export.howto_plain', { steps: t(`transfer.export.steps.${k}`) })}</p>
   </div>
+{/snippet}
+
+<!-- „Sprawdź ponownie” pod komunikatem w wierszu: ten sam wygląd przy plikach eksportu i kopii czatów WhatsApp. -->
+{#snippet recheck(onclick: () => void, disabled: boolean, busy: boolean)}
+  <button type="button" class="flex w-fit items-center gap-1.5 font-semibold text-accent hover:underline disabled:cursor-default disabled:text-soft disabled:no-underline"
+    {disabled} {onclick}>
+    {#if busy}<Spinner />{:else}<Icon name="rotate-ccw" size={13} />{/if}{t('transfer.recheck')}
+  </button>
 {/snippet}
 
 {#snippet exportList(k: ExportKind)}
@@ -242,12 +253,13 @@
 
 {#snippet whatsapp()}
   {@const backup = inv?.whatsapp_backup ?? null}
-  <div class="flex flex-col gap-0.5 pl-1.5" data-testid="whatsapp-note">
+  <!-- jak komunikat o plikach eksportu: bez listy do wyboru instrukcja jest od razu widoczna, przycisk pod nią -->
+  <div class="flex flex-col gap-1.5 pl-1.5" data-testid="whatsapp-note">
     {@render inlineNote(backup ? t('transfer.whatsapp_old_title', { when: when(backup) }) : t('transfer.whatsapp_none_title'))}
-    <p class="pl-5 text-sm text-mut">
-      {t('transfer.whatsapp_howto')} ·
-      <button type="button" class="font-semibold text-accent hover:underline" onclick={() => ctl.recheckWhatsapp()}>{t('transfer.recheck')}</button>
-    </p>
+    <div class="flex flex-col gap-1.5 pl-5 text-sm text-mut">
+      <p>{t('transfer.whatsapp_howto')}</p>
+      {@render recheck(recheckWhatsapp, waChecking || s.job !== null, waChecking)}
+    </div>
   </div>
 {/snippet}
 

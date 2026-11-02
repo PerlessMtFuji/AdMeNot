@@ -78,6 +78,25 @@ describe('TransferChoose', () => {
     expect(screen.queryByRole('status')).toBeNull();  // już nie osobny baner
   });
 
+  test('no WhatsApp chat backup: the re-check asks the bridge and clears the warning', async () => {
+    const { bridge } = await show({ whatsapp_backup: null });
+    const note = screen.getByTestId('whatsapp-note');
+    expect(within(note).getByText('Na telefonie nie ma kopii czatów')).toBeTruthy();
+    // instrukcja i przycisk w osobnych liniach, bez wiszącego „·”
+    expect(within(note).getByText(/^Na telefonie: WhatsApp → .* → Utwórz kopię$/)).toBeTruthy();
+    const btn = within(note).getByRole('button', { name: 'Sprawdź ponownie' }) as HTMLButtonElement;
+    await fireEvent.click(btn);
+    expect(bridge.calls.some((c) => c.method === 'transfer_whatsapp')).toBe(true);
+  });
+
+  test('the WhatsApp re-check is off while the phone is being read', async () => {
+    const { s } = await show({ whatsapp_backup: null });
+    s.job = { id: 'job-9', kind: 'transfer_scan' } as never;
+    await tick();
+    const note = screen.getByTestId('whatsapp-note');
+    expect((within(note).getByRole('button', { name: 'Sprawdź ponownie' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   const XIAOMI = { serial: 'R58T00TEST', manufacturer: 'Xiaomi', brand: 'Redmi' } as never;
   const vcf = (name: string, count: number | null, mtime: string, size = 2000) =>
     ({ remote: `/sdcard/Kopia/${name}`, name, size, mtime, count });
@@ -98,12 +117,12 @@ describe('TransferChoose', () => {
     expect(box.checked).toBe(true);
     expect(box.disabled).toBe(false);
     expect(meta(/Kontakty/)).toContain('3 z pliku eksportu');
-    // komunikat, lista plików i „Skanuj ponownie” siedzą w karcie wiersza Kontakty, nie w osobnym banerze
+    // komunikat, lista plików i „Sprawdź ponownie” siedzą w karcie wiersza Kontakty, nie w osobnym banerze
     const card = screen.getByRole('checkbox', { name: /Kontakty/ }).closest('.card') as HTMLElement;
     const note = within(card).getByTestId('export-note-contacts');
     expect(within(note).getByText('Telefon nie pozwolił odczytać kontaktów — użyto pliku eksportu.')).toBeTruthy();
     expect(within(note).getByRole('radiogroup', { name: 'Pliki eksportu na telefonie · Kontakty' })).toBeTruthy();
-    expect(within(note).getByRole('button', { name: 'Skanuj ponownie' })).toBeTruthy();
+    expect(within(note).getByRole('button', { name: 'Sprawdź ponownie' })).toBeTruthy();
     // instrukcja (z dopiskiem o Xiaomi) zwinięta, gdy jest z czego wybierać
     const howto = within(note).getByText('Brak aktualnego pliku? Jak go zrobić').closest('details')!;
     expect(howto.open).toBe(false);
@@ -142,18 +161,20 @@ describe('TransferChoose', () => {
     expect(box.disabled).toBe(true);
     expect(meta(/Kontakty/)).toContain('niedostępne');
     expect(screen.getByText('Telefon nie pozwolił odczytać kontaktów.')).toBeTruthy();
-    expect(screen.getByText(/Bez niej wyeksportuj dane do pliku/)).toBeTruthy();
+    expect(screen.getByText(/^Bez niej wyeksportuj kontakty do pliku \.vcf w aplikacji Kontakty/)).toBeTruthy();
     expect(screen.queryByRole('radiogroup')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Skanuj ponownie' })).toBeTruthy();
+    expect(within(screen.getByTestId('export-note-contacts')).getByRole('button', { name: 'Sprawdź ponownie' })).toBeTruthy();
   });
 
   test('rescanning asks the bridge and is disabled while the phone is read', async () => {
     const { s, bridge } = await onXiaomi({ contacts: null, denied: ['contacts'] });
-    await fireEvent.click(screen.getByRole('button', { name: 'Skanuj ponownie' }));
+    const note = () => within(screen.getByTestId('export-note-contacts'));
+    await fireEvent.click(note().getByRole('button', { name: 'Sprawdź ponownie' }));
     expect(bridge.calls.some((c) => c.method === 'transfer_rescan')).toBe(true);
+    expect(bridge.calls.some((c) => c.method === 'transfer_whatsapp')).toBe(false);
     s.job = { id: 'job-9', kind: 'transfer_scan' } as never;
     await tick();
-    expect((screen.getByRole('button', { name: /Skanuj ponownie/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((note().getByRole('button', { name: /Sprawdź ponownie/ }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   test('denied contacts and messages get a section each', async () => {
@@ -178,14 +199,25 @@ describe('TransferChoose', () => {
     await tick();
     expect(screen.getByText('Telefon nie pozwolił odczytać kontaktów.')).toBeTruthy();
     expect(screen.queryByText(/Xiaomi wpuszcza/)).toBeNull();
-    expect(screen.getByText(/^Wyeksportuj dane do pliku \(Kontakty/)).toBeTruthy();
+    expect(screen.getByText(/^Wyeksportuj kontakty do pliku \.vcf/)).toBeTruthy();
     expect(screen.queryByText(/Bez niej/)).toBeNull();
   });
 
   test('a read error that is not a refusal explains the export without "Bez niej", even on a Xiaomi', async () => {
     await onXiaomi({ contacts: null });
-    expect(screen.getByText(/^Wyeksportuj dane do pliku \(Kontakty/)).toBeTruthy();
+    expect(screen.getByText(/^Wyeksportuj kontakty do pliku \.vcf/)).toBeTruthy();
     expect(screen.queryByText(/Bez niej/)).toBeNull();
+  });
+
+  test('each row explains only its own export: contacts from Contacts, messages and calls from SMS Backup & Restore', async () => {
+    await show({ contacts: null, sms: null, mms: null, calls: null, denied: ['contacts', 'sms', 'calls'] });
+    const howto = (k: string) => within(screen.getByTestId(`export-note-${k}`)).getByText(/^Wyeksportuj/).textContent!;
+    expect(howto('contacts')).toMatch(/^Wyeksportuj kontakty do pliku \.vcf w aplikacji Kontakty/);
+    expect(howto('contacts')).not.toContain('SMS Backup');
+    expect(howto('sms')).toMatch(/^Wyeksportuj wiadomości do pliku aplikacją typu SMS Backup & Restore/);
+    expect(howto('sms')).not.toContain('Kontakty');
+    expect(howto('calls')).toMatch(/^Wyeksportuj historię połączeń do pliku aplikacją typu SMS Backup & Restore/);
+    for (const k of ['contacts', 'sms', 'calls']) expect(howto(k)).toContain('kliknij „Sprawdź ponownie”');
   });
 
   test('unticking the row sends no export file', async () => {

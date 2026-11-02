@@ -629,7 +629,7 @@ export function resumeSelection(inv: InventoryView, stored: StoredSelection | un
   };
 }
 
-/** Wybór po „Skanuj ponownie”: zaznaczenia serwisanta zostają (zawężone do tego, co telefon ma teraz), plik
+/** Wybór po „Sprawdź ponownie”: zaznaczenia serwisanta zostają (zawężone do tego, co telefon ma teraz), plik
  *  eksportu według `keptExport`; kategoria, dla której pierwszy plik eksportu właśnie się pojawił, jest zaznaczana. */
 export function rescanSelection(prev: TransferSelection, prevInv: InventoryView, inv: InventoryView): TransferSelection {
   const exports = keptExport(prev.exports ?? {}, prevInv, inv);

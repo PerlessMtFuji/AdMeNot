@@ -303,7 +303,7 @@ export class Controller {
         s.stopping = false;
         s.phase = 'connect';
       } else if (d.kind === 'transfer_scan' && s.phase === 'transfer_choose' && s.transfer.inventory) {
-        // „Skanuj ponownie” nie wyszło: zostaje poprzedni odczyt i wybór, błąd widać na karcie.
+        // „Sprawdź ponownie” nie wyszło: zostaje poprzedni odczyt i wybór, błąd widać na karcie.
       } else if (d.kind === 'transfer_scan' && s.phase === 'transfer_choose') {
         this.resetTransfer();
         s.device = null;
@@ -701,7 +701,7 @@ export class Controller {
     const s = this.state;
     on('transfer:inventory', (d) => {
       if (s.phase !== 'transfer_choose') return; // serwisant już wyszedł z przenoszenia
-      const prev = s.transfer.inventory; // jest tylko po „Skanuj ponownie” (`startTransfer` czyści stan)
+      const prev = s.transfer.inventory; // jest tylko po „Sprawdź ponownie” (`startTransfer` czyści stan)
       s.transfer.selection = prev ? rescanSelection(s.transfer.selection, prev, d.inventory)
         : resumeSelection(d.inventory, d.resumable?.selection);
       s.transfer.inventory = d.inventory;
@@ -842,7 +842,7 @@ export class Controller {
       exports: { ...sel.exports, [kind]: remote } };
   }
 
-  /** „Skanuj ponownie”: serwisant wyeksportował dane do pliku. Nowy inwentarz przychodzi jak zwykle
+  /** „Sprawdź ponownie”: serwisant wyeksportował dane do pliku. Nowy inwentarz przychodzi jak zwykle
    *  (`transfer:inventory`) i zachowuje wybór — patrz `rescanSelection`. */
   async rescanTransfer(): Promise<void> {
     const s = this.state;
