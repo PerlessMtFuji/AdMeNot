@@ -50,6 +50,7 @@
   import MessageCircle from '@lucide/svelte/icons/message-circle';
   import Music from '@lucide/svelte/icons/music';
   import Package from '@lucide/svelte/icons/package';
+  import Play from '@lucide/svelte/icons/play';
   import ScanLine from '@lucide/svelte/icons/scan-line';
   import Upload from '@lucide/svelte/icons/upload';
   import WifiOff from '@lucide/svelte/icons/wifi-off';
@@ -64,7 +65,7 @@
     'file-text': FileText, camera: Camera, 'screen-share': ScreenShare, 'screen-share-off': ScreenShareOff,
     heart: Heart, copy: Copy, 'arrow-down': ArrowDown, 'arrow-up': ArrowUp, file: FileIcon, film: Film, folder: Folder,
     'folder-lock': FolderLock, 'folder-open': FolderOpen, 'hard-drive': HardDrive, image: ImageIcon,
-    'layout-grid': LayoutGrid, list: List, 'message-circle': MessageCircle, music: Music, package: Package,
+    'layout-grid': LayoutGrid, list: List, 'message-circle': MessageCircle, music: Music, package: Package, play: Play,
     'scan-line': ScanLine, upload: Upload, 'wifi-off': WifiOff,
   } as const;
   export type IconName = keyof typeof ICONS;

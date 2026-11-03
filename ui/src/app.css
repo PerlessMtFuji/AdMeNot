@@ -192,6 +192,14 @@
   .progress-fill { position: relative; overflow: hidden; background: linear-gradient(90deg, #818cf8, #6366f1 60%, var(--color-accent)); box-shadow: 0 0 12px -1px var(--glow-accent); transition: width .6s cubic-bezier(.2, .8, .2, 1); }
   .progress-fill::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgb(255 255 255 / .45), transparent); animation: shimmer 1.4s linear infinite; }
   .flash { animation: flash 2s ease-out; }
+  /* Galeria: nagłówek dnia z matowego szkła, zabarwiony kolorem dominującym dnia (`--day`). */
+  .glass-pill {
+    background-color: color-mix(in srgb, var(--day, transparent) 30%, color-mix(in srgb, var(--color-surface) 72%, transparent));
+    backdrop-filter: blur(10px) saturate(1.5);
+    box-shadow: var(--shadow-raised);
+  }
+  /* Galeria: miniatura wyostrza się z rozmytej i lekko powiększonej (opóźnienie kaskady w style). */
+  .sharpen { animation: sharpen .5s cubic-bezier(.2, .8, .2, 1) both; }
 
   /* Obszar przewijany: treść wygasa miękko przy krawędzi, ale tylko tam, gdzie jest jeszcze co przewinąć.
      Pas pod paskiem przewijania (prawe 12px) zostaje bez maski. */
@@ -217,6 +225,11 @@
   6% { --fade-top: 36px; }
   94% { --fade-bottom: 36px; }
   100% { --fade-top: 36px; --fade-bottom: 0px; }
+}
+@keyframes sharpen {
+  0% { opacity: 0; filter: blur(14px) saturate(.6); transform: scale(1.2); }
+  35% { opacity: 1; }
+  100% { opacity: 1; filter: blur(0) saturate(1); transform: scale(1); }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes scan { 0% { top: -30%; } 100% { top: 110%; } }

@@ -167,12 +167,13 @@ export class ExplorerController {
   }
 
   /** Zaznaczenie jak w Windows: klik — tylko ten, Ctrl — przełącza, Shift — zakres od kotwicy
-   *  (z Ctrl dopisany do zaznaczenia). */
-  select(path: string, mods: SelectMods = {}): void {
+   *  (z Ctrl dopisany do zaznaczenia). `order` — kolejność na ekranie, gdy inna niż `items`
+   *  (galeria układa pliki po dniach). */
+  select(path: string, mods: SelectMods = {}, order?: readonly string[]): void {
     const s = this.state;
     const sel = s.selected;
     if (mods.shift && s.anchor) {
-      const order = this.items.map((e) => e.path);
+      order ??= this.items.map((e) => e.path);
       const a = order.indexOf(s.anchor);
       const b = order.indexOf(path);
       if (a >= 0 && b >= 0) {

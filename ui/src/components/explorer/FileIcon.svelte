@@ -12,7 +12,7 @@
     ['#b45309', ['zip', 'rar', '7z', 'tar', 'gz']],
     ['#0f766e', ['apk', 'apks', 'xapk']],
   ];
-  // Kafle mediów: gradient i symbol (miniatury zdjęć dochodzą w galerii — Task 11).
+  // Kafle mediów: gradient i symbol (w galerii — tło kafla, zanim przyjdzie miniatura).
   const MEDIA = {
     image: { glyph: 'image', from: '#60a5fa', to: '#4f46e5' },
     video: { glyph: 'film', from: '#f472b6', to: '#be185d' },
@@ -25,6 +25,11 @@
 
   export function isMedia(type: FileKind): type is keyof typeof MEDIA {
     return type in MEDIA;
+  }
+
+  /** Tło kafla galerii, zanim przyjdzie miniatura (kolor typu, gdy kolor dominujący nieznany). */
+  export function mediaGradient(type: FileKind): string | null {
+    return isMedia(type) ? `linear-gradient(135deg,${MEDIA[type].from},${MEDIA[type].to})` : null;
   }
 </script>
 

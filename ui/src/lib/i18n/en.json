@@ -120,6 +120,12 @@
       "switched": "Files of another phone were opened — the previous explorer was closed."
     },
     "day": { "today": "Today · {date}", "yesterday": "Yesterday" },
+    "gallery": {
+      "folders": "Folders",
+      "select_day": "Select files from: {day}",
+      "unselect_day": "Deselect files from: {day}",
+      "files": { "one": "{count} file", "few": "{count} files", "many": "{count} files", "other": "{count} files" }
+    },
     "date": { "today": "today, {time}", "yesterday": "yesterday, {time}" }
   },
   "usb": {

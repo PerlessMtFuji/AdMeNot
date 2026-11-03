@@ -2,9 +2,11 @@
   import { getContext } from 'svelte';
   import Crumbs from '../components/explorer/Crumbs.svelte';
   import FileList from '../components/explorer/FileList.svelte';
+  import Gallery from '../components/explorer/Gallery.svelte';
   import Places from '../components/explorer/Places.svelte';
   import type { Controller } from '../lib/controller';
   import { type ExplorerFilter, FILTERS, formatBytes } from '../lib/explorer/logic';
+  import { mediaFetcher, ThumbQueue } from '../lib/explorer/thumbs';
   import { ERROR_KEYS, i18n, t, tp } from '../lib/i18n/index.svelte';
   import { enter } from '../lib/motion';
   import Banner from '../ui/Banner.svelte';
@@ -22,6 +24,22 @@
   const folderName = $derived(s.crumbs.at(-1)?.label ?? '');
   const errorText = $derived(s.error ? t(`error.${known.includes(s.error.key) ? s.error.key : 'internal'}`) : '');
   const TOGGLE = 'grid h-8 w-9 place-items-center rounded-[9px] transition duration-150';
+  /** Odświeżanie „dziś/wczoraj”: co minutę i przy każdym odczycie folderu. */
+  const CLOCK_MS = 60_000;
+
+  // Miniatury galerii żyją tyle co ekran; przy wyjściu adresy `blob:` są zwalniane.
+  const thumbs = new ThumbQueue(mediaFetcher);
+  $effect(() => () => thumbs.clear());
+
+  let now = $state(new Date());
+  $effect(() => {
+    void s.entries;
+    now = new Date();
+  });
+  $effect(() => {
+    const timer = setInterval(() => (now = new Date()), CLOCK_MS);
+    return () => clearInterval(timer);
+  });
 
   /** Skróty jak w Eksploratorze Windows — poza polami tekstowymi (tam Backspace i Ctrl+A edytują tekst). */
   function onkey(e: KeyboardEvent): void {
@@ -117,8 +135,11 @@
           <p class="text-sm text-mut">{t('explorer.locked.text')}</p>
         </div>
       {:else}
-        <!-- Siatka galerii (widok „grid”) dochodzi w Tasku 11; do tego czasu oba widoki to lista. -->
-        <FileList {ex} {items} />
+        {#if s.view === 'grid'}
+          <Gallery {ex} {items} {now} {thumbs} />
+        {:else}
+          <FileList {ex} {items} {now} />
+        {/if}
         {#if !items.length && !s.loading}
           <p class="absolute inset-x-0 top-1/2 text-center text-sm text-soft">
             {s.entries.length ? t('explorer.empty.filter') : t('explorer.empty.folder')}

@@ -120,6 +120,12 @@
       "switched": "Otwarto pliki innego telefonu — poprzedni eksplorator został zamknięty."
     },
     "day": { "today": "Dziś · {date}", "yesterday": "Wczoraj" },
+    "gallery": {
+      "folders": "Foldery",
+      "select_day": "Zaznacz pliki z dnia: {day}",
+      "unselect_day": "Odznacz pliki z dnia: {day}",
+      "files": { "one": "{count} plik", "few": "{count} pliki", "many": "{count} plików", "other": "{count} pliku" }
+    },
     "date": { "today": "dziś, {time}", "yesterday": "wczoraj, {time}" }
   },
   "usb": {
