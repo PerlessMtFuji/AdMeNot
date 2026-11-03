@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { THUMB_CACHE, ThumbQueue, type Fetched } from './thumbs';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { type Fetched, THUMB_CACHE, ThumbDecodeError, ThumbQueue } from './thumbs';
 
 /** Atrapa pobierania: każde wywołanie czeka, aż test je rozstrzygnie. */
 function deferredFetcher() {
@@ -63,17 +63,66 @@ describe('ThumbQueue', () => {
     expect(created).toBe(0);
   });
 
-  test('a failed download is remembered and not retried in a loop', async () => {
+  test('a codec/decode error is permanent: the tile shows the type icon and is not retried', async () => {
     const { calls, fetcher } = deferredFetcher();
     const q = new ThumbQueue(fetcher);
-    q.want('bad', 0);
+    q.want('hevc', 0);
     await flush();
-    calls[0].reject(new Error('HEVC'));
+    calls[0].reject(new ThumbDecodeError('codec'));
     await flush();
-    expect(q.failed('bad')).toBe(true);
-    q.want('bad', 0);
+    expect(q.failed('hevc')).toBe(true);
+    q.want('hevc', 0);
+    q.retryFailed();
     await flush();
     expect(calls).toHaveLength(1);
+  });
+
+  test('a transient error (network, HTTP, timeout) is retried in the background with backoff', async () => {
+    vi.useFakeTimers();
+    try {
+      const { calls, fetcher } = deferredFetcher();
+      const q = new ThumbQueue(fetcher);
+      q.cancelAllExcept(new Set(['slow']));
+      q.want('slow', 0);
+      for (const wait of [1000, 2000, 4000]) {
+        await flush();
+        calls.at(-1)!.reject(new Error('network'));
+        await flush();
+        expect(q.failed('slow')).toBe(false);  // kafel czeka w kolorze, bez ikony
+        q.want('slow', 0);  // w trakcie odczekiwania bez dodatkowego pobrania
+        await flush();
+        const before = calls.length;
+        vi.advanceTimersByTime(wait - 1);
+        expect(calls).toHaveLength(before);
+        vi.advanceTimersByTime(1);
+        expect(calls).toHaveLength(before + 1);
+      }
+      await flush();
+      calls.at(-1)!.reject(new Error('network'));
+      await flush();
+      expect(q.failed('slow')).toBe(true);  // po 3 ponowieniach — ikona
+      expect(calls).toHaveLength(4);
+      q.retryFailed();  // zmiana folderu / telefon wrócił: widoczne ruszają od razu
+      await flush();
+      expect(q.failed('slow')).toBe(false);
+      expect(calls).toHaveLength(5);
+      calls[4].resolve({ blob: blob(), color: '#010203' });
+      await flush();
+      expect(q.get('slow')?.color).toBe('#010203');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('an image the browser cannot decode is released and falls back to the icon', async () => {
+    const q = new ThumbQueue(async () => ({ blob: blob(), color: '#abcdef' }));
+    q.want('u', 0);
+    await flush();
+    expect(q.get('u')?.src).toBe('blob:1');
+    q.broken('u');
+    expect(revoked).toEqual(['blob:1']);
+    expect(q.get('u')).toBeNull();
+    expect(q.failed('u')).toBe(true);
   });
 
   test('the cache keeps 400 thumbnails and revokes the object URL of the one that falls out', async () => {

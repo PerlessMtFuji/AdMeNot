@@ -62,6 +62,19 @@
     return out;
   });
 
+  // Nowy folder zaczyna się od góry (widok zostaje zamontowany, `ex.go` podmienia tylko wpisy). Przed
+  // kaskadą: ta bierze kafle widoczne po przewinięciu na górę.
+  let scrolledFor = untrack(() => s.path);
+  $effect(() => {
+    const path = s.path;
+    untrack(() => {
+      if (path === scrolledFor) return;
+      scrolledFor = path;
+      box.scrollTop = 0;
+      vp = { ...vp, top: 0 };
+    });
+  });
+
   // Pierwsze pokazanie folderu: kafle widoczne w tej chwili wyostrzają się kaskadą.
   let shown = $state<{ path: string; at: number; order: Map<string, number> } | null>(null);
   $effect(() => {
@@ -156,6 +169,10 @@
     return { x: ev.clientX - r.left, y: ev.clientY - r.top };
   }
 
+  /** Przerwanie ciągnięcia (koniec ciągnięcia albo zniknięcie galerii w jego trakcie). */
+  let endDrag: (() => void) | null = null;
+  $effect(() => () => endDrag?.());
+
   function onmousedown(ev: MouseEvent): void {
     const target = ev.target instanceof Element ? ev.target : null;
     if (ev.button !== 0 || target?.closest('[role="option"], button')) return;
@@ -177,12 +194,18 @@
       lasso = rect;
       ex.selectRect([...base, ...tilesInRect(layout, rect)], false);
     };
-    const up = () => {
+    const stop = () => {
       window.removeEventListener('mousemove', move);
       window.removeEventListener('mouseup', up);
+      endDrag = null;
+    };
+    const up = () => {
+      stop();
       if (!moved && !additive) ex.clear();  // klik w puste miejsce — jak w Windows
       lasso = null;
     };
+    endDrag?.();
+    endDrag = stop;
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
   }
@@ -230,7 +253,7 @@
         ondblclick={() => { if (e.kind === 'dir') void ex.go(e.path); }}
         onkeydown={(ev) => onkey(ev, e, i)}>
         <Thumb entry={e} thumb={url ? thumbs.get(url) : null} noThumb={!url || thumbs.failed(url)} selected={sel}
-          cascadeAt={cascadeAt(e.path)} />
+          cascadeAt={cascadeAt(e.path)} onbroken={() => { if (url) thumbs.broken(url); }} />
       </div>
     {/each}
     {#if lasso}<Lasso rect={lasso} />{/if}

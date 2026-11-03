@@ -8,6 +8,13 @@ export const THUMB_CACHE = 400;
 const VIDEO_TIMEOUT_MS = 15_000;
 /** Szerokość klatki filmu na kaflu (miniatury zdjęć z serwera mają 256 px). */
 const VIDEO_FRAME_PX = 256;
+/** Błąd przejściowy (sieć, kod HTTP, limit czasu) — ponawiamy w tle po 1, 2, 4 s; po tylu próbach kafel
+ *  pokazuje ikonę, aż do zmiany folderu albo powrotu telefonu (`retryFailed`). */
+const RETRIES = 3;
+const RETRY_BASE_MS = 1000;
+
+/** Pliku nie da się pokazać i ponawianie nic nie da (brak kodeka, nieczytelny obraz, „skażony” canvas). */
+export class ThumbDecodeError extends Error {}
 
 export interface Fetched {
   blob: Blob;
@@ -28,6 +35,11 @@ export type ThumbFetcher = (url: string, signal: AbortSignal) => Promise<Fetched
 export class ThumbQueue {
   private readonly cache = new SvelteMap<string, Thumb>();
   private readonly bad = new SvelteSet<string>();
+  /** Część `bad` po błędach przejściowych — `retryFailed` daje im kolejną szansę. */
+  private readonly exhausted = new Set<string>();
+  private readonly attempts = new Map<string, number>();
+  private readonly waiting = new Map<string, ReturnType<typeof setTimeout>>();
+  private readonly priority = new Map<string, number>();
   private readonly pending = new Map<string, number>();
   private readonly running = new Map<string, AbortController>();
   private keep = new Set<string>();
@@ -39,14 +51,16 @@ export class ThumbQueue {
     return this.cache.get(url) ?? null;
   }
 
-  /** Pobieranie się nie udało (np. HEVC bez kodeka) — kafel pokazuje ikonę typu. */
+  /** Miniatury nie będzie (np. HEVC bez kodeka albo telefon nie odpowiada mimo ponowień) — kafel
+   *  pokazuje ikonę typu. */
   failed(url: string): boolean {
     return this.bad.has(url);
   }
 
   /** Dopisuje do kolejki; mniejszy `priority` = wcześniej. Ponowne `want` tylko podnosi priorytet. */
   want(url: string, priority: number): void {
-    if (this.cache.has(url) || this.bad.has(url) || this.running.has(url)) return;
+    this.priority.set(url, Math.min(priority, this.priority.get(url) ?? Infinity));
+    if (this.cache.has(url) || this.bad.has(url) || this.running.has(url) || this.waiting.has(url)) return;
     const was = this.pending.get(url);
     if (was === undefined || priority < was) this.pending.set(url, priority);
     this.pump();
@@ -65,12 +79,33 @@ export class ThumbQueue {
     this.pump();
   }
 
+  /** Nowa szansa dla miniatur, które zawiodły przejściowo (zmiana folderu, telefon wrócił). Widoczne
+   *  ruszają od razu. */
+  retryFailed(): void {
+    for (const timer of this.waiting.values()) clearTimeout(timer);
+    this.waiting.clear();
+    this.attempts.clear();
+    for (const url of this.exhausted) this.bad.delete(url);
+    this.exhausted.clear();
+    for (const url of this.keep) this.want(url, this.priority.get(url) ?? 0);
+  }
+
+  /** `<img>` nie zdekodował pobranej miniatury — zwalnia ją i zostawia ikonę na stałe. */
+  broken(url: string): void {
+    const thumb = this.cache.get(url);
+    if (thumb) URL.revokeObjectURL(thumb.src);
+    this.cache.delete(url);
+    this.bad.add(url);
+  }
+
   /** Koniec eksploratora: wszystko anulowane, adresy `blob:` zwolnione. */
   clear(): void {
     this.cancelAllExcept(new Set());
+    this.retryFailed();
     for (const thumb of this.cache.values()) URL.revokeObjectURL(thumb.src);
     this.cache.clear();
     this.bad.clear();
+    this.priority.clear();
   }
 
   private pump(): void {
@@ -96,11 +131,25 @@ export class ThumbQueue {
       if (!mine()) return;
       this.running.delete(url);
       this.store(url, { src: URL.createObjectURL(r.blob), color: r.color, duration: r.duration });
-    }, () => {
+    }, (e: unknown) => {
       if (!mine()) return;
       this.running.delete(url);
-      this.bad.add(url);
+      this.fail(url, e instanceof ThumbDecodeError);
     }).finally(() => this.pump());
+  }
+
+  private fail(url: string, permanent: boolean): void {
+    const n = (this.attempts.get(url) ?? 0) + 1;
+    this.attempts.set(url, n);
+    if (permanent || n > RETRIES) {
+      if (!permanent) this.exhausted.add(url);
+      this.bad.add(url);
+      return;
+    }
+    this.waiting.set(url, setTimeout(() => {
+      this.waiting.delete(url);
+      if (this.keep.has(url)) this.want(url, this.priority.get(url) ?? 0);
+    }, RETRY_BASE_MS * 2 ** (n - 1)));
   }
 
   private store(url: string, thumb: Thumb): void {
@@ -137,32 +186,46 @@ export function videoFrame(url: string, signal: AbortSignal): Promise<Fetched> {
     const done = () => {
       settled = true;
       clearTimeout(timer);
-      signal.removeEventListener('abort', fail);
+      signal.removeEventListener('abort', onAbort);
       video.removeAttribute('src');
       video.load();  // zwalnia połączenie ze strumieniem
     };
-    const fail = () => {
+    const fail = (e: Error = new Error('video frame')) => {
       if (settled) return;
       done();
-      reject(new Error('video frame'));
+      reject(e);
     };
-    const timer = setTimeout(fail, VIDEO_TIMEOUT_MS);
-    signal.addEventListener('abort', fail);
+    const onAbort = () => fail();
+    const timer = setTimeout(onAbort, VIDEO_TIMEOUT_MS);
+    signal.addEventListener('abort', onAbort);
     video.crossOrigin = 'anonymous';
     video.preload = 'metadata';
     video.muted = true;
-    video.addEventListener('error', fail);
+    // brak kodeka / nieobsługiwany format — na stałe; błąd sieci — przejściowy
+    video.addEventListener('error', () => {
+      const code = video.error?.code;
+      const permanent = code === MediaError.MEDIA_ERR_DECODE || code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED;
+      fail(permanent ? new ThumbDecodeError('video codec') : new Error('video network'));
+    });
     video.addEventListener('loadedmetadata', () => {
       // pierwsza klatka bywa czarna — bierzemy chwilę dalej, ale nie poza krótki film
       video.currentTime = Math.min(1, (video.duration || 0) / 4);
     });
     video.addEventListener('seeked', () => {
+      try {
+        grab();
+      } catch (e) {
+        // np. „skażony” canvas (SecurityError) — ponawianie nic nie zmieni
+        fail(new ThumbDecodeError(String(e)));
+      }
+    }, { once: true });
+    const grab = () => {
       const w = VIDEO_FRAME_PX;
       const h = Math.max(1, Math.round((w * video.videoHeight) / Math.max(1, video.videoWidth)));
       const canvas = document.createElement('canvas');
       Object.assign(canvas, { width: w, height: h });
       const ctx = canvas.getContext('2d');
-      if (!ctx) return fail();
+      if (!ctx) throw new Error('no 2d context');
       ctx.drawImage(video, 0, 0, w, h);
       // kolor dominujący ≈ średnia: obraz zmniejszony do 1 piksela
       const dot = document.createElement('canvas');
@@ -175,9 +238,9 @@ export function videoFrame(url: string, signal: AbortSignal): Promise<Fetched> {
         if (settled) return;
         done();
         if (blob) resolve({ blob, color, duration });
-        else reject(new Error('video frame'));
+        else reject(new ThumbDecodeError('video frame'));
       }, 'image/jpeg', 0.82);
-    }, { once: true });
+    };
     video.src = url;
   });
 }

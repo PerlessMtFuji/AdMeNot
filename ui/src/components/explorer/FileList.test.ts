@@ -47,12 +47,15 @@ describe('FileList', () => {
   });
 
   test('the first visible row stays tabbable when the search hides the anchor', async () => {
-    const { ex, view } = await setup(files(5));
-    ex.select(files(5)[3].path);
-    ex.setQuery('plik_0000');  // pasuje do wszystkich
-    ex.setQuery('plik_00001');
+    const { ex, view } = await setup(files(12));
+    const tabbable = () => rows().filter((r) => r.tabIndex === 0).map((r) => r.dataset.path);
+    ex.select(files(12)[3].path);
+    await tick();
+    expect(tabbable()).toEqual([files(12)[3].path]);
+    ex.setQuery('plik_0001');  // zostają plik_00010 i plik_00011, kotwica (plik_00003) schowana
     await view.rerender({ ex, items: ex.items, now: NOW });
-    expect(rows().filter((r) => r.tabIndex === 0).map((r) => r.dataset.path)).toEqual([files(5)[1].path]);
+    expect(ex.state.anchor).toBe(files(12)[3].path);
+    expect(tabbable()).toEqual([files(12)[10].path]);
   });
 
   test('the date column follows the "now" the screen passes in (no stale "today" after midnight)', async () => {
@@ -60,5 +63,17 @@ describe('FileList', () => {
     expect(rows()[0].textContent).toContain('dziś');
     await view.rerender({ ex, items: ex.items, now: new Date(2026, 10, 3, 0, 5) });
     expect(rows()[0].textContent).toContain('wczoraj');
+  });
+
+  test('another folder opens at the top, not at the previous scroll offset', async () => {
+    const { ex } = await setup(files(2000));
+    const box = screen.getByRole('listbox', { name: 'Pliki w folderze' });
+    box.scrollTop = 30_000;
+    await fireEvent.scroll(box);
+    expect(rows().some((r) => r.dataset.path === files(2)[1].path)).toBe(false);
+    ex.state.path = '/sdcard/Documents';
+    await tick();
+    expect(box.scrollTop).toBe(0);
+    expect(rows().some((r) => r.dataset.path === files(2)[1].path)).toBe(true);
   });
 });

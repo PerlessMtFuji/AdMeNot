@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getContext } from 'svelte';
+  import { getContext, untrack } from 'svelte';
   import Crumbs from '../components/explorer/Crumbs.svelte';
   import FileList from '../components/explorer/FileList.svelte';
   import Gallery from '../components/explorer/Gallery.svelte';
@@ -30,6 +30,11 @@
   // Miniatury galerii żyją tyle co ekran; przy wyjściu adresy `blob:` są zwalniane.
   const thumbs = new ThumbQueue(mediaFetcher);
   $effect(() => () => thumbs.clear());
+  // Miniatury, które zawiodły przejściowo, próbują znowu po zmianie folderu i po powrocie telefonu.
+  $effect(() => {
+    void s.path;
+    if (!s.offline) untrack(() => thumbs.retryFailed());
+  });
 
   let now = $state(new Date());
   $effect(() => {

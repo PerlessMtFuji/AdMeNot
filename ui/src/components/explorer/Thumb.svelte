@@ -14,8 +14,10 @@
     selected: boolean;
     /** Kaskada przy pierwszym pokazaniu folderu: chwila (`performance.now()`), w której kafel ma się wyostrzyć. */
     cascadeAt: number | null;
+    /** Obrazu nie da się zdekodować — kafel przechodzi na ikonę typu. */
+    onbroken: () => void;
   };
-  let { entry, thumb, noThumb, selected, cascadeAt }: Props = $props();
+  let { entry, thumb, noThumb, selected, cascadeAt, onbroken }: Props = $props();
 
   // Miniatura już w pamięci przy pojawieniu się kafla (przewinięcie z powrotem) — bez efektu, od razu.
   const cachedAtMount = untrack(() => thumb !== null);
@@ -40,7 +42,7 @@
   style:background={noThumb ? undefined : tint}
   style:box-shadow={selected ? `0 0 0 2.5px var(--color-accent), 0 0 24px -2px ${glow}` : undefined}>
   {#if thumb && !noThumb}
-    <img src={thumb.src} alt="" draggable="false" class="absolute inset-0 h-full w-full object-cover {animate ? 'sharpen' : ''}"
+    <img src={thumb.src} alt="" draggable="false" onerror={onbroken} class="absolute inset-0 h-full w-full object-cover {animate ? 'sharpen' : ''}"
       style:animation-delay={animate ? `${delay}ms` : undefined} />
   {:else if noThumb}
     <div class="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-2 pt-1">
@@ -54,7 +56,7 @@
         <Icon name="play" size={16} strokeWidth={2.6} class="translate-x-px fill-current" />
       </span>
     </span>
-    {#if thumb?.duration}
+    {#if thumb?.duration && Number.isFinite(thumb.duration)}
       <span class="absolute bottom-1.5 left-2 text-2xs font-bold text-white tabular-nums [text-shadow:0_1px_2px_rgb(0_0_0/.6)]">
         {clock(thumb.duration)}
       </span>

@@ -7,6 +7,7 @@ import { GRID } from '../../lib/explorer/virtual';
 import type { EntryView } from '../../lib/types';
 import { setupCtl } from '../../test-utils';
 import Gallery from './Gallery.svelte';
+import Thumb from './Thumb.svelte';
 
 const NOW = new Date(2026, 10, 2, 12, 0);  // 2 listopada 2026, południe
 const DAY = 86_400;
@@ -27,9 +28,9 @@ async function setup(entries: EntryView[], fetcher = (): Promise<Fetched> => new
   await ex.open('R58T00TEST');
   ex.state.entries = entries;
   const thumbs = new ThumbQueue(fetcher);
-  render(Gallery, { props: { ex, items: ex.items, now: NOW, thumbs } });
+  const view = render(Gallery, { props: { ex, items: ex.items, now: NOW, thumbs } });
   await tick();
-  return { ex, thumbs };
+  return { ex, thumbs, view };
 }
 
 const grid = () => screen.getByRole('listbox', { name: 'Pliki w folderze' });
@@ -100,12 +101,38 @@ describe('Gallery', () => {
   });
 
   test('exactly one tile is tabbable, also when the anchor is hidden by the search', async () => {
-    const { ex } = await setup(photos(20));
-    const tabbable = () => tiles().filter((t) => t.tabIndex === 0);
-    expect(tabbable().map((t) => t.dataset.path)).toEqual([photos(20)[0].path]);
+    const { ex, view } = await setup(photos(20));
+    const tabbable = () => tiles().filter((t) => t.tabIndex === 0).map((t) => t.dataset.path);
+    expect(tabbable()).toEqual([photos(20)[0].path]);
     ex.select(photos(20)[5].path);
     await tick();
-    expect(tabbable().map((t) => t.dataset.path)).toEqual([photos(20)[5].path]);
+    expect(tabbable()).toEqual([photos(20)[5].path]);
+    ex.setQuery('IMG_0001');  // zostają IMG_00010…19, kotwica (IMG_00005) schowana
+    await view.rerender({ ex, items: ex.items, now: NOW, thumbs: new ThumbQueue(() => new Promise(() => {})) });
+    expect(ex.state.anchor).toBe(photos(20)[5].path);
+    expect(tabbable()).toEqual([photos(20)[10].path]);
+  });
+
+  test('another folder opens at the top, not at the previous scroll offset', async () => {
+    const { ex } = await setup(photos(600, 600));
+    const box = grid();
+    box.scrollTop = 6000;
+    await fireEvent.scroll(box);
+    expect(tiles().some((t) => t.dataset.path === photos(2)[1].path)).toBe(false);
+    ex.state.path = '/sdcard/Pictures/Screenshots';
+    await tick();
+    expect(box.scrollTop).toBe(0);
+    expect(tiles().some((t) => t.dataset.path === photos(2)[1].path)).toBe(true);
+  });
+
+  test('a lasso drag in progress stops when the gallery goes away', async () => {
+    const { ex, view } = await setup(photos(20));
+    const y = GRID.header + 5;
+    await fireEvent.mouseDown(grid(), { button: 0, clientX: 5, clientY: y });
+    view.unmount();
+    await fireEvent.mouseMove(window, { clientX: 300, clientY: y + 15 });
+    await fireEvent.mouseUp(window, { clientX: 300, clientY: y + 15 });
+    expect(ex.state.selected.size).toBe(0);
   });
 
   test('thumbnails sharpen in a cascade; with prefers-reduced-motion they appear without the animation', async () => {
@@ -122,5 +149,25 @@ describe('Gallery', () => {
     const fetcher = async (): Promise<Fetched> => ({ blob: {} as Blob, color: '#336699' });
     await setup(photos(4), fetcher);
     await vi.waitFor(() => expect(grid().querySelectorAll('img.sharpen')).toHaveLength(4));
+  });
+});
+
+describe('Thumb', () => {
+  const video = { ...photos(1)[0], name: 'VID.mp4', type: 'video' as const, ext: 'mp4', thumb: null, url: 'http://127.0.0.1:1/f' };
+  const props = { entry: video, noThumb: false, selected: false, cascadeAt: null, onbroken: () => {} };
+
+  test('a video shows its duration; an unknown (infinite) duration hides the badge', () => {
+    const { container, unmount } = render(Thumb, { props: { ...props, thumb: { src: 'blob:1', color: '#000000', duration: 42.4 } } });
+    expect(container.textContent).toContain('0:42');
+    unmount();
+    const live = render(Thumb, { props: { ...props, thumb: { src: 'blob:1', color: '#000000', duration: Infinity } } });
+    expect(live.container.textContent).not.toMatch(/Infinity|NaN/);
+  });
+
+  test('an image that cannot be decoded reports itself (falls back to the icon)', async () => {
+    const onbroken = vi.fn();
+    const { container } = render(Thumb, { props: { ...props, entry: photos(1)[0], onbroken, thumb: { src: 'blob:1', color: '' } } });
+    await fireEvent.error(container.querySelector('img')!);
+    expect(onbroken).toHaveBeenCalledOnce();
   });
 });

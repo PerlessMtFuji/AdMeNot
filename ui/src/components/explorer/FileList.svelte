@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import type { ExplorerController } from '../../lib/explorer/controller';
   import { formatBytes, type SortKey, shortDate } from '../../lib/explorer/logic';
   import { FALLBACK, rowRange, type Viewport, viewport } from '../../lib/explorer/virtual';
@@ -35,6 +35,18 @@
       if (i !== undefined && (i < range[0] || i >= range[1])) out.push(i);
     }
     return out;
+  });
+
+  // Nowy folder zaczyna się od góry (lista zostaje zamontowana, `ex.go` podmienia tylko wpisy).
+  let scrolledFor = untrack(() => s.path);
+  $effect(() => {
+    const path = s.path;
+    untrack(() => {
+      if (path === scrolledFor) return;
+      scrolledFor = path;
+      box.scrollTop = 0;
+      vp = { ...vp, top: 0 };
+    });
   });
 
   // Wejście wierszy tylko przy pokazaniu folderu — przewijanie nie „wlatuje” wierszami.
