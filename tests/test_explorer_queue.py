@@ -8,10 +8,14 @@ from pathlib import Path
 import pytest
 from faketransfer import FakeStoragePhone
 
+from admenot.engine.adb.transport import AdbError
 from admenot.engine.explorer.guard import ExplorerAdb, is_tmp_name
 from admenot.engine.explorer.plan import plan_to_pc, plan_to_phone
 from admenot.engine.explorer.queue import (
+    HASH_BASE_TIMEOUT,
+    HASH_MIN_SPEED,
     TransferQueue,
+    hash_timeout,
     read_tmp_folders,
     record_tmp_folder,
     sweep_recorded,
@@ -444,3 +448,105 @@ def test_program_killed_mid_upload_swept_on_next_open(phone, adb, tmp_path, make
     q.cancel(tid)
     release.set()
     q.wait_for(tid, "cancelled")
+
+
+# ---- poprawki po przeglądzie (runda 1) ------------------------------------------------------------
+
+
+def test_refused_tmp_cleanup_while_online_does_not_loop(phone, adb, tmp_path, make_queue, tmp_dir):
+    src = tmp_path / "src"
+    files = {"a.bin": b"a" * 30, "b.bin": b"b" * 30, "c.bin": b"c" * 30}
+    local_tree(src, files)
+    phone.local("/sdcard/Up").mkdir(parents=True)
+    plan = plan_to_phone(adb, [src / n for n in files], "/sdcard/Up")
+
+    def refuse_rm(cmd: str) -> None:  # telefon jest, ale `rm -f` odmawia
+        if cmd.startswith("rm "):
+            raise AdbError("command_failed", "rm: /sdcard/Up/x: Permission denied")
+
+    phone.on_shell = refuse_rm
+    phone.fail_after_push_files = 1
+    events = Events()
+    q = make_queue(emit=events)
+    tid = q.add(plan)
+    q.wait_for(tid, "waiting")
+    phone.fail_after_push_files = None
+    phone.reconnect()
+    st = q.wait_for(tid, "done")
+    assert events.statuses(tid).count("waiting") == 1  # bez pętli running/waiting
+    assert st.done_files == 3 and st.failed == []
+    assert {k: v for k, v in phone_files(phone, "/sdcard/Up").items() if not is_tmp_name(k)} == files
+    assert not no_phone_tmp(phone)  # połówka została na telefonie…
+    assert read_tmp_folders("FAKE", directory=tmp_dir) == ["/sdcard/Up"]  # …a folder na liście do sprzątnięcia
+
+
+def test_hash_timeout_scales_with_size():
+    assert hash_timeout(0) == HASH_BASE_TIMEOUT
+    assert hash_timeout(4 * 1024**3) >= HASH_BASE_TIMEOUT + 4 * 1024**3 / HASH_MIN_SPEED
+    assert hash_timeout(4 * 1024**3) > 200  # plik 4 GB: kilka minut, nie stałe 60 s
+
+
+def test_pc_target_appearing_before_commit_kept(phone, adb, pc, make_queue):
+    put(phone, "/sdcard/P/a.jpg", b"phone")
+    plan = plan_to_pc(adb, ["/sdcard/P/a.jpg"], pc, **OK)
+    assert plan.items[0].action == "copy"
+
+    class RacingPuller:  # klient zapisuje plik o tej nazwie, zanim pobrany dostanie docelową nazwę
+        def pull(self, remotes, target, should_stop, tick):
+            res = phone.pull(remotes, target, should_stop, tick)
+            (pc / "a.jpg").write_bytes(b"client")
+            return res
+
+    q = make_queue(puller=RacingPuller())
+    st = q.wait_for(q.add(plan), "done")
+    assert pc_files(pc) == {"a.jpg": b"client", "a (z telefonu).jpg": b"phone"}
+    assert st.renamed == 1 and st.done_files == 1
+
+
+def test_pc_target_appearing_after_existence_check_kept(phone, adb, pc, make_queue, monkeypatch):
+    put(phone, "/sdcard/P/b.jpg", b"phone")
+    plan = plan_to_pc(adb, ["/sdcard/P/b.jpg"], pc, **OK)
+    target = str(pc / "b.jpg")
+    real_lexists, real_rename = os.path.lexists, os.rename
+
+    def appear() -> None:
+        if not real_lexists(target):
+            (pc / "b.jpg").write_bytes(b"client")
+
+    def racing_lexists(path) -> bool:  # plik pojawia się tuż po sprawdzeniu, przed zmianą nazwy
+        found = real_lexists(path)
+        if str(path) == target:
+            appear()
+        return found
+
+    def racing_rename(src, dst) -> None:  # … albo w chwili samej zmiany nazwy
+        if str(dst) == target:
+            appear()
+        real_rename(src, dst)
+
+    monkeypatch.setattr(os.path, "lexists", racing_lexists)
+    monkeypatch.setattr(os, "rename", racing_rename)
+    q = make_queue()
+    st = q.wait_for(q.add(plan), "done")
+    assert pc_files(pc) == {"b.jpg": b"client", "b (z telefonu).jpg": b"phone"}
+    assert st.renamed == 1
+
+
+def test_emit_callback_can_read_tasks(phone, adb, pc, make_queue):
+    for i in range(3):
+        put(phone, f"/sdcard/P/f{i}.bin", b"x" * 5)
+    plan = plan_to_pc(adb, ["/sdcard/P"], pc, **OK)
+    holder: dict = {"stuck": 0, "seen": 0}
+
+    def emit(name: str, payload: dict) -> None:  # mostek odczytuje kolejkę z innego wątku i czeka
+        if "q" not in holder:
+            return
+        t = threading.Thread(target=lambda: holder.__setitem__("seen", len(holder["q"].tasks())))
+        t.start()
+        t.join(5)
+        holder["stuck"] += t.is_alive()
+
+    q = make_queue(emit=emit)
+    holder["q"] = q
+    q.wait_for(q.add(plan), "done")
+    assert holder["stuck"] == 0 and holder["seen"] == 1

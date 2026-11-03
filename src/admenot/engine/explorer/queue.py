@@ -23,8 +23,9 @@ import posixpath
 import secrets
 import threading
 import time
-from collections.abc import Callable, Collection, Iterable
+from collections.abc import Callable, Collection, Iterable, Iterator
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Literal
@@ -41,8 +42,20 @@ from admenot.engine.transfer.pusher import Pusher
 from admenot.engine.transfer.restore import _refused_paths
 
 __all__ = [
-    "BIG_FILE", "EVENT_INTERVAL", "RETRY_INTERVAL", "STREAMS", "TaskState", "TransferQueue",
-    "forget_tmp_folder", "read_tmp_folders", "record_tmp_folder", "sweep_recorded", "sweep_tmp",
+    "BIG_FILE",
+    "EVENT_INTERVAL",
+    "HASH_BASE_TIMEOUT",
+    "HASH_MIN_SPEED",
+    "RETRY_INTERVAL",
+    "STREAMS",
+    "TaskState",
+    "TransferQueue",
+    "forget_tmp_folder",
+    "hash_timeout",
+    "read_tmp_folders",
+    "record_tmp_folder",
+    "sweep_recorded",
+    "sweep_tmp",
 ]
 
 _LOG = logging.getLogger(__name__)
@@ -51,6 +64,8 @@ STREAMS = 4  # równoległe strumienie małych plików
 BIG_FILE = 64 * 1024 * 1024  # od tylu bajtów plik idzie sam
 EVENT_INTERVAL = 0.5  # s; najczęstsze zdarzenie postępu
 RETRY_INTERVAL = 2.0  # s; sprawdzanie, czy telefon wrócił
+HASH_BASE_TIMEOUT = 60.0  # s; `sha256sum` na telefonie: stała część limitu czasu
+HASH_MIN_SPEED = 20 * 1024 * 1024  # B/s; ostrożna prędkość `sha256sum` (wolna karta, pamięć eMMC)
 SCAN_FILE_MAX = 32  # powyżej tylu wgranych mediów jeden `scan_volume` zamiast `scan_file` na plik
 PC_PART = ".admenot-part"  # przyrostek pliku w trakcie pobierania na komputer
 _COMMIT_TRIES = 50  # kolejne nazwy obok, gdy cel ciągle się pojawia
@@ -203,6 +218,11 @@ class _Task:
     run_b0: int = 0
 
 
+def hash_timeout(size: int) -> float:
+    """Limit czasu `sha256sum` pliku o rozmiarze `size` (wielogigabajtowy film liczy się minutami)."""
+    return HASH_BASE_TIMEOUT + max(size, 0) / HASH_MIN_SPEED
+
+
 def _hash_local(path: str) -> str:
     with open(path, "rb") as fh:
         return hashlib.file_digest(fh, "sha256").hexdigest()
@@ -252,7 +272,9 @@ class TransferQueue:
         self.serial: str = adb_factory().serial or "unknown"
         self._tasks: dict[str, _Task] = {}
         self._lock = threading.RLock()
-        self._emit_lock = threading.Lock()  # zawsze przed `_lock`: kolejność zdarzeń = kolejność zmian
+        # zawsze przed `_lock`: kolejność zdarzeń = kolejność zmian; `emit` woła się bez `_lock` (`_locked`)
+        self._emit_lock = threading.RLock()
+        self._outbox: list[dict] = []  # zdarzenia zebrane pod `_lock`, wysyłane po jego zwolnieniu
         self._cond = threading.Condition(self._lock)
         self._wake = threading.Event()
         self._closing = False
@@ -269,7 +291,7 @@ class TransferQueue:
         for i in plan.items:
             folder, name = split(i.dst)
             names.setdefault(folder, set()).add(name)
-        with self._emit_lock, self._lock:
+        with self._locked():
             if self._closing:
                 raise RuntimeError("queue closed")
             self._seq += 1
@@ -285,7 +307,7 @@ class TransferQueue:
         return tid
 
     def pause(self, task_id: str) -> None:
-        with self._emit_lock, self._lock:
+        with self._locked():
             task = self._tasks.get(task_id)
             if task is None:
                 return
@@ -296,7 +318,7 @@ class TransferQueue:
         self._wake.set()
 
     def resume(self, task_id: str) -> None:
-        with self._emit_lock, self._lock:
+        with self._locked():
             task = self._tasks.get(task_id)
             if task is not None and task.state.status == "paused":
                 task.stop = None
@@ -304,7 +326,7 @@ class TransferQueue:
                 self._cond.notify_all()
 
     def cancel(self, task_id: str) -> None:
-        with self._emit_lock, self._lock:
+        with self._locked():
             task = self._tasks.get(task_id)
             if task is None:
                 return
@@ -334,7 +356,7 @@ class TransferQueue:
 
     def shutdown(self) -> None:
         """Anuluje wszystko (niedokończone zadania przepadają) i czeka na wątki."""
-        with self._emit_lock, self._lock:
+        with self._locked():
             self._closing = True
             for task in self._tasks.values():
                 if task.state.status in ("queued", "paused"):
@@ -372,16 +394,26 @@ class TransferQueue:
             st.speed, st.eta_s = 0.0, None
         return st
 
+    @contextmanager
+    def _locked(self) -> Iterator[None]:
+        """`_emit_lock` + `_lock`; zebrane zdarzenia idą do `emit` już bez `_lock` (callback może wołać
+        `tasks()`), ale jeszcze pod `_emit_lock` — w kolejności zmian."""
+        with self._emit_lock:
+            with self._lock:
+                yield
+            while self._outbox:
+                self._emit_fn("explorer:task", self._outbox.pop(0))
+
     def _emit(self, task: _Task, force: bool = False) -> None:
-        """Wołać z `_emit_lock` i `_lock`."""
+        """Wołać pod `_locked()`."""
         now = self._clock()
         if not force and task.last_emit is not None and now - task.last_emit < EVENT_INTERVAL:
             return
         task.last_emit = now
-        self._emit_fn("explorer:task", asdict(self._snapshot(task)))
+        self._outbox.append(asdict(self._snapshot(task)))
 
     def _set(self, task: _Task, status: Status) -> None:
-        """Zmiana statusu (wołać z `_emit_lock` i `_lock`)."""
+        """Zmiana statusu (wołać pod `_locked()`)."""
         if task.state.status == status:
             return
         task.state.status = status
@@ -391,11 +423,11 @@ class TransferQueue:
         self._cond.notify_all()
 
     def _status(self, task: _Task, status: Status) -> None:
-        with self._emit_lock, self._lock:
+        with self._locked():
             self._set(task, status)
 
     def _progress(self, task: _Task) -> None:
-        with self._emit_lock, self._lock:
+        with self._locked():
             self._emit(task)
 
     # ---- wątek kolejki -------------------------------------------------------------------
@@ -406,7 +438,7 @@ class TransferQueue:
         while True:
             with self._cond:
                 self._cond.wait_for(lambda: self._closing or self._next() is not None)
-            with self._emit_lock, self._lock:
+            with self._locked():
                 if self._closing:
                     return
                 task = self._next()
@@ -441,7 +473,7 @@ class TransferQueue:
     def _finish(self, task: _Task) -> None:
         if task.plan.kind == "to_phone" and task.media:
             self._scan(task.media)
-        with self._emit_lock, self._lock:
+        with self._locked():
             task.state.verified = ("mismatch" if task.mismatch else "hash") if task.verify_hash else "size"
             self._set(task, "done")
 
@@ -478,7 +510,7 @@ class TransferQueue:
                 if task.stop in ("pause", "cancel"):
                     return False
             if self._online():
-                with self._emit_lock, self._lock:
+                with self._locked():
                     if task.stop in ("pause", "cancel"):
                         return False
                     task.stop = None
@@ -541,7 +573,7 @@ class TransferQueue:
 
     def _settle(self, task: _Task, idx: int, item: Item, result: tuple[str, ...]) -> None:
         kind = result[0]
-        with self._emit_lock, self._lock:
+        with self._locked():
             st = task.state
             if kind == "stopped":
                 return
@@ -573,8 +605,8 @@ class TransferQueue:
             task.names.setdefault(folder, set()).add(name)
 
     # ---- telefon -> komputer --------------------------------------------------------------
-    def _phone_hash(self, path: str) -> str:
-        out = self._shell(f"sha256sum {q(path)}")
+    def _phone_hash(self, path: str, size: int) -> str:
+        out = self._shell(f"sha256sum {q(path)}", timeout=hash_timeout(size))
         digest = out.split(maxsplit=1)[0].lower() if out.strip() else ""
         if len(digest) != 64:
             raise _Failed("error")
@@ -586,7 +618,7 @@ class TransferQueue:
         renamed = item.action == "renamed"
         if item.action == "check_hash":
             if os.path.isfile(dst) and os.path.getsize(dst) == item.size \
-                    and _hash_local(dst) == self._phone_hash(item.src):
+                    and _hash_local(dst) == self._phone_hash(item.src, item.size):
                 return ("skipped",)
             if os.path.lexists(dst):
                 dst = self._pc_side(task, folder, name)
@@ -607,13 +639,18 @@ class TransferQueue:
                 raise _Failed(reason)
             if not os.path.isfile(part) or os.path.getsize(part) != item.size:
                 raise _Failed("size")
-            if task.verify_hash and _hash_local(part) != self._phone_hash(item.src):
+            if task.verify_hash and _hash_local(part) != self._phone_hash(item.src, item.size):
                 raise _Failed("mismatch")
             os.utime(part, (item.mtime, item.mtime))
-            if os.path.lexists(dst):  # cel pojawił się w trakcie — nigdy nie nadpisujemy
-                dst = self._pc_side(task, folder, name)
-                renamed = True
-            os.replace(part, dst)
+            for _ in range(_COMMIT_TRIES):
+                try:
+                    _commit_no_overwrite(part, dst)
+                    break
+                except FileExistsError:  # cel pojawił się w trakcie — nigdy nie nadpisujemy
+                    dst = self._pc_side(task, folder, name)
+                    renamed = True
+            else:
+                raise _Failed("error")
             part = ""
         finally:
             with self._lock:
@@ -668,7 +705,7 @@ class TransferQueue:
         size = os.path.getsize(item.src)
         if item.action == "check_hash":
             existing = self._phone_size(target)
-            if existing == size and self._phone_hash(target) == _hash_local(item.src):
+            if existing == size and self._phone_hash(target, size) == _hash_local(item.src):
                 return ("skipped",)
             if existing is not None:
                 target = self._phone_side(task, folder, name)
@@ -690,7 +727,7 @@ class TransferQueue:
         try:
             if self._phone_size(tmp) != size:
                 raise _Failed("size")
-            if task.verify_hash and self._phone_hash(tmp) != _hash_local(item.src):
+            if task.verify_hash and self._phone_hash(tmp, size) != _hash_local(item.src):
                 raise _Failed("mismatch")
         except _Failed:
             self._rm_tmp(task, tmp)
@@ -803,8 +840,12 @@ class TransferQueue:
                 try:
                     sizes = self._phone_sizes([tmp, target])
                 except (_Disconnect, _Failed):
-                    if strict:
+                    if strict and not self._online():
                         raise _Disconnect from None
+                    if strict:  # telefon jest, ale nie odpowiada na `stat`: plik zostaje dla `sweep_tmp`
+                        with self._lock:
+                            task.committing.pop(idx, None)
+                        self._abandon_tmp(task, tmp)
                     continue
                 with self._lock:
                     task.committing.pop(idx, None)
@@ -817,7 +858,15 @@ class TransferQueue:
                     self._settle(task, idx, item, ("done", "1" if target != item.dst else "0"))
                     continue
             if not self._rm_tmp(task, tmp) and strict:
-                raise _Disconnect
+                if not self._online():
+                    raise _Disconnect
+                self._abandon_tmp(task, tmp)  # `rm -f` odmówił przy działającym telefonie
+
+    def _abandon_tmp(self, task: _Task, tmp: str) -> None:
+        """Pliku tymczasowego nie da się usunąć teraz: zadanie przestaje go pilnować, a folder zostaje na
+        liście na dysku (licznik folderu nie maleje), więc posprząta go `sweep_tmp` przy następnym otwarciu."""
+        with self._lock:
+            task.tmps.discard(tmp)
 
     # ---- skan mediów ---------------------------------------------------------------------
     def _scan(self, media: list[str]) -> None:
@@ -839,6 +888,24 @@ class TransferQueue:
     def _read_sdk(self) -> int:
         out = self._adb_factory().shell("getprop ro.build.version.sdk").strip()
         return int(out) if out.isdigit() else 0
+
+
+def _commit_no_overwrite(src: str, dst: str) -> None:
+    """Zmiana nazwy, która nigdy nie nadpisuje: `FileExistsError`, gdy `dst` istnieje (też w chwili zapisu).
+    Windows: `os.rename` sam odmawia; gdzie indziej `os.link` (atomowo) i usunięcie `src`."""
+    if os.name == "nt":
+        os.rename(src, dst)
+        return
+    try:
+        os.link(src, dst)
+    except FileExistsError:
+        raise
+    except OSError:  # system plików bez dowiązań: sprawdzenie tuż przed zmianą nazwy
+        if os.path.lexists(dst):
+            raise FileExistsError(dst) from None
+        os.rename(src, dst)
+        return
+    os.unlink(src)
 
 
 def _unlink(path: str) -> None:
