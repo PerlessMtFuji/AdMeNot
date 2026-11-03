@@ -2,6 +2,7 @@ import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
 import { actedAfter, changedVerdicts, defaultSelection, defaultUploadChoice, keptUploadChoice, otherGroup, TEL_KINDS, telWrite, resumableCopy, UPLOAD_GROUPS, resumeSelection, rescanSelection, TRANSFER_CATEGORIES, transferNeed, transferTotals, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
 import { EMPTY_TRANSFER_SELECTION, emptyRestore, type AppState } from './state.svelte';
+import { ExplorerController } from './explorer/controller';
 import { applyTheme } from './theme';
 import type {
   ApiError, AppView, CacheUsage, ExportKind, TransferCategory, EtaView, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, TelKind, TelemetrySample, Theme, UploadChoiceView, Verdict,
@@ -20,7 +21,12 @@ export class Controller {
   private rechecking = false;  // odczyt kontroli w tle: następny nie startuje, póki poprzedni trwa
   private etaSeq = 0;  // szacunek dla zaznaczenia: liczy się tylko odpowiedź na ostatnie zapytanie
 
-  constructor(readonly state: AppState, readonly bridge: Bridge) {}
+  /** Eksplorator plików telefonu (ekran `explorer`). */
+  readonly explorer: ExplorerController;
+
+  constructor(readonly state: AppState, readonly bridge: Bridge) {
+    this.explorer = new ExplorerController(state, bridge);
+  }
 
   private get api() {
     return this.bridge.api;
@@ -334,6 +340,7 @@ export class Controller {
       }
     });
     this.subscribeTransfer();
+    this.explorer.subscribe();
     on('job:end', (d) => {
       this.ended.add(d.job_id);
       if (d.kind === 'update') s.updateProgress = null;
@@ -1205,8 +1212,9 @@ export class Controller {
     this.state.screen = 'settings';
   }
 
+  /** Z Historii i Ustawień: do otwartego eksploratora (sesja trwa), inaczej do głównego ekranu. */
   back(): void {
-    this.state.screen = 'main';
+    this.state.screen = this.explorer.state.open ? 'explorer' : 'main';
   }
 
   async saveSettings(changes: Partial<Settings>): Promise<Settings | null> {

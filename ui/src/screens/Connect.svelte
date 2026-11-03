@@ -15,6 +15,7 @@
   import { enter } from '../lib/motion';
   import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
+  import Icon from '../ui/Icon.svelte';
 
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
@@ -38,6 +39,11 @@
     { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   const source = (c: CopyView) => ({ phone: `${c.manufacturer} ${c.model}`.trim(),
     details: [c.client, when(c.created)].filter(Boolean).join(', ') });
+
+  // „Pliki”: eksplorator trzyma telefon na wyłączność, więc nie przy trwającym zadaniu ani sprzątaniu.
+  const ex = ctl.explorer.state;
+  const filesReason = $derived(!s.serial ? t('explorer.files_reason.pick') : s.job ? t('explorer.files_reason.busy')
+    : cleaning ? t('explorer.files_reason.cleanup') : null);
 
   /** „Inna kopia” i „Wgraj kopię”: lista kopii (z „Wgraj na podłączony telefon”) to zakładka Historii. */
   async function otherCopy(): Promise<void> {
@@ -65,6 +71,15 @@
   <div class="flex min-w-0 flex-1 flex-col gap-4">
     <PhoneCleanup />
     {#if s.interrupted.length}<InterruptedBanner orders={s.interrupted} />{/if}
+    {#if ex.notice}
+      <Banner tone={ex.notice === 'busy' ? 'warn' : 'info'} icon={ex.notice === 'busy' ? 'clock' : 'info'}
+        title={ex.notice === 'busy' ? t('explorer.notice.busy_title') : undefined}>
+        {t(`explorer.notice.${ex.notice}`)}
+        {#snippet actions()}
+          <Button size="sm" variant="ghost" onclick={() => ctl.explorer.dismissNotice()}>{t('common.close')}</Button>
+        {/snippet}
+      </Banner>
+    {/if}
     {#if resumable}
       <Banner tone="info" icon="rotate-ccw" title={t('transfer.resume_title', { when: when(resumable.created) })}>
         {t('transfer.resume_text')}
@@ -110,6 +125,10 @@
             placeholder={t('connect.client_placeholder')} aria-label={t('connect.client_label')} maxlength="80" />
           <Button type="submit" variant="primary" size="lg" disabled={!s.serial || cleaning}>{t('connect.scan')}</Button>
           <Button variant="secondary" size="lg" disabled={!s.serial || cleaning} onclick={() => ctl.startTransfer()}>{t('transfer.start')}</Button>
+          <Button variant="secondary" size="lg" disabled={filesReason !== null} title={filesReason ?? undefined}
+            onclick={() => { if (s.serial) void ctl.explorer.open(s.serial); }}>
+            <Icon name="folder-open" size={18} />{t('explorer.files')}
+          </Button>
           {#if anyCopy}
             <Button variant="secondary" size="lg" disabled={!s.serial || cleaning} onclick={otherCopy}>{t('transfer.restore.pick')}</Button>
           {/if}

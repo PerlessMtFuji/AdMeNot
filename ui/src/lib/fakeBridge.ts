@@ -1,6 +1,6 @@
 // Atrapa mostu: odtwarza scenariusze nagrane z prawdziwego Api (scripts/record_bridge_fixtures.py).
 import type { Bridge } from './bridge';
-import type { Api, CopyView, CrashSummary, DeviceCheck, EventMap, EventName, Lang, PlanView, ScanView, ServiceInfo, Settings, ShotView, TelemetrySample, UpdateView } from './types';
+import type { Api, ApiError, EntryView, ExplorerListView, CopyView, CrashSummary, DeviceCheck, EventMap, EventName, Lang, PlanView, ScanView, ServiceInfo, Settings, ShotView, TelemetrySample, UpdateView } from './types';
 // Wynik `telemetry_events.sample()` z Pythona (Task 7 planu kroku H) — ten sam kształt co prawdziwe zdarzenia.
 import SAMPLE from './telemetrySample.json';
 
@@ -38,6 +38,9 @@ export type FakeBridge = Bridge & {
   calls: { method: string; args: unknown[] }[];
   emit<K extends EventName>(name: K, detail: EventMap[K]): void;
 };
+
+const isError = (result: unknown): boolean => typeof result === 'object' && result !== null && 'error' in result
+  && (result as { error: unknown }).error !== null;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -310,6 +313,8 @@ export function createFakeBridge(name: string,
         return { resumed: null, overlays: [], errors: [] };
       case 'adb_shell':
         return { ok: true, output: `(atrapa) ${String(args[0])}\n` };
+      case 'explorer_close':
+        return {};
       case 'watch_devices':
       case 'stop':
       case 'reopen_screen':
@@ -369,12 +374,46 @@ export function createFakeBridge(name: string,
     return { ...plan, apps: [...plan.apps, ...rows], runnable: plan.runnable + rows.length, code: `${plan.code}F` };
   };
 
+  // Eksplorator: odczyty zależą od ścieżki — nagranie tej samej ścieżki, a folder bez nagrania składany
+  // z nagranych list (podfoldery z dłuższych ścieżek), żeby dało się chodzić po drzewie.
+  const BY_PATH = new Set(['explorer_list', 'explorer_meta', 'explorer_text']);
+  const recordedLists = () => data.calls.filter((c) => c.method === 'explorer_list' && !isError(c.result))
+    .map((c) => c.result as ExplorerListView);
+  const fakeListing = (path: string): ExplorerListView | ApiError => {
+    const lists = recordedLists();
+    if (!lists.length) return { error: { key: 'explorer_missing', message: '' } };
+    const root = lists[0].crumbs[0];
+    const known = new Map(lists.flatMap((l) => l.entries).map((e) => [e.path, e]));
+    const prefix = path === root.path ? `${root.path}/` : `${path}/`;
+    const children = new Map<string, EntryView>();
+    for (const p of [...known.keys(), ...lists.map((l) => l.path)]) {
+      if (!p.startsWith(prefix)) continue;
+      const name = p.slice(prefix.length).split('/')[0];
+      const child = prefix + name;
+      if (!children.has(child)) {
+        children.set(child, known.get(child) ?? { name, path: child, kind: 'dir', size: 4096, mtime: 1790413200,
+          label: null, locked: false, type: 'other', ext: '', thumb: null, url: null });
+      }
+    }
+    const parts = path.slice(root.path.length).split('/').filter(Boolean);
+    const crumbs = [root, ...parts.map((part, i) => ({ label: part, path: `${root.path}/${parts.slice(0, i + 1).join('/')}` }))];
+    return { path, crumbs, entries: [...children.values()], skipped: 0, locked: false };
+  };
+
   const invoke = (method: string, args: unknown[]): unknown => {
     calls.push({ method, args });
     const failure = failures.get(method);
     if (failure) {
       failures.delete(method);
       return { error: { ...failure } };
+    }
+    if (BY_PATH.has(method)) {
+      const hit = data.calls.find((c) => c.method === method && c.args[0] === args[0]);
+      if (hit) {
+        replay(hit.events);
+        return structuredClone(hit.result);
+      }
+      if (method === 'explorer_list' && queues.has(method)) return fakeListing(String(args[0]));
     }
     const queue = queues.get(method);
     if (!queue || queue.length === 0) return fallback(method, args);

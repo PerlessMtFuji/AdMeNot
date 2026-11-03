@@ -34,6 +34,10 @@ export interface Settings {
   telemetry_delete_pending: boolean;
   donate_reminders: boolean;
   apk_mode_default: ApkModeDefault;
+  /** Eksplorator: ostatni folder docelowy kopii na komputerze (zapisuje most). */
+  explorer_dest?: string | null;
+  /** Eksplorator: ostatnio odwiedzone foldery telefonu, najnowszy pierwszy („Ostatnio”). */
+  explorer_recent?: string[];
 }
 
 export interface TelemetrySample {
@@ -451,6 +455,86 @@ export interface ApiError {
 
 export type JobError = ApiErrorBody & { job_id: string; kind: string };
 
+// --- eksplorator plików (app/explorer_present.py, app/explorer_api.py)
+
+/** Miejsce w lewym panelu; `count` — liczba plików, dochodzi zdarzeniem `explorer:places` (null: nie policzono). */
+export interface PlaceView {
+  key: 'camera' | 'screenshots' | 'downloads' | 'whatsapp' | 'movies' | 'music' | 'documents' | 'all';
+  path: string;
+  count: number | null;
+  icon: 'camera' | 'screenshot' | 'download' | 'chat' | 'film' | 'music' | 'document' | 'phone';
+}
+
+export type FileKind = 'image' | 'video' | 'audio' | 'text' | 'apk' | 'doc' | 'other';
+
+/** Wpis folderu telefonu. Folder: `type` „other”, `ext` pusty. `label` — ludzka nazwa folderu aplikacji;
+ *  `locked` — Android nie pozwala zajrzeć (np. `Android/data`). `thumb`/`url` — lokalny serwer mediów. */
+export interface EntryView {
+  name: string;
+  path: string;
+  kind: 'dir' | 'file';
+  size: number;
+  mtime: number;
+  label: string | null;
+  locked: boolean;
+  type: FileKind;
+  ext: string;
+  thumb: string | null;
+  url: string | null;
+}
+
+export interface CrumbView {
+  label: string;
+  path: string;
+}
+
+export interface ExplorerOpenView {
+  device: PhoneCard;
+  places: PlaceView[];
+  /** Adres lokalnego serwera mediów (miniatury, podgląd). */
+  media: string;
+  sdk: number;
+  /** Ile naszych plików tymczasowych z poprzednich otwarć usunięto z telefonu. */
+  leftovers: number;
+}
+
+export interface ExplorerListView {
+  path: string;
+  crumbs: CrumbView[];
+  entries: EntryView[];
+  /** Pozycje pominięte przy odczycie (np. nieczytelne nazwy). */
+  skipped: number;
+  /** Cały folder bez dostępu (kłódka zamiast błędu). */
+  locked: boolean;
+}
+
+export type TaskStatus = 'queued' | 'running' | 'paused' | 'waiting' | 'done' | 'cancelled' | 'failed';
+
+/** Zadanie kolejki kopiowania (`to_pc`) albo wgrywania (`to_phone`). */
+export interface TaskView {
+  id: string;
+  kind: 'to_pc' | 'to_phone';
+  status: TaskStatus;
+  done_files: number;
+  total_files: number;
+  done_bytes: number;
+  total_bytes: number;
+  speed: number;
+  eta_s: number | null;
+  skipped: number;
+  renamed: number;
+  failed: { path: string; reason: 'denied' | 'size' | 'mismatch' | 'missing' | 'error' }[];
+  verified: 'size' | 'hash' | 'mismatch' | null;
+  dest: string;
+}
+
+export interface ExplorerProblem {
+  key: 'no_space' | 'read_only' | 'fat32_big' | 'path_too_long' | 'denied';
+  detail: Record<string, unknown>;
+}
+
+export type ExplorerStart = { task: TaskView } | { problems: ExplorerProblem[] };
+
 // --- przenoszenie danych: kopia starego telefonu (present.inventory_view / copy_view / backup_result_view)
 
 export type TransferCategory = 'media' | 'downloads' | 'whatsapp';
@@ -829,6 +913,25 @@ export interface Api {
   /** „Pomiń” przy prośbie o rolę SMS: wiadomości idą do pliku. Odmowa: `restore_required` (oddania roli
    *  nie wolno pominąć) albo `no_tap` (nic nie czeka). */
   skip_tap(): R<Record<string, never>>;
+  /** Eksplorator plików: trzyma blokadę telefonu do `explorer_close`; zajęty telefon → `explorer_busy`. */
+  explorer_open(serial: string): R<ExplorerOpenView>;
+  explorer_close(): R<Record<string, never>>;
+  explorer_list(path: string): R<ExplorerListView>;
+  explorer_meta(path: string): R<{ meta: Record<string, unknown> & { size: number; mtime: number; path: string } }>;
+  explorer_text(path: string, more: boolean): R<{ text: string; encoding: string; truncated: boolean }>;
+  explorer_mkdir(parent: string, name: string): R<{ path: string }>;
+  explorer_new_text(parent: string, name: string, text: string): R<{ path: string }>;
+  explorer_open_map(lat: number, lon: number): R<Record<string, never>>;
+  explorer_copy(paths: string[], dest: string | null, verifyHash: boolean): R<ExplorerStart>;
+  explorer_upload(paths: string[], remoteDir: string): R<ExplorerStart>;
+  explorer_pick_dest(): R<{ path: string | null }>;
+  explorer_pick_upload(kind: 'files' | 'folder'): R<{ paths: string[] }>;
+  explorer_clipboard(): R<{ paths: string[] }>;
+  explorer_tasks(): R<{ tasks: TaskView[] }>;
+  explorer_pause(taskId: string): R<Record<string, never>>;
+  explorer_resume(taskId: string): R<Record<string, never>>;
+  explorer_cancel(taskId: string): R<Record<string, never>>;
+  explorer_open_folder(path: string): R<Record<string, never>>;
 }
 
 export interface EventMap {
@@ -885,6 +988,17 @@ export interface EventMap {
   'transfer:cleanup_done': { ok: boolean; serial: string };
   /** `tel`: null dla samych plików albo po błędzie telefonii (`tel_error` — klucz błędu). */
   'transfer:restore_done': { result: RestoreResultView; copy: CopyView; tel?: TelResultView | null; tel_error?: string | null };
+  /** Eksplorator: liczby plików Miejsc liczone w tle (po każdym miejscu cała lista). */
+  'explorer:places': { places: PlaceView[] };
+  /** Telefon eksploratora zniknął z listy — most czeka na niego (kolejka stoi). */
+  'explorer:offline': { serial: string };
+  /** Ten sam telefon wrócił — UI odświeża bieżący folder. */
+  'explorer:online': { serial: string };
+  /** Most zamknął eksplorator: podłączono inny telefon albo otwarto eksplorator innego telefonu. */
+  'explorer:closed': { serial: string; reason: 'other_phone' | 'switched' };
+  'explorer:task': { task: TaskView };
+  /** Pliki upuszczone z Eksploratora Windows (liczba plików i bajty z folderami). */
+  'explorer:drop': { paths: string[]; count: number; bytes: number };
 }
 
 export type EventName = keyof EventMap;

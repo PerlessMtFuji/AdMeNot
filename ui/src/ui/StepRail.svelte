@@ -44,6 +44,11 @@
         </li>
       {/each}
     </ol>
+  {:else if s.screen === 'explorer'}
+    <!-- eksplorator jest poza krokami naprawy: „Wróć” zamyka go (most zwalnia telefon) i wraca na „Połącz” -->
+    <button class={NAV} title={t('explorer.back')} onclick={() => ctl.explorer.close()}>
+      <Icon name="arrow-left" /><span class="max-[1200px]:sr-only">{t('explorer.back')}</span>
+    </button>
   {:else}
     {@const backLabel = s.phase === 'connect' ? t('rail.new_order') : t('rail.back_to_order')}
     <button class={NAV} title={backLabel} onclick={() => ctl.back()}>

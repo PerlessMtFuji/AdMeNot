@@ -1,0 +1,131 @@
+<script lang="ts">
+  import { getContext } from 'svelte';
+  import Crumbs from '../components/explorer/Crumbs.svelte';
+  import FileList from '../components/explorer/FileList.svelte';
+  import Places from '../components/explorer/Places.svelte';
+  import type { Controller } from '../lib/controller';
+  import { type ExplorerFilter, FILTERS, formatBytes } from '../lib/explorer/logic';
+  import { ERROR_KEYS, i18n, t, tp } from '../lib/i18n/index.svelte';
+  import { enter } from '../lib/motion';
+  import Banner from '../ui/Banner.svelte';
+  import Button from '../ui/Button.svelte';
+  import Icon from '../ui/Icon.svelte';
+
+  const ctl = getContext<Controller>('ctl');
+  const ex = ctl.explorer;
+  const s = ex.state;
+  const known: readonly string[] = ERROR_KEYS;
+  const items = $derived(ex.items);
+  const files = $derived(s.entries.filter((e) => e.kind === 'file'));
+  const folders = $derived(s.entries.length - files.length);
+  const bytes = $derived(files.reduce((sum, e) => sum + e.size, 0));
+  const folderName = $derived(s.crumbs.at(-1)?.label ?? '');
+  const errorText = $derived(s.error ? t(`error.${known.includes(s.error.key) ? s.error.key : 'internal'}`) : '');
+  const TOGGLE = 'grid h-8 w-9 place-items-center rounded-[9px] transition duration-150';
+
+  /** Skróty jak w Eksploratorze Windows — poza polami tekstowymi (tam Backspace i Ctrl+A edytują tekst). */
+  function onkey(e: KeyboardEvent): void {
+    const el = e.target instanceof Element ? e.target : null;
+    if (el && (el.closest('input, textarea, select, [contenteditable="true"]') || el.closest('[role="dialog"]'))) return;
+    const mod = e.ctrlKey || e.metaKey;
+    if (e.key === 'Backspace' && !mod) {
+      e.preventDefault();
+      void ex.up();
+    } else if (mod && e.key.toLowerCase() === 'a') {
+      e.preventDefault();
+      ex.selectAll();
+    } else if (e.key === 'Escape') {
+      ex.clear();
+    } else if (e.key === 'F5') {
+      e.preventDefault();
+      void ex.refresh();
+    }
+  }
+</script>
+
+<svelte:window onkeydown={onkey} />
+
+<main class="flex min-w-0 flex-1 flex-col gap-3 px-6 pt-5 pb-6">
+  <h1 class="sr-only">{t('explorer.title', { name: s.device?.name ?? '' })}</h1>
+
+  <header class="flex min-w-0 items-center gap-3">
+    <Crumbs crumbs={s.crumbs} ongo={(p) => ex.go(p)} />
+    {#key s.path}
+      {#if files.length || folders}
+        <span in:enter={{ y: 4 }} class="flex-none rounded-full bg-accent-soft px-2.5 py-0.5 text-2xs font-bold text-accent tabular-nums">
+          {files.length ? tp('explorer.summary', files.length, { size: formatBytes(bytes, i18n.lang) }) : tp('explorer.folders', folders)}
+        </span>
+      {/if}
+    {/key}
+    {#if s.loading}<span class="spin flex-none" role="status" aria-label={t('explorer.loading')}></span>{/if}
+    <span class="flex-1"></span>
+    <div role="group" aria-label={t('explorer.view.label')}
+      class="flex flex-none gap-0.5 rounded-xl bg-neutral-soft p-[3px] shadow-[var(--shadow-well)]">
+      {#each [['grid', 'layout-grid'], ['list', 'list']] as const as [v, icon] (v)}
+        <button type="button" aria-pressed={s.view === v} aria-label={t(`explorer.view.${v}`)} title={t(`explorer.view.${v}`)}
+          onclick={() => ex.setView(v)} class="{TOGGLE} {s.view === v ? 'card text-ink' : 'text-mut hover:text-ink'}">
+          <Icon name={icon} size={16} />
+        </button>
+      {/each}
+    </div>
+  </header>
+
+  <div class="flex items-center gap-2.5">
+    <label class="field flex min-w-0 flex-1 items-center gap-2 rounded-xl px-3 py-2">
+      <Icon name="search" size={15} class="text-soft" />
+      <input type="search" class="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-soft"
+        aria-label={t('explorer.search_label')} placeholder={t('explorer.search', { folder: folderName })}
+        value={s.query} oninput={(e) => ex.setQuery(e.currentTarget.value)} />
+    </label>
+    <select class="field flex-none rounded-xl px-3 py-2 text-sm font-semibold text-ink" aria-label={t('explorer.filter.label')}
+      value={s.filter} onchange={(e) => ex.setFilter(e.currentTarget.value as ExplorerFilter)}>
+      {#each FILTERS as f (f)}<option value={f}>{t(`explorer.filter.${f}`)}</option>{/each}
+    </select>
+    <!-- Tworzenie i wgrywanie podłącza Task 12 (NewDialog, okno wyboru plików). -->
+    <Button size="sm" disabled class="flex-none !py-2">
+      <Icon name="plus" size={15} />{t('explorer.new')}<Icon name="chevron-down" size={14} />
+    </Button>
+    <Button size="sm" variant="primary" disabled class="flex-none !py-2">
+      <Icon name="upload" size={15} />{t('explorer.upload_here')}
+    </Button>
+  </div>
+
+  {#if s.offline}
+    <Banner tone="warn" icon="wifi-off" title={t('explorer.offline.title')}>{t('explorer.offline.text')}</Banner>
+  {/if}
+  {#if s.error}
+    <Banner tone="bad" icon="triangle-alert" title={errorText}>
+      {#snippet actions()}<Button size="sm" variant="ghost" onclick={() => (s.error = null)}>{t('common.close')}</Button>{/snippet}
+    </Banner>
+  {/if}
+  {#if s.leftovers > 0}
+    <Banner tone="ok" icon="check">
+      {tp('explorer.leftovers', s.leftovers)}
+      {#snippet actions()}<Button size="sm" variant="ghost" onclick={() => ex.dismissLeftovers()}>{t('common.close')}</Button>{/snippet}
+    </Banner>
+  {/if}
+
+  <div class="flex min-h-0 flex-1 gap-3.5">
+    <Places places={s.places} recent={s.recent} path={s.path} ongo={(p) => ex.go(p)} />
+    <section aria-label={folderName} class="relative flex min-h-0 min-w-0 flex-1 flex-col rounded-2xl card px-2 pt-3 pb-1.5">
+      {#if s.locked}
+        <div in:enter class="m-auto flex max-w-[380px] flex-col items-center gap-2 p-6 text-center">
+          <span class="grid h-12 w-12 place-items-center rounded-2xl bg-neutral-soft text-mut shadow-[var(--shadow-well)]">
+            <Icon name="folder-lock" size={22} />
+          </span>
+          <b class="text-ink">{t('explorer.locked.title')}</b>
+          <p class="text-sm text-mut">{t('explorer.locked.text')}</p>
+        </div>
+      {:else}
+        <!-- Siatka galerii (widok „grid”) dochodzi w Tasku 11; do tego czasu oba widoki to lista. -->
+        <FileList {ex} {items} />
+        {#if !items.length && !s.loading}
+          <p class="absolute inset-x-0 top-1/2 text-center text-sm text-soft">
+            {s.entries.length ? t('explorer.empty.filter') : t('explorer.empty.folder')}
+          </p>
+        {/if}
+        {#if s.skipped > 0}<p class="px-3 pt-1 text-2xs text-soft">{tp('explorer.skipped', s.skipped)}</p>{/if}
+      {/if}
+    </section>
+  </div>
+</main>

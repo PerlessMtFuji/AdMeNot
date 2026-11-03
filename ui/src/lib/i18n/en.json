@@ -87,6 +87,41 @@
     "adb_missing": "adb was not found.",
     "open_settings": "Open settings"
   },
+  "explorer": {
+    "files": "Files",
+    "files_reason": { "pick": "Pick a phone from the list first", "busy": "Available when the current task ends", "cleanup": "Available once the phone settings are restored" },
+    "back": "Back",
+    "title": "Files on {name}",
+    "crumbs_label": "Path",
+    "places_label": "Places",
+    "recent_label": "Recent",
+    "place": { "camera": "Camera", "screenshots": "Screenshots", "downloads": "Downloads", "whatsapp": "WhatsApp", "movies": "Movies", "music": "Music", "documents": "Documents", "all": "All storage" },
+    "counting": "counting files…",
+    "summary": { "one": "{count} file · {size}", "few": "{count} files · {size}", "many": "{count} files · {size}", "other": "{count} files · {size}" },
+    "folders": { "one": "{count} folder", "few": "{count} folders", "many": "{count} folders", "other": "{count} folders" },
+    "view": { "label": "View", "grid": "Grid", "list": "List" },
+    "search": "Search in {folder}…",
+    "search_label": "Search this folder",
+    "filter": { "label": "Show", "all": "Everything", "image": "Photos", "video": "Videos", "doc": "Documents", "apk": "APK" },
+    "new": "New",
+    "upload_here": "Upload here",
+    "list": { "label": "Files in folder", "name": "Name", "size": "Size", "date": "Date", "folder": "folder" },
+    "locked_row": "No access",
+    "locked": { "title": "Android does not allow looking into this folder", "text": "The phone does not share it over the cable — usually it is app data that Android protects from other programs." },
+    "empty": { "folder": "This folder is empty", "filter": "Nothing here matches the filter or search" },
+    "loading": "Loading the folder…",
+    "skipped": { "one": "Skipped {count} item whose name cannot be read.", "few": "Skipped {count} items whose names cannot be read.", "many": "Skipped {count} items whose names cannot be read.", "other": "Skipped {count} items whose names cannot be read." },
+    "offline": { "title": "Phone disconnected", "text": "Plug the cable back in — the explorer resumes on its own." },
+    "leftovers": { "one": "Removed {count} AdMeNot temporary file left on the phone by an interrupted upload.", "few": "Removed {count} AdMeNot temporary files left on the phone by an interrupted upload.", "many": "Removed {count} AdMeNot temporary files left on the phone by an interrupted upload.", "other": "Removed {count} AdMeNot temporary files left on the phone by an interrupted upload." },
+    "notice": {
+      "busy_title": "Files are not available right now",
+      "busy": "Another operation is running on this phone (scan, repair or data copy). Open the files when it ends.",
+      "other_phone": "Another phone was connected — the explorer was closed.",
+      "switched": "Files of another phone were opened — the previous explorer was closed."
+    },
+    "day": { "today": "Today · {date}", "yesterday": "Yesterday" },
+    "date": { "today": "today, {time}", "yesterday": "yesterday, {time}" }
+  },
   "usb": {
     "group": { "samsung": "Samsung", "xiaomi": "Xiaomi / Redmi / POCO", "motorola": "Motorola", "oppo": "Oppo / Realme / OnePlus", "huawei": "Huawei / Honor", "pixel": "Pixel", "other": "Other" },
     "samsung": {
@@ -948,7 +983,16 @@
     "transfer_in_use": "A file of this copy is open in another program (e.g. File Explorer or a photo viewer). Close it and try again.",
     "transfer_phone_full": "The new phone ran out of space. Free up space or untick some of the data and choose “Upload” — uploaded files stay.",
     "transfer_copy_missing": "This copy is no longer on this computer (it was deleted or moved).",
-    "transfer_no_plan": "The phone from the upload screen is no longer connected. Connect it and choose the copy again."
+    "transfer_no_plan": "The phone from the upload screen is no longer connected. Connect it and choose the copy again.",
+    "explorer_busy": "Another operation is running on this phone — open the files when it ends.",
+    "explorer_offline": "The phone is not responding — check the cable.",
+    "explorer_denied": "The phone does not allow this in this folder.",
+    "explorer_missing": "This file or folder is no longer on the phone.",
+    "explorer_exists": "A file or folder with this name is already here.",
+    "explorer_bad_name": "This name cannot be used — no “/”, not “.” or “..”, at most 255 bytes.",
+    "explorer_not_open": "The file explorer is already closed.",
+    "explorer_no_dest": "The destination folder is not on this computer (e.g. a removed USB drive) — pick another one.",
+    "explorer_not_folder": "This folder is no longer on this computer."
 
   }
 }

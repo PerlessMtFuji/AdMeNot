@@ -277,6 +277,57 @@ describe('Connect', () => {
     expect(within(radios[0].closest('label')!).queryByText('podgląd włączony')).toBeNull();
   });
 
+  test('"Files" opens the explorer of the selected phone', async () => {
+    const env = await setupCtl('explorer');
+    render(Connect, { context: new Map([['ctl', env.ctl]]) });
+    await tick();
+    const files = screen.getByRole('button', { name: 'Pliki' }) as HTMLButtonElement;
+    expect(files.disabled).toBe(false);
+    await fireEvent.click(files);
+    await vi.waitFor(() => expect(env.s.screen).toBe('explorer'));
+    expect(env.bridge.calls.find((c) => c.method === 'explorer_open')?.args).toEqual(['R58T00TEST']);
+    expect(env.ctl.explorer.state.open).toBe(true);
+  });
+
+  test('"Files" is disabled with a reason while a task runs, during phone cleanup and with no phone picked', async () => {
+    const env = await setupCtl('many');
+    render(Connect, { context: new Map([['ctl', env.ctl]]) });
+    await tick();
+    const files = () => screen.getByRole('button', { name: 'Pliki' }) as HTMLButtonElement;
+    env.s.serial = null;
+    await tick();
+    expect(files().disabled).toBe(true);
+    expect(files().title).toBe('Najpierw wybierz telefon z listy');
+    env.s.serial = 'HT7A1B2C3';
+    env.s.job = { id: 'job-1', kind: 'scan' };
+    await tick();
+    expect(files().disabled).toBe(true);
+    expect(files().title).toBe('Dostępne po zakończeniu bieżącego zadania');
+    env.s.job = null;
+    env.s.transfer.cleanup = { serial: 'HT7A1B2C3', running: true, ok: null };
+    await tick();
+    expect(files().disabled).toBe(true);
+    expect(files().title).toBe('Dostępne po przywróceniu ustawień telefonu');
+    env.s.transfer.cleanup = { serial: null, running: false, ok: null };
+    await tick();
+    expect(files().disabled).toBe(false);
+    expect(files().title).toBe('');
+  });
+
+  test('a busy phone: the bridge refuses "Files", a banner explains it and the screen stays', async () => {
+    const env = await setupCtl('explorer');
+    render(Connect, { context: new Map([['ctl', env.ctl]]) });
+    await tick();
+    env.bridge.failNext('explorer_open', 'explorer_busy', 'device');
+    await fireEvent.click(screen.getByRole('button', { name: 'Pliki' }));
+    await vi.waitFor(() => expect(screen.getByText(/Na tym telefonie trwa inna operacja/)).toBeTruthy());
+    expect(env.s.screen).toBe('main');
+    expect(env.s.error).toBeNull();  // baner na „Połącz”, nie karta błędu
+    await fireEvent.click(screen.getByRole('button', { name: 'Pliki' }));  // druga próba: baner znika
+    await vi.waitFor(() => expect(env.s.screen).toBe('explorer'));
+    expect(screen.queryByText(/Na tym telefonie trwa inna operacja/)).toBeNull();
+  });
+
   test('one ready phone: connected card with scan; adb missing points to settings', async () => {
     const { s, container } = await renderWith(Connect, 'adware');
     expect(screen.getByRole('heading', { name: 'Połączono' })).toBeTruthy();

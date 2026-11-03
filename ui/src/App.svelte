@@ -8,6 +8,7 @@
   import { screenIn } from './lib/motion';
   import Connect from './screens/Connect.svelte';
   import Execute from './screens/Execute.svelte';
+  import Explorer from './screens/Explorer.svelte';
   import History from './screens/History.svelte';
   import Results from './screens/Results.svelte';
   import Scan from './screens/Scan.svelte';
@@ -30,7 +31,7 @@
   // Ostrzeżenie przy pierwszym starcie (spec kroku H §3.1): zamiast zwykłego widoku, bez panelu kroków.
   const welcome = $derived(s.settingsLoaded && needsWelcome(s.settings));
 
-  const ORDER = ['connect', 'transfer_choose', 'transfer_backup', 'transfer_restore_plan', 'transfer_restore', 'scanning', 'results', 'executing', 'history', 'settings', 'fatal'];
+  const ORDER = ['connect', 'transfer_choose', 'transfer_backup', 'transfer_restore_plan', 'transfer_restore', 'scanning', 'results', 'executing', 'explorer', 'history', 'settings', 'fatal'];
   const view = $derived(s.fatal ? 'fatal' : s.screen !== 'main' ? s.screen
     : s.phase === 'done' ? 'executing' : s.phase === 'transfer_done' ? 'transfer_backup'
     : s.phase === 'transfer_restored' ? 'transfer_restore' : s.phase);
@@ -55,6 +56,8 @@
         <History />
       {:else if s.screen === 'settings'}
         <Settings />
+      {:else if s.screen === 'explorer'}
+        <Explorer />
       {:else if s.phase === 'connect'}
         <Connect />
       {:else if s.phase === 'scanning'}

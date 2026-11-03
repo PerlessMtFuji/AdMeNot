@@ -87,6 +87,41 @@
     "adb_missing": "Nie znaleziono programu adb.",
     "open_settings": "Otwórz ustawienia"
   },
+  "explorer": {
+    "files": "Pliki",
+    "files_reason": { "pick": "Najpierw wybierz telefon z listy", "busy": "Dostępne po zakończeniu bieżącego zadania", "cleanup": "Dostępne po przywróceniu ustawień telefonu" },
+    "back": "Wróć",
+    "title": "Pliki telefonu {name}",
+    "crumbs_label": "Ścieżka",
+    "places_label": "Miejsca",
+    "recent_label": "Ostatnio",
+    "place": { "camera": "Aparat", "screenshots": "Zrzuty ekranu", "downloads": "Pobrane", "whatsapp": "WhatsApp", "movies": "Filmy", "music": "Muzyka", "documents": "Dokumenty", "all": "Cała pamięć" },
+    "counting": "liczę pliki…",
+    "summary": { "one": "{count} plik · {size}", "few": "{count} pliki · {size}", "many": "{count} plików · {size}", "other": "{count} pliku · {size}" },
+    "folders": { "one": "{count} folder", "few": "{count} foldery", "many": "{count} folderów", "other": "{count} folderu" },
+    "view": { "label": "Widok", "grid": "Siatka", "list": "Lista" },
+    "search": "Szukaj w: {folder}…",
+    "search_label": "Szukaj w tym folderze",
+    "filter": { "label": "Pokaż", "all": "Wszystko", "image": "Zdjęcia", "video": "Filmy", "doc": "Dokumenty", "apk": "APK" },
+    "new": "Nowy",
+    "upload_here": "Wgraj tutaj",
+    "list": { "label": "Pliki w folderze", "name": "Nazwa", "size": "Rozmiar", "date": "Data", "folder": "folder" },
+    "locked_row": "Bez dostępu",
+    "locked": { "title": "Android nie pozwala zajrzeć do tego folderu", "text": "Telefon nie udostępnia go przez kabel — zwykle to dane aplikacji, które Android chroni przed innymi programami." },
+    "empty": { "folder": "Ten folder jest pusty", "filter": "Nic tu nie pasuje do filtra ani wyszukiwania" },
+    "loading": "Wczytuję folder…",
+    "skipped": { "one": "Pominięto {count} pozycję, której nazwy nie da się odczytać.", "few": "Pominięto {count} pozycje, których nazw nie da się odczytać.", "many": "Pominięto {count} pozycji, których nazw nie da się odczytać.", "other": "Pominięto {count} pozycji, których nazw nie da się odczytać." },
+    "offline": { "title": "Telefon odłączony", "text": "Podłącz kabel ponownie — eksplorator wznowi się sam." },
+    "leftovers": { "one": "Usunięto z telefonu {count} plik tymczasowy AdMeNot pozostały po przerwanym wgrywaniu.", "few": "Usunięto z telefonu {count} pliki tymczasowe AdMeNot pozostałe po przerwanym wgrywaniu.", "many": "Usunięto z telefonu {count} plików tymczasowych AdMeNot pozostałych po przerwanym wgrywaniu.", "other": "Usunięto z telefonu {count} pliku tymczasowego AdMeNot pozostałego po przerwanym wgrywaniu." },
+    "notice": {
+      "busy_title": "Pliki są teraz niedostępne",
+      "busy": "Na tym telefonie trwa inna operacja (skan, naprawa albo kopia danych). Otwórz pliki po jej zakończeniu.",
+      "other_phone": "Podłączono inny telefon — eksplorator został zamknięty.",
+      "switched": "Otwarto pliki innego telefonu — poprzedni eksplorator został zamknięty."
+    },
+    "day": { "today": "Dziś · {date}", "yesterday": "Wczoraj" },
+    "date": { "today": "dziś, {time}", "yesterday": "wczoraj, {time}" }
+  },
   "usb": {
     "group": { "samsung": "Samsung", "xiaomi": "Xiaomi / Redmi / POCO", "motorola": "Motorola", "oppo": "Oppo / Realme / OnePlus", "huawei": "Huawei / Honor", "pixel": "Pixel", "other": "Inny" },
     "samsung": {
@@ -948,7 +983,16 @@
     "transfer_in_use": "Plik tej kopii jest otwarty w innym programie (np. w Eksploratorze albo w przeglądarce zdjęć). Zamknij go i spróbuj ponownie.",
     "transfer_phone_full": "Na nowym telefonie skończyło się miejsce. Zwolnij miejsce albo odznacz część danych i wybierz „Wgraj” — wgrane pliki zostaną.",
     "transfer_copy_missing": "Tej kopii nie ma już na komputerze (została usunięta albo przeniesiona).",
-    "transfer_no_plan": "Telefonu z ekranu wgrywania nie ma już przy komputerze. Podłącz go i wybierz kopię jeszcze raz."
+    "transfer_no_plan": "Telefonu z ekranu wgrywania nie ma już przy komputerze. Podłącz go i wybierz kopię jeszcze raz.",
+    "explorer_busy": "Na tym telefonie trwa inna operacja — otwórz pliki po jej zakończeniu.",
+    "explorer_offline": "Telefon nie odpowiada — sprawdź kabel.",
+    "explorer_denied": "Telefon nie pozwala na to w tym folderze.",
+    "explorer_missing": "Tego pliku albo folderu nie ma już na telefonie.",
+    "explorer_exists": "Plik albo folder o tej nazwie już tu jest.",
+    "explorer_bad_name": "Tej nazwy nie da się użyć — bez znaku „/”, nie „.” ani „..”, najwyżej 255 bajtów.",
+    "explorer_not_open": "Eksplorator plików jest już zamknięty.",
+    "explorer_no_dest": "Folderu docelowego nie ma na komputerze (np. odłączony pendrive) — wybierz inny.",
+    "explorer_not_folder": "Tego folderu nie ma już na komputerze."
 
   }
 }

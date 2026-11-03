@@ -5,9 +5,11 @@ import { defineConfig } from 'vitest/config';
 // Okno ma most do metod uruchamiających programy (check_adb, adb_path, adb_shell): gdyby kiedyś
 // trafił się wstrzyknięty HTML, CSP nie pozwoli wykonać obcego skryptu (przegląd 2026-10-11).
 // Style inline: przejścia Svelte i atrybuty style. Obrazy data: — ikony aplikacji i zrzuty ekranu.
+// Eksplorator plików: miniatury, podgląd i strumienie z lokalnego serwera mediów (127.0.0.1, losowy port), blob: z pamięci.
 const CSP = [
   "default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data:", "font-src 'self' data:", "connect-src 'self'",
+  "img-src 'self' data: blob: http://127.0.0.1:*", "media-src http://127.0.0.1:* blob:", "font-src 'self' data:",
+  "connect-src 'self' http://127.0.0.1:*",
   "object-src 'none'", "base-uri 'none'", "form-action 'none'",
 ].join('; ');
 
