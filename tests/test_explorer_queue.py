@@ -1,0 +1,446 @@
+from __future__ import annotations
+
+import os
+import re
+import threading
+from pathlib import Path
+
+import pytest
+from faketransfer import FakeStoragePhone
+
+from admenot.engine.explorer.guard import ExplorerAdb, is_tmp_name
+from admenot.engine.explorer.plan import plan_to_pc, plan_to_phone
+from admenot.engine.explorer.queue import (
+    TransferQueue,
+    read_tmp_folders,
+    record_tmp_folder,
+    sweep_recorded,
+    sweep_tmp,
+)
+from admenot.engine.transfer.puller import PullResult
+
+OK = {"free_bytes": lambda p: 10**15, "filesystem": lambda p: "NTFS", "writable": lambda p: True}
+TMP_ON_PHONE = re.compile(r"\.admenot-[0-9a-f]{12}\.part")
+
+
+def put(phone: FakeStoragePhone, remote: str, data: bytes = b"x", mtime: int | None = None) -> None:
+    path = phone.local(remote)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    if mtime is not None:
+        os.utime(path, (mtime, mtime))
+
+
+def phone_files(phone: FakeStoragePhone, remote: str) -> dict[str, bytes]:
+    base = phone.local(remote)
+    return {p.relative_to(base).as_posix(): p.read_bytes() for p in sorted(base.rglob("*")) if p.is_file()}
+
+
+def pc_files(base: Path) -> dict[str, bytes]:
+    return {p.relative_to(base).as_posix(): p.read_bytes() for p in sorted(base.rglob("*")) if p.is_file()}
+
+
+class Events:
+    def __init__(self) -> None:
+        self.items: list[tuple[str, dict]] = []
+        self.lock = threading.Lock()
+
+    def __call__(self, name: str, payload: dict) -> None:
+        with self.lock:
+            self.items.append((name, payload))
+
+    def statuses(self, tid: str) -> list[str]:
+        return [p["status"] for n, p in self.items if n == "explorer:task" and p["id"] == tid]
+
+
+class Clock:
+    def __init__(self, step: float = 0.0) -> None:
+        self.now = 0.0
+        self.step = step
+
+    def __call__(self) -> float:
+        self.now += self.step
+        return self.now
+
+
+@pytest.fixture
+def phone(tmp_path: Path) -> FakeStoragePhone:
+    return FakeStoragePhone(tmp_path / "phone")
+
+
+@pytest.fixture
+def adb(phone: FakeStoragePhone) -> ExplorerAdb:
+    return ExplorerAdb(phone)
+
+
+@pytest.fixture
+def pc(tmp_path: Path) -> Path:
+    d = tmp_path / "pc"
+    d.mkdir()
+    return d
+
+
+@pytest.fixture
+def tmp_dir(tmp_path: Path) -> Path:
+    return tmp_path / "explorer_tmp"
+
+
+@pytest.fixture
+def make_queue(phone, adb, tmp_dir):
+    made: list[TransferQueue] = []
+
+    def make(*, puller=None, pusher=None, emit=None, is_connected=None, **kw) -> TransferQueue:
+        kw.setdefault("retry_interval", 0.001)
+        kw.setdefault("tmp_dir", tmp_dir)
+        kw.setdefault("sdk", lambda: 30)
+        q = TransferQueue(lambda: adb, puller or phone, pusher or phone, emit or Events(),
+                          is_connected or (lambda: phone.online), **kw)
+        made.append(q)
+        return q
+
+    yield make
+    for q in made:
+        q.shutdown()
+
+
+def local_tree(base: Path, files: dict[str, bytes], mtime: int = 1_600_000_000) -> None:
+    for rel, data in files.items():
+        p = base / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(data)
+        os.utime(p, (mtime, mtime))
+
+
+def no_phone_tmp(phone: FakeStoragePhone) -> bool:
+    return not any(is_tmp_name(p.name) for p in (phone.root / "sdcard").rglob("*"))
+
+
+# ---------------------------------------------------------------------------------------------
+
+
+def test_copy_to_pc_keeps_tree_and_mtime(phone, adb, pc, make_queue):
+    put(phone, "/sdcard/Pics/a.jpg", b"aaaa", mtime=1_500_000_000)
+    put(phone, "/sdcard/Pics/sub/b.txt", b"bb", mtime=1_400_000_000)
+    put(phone, "/sdcard/Pics/.hidden", b"h", mtime=1_300_000_000)
+    put(phone, "/sdcard/one.mp4", b"v" * 10, mtime=1_200_000_000)
+    plan = plan_to_pc(adb, ["/sdcard/Pics", "/sdcard/one.mp4"], pc, **OK)
+    q = make_queue()
+    tid = q.add(plan)
+    st = q.wait_for(tid, "done")
+    assert pc_files(pc) == {"Pics/a.jpg": b"aaaa", "Pics/sub/b.txt": b"bb", "Pics/.hidden": b"h",
+                            "one.mp4": b"v" * 10}
+    assert int(os.stat(pc / "Pics" / "a.jpg").st_mtime) == 1_500_000_000
+    assert int(os.stat(pc / "Pics" / "sub" / "b.txt").st_mtime) == 1_400_000_000
+    assert int(os.stat(pc / "one.mp4").st_mtime) == 1_200_000_000
+    assert (st.done_files, st.total_files, st.done_bytes, st.total_bytes) == (4, 4, 17, 17)
+    assert st.failed == [] and st.verified == "size" and st.kind == "to_pc"
+    assert st.dest == str(pc)
+
+
+def test_upload_uses_tmp_then_mv(phone, adb, tmp_path, make_queue):
+    src = tmp_path / "src"
+    local_tree(src, {"Up/a.jpg": b"aaa", "Up/b c'$.txt": b"bb"}, mtime=1_500_000_000)
+    phone.local("/sdcard/Download").mkdir(parents=True)
+    plan = plan_to_phone(adb, [src / "Up"], "/sdcard/Download")
+    q = make_queue()
+    st = q.wait_for(q.add(plan), "done")
+    assert phone_files(phone, "/sdcard/Download") == {"Up/a.jpg": b"aaa", "Up/b c'$.txt": b"bb"}
+    assert int(os.stat(phone.local("/sdcard/Download/Up/a.jpg")).st_mtime) == 1_500_000_000
+    assert all(TMP_ON_PHONE.fullmatch(p.rsplit("/", 1)[1]) for p in phone.pushed)
+    mvs = [c for c in phone.commands if c.startswith("mv -n ")]
+    assert len(mvs) == 2
+    assert all(re.fullmatch(r"mv -n '?/sdcard/Download/Up/\.admenot-[0-9a-f]{12}\.part'? .+", c) for c in mvs)
+    assert no_phone_tmp(phone)
+    assert st.done_files == 2 and st.verified == "size" and st.dest == "/sdcard/Download"
+    assert st.kind == "to_phone"
+
+
+def test_upload_never_overwrites(phone, adb, tmp_path, make_queue):
+    src = tmp_path / "src"
+    local_tree(src, {"a.jpg": b"mine"})
+    phone.local("/sdcard/Up").mkdir(parents=True)
+    plan = plan_to_phone(adb, [src / "a.jpg"], "/sdcard/Up")
+    assert plan.items[0].action == "copy"
+
+    def appear(cmd: str) -> None:  # klient zapisuje plik o tej samej nazwie w trakcie wgrywania
+        if cmd.startswith("mv -n ") and not phone.local("/sdcard/Up/a.jpg").exists():
+            put(phone, "/sdcard/Up/a.jpg", b"theirs")
+
+    phone.on_shell = appear
+    q = make_queue()
+    st = q.wait_for(q.add(plan), "done")
+    assert phone_files(phone, "/sdcard/Up") == {"a.jpg": b"theirs", "a (z komputera).jpg": b"mine"}
+    assert st.renamed == 1 and st.done_files == 1 and st.failed == []
+    assert len([c for c in phone.commands if c.startswith("mv -n ")]) == 2
+
+
+def test_same_content_skipped_by_hash(phone, adb, pc, tmp_path, make_queue):
+    # telefon -> komputer
+    put(phone, "/sdcard/P/a.jpg", b"same")
+    put(phone, "/sdcard/P/b.jpg", b"new!")
+    (pc / "P").mkdir()
+    (pc / "P" / "a.jpg").write_bytes(b"same")
+    (pc / "P" / "b.jpg").write_bytes(b"old!")
+    plan = plan_to_pc(adb, ["/sdcard/P"], pc, **OK)
+    assert sorted(i.action for i in plan.items) == ["check_hash", "check_hash"]
+    q = make_queue()
+    st = q.wait_for(q.add(plan), "done")
+    assert pc_files(pc) == {"P/a.jpg": b"same", "P/b.jpg": b"old!", "P/b (z telefonu).jpg": b"new!"}
+    assert (st.skipped, st.renamed, st.done_files, st.total_files) == (1, 1, 1, 1)
+    # komputer -> telefon
+    src = tmp_path / "src"
+    local_tree(src, {"c.txt": b"same", "d.txt": b"mine"})
+    put(phone, "/sdcard/Q/c.txt", b"same")
+    put(phone, "/sdcard/Q/d.txt", b"them")
+    plan = plan_to_phone(adb, [src / "c.txt", src / "d.txt"], "/sdcard/Q")
+    st = q.wait_for(q.add(plan), "done")
+    assert phone_files(phone, "/sdcard/Q") == {"c.txt": b"same", "d.txt": b"them", "d (z komputera).txt": b"mine"}
+    assert (st.skipped, st.renamed, st.done_files) == (1, 1, 1)
+    assert no_phone_tmp(phone)
+
+
+def test_cable_pull_waits_and_resumes(phone, adb, tmp_path, make_queue):
+    src = tmp_path / "src"
+    files = {f"Up/f{i}.bin": bytes([i]) * (100 + i) for i in range(7)}
+    local_tree(src, files)
+    phone.local("/sdcard/Download").mkdir(parents=True)
+    plan = plan_to_phone(adb, [src / "Up"], "/sdcard/Download")
+    phone.fail_after_push_files = 3
+    events = Events()
+    q = make_queue(emit=events)
+    tid = q.add(plan)
+    q.wait_for(tid, "waiting")
+    assert not phone.online
+    phone.fail_after_push_files = None
+    phone.reconnect()
+    st = q.wait_for(tid, "done")
+    assert phone_files(phone, "/sdcard/Download") == files  # każdy plik raz, bez „(z komputera)”
+    assert no_phone_tmp(phone)
+    assert st.done_files == 7 and st.failed == [] and st.renamed == 0
+    assert "waiting" in events.statuses(tid)
+    assert read_tmp_folders("FAKE", directory=q.tmp_dir) == []
+
+
+def test_other_phone_does_not_resume(phone, adb, tmp_path, make_queue):
+    src = tmp_path / "src"
+    local_tree(src, {"a.bin": b"a" * 10, "b.bin": b"b" * 10, "c.bin": b"c" * 10})
+    phone.local("/sdcard/Up").mkdir(parents=True)
+    plan = plan_to_phone(adb, [src / "a.bin", src / "b.bin", src / "c.bin"], "/sdcard/Up")
+    phone.fail_after_push_files = 1
+    present = {"serials": ["FAKE"]}
+    polls = threading.Semaphore(0)
+
+    def serials() -> list[str]:
+        polls.release()
+        return present["serials"]
+
+    q = make_queue(connected_serials=serials, is_connected=lambda: True)
+    tid = q.wait_for(q.add(plan), "waiting").id
+    phone.fail_after_push_files = None
+    present["serials"] = ["OTHER"]
+    phone.reconnect()  # adb odpowiada, ale podłączony jest inny telefon
+    while polls.acquire(blocking=False):
+        pass
+    for _ in range(20):
+        assert polls.acquire(timeout=5)
+    assert q.tasks()[0].status == "waiting"
+    pushes = phone.push_calls
+    present["serials"] = ["OTHER", "FAKE"]
+    q.wait_for(tid, "done")
+    assert phone.push_calls > pushes
+    assert phone_files(phone, "/sdcard/Up") == {"a.bin": b"a" * 10, "b.bin": b"b" * 10, "c.bin": b"c" * 10}
+
+
+class GatePusher:
+    """Pusher, który przy wybranym pliku zapisuje połowę na telefon i woła `action` (pauza/anulowanie)."""
+
+    def __init__(self, phone: FakeStoragePhone, name: str, action) -> None:
+        self.phone = phone
+        self.name = name
+        self.action = action
+        self.calls: list[str] = []
+        self.fired = False
+
+    def push(self, locals_, remote, should_stop, tick):
+        self.calls.append(locals_[0].name)
+        if locals_[0].name == self.name and not self.fired:
+            self.fired = True
+            data = locals_[0].read_bytes()
+            self.phone.local(remote).write_bytes(data[: len(data) // 2])
+            self.action()
+            while not should_stop():
+                tick()
+            return PullResult(1, [], True)
+        return self.phone.push(locals_, remote, should_stop, tick)
+
+
+def test_pause_resume_restarts_current_file(phone, adb, tmp_path, make_queue):
+    src = tmp_path / "src"
+    files = {"a.bin": b"a" * 50, "big.bin": b"B" * 400, "c.bin": b"c" * 50}
+    local_tree(src, files)
+    phone.local("/sdcard/Up").mkdir(parents=True)
+    plan = plan_to_phone(adb, [src / n for n in files], "/sdcard/Up")
+    holder: dict[str, str] = {}
+    pusher = GatePusher(phone, "big.bin", lambda: q.pause(holder["id"]))
+    q = make_queue(pusher=pusher, big_file=100)
+    holder["id"] = tid = q.add(plan)
+    st = q.wait_for(tid, "paused")
+    assert no_phone_tmp(phone)
+    assert not phone.local("/sdcard/Up/big.bin").exists()
+    q.resume(tid)
+    st = q.wait_for(tid, "done")
+    assert phone_files(phone, "/sdcard/Up") == files
+    assert pusher.calls.count("big.bin") == 2  # przerwany plik od początku
+    assert st.done_files == 3 and no_phone_tmp(phone)
+
+
+def test_cancel_removes_partials_both_sides(phone, adb, pc, tmp_path, make_queue, tmp_dir):
+    # komputer -> telefon
+    src = tmp_path / "src"
+    local_tree(src, {"big.bin": b"B" * 400})
+    phone.local("/sdcard/Up").mkdir(parents=True)
+    plan = plan_to_phone(adb, [src / "big.bin"], "/sdcard/Up")
+    holder: dict[str, str] = {}
+    pusher = GatePusher(phone, "big.bin", lambda: q.cancel(holder["id"]))
+    q = make_queue(pusher=pusher)
+    holder["id"] = tid = q.add(plan)
+    st = q.wait_for(tid, "cancelled")
+    assert phone_files(phone, "/sdcard/Up") == {}
+    assert read_tmp_folders("FAKE", directory=tmp_dir) == []
+    assert st.done_files == 0
+    # telefon -> komputer
+
+    class GatePuller:
+        def pull(self, remotes, target, should_stop, tick):
+            target.write_bytes(b"half")
+            q2.cancel(holder["id2"])
+            while not should_stop():
+                tick()
+            return PullResult(1, [], True)
+
+    put(phone, "/sdcard/V/movie.mp4", b"M" * 100)
+    plan = plan_to_pc(adb, ["/sdcard/V/movie.mp4"], pc, **OK)
+    q2 = make_queue(puller=GatePuller())
+    holder["id2"] = tid2 = q2.add(plan)
+    q2.wait_for(tid2, "cancelled")
+    assert pc_files(pc) == {}
+
+
+def test_denied_folder_reports_failed_files_and_leaves_nothing(phone, adb, tmp_path, make_queue, tmp_dir):
+    src = tmp_path / "src"
+    local_tree(src, {"Up/a.txt": b"a", "Up/b.txt": b"b", "c.txt": b"c"})
+    phone.local("/sdcard/Android/data").mkdir(parents=True)
+    phone.deny_prefixes = {"/sdcard/Android/data/"}
+    plan = plan_to_phone(adb, [src / "Up", src / "c.txt"], "/sdcard/Android/data")
+    q = make_queue()
+    st = q.wait_for(q.add(plan), "done")
+    assert sorted(r for _, r in st.failed) == ["denied", "denied", "denied"]
+    assert sorted(Path(p).name for p, _ in st.failed) == ["a.txt", "b.txt", "c.txt"]
+    assert phone_files(phone, "/sdcard/Android") == {}
+    assert read_tmp_folders("FAKE", directory=tmp_dir) == []
+    assert st.done_files == 0
+
+
+def test_verify_hash_mismatch_marked(phone, adb, pc, make_queue):
+    put(phone, "/sdcard/P/a.jpg", b"good")
+    put(phone, "/sdcard/P/b.jpg", b"fine")
+
+    def corrupt(cmd: str) -> None:  # telefon zmienia bajty w trakcie (ten sam rozmiar)
+        if cmd.startswith("sha256sum ") and "a.jpg" in cmd:
+            phone.local("/sdcard/P/a.jpg").write_bytes(b"evil")
+
+    phone.on_shell = corrupt
+    plan = plan_to_pc(adb, ["/sdcard/P"], pc, **OK)
+    q = make_queue()
+    st = q.wait_for(q.add(plan, verify_hash=True), "done")
+    assert st.verified == "mismatch"
+    assert st.failed == [("/sdcard/P/a.jpg", "mismatch")]
+    assert pc_files(pc) == {"P/b.jpg": b"fine"}  # uszkodzona kopia nie zostaje pod docelową nazwą
+    phone.on_shell = None
+    plan = plan_to_pc(adb, ["/sdcard/P/a.jpg"], pc / "P", **OK)
+    st = q.wait_for(q.add(plan, verify_hash=True), "done")
+    assert st.verified == "hash" and st.failed == []
+    assert (pc / "P" / "a.jpg").read_bytes() == b"evil"
+
+
+def test_media_scan_after_upload(phone, adb, tmp_path, make_queue):
+    src = tmp_path / "src"
+    local_tree(src, {"a.jpg": b"j", "b.mp4": b"m", "c.txt": b"t", "d.mp3": b"s"})
+    phone.local("/sdcard/Up").mkdir(parents=True)
+    names = [src / n for n in ("a.jpg", "b.mp4", "c.txt", "d.mp3")]
+    q = make_queue()
+    q.wait_for(q.add(plan_to_phone(adb, names, "/sdcard/Up")), "done")
+    assert sorted(phone.scanned) == ["/storage/emulated/0/Up/a.jpg", "/storage/emulated/0/Up/b.mp4",
+                                     "/storage/emulated/0/Up/d.mp3"]
+    phone.scanned.clear()
+    phone.local("/sdcard/Old").mkdir(parents=True)
+    old = make_queue(sdk=lambda: 28)
+    old.wait_for(old.add(plan_to_phone(adb, names, "/sdcard/Old")), "done")
+    assert phone.scanned == [] and phone.scans == 0
+
+
+def test_events_throttled(phone, adb, pc, make_queue):
+    for i in range(12):
+        put(phone, f"/sdcard/P/f{i}.bin", b"x" * 10)
+    plan = plan_to_pc(adb, ["/sdcard/P"], pc, **OK)
+    events = Events()
+    q = make_queue(emit=events, clock=Clock(step=0.0))  # zegar stoi: tylko zmiany statusu
+    tid = q.add(plan)
+    q.wait_for(tid, "done")
+    assert events.statuses(tid) == ["queued", "running", "done"]
+    assert all(n == "explorer:task" for n, _ in events.items)
+    last = events.items[-1][1]
+    assert last["done_files"] == 12 and last["status"] == "done" and isinstance(last["failed"], list)
+    # zegar idzie po 1 s na odczyt: zdarzenia postępu co plik
+    events2 = Events()
+    pc2 = pc / "second"
+    pc2.mkdir()
+    q2 = make_queue(emit=events2, clock=Clock(step=1.0))
+    tid2 = q2.add(plan_to_pc(adb, ["/sdcard/P"], pc2, **OK))
+    q2.wait_for(tid2, "done")
+    progress = [p["done_files"] for _, p in events2.items if p["status"] == "running"]
+    assert len(progress) > 3 and progress == sorted(progress)
+
+
+def test_sweep_tmp_removes_only_own_tmp_files(phone, adb):
+    for name in (".admenot-0123456789ab.part", ".admenot-x.part", "zdjęcie.jpg.part", "a.jpg"):
+        put(phone, f"/sdcard/Up/{name}")
+    put(phone, "/sdcard/Up/sub/.admenot-0123456789ab.part")
+    phone.local("/sdcard/Up/.admenot-abcdefabcdef.part").mkdir()  # folder o takiej nazwie — nie nasz plik
+    n = sweep_tmp(adb, ["/sdcard/Up", "/sdcard/Missing"])
+    assert n == 1
+    assert sorted(phone_files(phone, "/sdcard/Up")) == [
+        ".admenot-x.part", "a.jpg", "sub/.admenot-0123456789ab.part", "zdjęcie.jpg.part"]
+    assert phone.local("/sdcard/Up/.admenot-abcdefabcdef.part").is_dir()
+    assert [c for c in phone.commands if c.startswith("rm ")] == ["rm -f /sdcard/Up/.admenot-0123456789ab.part"]
+
+
+def test_program_killed_mid_upload_swept_on_next_open(phone, adb, tmp_path, make_queue, tmp_dir):
+    src = tmp_path / "src"
+    local_tree(src, {"a.bin": b"a" * 20})
+    phone.local("/sdcard/Up").mkdir(parents=True)
+    entered, release = threading.Event(), threading.Event()
+
+    class HangingPusher:  # proces zabity w połowie pliku: na telefonie połówka, na dysku wpis folderu
+        def push(self, locals_, remote, should_stop, tick):
+            phone.local(remote).write_bytes(locals_[0].read_bytes()[:10])
+            entered.set()
+            release.wait(10)
+            return PullResult(1, [], True)
+
+    q = make_queue(pusher=HangingPusher())
+    tid = q.add(plan_to_phone(adb, [src / "a.bin"], "/sdcard/Up"))
+    assert entered.wait(10)
+    # stan „zabitego” procesu: folder zapisany na dysku przed `push`, połówka pod nazwą tymczasową
+    assert read_tmp_folders("FAKE", directory=tmp_dir) == ["/sdcard/Up"]
+    assert [is_tmp_name(p.name) for p in phone.local("/sdcard/Up").iterdir()] == [True]
+    # następne otwarcie eksploratora (nowy proces) czyta listę z dysku i sprząta
+    assert sweep_recorded(adb, "FAKE", directory=tmp_dir) == 1
+    assert phone_files(phone, "/sdcard/Up") == {}
+    assert read_tmp_folders("FAKE", directory=tmp_dir) == []
+    record_tmp_folder("FAKE", "/sdcard/Gone", directory=tmp_dir)  # folder, którego już nie ma
+    assert sweep_recorded(adb, "FAKE", directory=tmp_dir) == 0
+    assert read_tmp_folders("FAKE", directory=tmp_dir) == []
+    q.cancel(tid)
+    release.set()
+    q.wait_for(tid, "cancelled")

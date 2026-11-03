@@ -254,7 +254,7 @@ class FakeStoragePhone:
             return self._dd(argv[1:])
         handler = {"find": self._find, "stat": self._stat, "df": self._df,
                    "sha256sum": self._sha256, "content": self._content, "ls": self._ls,
-                   "mkdir": self._mkdir, "mv": self._mv}.get(argv[0])
+                   "mkdir": self._mkdir, "mv": self._mv, "rm": self._rm}.get(argv[0])
         if handler is None:
             raise AdbError("command_failed", f"{argv[0]}: inaccessible or not found")
         return handler(argv[1:])
@@ -366,6 +366,15 @@ class FakeStoragePhone:
             raise AdbError("command_failed", f"mv: '{args[1]}': No such file or directory")
         if not dst.exists():
             src.rename(dst)
+        return b""
+
+    def _rm(self, args: list[str]) -> bytes:
+        """`rm -f <plik>` (eksplorator: tylko nasz plik tymczasowy pod `/sdcard/`); brak pliku — bez błędu."""
+        assert args[0] == "-f" and len(args) == 2, args
+        path = self.local(args[1])
+        if path.is_dir():
+            raise AdbError("command_failed", f"rm: {args[1]}: Is a directory")
+        path.unlink(missing_ok=True)
         return b""
 
     def _stat(self, args: list[str], tolerant: bool = False) -> bytes:
