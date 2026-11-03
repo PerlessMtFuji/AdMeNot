@@ -846,6 +846,8 @@ class TransferPhone:
         argv = shlex.split(command)
         if argv[:2] == ["pm", "path"] and len(argv) == 3:
             return argv[2] in self.storage.apps
+        if argv[:2] == ["rm", "-f"]:  # eksplorator: nasz plik tymczasowy pod `/sdcard/`
+            return True
         return (bool(argv) and argv[0] in _STORAGE_TOOLS) or _telephony_cmd(argv)
 
     def shell(self, command: str, timeout: float = 20.0) -> str:

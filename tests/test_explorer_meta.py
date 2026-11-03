@@ -19,7 +19,7 @@ from faketransfer import FakeStoragePhone, write_provider
 
 from admenot.engine.explorer.guard import ExplorerAdb
 from admenot.engine.explorer.meta import image_meta, media_meta
-from admenot.engine.explorer.textview import decode_text
+from admenot.engine.explorer.textview import decode_chunk, decode_text
 
 
 def photo(**kw) -> bytes:
@@ -114,3 +114,22 @@ def test_decode_text_cp1250():
 def test_decode_text_utf16_bom():
     assert decode_text("zażółć".encode("utf-16")) == ("zażółć", "utf-16")
     assert decode_text(b"\xfe\xff" + "ą".encode("utf-16-be")) == ("ą", "utf-16")
+
+
+@pytest.mark.parametrize(("data", "codec"), [
+    ("Zażółć\r\ngęślą".encode(), "utf-8"),
+    (b"\xef\xbb\xbf" + "Zażółć gęślą".encode(), "utf-8"),
+    (b"\xff\xfe" + "Zażółć gęślą".encode("utf-16-le"), "utf-16-le"),
+    (b"\xfe\xff" + "Zażółć gęślą".encode("utf-16-be"), "utf-16-be"),
+    ("Zażółć gęślą".encode("cp1250"), "cp1250"),
+])
+def test_decode_chunk_in_pieces_matches_whole(data, codec):
+    """Kawałki po 5 bajtów (granica w środku znaku i BOM-u) składają się w ten sam tekst."""
+    whole = decode_chunk(data)[0]
+    text, used_codec, pos = "", None, 0
+    while pos < len(data):
+        piece = data[pos:pos + 5]
+        part, used_codec, used = decode_chunk(piece, used_codec, final=pos + len(piece) >= len(data))
+        text, pos = text + part, pos + used
+        assert used > 0
+    assert text == whole and used_codec == codec and "\ufffd" not in text

@@ -1,0 +1,1627 @@
+{
+ "name": "explorer",
+ "calls": [
+  {
+   "method": "list_devices",
+   "args": [],
+   "result": {
+    "devices": [
+     {
+      "serial": "R58T00TEST",
+      "state": "device",
+      "model": "SM_A145R",
+      "name": "samsung SM-A145R",
+      "imei": null,
+      "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9Ii0xNiAtMTYgMTU2IDI3MiIgd2lkdGg9IjE1NiIgaGVpZ2h0PSIyNzIiPgogIDx0aXRsZT5UZWxlZm9uPC90aXRsZT4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iYm9keSIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMzYTQ1NTgiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIuNTUiIHN0b3AtY29sb3I9IiMxZjI5MzciLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMTExODI3Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJlZGdlIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzk0YTNiOCIgc3RvcC1vcGFjaXR5PSIuOSIvPgogICAgICA8c3RvcCBvZmZzZXQ9Ii41IiBzdG9wLWNvbG9yPSIjNDc1NTY5IiBzdG9wLW9wYWNpdHk9Ii41Ii8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBiMTIyMCIgc3RvcC1vcGFjaXR5PSIuOSIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ic2NyZWVuIiB4MT0iMCIgeTE9IjAiIHgyPSIuMzUiIHkyPSIxIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNjM2NmYxIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iLjUiIHN0b3AtY29sb3I9IiMzNzMwYTMiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPHJhZGlhbEdyYWRpZW50IGlkPSJnbG93QSIgY3g9Ii4yIiBjeT0iLjIyIiByPSIuNiI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2E1YjRmYyIgc3RvcC1vcGFjaXR5PSIuNzUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTViNGZjIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgIDwvcmFkaWFsR3JhZGllbnQ+CiAgICA8cmFkaWFsR3JhZGllbnQgaWQ9Imdsb3dCIiBjeD0iLjkiIGN5PSIuNzgiIHI9Ii41NSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzIyZDNlZSIgc3RvcC1vcGFjaXR5PSIuNDUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMjJkM2VlIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgIDwvcmFkaWFsR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdsYXJlIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMCI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2ZmZiIgc3RvcC1vcGFjaXR5PSIuMTYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjZmZmIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXAiPjxyZWN0IHg9IjkiIHk9IjkiIHdpZHRoPSIxMDIiIGhlaWdodD0iMjIyIiByeD0iMTMiLz48L2NsaXBQYXRoPgogIDwvZGVmcz4KICA8IS0tIHByenljaXNraSBib2N6bmUgLS0+CiAgPHJlY3QgeD0iMTE3IiB5PSI1OCIgd2lkdGg9IjQiIGhlaWdodD0iMjIiIHJ4PSIxLjUiIGZpbGw9IiMzMzQxNTUiLz4KICA8cmVjdCB4PSIxMTciIHk9IjkwIiB3aWR0aD0iNCIgaGVpZ2h0PSI0MCIgcng9IjEuNSIgZmlsbD0iIzMzNDE1NSIvPgogIDwhLS0gb2J1ZG93YSAtLT4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iMTE2IiBoZWlnaHQ9IjIzNiIgcng9IjE5IiBmaWxsPSJ1cmwoI2JvZHkpIi8+CiAgPHJlY3QgeD0iMi43NSIgeT0iMi43NSIgd2lkdGg9IjExNC41IiBoZWlnaHQ9IjIzNC41IiByeD0iMTguMjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0idXJsKCNlZGdlKSIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICA8IS0tIGVrcmFuIC0tPgogIDxnIGNsaXAtcGF0aD0idXJsKCNjbGlwKSI+CiAgICA8cmVjdCB4PSI5IiB5PSI5IiB3aWR0aD0iMTAyIiBoZWlnaHQ9IjIyMiIgZmlsbD0idXJsKCNzY3JlZW4pIi8+CiAgICA8cmVjdCB4PSI5IiB5PSI5IiB3aWR0aD0iMTAyIiBoZWlnaHQ9IjIyMiIgZmlsbD0idXJsKCNnbG93QSkiLz4KICAgIDxyZWN0IHg9IjkiIHk9IjkiIHdpZHRoPSIxMDIiIGhlaWdodD0iMjIyIiBmaWxsPSJ1cmwoI2dsb3dCKSIvPgogICAgPHBhdGggZD0iTTkgOWg2Mkw5IDE1MHoiIGZpbGw9InVybCgjZ2xhcmUpIi8+CiAgPC9nPgogIDxyZWN0IHg9IjkuNSIgeT0iOS41IiB3aWR0aD0iMTAxIiBoZWlnaHQ9IjIyMSIgcng9IjEyLjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLW9wYWNpdHk9Ii4zNSIvPgogIDwhLS0gYXBhcmF0IHByemVkbmkgaSBwYXNlayBnZXN0w7N3IC0tPgogIDxjaXJjbGUgY3g9IjYwIiBjeT0iMjAiIHI9IjMuNCIgZmlsbD0iIzBiMTAyMCIvPgogIDxjaXJjbGUgY3g9IjYxIiBjeT0iMTkiIHI9IjEiIGZpbGw9IiM0NzU1NjkiLz4KICA8cmVjdCB4PSI0NCIgeT0iMjIyIiB3aWR0aD0iMzIiIGhlaWdodD0iMi42IiByeD0iMS4zIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41NSIvPgo8L3N2Zz4K",
+      "android": "14"
+     }
+    ],
+    "error": null
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cat /proc/uptime",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "280000.12 500000.00\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "date \"+%Y-%m-%d %H:%M:%S\"",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "2026-09-26 14:00:00\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "getprop",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "[ro.product.brand]: [samsung]\n[ro.product.manufacturer]: [samsung]\n[ro.product.model]: [SM-A145R]\n[ro.product.device]: [a14]\n[ro.build.version.release]: [14]\n[ro.build.version.sdk]: [34]\n[ro.build.version.security_patch]: [2026-07-01]\n[ro.serialno]: [R58T00TEST]\n[persist.sys.device_name]: [Telefon Anny]\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "service call iphonesubinfo 1 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 1 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "service call iphonesubinfo 2 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 2 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "service call iphonesubinfo 3 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 3 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "service call iphonesubinfo 4 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 4 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "settings get --user 0 secure android_id",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "null\n",
+      "tag": null
+     }
+    ]
+   ]
+  },
+  {
+   "method": "explorer_open",
+   "args": [
+    "R58T00TEST"
+   ],
+   "result": {
+    "device": {
+     "serial": "R58T00TEST",
+     "name": "samsung SM-A145R",
+     "brand": "samsung",
+     "manufacturer": "samsung",
+     "model": "SM-A145R",
+     "market_name": null,
+     "android": "14",
+     "sdk": 34,
+     "patch": "2026-07-01",
+     "uptime_s": 280000.12,
+     "imei": null,
+     "match": {
+      "confidence": "none",
+      "step": "no_db",
+      "matched": null
+     },
+     "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9Ii0xNiAtMTYgMTU2IDI3MiIgd2lkdGg9IjE1NiIgaGVpZ2h0PSIyNzIiPgogIDx0aXRsZT5UZWxlZm9uPC90aXRsZT4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iYm9keSIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMzYTQ1NTgiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIuNTUiIHN0b3AtY29sb3I9IiMxZjI5MzciLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMTExODI3Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJlZGdlIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzk0YTNiOCIgc3RvcC1vcGFjaXR5PSIuOSIvPgogICAgICA8c3RvcCBvZmZzZXQ9Ii41IiBzdG9wLWNvbG9yPSIjNDc1NTY5IiBzdG9wLW9wYWNpdHk9Ii41Ii8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBiMTIyMCIgc3RvcC1vcGFjaXR5PSIuOSIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ic2NyZWVuIiB4MT0iMCIgeTE9IjAiIHgyPSIuMzUiIHkyPSIxIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNjM2NmYxIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iLjUiIHN0b3AtY29sb3I9IiMzNzMwYTMiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPHJhZGlhbEdyYWRpZW50IGlkPSJnbG93QSIgY3g9Ii4yIiBjeT0iLjIyIiByPSIuNiI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2E1YjRmYyIgc3RvcC1vcGFjaXR5PSIuNzUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTViNGZjIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgIDwvcmFkaWFsR3JhZGllbnQ+CiAgICA8cmFkaWFsR3JhZGllbnQgaWQ9Imdsb3dCIiBjeD0iLjkiIGN5PSIuNzgiIHI9Ii41NSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzIyZDNlZSIgc3RvcC1vcGFjaXR5PSIuNDUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMjJkM2VlIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgIDwvcmFkaWFsR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdsYXJlIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMCI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2ZmZiIgc3RvcC1vcGFjaXR5PSIuMTYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjZmZmIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXAiPjxyZWN0IHg9IjkiIHk9IjkiIHdpZHRoPSIxMDIiIGhlaWdodD0iMjIyIiByeD0iMTMiLz48L2NsaXBQYXRoPgogIDwvZGVmcz4KICA8IS0tIHByenljaXNraSBib2N6bmUgLS0+CiAgPHJlY3QgeD0iMTE3IiB5PSI1OCIgd2lkdGg9IjQiIGhlaWdodD0iMjIiIHJ4PSIxLjUiIGZpbGw9IiMzMzQxNTUiLz4KICA8cmVjdCB4PSIxMTciIHk9IjkwIiB3aWR0aD0iNCIgaGVpZ2h0PSI0MCIgcng9IjEuNSIgZmlsbD0iIzMzNDE1NSIvPgogIDwhLS0gb2J1ZG93YSAtLT4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iMTE2IiBoZWlnaHQ9IjIzNiIgcng9IjE5IiBmaWxsPSJ1cmwoI2JvZHkpIi8+CiAgPHJlY3QgeD0iMi43NSIgeT0iMi43NSIgd2lkdGg9IjExNC41IiBoZWlnaHQ9IjIzNC41IiByeD0iMTguMjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0idXJsKCNlZGdlKSIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICA8IS0tIGVrcmFuIC0tPgogIDxnIGNsaXAtcGF0aD0idXJsKCNjbGlwKSI+CiAgICA8cmVjdCB4PSI5IiB5PSI5IiB3aWR0aD0iMTAyIiBoZWlnaHQ9IjIyMiIgZmlsbD0idXJsKCNzY3JlZW4pIi8+CiAgICA8cmVjdCB4PSI5IiB5PSI5IiB3aWR0aD0iMTAyIiBoZWlnaHQ9IjIyMiIgZmlsbD0idXJsKCNnbG93QSkiLz4KICAgIDxyZWN0IHg9IjkiIHk9IjkiIHdpZHRoPSIxMDIiIGhlaWdodD0iMjIyIiBmaWxsPSJ1cmwoI2dsb3dCKSIvPgogICAgPHBhdGggZD0iTTkgOWg2Mkw5IDE1MHoiIGZpbGw9InVybCgjZ2xhcmUpIi8+CiAgPC9nPgogIDxyZWN0IHg9IjkuNSIgeT0iOS41IiB3aWR0aD0iMTAxIiBoZWlnaHQ9IjIyMSIgcng9IjEyLjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLW9wYWNpdHk9Ii4zNSIvPgogIDwhLS0gYXBhcmF0IHByemVkbmkgaSBwYXNlayBnZXN0w7N3IC0tPgogIDxjaXJjbGUgY3g9IjYwIiBjeT0iMjAiIHI9IjMuNCIgZmlsbD0iIzBiMTAyMCIvPgogIDxjaXJjbGUgY3g9IjYxIiBjeT0iMTkiIHI9IjEiIGZpbGw9IiM0NzU1NjkiLz4KICA8cmVjdCB4PSI0NCIgeT0iMjIyIiB3aWR0aD0iMzIiIGhlaWdodD0iMi42IiByeD0iMS4zIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41NSIvPgo8L3N2Zz4K"
+    },
+    "places": [
+     {
+      "key": "camera",
+      "path": "/sdcard/DCIM/Camera",
+      "count": null,
+      "icon": "camera"
+     },
+     {
+      "key": "downloads",
+      "path": "/sdcard/Download",
+      "count": null,
+      "icon": "download"
+     },
+     {
+      "key": "movies",
+      "path": "/sdcard/Movies",
+      "count": null,
+      "icon": "film"
+     },
+     {
+      "key": "music",
+      "path": "/sdcard/Music",
+      "count": null,
+      "icon": "music"
+     },
+     {
+      "key": "all",
+      "path": "/sdcard",
+      "count": null,
+      "icon": "phone"
+     }
+    ],
+    "media": "http://127.0.0.1:0/TOKEN",
+    "sdk": 34,
+    "leftovers": 0
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "cat /proc/uptime",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "280000.12 500000.00\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "date \"+%Y-%m-%d %H:%M:%S\"",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "2026-09-26 14:00:00\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "find /sdcard/DCIM/Camera/ -type f",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "/sdcard/DCIM/Camera/IMG_20260924_0028.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0029.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0030.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0031.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0032.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0033.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0034.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0035.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0036.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0037.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0038.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0039.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0014.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0015.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0016.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0017.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0018.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0019.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0020.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0021.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0022.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0023.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0024.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0025.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0026.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0027.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0000.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0001.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0002.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0003.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0004.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0005.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0006.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0007.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0008.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0009.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0010.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0011.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0012.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0013.jpg\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "getprop",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "[ro.product.brand]: [samsung]\n[ro.product.manufacturer]: [samsung]\n[ro.product.model]: [SM-A145R]\n[ro.product.device]: [a14]\n[ro.build.version.release]: [14]\n[ro.build.version.sdk]: [34]\n[ro.build.version.security_patch]: [2026-07-01]\n[ro.serialno]: [R58T00TEST]\n[persist.sys.device_name]: [Telefon Anny]\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "service call iphonesubinfo 1 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 1 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "service call iphonesubinfo 2 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 2 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "service call iphonesubinfo 3 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 3 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "service call iphonesubinfo 4 s16 com.android.shell",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "FakePhone: no response for 'service call iphonesubinfo 4 s16 com.android.shell'",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "settings get --user 0 secure android_id",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "null\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "stat -c '%f|%s|%Y|%n' /sdcard/DCIM/Camera/ /sdcard/Pictures/Screenshots/ /sdcard/DCIM/Screenshots/ /sdcard/Download/ /sdcard/Android/media/com.whatsapp/WhatsApp/Media/ /sdcard/WhatsApp/Media/ /sdcard/Movies/ /sdcard/Music/ /sdcard/Documents/ 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "41f9|12288|1790413200|/sdcard/DCIM/Camera/\nstat: '/sdcard/Pictures/Screenshots/': No such file or directory\nstat: '/sdcard/DCIM/Screenshots/': No such file or directory\n41f9|0|1790413200|/sdcard/Download/\nstat: '/sdcard/Android/media/com.whatsapp/WhatsApp/Media/': No such file or directory\nstat: '/sdcard/WhatsApp/Media/': No such file or directory\n41f9|0|1790413200|/sdcard/Movies/\n41f9|0|1790413200|/sdcard/Music/\nstat: '/sdcard/Documents/': No such file or directory\n",
+      "tag": null
+     }
+    ],
+    [
+     "explorer:places",
+     {
+      "places": [
+       {
+        "key": "camera",
+        "path": "/sdcard/DCIM/Camera",
+        "count": 40,
+        "icon": "camera"
+       },
+       {
+        "key": "downloads",
+        "path": "/sdcard/Download",
+        "count": null,
+        "icon": "download"
+       },
+       {
+        "key": "movies",
+        "path": "/sdcard/Movies",
+        "count": null,
+        "icon": "film"
+       },
+       {
+        "key": "music",
+        "path": "/sdcard/Music",
+        "count": null,
+        "icon": "music"
+       },
+       {
+        "key": "all",
+        "path": "/sdcard",
+        "count": null,
+        "icon": "phone"
+       }
+      ]
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "find /sdcard/Download/ -type f",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "/sdcard/Download/aplikacja.apk\n/sdcard/Download/faktura.pdf\n/sdcard/Download/notatka.txt\n/sdcard/Download/umowa.docx\n",
+      "tag": null
+     }
+    ],
+    [
+     "explorer:places",
+     {
+      "places": [
+       {
+        "key": "camera",
+        "path": "/sdcard/DCIM/Camera",
+        "count": 40,
+        "icon": "camera"
+       },
+       {
+        "key": "downloads",
+        "path": "/sdcard/Download",
+        "count": 4,
+        "icon": "download"
+       },
+       {
+        "key": "movies",
+        "path": "/sdcard/Movies",
+        "count": null,
+        "icon": "film"
+       },
+       {
+        "key": "music",
+        "path": "/sdcard/Music",
+        "count": null,
+        "icon": "music"
+       },
+       {
+        "key": "all",
+        "path": "/sdcard",
+        "count": null,
+        "icon": "phone"
+       }
+      ]
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "find /sdcard/Movies/ -type f",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "/sdcard/Movies/film 1.mp4\n/sdcard/Movies/film 2.mp4\n",
+      "tag": null
+     }
+    ],
+    [
+     "explorer:places",
+     {
+      "places": [
+       {
+        "key": "camera",
+        "path": "/sdcard/DCIM/Camera",
+        "count": 40,
+        "icon": "camera"
+       },
+       {
+        "key": "downloads",
+        "path": "/sdcard/Download",
+        "count": 4,
+        "icon": "download"
+       },
+       {
+        "key": "movies",
+        "path": "/sdcard/Movies",
+        "count": 2,
+        "icon": "film"
+       },
+       {
+        "key": "music",
+        "path": "/sdcard/Music",
+        "count": null,
+        "icon": "music"
+       },
+       {
+        "key": "all",
+        "path": "/sdcard",
+        "count": null,
+        "icon": "phone"
+       }
+      ]
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "find /sdcard/Music/ -type f",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "/sdcard/Music/utwór 1.mp3\n/sdcard/Music/utwór 2.mp3\n/sdcard/Music/utwór 3.mp3\n",
+      "tag": null
+     }
+    ],
+    [
+     "explorer:places",
+     {
+      "places": [
+       {
+        "key": "camera",
+        "path": "/sdcard/DCIM/Camera",
+        "count": 40,
+        "icon": "camera"
+       },
+       {
+        "key": "downloads",
+        "path": "/sdcard/Download",
+        "count": 4,
+        "icon": "download"
+       },
+       {
+        "key": "movies",
+        "path": "/sdcard/Movies",
+        "count": 2,
+        "icon": "film"
+       },
+       {
+        "key": "music",
+        "path": "/sdcard/Music",
+        "count": 3,
+        "icon": "music"
+       },
+       {
+        "key": "all",
+        "path": "/sdcard",
+        "count": null,
+        "icon": "phone"
+       }
+      ]
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "find /sdcard/ -type f",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "/sdcard/Android/data/com.example/cache.bin\n/sdcard/DCIM/Camera/IMG_20260924_0028.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0029.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0030.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0031.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0032.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0033.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0034.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0035.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0036.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0037.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0038.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0039.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0014.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0015.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0016.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0017.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0018.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0019.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0020.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0021.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0022.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0023.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0024.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0025.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0026.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0027.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0000.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0001.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0002.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0003.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0004.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0005.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0006.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0007.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0008.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0009.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0010.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0011.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0012.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0013.jpg\n/sdcard/Download/aplikacja.apk\n/sdcard/Download/faktura.pdf\n/sdcard/Download/notatka.txt\n/sdcard/Download/umowa.docx\n/sdcard/Movies/film 1.mp4\n/sdcard/Movies/film 2.mp4\n/sdcard/Music/utwór 1.mp3\n/sdcard/Music/utwór 2.mp3\n/sdcard/Music/utwór 3.mp3\n",
+      "tag": null
+     }
+    ],
+    [
+     "explorer:places",
+     {
+      "places": [
+       {
+        "key": "camera",
+        "path": "/sdcard/DCIM/Camera",
+        "count": 40,
+        "icon": "camera"
+       },
+       {
+        "key": "downloads",
+        "path": "/sdcard/Download",
+        "count": 4,
+        "icon": "download"
+       },
+       {
+        "key": "movies",
+        "path": "/sdcard/Movies",
+        "count": 2,
+        "icon": "film"
+       },
+       {
+        "key": "music",
+        "path": "/sdcard/Music",
+        "count": 3,
+        "icon": "music"
+       },
+       {
+        "key": "all",
+        "path": "/sdcard",
+        "count": 50,
+        "icon": "phone"
+       }
+      ]
+     }
+    ]
+   ]
+  },
+  {
+   "method": "explorer_list",
+   "args": [
+    "/sdcard/DCIM/Camera"
+   ],
+   "result": {
+    "path": "/sdcard/DCIM/Camera",
+    "crumbs": [
+     {
+      "label": "samsung SM-A145R",
+      "path": "/sdcard"
+     },
+     {
+      "label": "DCIM",
+      "path": "/sdcard/DCIM"
+     },
+     {
+      "label": "Camera",
+      "path": "/sdcard/DCIM/Camera"
+     }
+    ],
+    "entries": [
+     {
+      "name": "IMG_20260924_0028.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260924_0028.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790240400,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0028.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0028.jpg"
+     },
+     {
+      "name": "IMG_20260924_0029.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260924_0029.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790239800,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0029.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0029.jpg"
+     },
+     {
+      "name": "IMG_20260924_0030.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260924_0030.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790239200,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0030.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0030.jpg"
+     },
+     {
+      "name": "IMG_20260924_0031.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260924_0031.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790238600,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0031.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0031.jpg"
+     },
+     {
+      "name": "IMG_20260924_0032.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260924_0032.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790238000,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0032.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0032.jpg"
+     },
+     {
+      "name": "IMG_20260924_0033.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260924_0033.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790237400,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0033.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0033.jpg"
+     },
+     {
+      "name": "IMG_20260924_0034.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260924_0034.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790236800,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0034.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0034.jpg"
+     },
+     {
+      "name": "IMG_20260924_0035.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260924_0035.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790236200,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0035.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0035.jpg"
+     },
+     {
+      "name": "IMG_20260924_0036.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260924_0036.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790235600,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0036.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0036.jpg"
+     },
+     {
+      "name": "IMG_20260924_0037.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260924_0037.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790235000,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0037.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0037.jpg"
+     },
+     {
+      "name": "IMG_20260924_0038.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260924_0038.jpg",
+      "kind": "file",
+      "size": 677,
+      "mtime": 1790234400,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0038.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0038.jpg"
+     },
+     {
+      "name": "IMG_20260924_0039.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260924_0039.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790233800,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0039.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260924_0039.jpg"
+     },
+     {
+      "name": "IMG_20260925_0014.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260925_0014.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790326800,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0014.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0014.jpg"
+     },
+     {
+      "name": "IMG_20260925_0015.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260925_0015.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790326200,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0015.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0015.jpg"
+     },
+     {
+      "name": "IMG_20260925_0016.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260925_0016.jpg",
+      "kind": "file",
+      "size": 675,
+      "mtime": 1790325600,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0016.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0016.jpg"
+     },
+     {
+      "name": "IMG_20260925_0017.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260925_0017.jpg",
+      "kind": "file",
+      "size": 675,
+      "mtime": 1790325000,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0017.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0017.jpg"
+     },
+     {
+      "name": "IMG_20260925_0018.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260925_0018.jpg",
+      "kind": "file",
+      "size": 675,
+      "mtime": 1790324400,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0018.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0018.jpg"
+     },
+     {
+      "name": "IMG_20260925_0019.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260925_0019.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790323800,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0019.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0019.jpg"
+     },
+     {
+      "name": "IMG_20260925_0020.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260925_0020.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790323200,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0020.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0020.jpg"
+     },
+     {
+      "name": "IMG_20260925_0021.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260925_0021.jpg",
+      "kind": "file",
+      "size": 675,
+      "mtime": 1790322600,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0021.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0021.jpg"
+     },
+     {
+      "name": "IMG_20260925_0022.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260925_0022.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790322000,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0022.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0022.jpg"
+     },
+     {
+      "name": "IMG_20260925_0023.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260925_0023.jpg",
+      "kind": "file",
+      "size": 675,
+      "mtime": 1790321400,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0023.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0023.jpg"
+     },
+     {
+      "name": "IMG_20260925_0024.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260925_0024.jpg",
+      "kind": "file",
+      "size": 675,
+      "mtime": 1790320800,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0024.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0024.jpg"
+     },
+     {
+      "name": "IMG_20260925_0025.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260925_0025.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790320200,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0025.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0025.jpg"
+     },
+     {
+      "name": "IMG_20260925_0026.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260925_0026.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790319600,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0026.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0026.jpg"
+     },
+     {
+      "name": "IMG_20260925_0027.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260925_0027.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790319000,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0027.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260925_0027.jpg"
+     },
+     {
+      "name": "IMG_20260926_0000.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260926_0000.jpg",
+      "kind": "file",
+      "size": 833,
+      "mtime": 1790413200,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0000.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0000.jpg"
+     },
+     {
+      "name": "IMG_20260926_0001.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260926_0001.jpg",
+      "kind": "file",
+      "size": 677,
+      "mtime": 1790412600,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0001.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0001.jpg"
+     },
+     {
+      "name": "IMG_20260926_0002.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260926_0002.jpg",
+      "kind": "file",
+      "size": 677,
+      "mtime": 1790412000,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0002.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0002.jpg"
+     },
+     {
+      "name": "IMG_20260926_0003.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260926_0003.jpg",
+      "kind": "file",
+      "size": 677,
+      "mtime": 1790411400,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0003.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0003.jpg"
+     },
+     {
+      "name": "IMG_20260926_0004.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260926_0004.jpg",
+      "kind": "file",
+      "size": 677,
+      "mtime": 1790410800,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0004.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0004.jpg"
+     },
+     {
+      "name": "IMG_20260926_0005.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260926_0005.jpg",
+      "kind": "file",
+      "size": 677,
+      "mtime": 1790410200,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0005.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0005.jpg"
+     },
+     {
+      "name": "IMG_20260926_0006.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260926_0006.jpg",
+      "kind": "file",
+      "size": 677,
+      "mtime": 1790409600,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0006.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0006.jpg"
+     },
+     {
+      "name": "IMG_20260926_0007.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260926_0007.jpg",
+      "kind": "file",
+      "size": 677,
+      "mtime": 1790409000,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0007.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0007.jpg"
+     },
+     {
+      "name": "IMG_20260926_0008.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260926_0008.jpg",
+      "kind": "file",
+      "size": 677,
+      "mtime": 1790408400,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0008.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0008.jpg"
+     },
+     {
+      "name": "IMG_20260926_0009.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260926_0009.jpg",
+      "kind": "file",
+      "size": 677,
+      "mtime": 1790407800,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0009.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0009.jpg"
+     },
+     {
+      "name": "IMG_20260926_0010.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260926_0010.jpg",
+      "kind": "file",
+      "size": 677,
+      "mtime": 1790407200,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0010.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0010.jpg"
+     },
+     {
+      "name": "IMG_20260926_0011.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260926_0011.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790406600,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0011.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0011.jpg"
+     },
+     {
+      "name": "IMG_20260926_0012.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260926_0012.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790406000,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0012.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0012.jpg"
+     },
+     {
+      "name": "IMG_20260926_0013.jpg",
+      "path": "/sdcard/DCIM/Camera/IMG_20260926_0013.jpg",
+      "kind": "file",
+      "size": 676,
+      "mtime": 1790405400,
+      "label": null,
+      "locked": false,
+      "type": "image",
+      "ext": "jpg",
+      "thumb": "http://127.0.0.1:0/TOKEN/thumb?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0013.jpg&s=256",
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDCIM%2FCamera%2FIMG_20260926_0013.jpg"
+     }
+    ],
+    "skipped": 0,
+    "locked": false
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "find /sdcard/DCIM/Camera/ -mindepth 1 -maxdepth 1 -exec stat -c '%f|%s|%Y|%n' {} +",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "81b0|676|1790240400|/sdcard/DCIM/Camera/IMG_20260924_0028.jpg\n81b0|676|1790239800|/sdcard/DCIM/Camera/IMG_20260924_0029.jpg\n81b0|676|1790239200|/sdcard/DCIM/Camera/IMG_20260924_0030.jpg\n81b0|676|1790238600|/sdcard/DCIM/Camera/IMG_20260924_0031.jpg\n81b0|676|1790238000|/sdcard/DCIM/Camera/IMG_20260924_0032.jpg\n81b0|676|1790237400|/sdcard/DCIM/Camera/IMG_20260924_0033.jpg\n81b0|676|1790236800|/sdcard/DCIM/Camera/IMG_20260924_0034.jpg\n81b0|676|1790236200|/sdcard/DCIM/Camera/IMG_20260924_0035.jpg\n81b0|676|1790235600|/sdcard/DCIM/Camera/IMG_20260924_0036.jpg\n81b0|676|1790235000|/sdcard/DCIM/Camera/IMG_20260924_0037.jpg\n81b0|677|1790234400|/sdcard/DCIM/Camera/IMG_20260924_0038.jpg\n81b0|676|1790233800|/sdcard/DCIM/Camera/IMG_20260924_0039.jpg\n81b0|676|1790326800|/sdcard/DCIM/Camera/IMG_20260925_0014.jpg\n81b0|676|1790326200|/sdcard/DCIM/Camera/IMG_20260925_0015.jpg\n81b0|675|1790325600|/sdcard/DCIM/Camera/IMG_20260925_0016.jpg\n81b0|675|1790325000|/sdcard/DCIM/Camera/IMG_20260925_0017.jpg\n81b0|675|1790324400|/sdcard/DCIM/Camera/IMG_20260925_0018.jpg\n81b0|676|1790323800|/sdcard/DCIM/Camera/IMG_20260925_0019.jpg\n81b0|676|1790323200|/sdcard/DCIM/Camera/IMG_20260925_0020.jpg\n81b0|675|1790322600|/sdcard/DCIM/Camera/IMG_20260925_0021.jpg\n81b0|676|1790322000|/sdcard/DCIM/Camera/IMG_20260925_0022.jpg\n81b0|675|1790321400|/sdcard/DCIM/Camera/IMG_20260925_0023.jpg\n81b0|675|1790320800|/sdcard/DCIM/Camera/IMG_20260925_0024.jpg\n81b0|676|1790320200|/sdcard/DCIM/Camera/IMG_20260925_0025.jpg\n81b0|676|1790319600|/sdcard/DCIM/Camera/IMG_20260925_0026.jpg\n81b0|676|1790319000|/sdcard/DCIM/Camera/IMG_20260925_0027.jpg\n81b0|833|1790413200|/sdcard/DCIM/Camera/IMG_20260926_0000.jpg\n81b0|677|1790412600|/sdcard/DCIM/Camera/IMG_20260926_0001.jpg\n81b0|677|1790412000|/sdcard/DCIM/Camera/IMG_20260926_0002.jpg\n81b0|677|1790411400|/sdcard/DCIM/Camera/IMG_20260926_0003.jpg\n81b0|677|1790410800|/sdcard/DCIM/Camera/IMG_20260926_0004.jpg\n81b0|677|1790410200|/sdcard/DCIM/Camera/IMG_20260926_0005.jpg\n81b0|677|1790409600|/sdcard/DCIM/Camera/IMG_20260926_0006.jpg\n81b0|677|1790409000|/sdcard/DCIM/Camera/IMG_20260926_0007.jpg\n81b0|677|1790408400|/sdcard/DCIM/Camera/IMG_20260926_0008.jpg\n81b0|677|1790407800|/sdcard/DCIM/Camera/IMG_20260926_0009.jpg\n81b0|677|1790407200|/sdcard/DCIM/Camera/IMG_20260926_0010.jpg\n81b0|676|1790406600|/sdcard/DCIM/Camera/IMG_20260926_0011.jpg\n81b0|676|1790406000|/sdcard/DCIM/Camera/IMG_20260926_0012.jpg\n81b0|676|1790405400|/sdcard/DCIM/Camera/IMG_20260926_0013.jpg\n",
+      "tag": null
+     }
+    ]
+   ]
+  },
+  {
+   "method": "explorer_meta",
+   "args": [
+    "/sdcard/DCIM/Camera/IMG_20260926_0000.jpg"
+   ],
+   "result": {
+    "meta": {
+     "gps": {
+      "lat": 52.22977777777778,
+      "lon": 21.011694444444444,
+      "alt": null
+     },
+     "width": 64,
+     "height": 48,
+     "Make": "OPPO",
+     "GPSLatitudeRef": "N",
+     "GPSLatitude": [
+      52.0,
+      13.0,
+      47.2
+     ],
+     "GPSLongitudeRef": "E",
+     "GPSLongitude": [
+      21.0,
+      0.0,
+      42.1
+     ],
+     "size": 833,
+     "mtime": 1790413200,
+     "path": "/sdcard/DCIM/Camera/IMG_20260926_0000.jpg"
+    }
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "host:exec-out dd if=/sdcard/DCIM/Camera/IMG_20260926_0000.jpg bs=65536 skip=0 status=none",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "<833 B>",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "stat -c '%f|%s|%Y|%n' /sdcard/DCIM/Camera/IMG_20260926_0000.jpg 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "81b0|833|1790413200|/sdcard/DCIM/Camera/IMG_20260926_0000.jpg\n",
+      "tag": null
+     }
+    ]
+   ]
+  },
+  {
+   "method": "explorer_list",
+   "args": [
+    "/sdcard/Download"
+   ],
+   "result": {
+    "path": "/sdcard/Download",
+    "crumbs": [
+     {
+      "label": "samsung SM-A145R",
+      "path": "/sdcard"
+     },
+     {
+      "label": "Download",
+      "path": "/sdcard/Download"
+     }
+    ],
+    "entries": [
+     {
+      "name": "aplikacja.apk",
+      "path": "/sdcard/Download/aplikacja.apk",
+      "kind": "file",
+      "size": 7,
+      "mtime": 1790409600,
+      "label": null,
+      "locked": false,
+      "type": "apk",
+      "ext": "apk",
+      "thumb": null,
+      "url": null
+     },
+     {
+      "name": "faktura.pdf",
+      "path": "/sdcard/Download/faktura.pdf",
+      "kind": "file",
+      "size": 16,
+      "mtime": 1790409600,
+      "label": null,
+      "locked": false,
+      "type": "doc",
+      "ext": "pdf",
+      "thumb": null,
+      "url": null
+     },
+     {
+      "name": "notatka.txt",
+      "path": "/sdcard/Download/notatka.txt",
+      "kind": "file",
+      "size": 17,
+      "mtime": 1790409600,
+      "label": null,
+      "locked": false,
+      "type": "text",
+      "ext": "txt",
+      "thumb": null,
+      "url": null
+     },
+     {
+      "name": "umowa.docx",
+      "path": "/sdcard/Download/umowa.docx",
+      "kind": "file",
+      "size": 9,
+      "mtime": 1790409600,
+      "label": null,
+      "locked": false,
+      "type": "doc",
+      "ext": "docx",
+      "thumb": null,
+      "url": null
+     }
+    ],
+    "skipped": 0,
+    "locked": false
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "find /sdcard/Download/ -mindepth 1 -maxdepth 1 -exec stat -c '%f|%s|%Y|%n' {} +",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "81b0|7|1790409600|/sdcard/Download/aplikacja.apk\n81b0|16|1790409600|/sdcard/Download/faktura.pdf\n81b0|17|1790409600|/sdcard/Download/notatka.txt\n81b0|9|1790409600|/sdcard/Download/umowa.docx\n",
+      "tag": null
+     }
+    ]
+   ]
+  },
+  {
+   "method": "explorer_text",
+   "args": [
+    "/sdcard/Download/notatka.txt",
+    false
+   ],
+   "result": {
+    "text": "Zażółć gęślą jaźń",
+    "encoding": "cp1250",
+    "truncated": false
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "host:exec-out dd if=/sdcard/Download/notatka.txt bs=65536 skip=0 status=none",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "<17 B>",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "stat -c '%f|%s|%Y|%n' /sdcard/Download/notatka.txt 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "81b0|17|1790409600|/sdcard/Download/notatka.txt\n",
+      "tag": null
+     }
+    ]
+   ]
+  },
+  {
+   "method": "explorer_mkdir",
+   "args": [
+    "/sdcard/Download",
+    "Nowy folder"
+   ],
+   "result": {
+    "path": "/sdcard/Download/Nowy folder"
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "mkdir -p '/sdcard/Download/Nowy folder'",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "stat -c '%f|%s|%Y|%n' '/sdcard/Download/Nowy folder' 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "stat: '/sdcard/Download/Nowy folder': No such file or directory\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "stat -c '%f|%s|%Y|%n' '/sdcard/Download/Nowy folder' 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "41f9|0|1790413200|/sdcard/Download/Nowy folder\n",
+      "tag": null
+     }
+    ]
+   ]
+  },
+  {
+   "method": "explorer_new_text",
+   "args": [
+    "/sdcard/Download",
+    "Lista zakupów",
+    "mleko\nchleb"
+   ],
+   "result": {
+    "path": "/sdcard/Download/Lista zakupów.txt"
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "mv -n /sdcard/Download/.admenot-0123456789ab.part '/sdcard/Download/Lista zakupów.txt'",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "stat -c '%f|%s|%Y|%n' '/sdcard/Download/Lista zakupów.txt' 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "stat: '/sdcard/Download/Lista zakupów.txt': No such file or directory\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "stat -c '%f|%s|%Y|%n' /sdcard/Download/.admenot-0123456789ab.part '/sdcard/Download/Lista zakupów.txt' 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "stat: '/sdcard/Download/.admenot-0123456789ab.part': No such file or directory\n81b0|11|1790413200|/sdcard/Download/Lista zakupów.txt\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "stat -c '%f|%s|%Y|%n' /sdcard/Download/.admenot-0123456789ab.part 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "81b0|11|1790413200|/sdcard/Download/.admenot-0123456789ab.part\n",
+      "tag": null
+     }
+    ]
+   ]
+  },
+  {
+   "method": "explorer_mkdir",
+   "args": [
+    "/sdcard/Download",
+    "Nowy folder"
+   ],
+   "result": {
+    "error": {
+     "key": "explorer_exists",
+     "message": ""
+    }
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "stat -c '%f|%s|%Y|%n' '/sdcard/Download/Nowy folder' 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "41f9|0|1790413200|/sdcard/Download/Nowy folder\n",
+      "tag": null
+     }
+    ]
+   ]
+  },
+  {
+   "method": "explorer_list",
+   "args": [
+    "/sdcard/Android"
+   ],
+   "result": {
+    "path": "/sdcard/Android",
+    "crumbs": [
+     {
+      "label": "samsung SM-A145R",
+      "path": "/sdcard"
+     },
+     {
+      "label": "Android",
+      "path": "/sdcard/Android"
+     }
+    ],
+    "entries": [
+     {
+      "name": "data",
+      "path": "/sdcard/Android/data",
+      "kind": "dir",
+      "size": 4096,
+      "mtime": 1790413200,
+      "label": null,
+      "locked": true,
+      "type": "other",
+      "ext": "",
+      "thumb": null,
+      "url": null
+     }
+    ],
+    "skipped": 0,
+    "locked": false
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "find /sdcard/Android/ -mindepth 1 -maxdepth 1 -exec stat -c '%f|%s|%Y|%n' {} +",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "41f9|4096|1790413200|/sdcard/Android/data\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "ls /sdcard/Android/data/ 2>&1",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "ls: /sdcard/Android/data/: Permission denied",
+      "tag": null
+     }
+    ]
+   ]
+  },
+  {
+   "method": "explorer_list",
+   "args": [
+    "/sdcard/Android/data"
+   ],
+   "result": {
+    "path": "/sdcard/Android/data",
+    "crumbs": [
+     {
+      "label": "samsung SM-A145R",
+      "path": "/sdcard"
+     },
+     {
+      "label": "Android",
+      "path": "/sdcard/Android"
+     },
+     {
+      "label": "data",
+      "path": "/sdcard/Android/data"
+     }
+    ],
+    "entries": [],
+    "skipped": 0,
+    "locked": true
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "find /sdcard/Android/data/ -mindepth 1 -maxdepth 1 -exec stat -c '%f|%s|%Y|%n' {} +",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "find: '/sdcard/Android/data/': Permission denied",
+      "tag": null
+     }
+    ]
+   ]
+  },
+  {
+   "method": "explorer_list",
+   "args": [
+    "/sdcard"
+   ],
+   "result": {
+    "path": "/sdcard",
+    "crumbs": [
+     {
+      "label": "samsung SM-A145R",
+      "path": "/sdcard"
+     }
+    ],
+    "entries": [
+     {
+      "name": "Android",
+      "path": "/sdcard/Android",
+      "kind": "dir",
+      "size": 4096,
+      "mtime": 1790413200,
+      "label": null,
+      "locked": false,
+      "type": "other",
+      "ext": "",
+      "thumb": null,
+      "url": null
+     },
+     {
+      "name": "DCIM",
+      "path": "/sdcard/DCIM",
+      "kind": "dir",
+      "size": 4096,
+      "mtime": 1790413200,
+      "label": null,
+      "locked": false,
+      "type": "other",
+      "ext": "",
+      "thumb": null,
+      "url": null
+     },
+     {
+      "name": "Download",
+      "path": "/sdcard/Download",
+      "kind": "dir",
+      "size": 4096,
+      "mtime": 1790413200,
+      "label": null,
+      "locked": false,
+      "type": "other",
+      "ext": "",
+      "thumb": null,
+      "url": null
+     },
+     {
+      "name": "Movies",
+      "path": "/sdcard/Movies",
+      "kind": "dir",
+      "size": 4096,
+      "mtime": 1790413200,
+      "label": null,
+      "locked": false,
+      "type": "other",
+      "ext": "",
+      "thumb": null,
+      "url": null
+     },
+     {
+      "name": "Music",
+      "path": "/sdcard/Music",
+      "kind": "dir",
+      "size": 4096,
+      "mtime": 1790413200,
+      "label": null,
+      "locked": false,
+      "type": "other",
+      "ext": "",
+      "thumb": null,
+      "url": null
+     }
+    ],
+    "skipped": 0,
+    "locked": false
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "find /sdcard/ -mindepth 1 -maxdepth 1 -exec stat -c '%f|%s|%Y|%n' {} +",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "41f9|4096|1790413200|/sdcard/Android\n41f9|4096|1790413200|/sdcard/DCIM\n41f9|4096|1790413200|/sdcard/Download\n41f9|4096|1790413200|/sdcard/Movies\n41f9|4096|1790413200|/sdcard/Music\n",
+      "tag": null
+     }
+    ]
+   ]
+  },
+  {
+   "method": "explorer_close",
+   "args": [],
+   "result": {},
+   "events": []
+  }
+ ]
+}

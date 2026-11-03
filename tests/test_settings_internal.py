@@ -36,6 +36,21 @@ def test_internal_keys_round_trip():
     assert s.telemetry_start_day == "2026-10-10" and not welcome.welcome_needed(s)
 
 
+def test_explorer_keys_round_trip():
+    assert (load_settings().explorer_dest, load_settings().explorer_recent) == (None, [])
+    save_internal({"explorer_dest": "D:\\Klienci", "explorer_recent": ["/sdcard/DCIM/Camera", "/sdcard"]})
+    s = load_settings()
+    assert (s.explorer_dest, s.explorer_recent) == ("D:\\Klienci", ["/sdcard/DCIM/Camera", "/sdcard"])
+
+
+@pytest.mark.parametrize("recent", [
+    ["/data/local/tmp"], ["/sdcard/a\nb"], "/sdcard/DCIM", [f"/sdcard/{i}" for i in range(9)], [1],
+])
+def test_explorer_recent_rejects_bad_values(recent):
+    with pytest.raises(ValueError):
+        save_internal({"explorer_recent": recent})
+
+
 def test_ui_save_cannot_touch_internal_keys():
     for key in INTERNAL_KEYS:
         with pytest.raises(ValueError):

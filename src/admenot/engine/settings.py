@@ -20,7 +20,7 @@ import threading
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -42,7 +42,7 @@ KEYS = ("lang", "mode", "adb_path", "backups_dir", "report_pdf_dir", "theme", "m
 # ustawień: UI nie może podstawić własnego ID instalacji ani „zaakceptować” ostrzeżenia bokiem.
 INTERNAL_KEYS = ("welcome_version", "welcome_at", "telemetry", "telemetry_packages",
                  "telemetry_id", "telemetry_at", "telemetry_start_day",
-                 "donate_count", "donate_shown_at", "donate_off")
+                 "donate_count", "donate_shown_at", "donate_off", "explorer_dest", "explorer_recent")
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 LOGO_TYPES = {
@@ -51,6 +51,7 @@ LOGO_TYPES = {
 }
 MAX_LOGO_BYTES = 1_000_000
 SCHEMA_KEY = "schema"
+EXPLORER_RECENT_MAX = 8  # „Ostatnio” w eksploratorze plików
 
 
 def _v1(data: dict[str, Any]) -> dict[str, Any]:
@@ -96,6 +97,8 @@ class Settings:
     donate_count: int = 0  # udane zlecenia od ostatniego przypomnienia o wsparciu (spec kroku J §4)
     donate_shown_at: str | None = None  # dzień (lokalny) ostatniego przypomnienia
     donate_off: bool = False  # „Już wspieram, nie pokazuj więcej”
+    explorer_dest: str | None = None  # eksplorator: ostatni folder docelowy na komputerze
+    explorer_recent: list[str] = field(default_factory=list)  # eksplorator: ostatnie foldery telefonu
 
 
 @dataclass(frozen=True)
@@ -228,6 +231,10 @@ def archive_dir_ok(value: str) -> bool:
 
 
 def _valid(key: str, value: Any) -> bool:
+    if key == "explorer_recent":
+        return (isinstance(value, list) and len(value) <= EXPLORER_RECENT_MAX
+                and all(isinstance(p, str) and (p == "/sdcard" or p.startswith("/sdcard/")) and "\n" not in p
+                        for p in value))
     if key == "donate_count":
         return isinstance(value, int) and not isinstance(value, bool) and value >= 0
     if key == "donate_off":
@@ -278,7 +285,8 @@ def save_settings(changes: dict[str, Any], path: Path | None = None) -> Settings
 
 
 def save_internal(changes: dict[str, Any], path: Path | None = None) -> Settings:
-    """Zapis kluczy wewnętrznych (`INTERNAL_KEYS`) — tylko z `welcome`, `app.telemetry` i `donate`."""
+    """Zapis kluczy wewnętrznych (`INTERNAL_KEYS`) — tylko z `welcome`, `app.telemetry`, `donate`
+    i eksploratora plików (`app.explorer_api`)."""
     path = path or settings_path()
     unknown = sorted(set(changes) - set(INTERNAL_KEYS))
     bad = sorted(k for k, v in changes.items() if k in INTERNAL_KEYS and not _valid(k, v))

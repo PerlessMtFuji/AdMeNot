@@ -10,7 +10,6 @@ Protokół i dane serwisu nie dotykają telefonu, więc idą bez JobRunner (pywe
 from __future__ import annotations
 
 import contextlib
-import functools
 import os
 import re
 import secrets
@@ -26,8 +25,9 @@ from typing import Any
 
 from admenot import __version__
 from admenot.app import crash, telemetry
-from admenot.app.errors import AppError, error_payload, log_exception, report_error
+from admenot.app.errors import AppError, bridge, error_payload, log_exception, report_error
 from admenot.app.events import Emitter
+from admenot.app.explorer_api import ExplorerMixin, MediaFactory
 from admenot.app.jobs import Job, JobRunner, Stopped
 from admenot.app.present import (
     app_name,
@@ -349,18 +349,10 @@ def _transfer_errors(kind: str) -> Iterator[None]:
         raise AppError("transfer_failed", type(exc).__name__, **extra) from None
 
 
-def _api(method: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]:
-    @functools.wraps(method)
-    def wrapper(self: Api, *args: Any, **kwargs: Any) -> dict[str, Any]:
-        try:
-            return method(self, *args, **kwargs)
-        except Exception as exc:  # noqa: BLE001 — do JS nigdy nie leci wyjątek
-            return {"error": report_error(exc, {"call": method.__name__})}
-
-    return wrapper
+_api = bridge
 
 
-class Api:
+class Api(ExplorerMixin):
     def __init__(
         self,
         emitter: Emitter,
@@ -386,6 +378,8 @@ class Api:
         puller_factory: PullerFactory = _real_puller,
         pusher_factory: PusherFactory = _real_pusher,
         transfer_purge_s: float | None = TRANSFER_PURGE_S,
+        explorer_media: MediaFactory | None = None,
+        explorer_temp: Path | None = None,
     ) -> None:
         self._emitter = emitter
         self._host_factory = host_factory
@@ -463,6 +457,8 @@ class Api:
         # (RLock: zadanie synchroniczne w testach woła wejścia z wnętrza sprzątania).
         self._cleanup_lock = threading.RLock()
         self._purge_stop = threading.Event()
+        # Eksplorator plików (`ExplorerMixin`): sesja, serwer mediów (podmieniany w testach), `%TEMP%`.
+        self._explorer_setup(explorer_media, explorer_temp)
         self._clean_screenshots()
         self._purge_old_data()
         # Zegar dobowy: okno bywa otwarte dniami, a kopie po 7 dniach mają zniknąć. Testy
@@ -651,6 +647,7 @@ class Api:
             return {"devices": [], "error": error_payload(exc)["key"]}
         crash.note_serials(e.serial for e in entries)
         ready = {e.serial for e in entries if e.state == "device"}
+        self._explorer_presence(ready)
         for serial in set(self._identities) - ready:
             self._identities.pop(serial, None)  # odłączony: przy następnym podłączeniu czytamy od nowa
         with self._cleanup_lock:
@@ -889,6 +886,7 @@ class Api:
     def start_scan(self, serial: str, client: str | None = None) -> dict[str, Any]:
         if not isinstance(serial, str) or not serial.strip():
             raise AppError("bad_request", "serial")
+        self._require_explorer_free(serial)
         self._require_cleaned(serial)
         self._abandon_apk(notify=False)
         with self._shots_lock:
@@ -1751,6 +1749,7 @@ class Api:
             raise AppError("bad_request", "serial")
         if client is not None and not isinstance(client, str):
             raise AppError("bad_request", "client")
+        self._require_explorer_free(serial)
         self._require_cleaned(serial)
         self._abandon_apk(notify=False)
         adb = self._session(serial.strip())
@@ -1922,6 +1921,7 @@ class Api:
             raise AppError("bad_request", "copy_id") from None
         if meta.status == "in_progress":  # wgrywać można tylko kopię skończoną (spec §4.1)
             raise AppError("bad_request", "copy_status")
+        self._require_explorer_free(serial)
         self._require_cleaned(serial)
         self._abandon_apk(notify=False)
         adb = self._session(serial.strip())
@@ -2360,6 +2360,10 @@ class Api:
 
     def _shutdown(self) -> None:
         self._purge_stop.set()
+        try:
+            self._explorer_end()
+        except Exception as exc:  # noqa: BLE001 — zamknięcie okna nie może utknąć na eksploratorze
+            log_exception(exc)
         job = self._transfer_job()
         if job is not None:
             self._jobs.stop(job.id)  # bez czekania: `_shutdown` bywa wołane z wątku GUI

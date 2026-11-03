@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import traceback
 from collections.abc import Callable
 from datetime import datetime
@@ -74,3 +75,15 @@ def report_error(exc: BaseException, context: dict[str, Any] | None = None) -> d
         if crash_id:
             payload["crash"] = crash_id
     return payload
+
+
+def bridge(method: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]:
+    """Metoda mostu dla JS: wyjątek nigdy nie leci do okna — wynik to `{"error": payload}`."""
+    @functools.wraps(method)
+    def wrapper(self: Any, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        try:
+            return method(self, *args, **kwargs)
+        except Exception as exc:  # noqa: BLE001 — do JS nigdy nie leci wyjątek
+            return {"error": report_error(exc, {"call": method.__name__})}
+
+    return wrapper

@@ -175,10 +175,14 @@ def sweep_tmp(adb: ExplorerAdb, folders: Iterable[str]) -> int:
     return removed
 
 
-def sweep_recorded(adb: ExplorerAdb, serial: str, *, directory: Path | None = None) -> int:
-    """Sprząta foldery z listy na dysku (przy otwarciu eksploratora) i usuwa je z listy."""
+def sweep_recorded(adb: ExplorerAdb, serial: str, *, directory: Path | None = None,
+                   skip: Collection[str] = ()) -> int:
+    """Sprząta foldery z listy na dysku (przy otwarciu eksploratora) i usuwa je z listy.
+    `skip` — foldery, których pliki tymczasowe pilnuje jeszcze żywa kolejka tego telefonu."""
     removed = 0
     for folder in read_tmp_folders(serial, directory=directory):
+        if folder in skip:
+            continue
         removed += sweep_tmp(adb, [folder])
         forget_tmp_folder(serial, folder, directory=directory)
     return removed
@@ -341,6 +345,11 @@ class TransferQueue:
         self._wake.set()
         if leftovers:  # wstrzymane po odłączeniu: plik tymczasowy na telefonie zostaje do `sweep_tmp`
             self._clean_tmps(task)
+
+    def tracked_folders(self) -> set[str]:
+        """Foldery telefonu z naszymi plikami tymczasowymi pilnowanymi teraz przez kolejkę."""
+        with self._lock:
+            return set(self._folders)
 
     def tasks(self) -> list[TaskState]:
         with self._lock:
