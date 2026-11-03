@@ -6,6 +6,7 @@ import os
 import threading
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from apphelpers import NOW, make_api
@@ -370,3 +371,102 @@ def test_no_paths_in_session_log(tmp_path):
     assert "find " in log and "dd if=" in log  # polecenia są, ścieżki zwinięte
     for secret in ("IMG_", "Camera", "piosenka", "Łódź", "notatka", "Kowalskiego", "Download", "Music"):
         assert secret not in log, secret
+
+
+def _wait_lock_free(timeout: float = 10.0) -> None:
+    deadline = time.monotonic() + timeout
+    while not _lock_free():
+        assert time.monotonic() < deadline, "blokada telefonu nie zwolniona"
+        time.sleep(0.02)
+
+
+def test_shutdown_does_not_wait_for_busy_queue_worker(tmp_path):
+    """Okno zamyka się od razu; blokadę telefonu zwalnia dopiero koniec wątku kolejki (np. `sha256sum`)."""
+    api, _, _, _ = _opened(tmp_path)
+    queue = api._explorer_queue()
+    gate = threading.Event()
+    queue._worker = threading.Thread(target=gate.wait, args=(10,), daemon=True)  # wątek w długim kroku
+    queue._worker.start()
+    api._sync = False  # jak w oknie: bez czekania
+    started = time.monotonic()
+    try:
+        api._shutdown()
+        assert time.monotonic() - started < 2
+        assert api._explorer is None and not _lock_free()
+        assert api.explorer_open(SERIAL)["error"] == {"key": "explorer_busy", "message": "device"}
+    finally:
+        gate.set()
+    _wait_lock_free()
+
+
+def test_open_other_phone_while_busy_keeps_session(tmp_path):
+    api, rec, host, _ = _opened(tmp_path, other=True)
+    host.connected.add(OTHER)
+    api._jobs._current = SimpleNamespace(kind="scan")  # trwa zadanie
+    try:
+        assert api.explorer_open(OTHER)["error"] == {"key": "explorer_busy", "message": "scan"}
+    finally:
+        api._jobs._current = None
+    assert api._explorer.serial == SERIAL and not rec.of("explorer:closed")
+    assert "error" not in api.explorer_open(OTHER)
+    assert rec.of("explorer:closed") == [{"serial": SERIAL, "reason": "switched"}]
+    assert _lock_free(SERIAL) and not _lock_free(OTHER)
+    api.explorer_close()
+
+
+def test_apk_analysis_refused_while_explorer_open(tmp_path):
+    host = _host(tmp_path)
+    api, _ = _api(host)
+    assert "job_id" in api.start_scan(SERIAL, None)
+    assert "error" not in api.explorer_open(SERIAL)
+    busy = {"key": "busy", "message": "explorer"}
+    assert api.deep_analyze("com.clean.pro.boost")["error"] == busy
+    assert api.analyze_selected(["com.clean.pro.boost"])["error"] == busy
+    assert api.analyze_all()["error"] == busy
+    api.explorer_close()
+    assert "job_id" in api.analyze_all()
+
+
+def test_presence_close_failure_keeps_device_list(tmp_path, monkeypatch):
+    api, rec, host, _ = _opened(tmp_path, other=True)
+    host.connected.discard(SERIAL)
+    _storage_of(host).online = False
+    api.list_devices()
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("close failed")
+
+    monkeypatch.setattr(api, "_explorer_end", broken)
+    host.connected.add(OTHER)
+    listed = api.list_devices()
+    assert listed["error"] is None and [d["serial"] for d in listed["devices"]] == [OTHER]
+    assert rec.of("explorer:closed") == [{"serial": SERIAL, "reason": "other_phone"}]
+
+
+def test_place_count_unexpected_error_skips_only_that_place(tmp_path, monkeypatch):
+    real = explorer_api.count_place
+
+    def count(adb, place):
+        if place.key == "music":
+            raise RuntimeError("boom")
+        return real(adb, place)
+
+    monkeypatch.setattr(explorer_api, "count_place", count)
+    _, rec, _, _ = _opened(tmp_path)
+    counted = {p["key"]: p["count"] for p in rec.of("explorer:places")[-1]["places"]}
+    assert counted["music"] is None and counted["all"] == 6
+
+
+def test_unexpected_error_log_has_no_paths(tmp_path, monkeypatch):
+    api, _, _, _ = _opened(tmp_path)
+
+    secret = "Tajne zdjęcie.jpg"  # nie w linii z raise: traceback pokazuje linię źródła
+
+    def broken(adb, path, **kw):
+        raise RuntimeError(f"cannot read '{path}/{secret}'")
+
+    monkeypatch.setattr(explorer_api, "list_dir", broken)
+    error = api.explorer_list("/sdcard/DCIM/Kowalski")["error"]
+    assert error["key"] == "internal"
+    text = Path(error["log"]).read_text("utf-8")
+    assert "RuntimeError" in text and "Tajne" not in text and "Kowalski" not in text

@@ -13,6 +13,7 @@ się zamyka (`explorer:closed`).
 from __future__ import annotations
 
 import contextlib
+import functools
 import math
 import queue
 import re
@@ -30,6 +31,7 @@ from admenot.app.present import device_card
 from admenot.engine.adb.devices import list_devices
 from admenot.engine.adb.sessionlog import SessionLogAdb
 from admenot.engine.adb.transport import AdbError
+from admenot.engine.clientpaths import client_paths
 from admenot.engine.device.info import DeviceInfo, read_device_info
 from admenot.engine.explorer.create import CreateError, make_folder, make_text
 from admenot.engine.explorer.guard import ExplorerAdb, UnsafeCommand, safe_read_path
@@ -50,6 +52,8 @@ from admenot.engine.transfer.guard import STAT_TAIL, q
 __all__ = ["ExplorerMixin", "MediaFactory", "explorer_temp_dir"]
 
 MediaFactory = Callable[[str, ExplorerAdb, Callable[[str], bool]], MediaServer]
+# Nieoczekiwany błąd metody eksploratora: wpis w lokalnym logu bez nazw plików klienta.
+_bridge = functools.partial(bridge, scrub=client_paths)
 _LOCAL_ORIGIN = re.compile(r"http://(?:127\.0\.0\.1|localhost)(?::\d{1,5})?")
 
 
@@ -84,7 +88,7 @@ class _Pump:
             try:
                 self._emit(*item)
             except Exception as exc:  # noqa: BLE001 — zamknięte okno nie zatrzymuje kolejki
-                log_exception(exc)
+                log_exception(exc, scrub=client_paths)
 
 
 @dataclass
@@ -212,7 +216,7 @@ class ExplorerMixin:
         try:
             return sweep_recorded(sess_adb, serial, skip=skip)
         except (AdbError, UnsafeCommand, OSError) as exc:
-            log_exception(exc)
+            log_exception(exc, scrub=client_paths)
             return 0
 
     def _explorer_view(self, sess: _Session, leftovers: int) -> dict[str, Any]:
@@ -228,6 +232,9 @@ class ExplorerMixin:
                 try:
                     count: int | None = count_place(sess.adb, place)
                 except (ListError, AdbError):
+                    count = None
+                except Exception as exc:  # noqa: BLE001 — jedno miejsce bez liczby, reszta liczy się dalej
+                    log_exception(exc, scrub=client_paths)
                     count = None
                 with self._explorer_lock:
                     if self._explorer is not sess:
@@ -251,24 +258,45 @@ class ExplorerMixin:
         try:
             self._settings = save_internal({"explorer_recent": recent})
         except (OSError, ValueError, TimeoutError, SettingsTooNew) as exc:
-            log_exception(exc)
+            log_exception(exc, scrub=client_paths)
 
-    def _explorer_end(self, only: _Session | None = None) -> None:
-        """Zamknięcie sesji: kolejka (anulowana), serwer mediów, blokada telefonu, `%TEMP%`.
-        `only` — tylko gdy otwarta jest wciąż ta sesja (zamknięcie z obserwatora telefonów)."""
+    def _explorer_end(self, only: _Session | None = None, wait: bool | None = None) -> _Session | None:
+        """Zamknięcie sesji: kolejka (anulowana), serwer mediów, `%TEMP%`, blokada telefonu; zwraca
+        zamkniętą sesję. `only` — tylko gdy otwarta jest wciąż ta sesja (zamknięcie z obserwatora telefonów).
+
+        Bez czekania (`wait` None = tylko w testach `sync_jobs` czekamy): woła to wątek GUI (`_shutdown`),
+        obserwator telefonów i `explorer_open` pod blokadą sesji, a wątek kolejki może być w kroku, który
+        nie patrzy na anulowanie (`sha256sum` dużego pliku). Kolejka dostaje anulowanie od razu, a blokadę
+        telefonu zwalnia wątek `explorer-close` dopiero po końcu wątku kolejki — ten jeszcze sprząta swoje
+        pliki tymczasowe na telefonie, więc do tego czasu nikt inny (skan, kopia, nowy eksplorator) nie
+        dostaje tego telefonu."""
         with self._explorer_lock:
             sess = self._explorer
             if sess is None or (only is not None and sess is not only):
-                return
+                return None
             self._explorer = None
+        queue_ = sess.queue
         try:
-            if sess.queue is not None:
-                sess.queue.shutdown()
+            sess.media.stop()  # od razu; `stack.close()` woła `stop` jeszcze raz — bez skutku
+            if queue_ is not None:
+                queue_.shutdown(wait=False)
         finally:
-            if sess.pump is not None:
-                sess.pump.close()
-            sess.stack.close()
             self._explorer_clean_temp()
+
+        def finish() -> None:
+            try:
+                if queue_ is not None:
+                    queue_.join()
+            finally:
+                if sess.pump is not None:
+                    sess.pump.close()
+                sess.stack.close()
+
+        if queue_ is None or (self._sync if wait is None else wait):
+            finish()
+        else:
+            threading.Thread(target=finish, name="explorer-close", daemon=True).start()
+        return sess
 
     def _require_explorer_free(self, serial: str) -> None:
         """Wejście skanu/przenoszenia: telefon z otwartym eksploratorem jest zajęty."""
@@ -296,7 +324,10 @@ class ExplorerMixin:
                 sess.others &= ready  # odłączony i podłączony znowu inny telefon też zamknie eksplorator
                 return
         if event[0] == "explorer:closed":
-            self._explorer_end(only=sess)
+            try:
+                self._explorer_end(only=sess)
+            except Exception as exc:  # noqa: BLE001 — lista telefonów działa dalej
+                log_exception(exc, scrub=client_paths)
         self._emit(*event)
 
     def _explorer_queue(self) -> TransferQueue:
@@ -316,7 +347,7 @@ class ExplorerMixin:
 
     # --- metody dla UI ----------------------------------------------------------------------
 
-    @bridge
+    @_bridge
     def explorer_open(self, serial: str) -> dict[str, Any]:
         if not isinstance(serial, str) or not serial.strip():
             raise AppError("bad_request", "serial")
@@ -328,7 +359,6 @@ class ExplorerMixin:
                 # pilnowanymi przez żywą kolejkę zostają
                 skip = sess.queue.tracked_folders() if sess.queue is not None else set()
                 return self._explorer_view(sess, self._explorer_sweep(sess.adb, serial, skip))
-            self._explorer_end()
             job = self._jobs.current()
             if job is not None:
                 raise AppError("explorer_busy", job.kind)
@@ -338,6 +368,10 @@ class ExplorerMixin:
                 if exc.key == "busy":
                     raise AppError("explorer_busy", exc.message) from None
                 raise
+            # inny telefon: poprzednia sesja (i jej zadania) się kończy — UI dostaje `explorer:closed`
+            old = self._explorer_end()
+            if old is not None:
+                self._emit("explorer:closed", {"serial": old.serial, "reason": "switched"})
             stack = contextlib.ExitStack()
             try:
                 try:
@@ -355,20 +389,21 @@ class ExplorerMixin:
                 media = self._explorer_media(serial, adb, _local_origin)
                 stack.callback(media.stop)
                 base = media.start()
+                sess = _Session(serial, device, match, log, adb, media, base, stack, places)
             except BaseException:
                 stack.close()
                 raise
-            sess = self._explorer = _Session(serial, device, match, log, adb, media, base, stack, places)
+            self._explorer = sess
         view = self._explorer_view(sess, leftovers)  # liczby miejsc dochodzą zdarzeniem
         self._explorer_count(sess)
         return view
 
-    @bridge
+    @_bridge
     def explorer_close(self) -> dict[str, Any]:
         self._explorer_end()
         return {}
 
-    @bridge
+    @_bridge
     def explorer_list(self, path: str) -> dict[str, Any]:
         sess = self._explorer_session()
         path = self._explorer_path(path)
@@ -388,7 +423,7 @@ class ExplorerMixin:
         return {"path": path, "crumbs": crumbs(path, sess.name, apps),
                 "entries": [entry_view(e, sess.media) for e in entries], "skipped": skipped, "locked": locked}
 
-    @bridge
+    @_bridge
     def explorer_meta(self, path: str) -> dict[str, Any]:
         sess = self._explorer_session()
         path = self._explorer_path(path, file=True)
@@ -403,7 +438,7 @@ class ExplorerMixin:
                     meta = media_meta(sess.adb, path)
         return {"meta": {**meta, "size": size, "mtime": mtime, "path": path}}
 
-    @bridge
+    @_bridge
     def explorer_text(self, path: str, more: bool = False) -> dict[str, Any]:
         """Podgląd tekstu po `TEXT_LIMIT` bajtów; `more` — następny kawałek tego samego pliku."""
         sess = self._explorer_session()
@@ -427,7 +462,7 @@ class ExplorerMixin:
         return {"text": text, "encoding": "utf-16" if codec.startswith("utf-16") else codec,
                 "truncated": offset < size}
 
-    @bridge
+    @_bridge
     def explorer_mkdir(self, parent: str, name: str) -> dict[str, Any]:
         sess = self._explorer_session()
         if not isinstance(parent, str) or not isinstance(name, str):
@@ -438,7 +473,7 @@ class ExplorerMixin:
         except AppError as exc:
             raise _bad_name(exc) from None
 
-    @bridge
+    @_bridge
     def explorer_new_text(self, parent: str, name: str, text: str) -> dict[str, Any]:
         sess = self._explorer_session()
         if not all(isinstance(v, str) for v in (parent, name, text)):
@@ -451,7 +486,7 @@ class ExplorerMixin:
         except AppError as exc:
             raise _bad_name(exc) from None
 
-    @bridge
+    @_bridge
     def explorer_open_map(self, lat: float, lon: float) -> dict[str, Any]:
         if not all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
                    for v in (lat, lon)) or abs(lat) > 90 or abs(lon) > 180:

@@ -363,8 +363,9 @@ class TransferQueue:
                 raise TimeoutError(f"{task_id}: {self._tasks[task_id].state.status}")
             return self._snapshot(self._tasks[task_id])
 
-    def shutdown(self) -> None:
-        """Anuluje wszystko (niedokończone zadania przepadają) i czeka na wątki."""
+    def shutdown(self, wait: bool = True) -> None:
+        """Anuluje wszystko (niedokończone zadania przepadają); `wait` — czeka na wątek kolejki
+        (bez czekania: wątek kończy bieżący krok, np. `sha256sum`, i sprząta sam; `join` czeka później)."""
         with self._locked():
             self._closing = True
             for task in self._tasks.values():
@@ -375,8 +376,17 @@ class TransferQueue:
             self._cond.notify_all()
             worker = self._worker
         self._wake.set()
-        if worker is not None:
+        if wait and worker is not None:
             worker.join()
+
+    def join(self, timeout: float | None = None) -> bool:
+        """Czeka na koniec wątku kolejki (po `shutdown`); True, gdy wątku już nie ma."""
+        with self._lock:
+            worker = self._worker
+        if worker is not None:
+            worker.join(timeout)
+            return not worker.is_alive()
+        return True
 
     # ---- stan i zdarzenia ----------------------------------------------------------------
     def _request(self, task: _Task, reason: _Stop) -> None:

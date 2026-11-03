@@ -1089,6 +1089,7 @@ class Api(ExplorerMixin):
     def deep_analyze(self, package: str) -> dict[str, Any]:
         """Głęboka analiza jednej aplikacji (ścieżki w kodzie) — tylko na żądanie, ocena §6, §8."""
         self._require_scan()
+        self._require_explorer_free(self._serial or "")
         if self._apk_factory is None:
             raise AppError("bad_request", "apk")
         report = self._report
@@ -1105,6 +1106,7 @@ class Api(ExplorerMixin):
     def analyze_selected(self, packages: list[str]) -> dict[str, Any]:
         """Analiza tylko wskazanych aplikacji (tryb ręczny, spec §2.2)."""
         self._require_scan()
+        self._require_explorer_free(self._serial or "")
         if self._apk_factory is None:
             raise AppError("bad_request", "apk")
         report = self._report
@@ -1123,6 +1125,7 @@ class Api(ExplorerMixin):
     def analyze_all(self) -> dict[str, Any]:
         """Pełna analiza z trybu ręcznego — bez ponownego pytania o tryb."""
         self._require_scan()
+        self._require_explorer_free(self._serial or "")
         if self._apk_factory is None:
             raise AppError("bad_request", "apk")
         adb, report = self._adb, self._report
