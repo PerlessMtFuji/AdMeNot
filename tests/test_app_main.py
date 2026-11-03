@@ -1,5 +1,6 @@
 import subprocess
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -36,24 +37,40 @@ def test_window_is_created_with_the_api(monkeypatch, tmp_path):
     monkeypatch.setattr(app_main, "WEB_DIR", web)
     created = {}
 
-    class Events:
-        def __init__(self):
-            self.closing = self
+    class Hook:
+        def __init__(self, name):
+            self.name = name
 
         def __iadd__(self, handler):
-            created["closing"] = handler
+            created[self.name] = handler
             return self
+
+    class Events:
+        def __init__(self):
+            self.closing = Hook("closing")
+            self.loaded = Hook("loaded")
+
+    class DocumentEvents:
+        def __init__(self):
+            self.dragover = Hook("dragover")
+            self.drop = Hook("drop")
 
     class Window:
         def __init__(self):
             self.events = Events()
+            self.dom = SimpleNamespace(document=SimpleNamespace(events=DocumentEvents()))
 
         def destroy(self):
             pass
 
+        def create_file_dialog(self, kind, **kw):
+            created["dialog"] = (kind, kw)
+            return ("C:\\a.jpg", "C:\\b.jpg")
+
     class FakeWebview:
         class FileDialog:
             FOLDER = "folder"
+            OPEN = "open"
 
         @staticmethod
         def create_window(title, **kw):
@@ -64,7 +81,14 @@ def test_window_is_created_with_the_api(monkeypatch, tmp_path):
         def start(**kw):
             created["start"] = kw
 
+    class DOMEventHandler:
+        def __init__(self, callback, prevent_default=False, stop_propagation=False, debounce=0):
+            self.callback, self.prevent_default, self.debounce = callback, prevent_default, debounce
+
     monkeypatch.setitem(sys.modules, "webview", FakeWebview)
+    monkeypatch.setitem(sys.modules, "webview.dom", SimpleNamespace(DOMEventHandler=DOMEventHandler))
+    dropped = []
+    monkeypatch.setattr(app_main.Api, "_explorer_drop", lambda self, paths: dropped.append(paths))
     started, telemetry = [], []
     monkeypatch.setattr(app_main.Api, "_start_updates", lambda self: started.append(self))
     monkeypatch.setattr(app_main.Api, "_start_telemetry", lambda self: telemetry.append("start"))
@@ -75,6 +99,18 @@ def test_window_is_created_with_the_api(monkeypatch, tmp_path):
     assert created["closing"].__self__ is created["js_api"]
     assert started == [created["js_api"]]  # wątek aktualizacji startuje tylko z prawdziwego okna
     assert telemetry == ["start", "stop"]  # wątek statystyk: tylko z okna, kończy się z oknem
+    # eksplorator: „Wgraj tutaj” (wiele plików) i upuszczenie z Eksploratora Windows
+    api = created["js_api"]
+    assert api._pick_files_fn() == ["C:\\a.jpg", "C:\\b.jpg"]
+    assert created["dialog"] == ("open", {"allow_multiple": True})
+    created["loaded"]()  # po załadowaniu strony: obsługa `dragover` i `drop`
+    assert created["dragover"].prevent_default and created["dragover"].debounce > 0
+    assert created["drop"].prevent_default
+    created["drop"].callback({"dataTransfer": {"files": [
+        {"name": "a.jpg", "pywebviewFullPath": "C:\\Zdjęcia\\a.jpg"},
+        {"name": "Folder", "size": 0, "type": "", "pywebviewFullPath": "C:\\Zdjęcia\\Folder"}]}})
+    created["drop"].callback({"dataTransfer": {"files": []}})  # przeciągnięty tekst
+    assert dropped == [["C:\\Zdjęcia\\a.jpg", "C:\\Zdjęcia\\Folder"], []]
 
 
 def test_cli_gui_command(monkeypatch):
@@ -107,7 +143,7 @@ def test_frozen_build_reports_a_missing_webview2_in_a_window(monkeypatch, tmp_pa
 
     class Window:
         def __init__(self):
-            self.events = type("Events", (), {"closing": Closing()})()
+            self.events = type("Events", (), {"closing": Closing(), "loaded": Closing()})()
 
         def destroy(self):
             pass
@@ -163,7 +199,7 @@ def _fake_webview(monkeypatch, tmp_path, start):
 
     class Window:
         def __init__(self):
-            self.events = type("Events", (), {"closing": Closing()})()
+            self.events = type("Events", (), {"closing": Closing(), "loaded": Closing()})()
 
         def destroy(self):
             pass

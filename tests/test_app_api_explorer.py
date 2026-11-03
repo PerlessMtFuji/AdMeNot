@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import threading
 import time
@@ -21,7 +22,7 @@ from admenot.engine.device.info import GETPROP
 from admenot.engine.explorer.plan import TaskPlan
 from admenot.engine.explorer.queue import read_tmp_folders, record_tmp_folder
 from admenot.engine.oplock import DeviceBusy, device_lock
-from admenot.engine.paths import journal_path, logs_dir
+from admenot.engine.paths import journal_path, logs_dir, telemetry_path
 from admenot.engine.settings import load_settings
 
 OTHER = "R58W20NEW01"
@@ -470,3 +471,261 @@ def test_unexpected_error_log_has_no_paths(tmp_path, monkeypatch):
     assert error["key"] == "internal"
     text = Path(error["log"]).read_text("utf-8")
     assert "RuntimeError" in text and "Tajne" not in text and "Kowalski" not in text
+
+
+# --- Task 9: kopiowanie i wgrywanie, upuszczanie, schowek, telemetria ---------------------------
+
+
+def _wait_task(api, tid: str, *statuses: str) -> dict:
+    api._explorer.queue.wait_for(tid, *statuses)
+    return next(t for t in api.explorer_tasks()["tasks"] if t["id"] == tid)
+
+
+def _pc_dir(tmp_path: Path, name: str = "pc") -> Path:
+    d = tmp_path / name
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def test_copy_uses_saved_dest(tmp_path):
+    api, rec, _, _ = _opened(tmp_path)
+    assert api.explorer_copy(["/sdcard/Download/faktura.pdf"])["error"]["key"] == "explorer_no_dest"
+    pc = _pc_dir(tmp_path)
+    api._attach(pick_folder=lambda: str(pc), close=lambda: None)
+    assert api.explorer_pick_dest() == {"path": str(pc)}
+    assert load_settings().explorer_dest == str(pc)
+    started = api.explorer_copy(["/sdcard/Download/faktura.pdf", "/sdcard/DCIM/Camera"])
+    task = _wait_task(api, started["task"], "done")
+    assert (pc / "faktura.pdf").read_bytes() == b"%PDF-1.4"
+    assert (pc / "Camera" / "IMG_Ąę 1.jpg").is_file() and (pc / "Camera" / ".hidden.jpg").is_file()
+    assert task["kind"] == "to_pc" and task["status"] == "done" and task["done_files"] == 3
+    assert task["dest"] == str(pc) and task["failed"] == []
+    assert rec.of("explorer:task")[-1]["task"]["status"] == "done"
+    other = _pc_dir(tmp_path, "inny")  # jawny folder docelowy też zostaje zapamiętany
+    again = api.explorer_copy(["/sdcard/Download/faktura.pdf"], str(other), True)
+    assert _wait_task(api, again["task"], "done")["verified"] == "hash"
+    assert (other / "faktura.pdf").is_file() and load_settings().explorer_dest == str(other)
+    missing = api.explorer_copy(["/sdcard/Download/faktura.pdf"], str(tmp_path / "brak"))
+    assert missing["error"]["key"] == "explorer_no_dest"
+    assert api.explorer_copy([], str(pc))["error"]["key"] == "bad_request"
+    assert api.explorer_copy(["/data/local/x"], str(pc))["error"]["key"] == "bad_request"
+    assert api.explorer_copy(["/sdcard/Download/faktura.pdf"], str(pc), "tak")["error"]["key"] == "bad_request"
+    api.explorer_close()
+
+
+def test_copy_problems_returned_before_start(tmp_path, monkeypatch):
+    real = explorer_api.plan_to_pc
+    monkeypatch.setattr(explorer_api, "plan_to_pc",
+                        lambda adb, paths, dest: real(adb, paths, dest, free_bytes=lambda p: 3))
+    api, rec, _, _ = _opened(tmp_path)
+    pc = _pc_dir(tmp_path)
+    out = api.explorer_copy(["/sdcard/Download/faktura.pdf"], str(pc))
+    assert out == {"problems": [{"key": "no_space", "detail": {"need": 8, "free": 3, "missing": 5}}]}
+    assert api.explorer_tasks() == {"tasks": []} and not rec.of("explorer:task")
+    assert not (pc / "faktura.pdf").exists()
+    local = _pc_dir(tmp_path, "z komputera")
+    (local / "a.txt").write_bytes(b"a")
+    denied = api.explorer_upload([str(local / "a.txt")], "/sdcard/Android/data")
+    assert denied == {"problems": [{"key": "denied", "detail": {"paths": ["/sdcard/Android/data"]}}]}
+    assert api.explorer_tasks() == {"tasks": []}
+    api.explorer_close()
+
+
+def test_upload_task_events(tmp_path):
+    api, rec, host, _ = _opened(tmp_path)
+    local = _pc_dir(tmp_path, "z komputera")
+    (local / "zdjęcie.jpg").write_bytes(b"J" * 10)
+    (local / "Folder").mkdir()
+    (local / "Folder" / "b.txt").write_bytes(b"bb")
+    started = api.explorer_upload([str(local / "zdjęcie.jpg"), str(local / "Folder")], "/sdcard/Download")
+    task = _wait_task(api, started["task"], "done")
+    storage = _storage_of(host)
+    assert storage.local("/sdcard/Download/zdjęcie.jpg").read_bytes() == b"J" * 10
+    assert storage.local("/sdcard/Download/Folder/b.txt").read_bytes() == b"bb"
+    assert task["kind"] == "to_phone" and task["done_files"] == 2 and task["dest"] == "/sdcard/Download"
+    statuses = [e["task"]["status"] for e in rec.of("explorer:task") if e["task"]["id"] == started["task"]]
+    assert statuses[0] == "queued" and "running" in statuses and statuses[-1] == "done"
+    assert api.explorer_upload([str(local / "zdjęcie.jpg")], "/data/local")["error"]["key"] == "bad_request"
+    assert api.explorer_upload(["względna.txt"], "/sdcard/Download")["error"]["key"] == "bad_request"
+    assert api.explorer_upload("C:\\x", "/sdcard/Download")["error"]["key"] == "bad_request"
+    api.explorer_close()
+
+
+def test_upload_offline_df_maps_to_offline(tmp_path, monkeypatch):
+    from admenot.engine.adb.transport import AdbError
+
+    def offline(*args, **kwargs):
+        raise AdbError("offline", "device offline")
+
+    api, _, host, _ = _opened(tmp_path)
+    local = _pc_dir(tmp_path, "z komputera")
+    (local / "a.txt").write_bytes(b"a")
+    monkeypatch.setattr(explorer_api, "plan_to_phone", offline)
+    _storage_of(host).online = False
+    assert api.explorer_upload([str(local / "a.txt")], "/sdcard/Download")["error"]["key"] == "explorer_offline"
+    api.explorer_close()
+
+
+class _GatedPusher:
+    """`adb push` czekający na sygnał — pierwsze zadanie trwa, kolejne czekają w kolejce."""
+
+    def __init__(self, inner) -> None:
+        self.inner = inner
+        self.gate = threading.Event()
+        self.entered = threading.Event()
+
+    def push(self, *args, **kwargs):
+        self.entered.set()
+        self.gate.wait(10)
+        return self.inner.push(*args, **kwargs)
+
+
+def test_pause_resume_cancel_roundtrip(tmp_path):
+    host = _host(tmp_path)
+    gated = _GatedPusher(host.phone(SERIAL))
+    api, _ = _api(host, pusher_factory=lambda adb_path, serial, log: gated)
+    api.explorer_open(SERIAL)
+    local = _pc_dir(tmp_path, "z komputera")
+    (local / "a.txt").write_bytes(b"a")
+    (local / "b.txt").write_bytes(b"b")
+    first = api.explorer_upload([str(local / "a.txt")], "/sdcard/Download")["task"]
+    assert gated.entered.wait(5)
+    second = api.explorer_upload([str(local / "b.txt")], "/sdcard/Music")["task"]
+    try:
+        assert api.explorer_pause(second) == {}
+        assert _wait_task(api, second, "paused")["status"] == "paused"
+        assert api.explorer_resume(second) == {}
+        assert _wait_task(api, second, "queued")["status"] == "queued"
+        assert api.explorer_cancel(second) == {}
+        assert _wait_task(api, second, "cancelled")["status"] == "cancelled"
+        assert api.explorer_cancel(first) == {}
+    finally:
+        gated.gate.set()
+    assert _wait_task(api, first, "cancelled")["status"] == "cancelled"
+    assert not _storage_of(host).local("/sdcard/Music/b.txt").exists()
+    assert api.explorer_pause("t999") == {}  # nieznane zadanie: nic
+    assert api.explorer_cancel(7)["error"]["key"] == "bad_request"
+    api.explorer_close()
+    assert api.explorer_tasks()["error"]["key"] == "explorer_not_open"
+
+
+def test_pick_upload_and_tasks_without_queue(tmp_path):
+    api, _, _, _ = _opened(tmp_path)
+    assert api.explorer_tasks() == {"tasks": []}
+    assert api.explorer_pick_upload("files") == {"paths": []}  # bez okna
+    api._attach(pick_folder=lambda: "C:\\Zdjęcia", close=lambda: None,
+                pick_files=lambda: ["C:\\a.jpg", "C:\\b.jpg"])
+    assert api.explorer_pick_upload("files") == {"paths": ["C:\\a.jpg", "C:\\b.jpg"]}
+    assert api.explorer_pick_upload("folder") == {"paths": ["C:\\Zdjęcia"]}
+    api._attach(pick_folder=lambda: None, close=lambda: None)
+    assert api.explorer_pick_upload("folder") == {"paths": []}
+    assert api.explorer_pick_upload("all")["error"]["key"] == "bad_request"
+    api.explorer_close()
+
+
+def test_clipboard_paths(tmp_path):
+    copied = ["C:\\Users\\Jan\\Komputeł.xlsx", "C:\\Users\\Jan\\Loty - zdjęcia"]
+    api, _, _, _ = _opened(tmp_path, explorer_clipboard=lambda: list(copied))
+    assert api.explorer_clipboard() == {"paths": copied}
+    copied.clear()
+    assert api.explorer_clipboard() == {"paths": []}
+    api.explorer_close()
+
+
+def test_drop_event_only_when_open(tmp_path):
+    local = _pc_dir(tmp_path, "upuszczone")
+    (local / "a.jpg").write_bytes(b"a" * 100)
+    (local / "Folder" / "sub").mkdir(parents=True)
+    (local / "Folder" / "b.txt").write_bytes(b"b" * 20)
+    (local / "Folder" / "sub" / "c.txt").write_bytes(b"c" * 3)
+    dropped = [str(local / "a.jpg"), str(local / "Folder"), str(local / "zniknął.txt")]
+    host = _host(tmp_path)
+    api, rec = _api(host)
+    api._explorer_drop(dropped)
+    assert not rec.of("explorer:drop")
+    api.explorer_open(SERIAL)
+    api._explorer_drop(dropped)
+    assert rec.of("explorer:drop") == [{"paths": dropped, "count": 3, "bytes": 123}]
+    api._explorer_drop([])  # nic nie upuszczono (np. tekst z innej aplikacji)
+    assert len(rec.of("explorer:drop")) == 1
+    api.explorer_close()
+    api._explorer_drop(dropped)
+    assert len(rec.of("explorer:drop")) == 1
+
+
+def test_open_folder_only_existing_pc_directory(tmp_path):
+    opened: list[Path] = []
+    api, _, _, _ = _opened(tmp_path, open_file=opened.append)
+    pc = _pc_dir(tmp_path)
+    (pc / "program.exe").write_bytes(b"MZ")
+    assert api.explorer_open_folder(str(pc)) == {}
+    assert opened == [pc]
+    assert api.explorer_open_folder(str(pc / "program.exe"))["error"]["key"] == "explorer_not_folder"
+    assert api.explorer_open_folder(str(pc / "brak"))["error"]["key"] == "explorer_not_folder"
+    assert api.explorer_open_folder("pc")["error"]["key"] == "explorer_not_folder"  # względna
+    assert api.explorer_open_folder(None)["error"]["key"] == "bad_request"
+    assert opened == [pc]
+    api.explorer_close()
+
+
+def _strings(value) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [s for k, v in value.items() for s in (*_strings(k), *_strings(v))]
+    if isinstance(value, list):
+        return [s for v in value for s in _strings(v)]
+    return []
+
+
+def test_explorer_event_has_no_paths(tmp_path):
+    api, _, _, _ = _opened(tmp_path)
+    api.set_telemetry(True, False)
+    pc = _pc_dir(tmp_path)
+    local = _pc_dir(tmp_path, "z komputera")
+    (local / "zdjęcie klienta.jpg").write_bytes(b"J" * 10)
+    copied = api.explorer_copy(["/sdcard/Download/faktura.pdf", "/sdcard/Music/piosenka.mp3"], str(pc))
+    _wait_task(api, copied["task"], "done")
+    uploaded = api.explorer_upload([str(local / "zdjęcie klienta.jpg")], "/sdcard/Download")
+    _wait_task(api, uploaded["task"], "done")
+    api.explorer_meta("/sdcard/DCIM/Camera/IMG_Ąę 1.jpg")
+    api.explorer_meta("/sdcard/Download")  # folder: to nie podgląd
+    api.explorer_text("/sdcard/Download/notatka Łódź.txt")
+    api.explorer_mkdir("/sdcard/Download", "Folder Kowalskiego")
+    api.explorer_mkdir("/sdcard/Download", "Folder Kowalskiego")  # explorer_exists
+    api.explorer_open_folder(str(pc / "brak"))
+    api.explorer_close()
+    events = [json.loads(x) for x in telemetry_path().read_text("utf-8").splitlines()]
+    shown = [e for e in events if e["type"] == "explorer"]
+    assert len(shown) == 1
+    event = shown[0]
+    assert event["device"]["android"] == "14"
+    assert (event["copied_files"], event["uploaded_files"]) == (2, 1)
+    assert event["previews"] == {"image": 1, "video": 0, "audio": 0, "text": 1}
+    assert event["created"] == {"folder": 1, "text": 0}
+    assert event["errors"] == {"explorer_exists": 1, "explorer_not_folder": 1}
+    assert isinstance(event["seconds"], int)
+    assert event["mb_s"] is None or isinstance(event["mb_s"], int)
+    secrets = [*FILES, "faktura", "piosenka", "IMG_", "Łódź", "Kowalski", "zdjęcie", "klienta", str(tmp_path)]
+    body = {k: v for k, v in event.items() if k not in ("install", "type", "t", "app", "os", "lang")}
+    for text in _strings(body):
+        assert "/" not in text and "\\" not in text, text
+        assert not any(s in text for s in secrets), text
+
+
+def test_explorer_event_counts_task_time_and_speed(tmp_path, monkeypatch):
+    seen: list[tuple] = []
+    real = explorer_api.explorer_event
+    monkeypatch.setattr(explorer_api, "explorer_event", lambda *a: seen.append(a) or real(*a))
+    ticks = iter(range(0, 1000, 2))
+    api, _ = _api(_host(tmp_path))
+    api._clock = lambda: float(next(ticks))  # każdy odczyt zegara: +2 s
+    api.set_telemetry(True, False)
+    api.explorer_open(SERIAL)
+    pc = _pc_dir(tmp_path)
+    copied = api.explorer_copy(["/sdcard/Music/piosenka.mp3"], str(pc))
+    _wait_task(api, copied["task"], "done")  # running (t=0) → done (t=2): 40 B w 2 s
+    api.explorer_close()
+    (_device, seconds, copied_files, copied_bytes, uploaded_files, uploaded_bytes, *_rest, speeds) = seen[0]
+    assert (copied_files, copied_bytes, uploaded_files, uploaded_bytes) == (1, 40, 0, 0)
+    assert list(speeds) == [20.0] and seconds >= 4

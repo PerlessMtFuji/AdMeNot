@@ -16,7 +16,9 @@ from typing import Any
 from admenot import __version__
 from admenot.app import crash
 from admenot.app.api import Api
+from admenot.app.errors import log_exception
 from admenot.app.events import WindowEmitter
+from admenot.engine.clientpaths import client_paths
 from admenot.engine.settings import effective_lang, load_settings
 
 WEB_DIR = Path(__file__).resolve().parent / "web"
@@ -102,7 +104,30 @@ def run_gui() -> int:
                 file_types=("Logo (*.png;*.jpg;*.jpeg;*.webp;*.svg)",))
             return chosen[0] if chosen else None
 
-        api._attach(pick_folder=pick_folder, close=window.destroy, pick_file=pick_file)
+        def pick_files() -> list[str]:
+            """Eksplorator plików: „Wgraj tutaj” — wiele plików naraz."""
+            chosen = window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True)
+            return list(chosen or [])
+
+        def bind_drop() -> None:
+            """Przeciągnięcie z Eksploratora Windows: JS widzi tylko nazwy, pełne ścieżki (także folderów)
+            daje pywebview w Pythonie (`pywebviewFullPath`). `preventDefault` na `dragover` i `drop` —
+            inaczej WebView2 otworzyłby upuszczony plik zamiast programu. Po każdym załadowaniu strony."""
+            from webview.dom import DOMEventHandler
+
+            def on_drop(event: dict[str, Any]) -> None:
+                try:
+                    files = (event.get("dataTransfer") or {}).get("files") or []
+                    api._explorer_drop([f.get("pywebviewFullPath") for f in files if isinstance(f, dict)])
+                except Exception as exc:  # noqa: BLE001 — nieudane upuszczenie nie psuje okna
+                    log_exception(exc, scrub=client_paths)
+
+            document = window.dom.document
+            document.events.dragover += DOMEventHandler(lambda _event: None, True, False, debounce=500)
+            document.events.drop += DOMEventHandler(on_drop, True, False)
+
+        api._attach(pick_folder=pick_folder, close=window.destroy, pick_file=pick_file, pick_files=pick_files)
+        window.events.loaded += bind_drop
         api._start_updates()
         api._start_telemetry()
         window.events.closing += api._on_closing

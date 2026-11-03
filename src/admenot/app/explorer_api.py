@@ -15,30 +15,36 @@ from __future__ import annotations
 import contextlib
 import functools
 import math
+import os
 import queue
 import re
 import shutil
 import tempfile
 import threading
+from collections import Counter
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from admenot.app import telemetry, winclip
 from admenot.app.errors import AppError, bridge, log_exception
 from admenot.app.explorer_present import ROOT, crumbs, entry_view, file_type, place_view
 from admenot.app.present import device_card
+from admenot.app.telemetry_events import explorer_event
 from admenot.engine.adb.devices import list_devices
 from admenot.engine.adb.sessionlog import SessionLogAdb
 from admenot.engine.adb.transport import AdbError
 from admenot.engine.clientpaths import client_paths
 from admenot.engine.device.info import DeviceInfo, read_device_info
+from admenot.engine.explorer import hostfs
 from admenot.engine.explorer.create import CreateError, make_folder, make_text
-from admenot.engine.explorer.guard import ExplorerAdb, UnsafeCommand, safe_read_path
+from admenot.engine.explorer.guard import ExplorerAdb, UnsafeCommand, is_tmp_name, safe_read_path
 from admenot.engine.explorer.listing import ListError, list_dir, list_error
 from admenot.engine.explorer.media import MediaServer
 from admenot.engine.explorer.meta import image_meta, media_meta
 from admenot.engine.explorer.places import Place, count_place, find_places
+from admenot.engine.explorer.plan import Problem, TaskPlan, plan_to_pc, plan_to_phone
 from admenot.engine.explorer.queue import TransferQueue, sweep_recorded
 from admenot.engine.explorer.textview import TEXT_LIMIT, decode_chunk
 from admenot.engine.explorer.thumbs import EXIF_HEAD
@@ -52,9 +58,26 @@ from admenot.engine.transfer.guard import STAT_TAIL, q
 __all__ = ["ExplorerMixin", "MediaFactory", "explorer_temp_dir"]
 
 MediaFactory = Callable[[str, ExplorerAdb, Callable[[str], bool]], MediaServer]
-# Nieoczekiwany błąd metody eksploratora: wpis w lokalnym logu bez nazw plików klienta.
-_bridge = functools.partial(bridge, scrub=client_paths)
 _LOCAL_ORIGIN = re.compile(r"http://(?:127\.0\.0\.1|localhost)(?::\d{1,5})?")
+_END = frozenset({"done", "cancelled", "failed"})  # końcowe stany zadania kolejki
+_PREVIEW_KINDS = frozenset({"image", "video", "audio"})  # podgląd przez `explorer_meta` (tekst: `explorer_text`)
+
+
+def _bridge(method: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]:
+    """Metoda mostu eksploratora: nieoczekiwany błąd w lokalnym logu bez nazw plików klienta, a klucz
+    każdego błędu (nie komunikat) liczy się do statystyk otwartej sesji."""
+    wrapped = bridge(method, scrub=client_paths)
+
+    @functools.wraps(method)
+    def counted(self: Any, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        out = wrapped(self, *args, **kwargs)
+        error = out.get("error") if isinstance(out, dict) else None
+        sess = self._explorer
+        if isinstance(error, dict) and sess is not None:
+            sess.stats.note_error(str(error.get("key")))
+        return out
+
+    return counted
 
 
 def explorer_temp_dir() -> Path:
@@ -92,6 +115,53 @@ class _Pump:
 
 
 @dataclass
+class _Stats:
+    """Liczby sesji do telemetrii (`explorer_event`): bez nazw plików i ścieżek. Zadania kolejki
+    aktualizuje wątek kolejki, resztę wątki mostu — stąd blokada."""
+
+    started: float = 0.0
+    previews: Counter[str] = field(default_factory=Counter)
+    created: Counter[str] = field(default_factory=Counter)
+    errors: Counter[str] = field(default_factory=Counter)
+    files: Counter[str] = field(default_factory=Counter)  # to_pc / to_phone → przesłane pliki
+    bytes: Counter[str] = field(default_factory=Counter)  # to_pc / to_phone → przesłane bajty
+    speeds: list[float] = field(default_factory=list)  # średnia prędkość zakończonych zadań, B/s
+    runs: dict[str, tuple[float | None, float]] = field(default_factory=dict)  # zadanie → (od kiedy działa, czas pracy)
+    lock: threading.Lock = field(default_factory=threading.Lock)
+
+    def note_error(self, key: str) -> None:
+        with self.lock:
+            self.errors[key] += 1
+
+    def note(self, counter: str, key: str) -> None:
+        with self.lock:
+            getattr(self, counter)[key] += 1
+
+    def task(self, view: dict[str, Any], now: float) -> None:
+        """Zdarzenie kolejki: czas pracy zadania (bez pauz i czekania na telefon), a po końcu zadania
+        pliki, bajty, prędkość i powody nieudanych plików (`file_<powód>`)."""
+        tid, status = view["id"], view["status"]
+        with self.lock:
+            since, active = self.runs.get(tid, (None, 0.0))
+            if status == "running" and since is None:
+                since = now
+            elif status != "running" and since is not None:
+                since, active = None, active + max(0.0, now - since)
+            if status not in _END:
+                self.runs[tid] = (since, active)
+                return
+            if tid not in self.runs:
+                return  # koniec już policzony
+            del self.runs[tid]
+            self.files[view["kind"]] += view["done_files"]
+            self.bytes[view["kind"]] += view["done_bytes"]
+            for _src, reason in view["failed"]:
+                self.errors[f"file_{reason}"] += 1
+            if active > 0 and view["done_bytes"] > 0:
+                self.speeds.append(view["done_bytes"] / active)
+
+
+@dataclass
 class _Session:
     serial: str
     device: DeviceInfo
@@ -107,6 +177,7 @@ class _Session:
     queue: TransferQueue | None = None
     pump: _Pump | None = None
     text: tuple[str, int, str] | None = None  # podgląd tekstu: (ścieżka, następny bajt, kodek)
+    stats: _Stats = field(default_factory=_Stats)  # liczby do telemetrii przy zamknięciu
     card: dict[str, Any] = field(init=False)  # karta telefonu (nazwa w okruszkach)
 
     def __post_init__(self) -> None:
@@ -122,11 +193,14 @@ class ExplorerMixin:
     `_settings`, `_jobs`, `_sync`, `_names`, `_serial`, `_provider`, `_open_url`, fabryk `adb pull/push`
     i `_require_cleaned`)."""
 
-    def _explorer_setup(self, media_factory: MediaFactory | None, temp_dir: Path | None) -> None:
+    def _explorer_setup(self, media_factory: MediaFactory | None, temp_dir: Path | None,
+                        clipboard: Callable[[], list[str]] | None = None) -> None:
         self._explorer: _Session | None = None
         self._explorer_lock = threading.RLock()
         self._explorer_media = media_factory or self._real_media
         self._explorer_temp = temp_dir or explorer_temp_dir()
+        self._explorer_clipboard = clipboard or winclip.clipboard_files
+        self._pick_files_fn: Callable[[], list[str]] | None = None
         self._explorer_clean_temp()
 
     # --- pomocnicze -----------------------------------------------------------------------
@@ -276,6 +350,7 @@ class ExplorerMixin:
                 return None
             self._explorer = None
         queue_ = sess.queue
+        seconds = self._clock() - sess.stats.started
         try:
             sess.media.stop()  # od razu; `stack.close()` woła `stop` jeszcze raz — bez skutku
             if queue_ is not None:
@@ -291,12 +366,62 @@ class ExplorerMixin:
                 if sess.pump is not None:
                     sess.pump.close()
                 sess.stack.close()
+                # po końcu wątku kolejki: anulowane przy zamknięciu zadania też są już policzone
+                self._explorer_telemetry(sess, seconds)
 
         if queue_ is None or (self._sync if wait is None else wait):
             finish()
         else:
             threading.Thread(target=finish, name="explorer-close", daemon=True).start()
         return sess
+
+    @staticmethod
+    def _explorer_telemetry(sess: _Session, seconds: float) -> None:
+        """Zdarzenie `explorer` (same liczby; zgodę sprawdza `telemetry.record`)."""
+        st = sess.stats
+        with st.lock:
+            args = (sess.device, seconds, st.files["to_pc"], st.bytes["to_pc"], st.files["to_phone"],
+                    st.bytes["to_phone"], dict(st.previews), dict(st.created), dict(st.errors), list(st.speeds))
+        telemetry.record("explorer", lambda _packages: explorer_event(*args))
+
+    def _explorer_task_event(self, sess: _Session, detail: dict[str, Any]) -> None:
+        """`explorer:task` z kolejki (wątek kolejki): statystyki sesji, potem widok do okna."""
+        try:
+            sess.stats.task(detail, self._clock())
+        except Exception as exc:  # noqa: BLE001 — statystyki nie zatrzymują zdarzeń kolejki
+            log_exception(exc, scrub=client_paths)
+        (sess.pump or self._emit)("explorer:task", {"task": _task_view(detail)})
+
+    def _explorer_start(self, sess: _Session, plan: TaskPlan, verify_hash: bool) -> dict[str, Any]:
+        """Problemy planu → nic nie startuje, UI je pokazuje; inaczej zadanie trafia do kolejki."""
+        if plan.problems:
+            for problem in plan.problems:
+                sess.stats.note_error(f"problem_{problem.key}")
+            return {"problems": [_problem_view(p) for p in plan.problems]}
+        try:
+            return {"task": self._explorer_queue().add(plan, verify_hash)}
+        except RuntimeError:  # kolejka zamknięta w międzyczasie (eksplorator zamknięty)
+            raise AppError("explorer_not_open") from None
+
+    def _explorer_save_dest(self, path: str) -> None:
+        if path == self._settings.explorer_dest:
+            return
+        try:
+            self._settings = save_internal({"explorer_dest": path})
+        except (OSError, ValueError, TimeoutError, SettingsTooNew) as exc:
+            log_exception(exc, scrub=client_paths)
+
+    def _explorer_drop(self, paths: list[Any]) -> None:
+        """Pliki/foldery upuszczone z Eksploratora Windows (handler `drop` okna, `main.py`): zdarzenie
+        `explorer:drop` z liczbą plików i sumą bajtów — tylko przy otwartym eksploratorze."""
+        if self._explorer is None:
+            return
+        paths = [p for p in paths if isinstance(p, str) and p]
+        if not paths:
+            return
+        count, size = _local_totals(paths)
+        if self._explorer is not None:
+            self._emit("explorer:drop", {"paths": paths, "count": count, "bytes": size})
 
     def _require_explorer_free(self, serial: str) -> None:
         """Wejście skanu/przenoszenia: telefon z otwartym eksploratorem jest zajęty."""
@@ -341,7 +466,8 @@ class ExplorerMixin:
                 sess.pump = None if self._sync else _Pump(self._emit)
                 sess.queue = TransferQueue(
                     lambda: sess.adb, self._puller_factory(adb_path, serial, sess.log),
-                    self._pusher_factory(adb_path, serial, sess.log), sess.pump or self._emit,
+                    self._pusher_factory(adb_path, serial, sess.log),
+                    lambda _name, detail: self._explorer_task_event(sess, detail),
                     lambda: serial in self._ready_serials(), sdk=lambda: sess.device.sdk)
             return sess.queue
 
@@ -390,6 +516,7 @@ class ExplorerMixin:
                 stack.callback(media.stop)
                 base = media.start()
                 sess = _Session(serial, device, match, log, adb, media, base, stack, places)
+                sess.stats.started = self._clock()
             except BaseException:
                 stack.close()
                 raise
@@ -436,6 +563,8 @@ class ExplorerMixin:
                     meta = image_meta(sess.media.read_range(path, 0, min(size, EXIF_HEAD)))
                 elif kind in ("video", "audio"):
                     meta = media_meta(sess.adb, path)
+            if kind in _PREVIEW_KINDS:
+                sess.stats.note("previews", kind)
         return {"meta": {**meta, "size": size, "mtime": mtime, "path": path}}
 
     @_bridge
@@ -457,6 +586,8 @@ class ExplorerMixin:
             if want and not data:  # strumień urwany od razu
                 raise AdbError("command_failed", "empty read")
         text, codec, used = decode_chunk(data, codec, final=offset + len(data) >= size)
+        if offset == 0:  # następne kawałki tego samego pliku to ten sam podgląd
+            sess.stats.note("previews", "text")
         offset += used
         sess.text = (path, offset, codec)
         return {"text": text, "encoding": "utf-16" if codec.startswith("utf-16") else codec,
@@ -469,9 +600,11 @@ class ExplorerMixin:
             raise AppError("bad_request", "name")
         try:
             with self._explorer_errors(sess):
-                return {"path": make_folder(sess.adb, parent, name)}
+                made = make_folder(sess.adb, parent, name)
         except AppError as exc:
             raise _bad_name(exc) from None
+        sess.stats.note("created", "folder")
+        return {"path": made}
 
     @_bridge
     def explorer_new_text(self, parent: str, name: str, text: str) -> dict[str, Any]:
@@ -482,9 +615,11 @@ class ExplorerMixin:
         try:
             with self._explorer_errors(sess):
                 pusher = self._pusher_factory(self._settings.adb_path, sess.serial, sess.log)
-                return {"path": make_text(sess.adb, pusher, parent, name, text, temp_dir=self._explorer_temp)}
+                made = make_text(sess.adb, pusher, parent, name, text, temp_dir=self._explorer_temp)
         except AppError as exc:
             raise _bad_name(exc) from None
+        sess.stats.note("created", "text")
+        return {"path": made}
 
     @_bridge
     def explorer_open_map(self, lat: float, lon: float) -> dict[str, Any]:
@@ -494,6 +629,168 @@ class ExplorerMixin:
         la, lo = f"{lat:.6f}", f"{lon:.6f}"
         self._open_url(f"https://www.openstreetmap.org/?mlat={la}&mlon={lo}#map=17/{la}/{lo}")
         return {}
+
+    # --- kopiowanie i wgrywanie -------------------------------------------------------------
+
+    @_bridge
+    def explorer_copy(self, paths: list[str], dest: str | None = None,
+                      verify_hash: bool = False) -> dict[str, Any]:
+        """Kopia zaznaczenia z telefonu do folderu na komputerze (`dest` None → ostatni wybrany).
+        Problemy planu (miejsce, FAT32, zapis, odmowa) wracają przed startem zamiast zadania."""
+        sess = self._explorer_session()
+        if not isinstance(paths, list) or not paths:
+            raise AppError("bad_request", "paths")
+        if not isinstance(verify_hash, bool):
+            raise AppError("bad_request", "verify_hash")
+        remote = [self._explorer_path(p, file=True) for p in paths]
+        if dest is None:
+            dest = self._settings.explorer_dest
+        elif not isinstance(dest, str):
+            raise AppError("bad_request", "dest")
+        if not dest or not os.path.isabs(dest) or not os.path.isdir(dest):  # np. odłączony pendrive
+            raise AppError("explorer_no_dest")
+        with self._explorer_errors(sess):
+            plan = plan_to_pc(sess.adb, remote, Path(dest))
+        self._explorer_save_dest(dest)
+        return self._explorer_start(sess, plan, verify_hash)
+
+    @_bridge
+    def explorer_upload(self, locals_: list[str], remote_dir: str) -> dict[str, Any]:
+        """Wgranie plików/folderów z komputera (okno wyboru, upuszczenie, Ctrl+V) do folderu telefonu."""
+        sess = self._explorer_session()
+        if not isinstance(locals_, list) or not locals_ or not all(
+                isinstance(p, str) and os.path.isabs(p) for p in locals_):
+            raise AppError("bad_request", "paths")
+        remote_dir = self._explorer_path(remote_dir)
+        with self._explorer_errors(sess):  # `df` przy odłączonym telefonie → explorer_offline
+            plan = plan_to_phone(sess.adb, [Path(p) for p in locals_], remote_dir)
+        return self._explorer_start(sess, plan, False)
+
+    @_bridge
+    def explorer_pick_dest(self) -> dict[str, Any]:
+        """Okno wyboru folderu docelowego kopii; wybrany zostaje zapamiętany (`explorer_dest`)."""
+        path = self._pick_folder_fn() if self._pick_folder_fn else None
+        if path:
+            self._explorer_save_dest(path)
+        return {"path": path}
+
+    @_bridge
+    def explorer_pick_upload(self, kind: str) -> dict[str, Any]:
+        """Okno wyboru plików (wiele) albo jednego folderu do wgrania; anulowane → pusta lista."""
+        if kind == "files":
+            return {"paths": list(self._pick_files_fn() or []) if self._pick_files_fn else []}
+        if kind == "folder":
+            path = self._pick_folder_fn() if self._pick_folder_fn else None
+            return {"paths": [path] if path else []}
+        raise AppError("bad_request", "kind")
+
+    @_bridge
+    def explorer_clipboard(self) -> dict[str, Any]:
+        """Pliki i foldery skopiowane (Ctrl+C) w Eksploratorze Windows — do wgrania po Ctrl+V."""
+        return {"paths": list(self._explorer_clipboard())}
+
+    @_bridge
+    def explorer_tasks(self) -> dict[str, Any]:
+        sess = self._explorer_session()
+        tasks = sess.queue.tasks() if sess.queue is not None else []
+        return {"tasks": [_task_view(asdict(t)) for t in tasks]}
+
+    def _explorer_task_queue(self, task_id: Any) -> TransferQueue | None:
+        sess = self._explorer_session()
+        if not isinstance(task_id, str):
+            raise AppError("bad_request", "id")
+        return sess.queue
+
+    @_bridge
+    def explorer_pause(self, task_id: str) -> dict[str, Any]:
+        queue_ = self._explorer_task_queue(task_id)
+        if queue_ is not None:
+            queue_.pause(task_id)
+        return {}
+
+    @_bridge
+    def explorer_resume(self, task_id: str) -> dict[str, Any]:
+        queue_ = self._explorer_task_queue(task_id)
+        if queue_ is not None:
+            queue_.resume(task_id)
+        return {}
+
+    @_bridge
+    def explorer_cancel(self, task_id: str) -> dict[str, Any]:
+        """Anulowanie od razu; wstrzymane zadanie z plikiem tymczasowym na telefonie sprząta go
+        (`stat`/`rm`, do minuty) — w osobnym wątku, żeby UI nie czekało (w testach `sync_jobs` od razu)."""
+        queue_ = self._explorer_task_queue(task_id)
+        if queue_ is None:
+            return {}
+
+        def cancel() -> None:
+            try:
+                queue_.cancel(task_id)
+            except Exception as exc:  # noqa: BLE001 — sprzątanie dokończy `sweep_tmp` przy następnym otwarciu
+                log_exception(exc, scrub=client_paths)
+
+        if self._sync:
+            cancel()
+        else:
+            threading.Thread(target=cancel, name="explorer-cancel", daemon=True).start()
+        return {}
+
+    @_bridge
+    def explorer_open_folder(self, path: str) -> dict[str, Any]:
+        """„Otwórz folder” po kopii: tylko istniejący folder na komputerze — nigdy plik (bez uruchamiania)."""
+        if not isinstance(path, str) or not path:
+            raise AppError("bad_request", "path")
+        folder = Path(path)
+        if not folder.is_absolute() or not folder.is_dir():
+            raise AppError("explorer_not_folder")
+        self._open_file(folder)
+        return {}
+
+
+def _task_view(state: dict[str, Any]) -> dict[str, Any]:
+    """`TaskState` (słownik z kolejki) dla UI; nieudane pliki jako `{path, reason}`."""
+    return {**state, "speed": round(state["speed"]),
+            "failed": [{"path": src, "reason": reason} for src, reason in state["failed"]]}
+
+
+def _problem_view(problem: Problem) -> dict[str, Any]:
+    return {"key": problem.key, "detail": problem.detail}
+
+
+def _local_totals(paths: list[str]) -> tuple[int, int]:
+    """(liczba plików, suma bajtów) upuszczonych plików i folderów na komputerze — foldery rekurencyjnie,
+    jak plan wgrywania (bez dowiązań i naszych plików tymczasowych); nieczytelne pozycje są pomijane."""
+    count = size = 0
+
+    def walk(folder: str) -> None:
+        nonlocal count, size
+        try:
+            with os.scandir(hostfs.long_path(folder)) as it:
+                entries = list(it)
+        except OSError:
+            return
+        for e in entries:
+            try:
+                if e.is_symlink() or is_tmp_name(e.name):
+                    continue
+                if e.is_dir(follow_symlinks=False):
+                    walk(e.path)
+                elif e.is_file(follow_symlinks=False):
+                    size += e.stat(follow_symlinks=False).st_size
+                    count += 1
+            except OSError:
+                continue
+
+    for p in paths:
+        try:
+            if os.path.isdir(p):
+                walk(p)
+            elif os.path.isfile(p):
+                size += os.path.getsize(p)
+                count += 1
+        except OSError:
+            continue
+    return count, size
 
 
 def _bad_name(exc: AppError) -> AppError:

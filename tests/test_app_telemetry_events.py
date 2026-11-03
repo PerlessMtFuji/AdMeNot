@@ -123,8 +123,8 @@ def test_undo_targets_do_not_fail_an_app_for_skipped_or_timed_out_sites():
 def test_sample_uses_the_same_shapes():
     s = ev.sample()
     assert [e["type"] for e in s["basic"]] == ["start", "scan", "repair", "undo", "transfer_backup",
-                                              "transfer_restore"]
-    no_packages = ("start", "transfer_backup", "transfer_restore")  # zdarzenia bez listy pakietów
+                                              "transfer_restore", "explorer"]
+    no_packages = ("start", "transfer_backup", "transfer_restore", "explorer")  # zdarzenia bez listy pakietów
     assert all(e["packages"] is None for e in s["basic"] if e["type"] not in no_packages)
     assert all(e["packages"] for e in s["packages"] if e["type"] not in no_packages)
     assert all("packages" not in e for e in s["basic"] + s["packages"] if e["type"] in no_packages)
@@ -373,3 +373,28 @@ def test_transfer_restore_event_tel_status_and_limits():
     big = dc.replace(big, kinds={"calls": dc.replace(big.kinds["sms"], written=10**9)})
     body = ev.transfer_restore_event(ev._SAMPLE_DEVICE, _restore_result(), _upload_choice(), 4, big)
     assert body["tel"]["calls"]["written"] == ev.MAX_COUNT
+
+
+def test_sample_contains_explorer():
+    for variant in ("basic", "packages"):
+        shown = next(e for e in ev.sample()[variant] if e["type"] == "explorer")
+        assert set(shown) - {"install", "type", "t", "app", "os", "lang"} == {
+            "device", "seconds", "copied_files", "copied_mb", "uploaded_files", "uploaded_mb", "previews",
+            "created", "errors", "mb_s"}
+        assert set(shown["previews"]) == {"image", "video", "audio", "text"}
+        assert set(shown["created"]) == {"folder", "text"}
+        assert "packages" not in shown
+
+
+def test_explorer_event_numbers_limits_and_error_keys():
+    body = ev.explorer_event(ev._SAMPLE_DEVICE, 10**7, 3, 2_600_000, 10**9, 10**20, {"image": 2, "x": 5},
+                             {"folder": 1}, {"explorer_denied": 2, "file_size": 1, "C:/Users/Jan/a.jpg": 1,
+                                             "zero": 0},
+                             [0.0, 30_000_000.0, 20_000_000.0, 50_000_000.0])
+    assert body == {
+        "device": {"manufacturer": "OPPO", "model": "CPH2483", "android": "14"},
+        "seconds": 86_400, "copied_files": 3, "copied_mb": 3, "uploaded_files": ev.MAX_COUNT,
+        "uploaded_mb": ev.MAX_MB, "previews": {"image": 2, "video": 0, "audio": 0, "text": 0},
+        "created": {"folder": 1, "text": 0}, "errors": {"explorer_denied": 2, "file_size": 1}, "mb_s": 30}
+    idle = ev.explorer_event(ev._SAMPLE_DEVICE, 5, 0, 0, 0, 0, {}, {}, {}, [])
+    assert idle["mb_s"] is None and idle["errors"] == {}

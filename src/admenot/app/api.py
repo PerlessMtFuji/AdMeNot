@@ -380,6 +380,7 @@ class Api(ExplorerMixin):
         transfer_purge_s: float | None = TRANSFER_PURGE_S,
         explorer_media: MediaFactory | None = None,
         explorer_temp: Path | None = None,
+        explorer_clipboard: Callable[[], list[str]] | None = None,
     ) -> None:
         self._emitter = emitter
         self._host_factory = host_factory
@@ -458,7 +459,7 @@ class Api(ExplorerMixin):
         self._cleanup_lock = threading.RLock()
         self._purge_stop = threading.Event()
         # Eksplorator plików (`ExplorerMixin`): sesja, serwer mediów (podmieniany w testach), `%TEMP%`.
-        self._explorer_setup(explorer_media, explorer_temp)
+        self._explorer_setup(explorer_media, explorer_temp, explorer_clipboard)
         self._clean_screenshots()
         self._purge_old_data()
         # Zegar dobowy: okno bywa otwarte dniami, a kopie po 7 dniach mają zniknąć. Testy
@@ -2352,10 +2353,12 @@ class Api(ExplorerMixin):
         return {"path": self._pick_folder_fn() if self._pick_folder_fn else None}
 
     def _attach(self, pick_folder: Callable[[], str | None], close: Callable[[], None],
-                pick_file: Callable[[], str | None] | None = None) -> None:
+                pick_file: Callable[[], str | None] | None = None,
+                pick_files: Callable[[], list[str]] | None = None) -> None:
         self._pick_folder_fn = pick_folder
         self._close_fn = close
         self._pick_file_fn = pick_file
+        self._pick_files_fn = pick_files  # eksplorator: „Wgraj tutaj” (wiele plików)
 
     def _transfer_job(self) -> Job | None:
         job = self._jobs.current()

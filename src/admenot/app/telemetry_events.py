@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import platform
 import re
-from collections.abc import Iterable
+import statistics
+from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime
 from typing import Any
 
@@ -235,6 +236,32 @@ def transfer_restore_event(device: DeviceInfo, result: RestoreResult, choice: Up
     }
 
 
+EXPLORER_PREVIEWS = ("image", "video", "audio", "text")
+EXPLORER_CREATED = ("folder", "text")
+_ERROR_KEY = re.compile(r"^[a-z0-9_]{1,64}$")  # klucze błędów — nigdy tekst z nazwą pliku albo ścieżką
+
+
+def explorer_event(device: DeviceInfo, seconds: float, copied_files: int, copied_bytes: int,
+                   uploaded_files: int, uploaded_bytes: int, previews: Mapping[str, int],
+                   created: Mapping[str, int], errors: Mapping[str, int],
+                   speeds: Iterable[float]) -> dict[str, Any]:
+    """Zamknięta sesja eksploratora plików: same liczby. Bez nazw plików, folderów i ścieżek —
+    błędy tylko jako klucz (`explorer_denied`, `file_size`…) z liczbą. `speeds` — średnie prędkości
+    zadań (B/s); `mb_s` to ich mediana w MB/s (None: żadne zadanie nie przesłało danych)."""
+    keys = sorted(k for k in errors if _ERROR_KEY.match(k) and errors[k] > 0)[:MAX_ERRORS]
+    measured = [s for s in speeds if s > 0]
+    return {
+        "device": device_of(device), "seconds": _count(round(seconds), MAX_SECONDS),
+        "copied_files": _count(copied_files), "copied_mb": _count(round(copied_bytes / 1_000_000), MAX_MB),
+        "uploaded_files": _count(uploaded_files),
+        "uploaded_mb": _count(round(uploaded_bytes / 1_000_000), MAX_MB),
+        "previews": {k: _count(previews.get(k, 0)) for k in EXPLORER_PREVIEWS},
+        "created": {k: _count(created.get(k, 0)) for k in EXPLORER_CREATED},
+        "errors": {k: _count(errors[k]) for k in keys},
+        "mb_s": _count(round(statistics.median(measured) / 1_000_000)) if measured else None,
+    }
+
+
 _SAMPLE_DEVICE = DeviceInfo(serial="-", brand="OPPO", manufacturer="OPPO", model="CPH2483",
                             device="-", market_name=None, android_release="14", sdk=34,
                             security_patch=None, uptime_s=0.0, local_now=datetime(2026, 10, 10))
@@ -277,6 +304,10 @@ def sample() -> dict[str, list[dict[str, Any]]]:
                            "calls": TelKindResult(640, 0, 0, 0, 0, 0, "app_process", False)},
                     safety={"contacts": True, "sms": True, "calls": True}, manual=[],
                     cleanup=CleanupResult(True, True, True, True), synced_accounts={}, seconds=95)
+    # Eksplorator plików: liczby plików, MB, podglądów i błędów (klucze) — bez nazw i ścieżek.
+    explorer = explorer_event(_SAMPLE_DEVICE, 612, 148, 1_920_000_000, 6, 41_000_000,
+                              {"image": 23, "video": 2, "audio": 1, "text": 1}, {"folder": 1, "text": 0},
+                              {"explorer_denied": 1}, [31_000_000, 28_000_000, 35_000_000])
     out: dict[str, list[dict[str, Any]]] = {}
     for name, packages in (("basic", False), ("packages", True)):
         bodies = [("start", start_body("simple")), ("scan", _sample_scan(packages)),
@@ -285,6 +316,7 @@ def sample() -> dict[str, list[dict[str, Any]]]:
                   ("undo", undo_event(_SAMPLE_DEVICE, ["com.wlive.forecast"], [], 2, packages,
                                     sites=2, sites_restored=1)),
                   ("transfer_backup", transfer_backup_event(_SAMPLE_DEVICE, backup, chosen)),
-                  ("transfer_restore", transfer_restore_event(_SAMPLE_DEVICE, restore, upload, 4, tel))]
+                  ("transfer_restore", transfer_restore_event(_SAMPLE_DEVICE, restore, upload, 4, tel)),
+                  ("explorer", explorer)]
         out[name] = [{**common(SAMPLE_INSTALL, t, now, "pl"), **body} for t, body in bodies]
     return out

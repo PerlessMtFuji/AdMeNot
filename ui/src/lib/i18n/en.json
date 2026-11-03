@@ -268,6 +268,7 @@
       "undo": "After an undo: how many apps were restored and how many days after the repair.",
       "transfer_backup": "After copying an old phone's data: phone manufacturer, model and Android version, outcome, duration, size in MB, number of copied and failed files and apps, which kinds of data were selected — no folder, file or app names.",
       "transfer_restore": "After uploading a copy to a new phone: the new phone's manufacturer, model and Android version, outcome, duration, size in MB, numbers of files uploaded, already present, saved alongside, refused by Android, failed, skipped and missing from the copy, number of skipped APK files (harmful and suspicious), number of parallel transfers, how files were checked, whether the gallery was refreshed, which kinds of files were selected — no folder, file or app names.",
+      "explorer": "After closing the file explorer: the phone's manufacturer, model and Android version, duration, number and size in MB of files copied to the computer and uploaded to the phone, median speed, number of previews (photos, videos, audio, text), number of folders and text files created, number of errors by code — no folder or file names and no paths.",
       "packages": "With the second consent: package names of apps the program flagged or you selected, with the rating and your decision.",
       "never": "Never: serial number, IMEI, customer name, order number, shop details, screenshots, names of apps rated safe and left untouched."
     },
