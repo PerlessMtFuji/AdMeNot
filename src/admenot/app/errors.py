@@ -67,7 +67,7 @@ def report_error(exc: BaseException, context: dict[str, Any] | None = None,
     payload = error_payload(exc)
     if payload["key"] == "internal":
         try:
-            payload["log"] = str(log_exception(exc, scrub=scrub))
+            payload["log"] = str(log_exception(exc) if scrub is None else log_exception(exc, scrub=scrub))
         except OSError:
             payload["log_failed"] = True
         try:
