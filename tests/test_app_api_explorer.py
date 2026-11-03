@@ -729,3 +729,84 @@ def test_explorer_event_counts_task_time_and_speed(tmp_path, monkeypatch):
     (_device, seconds, copied_files, copied_bytes, uploaded_files, uploaded_bytes, *_rest, speeds) = seen[0]
     assert (copied_files, copied_bytes, uploaded_files, uploaded_bytes) == (1, 40, 0, 0)
     assert list(speeds) == [20.0] and seconds >= 4
+
+
+# --- poprawki po przeglądzie Taska 9 -----------------------------------------------------------
+
+
+def test_plan_for_replaced_session_is_not_queued(tmp_path, monkeypatch):
+    """Plan liczony dla telefonu A nie trafia do kolejki telefonu B otwartego w trakcie planowania."""
+    api, _, host, _ = _opened(tmp_path, other=True)
+    host.connected.add(OTHER)
+    real = explorer_api.plan_to_phone
+
+    def plan_and_switch(*args, **kwargs):
+        plan = real(*args, **kwargs)
+        api.explorer_close()
+        assert "error" not in api.explorer_open(OTHER)
+        return plan
+
+    monkeypatch.setattr(explorer_api, "plan_to_phone", plan_and_switch)
+    local = _pc_dir(tmp_path, "z komputera")
+    (local / "a.txt").write_bytes(b"a")
+    out = api.explorer_upload([str(local / "a.txt")], "/sdcard/Download")
+    assert out["error"]["key"] == "explorer_not_open"
+    assert api._explorer.serial == OTHER and api._explorer.queue is None
+    assert api.explorer_tasks() == {"tasks": []}
+    assert not _storage_of(host, OTHER).local("/sdcard/Download/a.txt").exists()
+    api.explorer_close()
+
+
+def test_task_ids_are_unique_across_sessions(tmp_path):
+    api, _, host, _ = _opened(tmp_path)
+    local = _pc_dir(tmp_path, "z komputera")
+    (local / "a.txt").write_bytes(b"a")
+    (local / "b.txt").write_bytes(b"b")
+    old = api.explorer_upload([str(local / "a.txt")], "/sdcard/Download")["task"]
+    _wait_task(api, old, "done")
+    api.explorer_close()
+    api.explorer_open(SERIAL)
+    gated = _GatedPusher(host.phone(SERIAL))
+    api._pusher_factory = lambda adb_path, serial, log: gated
+    new = api.explorer_upload([str(local / "b.txt")], "/sdcard/Music")["task"]
+    try:
+        assert new != old
+        assert gated.entered.wait(5)
+        assert api.explorer_cancel(old) == {} and api.explorer_pause(old) == {}  # stary identyfikator: nic
+    finally:
+        gated.gate.set()
+    assert _wait_task(api, new, "done")["status"] == "done"
+    assert _storage_of(host).local("/sdcard/Music/b.txt").read_bytes() == b"b"
+    api.explorer_close()
+
+
+def test_upload_into_probed_locked_folder_is_denied_before_start(tmp_path, monkeypatch):
+    seen: list = []
+    real = explorer_api.plan_to_phone
+    monkeypatch.setattr(explorer_api, "plan_to_phone",
+                        lambda *a, **kw: seen.append(kw.get("locked")) or real(*a, **kw))
+    api, _, _, _ = _opened(tmp_path)
+    locked = [e for e in api.explorer_list("/sdcard/Android")["entries"] if e["locked"]]
+    assert [e["path"] for e in locked] == ["/sdcard/Android/data"]
+    local = _pc_dir(tmp_path, "z komputera")
+    (local / "a.txt").write_bytes(b"a")
+    out = api.explorer_upload([str(local / "a.txt")], "/sdcard/Android/data/com.example")
+    assert out["problems"][0]["key"] == "denied"
+    assert seen == [frozenset({"/sdcard/Android/data"})]
+    assert api.explorer_tasks() == {"tasks": []}
+    api.explorer_close()
+
+
+def test_close_failure_still_records_telemetry(tmp_path):
+    api, _, _, _ = _opened(tmp_path)
+    api.set_telemetry(True, False)
+    api._explorer_queue()  # zamknięcie czeka na wątek kolejki, potem zwalnia telefon
+
+    def broken():
+        raise OSError("close failed")
+
+    api._explorer.stack.callback(broken)
+    assert api.explorer_close()["error"]["key"] == "internal"
+    events = [json.loads(x) for x in telemetry_path().read_text("utf-8").splitlines()]
+    assert [e["type"] for e in events].count("explorer") == 1
+    assert _lock_free()

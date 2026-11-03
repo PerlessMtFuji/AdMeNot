@@ -258,7 +258,7 @@ class TransferQueue:
                  retry_interval: float = RETRY_INTERVAL,
                  tmp_dir: Path | None = None,
                  token: Callable[[], str] = lambda: secrets.token_hex(6),
-                 streams: int = STREAMS, big_file: int = BIG_FILE) -> None:
+                 streams: int = STREAMS, big_file: int = BIG_FILE, id_prefix: str = "t") -> None:
         self._adb_factory = adb_factory
         self._puller = puller
         self._pusher = pusher
@@ -273,6 +273,7 @@ class TransferQueue:
         self._token = token
         self._streams = max(1, streams)
         self._big = big_file
+        self._id_prefix = id_prefix  # różne kolejki (sesje) — różne identyfikatory zadań
         self.serial: str = adb_factory().serial or "unknown"
         self._tasks: dict[str, _Task] = {}
         self._lock = threading.RLock()
@@ -299,7 +300,7 @@ class TransferQueue:
             if self._closing:
                 raise RuntimeError("queue closed")
             self._seq += 1
-            tid = f"t{self._seq}"
+            tid = f"{self._id_prefix}{self._seq}"
             state = TaskState(tid, plan.kind, "queued", 0, len(live), 0, sum(i.size for i in live), 0.0, None,
                               plan.skipped + len(plan.items) - len(live), 0, [], None, _dest(plan))
             task = self._tasks[tid] = _Task(plan, verify_hash, state, status, names)

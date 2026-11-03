@@ -178,6 +178,7 @@ class _Session:
     pump: _Pump | None = None
     text: tuple[str, int, str] | None = None  # podgląd tekstu: (ścieżka, następny bajt, kodek)
     stats: _Stats = field(default_factory=_Stats)  # liczby do telemetrii przy zamknięciu
+    locked: set[str] = field(default_factory=set)  # foldery z kłódką wg sondy listowania (R5) — do planu wgrywania
     card: dict[str, Any] = field(init=False)  # karta telefonu (nazwa w okruszkach)
 
     def __post_init__(self) -> None:
@@ -201,6 +202,7 @@ class ExplorerMixin:
         self._explorer_temp = temp_dir or explorer_temp_dir()
         self._explorer_clipboard = clipboard or winclip.clipboard_files
         self._pick_files_fn: Callable[[], list[str]] | None = None
+        self._explorer_seq = 0  # kolejne kolejki zadań (przedrostek identyfikatorów)
         self._explorer_clean_temp()
 
     # --- pomocnicze -----------------------------------------------------------------------
@@ -363,11 +365,14 @@ class ExplorerMixin:
                 if queue_ is not None:
                     queue_.join()
             finally:
-                if sess.pump is not None:
-                    sess.pump.close()
-                sess.stack.close()
-                # po końcu wątku kolejki: anulowane przy zamknięciu zadania też są już policzone
-                self._explorer_telemetry(sess, seconds)
+                try:
+                    # po końcu wątku kolejki (anulowane przy zamknięciu zadania też są już policzone),
+                    # a przed zwolnieniem telefonu — błąd zamknięcia nie gubi zdarzenia
+                    self._explorer_telemetry(sess, seconds)
+                finally:
+                    if sess.pump is not None:
+                        sess.pump.close()
+                    sess.stack.close()
 
         if queue_ is None or (self._sync if wait is None else wait):
             finish()
@@ -399,7 +404,10 @@ class ExplorerMixin:
                 sess.stats.note_error(f"problem_{problem.key}")
             return {"problems": [_problem_view(p) for p in plan.problems]}
         try:
-            return {"task": self._explorer_queue().add(plan, verify_hash)}
+            # pod blokadą sesji: plan liczony dla `sess` trafia tylko do kolejki tej sesji — nie do kolejki
+            # telefonu otwartego w międzyczasie
+            with self._explorer_lock:
+                return {"task": self._explorer_queue(sess).add(plan, verify_hash)}
         except RuntimeError:  # kolejka zamknięta w międzyczasie (eksplorator zamknięty)
             raise AppError("explorer_not_open") from None
 
@@ -455,12 +463,18 @@ class ExplorerMixin:
                 log_exception(exc, scrub=client_paths)
         self._emit(*event)
 
-    def _explorer_queue(self) -> TransferQueue:
+    def _explorer_queue(self, expected: _Session | None = None) -> TransferQueue:
         """Kolejka zadań otwartego eksploratora (kopiowanie i wgrywanie, Task 9), tworzona przy pierwszym
-        zadaniu: adb, `adb pull/push` i sprawdzanie podłączenia — tylko telefon tej sesji."""
+        zadaniu: adb, `adb pull/push` i sprawdzanie podłączenia — tylko telefon tej sesji. `expected` —
+        sesja, dla której wołający coś przygotował; inna (albo żadna) otwarta → `explorer_not_open`.
+        Identyfikatory zadań mają przedrostek sesji (`s<n>t<m>`), więc stary identyfikator nie trafi
+        w zadanie nowej sesji."""
         with self._explorer_lock:
             sess = self._explorer_session()
+            if expected is not None and sess is not expected:
+                raise AppError("explorer_not_open")
             if sess.queue is None:
+                self._explorer_seq += 1
                 serial = sess.serial
                 adb_path = self._settings.adb_path
                 sess.pump = None if self._sync else _Pump(self._emit)
@@ -468,7 +482,8 @@ class ExplorerMixin:
                     lambda: sess.adb, self._puller_factory(adb_path, serial, sess.log),
                     self._pusher_factory(adb_path, serial, sess.log),
                     lambda _name, detail: self._explorer_task_event(sess, detail),
-                    lambda: serial in self._ready_serials(), sdk=lambda: sess.device.sdk)
+                    lambda: serial in self._ready_serials(), sdk=lambda: sess.device.sdk,
+                    id_prefix=f"s{self._explorer_seq}t")
             return sess.queue
 
     # --- metody dla UI ----------------------------------------------------------------------
@@ -545,6 +560,10 @@ class ExplorerMixin:
             entries, skipped, locked = [], 0, True  # folder z kłódką zamiast błędu (spec §5.3)
         except (AdbError, UnsafeCommand) as exc:
             raise self._explorer_error(sess, exc) from None
+        with self._explorer_lock:  # wynik sondy kłódki dla planu wgrywania (`plan_to_phone(locked=…)`)
+            if locked:
+                sess.locked.add(path)
+            sess.locked.update(e.path for e in entries if e.locked)
         if not locked:
             self._explorer_remember(path)
         return {"path": path, "crumbs": crumbs(path, sess.name, apps),
@@ -662,8 +681,10 @@ class ExplorerMixin:
                 isinstance(p, str) and os.path.isabs(p) for p in locals_):
             raise AppError("bad_request", "paths")
         remote_dir = self._explorer_path(remote_dir)
+        with self._explorer_lock:
+            locked = frozenset(sess.locked)
         with self._explorer_errors(sess):  # `df` przy odłączonym telefonie → explorer_offline
-            plan = plan_to_phone(sess.adb, [Path(p) for p in locals_], remote_dir)
+            plan = plan_to_phone(sess.adb, [Path(p) for p in locals_], remote_dir, locked=locked)
         return self._explorer_start(sess, plan, False)
 
     @_bridge
