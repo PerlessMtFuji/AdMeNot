@@ -29,7 +29,8 @@ export class ExplorerState {
   selected = new SvelteSet<string>();
   /** Kotwica zaznaczenia zakresem (Shift+klik). */
   anchor = $state<string | null>(null);
-  tasks = $state<TaskView[]>([]);
+  /** Zadania kolejki; raw — zdarzenia podmieniają je w całości, bez głębokich proxy. */
+  tasks = $state.raw<TaskView[]>([]);
   /** Telefon zniknął z listy — most czeka na jego powrót (`explorer:online`). */
   offline = $state(false);
   preview = $state<string | null>(null);

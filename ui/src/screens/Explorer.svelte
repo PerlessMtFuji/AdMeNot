@@ -4,6 +4,12 @@
   import FileList from '../components/explorer/FileList.svelte';
   import Gallery from '../components/explorer/Gallery.svelte';
   import Places from '../components/explorer/Places.svelte';
+  import DropZone from '../components/explorer/DropZone.svelte';
+  import Menu from '../components/explorer/Menu.svelte';
+  import NewDialog from '../components/explorer/NewDialog.svelte';
+  import ProblemsDialog from '../components/explorer/ProblemsDialog.svelte';
+  import SelectionBar from '../components/explorer/SelectionBar.svelte';
+  import TaskBar from '../components/explorer/TaskBar.svelte';
   import type { Controller } from '../lib/controller';
   import { type ExplorerFilter, FILTERS, formatBytes } from '../lib/explorer/logic';
   import { mediaFetcher, ThumbQueue } from '../lib/explorer/thumbs';
@@ -57,6 +63,9 @@
     } else if (mod && e.key.toLowerCase() === 'a') {
       e.preventDefault();
       ex.selectAll();
+    } else if (mod && e.key.toLowerCase() === 'v') {
+      e.preventDefault();
+      void ex.paste();
     } else if (e.key === 'Escape') {
       ex.clear();
     } else if (e.key === 'F5') {
@@ -64,9 +73,31 @@
       void ex.refresh();
     }
   }
+
+  let creating = $state<'folder' | 'text' | null>(null);
+  const isFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('Files');
+  /** Przeciąganie z Eksploratora Windows: strefa upuszczania; samo wgranie robi `explorer:drop` (ścieżki zna tylko most). */
+  function ondragenter(e: DragEvent): void {
+    if (!isFiles(e)) return;
+    e.preventDefault();
+    ex.dragOver(e.dataTransfer?.items?.length ?? null);
+  }
+  function ondragover(e: DragEvent): void {
+    if (isFiles(e)) e.preventDefault();
+  }
+  function ondragleave(e: DragEvent): void {
+    if (!e.relatedTarget) ex.dragEnd();
+  }
+  function ondrop(e: DragEvent): void {
+    if (!isFiles(e)) return;
+    e.preventDefault();
+    // gdyby most nie przysłał `explorer:drop` (np. upuszczono coś bez plików), strefa nie może zostać
+    setTimeout(() => ex.dragEnd(), DROP_GRACE_MS);
+  }
+  const DROP_GRACE_MS = 2000;
 </script>
 
-<svelte:window onkeydown={onkey} />
+<svelte:window onkeydown={onkey} {ondragenter} {ondragover} {ondragleave} {ondrop} />
 
 <main class="flex min-w-0 flex-1 flex-col gap-3 px-6 pt-5 pb-6">
   <h1 class="sr-only">{t('explorer.title', { name: s.device?.name ?? '' })}</h1>
@@ -104,13 +135,22 @@
       value={s.filter} onchange={(e) => ex.setFilter(e.currentTarget.value as ExplorerFilter)}>
       {#each FILTERS as f (f)}<option value={f}>{t(`explorer.filter.${f}`)}</option>{/each}
     </select>
-    <!-- Tworzenie i wgrywanie podłącza Task 12 (NewDialog, okno wyboru plików). -->
-    <Button size="sm" disabled class="flex-none !py-2">
+    <Menu title={t('explorer.new_menu.label')} menuLabel={t('explorer.new_menu.label')} disabled={s.locked}
+      class="btn-secondary rounded-[10px] px-3 py-2 text-sm text-ink"
+      items={[
+        { id: 'folder', label: t('explorer.new_menu.folder'), onselect: () => (creating = 'folder') },
+        { id: 'text', label: t('explorer.new_menu.text'), onselect: () => (creating = 'text') },
+      ]}>
       <Icon name="plus" size={15} />{t('explorer.new')}<Icon name="chevron-down" size={14} />
-    </Button>
-    <Button size="sm" variant="primary" disabled class="flex-none !py-2">
-      <Icon name="upload" size={15} />{t('explorer.upload_here')}
-    </Button>
+    </Menu>
+    <Menu title={t('explorer.upload_menu.label')} menuLabel={t('explorer.upload_menu.label')} disabled={s.locked}
+      class="btn-primary rounded-[10px] px-3 py-2 text-sm text-white"
+      items={[
+        { id: 'files', label: t('explorer.upload_menu.files'), onselect: () => void ex.pickUpload('files') },
+        { id: 'folder', label: t('explorer.upload_menu.folder'), onselect: () => void ex.pickUpload('folder') },
+      ]}>
+      <Icon name="upload" size={15} />{t('explorer.upload_here')}<Icon name="chevron-down" size={14} />
+    </Menu>
   </div>
 
   {#if s.offline}
@@ -119,6 +159,12 @@
   {#if s.error}
     <Banner tone="bad" icon="triangle-alert" title={errorText}>
       {#snippet actions()}<Button size="sm" variant="ghost" onclick={() => (s.error = null)}>{t('common.close')}</Button>{/snippet}
+    </Banner>
+  {/if}
+  {#if s.clipboardEmpty}
+    <Banner tone="info" icon="info">
+      {t('explorer.clipboard_empty')}
+      {#snippet actions()}<Button size="sm" variant="ghost" onclick={() => ex.dismissClipboard()}>{t('common.close')}</Button>{/snippet}
     </Banner>
   {/if}
   {#if s.leftovers > 0}
@@ -152,6 +198,16 @@
         {/if}
         {#if s.skipped > 0}<p class="px-3 pt-1 text-2xs text-soft">{tp('explorer.skipped', s.skipped)}</p>{/if}
       {/if}
+      {#if s.drop}<DropZone drop={s.drop} folder={folderName} />{/if}
     </section>
   </div>
+
+  <SelectionBar {ex} />
+  <TaskBar {ex} />
 </main>
+
+{#if creating}
+  <NewDialog kind={creating} where={folderName} oncancel={() => (creating = null)}
+    onsubmit={(name, text) => (creating === 'folder' ? ex.newFolder(name) : ex.newText(name, text))} />
+{/if}
+{#if s.problems}<ProblemsDialog {ex} problems={s.problems} />{/if}

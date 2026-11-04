@@ -252,8 +252,10 @@
         onclick={(ev) => onclick(ev, e)}
         ondblclick={() => { if (e.kind === 'dir') void ex.go(e.path); }}
         onkeydown={(ev) => onkey(ev, e, i)}>
-        <Thumb entry={e} thumb={url ? thumbs.get(url) : null} noThumb={!url || thumbs.failed(url)} selected={sel}
-          cascadeAt={cascadeAt(e.path)} onbroken={() => { if (url) thumbs.broken(url); }} />
+        <div class="h-full w-full {s.fresh.has(e.path) ? '[animation:pop-in_.35s]' : ''}">
+          <Thumb entry={e} thumb={url ? thumbs.get(url) : null} noThumb={!url || thumbs.failed(url)} selected={sel}
+            cascadeAt={cascadeAt(e.path)} onbroken={() => { if (url) thumbs.broken(url); }} />
+        </div>
       </div>
     {/each}
     {#if lasso}<Lasso rect={lasso} />{/if}
