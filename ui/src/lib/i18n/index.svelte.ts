@@ -37,7 +37,7 @@ export const PLURAL_KEYS = ['results.title', 'results.safe', 'expert.days', 'pan
   'explorer.selection.count', 'explorer.preview.lines', 'explorer.task.copied', 'explorer.task.uploaded', 'explorer.task.failed_pc',
   'explorer.task.failed_phone', 'explorer.task.skipped', 'explorer.task.renamed', 'explorer.task.damaged',
   'explorer.task.more', 'explorer.problems.path_too_long_pc', 'explorer.problems.path_too_long_phone',
-  'explorer.drop.items'] as const;
+  'explorer.drop.items', 'explorer.leave.message'] as const;
 
 
 class I18n {

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import threading
 import time
 from pathlib import Path
@@ -24,6 +25,7 @@ from admenot.engine.explorer.queue import read_tmp_folders, record_tmp_folder
 from admenot.engine.oplock import DeviceBusy, device_lock
 from admenot.engine.paths import journal_path, logs_dir, telemetry_path
 from admenot.engine.settings import load_settings
+from admenot.engine.transfer.puller import RealPuller
 
 OTHER = "R58W20NEW01"
 MTIME = 1_700_000_000
@@ -847,3 +849,92 @@ def test_close_failure_still_records_telemetry(tmp_path):
     events = [json.loads(x) for x in telemetry_path().read_text("utf-8").splitlines()]
     assert [e["type"] for e in events].count("explorer") == 1
     assert _lock_free()
+
+
+# --- wyjście z programu przy trwającym zadaniu ----------------------------------------------------
+
+
+def _slow_adb(tmp_path: Path) -> tuple[Path, Path]:
+    """Atrapa `adb` dla `RealPuller`: pisze do celu po kawałku i nie kończy się sama; zapisuje swój PID."""
+    pid_file = tmp_path / "adb.pid"
+    script = tmp_path / "slow_adb.py"
+    script.write_text(
+        "import os, sys, time\n"
+        f"open({str(pid_file)!r}, 'w').write(str(os.getpid()))\n"
+        "with open(sys.argv[-1], 'ab') as fh:\n"
+        "    for _ in range(6000):\n"
+        "        fh.write(b'x' * 64); fh.flush(); time.sleep(0.01)\n", "utf-8")
+    if sys.platform == "win32":
+        exe = tmp_path / "slow_adb.cmd"
+        exe.write_text(f'@"{sys.executable}" "{script}" %*\r\n', "utf-8")
+    else:
+        exe = tmp_path / "slow_adb"
+        exe.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n', "utf-8")
+        exe.chmod(0o755)
+    return exe, pid_file
+
+
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="sygnał 0 do sprawdzenia procesu — POSIX")
+def test_window_close_with_running_copy_kills_adb_and_leaves_no_part(tmp_path):
+    exe, pid_file = _slow_adb(tmp_path)
+    host = _host(tmp_path)
+    api, _ = _api(host, sync=False, puller_factory=lambda adb_path, serial, log: RealPuller(str(exe), serial, log))
+    assert "error" not in api.explorer_open(SERIAL)
+    pc = _pc_dir(tmp_path)
+    closed = threading.Event()
+    api._attach(pick_folder=lambda: str(pc), close=closed.set)
+    started = api.explorer_copy(["/sdcard/Music/piosenka.mp3"], str(pc))
+    part = pc / "piosenka.mp3.admenot-part"
+    deadline = time.monotonic() + 10
+    while not (pid_file.exists() and part.exists() and part.stat().st_size > 0):
+        assert time.monotonic() < deadline, "atrapa adb nie ruszyła"
+        time.sleep(0.02)
+    pid = int(pid_file.read_text())
+    assert _alive(pid) and api._explorer_active() == 1
+    assert api._on_closing() is False  # okno czeka na koniec kolejki (nie na wątku GUI)
+    assert closed.wait(15), "okno się nie zamknęło"
+    assert not _alive(pid), "adb pull nadal działa po zamknięciu programu"
+    assert not part.exists() and list(pc.iterdir()) == []  # bez `.admenot-part` i bez niepełnego pliku
+    assert api._explorer is None
+    assert started["task"].startswith("s1t")
+    _wait_lock_free()
+    assert api._on_closing() is True  # drugie wywołanie (po `close_fn`) zamyka okno
+
+
+def test_quit_join_timeout_removes_partials(tmp_path):
+    """Wątek kolejki nie skończył się na czas (np. długie `sha256sum`): `.admenot-part` usuwamy sami."""
+    api, _, _, _ = _opened(tmp_path)
+    queue = api._explorer_queue()
+    gate = threading.Event()
+    queue._worker = threading.Thread(target=gate.wait, args=(10,), daemon=True)
+    queue._worker.start()
+    pc = _pc_dir(tmp_path)
+    part = pc / "film.mp4.admenot-part"
+    part.write_bytes(b"half")
+    plan = TaskPlan("to_pc", [], [], 0, [])
+    tid = queue.add(plan)
+    queue._tasks[tid].inflight[0] = str(part)
+    queue._tasks[tid].state.status = "running"
+    try:
+        started = time.monotonic()
+        api._explorer_quit(timeout=0.2)
+        assert time.monotonic() - started < 5
+        assert not part.exists() and api._explorer is None
+    finally:
+        gate.set()
+    _wait_lock_free()
+
+
+def test_window_close_without_explorer_tasks_closes_at_once(tmp_path):
+    api, _, _, _ = _opened(tmp_path)
+    assert api._explorer_active() == 0
+    assert api._on_closing() is True
+    assert api._explorer is None and _lock_free()

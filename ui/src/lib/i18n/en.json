@@ -120,6 +120,7 @@
     "skipped": { "one": "Skipped {count} item whose name cannot be read.", "few": "Skipped {count} items whose names cannot be read.", "many": "Skipped {count} items whose names cannot be read.", "other": "Skipped {count} items whose names cannot be read." },
     "offline": { "title": "Phone disconnected", "text": "Plug the cable back in — the explorer resumes on its own." },
     "leftovers": { "one": "Removed {count} AdMeNot temporary file left on the phone by an interrupted upload.", "few": "Removed {count} AdMeNot temporary files left on the phone by an interrupted upload.", "many": "Removed {count} AdMeNot temporary files left on the phone by an interrupted upload.", "other": "Removed {count} AdMeNot temporary files left on the phone by an interrupted upload." },
+    "leave": { "title": "Close the file explorer?", "message": { "one": "{count} task will be cancelled.", "few": "{count} tasks will be cancelled.", "many": "{count} tasks will be cancelled.", "other": "{count} tasks will be cancelled." }, "hint": "Partly copied files are removed; finished ones stay.", "stay": "Stay", "confirm": "Cancel tasks and leave" },
     "notice": {
       "busy_title": "Files are not available right now",
       "busy": "Another operation is running on this phone (scan, repair or data copy). Open the files when it ends.",

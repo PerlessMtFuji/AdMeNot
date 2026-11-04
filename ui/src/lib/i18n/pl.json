@@ -120,6 +120,7 @@
     "skipped": { "one": "Pominięto {count} pozycję, której nazwy nie da się odczytać.", "few": "Pominięto {count} pozycje, których nazw nie da się odczytać.", "many": "Pominięto {count} pozycji, których nazw nie da się odczytać.", "other": "Pominięto {count} pozycji, których nazw nie da się odczytać." },
     "offline": { "title": "Telefon odłączony", "text": "Podłącz kabel ponownie — eksplorator wznowi się sam." },
     "leftovers": { "one": "Usunięto z telefonu {count} plik tymczasowy AdMeNot pozostały po przerwanym wgrywaniu.", "few": "Usunięto z telefonu {count} pliki tymczasowe AdMeNot pozostałe po przerwanym wgrywaniu.", "many": "Usunięto z telefonu {count} plików tymczasowych AdMeNot pozostałych po przerwanym wgrywaniu.", "other": "Usunięto z telefonu {count} pliku tymczasowego AdMeNot pozostałego po przerwanym wgrywaniu." },
+    "leave": { "title": "Zamknąć eksplorator?", "message": { "one": "{count} zadanie zostanie anulowane.", "few": "{count} zadania zostaną anulowane.", "many": "{count} zadań zostanie anulowanych.", "other": "{count} zadania zostanie anulowane." }, "hint": "Częściowo skopiowane pliki zostaną usunięte, gotowe zostają.", "stay": "Zostań", "confirm": "Anuluj zadania i wyjdź" },
     "notice": {
       "busy_title": "Pliki są teraz niedostępne",
       "busy": "Na tym telefonie trwa inna operacja (skan, naprawa albo kopia danych). Otwórz pliki po jej zakończeniu.",

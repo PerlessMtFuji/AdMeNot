@@ -114,6 +114,58 @@ describe('Explorer', () => {
     expect(screen.getByRole('heading', { name: 'Połączono' })).toBeTruthy();
   });
 
+  test('"Back" with a running task asks first: "Stay" keeps the explorer, confirming cancels and closes', async () => {
+    const { s, ctl, bridge } = await openExplorer();
+    await ctl.explorer.uploadPaths(['C:\\a.jpg']);
+    const task = ctl.explorer.state.tasks[0];
+    bridge.emit('explorer:task', { task: { ...task, status: 'running' } });
+    await tick();
+    await fireEvent.click(screen.getByRole('button', { name: 'Wróć' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Zamknąć eksplorator?' });
+    expect(dialog.textContent).toContain('1 zadanie zostanie anulowane.');
+    await fireEvent.click(within(dialog).getByRole('button', { name: 'Zostań' }));
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(s.screen).toBe('explorer');
+    expect(ctl.explorer.state.open).toBe(true);
+    expect(bridge.calls.some((c) => c.method === 'explorer_close')).toBe(false);
+    // drugie zadanie w kolejce: liczba w pytaniu
+    await ctl.explorer.uploadPaths(['C:\\b.jpg']);
+    await fireEvent.click(screen.getByRole('button', { name: 'Wróć' }));
+    const again = await screen.findByRole('dialog', { name: 'Zamknąć eksplorator?' });
+    expect(again.textContent).toContain('2 zadania zostaną anulowane.');
+    await fireEvent.click(within(again).getByRole('button', { name: 'Anuluj zadania i wyjdź' }));
+    await vi.waitFor(() => expect(bridge.calls.some((c) => c.method === 'explorer_close')).toBe(true));
+    expect(s.screen).toBe('main');
+  });
+
+  test('"Back" without running tasks closes at once; finished tasks do not ask', async () => {
+    const { s, ctl, bridge } = await openExplorer();
+    await ctl.explorer.uploadPaths(['C:\\a.jpg']);
+    const task = ctl.explorer.state.tasks[0];
+    bridge.emit('explorer:task', { task: { ...task, status: 'done', done_files: 2 } });
+    await tick();
+    await fireEvent.click(screen.getByRole('button', { name: 'Wróć' }));
+    await vi.waitFor(() => expect(bridge.calls.some((c) => c.method === 'explorer_close')).toBe(true));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(s.screen).toBe('main');
+  });
+
+  test('starting another job with a paused explorer task asks too; "Stay" does not start it', async () => {
+    const { ctl, bridge } = await openExplorer();
+    await ctl.explorer.uploadPaths(['C:\\a.jpg']);
+    const task = ctl.explorer.state.tasks[0];
+    bridge.emit('explorer:task', { task: { ...task, status: 'paused' } });
+    await tick();
+    const planned = ctl.planRestore('OLD/20261031-173908');
+    const dialog = await screen.findByRole('dialog', { name: 'Zamknąć eksplorator?' });
+    await fireEvent.click(within(dialog).getByRole('button', { name: 'Zostań' }));
+    await planned;
+    const methods = bridge.calls.map((c) => c.method);
+    expect(methods).not.toContain('explorer_close');
+    expect(methods).not.toContain('restore_plan');
+    expect(ctl.explorer.state.open).toBe(true);
+  });
+
   test('a disconnected phone shows a banner; it comes back on its own and the folder refreshes', async () => {
     const { bridge } = await openExplorer();
     bridge.emit('explorer:offline', { serial: SERIAL });

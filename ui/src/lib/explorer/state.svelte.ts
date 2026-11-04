@@ -65,6 +65,8 @@ export class ExplorerState {
   fresh = new SvelteSet<string>();
   /** Ctrl+V bez plików w schowku Windows — podpowiedź do zamknięcia. */
   clipboardEmpty = $state(false);
+  /** Wyjście z eksploratora przy trwających zadaniach: ile zadań przepadnie (0 — okno pytania zamknięte). */
+  leaveAsk = $state(0);
 }
 
 export interface PlayingTrack {

@@ -76,6 +76,7 @@ _STORAGE = "/storage/emulated/0"
 Status = Literal["queued", "running", "paused", "waiting", "done", "cancelled", "failed"]
 _Stop = Literal["cancel", "pause", "disconnect"]
 _PRIORITY = {"disconnect": 1, "pause": 2, "cancel": 3}
+_ACTIVE = frozenset({"queued", "running", "paused", "waiting"})
 
 
 @dataclass
@@ -346,6 +347,19 @@ class TransferQueue:
         self._wake.set()
         if leftovers:  # wstrzymane po odłączeniu: plik tymczasowy na telefonie zostaje do `sweep_tmp`
             self._clean_tmps(task)
+
+    def active(self) -> int:
+        """Zadania, które zamknięcie kolejki anuluje (w kolejce, w toku, wstrzymane, czekające na telefon)."""
+        with self._lock:
+            return sum(t.state.status in _ACTIVE for t in self._tasks.values())
+
+    def drop_partials(self) -> None:
+        """Usuwa lokalne `<cel>.admenot-part` plików w toku — gdy wątek kolejki nie skończył się na czas
+        przy wyjściu z programu (zwykle sprząta je sam po anulowaniu)."""
+        with self._lock:
+            parts = [part for t in self._tasks.values() for part in t.inflight.values()]
+        for part in parts:
+            _unlink(part)
 
     def tracked_folders(self) -> set[str]:
         """Foldery telefonu z naszymi plikami tymczasowymi pilnowanymi teraz przez kolejkę."""

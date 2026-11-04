@@ -61,6 +61,7 @@ MediaFactory = Callable[[str, ExplorerAdb, Callable[[str], bool]], MediaServer]
 _LOCAL_ORIGIN = re.compile(r"http://(?:127\.0\.0\.1|localhost)(?::\d{1,5})?")
 _END = frozenset({"done", "cancelled", "failed"})  # końcowe stany zadania kolejki
 _PREVIEW_KINDS = frozenset({"image", "video", "audio"})  # podgląd przez `explorer_meta` (tekst: `explorer_text`)
+EXPLORER_QUIT_WAIT = 10.0  # s; wyjście z programu czeka na wątek kolejki (zabicie `adb`, sprzątanie)
 
 
 def _bridge(method: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]:
@@ -379,6 +380,26 @@ class ExplorerMixin:
         else:
             threading.Thread(target=finish, name="explorer-close", daemon=True).start()
         return sess
+
+    def _explorer_active(self) -> int:
+        """Trwające zadania kolejki otwartego eksploratora (zamknięcie sesji je anuluje)."""
+        sess = self._explorer
+        queue_ = sess.queue if sess is not None else None
+        return queue_.active() if queue_ is not None else 0
+
+    def _explorer_quit(self, timeout: float = EXPLORER_QUIT_WAIT) -> None:
+        """Wyjście z programu (nie z wątku GUI): sesja się kończy, kolejka anuluje zadania, a my czekamy do
+        `timeout` s na jej wątek — ten zabija `adb pull/push` (`_kill_tree`) i usuwa swoje `.admenot-part`,
+        zanim proces programu zniknie (inaczej osierocony `adb` pisałby dalej na dysk). Wątek, który nie
+        zdążył (np. długie `sha256sum`), zostaje, a pliki w toku na komputerze usuwamy sami."""
+        try:
+            sess = self._explorer_end(wait=False)
+        except Exception as exc:  # noqa: BLE001 — zamknięcie programu nie może utknąć na eksploratorze
+            log_exception(exc, scrub=client_paths)
+            return
+        queue_ = sess.queue if sess is not None else None
+        if queue_ is not None and not queue_.join(timeout):
+            queue_.drop_partials()
 
     @staticmethod
     def _explorer_telemetry(sess: _Session, seconds: float) -> None:

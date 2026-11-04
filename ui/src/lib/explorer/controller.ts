@@ -9,6 +9,8 @@ import { ExplorerState, type PlayingTrack } from './state.svelte';
 const RECENT_MAX = 8;
 /** Jak długo nowe wpisy po odświeżeniu są „świeże” (animacja `pop-in`). */
 const FRESH_MS = 700;
+/** Zadania, które wyjście z eksploratora anuluje (most zamyka kolejkę razem z sesją). */
+const ACTIVE: ReadonlySet<TaskView['status']> = new Set(['queued', 'running', 'paused', 'waiting']);
 
 export interface SelectMods {
   ctrl?: boolean;
@@ -24,6 +26,7 @@ export class ExplorerController {
   private earlyPlaces: PlaceView[] | null = null;  // liczby Miejsc, które przyszły przed wynikiem otwarcia
   private freshTimer: ReturnType<typeof setTimeout> | undefined;
   private player: AudioPlayer | null = null;
+  private leaveAnswer: ((ok: boolean) => void) | null = null;  // okno „N zadań zostanie anulowanych”
 
   constructor(private readonly app: AppState, private readonly bridge: Bridge) {}
 
@@ -106,6 +109,11 @@ export class ExplorerController {
     await this.go(s.places[0]?.path ?? ROOT);
   }
 
+  /** Zadania, które wyjście z eksploratora anuluje. */
+  get activeTasks(): number {
+    return this.state.tasks.filter((x) => ACTIVE.has(x.status)).length;
+  }
+
   /** Pamięć telefonu do sylwetki w Miejscach — w tle; błąd zostawia sylwetkę bez „cieczy”. */
   private async loadStorage(): Promise<void> {
     const s = this.state;
@@ -118,16 +126,34 @@ export class ExplorerController {
     }
   }
 
-  /** „Wróć”: most zwalnia telefon, ekran wraca na „Połącz”. */
-  async close(): Promise<void> {
+  /** „Wróć” (i każde inne wyjście z eksploratora): most zwalnia telefon, ekran wraca na „Połącz”. Przy
+   *  trwających zadaniach najpierw pyta („N zadań zostanie anulowanych”); false — serwisant został. */
+  async close(): Promise<boolean> {
+    const count = this.state.open ? this.activeTasks : 0;
+    if (count > 0 && !(await this.askLeave(count))) return false;
     const wasOpen = this.state.open;
     this.leave();
-    if (!wasOpen) return;
+    if (!wasOpen) return true;
     try {
       await this.api.explorer_close();
     } catch {
       // okno i tak wraca na „Połącz”; most zamyka sesję także przy wyjściu z programu
     }
+    return true;
+  }
+
+  private askLeave(count: number): Promise<boolean> {
+    this.leaveAnswer?.(false);  // drugie wyjście, zanim odpowiedziano na pierwsze: pierwsze zostaje
+    this.state.leaveAsk = count;
+    return new Promise((resolve) => { this.leaveAnswer = resolve; });
+  }
+
+  /** Odpowiedź z okna pytania o wyjście: true — anuluj zadania i wyjdź, false — zostań. */
+  answerLeave(ok: boolean): void {
+    const answer = this.leaveAnswer;
+    this.leaveAnswer = null;
+    this.state.leaveAsk = 0;
+    answer?.(ok);
   }
 
   async go(path: string, refresh = false): Promise<void> {
@@ -569,6 +595,8 @@ export class ExplorerController {
 
   private reset(): void {
     const s = this.state;
+    // sesji już nie ma (np. most zamknął ją sam): pytanie o anulowanie zadań nie ma sensu — wyjście idzie dalej
+    if (this.leaveAnswer) this.answerLeave(true);
     this.seq += 1;  // spóźniona lista poprzedniej sesji nie trafi na ekran
     this.stopTrack();
     s.selected.clear();

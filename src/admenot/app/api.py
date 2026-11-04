@@ -2399,6 +2399,12 @@ class Api(ExplorerMixin):
             threading.Thread(target=self._close_after, args=(job,), daemon=True,
                              name="admenot-quit").start()
             return False
+        if self._explorer_active():
+            # Jak przy kopii: bez pytania (UI pyta przy wyjściu z eksploratora, okno zamyka serwisant),
+            # zadania eksploratora są anulowane, a okno zamyka się dopiero po końcu wątku kolejki (zabity
+            # `adb`, usunięte `.admenot-part`) — na osobnym wątku, nigdy na wątku GUI.
+            threading.Thread(target=self._close, daemon=True, name="admenot-quit").start()
+            return False
         self._shutdown()
         return True
 
@@ -2421,6 +2427,9 @@ class Api(ExplorerMixin):
         self._close()
 
     def _close(self) -> None:
+        """Zamknięcie programu poza wątkiem GUI (`quit`, `_close_after`, `_on_closing` z zadaniami
+        eksploratora): najpierw czeka na koniec kolejki eksploratora, potem reszta `_shutdown`."""
+        self._explorer_quit()
         self._shutdown()
         self._quitting = True
         if self._close_fn is not None:

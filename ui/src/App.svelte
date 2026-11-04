@@ -3,7 +3,7 @@
   import CrashDialog from './components/CrashDialog.svelte';
   import ErrorCard from './components/ErrorCard.svelte';
   import type { Controller } from './lib/controller';
-  import { t } from './lib/i18n/index.svelte';
+  import { t, tp } from './lib/i18n/index.svelte';
   import { needsWelcome } from './lib/logic';
   import { screenIn } from './lib/motion';
   import Connect from './screens/Connect.svelte';
@@ -86,6 +86,18 @@
     {#snippet actions()}
       <Button onclick={() => (s.closeRequested = false)}>{t('common.cancel')}</Button>
       <Button variant="danger" onclick={() => ctl.quit()}>{t('close.confirm')}</Button>
+    {/snippet}
+  </Dialog>
+{/if}
+
+{#if ctl.explorer.state.leaveAsk > 0}
+  <!-- wyjście z eksploratora („Wróć”, skan, kopia danych…) przy trwających zadaniach: kolejka zamyka się razem z sesją -->
+  <Dialog title={t('explorer.leave.title')} oncancel={() => ctl.explorer.answerLeave(false)}>
+    <p>{tp('explorer.leave.message', ctl.explorer.state.leaveAsk)}</p>
+    <p class="mt-2 text-sm">{t('explorer.leave.hint')}</p>
+    {#snippet actions()}
+      <Button onclick={() => ctl.explorer.answerLeave(false)}>{t('explorer.leave.stay')}</Button>
+      <Button variant="danger" onclick={() => ctl.explorer.answerLeave(true)}>{t('explorer.leave.confirm')}</Button>
     {/snippet}
   </Dialog>
 {/if}

@@ -386,7 +386,8 @@ export class Controller {
   }
 
   async startScan(): Promise<void> {
-    if (this.explorer.state.open) await this.explorer.close();  // ekran wychodzi z eksploratora: telefon wolny dla zadania
+    // ekran wychodzi z eksploratora (telefon wolny dla zadania); trwające zadania — najpierw pytanie, „Zostań” przerywa
+    if (this.explorer.state.open && !(await this.explorer.close())) return;
     const s = this.state;
     if (!s.serial) return;
     Object.assign(s, {
@@ -681,7 +682,8 @@ export class Controller {
   }
 
   async resume(order: string): Promise<void> {
-    if (this.explorer.state.open) await this.explorer.close();  // ekran wychodzi z eksploratora: telefon wolny dla zadania
+    // ekran wychodzi z eksploratora (telefon wolny dla zadania); trwające zadania — najpierw pytanie, „Zostań” przerywa
+    if (this.explorer.state.open && !(await this.explorer.close())) return;
     const s = this.state;
     s.error = null;
     // zlecenie znika z „przerwanych” dopiero z `exec:order`: nieudane wznowienie zostawia je
@@ -781,7 +783,8 @@ export class Controller {
   /** „Kopiuj dane” na ekranie Połącz: inwentarz wybranego telefonu, potem ekran wyboru. `resume` („Wznów”
    *  z banera): po inwentarzu kopia rusza od razu z zapisanym wyborem — patrz `continueResume`. */
   async startTransfer(resume = false): Promise<void> {
-    if (this.explorer.state.open) await this.explorer.close();  // ekran wychodzi z eksploratora: telefon wolny dla zadania
+    // ekran wychodzi z eksploratora (telefon wolny dla zadania); trwające zadania — najpierw pytanie, „Zostań” przerywa
+    if (this.explorer.state.open && !(await this.explorer.close())) return;
     const s = this.state;
     if (!s.serial) return;
     this.resetTransfer();
@@ -921,7 +924,8 @@ export class Controller {
 
   /** „Wgraj” (Połącz albo Historia): plan wgrywania kopii na wybrany telefon, potem ekran wyboru. */
   async planRestore(copyId: string): Promise<void> {
-    if (this.explorer.state.open) await this.explorer.close();  // ekran wychodzi z eksploratora: telefon wolny dla zadania
+    // ekran wychodzi z eksploratora (telefon wolny dla zadania); trwające zadania — najpierw pytanie, „Zostań” przerywa
+    if (this.explorer.state.open && !(await this.explorer.close())) return;
     const s = this.state;
     if (!s.serial) return;
     this.resetTransfer();
