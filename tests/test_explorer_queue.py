@@ -345,13 +345,37 @@ def test_denied_folder_reports_failed_files_and_leaves_nothing(phone, adb, tmp_p
     assert st.done_files == 0
 
 
-def test_verify_hash_mismatch_marked(phone, adb, pc, make_queue):
+def test_verify_hash_mismatch_recopied_once_then_verified(phone, adb, pc, make_queue):
     put(phone, "/sdcard/P/a.jpg", b"good")
     put(phone, "/sdcard/P/b.jpg", b"fine")
+    hits = {"n": 0}
 
-    def corrupt(cmd: str) -> None:  # telefon zmienia bajty w trakcie (ten sam rozmiar)
+    def corrupt(cmd: str) -> None:  # telefon zmienia bajty przy pierwszym sprawdzeniu (ten sam rozmiar)
         if cmd.startswith("sha256sum ") and "a.jpg" in cmd:
-            phone.local("/sdcard/P/a.jpg").write_bytes(b"evil")
+            hits["n"] += 1
+            if hits["n"] == 1:
+                phone.local("/sdcard/P/a.jpg").write_bytes(b"evil")
+
+    phone.on_shell = corrupt
+    plan = plan_to_pc(adb, ["/sdcard/P"], pc, **OK)
+    q = make_queue()
+    st = q.wait_for(q.add(plan, verify_hash=True), "done")
+    assert st.verified == "hash" and st.failed == []  # druga kopia zgodna: bez „uszkodzonych”
+    assert (st.done_files, st.total_files) == (2, 2)
+    assert pc_files(pc) == {"P/a.jpg": b"evil", "P/b.jpg": b"fine"}
+    assert phone.pulled.count("/sdcard/P/a.jpg") == 2 and phone.pulled.count("/sdcard/P/b.jpg") == 1
+    assert not any(p.name.endswith(".admenot-part") for p in pc.rglob("*"))
+
+
+def test_verify_hash_mismatch_twice_marked_damaged(phone, adb, pc, make_queue):
+    put(phone, "/sdcard/P/a.jpg", b"good")
+    put(phone, "/sdcard/P/b.jpg", b"fine")
+    hits = {"n": 0}
+
+    def corrupt(cmd: str) -> None:  # bajty zmieniają się przy każdym sprawdzeniu
+        if cmd.startswith("sha256sum ") and "a.jpg" in cmd:
+            hits["n"] += 1
+            phone.local("/sdcard/P/a.jpg").write_bytes(f"ev{hits['n']:02d}".encode())
 
     phone.on_shell = corrupt
     plan = plan_to_pc(adb, ["/sdcard/P"], pc, **OK)
@@ -359,12 +383,57 @@ def test_verify_hash_mismatch_marked(phone, adb, pc, make_queue):
     st = q.wait_for(q.add(plan, verify_hash=True), "done")
     assert st.verified == "mismatch"
     assert st.failed == [("/sdcard/P/a.jpg", "mismatch")]
+    assert phone.pulled.count("/sdcard/P/a.jpg") == 2  # jedna automatyczna ponowna kopia, nie więcej
     assert pc_files(pc) == {"P/b.jpg": b"fine"}  # uszkodzona kopia nie zostaje pod docelową nazwą
-    phone.on_shell = None
-    plan = plan_to_pc(adb, ["/sdcard/P/a.jpg"], pc / "P", **OK)
+
+
+def test_upload_hash_mismatch_reuploaded_once(phone, adb, tmp_path, make_queue):
+    src = tmp_path / "src"
+    local_tree(src, {"a.bin": b"good", "b.bin": b"fine"})
+    phone.local("/sdcard/Up").mkdir(parents=True)
+    plan = plan_to_phone(adb, [src / "a.bin", src / "b.bin"], "/sdcard/Up")
+    pusher = NamedPusher(phone)
+    mode = {"always": False, "hits": 0}
+
+    def corrupt(cmd: str) -> None:  # karta psuje wgrany plik `a.bin` (ten sam rozmiar)
+        if not cmd.startswith("sha256sum ") or not TMP_ON_PHONE.search(cmd):
+            return
+        tmp = cmd.split(" ", 1)[1].strip("'")
+        if pusher.by_tmp.get(tmp) == "a.bin":
+            mode["hits"] += 1
+            if mode["always"] or mode["hits"] == 1:
+                phone.local(tmp).write_bytes(b"BAD!")
+
+    phone.on_shell = corrupt
+    q = make_queue(pusher=pusher)
     st = q.wait_for(q.add(plan, verify_hash=True), "done")
-    assert st.verified == "hash" and st.failed == []
-    assert (pc / "P" / "a.jpg").read_bytes() == b"evil"
+    assert st.verified == "hash" and st.failed == [] and st.done_files == 2
+    assert phone_files(phone, "/sdcard/Up") == {"a.bin": b"good", "b.bin": b"fine"}
+    assert pusher.names.count("a.bin") == 2 and pusher.names.count("b.bin") == 1
+    assert no_phone_tmp(phone)
+    # psuje się za każdym razem: plik uszkodzony, na telefonie nic po nim nie zostaje
+    mode["always"] = True
+    phone.local("/sdcard/Up2").mkdir(parents=True)
+    plan = plan_to_phone(adb, [src / "a.bin", src / "b.bin"], "/sdcard/Up2")
+    pusher.names.clear()
+    st = q.wait_for(q.add(plan, verify_hash=True), "done")
+    assert st.verified == "mismatch" and st.failed == [(str(src / "a.bin"), "mismatch")]
+    assert pusher.names.count("a.bin") == 2
+    assert phone_files(phone, "/sdcard/Up2") == {"b.bin": b"fine"} and no_phone_tmp(phone)
+
+
+class NamedPusher:
+    """Pusher atrapy, który pamięta, który plik lokalny trafił do którego pliku tymczasowego."""
+
+    def __init__(self, phone: FakeStoragePhone) -> None:
+        self.phone = phone
+        self.names: list[str] = []
+        self.by_tmp: dict[str, str] = {}
+
+    def push(self, locals_, remote, should_stop, tick):
+        self.names.append(locals_[0].name)
+        self.by_tmp[remote] = locals_[0].name
+        return self.phone.push(locals_, remote, should_stop, tick)
 
 
 def test_media_scan_after_upload(phone, adb, tmp_path, make_queue):

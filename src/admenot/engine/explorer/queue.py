@@ -667,20 +667,24 @@ class TransferQueue:
         with self._lock:
             task.inflight[idx] = part
         try:
-            res = self._pull(task, item.src, part)
-            if res.stopped:
-                return ("stopped",)
-            if res.rc != 0:
-                if not self._online():
-                    raise _Disconnect
-                text = "\n".join(res.lines).lower()
-                reason = "denied" if any(d in text for d in _DENIED) else \
-                    "missing" if "no such file" in text else "error"
-                raise _Failed(reason)
-            if not os.path.isfile(part) or os.path.getsize(part) != item.size:
-                raise _Failed("size")
-            if task.verify_hash and _hash_local(part) != self._phone_hash(item.src, item.size):
-                raise _Failed("mismatch")
+            for attempt in range(2):  # inna suma SHA-256 → plik kopiowany jeszcze raz, sam (raz)
+                res = self._pull(task, item.src, part)
+                if res.stopped:
+                    return ("stopped",)
+                if res.rc != 0:
+                    if not self._online():
+                        raise _Disconnect
+                    text = "\n".join(res.lines).lower()
+                    reason = "denied" if any(d in text for d in _DENIED) else \
+                        "missing" if "no such file" in text else "error"
+                    raise _Failed(reason)
+                if not os.path.isfile(part) or os.path.getsize(part) != item.size:
+                    raise _Failed("size")
+                if not task.verify_hash or _hash_local(part) == self._phone_hash(item.src, item.size):
+                    break
+                if attempt:
+                    raise _Failed("mismatch")
+                _unlink(part)
             os.utime(part, (item.mtime, item.mtime))
             for _ in range(_COMMIT_TRIES):
                 try:
@@ -750,28 +754,32 @@ class TransferQueue:
             if existing is not None:
                 target = self._phone_side(task, folder, name)
                 renamed = True
-        tmp = f"{folder}/{TMP_PREFIX}{self._token()}{TMP_SUFFIX}"
-        if not is_tmp_name(posixpath.basename(tmp)):
-            raise _Failed("error")
-        self._add_tmp(task, tmp)
-        res = self._push(task, item.src, tmp)
-        if res.stopped:
+        for attempt in range(2):  # inna suma SHA-256 → plik wgrywany jeszcze raz, sam (raz)
+            tmp = f"{folder}/{TMP_PREFIX}{self._token()}{TMP_SUFFIX}"
+            if not is_tmp_name(posixpath.basename(tmp)):
+                raise _Failed("error")
+            self._add_tmp(task, tmp)
+            res = self._push(task, item.src, tmp)
+            if res.stopped:
+                self._rm_tmp(task, tmp)
+                return ("stopped",)
+            if res.rc != 0:
+                if not self._online():
+                    raise _Disconnect
+                self._rm_tmp(task, tmp)
+                text = "\n".join(res.lines).lower()
+                raise _Failed("denied" if any(d in text for d in _DENIED) else "error")
+            try:
+                if self._phone_size(tmp) != size:
+                    raise _Failed("size")
+                if not task.verify_hash or self._phone_hash(tmp, size) == _hash_local(item.src):
+                    break
+                if attempt:
+                    raise _Failed("mismatch")
+            except _Failed:
+                self._rm_tmp(task, tmp)
+                raise
             self._rm_tmp(task, tmp)
-            return ("stopped",)
-        if res.rc != 0:
-            if not self._online():
-                raise _Disconnect
-            self._rm_tmp(task, tmp)
-            text = "\n".join(res.lines).lower()
-            raise _Failed("denied" if any(d in text for d in _DENIED) else "error")
-        try:
-            if self._phone_size(tmp) != size:
-                raise _Failed("size")
-            if task.verify_hash and self._phone_hash(tmp, size) != _hash_local(item.src):
-                raise _Failed("mismatch")
-        except _Failed:
-            self._rm_tmp(task, tmp)
-            raise
         try:
             for _ in range(_COMMIT_TRIES):
                 with self._lock:
