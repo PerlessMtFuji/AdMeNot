@@ -106,7 +106,24 @@ export class ExplorerController {
     this.earlyPlaces = null;
     app.screen = 'explorer';
     void this.loadStorage();
+    void this.loadTasks();
     await this.go(s.places[0]?.path ?? ROOT);
+  }
+
+  /** Zadania kolejki mostu, które żyją dłużej niż okno (np. po przeładowaniu WebView ta sama sesja). */
+  private async loadTasks(): Promise<void> {
+    const s = this.state;
+    const serial = s.serial;
+    try {
+      const r = await this.api.explorer_tasks();
+      if (isApiError(r) || !s.open || s.serial !== serial) return;
+      // zdarzenia `explorer:task`, które przyszły w międzyczasie, są nowsze — zostają
+      const known = new Set(s.tasks.map((x) => x.id));
+      const missing = r.tasks.filter((x) => !known.has(x.id));
+      if (missing.length) s.tasks = [...missing, ...s.tasks];
+    } catch {
+      // bez listy pasek zadań wypełnią kolejne zdarzenia kolejki
+    }
   }
 
   /** Zadania, które wyjście z eksploratora anuluje. */
@@ -365,7 +382,7 @@ export class ExplorerController {
       this.audio.load(track.url);
       s.playing = track;
     }
-    if (!(await this.audio.play())) s.playError = true;
+    s.playError = !(await this.audio.play());  // udane odtworzenie (także ponowne) gasi błąd
   }
 
   /** Spacja / przycisk: odtwarza, wstrzymuje albo wznawia utwór. */

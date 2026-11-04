@@ -369,6 +369,8 @@ class FakeStoragePhone:
         src, dst = self.local(args[1]), self.local(args[2])
         if not src.exists():
             raise AdbError("command_failed", f"mv: '{args[1]}': No such file or directory")
+        if dst.is_dir():  # jak toybox: cel-folder → plik ląduje w środku (pod własną nazwą)
+            dst = dst / src.name
         if not dst.exists():
             src.rename(dst)
         return b""

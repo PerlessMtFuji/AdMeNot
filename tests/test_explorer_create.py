@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from faketransfer import FakeStoragePhone
 
-from admenot.engine.adb.transport import AdbError
+from admenot.engine.adb.transport import AdbError, classify_error
 from admenot.engine.explorer.create import CreateError, make_folder, make_text
 from admenot.engine.explorer.guard import ExplorerAdb, ExplorerPusher, UnsafeCommand, is_tmp_name
 from admenot.engine.explorer.queue import read_tmp_folders, record_tmp_folder
@@ -158,6 +158,18 @@ def test_listed_folder_stays_listed(adb, phone, dirs):
     record_tmp_folder("FAKE", "/sdcard/Docs", directory=dirs[0])
     text(adb, phone, dirs, "a")
     assert read_tmp_folders("FAKE", directory=dirs[0]) == ["/sdcard/Docs"]
+
+
+def test_offline_word_in_folder_name_is_not_a_disconnect(adb, phone):
+    # adb klasyfikuje błąd po tekście: „Mapy offline” w ścieżce daje rodzaj `offline`, choć telefon jest
+    def refuse(cmd: str) -> None:
+        if cmd.startswith("mkdir "):
+            raise classify_error("mkdir: '/sdcard/Docs/Mapy offline': Permission denied")
+
+    phone.on_shell = refuse
+    with pytest.raises(CreateError) as e:
+        make_folder(adb, "/sdcard/Docs", "Mapy offline")
+    assert e.value.key == "denied"
 
 
 def test_make_text_pushes_only_through_the_explorer_guard(adb, phone, dirs):

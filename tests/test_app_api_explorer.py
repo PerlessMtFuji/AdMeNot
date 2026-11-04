@@ -920,6 +920,23 @@ def test_old_flat_recent_list_is_ignored(tmp_path):
     api.explorer_close()
 
 
+# --- rozmiary plików w serwerze mediów -------------------------------------------------------------
+
+
+def test_listing_a_folder_refreshes_cached_file_sizes(tmp_path):
+    api, _, host, _ = _opened(tmp_path)
+    media = api._explorer.media
+    path = "/sdcard/Download/faktura.pdf"
+    assert media.size_of(path) == len(b"%PDF-1.4")
+    _storage_of(host).local(path).write_bytes(b"%PDF-1.7 dluzsza wersja")
+    assert media.size_of(path) == len(b"%PDF-1.4")  # pamięć podręczna
+    api.explorer_list("/sdcard/DCIM/Camera")  # inny folder: bez zmian
+    assert media.size_of(path) == len(b"%PDF-1.4")
+    api.explorer_list("/sdcard/Download")
+    assert media.size_of(path) == len(b"%PDF-1.7 dluzsza wersja")
+    api.explorer_close()
+
+
 # --- wyjście z programu przy trwającym zadaniu ----------------------------------------------------
 
 
@@ -1007,3 +1024,22 @@ def test_window_close_without_explorer_tasks_closes_at_once(tmp_path):
     assert api._explorer_active() == 0
     assert api._on_closing() is True
     assert api._explorer is None and _lock_free()
+
+
+def test_switch_phone_emits_closed_outside_the_session_lock(tmp_path):
+    """`explorer:closed` idzie do okna (`run_js` czeka na wątek GUI) już po zwolnieniu `_explorer_lock`."""
+    api, rec, host, _ = _opened(tmp_path, other=True)
+    host.connected.add(OTHER)
+    held: list[bool] = []
+    emit = api._emit
+
+    def spy(name, detail):
+        if name == "explorer:closed":
+            held.append(api._explorer_lock._is_owned())
+        emit(name, detail)
+
+    api._emit = spy
+    assert "error" not in api.explorer_open(OTHER)
+    assert held == [False]
+    assert rec.of("explorer:closed") == [{"serial": SERIAL, "reason": "switched"}]
+    api.explorer_close()

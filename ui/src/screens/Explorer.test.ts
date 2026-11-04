@@ -166,6 +166,19 @@ describe('Explorer', () => {
     expect(ctl.explorer.state.open).toBe(true);
   });
 
+  test('reopening after a window reload shows tasks still running on the bridge', async () => {
+    const env = await setupCtl('explorer');
+    const running = { id: 's1t7', kind: 'to_pc' as const, status: 'running' as const, done_files: 3, total_files: 10,
+      done_bytes: 300, total_bytes: 1000, speed: 100, eta_s: 7, skipped: 0, renamed: 0, failed: [], verified: null,
+      dest: 'D:\\Klient' };
+    env.bridge.answerNext('explorer_tasks', { tasks: [running] });
+    render(App, { props: { ctl: env.ctl } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Pliki' }));
+    await vi.waitFor(() => expect(env.ctl.explorer.state.tasks.map((x) => x.id)).toEqual(['s1t7']));
+    expect(env.bridge.calls.some((c) => c.method === 'explorer_tasks')).toBe(true);
+    expect(env.ctl.explorer.activeTasks).toBe(1);
+  });
+
   test('a disconnected phone shows a banner; it comes back on its own and the folder refreshes', async () => {
     const { bridge } = await openExplorer();
     bridge.emit('explorer:offline', { serial: SERIAL });

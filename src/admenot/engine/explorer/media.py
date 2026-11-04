@@ -280,6 +280,7 @@ class MediaServer:
         self.open_stream = open_stream or _adb_stream(adb_path, serial)
         self._size_of = size_of or _adb_size(adb_path, serial)
         self._sizes: dict[str, int] = {}
+        self._sizes_lock = threading.Lock()
         self.cache = cache or ThumbCache()
         self.token = secrets.token_urlsafe(16)
         self._httpd: _Server | None = None
@@ -308,10 +309,21 @@ class MediaServer:
 
     # ---- odczyt --------------------------------------------------------------------------
     def size_of(self, path: str) -> int:
-        size = self._sizes.get(path)
+        with self._sizes_lock:
+            size = self._sizes.get(path)
         if size is None:
-            size = self._sizes[path] = self._size_of(path)
+            size = self._size_of(path)
+            with self._sizes_lock:
+                self._sizes[path] = size
         return size
+
+    def forget_sizes(self, folder: str) -> None:
+        """Zapomina rozmiary plików bezpośrednio w `folder` (przy każdym jego listowaniu — plik mógł się
+        zmienić, np. nadpisany przez klienta na telefonie)."""
+        prefix = folder.rstrip("/") + "/"
+        with self._sizes_lock:
+            for path in [p for p in self._sizes if p.startswith(prefix) and "/" not in p[len(prefix):]]:
+                del self._sizes[path]
 
     def read_range(self, path: str, start: int, length: int) -> bytes:
         """`length` bajtów pliku od `start` tą samą drogą co serwer (np. podgląd tekstu)."""

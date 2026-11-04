@@ -29,7 +29,6 @@ from admenot.engine.explorer.guard import (
     is_tmp_name,
 )
 from admenot.engine.explorer.queue import (
-    _CONNECTION_KINDS,
     _DENIED,
     forget_tmp_folder,
     read_tmp_folders,
@@ -68,12 +67,11 @@ def _online(adb: ExplorerAdb) -> bool:
 
 
 def _failure(adb: ExplorerAdb, exc: AdbError) -> CreateError:
-    """Błąd adb → `offline` (odłączenie) albo `denied` (telefon odmówił; inna awaria też kończy się tu)."""
-    if exc.kind in _CONNECTION_KINDS:
+    """Błąd adb → `offline` (odłączenie) albo `denied` (telefon odmówił; inna awaria też kończy się tu).
+    Odłączenie rozstrzyga `get-state`, nie tekst błędu (folder „Mapy offline” to nie odłączenie)."""
+    if not _online(adb):
         return CreateError("offline")
-    if any(d in exc.message.lower() for d in _DENIED):
-        return CreateError("denied")
-    return CreateError("offline" if not _online(adb) else "denied")
+    return CreateError("denied")
 
 
 def _stat(adb: ExplorerAdb, paths: list[str]) -> dict[str, tuple[bool, int]]:

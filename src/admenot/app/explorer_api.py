@@ -578,49 +578,53 @@ class ExplorerMixin:
         if not isinstance(serial, str) or not serial.strip():
             raise AppError("bad_request", "serial")
         serial = serial.strip()
-        with self._explorer_lock:
-            sess = self._explorer
-            if sess is not None and sess.serial == serial:
-                # ponowne otwarcie (np. odświeżone okno): ta sama sesja; foldery z plikami tymczasowymi
-                # pilnowanymi przez żywą kolejkę zostają
-                skip = sess.queue.tracked_folders() if sess.queue is not None else set()
-                return self._explorer_view(sess, self._explorer_sweep(sess.adb, serial, skip))
-            job = self._jobs.current()
-            if job is not None:
-                raise AppError("explorer_busy", job.kind)
-            try:
-                self._require_cleaned(serial)
-            except AppError as exc:
-                if exc.key == "busy":
-                    raise AppError("explorer_busy", exc.message) from None
-                raise
-            # inny telefon: poprzednia sesja (i jej zadania) się kończy — UI dostaje `explorer:closed`
-            old = self._explorer_end()
-            if old is not None:
-                self._emit("explorer:closed", {"serial": old.serial, "reason": "switched"})
-            stack = contextlib.ExitStack()
-            try:
+        old: _Session | None = None
+        try:
+            with self._explorer_lock:
+                sess = self._explorer
+                if sess is not None and sess.serial == serial:
+                    # ponowne otwarcie (np. odświeżone okno): ta sama sesja; foldery z plikami tymczasowymi
+                    # pilnowanymi przez żywą kolejkę zostają
+                    skip = sess.queue.tracked_folders() if sess.queue is not None else set()
+                    return self._explorer_view(sess, self._explorer_sweep(sess.adb, serial, skip))
+                job = self._jobs.current()
+                if job is not None:
+                    raise AppError("explorer_busy", job.kind)
                 try:
-                    stack.enter_context(device_lock(journal_path(), serial))
-                except DeviceBusy:
-                    raise AppError("explorer_busy", "device") from None
-                log = self._session(serial)
-                with self._explorer_errors(None):
-                    device = read_device_info(log)
-                match = self._provider.match(device)
-                adb = ExplorerAdb(log)
-                leftovers = self._explorer_sweep(adb, serial, set())
-                with self._explorer_errors(None):
-                    places = find_places(adb)
-                media = self._explorer_media(serial, adb, _local_origin)
-                stack.callback(media.stop)
-                base = media.start()
-                sess = _Session(serial, device, match, log, adb, media, base, stack, places)
-                sess.stats.started = self._clock()
-            except BaseException:
-                stack.close()
-                raise
-            self._explorer = sess
+                    self._require_cleaned(serial)
+                except AppError as exc:
+                    if exc.key == "busy":
+                        raise AppError("explorer_busy", exc.message) from None
+                    raise
+                # inny telefon: poprzednia sesja (i jej zadania) się kończy — UI dostaje `explorer:closed`
+                # (po zwolnieniu `_explorer_lock`: `run_js` czeka na wątek GUI, a ten może czekać na blokadę)
+                old = self._explorer_end()
+                stack = contextlib.ExitStack()
+                try:
+                    try:
+                        stack.enter_context(device_lock(journal_path(), serial))
+                    except DeviceBusy:
+                        raise AppError("explorer_busy", "device") from None
+                    log = self._session(serial)
+                    with self._explorer_errors(None):
+                        device = read_device_info(log)
+                    match = self._provider.match(device)
+                    adb = ExplorerAdb(log)
+                    leftovers = self._explorer_sweep(adb, serial, set())
+                    with self._explorer_errors(None):
+                        places = find_places(adb)
+                    media = self._explorer_media(serial, adb, _local_origin)
+                    stack.callback(media.stop)
+                    base = media.start()
+                    sess = _Session(serial, device, match, log, adb, media, base, stack, places)
+                    sess.stats.started = self._clock()
+                except BaseException:
+                    stack.close()
+                    raise
+                self._explorer = sess
+        finally:
+            if old is not None:  # także gdy nowy telefon się nie otworzył — stara sesja i tak zamknięta
+                self._emit("explorer:closed", {"serial": old.serial, "reason": "switched"})
         view = self._explorer_view(sess, leftovers)  # liczby miejsc dochodzą zdarzeniem
         self._explorer_count(sess)
         return view
@@ -654,6 +658,7 @@ class ExplorerMixin:
             if locked:
                 sess.locked.add(path)
             sess.locked.update(e.path for e in entries if e.locked)
+        sess.media.forget_sizes(path)  # świeże rozmiary plików folderu (miniatury, podgląd)
         if not locked:
             self._explorer_remember(sess.serial, path)
         return {"path": path, "crumbs": crumbs(path, sess.name, apps),

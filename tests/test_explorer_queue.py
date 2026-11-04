@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from faketransfer import FakeStoragePhone
 
-from admenot.engine.adb.transport import AdbError
+from admenot.engine.adb.transport import AdbError, classify_error
 from admenot.engine.explorer.guard import ExplorerAdb, ExplorerPusher, is_tmp_name
 from admenot.engine.explorer.plan import plan_to_pc, plan_to_phone
 from admenot.engine.explorer.queue import (
@@ -619,6 +619,60 @@ def test_emit_callback_can_read_tasks(phone, adb, pc, make_queue):
     holder["q"] = q
     q.wait_for(q.add(plan), "done")
     assert holder["stuck"] == 0 and holder["seen"] == 1
+
+
+def test_copy_to_pc_keeps_tricky_names(phone, adb, pc, make_queue):
+    # Review Focus 1: myślnik na początku, `$`, polskie znaki, apostrof, emoji — nazwy bez zmian na PC
+    names = ["-a.jpg", "$x zażółć.jpg", "it's Ola.jpg", "🎉 urodziny 😀.jpg"]
+    for i, name in enumerate(names):
+        put(phone, f"/sdcard/Pics/{name}", bytes([65 + i]) * (i + 1))
+    plan = plan_to_pc(adb, ["/sdcard/Pics"], pc, **OK)
+    q = make_queue()
+    st = q.wait_for(q.add(plan, verify_hash=True), "done")
+    assert pc_files(pc) == {f"Pics/{name}": bytes([65 + i]) * (i + 1) for i, name in enumerate(names)}
+    assert sorted(os.listdir(pc / "Pics")) == sorted(names)
+    assert st.failed == [] and st.renamed == 0 and st.verified == "hash"
+
+
+def test_offline_in_folder_name_with_mkdir_failure_fails_the_file(phone, adb, tmp_path, make_queue):
+    src = tmp_path / "src"
+    local_tree(src, {"Mapy offline/plan.txt": b"p"})
+    phone.local("/sdcard/Download").mkdir(parents=True)
+    plan = plan_to_phone(adb, [src / "Mapy offline"], "/sdcard/Download")
+
+    def refuse(cmd: str) -> None:  # tekst błędu z „offline” → adb mówi rodzaj `offline`, telefon jest
+        if cmd.startswith("mkdir "):
+            raise classify_error("mkdir: '/sdcard/Download/Mapy offline': Permission denied")
+
+    phone.on_shell = refuse
+    events = Events()
+    q = make_queue(emit=events)
+    tid = q.add(plan)
+    st = q.wait_for(tid, "done", timeout=10)
+    assert st.failed == [(str(src / "Mapy offline" / "plan.txt"), "denied")]
+    assert "waiting" not in events.statuses(tid)
+    assert phone.push_calls == 0 and no_phone_tmp(phone)
+
+
+def test_directory_with_target_name_gets_name_beside(phone, adb, tmp_path, make_queue):
+    src = tmp_path / "src"
+    local_tree(src, {"a.jpg": b"mine"})
+    phone.local("/sdcard/Up").mkdir(parents=True)
+    plan = plan_to_phone(adb, [src / "a.jpg"], "/sdcard/Up")
+    assert plan.items[0].action == "copy"
+
+    class DirAppears:  # klient tworzy folder o nazwie celu w trakcie wgrywania
+        def push(self, locals_, remote, should_stop, tick):
+            phone.local("/sdcard/Up/a.jpg").mkdir(exist_ok=True)
+            return phone.push(locals_, remote, should_stop, tick)
+
+    q = make_queue(pusher=DirAppears())
+    st = q.wait_for(q.add(plan), "done")
+    assert phone.local("/sdcard/Up/a.jpg").is_dir()
+    assert list(phone.local("/sdcard/Up/a.jpg").iterdir()) == []  # `mv -n` nie wsunął pliku do folderu
+    assert phone_files(phone, "/sdcard/Up") == {"a (z komputera).jpg": b"mine"}
+    assert st.renamed == 1 and st.done_files == 1 and st.failed == []
+    assert not any(c.startswith("mv -n ") and c.endswith("/sdcard/Up/a.jpg'") for c in phone.commands)
 
 
 def test_queue_pushes_only_through_the_explorer_guard(phone, adb, tmp_path, make_queue):

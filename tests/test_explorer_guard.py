@@ -128,6 +128,15 @@ def test_allows_writes_under_sdcard(cmd):
     "rm\xa0-rf\xa0/sdcard",
     "rm\x0b-rf /sdcard/x",
     "head x",
+    # Task 14: sumowanie rozmiarów `find <p> -type f -exec stat -c %s {} +`
+    "find '/data/' -type f -exec stat -c %s {} +",
+    "find /data/media/0 -type f -exec stat -c %s {} +",
+    "find '/sdcard/../data/' -type f -exec stat -c %s {} +",
+    "find '/sdcard/DCIM/..' -type f -exec stat -c %s {} +",
+    "find '/sdcard/DCIM/' -type f -exec stat -c %s {} +; reboot",
+    "find '/sdcard/DCIM/' -type f -exec stat -c %s {} + ; reboot",
+    r"find '/sdcard/DCIM/' -type f -exec stat -c %s {} \;",
+    "find '/sdcard/DCIM/' -type f -exec stat -c %s {} ';'",
 ])
 def test_refuses(cmd):
     with pytest.raises(UnsafeCommand):

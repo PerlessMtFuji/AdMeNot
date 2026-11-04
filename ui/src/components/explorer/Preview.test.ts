@@ -188,6 +188,21 @@ describe('Preview', () => {
     expect(within(mini).getByRole('alert').textContent).toContain('Nie udało się odtworzyć');
   });
 
+  test('a successful replay of the same track clears the audio error', async () => {
+    const { ex } = await openExplorer();
+    const song = ex.state.entries.find((e) => e.name === 'piosenka.mp3')!;
+    ex.openPreview(song.path);
+    await tick();
+    await fireEvent.click(within(dialog()).getByRole('button', { name: 'Odtwórz' }));
+    ex.audio.el.dispatchEvent(new Event('error'));
+    expect((await within(dialog()).findByRole('alert')).textContent).toContain('Nie udało się odtworzyć tego utworu');
+    Object.defineProperty(ex.audio.el, 'paused', { value: true, configurable: true });
+    await ex.toggleTrack(song);  // ten sam utwór jeszcze raz — tym razem gra
+    expect(ex.state.playing?.path).toBe(song.path);
+    expect(ex.state.playError).toBe(false);
+    await vi.waitFor(() => expect(within(dialog()).queryByRole('alert')).toBeNull());
+  });
+
   test('the preview closes when a refresh removes its file', async () => {
     const { ex, bridge } = await openExplorer();
     ex.openPreview(GPS_FILE);

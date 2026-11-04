@@ -570,8 +570,9 @@ class TransferQueue:
             return False
 
     def _check(self, exc: AdbError) -> None:
-        """Błąd adb: odłączenie → `_Disconnect`; inaczej `_Failed` z powodem."""
-        if exc.kind in _CONNECTION_KINDS or not self._online():
+        """Błąd adb: odłączenie (rozstrzyga tylko `_online`, nie tekst błędu — ścieżka „Mapy offline”
+        to nie odłączenie) → `_Disconnect`; inaczej `_Failed` z powodem."""
+        if not self._online():
             raise _Disconnect from exc
         low = exc.message.lower()
         if any(d in low for d in _DENIED):
@@ -732,7 +733,7 @@ class TransferQueue:
             try:
                 self._adb_factory().shell("mkdir -p " + " ".join(q(d) for d in batch), timeout=120)
             except AdbError as exc:
-                if exc.kind in _CONNECTION_KINDS or not self._online():
+                if not self._online():  # nie `exc.kind`: tekst błędu z nazwą „… offline” to nie odłączenie
                     raise _Disconnect from exc
                 refused |= _refused_paths(exc.message)
         if not refused:
@@ -782,6 +783,10 @@ class TransferQueue:
             self._rm_tmp(task, tmp)
         try:
             for _ in range(_COMMIT_TRIES):
+                if target in self._phone_stat([target]):  # cel jest (plik albo folder): `mv -n` do
+                    target = self._phone_side(task, folder, name)  # folderu wsunąłby plik do środka
+                    renamed = True
+                    continue
                 with self._lock:
                     task.committing[idx] = (tmp, target, size)
                 self._shell(f"mv -n {q(tmp)} {q(target)}")
@@ -813,10 +818,10 @@ class TransferQueue:
         except AdbError as exc:
             return PullResult(1, [f"adb: error: {exc.kind}"], False)
 
-    def _phone_sizes(self, remotes: list[str]) -> dict[str, int]:
-        """Rozmiary istniejących zwykłych plików (`stat` z `STAT_TAIL`: brak pliku = linia błędu)."""
+    def _phone_stat(self, remotes: list[str]) -> dict[str, tuple[bool, int]]:
+        """Istniejące ścieżki → (czy folder, rozmiar) (`stat` z `STAT_TAIL`: brak pliku = linia błędu)."""
         out = self._shell("stat -c '%f|%s|%Y|%n' " + " ".join(q(r) for r in remotes) + STAT_TAIL)
-        sizes: dict[str, int] = {}
+        found: dict[str, tuple[bool, int]] = {}
         for line in out.splitlines():
             parts = line.split("|", 3)
             if len(parts) == 4 and parts[1].isdigit() and parts[3] in remotes:
@@ -824,9 +829,12 @@ class TransferQueue:
                     is_dir = int(parts[0], 16) & 0o170000 == 0o040000
                 except ValueError:
                     continue
-                if not is_dir:
-                    sizes[parts[3]] = int(parts[1])
-        return sizes
+                found[parts[3]] = (is_dir, int(parts[1]))
+        return found
+
+    def _phone_sizes(self, remotes: list[str]) -> dict[str, int]:
+        """Rozmiary istniejących zwykłych plików."""
+        return {p: size for p, (is_dir, size) in self._phone_stat(remotes).items() if not is_dir}
 
     def _phone_size(self, remote: str) -> int | None:
         return self._phone_sizes([remote]).get(remote)
@@ -835,7 +843,7 @@ class TransferQueue:
         try:
             existing = [e.name for e in list_dir(self._adb_factory(), folder, include_hidden=True).entries]
         except ListError as exc:
-            if exc.kind == "offline" or not self._online():
+            if not self._online():
                 raise _Disconnect from exc
             existing = []
         new = side_name(name, self._taken(task, folder, existing), "z komputera")
