@@ -41,6 +41,12 @@ const restore = (extra: Record<string, unknown> = {}) => common("transfer_restor
   hashed: false, media_scan: "done", groups: GROUPS, ...extra,
 });
 
+const explorer = (extra: Record<string, unknown> = {}) => common("explorer", {
+  device: DEVICE, seconds: 612, copied_files: 148, copied_mb: 1920, uploaded_files: 6, uploaded_mb: 41,
+  previews: { image: 23, video: 2, audio: 1, text: 1 }, created: { folder: 1, text: 0 },
+  errors: { explorer_denied: 1 }, mb_s: 31, ...extra,
+});
+
 async function post(events: unknown[], raw?: string): Promise<Response> {
   return exports.default.fetch(new Request(BASE + "/api/v1/telemetry", {
     method: "POST", headers: { "Content-Type": "application/json", "CF-Connecting-IP": crypto.randomUUID() },
@@ -350,5 +356,38 @@ describe("retencja", () => {
     await worker.scheduled!({ cron: "17 3 * * *", scheduledTime: Date.now(), noRetry() {} } as ScheduledController,
       env, {} as ExecutionContext);
     expect(await rows()).toHaveLength(1);
+  });
+});
+
+describe("POST /api/v1/telemetry: explorer", () => {
+  it("przyjmuje zdarzenie i zapisuje same liczby", async () => {
+    expect((await post([explorer(), explorer({ errors: {}, mb_s: null })])).status).toBe(200);
+    const [first, second] = (await rows()).map((r) => JSON.parse(r.body));
+    expect(first).toMatchObject({ type: "explorer", copied_files: 148, copied_mb: 1920, mb_s: 31,
+      previews: { image: 23, video: 2, audio: 1, text: 1 }, created: { folder: 1, text: 0 },
+      errors: { explorer_denied: 1 } });
+    expect(second).toMatchObject({ errors: {}, mb_s: null });
+  });
+
+  it.each([
+    ["tekst ze znakiem / w errors", explorer({ errors: { "DCIM/Camera": 1 } })],
+    ["tekst ze znakiem / w wartości", explorer({ errors: { explorer_denied: "a/b" } })],
+    ["klucz błędu z kropką (nazwa pliku)", explorer({ errors: { "IMG_1.jpg": 1 } })],
+    ["wielkie litery w kluczu błędu", explorer({ errors: { Explorer: 1 } })],
+    ["zbyt długi klucz błędu", explorer({ errors: { ["a".repeat(65)]: 1 } })],
+    ["ułamek w errors", explorer({ errors: { explorer_denied: 1.5 } })],
+    ["ponad 20 kluczy błędów", explorer({ errors: Object.fromEntries(Array.from({ length: 21 }, (_, i) => [`e_${i}`, 1])) })],
+    ["nieznane pole", explorer({ path: "DCIM" })],
+    ["pole tekstowe z /", explorer({ mb_s: "a/b" })],
+    ["nieznany klucz previews", explorer({ previews: { image: 1, video: 0, audio: 0, text: 0, pdf: 1 } })],
+    ["brak klucza created", explorer({ created: { folder: 1 } })],
+    ["ujemna liczba", explorer({ copied_files: -1 })],
+    ["seconds ponad dobę", explorer({ seconds: 86_401 })],
+    ["copied_mb ponad limit", explorer({ copied_mb: 10_000_001 })],
+    ["brak urządzenia", explorer({ device: undefined })],
+    ["mb_s ujemne", explorer({ mb_s: -1 })],
+  ])("400: %s", async (_name, event) => {
+    expect((await post([event])).status).toBe(400);
+    expect(await rows()).toEqual([]);
   });
 });
