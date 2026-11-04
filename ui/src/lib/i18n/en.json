@@ -119,6 +119,42 @@
       "other_phone": "Another phone was connected — the explorer was closed.",
       "switched": "Files of another phone were opened — the previous explorer was closed."
     },
+    "preview": {
+      "label": "Preview of {name}",
+      "close": "Close preview",
+      "copy": "Copy to computer",
+      "info": "File information",
+      "prev": "Previous file",
+      "next": "Next file",
+      "neighbours": "Neighbouring files",
+      "rotate": "Rotate 90°",
+      "play": "Play",
+      "pause": "Pause",
+      "seek": "Seek",
+      "next_track": "Next track",
+      "loading": "Loading…",
+      "failed": "Could not load the preview.",
+      "unsupported": "This file cannot be shown here — copy it to the computer.",
+      "copy_text": "Copy text",
+      "text_copied": "Copied",
+      "more": "Show more",
+      "encoding": "Encoding: {encoding}",
+      "lines": { "one": "{count} line", "few": "{count} lines", "many": "{count} lines", "other": "{count} lines" },
+      "meta": {
+        "photo": "Photo", "video": "Video", "audio": "Track", "camera": "Camera", "location": "Location", "file": "File",
+        "coords": "Coordinates", "map": "Show on map", "name": "Name", "path": "Path", "size": "Size", "modified": "Modified",
+        "dimensions": "Dimensions"
+      },
+      "field": {
+        "Make": "Make", "Model": "Model", "LensModel": "Lens", "LensMake": "Lens make", "Software": "Software",
+        "DateTimeOriginal": "Taken", "DateTime": "Changed", "ExposureTime": "Exposure time", "FNumber": "Aperture",
+        "ISOSpeedRatings": "ISO", "PhotographicSensitivity": "ISO", "FocalLength": "Focal length", "Flash": "Flash",
+        "Orientation": "Orientation", "WhiteBalance": "White balance", "duration": "Duration", "bitrate": "Bitrate",
+        "mime_type": "Type", "date_taken": "Taken", "title": "Title", "artist": "Artist", "album": "Album",
+        "width": "Width", "height": "Height", "alt": "Altitude"
+      }
+    },
+    "mini": { "label": "Mini player", "stop": "Stop and close" },
     "day": { "today": "Today · {date}", "yesterday": "Yesterday" },
     "gallery": {
       "folders": "Folders",

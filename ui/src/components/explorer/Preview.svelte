@@ -1,0 +1,167 @@
+<script lang="ts">
+  import { fade } from 'svelte/transition';
+  import { closeMorph } from '../../lib/explorer/morph';
+  import type { ExplorerController } from '../../lib/explorer/controller';
+  import { clock, formatBytes } from '../../lib/explorer/logic';
+  import type { ThumbQueue } from '../../lib/explorer/thumbs';
+  import { i18n, t } from '../../lib/i18n/index.svelte';
+  import { DUR, ms } from '../../lib/motion';
+  import type { EntryMeta } from '../../lib/types';
+  import Button from '../../ui/Button.svelte';
+  import Icon from '../../ui/Icon.svelte';
+  import FileIcon from './FileIcon.svelte';
+  import MediaView from './MediaView.svelte';
+  import MetaPanel from './MetaPanel.svelte';
+  import PhotoView from './PhotoView.svelte';
+  import TextView from './TextView.svelte';
+
+  /** Okno podglądu nad eksploratorem: ciemne tło, pasek u góry, Esc / ← / → / Spacja. */
+  let { ex, thumbs }: { ex: ExplorerController; thumbs: ThumbQueue } = $props();
+  const entry = $derived(ex.previewEntry);
+  const NEIGHBOURS = 5;
+  /** Co przeglądarka pokaże w <img> (HEIC i RAW — nie). */
+  const NATIVE_IMAGE = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif', 'svg'];
+
+  let info = $state(false);
+  let meta = $state<EntryMeta | null>(null);
+  let broken = $state<string | null>(null);  // plik, którego nie dało się zdekodować
+  let box = $state<HTMLElement>();
+  let media = $state<{ toggle(): void }>();
+
+  const view = $derived.by(() => {
+    if (!entry || broken === entry.path) return 'unsupported';
+    if (entry.type === 'image') return entry.url && NATIVE_IMAGE.includes(entry.ext.toLowerCase()) ? 'photo' : 'unsupported';
+    if (entry.type === 'video' || entry.type === 'audio') return entry.url ? 'media' : 'unsupported';
+    return entry.type === 'text' ? 'text' : 'unsupported';
+  });
+  const showInfo = $derived(view === 'unsupported' || info);
+
+  $effect(() => {
+    const path = entry?.path;
+    meta = null;
+    if (!path) return;
+    let stale = false;
+    void ex.meta(path).then((m) => { if (!stale) meta = m; });
+    return () => { stale = true; };
+  });
+
+  const files = $derived(ex.items.filter((e) => e.kind === 'file'));
+  const at = $derived(files.findIndex((e) => e.path === entry?.path));
+  const strip = $derived(entry?.type === 'image' ? files.slice(Math.max(0, at - NEIGHBOURS), at + NEIGHBOURS + 1) : []);
+
+  const facts = $derived.by(() => {
+    if (!entry) return [];
+    const out = [formatBytes(entry.size, i18n.lang)];
+    if (typeof meta?.width === 'number' && typeof meta?.height === 'number') out.push(`${meta.width} × ${meta.height}`);
+    if (Number(meta?.duration) > 0) out.push(clock(Number(meta?.duration) / 1000));
+    for (const k of ['artist', 'album']) if (typeof meta?.[k] === 'string') out.push(String(meta[k]));
+    out.push(new Date(entry.mtime * 1000).toLocaleDateString(i18n.lang === 'pl' ? 'pl-PL' : 'en-US', { dateStyle: 'medium' }));
+    return out;
+  });
+
+  function close(): void {
+    const path = ex.state.preview;
+    if (path === null) return;
+    void closeMorph(path, () => ex.closePreview());
+  }
+
+  function onkey(e: KeyboardEvent): void {
+    const el = e.target instanceof Element ? e.target : null;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      close();
+    } else if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && !el?.closest('input, textarea, select')) {
+      e.preventDefault();
+      ex.next(e.key === 'ArrowRight' ? 1 : -1);
+    } else if (e.key === ' ' && !el?.closest('button, input, textarea, select, a') && view === 'media') {
+      e.preventDefault();
+      media?.toggle();
+    }
+  }
+
+  // Okno żyje w <body> (jak Dialog): przodek z transformacją nie zamknie `position: fixed` w swojej kolumnie.
+  function portal(node: HTMLElement) {
+    document.body.appendChild(node);
+    return { destroy: () => node.remove() };
+  }
+
+  $effect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    box?.focus();
+    return () => previous?.focus?.();
+  });
+
+  const NAV = 'absolute top-1/2 z-10 grid h-12 w-12 -translate-y-1/2 place-items-center rounded-full bg-black/40 text-white backdrop-blur-md transition duration-150 hover:bg-black/65 disabled:opacity-0';
+</script>
+
+<svelte:window onkeydown={onkey} />
+
+{#if entry}
+  <div use:portal bind:this={box} role="dialog" aria-modal="true" aria-label={t('explorer.preview.label', { name: entry.label ?? entry.name })}
+    tabindex="-1" in:fade={{ duration: ms(DUR.micro) }}
+    class="fixed inset-0 z-40 flex flex-col bg-[#07090d] text-white outline-none">
+    <header class="relative z-10 flex flex-none items-center gap-3 border-b border-white/10 bg-black/35 px-5 py-3 backdrop-blur-xl">
+      <div class="min-w-0 flex-1">
+        <b class="block truncate text-md">{entry.label ?? entry.name}</b>
+        <p class="truncate text-xs text-white/65">{facts.join(' · ')}</p>
+      </div>
+      {#if view !== 'unsupported'}
+        <button type="button" aria-pressed={info} onclick={() => (info = !info)} aria-label={t('explorer.preview.info')}
+          title={t('explorer.preview.info')}
+          class="grid h-10 w-10 place-items-center rounded-full transition duration-150 {info ? 'bg-white/25' : 'bg-white/10 hover:bg-white/20'}">
+          <Icon name="info" size={18} />
+        </button>
+      {/if}
+      <Button size="sm" variant="primary" disabled={ex.state.starting} onclick={() => ex.copyPreview()}>
+        <Icon name="download" size={15} />{t('explorer.preview.copy')}
+      </Button>
+      <button type="button" onclick={close} aria-label={t('explorer.preview.close')} title={t('explorer.preview.close')}
+        class="grid h-10 w-10 place-items-center rounded-full bg-white/10 transition duration-150 hover:bg-white/20">
+        <Icon name="x" size={18} />
+      </button>
+    </header>
+
+    <div class="relative flex min-h-0 flex-1">
+      <div class="relative min-w-0 flex-1">
+        {#key entry.path}
+          <div class="absolute inset-0" in:fade={{ duration: ms(DUR.enter) }}>
+            {#if view === 'photo'}
+              <PhotoView {entry} onfail={() => (broken = entry.path)} />
+            {:else if view === 'media'}
+              <MediaView bind:this={media} {ex} {entry} {meta} {thumbs} onfail={() => (broken = entry.path)} />
+            {:else if view === 'text'}
+              <TextView {ex} {entry} />
+            {:else}
+              <div class="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center">
+                <FileIcon kind="file" type={entry.type} ext={entry.ext} size={96} />
+                <p class="max-w-[360px] text-sm text-white/75">{t('explorer.preview.unsupported')}</p>
+              </div>
+            {/if}
+          </div>
+        {/key}
+        <button type="button" class="{NAV} left-4" onclick={() => ex.next(-1)} disabled={at <= 0}
+          aria-label={t('explorer.preview.prev')} title={t('explorer.preview.prev')}><Icon name="chevron-left" size={22} /></button>
+        <button type="button" class="{NAV} right-4" onclick={() => ex.next(1)} disabled={at < 0 || at >= files.length - 1}
+          aria-label={t('explorer.preview.next')} title={t('explorer.preview.next')}><Icon name="chevron-right" size={22} /></button>
+      </div>
+      {#if showInfo}
+        <MetaPanel {entry} {meta} onmap={(lat, lon) => ex.openMap(lat, lon)} />
+      {/if}
+    </div>
+
+    {#if strip.length > 1}
+      <nav aria-label={t('explorer.preview.neighbours')}
+        class="relative z-10 flex flex-none justify-center gap-2 border-t border-white/10 bg-black/35 px-5 py-2.5 backdrop-blur-xl">
+        {#each strip as n (n.path)}
+          <button type="button" onclick={() => ex.openPreview(n.path)} aria-label={n.label ?? n.name}
+            aria-current={n.path === entry.path ? 'true' : undefined}
+            class="h-12 w-12 flex-none overflow-hidden rounded-[10px] transition duration-150 ease-out
+              {n.path === entry.path ? 'scale-100 opacity-100 ring-2 ring-accent' : 'scale-90 opacity-60 hover:opacity-100'}">
+            {#if n.thumb}<img src={n.thumb} alt="" draggable="false" class="h-full w-full object-cover" />
+            {:else}<span class="grid h-full w-full place-items-center bg-white/10"><Icon name="image" size={18} /></span>{/if}
+          </button>
+        {/each}
+      </nav>
+    {/if}
+  </div>
+{/if}

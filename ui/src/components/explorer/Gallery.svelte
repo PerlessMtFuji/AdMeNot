@@ -2,6 +2,7 @@
   import { tick, untrack } from 'svelte';
   import type { ExplorerController } from '../../lib/explorer/controller';
   import { days } from '../../lib/explorer/logic';
+  import { openMorph } from '../../lib/explorer/morph';
   import type { ThumbQueue } from '../../lib/explorer/thumbs';
   import {
     FALLBACK, GRID, type GroupIn, gridLayout, inView, locate, neighbour, type Rect, tileRect, tilesInRect, type Viewport,
@@ -144,12 +145,18 @@
     box.querySelector<HTMLElement>(`[data-path="${CSS.escape(path)}"]`)?.focus();
   }
 
-  /** Klawiatura w siatce: Enter wchodzi do folderu, Spacja przełącza zaznaczenie, strzałki przesuwają
+  /** Folder — wchodzi do niego, plik — otwiera podgląd (zdjęcie rośnie z kafla). */
+  function open(e: EntryView): void {
+    if (e.kind === 'dir') void ex.go(e.path);
+    else void openMorph(e.path, () => ex.openPreview(e.path));
+  }
+
+  /** Klawiatura w siatce: Enter wchodzi do folderu albo otwiera podgląd, Spacja przełącza zaznaczenie, strzałki przesuwają
    *  (z Shift — zakres). */
   function onkey(ev: KeyboardEvent, e: EntryView, i: number): void {
-    if (ev.key === 'Enter' && e.kind === 'dir') {
+    if (ev.key === 'Enter') {
       ev.preventDefault();
-      void ex.go(e.path);
+      open(e);
     } else if (ev.key === ' ') {
       ev.preventDefault();
       ex.select(e.path, { ctrl: true }, order);
@@ -250,7 +257,7 @@
         class="group absolute top-0 left-0 rounded-[12px] outline-offset-2"
         style:transform="translate({rect.x}px, {rect.y}px)" style:width="{rect.w}px" style:height="{rect.h}px"
         onclick={(ev) => onclick(ev, e)}
-        ondblclick={() => { if (e.kind === 'dir') void ex.go(e.path); }}
+        ondblclick={() => open(e)}
         onkeydown={(ev) => onkey(ev, e, i)}>
         <div class="h-full w-full {s.fresh.has(e.path) ? '[animation:pop-in_.35s]' : ''}">
           <Thumb entry={e} thumb={url ? thumbs.get(url) : null} noThumb={!url || thumbs.failed(url)} selected={sel}

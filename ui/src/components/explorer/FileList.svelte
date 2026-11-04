@@ -78,12 +78,18 @@
     box.querySelector<HTMLElement>(`[data-path="${CSS.escape(path)}"]`)?.focus();
   }
 
-  /** Klawiatura w liście: Enter wchodzi do folderu, Spacja przełącza zaznaczenie, strzałki przesuwają
+  /** Folder — wchodzi do niego, plik — otwiera podgląd. */
+  function open(entry: EntryView): void {
+    if (entry.kind === 'dir') void ex.go(entry.path);
+    else ex.openPreview(entry.path);
+  }
+
+  /** Klawiatura w liście: Enter wchodzi do folderu albo otwiera podgląd, Spacja przełącza zaznaczenie, strzałki przesuwają
    *  zaznaczenie (z Shift — zakres). */
   function onkey(e: KeyboardEvent, entry: EntryView, i: number): void {
-    if (e.key === 'Enter' && entry.kind === 'dir') {
+    if (e.key === 'Enter') {
       e.preventDefault();
-      void ex.go(entry.path);
+      open(entry);
     } else if (e.key === ' ') {
       e.preventDefault();
       ex.select(entry.path, { ctrl: true });
@@ -125,7 +131,7 @@
         <div role="option" aria-selected={sel} data-path={e.path} tabindex={tabPath === e.path ? 0 : -1}
           in:rowIn={{ i, on: fresh }}
           onclick={(ev) => ex.select(e.path, { ctrl: ev.ctrlKey || ev.metaKey, shift: ev.shiftKey })}
-          ondblclick={() => { if (e.kind === 'dir') void ex.go(e.path); }}
+          ondblclick={() => open(e)}
           onkeydown={(ev) => onkey(ev, e, i)}
           style:top="{PAD_Y + i * ROW_H}px" style:height="{ROW_H}px"
           class="group {COLS} absolute inset-x-0 cursor-default rounded-xl px-3 select-none transition-colors duration-150

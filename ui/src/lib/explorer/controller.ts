@@ -1,4 +1,5 @@
 import { type Bridge, isApiError } from '../bridge';
+import { AudioPlayer } from './audio';
 import type { AppState } from '../state.svelte';
 import type { ApiError, ApiErrorBody, EntryView, ExplorerListView, ExplorerOpenView, ExplorerStart, PlaceView, TaskView } from '../types';
 import { days, defaultView, type ExplorerFilter, type ExplorerView, parentPath, placeAt, ROOT, SORT_START, type SortKey, visible } from './logic';
@@ -22,6 +23,7 @@ export class ExplorerController {
   private opening = false;
   private earlyPlaces: PlaceView[] | null = null;  // liczby Miejsc, które przyszły przed wynikiem otwarcia
   private freshTimer: ReturnType<typeof setTimeout> | undefined;
+  private player: AudioPlayer | null = null;
 
   constructor(private readonly app: AppState, private readonly bridge: Bridge) {}
 
@@ -239,6 +241,101 @@ export class ExplorerController {
     this.state.anchor = null;
   }
 
+  // ---- podgląd i odtwarzacz --------------------------------------------------------------------
+
+  /** Odtwarzacz muzyki (tworzony przy pierwszym użyciu); żyje do końca sesji eksploratora. */
+  get audio(): AudioPlayer {
+    return (this.player ??= new AudioPlayer());
+  }
+
+  /** Plik w oknie podglądu (wpis bieżącego folderu) albo undefined. */
+  get previewEntry(): EntryView | undefined {
+    const path = this.state.preview;
+    return path === null ? undefined : this.state.entries.find((e) => e.path === path);
+  }
+
+  openPreview(path: string): void {
+    if (this.state.entries.some((e) => e.path === path && e.kind === 'file')) this.state.preview = path;
+  }
+
+  closePreview(): void {
+    this.state.preview = null;
+  }
+
+  /** Strzałki w podglądzie: poprzedni/następny plik spośród widocznych po filtrze i szukaniu (bez zawijania). */
+  next(delta: 1 | -1): void {
+    const s = this.state;
+    const files = this.items.filter((e) => e.kind === 'file');
+    const at = files.findIndex((e) => e.path === s.preview);
+    const to = files[at + delta];
+    if (at >= 0 && to) s.preview = to.path;
+  }
+
+  /** Wszystkie pola metadanych pliku (EXIF, MediaStore) albo null, gdy się nie udało. */
+  async meta(path: string) {
+    return (await this.request(() => this.api.explorer_meta(path), false))?.meta ?? null;
+  }
+
+  /** Kawałek tekstu pliku; `more` — następny kawałek tego samego pliku. */
+  text(path: string, more: boolean) {
+    return this.request(() => this.api.explorer_text(path, more), false);
+  }
+
+  async openMap(lat: number, lon: number): Promise<void> {
+    await this.request(() => this.api.explorer_open_map(lat, lon));
+  }
+
+  /** „Kopiuj na komputer” w podglądzie: tylko ten plik, do zapamiętanego folderu (bez folderu — najpierw pyta). */
+  async copyPreview(): Promise<void> {
+    const s = this.state;
+    const path = s.preview;
+    if (path === null || s.starting) return;
+    if (!s.dest && !(await this.pickDest())) return;
+    await this.copy([path], s.dest!, false);
+  }
+
+  /** Odtwórz utwór (od początku, gdy to inny niż grający). */
+  async playTrack(entry: EntryView): Promise<void> {
+    if (!entry.url) return;
+    const s = this.state;
+    if (s.playing?.path !== entry.path) {
+      this.audio.load(entry.url);
+      s.playing = { path: entry.path, title: entry.label ?? entry.name, cover: entry.thumb };
+    }
+    await this.audio.play();
+  }
+
+  /** Spacja / przycisk: odtwarza, wstrzymuje albo wznawia utwór. */
+  async toggleTrack(entry?: EntryView): Promise<void> {
+    const s = this.state;
+    const playing = s.playing;
+    if (playing && (!entry || entry.path === playing.path)) {
+      if (this.audio.el.paused) await this.audio.play();
+      else this.audio.pause();
+    } else if (entry) {
+      await this.playTrack(entry);
+    }
+  }
+
+  /** Następny utwór z tego folderu (⏭) — według kolejności na ekranie. */
+  get nextTrack(): EntryView | undefined {
+    const tracks = this.items.filter((e) => e.type === 'audio' && e.kind === 'file' && e.url);
+    const at = tracks.findIndex((e) => e.path === this.state.playing?.path);
+    return at >= 0 ? tracks[at + 1] : undefined;
+  }
+
+  async skipTrack(): Promise<void> {
+    const next = this.nextTrack;
+    if (!next) return;
+    if (this.state.preview !== null) this.state.preview = next.path;  // okno podglądu idzie za utworem
+    await this.playTrack(next);
+  }
+
+  stopTrack(): void {
+    this.state.playing = null;
+    this.player?.stop();
+  }
+
   // ---- zadania: kopiowanie na komputer i wgrywanie na telefon ---------------------------------
 
   /** Okno wyboru folderu docelowego na komputerze; most go zapamiętuje. False — anulowane. */
@@ -382,8 +479,9 @@ export class ExplorerController {
     return r.task.id;
   }
 
-  /** Wywołanie mostu z błędem w banerze nad listą (sesja zamknięta → powrót na „Połącz”). */
-  private async request<T extends object>(call: () => Promise<T | ApiError>): Promise<T | null> {
+  /** Wywołanie mostu z błędem w banerze nad listą (sesja zamknięta → powrót na „Połącz”); `banner = false` —
+   *  błąd tylko zwraca null, a okno wywołujące (podgląd) mówi o nim samo. */
+  private async request<T extends object>(call: () => Promise<T | ApiError>, banner = true): Promise<T | null> {
     let r: T | ApiError;
     try {
       r = await call();
@@ -394,7 +492,7 @@ export class ExplorerController {
     if (r.error.key === 'explorer_not_open') {
       this.leave();
       this.app.error = r.error;
-    } else if (this.state.open) {
+    } else if (banner && this.state.open) {
       this.state.error = r.error;
     }
     return null;
@@ -433,13 +531,14 @@ export class ExplorerController {
   private reset(): void {
     const s = this.state;
     this.seq += 1;  // spóźniona lista poprzedniej sesji nie trafi na ekran
+    this.stopTrack();
     s.selected.clear();
     this.markFresh([]);
     Object.assign(s, {
       problems: null, drop: null, starting: false, clipboardEmpty: false,
       open: false, serial: null, device: null, places: [], recent: [], path: ROOT, crumbs: [], entries: [],
       locked: false, skipped: 0, loading: false, view: 'list', filter: 'all', query: '', anchor: null, tasks: [],
-      offline: false, preview: null, dest: null, leftovers: 0, media: '', error: null,
+      offline: false, preview: null, playing: null, dest: null, leftovers: 0, media: '', error: null,
     });
   }
 }

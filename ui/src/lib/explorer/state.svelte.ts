@@ -33,7 +33,10 @@ export class ExplorerState {
   tasks = $state.raw<TaskView[]>([]);
   /** Telefon zniknął z listy — most czeka na jego powrót (`explorer:online`). */
   offline = $state(false);
+  /** Ścieżka pliku w oknie podglądu. */
   preview = $state<string | null>(null);
+  /** Utwór w odtwarzaczu (gra dalej po zamknięciu podglądu, w mini-odtwarzaczu). */
+  playing = $state<PlayingTrack | null>(null);
   /** Folder docelowy kopii na komputerze (zapamiętany przez most). */
   dest = $state<string | null>(null);
   /** Ile plików tymczasowych z poprzednich otwarć most usunął z telefonu (baner do zamknięcia). */
@@ -55,6 +58,13 @@ export class ExplorerState {
   fresh = new SvelteSet<string>();
   /** Ctrl+V bez plików w schowku Windows — podpowiedź do zamknięcia. */
   clipboardEmpty = $state(false);
+}
+
+export interface PlayingTrack {
+  path: string;
+  title: string;
+  /** Okładka (adres miniatury) albo null — wtedy kolorowy kafel. */
+  cover: string | null;
 }
 
 export interface ExplorerProblems {

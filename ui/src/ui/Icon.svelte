@@ -3,6 +3,7 @@
   import BellRing from '@lucide/svelte/icons/bell-ring';
   import Camera from '@lucide/svelte/icons/camera';
   import Check from '@lucide/svelte/icons/check';
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
   import Clock from '@lucide/svelte/icons/clock';
@@ -49,8 +50,11 @@
   import List from '@lucide/svelte/icons/list';
   import MessageCircle from '@lucide/svelte/icons/message-circle';
   import Music from '@lucide/svelte/icons/music';
+  import MapPin from '@lucide/svelte/icons/map-pin';
   import Package from '@lucide/svelte/icons/package';
   import Play from '@lucide/svelte/icons/play';
+  import RotateCw from '@lucide/svelte/icons/rotate-cw';
+  import SkipForward from '@lucide/svelte/icons/skip-forward';
   import ScanLine from '@lucide/svelte/icons/scan-line';
   import Upload from '@lucide/svelte/icons/upload';
   import WifiOff from '@lucide/svelte/icons/wifi-off';
@@ -66,7 +70,7 @@
     heart: Heart, copy: Copy, 'arrow-down': ArrowDown, 'arrow-up': ArrowUp, file: FileIcon, film: Film, folder: Folder,
     'folder-lock': FolderLock, 'folder-open': FolderOpen, 'hard-drive': HardDrive, image: ImageIcon,
     'layout-grid': LayoutGrid, list: List, 'message-circle': MessageCircle, music: Music, package: Package, play: Play,
-    'scan-line': ScanLine, upload: Upload, 'wifi-off': WifiOff,
+    'scan-line': ScanLine, 'chevron-left': ChevronLeft, 'map-pin': MapPin, 'rotate-cw': RotateCw, 'skip-forward': SkipForward, upload: Upload, 'wifi-off': WifiOff,
   } as const;
   export type IconName = keyof typeof ICONS;
 </script>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte';
+  import { clock } from '../../lib/explorer/logic';
   import type { Thumb } from '../../lib/explorer/thumbs';
   import { reducedMotion } from '../../lib/motion';
   import type { EntryView } from '../../lib/types';
@@ -26,14 +27,6 @@
   const delay = $derived(thumb && cascadeAt !== null ? Math.max(0, Math.round(cascadeAt - performance.now())) : 0);
   const tint = $derived(thumb?.color || mediaGradient(entry.type));
   const glow = $derived(thumb?.color || 'var(--glow-accent)');
-
-  function clock(seconds: number): string {
-    const s = Math.round(seconds);
-    const h = Math.floor(s / 3600);
-    const mm = String(Math.floor((s % 3600) / 60));
-    const ss = String(s % 60).padStart(2, '0');
-    return h ? `${h}:${mm.padStart(2, '0')}:${ss}` : `${mm}:${ss}`;
-  }
 </script>
 
 <!-- Zaznaczony kafel kurczy się lekko w ramce akcentu, z poświatą w kolorze zdjęcia. -->

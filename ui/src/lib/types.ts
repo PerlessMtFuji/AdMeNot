@@ -483,6 +483,9 @@ export interface EntryView {
   url: string | null;
 }
 
+/** Metadane pliku z `explorer_meta`: EXIF / MediaStore dosłownie, plus `gps`, `width`, `height` (zdjęcia). */
+export type EntryMeta = Record<string, unknown> & { size: number; mtime: number; path: string };
+
 export interface CrumbView {
   label: string;
   path: string;
@@ -917,7 +920,7 @@ export interface Api {
   explorer_open(serial: string): R<ExplorerOpenView>;
   explorer_close(): R<Record<string, never>>;
   explorer_list(path: string): R<ExplorerListView>;
-  explorer_meta(path: string): R<{ meta: Record<string, unknown> & { size: number; mtime: number; path: string } }>;
+  explorer_meta(path: string): R<{ meta: EntryMeta }>;
   explorer_text(path: string, more: boolean): R<{ text: string; encoding: string; truncated: boolean }>;
   explorer_mkdir(parent: string, name: string): R<{ path: string }>;
   explorer_new_text(parent: string, name: string, text: string): R<{ path: string }>;

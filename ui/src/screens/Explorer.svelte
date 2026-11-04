@@ -6,7 +6,9 @@
   import Places from '../components/explorer/Places.svelte';
   import DropZone from '../components/explorer/DropZone.svelte';
   import Menu from '../components/explorer/Menu.svelte';
+  import MiniPlayer from '../components/explorer/MiniPlayer.svelte';
   import NewDialog from '../components/explorer/NewDialog.svelte';
+  import Preview from '../components/explorer/Preview.svelte';
   import ProblemsDialog from '../components/explorer/ProblemsDialog.svelte';
   import SelectionBar from '../components/explorer/SelectionBar.svelte';
   import TaskBar from '../components/explorer/TaskBar.svelte';
@@ -54,6 +56,7 @@
 
   /** Skróty jak w Eksploratorze Windows — poza polami tekstowymi (tam Backspace i Ctrl+A edytują tekst). */
   function onkey(e: KeyboardEvent): void {
+    if (s.preview !== null) return;  // okno podglądu ma własne skróty (Esc, ←, →, Spacja)
     const el = e.target instanceof Element ? e.target : null;
     if (el && (el.closest('input, textarea, select, [contenteditable="true"]') || el.closest('[role="dialog"]'))) return;
     const mod = e.ctrlKey || e.metaKey;
@@ -203,6 +206,7 @@
   </div>
 
   <SelectionBar {ex} />
+  <MiniPlayer {ex} {thumbs} />
   <TaskBar {ex} />
 </main>
 
@@ -210,4 +214,5 @@
   <NewDialog kind={creating} where={folderName} oncancel={() => (creating = null)}
     onsubmit={(name, text) => (creating === 'folder' ? ex.newFolder(name) : ex.newText(name, text))} />
 {/if}
+{#if s.preview !== null}<Preview {ex} {thumbs} />{/if}
 {#if s.problems}<ProblemsDialog {ex} problems={s.problems} />{/if}

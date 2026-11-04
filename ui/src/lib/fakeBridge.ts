@@ -425,6 +425,20 @@ export function createFakeBridge(name: string,
     return { path, crumbs, entries: [...children.values()], skipped: 0, locked: false };
   };
 
+  // Podgląd: nagrany jest jeden plik z GPS (`IMG_20260926_0000.jpg`) i jeden tekst w cp1250; reszta składana tak,
+  // żeby podgląd działał na każdym pliku. Tekst oddaje się dwoma kawałkami („Pokaż więcej”).
+  const fakeMeta = (path: string) => {
+    const known = recordedLists().flatMap((l) => l.entries).find((e) => e.path === path);
+    return { meta: { gps: null, width: 64, height: 48, size: known?.size ?? 0, mtime: known?.mtime ?? 0, path } };
+  };
+  const fakeText = (path: string, more: boolean) => {
+    const hit = data.calls.find((c) => c.method === 'explorer_text' && c.args[0] === path)?.result as
+      { text: string; encoding: string } | undefined;
+    const encoding = hit?.encoding ?? 'utf-8';
+    if (more) return { text: '\nDalszy ciąg pliku — drugi kawałek.', encoding, truncated: false };
+    return { text: hit?.text ?? 'Przykładowy tekst pliku.', encoding, truncated: true };
+  };
+
   const invoke = (method: string, args: unknown[]): unknown => {
     calls.push({ method, args });
     const failure = failures.get(method);
@@ -437,6 +451,7 @@ export function createFakeBridge(name: string,
       answers.delete(method);
       return structuredClone(result);
     }
+    if (method === 'explorer_text') return fakeText(String(args[0]), args[1] === true);
     if (BY_PATH.has(method)) {
       const hit = data.calls.find((c) => c.method === method && c.args[0] === args[0]);
       if (hit) {
@@ -444,6 +459,7 @@ export function createFakeBridge(name: string,
         return structuredClone(hit.result);
       }
       if (method === 'explorer_list' && queues.has(method)) return fakeListing(String(args[0]));
+      if (method === 'explorer_meta') return fakeMeta(String(args[0]));
     }
     const queue = queues.get(method);
     if (!queue || queue.length === 0) return fallback(method, args);

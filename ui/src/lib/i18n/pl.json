@@ -119,6 +119,42 @@
       "other_phone": "Podłączono inny telefon — eksplorator został zamknięty.",
       "switched": "Otwarto pliki innego telefonu — poprzedni eksplorator został zamknięty."
     },
+    "preview": {
+      "label": "Podgląd pliku {name}",
+      "close": "Zamknij podgląd",
+      "copy": "Kopiuj na komputer",
+      "info": "Informacje o pliku",
+      "prev": "Poprzedni plik",
+      "next": "Następny plik",
+      "neighbours": "Sąsiednie pliki",
+      "rotate": "Obróć o 90°",
+      "play": "Odtwórz",
+      "pause": "Wstrzymaj",
+      "seek": "Przewiń",
+      "next_track": "Następny utwór",
+      "loading": "Wczytuję…",
+      "failed": "Nie udało się wczytać podglądu.",
+      "unsupported": "Tego pliku nie da się tu pokazać — skopiuj go na komputer.",
+      "copy_text": "Kopiuj tekst",
+      "text_copied": "Skopiowano",
+      "more": "Pokaż więcej",
+      "encoding": "Kodowanie: {encoding}",
+      "lines": { "one": "{count} linia", "few": "{count} linie", "many": "{count} linii", "other": "{count} linii" },
+      "meta": {
+        "photo": "Zdjęcie", "video": "Film", "audio": "Utwór", "camera": "Aparat", "location": "Lokalizacja", "file": "Plik",
+        "coords": "Współrzędne", "map": "Pokaż na mapie", "name": "Nazwa", "path": "Ścieżka", "size": "Rozmiar", "modified": "Zmieniony",
+        "dimensions": "Wymiary"
+      },
+      "field": {
+        "Make": "Producent", "Model": "Model", "LensModel": "Obiektyw", "LensMake": "Producent obiektywu", "Software": "Oprogramowanie",
+        "DateTimeOriginal": "Zrobione", "DateTime": "Zmieniono", "ExposureTime": "Czas naświetlania", "FNumber": "Przysłona",
+        "ISOSpeedRatings": "ISO", "PhotographicSensitivity": "ISO", "FocalLength": "Ogniskowa", "Flash": "Lampa błyskowa",
+        "Orientation": "Orientacja", "WhiteBalance": "Balans bieli", "duration": "Czas trwania", "bitrate": "Przepływność",
+        "mime_type": "Typ", "date_taken": "Zrobione", "title": "Tytuł", "artist": "Wykonawca", "album": "Album",
+        "width": "Szerokość", "height": "Wysokość", "alt": "Wysokość n.p.m."
+      }
+    },
+    "mini": { "label": "Mini odtwarzacz", "stop": "Zatrzymaj i zamknij" },
     "day": { "today": "Dziś · {date}", "yesterday": "Wczoraj" },
     "gallery": {
       "folders": "Foldery",

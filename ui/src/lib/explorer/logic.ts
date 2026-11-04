@@ -141,3 +141,12 @@ export function formatBytes(bytes: number, lang: string): string {
     { maximumFractionDigits: digits }).format(value);
   return `${number} ${UNITS[unit]}`;
 }
+
+/** Czas trwania „m:ss” albo „g:mm:ss”. */
+export function clock(seconds: number): string {
+  const s = Math.round(seconds);
+  const h = Math.floor(s / 3600);
+  const mm = String(Math.floor((s % 3600) / 60));
+  const ss = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${mm.padStart(2, '0')}:${ss}` : `${mm}:${ss}`;
+}
