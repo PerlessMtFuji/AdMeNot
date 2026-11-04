@@ -3,6 +3,7 @@
   import { highlight, type Token } from '../../lib/explorer/highlight';
   import { t, tp } from '../../lib/i18n/index.svelte';
   import type { EntryView } from '../../lib/types';
+  import Banner from '../../ui/Banner.svelte';
   import Button from '../../ui/Button.svelte';
   import Icon from '../../ui/Icon.svelte';
 
@@ -68,7 +69,7 @@
   </div>
   <div class="min-h-0 flex-1 overflow-auto rounded-2xl bg-white/[.06] shadow-[inset_0_0_0_1px_rgb(255_255_255/.08)]">
     {#if failed}
-      <p class="p-6 text-sm text-white/70">{t('explorer.preview.failed')}</p>
+      <div class="p-4"><Banner tone="bad" icon="triangle-alert">{t('explorer.preview.failed')}</Banner></div>
     {:else}
       <div class="flex min-w-max font-mono text-[13px] leading-[1.6] text-white/90">
         <pre aria-hidden="true" class="sticky left-0 flex-none bg-[#11141b] px-3 py-3 text-right text-white/35 select-none">{gutter}</pre>

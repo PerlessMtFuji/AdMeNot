@@ -51,9 +51,13 @@ export class AudioPlayer {
   private analyser: AnalyserLike | null = null;
   private buffer: Uint8Array<ArrayBuffer> | null = null;
   private wired = false;
+  private routingBroken = false;
+  /** Błąd wczytania lub dekodowania (zdarzenie `error` elementu) — ustawia kontroler. */
+  onerror: (() => void) | null = null;
 
   constructor(private readonly factory: ContextFactory | null = defaultContext()) {
     this.el = new Audio();
+    this.el.addEventListener('error', () => this.onerror?.());
     this.el.preload = 'metadata';
     this.el.crossOrigin = 'anonymous';  // serwer mediów daje CORS; bez tego analizator widzi ciszę
   }
@@ -67,13 +71,16 @@ export class AudioPlayer {
     if (this.el.getAttribute('src') !== url) this.el.src = url;
   }
 
-  async play(): Promise<void> {
+  /** False — odtwarzanie się nie udało (kontroler pokazuje błąd). Przerwanie przez kolejne load()/pause() to nie błąd. */
+  async play(): Promise<boolean> {
     this.wire();
+    if (this.routingBroken) return false;
     try {
       if (this.ctx?.state === 'suspended') await this.ctx.resume();
       await this.el.play();
-    } catch {
-      // przerwane kolejnym load()/pause() albo autoodtwarzanie zablokowane — przycisk zostaje „odtwórz”
+      return true;
+    } catch (e) {
+      return (e as { name?: string })?.name === 'AbortError';
     }
   }
 
@@ -106,19 +113,30 @@ export class AudioPlayer {
   private wire(): void {
     if (this.wired || !this.factory) return;
     this.wired = true;
+    let ctx: ContextLike | null = null;
+    let source: { connect(node: unknown): void } | null = null;
     try {
-      const ctx = this.factory();
+      ctx = this.factory();
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 128;
       analyser.smoothingTimeConstant = 0.8;
-      ctx.createMediaElementSource(this.el).connect(analyser);
+      source = ctx.createMediaElementSource(this.el);
+      source.connect(analyser);
       analyser.connect(ctx.destination);
       this.ctx = ctx;
       this.analyser = analyser;
       this.buffer = new Uint8Array(analyser.frequencyBinCount);
     } catch {
-      this.ctx = null;  // bez analizatora muzyka gra normalnie
+      // Bez analizatora muzyka gra normalnie. Ale element po `createMediaElementSource` jest przepięty do
+      // grafu i bez połączenia z wyjściem milczy — wracamy do bezpośredniego wyjścia.
       this.analyser = null;
+      this.buffer = null;
+      this.ctx = source ? ctx : null;
+      try {
+        if (source && ctx) source.connect(ctx.destination);
+      } catch {
+        this.routingBroken = true;  // element przepięty donikąd: lepiej błąd niż cicha muzyka
+      }
     }
   }
 }

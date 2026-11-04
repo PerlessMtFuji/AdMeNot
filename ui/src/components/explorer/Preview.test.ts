@@ -5,7 +5,6 @@ import App from '../../App.svelte';
 import { setupCtl } from '../../test-utils';
 import type { EntryView } from '../../lib/types';
 
-const SERIAL = 'R58T00TEST';
 const GPS_FILE = '/sdcard/DCIM/Camera/IMG_20260926_0000.jpg';
 const NOTE = '/sdcard/Download/notatka.txt';
 
@@ -21,7 +20,7 @@ async function openExplorer() {
   await fireEvent.click(screen.getByRole('button', { name: 'Pliki' }));
   await vi.waitFor(() => expect(screen.getByRole('listbox', { name: 'Pliki w folderze' })).toBeTruthy());
   const ex = env.ctl.explorer;
-  ex.state.entries = [...ex.state.entries, entry('piosenka.mp3', 'audio', 'mp3'), entry('IMG_0001.heic', 'image', 'heic')];
+  ex.state.entries = [...ex.state.entries, entry('piosenka.mp3', 'audio', 'mp3'), entry('druga.mp3', 'audio', 'mp3'), entry('IMG_0001.heic', 'image', 'heic')];
   return { ...env, ex };
 }
 
@@ -130,6 +129,77 @@ describe('Preview', () => {
     await fireEvent.click(within(dialog()).getByRole('button', { name: 'Kopiuj na komputer' }));
     await vi.waitFor(() => expect(bridge.calls.find((c) => c.method === 'explorer_copy')).toBeTruthy());
     expect(bridge.calls.find((c) => c.method === 'explorer_copy')?.args[0]).toEqual([heic.path]);
-    expect(SERIAL).toBeTruthy();
+  });
+
+  test('a failed copy started from the preview shows a Banner inside the preview', async () => {
+    const { ex, bridge } = await openExplorer();
+    ex.openPreview(GPS_FILE);
+    await tick();
+    bridge.failNext('explorer_copy', 'explorer_offline');
+    await fireEvent.click(within(dialog()).getByRole('button', { name: 'Kopiuj na komputer' }));
+    const alert = await within(dialog()).findByRole('alert');
+    expect(alert.textContent).toContain('Telefon nie odpowiada');
+    await fireEvent.click(within(alert).getByRole('button', { name: 'Zamknij' }));
+    expect(within(dialog()).queryByRole('alert')).toBeNull();
+  });
+
+  test('a started copy is confirmed inside the preview', async () => {
+    const { ex } = await openExplorer();
+    ex.openPreview(GPS_FILE);
+    await tick();
+    await fireEvent.click(within(dialog()).getByRole('button', { name: 'Kopiuj na komputer' }));
+    const status = await within(dialog()).findByText('Kopiowanie rozpoczęte', { exact: false });
+    expect(status).toBeTruthy();
+    expect(within(dialog()).queryByRole('alert')).toBeNull();
+  });
+
+  test('the next-track button and auto-advance follow the playlist captured at start, even after browsing away', async () => {
+    const { ex } = await openExplorer();
+    const [first, second] = ['druga.mp3', 'piosenka.mp3'].map((n) => ex.state.entries.find((e) => e.name === n)!);
+    ex.openPreview(first.path);
+    await tick();
+    await fireEvent.click(within(dialog()).getByRole('button', { name: 'Odtwórz' }));
+    await fireEvent.keyDown(window, { key: 'Escape' });
+    await ex.go('/sdcard/Download');  // inny folder: druga.mp3 i piosenka.mp3 nie ma już na liście
+    expect(ex.items.some((e) => e.type === 'audio')).toBe(false);
+    const mini = screen.getByRole('region', { name: 'Mini odtwarzacz' });
+    await fireEvent.click(within(mini).getByRole('button', { name: 'Następny utwór' }));
+    expect(ex.state.playing?.path).toBe(second.path);
+    expect(within(screen.getByRole('region', { name: 'Mini odtwarzacz' })).getByRole('button', { name: 'Następny utwór' })
+      .hasAttribute('disabled')).toBe(true);  // ostatni na liście
+
+    ex.stopTrack();
+    ex.state.entries = [...ex.state.entries, first, second];
+    await ex.playTrack(first);
+    ex.audio.el.dispatchEvent(new Event('ended'));
+    await vi.waitFor(() => expect(ex.state.playing?.path).toBe(second.path));
+  });
+
+  test('an audio error shows a Banner in the preview and an error state in the mini player', async () => {
+    const { ex } = await openExplorer();
+    const song = ex.state.entries.find((e) => e.name === 'piosenka.mp3')!;
+    ex.openPreview(song.path);
+    await tick();
+    await fireEvent.click(within(dialog()).getByRole('button', { name: 'Odtwórz' }));
+    ex.audio.el.dispatchEvent(new Event('error'));
+    expect((await within(dialog()).findByRole('alert')).textContent).toContain('Nie udało się odtworzyć tego utworu');
+    await fireEvent.keyDown(window, { key: 'Escape' });
+    const mini = screen.getByRole('region', { name: 'Mini odtwarzacz' });
+    expect(within(mini).getByRole('alert').textContent).toContain('Nie udało się odtworzyć');
+  });
+
+  test('the preview closes when a refresh removes its file', async () => {
+    const { ex, bridge } = await openExplorer();
+    ex.openPreview(GPS_FILE);
+    await tick();
+    const s = ex.state;
+    bridge.answerNext('explorer_list', JSON.parse(JSON.stringify({ path: s.path, crumbs: s.crumbs,
+      entries: s.entries.filter((e) => e.path !== GPS_FILE), skipped: 0, locked: false })));
+    await ex.refresh();
+    await tick();
+    expect(s.preview).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await fireEvent.keyDown(window, { key: 'a', ctrlKey: true });  // skróty ekranu znów działają
+    expect(s.selected.size).toBeGreaterThan(0);
   });
 });

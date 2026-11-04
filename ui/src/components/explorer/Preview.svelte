@@ -4,9 +4,10 @@
   import type { ExplorerController } from '../../lib/explorer/controller';
   import { clock, formatBytes } from '../../lib/explorer/logic';
   import type { ThumbQueue } from '../../lib/explorer/thumbs';
-  import { i18n, t } from '../../lib/i18n/index.svelte';
+  import { ERROR_KEYS, i18n, t } from '../../lib/i18n/index.svelte';
   import { DUR, ms } from '../../lib/motion';
   import type { EntryMeta } from '../../lib/types';
+  import Banner from '../../ui/Banner.svelte';
   import Button from '../../ui/Button.svelte';
   import Icon from '../../ui/Icon.svelte';
   import FileIcon from './FileIcon.svelte';
@@ -27,6 +28,16 @@
   let broken = $state<string | null>(null);  // plik, którego nie dało się zdekodować
   let box = $state<HTMLElement>();
   let media = $state<{ toggle(): void }>();
+  /** „Kopiuj na komputer” przyjęte do kolejki — potwierdzenie (postęp jest na pasku zadań pod oknem). */
+  let started = $state(false);
+  const known: readonly string[] = ERROR_KEYS;
+  const error = $derived(ex.state.error);
+  const audioFailed = $derived(ex.state.playError && entry?.type === 'audio' && ex.state.playing?.path === entry.path);
+
+  async function copy(): Promise<void> {
+    started = false;
+    started = await ex.copyPreview();
+  }
 
   const view = $derived.by(() => {
     if (!entry || broken === entry.path) return 'unsupported';
@@ -39,6 +50,7 @@
   $effect(() => {
     const path = entry?.path;
     meta = null;
+    started = false;
     if (!path) return;
     let stale = false;
     void ex.meta(path).then((m) => { if (!stale) meta = m; });
@@ -112,7 +124,7 @@
           <Icon name="info" size={18} />
         </button>
       {/if}
-      <Button size="sm" variant="primary" disabled={ex.state.starting} onclick={() => ex.copyPreview()}>
+      <Button size="sm" variant="primary" disabled={ex.state.starting} onclick={copy}>
         <Icon name="download" size={15} />{t('explorer.preview.copy')}
       </Button>
       <button type="button" onclick={close} aria-label={t('explorer.preview.close')} title={t('explorer.preview.close')}
@@ -120,6 +132,24 @@
         <Icon name="x" size={18} />
       </button>
     </header>
+
+    {#if error || started || audioFailed || view === 'unsupported'}
+      <div class="relative z-10 flex flex-none flex-col gap-2 px-5 pt-3">
+        {#if error}
+          <Banner tone="bad" icon="triangle-alert" title={t(`error.${known.includes(error.key) ? error.key : 'internal'}`)}>
+            {#snippet actions()}<Button size="sm" variant="ghost" onclick={() => (ex.state.error = null)}>{t('common.close')}</Button>{/snippet}
+          </Banner>
+        {/if}
+        {#if audioFailed}<Banner tone="bad" icon="triangle-alert">{t('explorer.preview.play_failed')}</Banner>{/if}
+        {#if started}
+          <Banner tone="ok" icon="check">
+            {t('explorer.preview.copy_started')}
+            {#snippet actions()}<Button size="sm" variant="ghost" onclick={() => (started = false)}>{t('common.close')}</Button>{/snippet}
+          </Banner>
+        {/if}
+        {#if view === 'unsupported'}<Banner tone="info" icon="info">{t('explorer.preview.unsupported')}</Banner>{/if}
+      </div>
+    {/if}
 
     <div class="relative flex min-h-0 flex-1">
       <div class="relative min-w-0 flex-1">
@@ -134,7 +164,6 @@
             {:else}
               <div class="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center">
                 <FileIcon kind="file" type={entry.type} ext={entry.ext} size={96} />
-                <p class="max-w-[360px] text-sm text-white/75">{t('explorer.preview.unsupported')}</p>
               </div>
             {/if}
           </div>

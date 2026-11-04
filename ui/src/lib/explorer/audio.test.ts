@@ -43,4 +43,37 @@ describe('audio', () => {
     expect(player.el.play).toHaveBeenCalled();
     expect(player.levels()).toEqual(new Array(BARS).fill(0));
   });
+
+  test('an element error is reported through onerror', () => {
+    const player = new AudioPlayer(null);
+    const onerror = vi.fn();
+    player.onerror = onerror;
+    player.el.dispatchEvent(new Event('error'));
+    expect(onerror).toHaveBeenCalledOnce();
+  });
+
+  test('play() reports a failed start but not an interrupted one', async () => {
+    const player = new AudioPlayer(null);
+    vi.mocked(player.el.play).mockRejectedValueOnce(Object.assign(new Error('x'), { name: 'NotSupportedError' }));
+    expect(await player.play()).toBe(false);
+    vi.mocked(player.el.play).mockRejectedValueOnce(Object.assign(new Error('x'), { name: 'AbortError' }));
+    expect(await player.play()).toBe(true);
+  });
+
+  test('if the analyser graph fails after the element was captured, the element is routed straight to the output', async () => {
+    const { ctx, analyser, source } = fakeContext();
+    analyser.connect.mockImplementation(() => { throw new Error('graph'); });
+    const player = new AudioPlayer(() => ctx);
+    expect(await player.play()).toBe(true);
+    expect(source.connect).toHaveBeenLastCalledWith(ctx.destination);
+    expect(player.levels()).toEqual(new Array(BARS).fill(0));
+  });
+
+  test('if even the direct route fails, play() reports an error instead of staying silent', async () => {
+    const { ctx, analyser, source } = fakeContext();
+    analyser.connect.mockImplementation(() => { throw new Error('graph'); });
+    source.connect.mockImplementation(() => { throw new Error('route'); });
+    const player = new AudioPlayer(() => ctx);
+    expect(await player.play()).toBe(false);
+  });
 });

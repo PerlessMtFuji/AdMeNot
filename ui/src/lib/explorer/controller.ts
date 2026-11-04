@@ -3,7 +3,7 @@ import { AudioPlayer } from './audio';
 import type { AppState } from '../state.svelte';
 import type { ApiError, ApiErrorBody, EntryView, ExplorerListView, ExplorerOpenView, ExplorerStart, PlaceView, TaskView } from '../types';
 import { days, defaultView, type ExplorerFilter, type ExplorerView, parentPath, placeAt, ROOT, SORT_START, type SortKey, visible } from './logic';
-import { ExplorerState } from './state.svelte';
+import { ExplorerState, type PlayingTrack } from './state.svelte';
 
 /** Jak `EXPLORER_RECENT_MAX` w ustawieniach mostu. */
 const RECENT_MAX = 8;
@@ -149,6 +149,7 @@ export class ExplorerController {
       skipped: r.skipped });
     if (same) {
       const present = new Set(r.entries.map((e) => e.path));
+      if (s.preview !== null && !present.has(s.preview)) s.preview = null;  // plik zniknął przy odświeżeniu
       for (const p of [...s.selected]) if (!present.has(p)) s.selected.delete(p);
       if (s.anchor && !present.has(s.anchor)) s.anchor = null;
     } else {
@@ -245,7 +246,13 @@ export class ExplorerController {
 
   /** Odtwarzacz muzyki (tworzony przy pierwszym użyciu); żyje do końca sesji eksploratora. */
   get audio(): AudioPlayer {
-    return (this.player ??= new AudioPlayer());
+    if (!this.player) {
+      const player = new AudioPlayer();
+      player.onerror = () => { this.state.playError = true; };
+      player.el.addEventListener('ended', () => { void this.skipTrack(); });
+      this.player = player;
+    }
+    return this.player;
   }
 
   /** Plik w oknie podglądu (wpis bieżącego folderu) albo undefined. */
@@ -255,7 +262,9 @@ export class ExplorerController {
   }
 
   openPreview(path: string): void {
-    if (this.state.entries.some((e) => e.path === path && e.kind === 'file')) this.state.preview = path;
+    if (!this.state.entries.some((e) => e.path === path && e.kind === 'file')) return;
+    this.state.preview = path;
+    this.state.error = null;  // baner w podglądzie mówi tylko o jego własnych działaniach
   }
 
   closePreview(): void {
@@ -286,23 +295,37 @@ export class ExplorerController {
   }
 
   /** „Kopiuj na komputer” w podglądzie: tylko ten plik, do zapamiętanego folderu (bez folderu — najpierw pyta). */
-  async copyPreview(): Promise<void> {
+  async copyPreview(): Promise<boolean> {
     const s = this.state;
     const path = s.preview;
-    if (path === null || s.starting) return;
-    if (!s.dest && !(await this.pickDest())) return;
-    await this.copy([path], s.dest!, false);
+    if (path === null || s.starting) return false;
+    if (!s.dest && !(await this.pickDest())) return false;
+    return this.copy([path], s.dest!, false);
   }
 
-  /** Odtwórz utwór (od początku, gdy to inny niż grający). */
+  private track(e: EntryView): PlayingTrack {
+    return { path: e.path, title: e.label ?? e.name, cover: e.thumb, url: e.url! };
+  }
+
+  /** Odtwórz utwór (od początku, gdy to inny niż grający); z listy ekranu zapamiętuje listę odtwarzania. */
   async playTrack(entry: EntryView): Promise<void> {
     if (!entry.url) return;
     const s = this.state;
-    if (s.playing?.path !== entry.path) {
-      this.audio.load(entry.url);
-      s.playing = { path: entry.path, title: entry.label ?? entry.name, cover: entry.thumb };
+    if (s.playing?.path !== entry.path || !s.queue.some((t) => t.path === entry.path)) {
+      s.queue = this.items.filter((e) => e.kind === 'file' && e.type === 'audio' && e.url).map((e) => this.track(e));
+      if (!s.queue.some((t) => t.path === entry.path)) s.queue = [...s.queue, this.track(entry)];
     }
-    await this.audio.play();
+    await this.begin(this.track(entry));
+  }
+
+  private async begin(track: PlayingTrack): Promise<void> {
+    const s = this.state;
+    if (s.playing?.path !== track.path) {
+      s.playError = false;
+      this.audio.load(track.url);
+      s.playing = track;
+    }
+    if (!(await this.audio.play())) s.playError = true;
   }
 
   /** Spacja / przycisk: odtwarza, wstrzymuje albo wznawia utwór. */
@@ -310,29 +333,31 @@ export class ExplorerController {
     const s = this.state;
     const playing = s.playing;
     if (playing && (!entry || entry.path === playing.path)) {
-      if (this.audio.el.paused) await this.audio.play();
+      if (this.audio.el.paused) await this.begin(playing);
       else this.audio.pause();
     } else if (entry) {
       await this.playTrack(entry);
     }
   }
 
-  /** Następny utwór z tego folderu (⏭) — według kolejności na ekranie. */
-  get nextTrack(): EntryView | undefined {
-    const tracks = this.items.filter((e) => e.type === 'audio' && e.kind === 'file' && e.url);
-    const at = tracks.findIndex((e) => e.path === this.state.playing?.path);
-    return at >= 0 ? tracks[at + 1] : undefined;
+  /** Następny utwór z zapamiętanej listy odtwarzania (⏭). */
+  get nextTrack(): PlayingTrack | undefined {
+    const { queue, playing } = this.state;
+    const at = queue.findIndex((t) => t.path === playing?.path);
+    return at >= 0 ? queue[at + 1] : undefined;
   }
 
   async skipTrack(): Promise<void> {
     const next = this.nextTrack;
     if (!next) return;
-    if (this.state.preview !== null) this.state.preview = next.path;  // okno podglądu idzie za utworem
-    await this.playTrack(next);
+    if (this.state.preview !== null) this.openPreview(next.path);  // okno podglądu idzie za utworem
+    await this.begin(next);
   }
 
   stopTrack(): void {
     this.state.playing = null;
+    this.state.queue = [];
+    this.state.playError = false;
     this.player?.stop();
   }
 
@@ -538,7 +563,7 @@ export class ExplorerController {
       problems: null, drop: null, starting: false, clipboardEmpty: false,
       open: false, serial: null, device: null, places: [], recent: [], path: ROOT, crumbs: [], entries: [],
       locked: false, skipped: 0, loading: false, view: 'list', filter: 'all', query: '', anchor: null, tasks: [],
-      offline: false, preview: null, playing: null, dest: null, leftovers: 0, media: '', error: null,
+      offline: false, preview: null, playing: null, queue: [], playError: false, dest: null, leftovers: 0, media: '', error: null,
     });
   }
 }

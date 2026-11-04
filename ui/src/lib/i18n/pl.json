@@ -135,6 +135,8 @@
       "loading": "Wczytuję…",
       "failed": "Nie udało się wczytać podglądu.",
       "unsupported": "Tego pliku nie da się tu pokazać — skopiuj go na komputer.",
+      "copy_started": "Kopiowanie rozpoczęte — postęp na pasku zadań.",
+      "play_failed": "Nie udało się odtworzyć tego utworu.",
       "copy_text": "Kopiuj tekst",
       "text_copied": "Skopiowano",
       "more": "Pokaż więcej",
@@ -154,7 +156,7 @@
         "width": "Szerokość", "height": "Wysokość", "alt": "Wysokość n.p.m."
       }
     },
-    "mini": { "label": "Mini odtwarzacz", "stop": "Zatrzymaj i zamknij" },
+    "mini": { "label": "Mini odtwarzacz", "stop": "Zatrzymaj i zamknij", "error": "Nie udało się odtworzyć" },
     "day": { "today": "Dziś · {date}", "yesterday": "Wczoraj" },
     "gallery": {
       "folders": "Foldery",

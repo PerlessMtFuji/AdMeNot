@@ -37,6 +37,11 @@ export class ExplorerState {
   preview = $state<string | null>(null);
   /** Utwór w odtwarzaczu (gra dalej po zamknięciu podglądu, w mini-odtwarzaczu). */
   playing = $state<PlayingTrack | null>(null);
+  /** Lista odtwarzania zapamiętana przy starcie utworu (kolejność z ekranu): ⏭ i auto-przejście idą po niej,
+   *  niezależnie od folderu, filtra i szukania oglądanych później. */
+  queue = $state.raw<PlayingTrack[]>([]);
+  /** Utwór się nie wczytał albo nie da się go odtworzyć. */
+  playError = $state(false);
   /** Folder docelowy kopii na komputerze (zapamiętany przez most). */
   dest = $state<string | null>(null);
   /** Ile plików tymczasowych z poprzednich otwarć most usunął z telefonu (baner do zamknięcia). */
@@ -65,6 +70,7 @@ export interface PlayingTrack {
   title: string;
   /** Okładka (adres miniatury) albo null — wtedy kolorowy kafel. */
   cover: string | null;
+  url: string;
 }
 
 export interface ExplorerProblems {

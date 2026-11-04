@@ -135,6 +135,8 @@
       "loading": "Loading…",
       "failed": "Could not load the preview.",
       "unsupported": "This file cannot be shown here — copy it to the computer.",
+      "copy_started": "Copy started — progress is in the task bar.",
+      "play_failed": "This track could not be played.",
       "copy_text": "Copy text",
       "text_copied": "Copied",
       "more": "Show more",
@@ -154,7 +156,7 @@
         "width": "Width", "height": "Height", "alt": "Altitude"
       }
     },
-    "mini": { "label": "Mini player", "stop": "Stop and close" },
+    "mini": { "label": "Mini player", "stop": "Stop and close", "error": "Playback failed" },
     "day": { "today": "Today · {date}", "yesterday": "Yesterday" },
     "gallery": {
       "folders": "Folders",

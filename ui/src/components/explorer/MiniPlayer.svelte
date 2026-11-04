@@ -60,7 +60,12 @@
       </span>
     </div>
     <b class="min-w-0 flex-1 truncate text-sm text-ink">{playing.title}</b>
-    <div aria-hidden="true" class="flex h-6 flex-none items-end gap-[2px]">
+    {#if ex.state.playError}
+      <span role="alert" class="flex flex-none items-center gap-1.5 text-xs font-semibold text-bad">
+        <Icon name="triangle-alert" size={14} />{t('explorer.mini.error')}
+      </span>
+    {/if}
+    <div aria-hidden="true" class="flex h-6 flex-none items-end gap-[2px] {ex.state.playError ? 'hidden' : ''}">
       {#each Array.from({ length: BARS }, (_, i) => i) as i (i)}
         <span bind:this={bars[i]} class="h-full w-[3px] origin-bottom rounded-full bg-accent" style:transform="scaleY({IDLE})"></span>
       {/each}
