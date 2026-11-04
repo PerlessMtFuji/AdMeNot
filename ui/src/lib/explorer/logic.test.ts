@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { i18n } from '../i18n/index.svelte';
 import type { EntryView } from '../types';
-import { days, defaultView, fileType, formatBytes, parentPath, pcFolderOf, visible } from './logic';
+import { days, defaultView, fileType, formatBytes, parentPath, visible } from './logic';
 
 const at = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 
@@ -109,17 +109,5 @@ describe('helpers', () => {
     expect(formatBytes(1536, 'pl')).toBe('1,5 KB');
     expect(formatBytes(310 * 1024, 'pl')).toBe('310 KB');
     expect(formatBytes(6.1 * 1024 ** 3, 'en')).toBe('6.1 GB');
-  });
-});
-
-describe('pcFolderOf', () => {
-  const sel = ['/sdcard/DCIM/Camera', '/sdcard/Download/a.pdf'];
-  test('keeps the structure below the selected folder', () => {
-    expect(pcFolderOf('/sdcard/DCIM/Camera/2026/x.jpg', sel, 'D:\\K')).toBe('D:\\K\\Camera\\2026');
-    expect(pcFolderOf('/sdcard/DCIM/Camera/x.jpg', sel, 'E:\\')).toBe('E:\\Camera');
-  });
-  test('a directly selected file goes straight to the destination; unknown files have no folder', () => {
-    expect(pcFolderOf('/sdcard/Download/a.pdf', sel, 'E:\\')).toBe('E:\\');
-    expect(pcFolderOf('/sdcard/DCIM/Cameraman/x.jpg', sel, 'D:\\K')).toBeNull();
   });
 });

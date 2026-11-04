@@ -168,8 +168,6 @@
       "open_folder": "Otwórz folder",
       "show": "Pokaż",
       "dismiss": "Ukryj",
-      "retry": "Ponów uszkodzone",
-      "retry_title": "Skopiuj uszkodzone pliki jeszcze raz, ze sprawdzeniem co do bajtu",
       "cancelled": "Anulowano",
       "failed": "Zadanie przerwane",
       "with_errors": "Gotowe z błędami",

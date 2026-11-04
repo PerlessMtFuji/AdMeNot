@@ -92,18 +92,13 @@ describe('TaskBar', () => {
     await vi.waitFor(() => expect(calls(bridge, 'explorer_list').at(-1)).toEqual(['/sdcard/Download']));
   });
 
-  test('a damaged copy is marked and "Retry" copies those files again with a byte check', async () => {
-    const { bridge, ex, emit } = await setup();
-    ex.state.dest = DEST;
-    ex.state.selected.add('/sdcard/DCIM/Camera');
-    await ex.copySelected(true);
-    const id = ex.state.tasks[0].id;
-    await emit(task({ id, status: 'done', done_files: 9, verified: 'mismatch',
+  test('a damaged copy is marked as damaged, without a manual retry', async () => {
+    const { emit } = await setup();
+    await emit(task({ status: 'done', done_files: 9, verified: 'mismatch',
       failed: [{ path: '/sdcard/DCIM/Camera/2026/IMG_1.jpg', reason: 'mismatch' }] }));
     expect(screen.getByText(/1 uszkodzony/)).toBeTruthy();
-    await fireEvent.click(screen.getByRole('button', { name: 'Ponów uszkodzone' }));
-    await vi.waitFor(() => expect(calls(bridge, 'explorer_copy').at(-1))
-      .toEqual([['/sdcard/DCIM/Camera/2026/IMG_1.jpg'], `${DEST}\\Camera\\2026`, true]));
+    expect(screen.getByText(/IMG_1\.jpg — kopia uszkodzona/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Ponów/ })).toBeNull();
   });
 
   test('a finished task can be dismissed', async () => {

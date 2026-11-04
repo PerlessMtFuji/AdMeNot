@@ -168,8 +168,6 @@
       "open_folder": "Open folder",
       "show": "Show",
       "dismiss": "Hide",
-      "retry": "Retry damaged",
-      "retry_title": "Copy the damaged files again, verified byte for byte",
       "cancelled": "Cancelled",
       "failed": "Task stopped",
       "with_errors": "Done with errors",

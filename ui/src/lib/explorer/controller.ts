@@ -1,7 +1,7 @@
 import { type Bridge, isApiError } from '../bridge';
 import type { AppState } from '../state.svelte';
 import type { ApiError, ApiErrorBody, EntryView, ExplorerListView, ExplorerOpenView, ExplorerStart, PlaceView, TaskView } from '../types';
-import { days, defaultView, type ExplorerFilter, type ExplorerView, parentPath, pcFolderOf, placeAt, ROOT, SORT_START, type SortKey, visible } from './logic';
+import { days, defaultView, type ExplorerFilter, type ExplorerView, parentPath, placeAt, ROOT, SORT_START, type SortKey, visible } from './logic';
 import { ExplorerState } from './state.svelte';
 
 /** Jak `EXPLORER_RECENT_MAX` w ustawieniach mostu. */
@@ -21,8 +21,6 @@ export class ExplorerController {
   private seq = 0;  // odczyt folderu: liczy się tylko odpowiedź na ostatnie przejście
   private opening = false;
   private earlyPlaces: PlaceView[] | null = null;  // liczby Miejsc, które przyszły przed wynikiem otwarcia
-  /** Kopie zlecone w tej sesji: zaznaczenie i folder docelowy (ponowna kopia uszkodzonych plików). */
-  private copies = new Map<string, { paths: string[]; dest: string }>();
   private freshTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(private readonly app: AppState, private readonly bridge: Bridge) {}
@@ -285,24 +283,6 @@ export class ExplorerController {
     await this.uploadPaths(r.paths);
   }
 
-  /** Ponowna kopia plików uszkodzonych w zadaniu (niezgodna suma) — z pełnym sprawdzeniem, do tych
-   *  samych podfolderów. Tylko dla kopii zleconych w tej sesji okna (zna ich zaznaczenie). */
-  canRetry(task: TaskView): boolean {
-    return task.kind === 'to_pc' && this.copies.has(task.id) && task.failed.some((f) => f.reason === 'mismatch');
-  }
-
-  async retryDamaged(task: TaskView): Promise<void> {
-    const origin = this.copies.get(task.id);
-    if (!origin) return;
-    const byFolder = new Map<string, string[]>();
-    for (const f of task.failed) {
-      const folder = f.reason === 'mismatch' ? pcFolderOf(f.path, origin.paths, origin.dest) : null;
-      if (folder !== null) byFolder.set(folder, [...(byFolder.get(folder) ?? []), f.path]);
-    }
-    this.dismissTask(task.id);
-    for (const [folder, paths] of byFolder) await this.copy(paths, folder, true);
-  }
-
   async pause(id: string): Promise<void> {
     await this.request(() => this.api.explorer_pause(id));
   }
@@ -328,7 +308,6 @@ export class ExplorerController {
   /** Skończone zadanie znika z paska zadań. */
   dismissTask(id: string): void {
     this.state.tasks = this.state.tasks.filter((x) => x.id !== id);
-    this.copies.delete(id);
   }
 
   dismissProblems(): void {
@@ -380,9 +359,7 @@ export class ExplorerController {
   }
 
   private async copy(paths: string[], dest: string, verifyHash: boolean): Promise<boolean> {
-    const id = await this.start('to_pc', () => this.api.explorer_copy(paths, dest, verifyHash));
-    if (id) this.copies.set(id, { paths, dest });
-    return id !== null;
+    return (await this.start('to_pc', () => this.api.explorer_copy(paths, dest, verifyHash))) !== null;
   }
 
   /** Plan zadania w moście: problemy → okno (nic nie startuje), zadanie → pasek zadań. Id zadania albo null. */
@@ -457,7 +434,6 @@ export class ExplorerController {
     const s = this.state;
     this.seq += 1;  // spóźniona lista poprzedniej sesji nie trafi na ekran
     s.selected.clear();
-    this.copies.clear();
     this.markFresh([]);
     Object.assign(s, {
       problems: null, drop: null, starting: false, clipboardEmpty: false,

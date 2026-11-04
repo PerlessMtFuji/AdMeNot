@@ -121,9 +121,6 @@
         </span>
       </div>
       {#if x.status === 'done'}
-        {#if ex.canRetry(x)}
-          <Button size="sm" title={t('explorer.task.retry_title')} onclick={() => ex.retryDamaged(x)}>{t('explorer.task.retry')}</Button>
-        {/if}
         {#if x.kind === 'to_pc'}
           <Button size="sm" onclick={() => ex.openFolder(x)}>{t('explorer.task.open_folder')}</Button>
         {:else}
