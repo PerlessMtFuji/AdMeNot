@@ -45,6 +45,7 @@ export class ExplorerController {
       if (s.open) s.places = d.places;
       else if (this.opening) this.earlyPlaces = d.places;
     });
+    on('explorer:storage', (d) => { if (s.open) s.storage = d; });
     on('explorer:offline', (d) => { if (mine(d)) s.offline = true; });
     on('explorer:online', (d) => {
       if (!mine(d)) return;
@@ -101,7 +102,20 @@ export class ExplorerController {
     });
     this.earlyPlaces = null;
     app.screen = 'explorer';
+    void this.loadStorage();
     await this.go(s.places[0]?.path ?? ROOT);
+  }
+
+  /** Pamięć telefonu do sylwetki w Miejscach — w tle; błąd zostawia sylwetkę bez „cieczy”. */
+  private async loadStorage(): Promise<void> {
+    const s = this.state;
+    const serial = s.serial;
+    try {
+      const r = await this.api.explorer_storage();
+      if (!isApiError(r) && s.open && s.serial === serial) s.storage = r;
+    } catch {
+      // bez pamięci sylwetka jest pusta; nic więcej się nie psuje
+    }
   }
 
   /** „Wróć”: most zwalnia telefon, ekran wraca na „Połącz”. */
@@ -560,7 +574,7 @@ export class ExplorerController {
     s.selected.clear();
     this.markFresh([]);
     Object.assign(s, {
-      problems: null, drop: null, starting: false, clipboardEmpty: false,
+      storage: null, problems: null, drop: null, starting: false, clipboardEmpty: false,
       open: false, serial: null, device: null, places: [], recent: [], path: ROOT, crumbs: [], entries: [],
       locked: false, skipped: 0, loading: false, view: 'list', filter: 'all', query: '', anchor: null, tasks: [],
       offline: false, preview: null, playing: null, queue: [], playError: false, dest: null, leftovers: 0, media: '', error: null,

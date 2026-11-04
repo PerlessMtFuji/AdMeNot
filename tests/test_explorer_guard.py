@@ -44,6 +44,7 @@ class Recorder:
     "stat -c '%f|%s|%Y|%n' '/sdcard/a b' 2>&1 || true",
     "find '/sdcard/Download/' -type f",
     "find /sdcard/ -type f",
+    "find '/sdcard/DCIM/Camera/' -type f -exec stat -c %s {} +",
     "sha256sum '/sdcard/x'",
     "df -k /sdcard",
     "ls '/sdcard/DCIM/'",

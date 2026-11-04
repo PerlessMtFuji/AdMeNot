@@ -5,6 +5,7 @@
   import Gallery from '../components/explorer/Gallery.svelte';
   import Places from '../components/explorer/Places.svelte';
   import DropZone from '../components/explorer/DropZone.svelte';
+  import EmptyState from '../components/explorer/EmptyState.svelte';
   import Menu from '../components/explorer/Menu.svelte';
   import MiniPlayer from '../components/explorer/MiniPlayer.svelte';
   import NewDialog from '../components/explorer/NewDialog.svelte';
@@ -17,6 +18,7 @@
   import { mediaFetcher, ThumbQueue } from '../lib/explorer/thumbs';
   import { ERROR_KEYS, i18n, t, tp } from '../lib/i18n/index.svelte';
   import { enter } from '../lib/motion';
+  import { zoomRun, zoomSnapshot } from '../lib/explorer/zoom';
   import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
@@ -42,6 +44,36 @@
   $effect(() => {
     void s.path;
     if (!s.offline) untrack(() => thumbs.retryFailed());
+  });
+
+  // Wejście w folder = przybliżenie (wyjście wyżej — odwrotnie). Zdjęcie starej zawartości robi się tuż przed
+  // podmianą DOM (`$effect.pre`), ruch ruszają efekty po niej. Początek ruchu: ostatni klik w obszarze listy.
+  let section: HTMLElement;
+  let stage: HTMLElement;
+  let clickAt: { x: number; y: number } | null = null;
+  let zoomPath = untrack(() => s.path);
+  let zoom: ReturnType<typeof zoomSnapshot> = null;
+  function remember(e: PointerEvent): void {
+    const box = stage?.getBoundingClientRect();
+    clickAt = box ? { x: e.clientX - box.left, y: e.clientY - box.top } : null;
+  }
+  $effect.pre(() => {
+    const path = s.path;
+    untrack(() => {
+      if (path === zoomPath) return;
+      zoom?.ghost.remove();
+      zoom = stage ? zoomSnapshot(section, stage, zoomPath, path, clickAt) : null;
+      zoomPath = path;
+      clickAt = null;
+    });
+  });
+  $effect(() => {
+    void s.path;
+    untrack(() => {
+      if (!zoom) return;
+      zoomRun(stage, zoom);
+      zoom = null;
+    });
   });
 
   let now = $state(new Date());
@@ -178,30 +210,27 @@
   {/if}
 
   <div class="flex min-h-0 flex-1 gap-3.5">
-    <Places places={s.places} recent={s.recent} path={s.path} ongo={(p) => ex.go(p)} />
-    <section aria-label={folderName} class="relative flex min-h-0 min-w-0 flex-1 flex-col rounded-2xl card px-2 pt-3 pb-1.5">
-      {#if s.locked}
-        <div in:enter class="m-auto flex max-w-[380px] flex-col items-center gap-2 p-6 text-center">
-          <span class="grid h-12 w-12 place-items-center rounded-2xl bg-neutral-soft text-mut shadow-[var(--shadow-well)]">
-            <Icon name="folder-lock" size={22} />
-          </span>
-          <b class="text-ink">{t('explorer.locked.title')}</b>
-          <p class="text-sm text-mut">{t('explorer.locked.text')}</p>
-        </div>
-      {:else}
-        {#if s.view === 'grid'}
-          <Gallery {ex} {items} {now} {thumbs} />
+    <Places places={s.places} recent={s.recent} path={s.path} storage={s.storage} ongo={(p) => ex.go(p)} />
+    <section bind:this={section} aria-label={folderName} onpointerdown={remember}
+      class="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl card px-2 pt-3 pb-1.5">
+      <div bind:this={stage} class="relative flex min-h-0 flex-1 flex-col">
+        {#if s.locked}
+          <EmptyState kind="locked" />
         {:else}
-          <FileList {ex} {items} {now} />
+          {#if s.view === 'grid'}
+            <Gallery {ex} {items} {now} {thumbs} />
+          {:else}
+            <FileList {ex} {items} {now} />
+          {/if}
+          {#if !items.length && !s.loading}
+            <div class="pointer-events-none absolute inset-0 grid place-items-center">
+              <EmptyState kind={s.offline ? 'offline' : s.entries.length ? 'filter' : 'folder'} />
+            </div>
+          {/if}
+          {#if s.skipped > 0}<p class="px-3 pt-1 text-2xs text-soft">{tp('explorer.skipped', s.skipped)}</p>{/if}
         {/if}
-        {#if !items.length && !s.loading}
-          <p class="absolute inset-x-0 top-1/2 text-center text-sm text-soft">
-            {s.entries.length ? t('explorer.empty.filter') : t('explorer.empty.folder')}
-          </p>
-        {/if}
-        {#if s.skipped > 0}<p class="px-3 pt-1 text-2xs text-soft">{tp('explorer.skipped', s.skipped)}</p>{/if}
-      {/if}
-      {#if s.drop}<DropZone drop={s.drop} folder={folderName} />{/if}
+      </div>
+      {#if s.drop}<DropZone drop={s.drop} folder={folderName} free={s.storage ? Math.max(0, s.storage.total - s.storage.used) : null} />{/if}
     </section>
   </div>
 

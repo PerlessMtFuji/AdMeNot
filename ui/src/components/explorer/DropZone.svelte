@@ -7,10 +7,11 @@
   import Icon from '../../ui/Icon.svelte';
 
   /** Strefa upuszczania nad listą: pliki z Eksploratora Windows trafią do bieżącego folderu telefonu. */
-  let { drop, folder }: { drop: DropInfo; folder: string } = $props();
+  let { drop, folder, free = null }: { drop: DropInfo; folder: string; free?: number | null } = $props();
   const facts = $derived([
     drop.count !== null ? tp('explorer.drop.items', drop.count) : null,
     drop.bytes !== null ? formatBytes(drop.bytes, i18n.lang) : null,
+    free !== null ? t('explorer.drop.free', { size: formatBytes(free, i18n.lang) }) : null,
   ].filter(Boolean).join(' · '));
 </script>
 

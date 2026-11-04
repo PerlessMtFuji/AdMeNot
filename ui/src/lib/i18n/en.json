@@ -108,7 +108,14 @@
     "list": { "label": "Files in folder", "name": "Name", "size": "Size", "date": "Date", "folder": "folder" },
     "locked_row": "No access",
     "locked": { "title": "Android does not allow looking into this folder", "text": "The phone does not share it over the cable — usually it is app data that Android protects from other programs." },
-    "empty": { "folder": "This folder is empty", "filter": "Nothing here matches the filter or search" },
+    "empty": { "folder": "This folder is empty", "folder_text": "Upload files from your computer — drag them onto the window or use “Upload here”.", "filter": "Nothing here matches the filter or search", "filter_text": "Change the type filter or clear the search box." },
+    "storage": {
+      "label": "Phone storage",
+      "level": "{percent}% of the phone storage is used",
+      "used_of": "{used} of {total}",
+      "free": "{size} free",
+      "group": { "photos": "Photos", "videos": "Videos", "whatsapp": "WhatsApp", "other": "Other" }
+    },
     "loading": "Loading the folder…",
     "skipped": { "one": "Skipped {count} item whose name cannot be read.", "few": "Skipped {count} items whose names cannot be read.", "many": "Skipped {count} items whose names cannot be read.", "other": "Skipped {count} items whose names cannot be read." },
     "offline": { "title": "Phone disconnected", "text": "Plug the cable back in — the explorer resumes on its own." },
@@ -253,7 +260,8 @@
     "drop": {
       "title": "Drop to upload to {folder}",
       "items": { "one": "{count} item", "few": "{count} items", "many": "{count} items", "other": "{count} items" },
-      "preparing": "Preparing the upload to {folder}…"
+      "preparing": "Preparing the upload to {folder}…",
+      "free": "free space: {size}"
     },
     "clipboard_empty": "There are no files on the clipboard — copy them in Windows Explorer (Ctrl+C) and come back with Ctrl+V."
   },

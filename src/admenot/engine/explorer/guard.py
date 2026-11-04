@@ -91,7 +91,9 @@ def assert_explorer(cmd: str) -> None:
     name = t[0]
 
     if name == "find":
-        if len(t) == 4 and t[2:] == ["-type", "f"]:  # zliczanie plików miejsca: wyłącznie ta postać
+        if len(t) == 4 and t[2:] == ["-type", "f"]:  # zliczanie plików miejsca
+            safe_read_path(t[1])
+        elif len(t) == 10 and t[2:] == ["-type", "f", "-exec", "stat", "-c", "%s", "{}", "+"]:  # sumowanie rozmiarów
             safe_read_path(t[1])
         elif (len(t) != 12 or t[2:] != ["-mindepth", "1", "-maxdepth", "1", "-exec", "stat", "-c",
                                       _STAT_FORMAT, "{}", "+"]):

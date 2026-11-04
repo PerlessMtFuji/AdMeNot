@@ -294,4 +294,15 @@ describe('Explorer', () => {
     await tick();
     expect(lists()).toBe(before + 1);
   });
+
+  test('empty states: filter without results and a disconnected phone', async () => {
+    const { bridge } = await openExplorer();
+    await fireEvent.input(screen.getByRole('searchbox'), { target: { value: 'nie ma takiego pliku' } });
+    await vi.waitFor(() => expect(document.querySelector('[data-empty="filter"]')).toBeTruthy());
+    expect(screen.getByText('Nic tu nie pasuje do filtra ani wyszukiwania')).toBeTruthy();
+    expect(screen.getByText('Zmień filtr typu albo wyczyść pole wyszukiwania.')).toBeTruthy();
+    bridge.emit('explorer:offline', { serial: SERIAL });
+    await vi.waitFor(() => expect(document.querySelector('[data-empty="offline"]')).toBeTruthy());
+    expect(document.querySelector('[data-empty="filter"]')).toBeNull();
+  });
 });

@@ -1,5 +1,8 @@
 <script lang="ts">
+  import { cubicOut } from 'svelte/easing';
+  import { fly } from 'svelte/transition';
   import { t } from '../../lib/i18n/index.svelte';
+  import { DUR, ms } from '../../lib/motion';
   import type { CrumbView } from '../../lib/types';
   import Icon from '../../ui/Icon.svelte';
 
@@ -13,7 +16,7 @@
     {#each crumbs as c, i (c.path)}
       {@const last = i === crumbs.length - 1}
       {#if i > 0}<li aria-hidden="true" class="flex-none text-soft"><Icon name="chevron-right" size={15} /></li>{/if}
-      <li class="min-w-0 {last ? 'flex-none max-w-[45%]' : 'flex-shrink'}">
+      <li in:fly={{ x: 14, duration: ms(DUR.zoom), easing: cubicOut }} class="min-w-0 {last ? 'flex-none max-w-[45%]' : 'flex-shrink'}">
         <button type="button" title={c.label} aria-current={last ? 'location' : undefined} onclick={() => ongo(c.path)}
           class="flex max-w-full min-w-0 items-center gap-1.5 rounded-lg px-1.5 py-0.5 transition duration-150
             hover:bg-neutral-soft {last ? 'text-ink' : 'text-mut hover:text-ink'}">

@@ -43,7 +43,7 @@ from admenot.engine.explorer.guard import ExplorerAdb, UnsafeCommand, is_tmp_nam
 from admenot.engine.explorer.listing import ListError, list_dir, list_error
 from admenot.engine.explorer.media import MediaServer
 from admenot.engine.explorer.meta import image_meta, media_meta
-from admenot.engine.explorer.places import Place, count_place, find_places
+from admenot.engine.explorer.places import Place, count_place, find_places, place_bytes
 from admenot.engine.explorer.plan import Problem, TaskPlan, plan_to_pc, plan_to_phone
 from admenot.engine.explorer.queue import TransferQueue, sweep_recorded
 from admenot.engine.explorer.textview import TEXT_LIMIT, decode_chunk
@@ -396,6 +396,50 @@ class ExplorerMixin:
         except Exception as exc:  # noqa: BLE001 — statystyki nie zatrzymują zdarzeń kolejki
             log_exception(exc, scrub=client_paths)
         (sess.pump or self._emit)("explorer:task", {"task": _task_view(detail)})
+        if detail.get("kind") == "to_phone" and detail.get("status") in _END:
+            self._explorer_storage_push(sess)
+
+    def _explorer_storage_push(self, sess: _Session) -> None:
+        """`explorer:storage` po zadaniu do telefonu (w tle — liczenie rozmiarów Miejsc trwa)."""
+        def run() -> None:
+            try:
+                if self._explorer is sess:
+                    self._emit("explorer:storage", self._explorer_usage(sess))
+            except (ListError, AdbError, UnsafeCommand, AppError):
+                pass
+            except Exception as exc:  # noqa: BLE001 — zdarzenie pamięci nie psuje kolejki
+                log_exception(exc, scrub=client_paths)
+
+        if self._sync:
+            run()
+        else:
+            threading.Thread(target=run, name="explorer-storage", daemon=True).start()
+
+    def _explorer_usage(self, sess: _Session) -> dict[str, Any]:
+        """Pamięć telefonu: `df -k /sdcard` + rozmiary Miejsc podzielone na zdjęcia, filmy i WhatsApp;
+        reszta zajętego miejsca to „inne”."""
+        with self._explorer_errors(sess):
+            out = sess.adb.shell("df -k /sdcard")
+        total = used = 0
+        for line in reversed(out.splitlines()):
+            cols = line.split()
+            if len(cols) >= 4 and cols[1].isdigit() and cols[2].isdigit():
+                total, used = int(cols[1]) * 1024, int(cols[2]) * 1024
+                break
+        else:
+            raise AppError("explorer_offline")
+        sizes = {"photos": 0, "videos": 0, "whatsapp": 0}
+        group = {"camera": "photos", "screenshots": "photos", "movies": "videos", "whatsapp": "whatsapp"}
+        for place in list(sess.places):
+            key = group.get(place.key)
+            if key is None:
+                continue
+            try:
+                sizes[key] += place_bytes(sess.adb, place)
+            except (ListError, AdbError):
+                continue  # miejsce bez rozmiaru — wchodzi do „inne”
+        sizes["other"] = max(0, used - sum(sizes.values()))
+        return {"total": total, "used": used, "groups": sizes}
 
     def _explorer_start(self, sess: _Session, plan: TaskPlan, verify_hash: bool) -> dict[str, Any]:
         """Problemy planu → nic nie startuje, UI je pokazuje; inaczej zadanie trafia do kolejki."""
@@ -539,6 +583,11 @@ class ExplorerMixin:
         view = self._explorer_view(sess, leftovers)  # liczby miejsc dochodzą zdarzeniem
         self._explorer_count(sess)
         return view
+
+    @_bridge
+    def explorer_storage(self) -> dict[str, Any]:
+        """Zajęta i całkowita pamięć telefonu z podziałem na grupy (sylwetka z „cieczą” w Miejscach)."""
+        return self._explorer_usage(self._explorer_session())
 
     @_bridge
     def explorer_close(self) -> dict[str, Any]:

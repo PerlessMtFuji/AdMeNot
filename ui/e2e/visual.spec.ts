@@ -138,6 +138,20 @@ for (const theme of ['light', 'dark'] as const) {
       await page.getByRole('button', { name: 'Ustawienia' }).click();
       await expect(page).toHaveScreenshot(`settings-${theme}.png`);
     });
+
+    // Snapshots for the two cases below are generated on Windows (`--update-snapshots`), like the rest of the suite.
+    test('explorer: gallery and preview', async ({ page }) => {
+      await page.goto('/?scenario=explorer');
+      await expect(page.getByRole('heading', { name: 'Połączono' })).toBeVisible();
+      await page.getByRole('button', { name: 'Pliki' }).click();
+      const list = page.getByRole('listbox', { name: 'Pliki w folderze' });
+      await expect(list.getByRole('option').first()).toBeVisible();
+      await expect(page.getByRole('img', { name: /Zajęte \d+% pamięci telefonu/ })).toBeVisible();
+      await expect(page).toHaveScreenshot(`explorer-gallery-${theme}.png`);
+      await list.getByRole('option').first().dblclick();
+      await expect(page.getByRole('dialog', { name: /^Podgląd pliku/ })).toBeVisible();
+      await expect(page).toHaveScreenshot(`explorer-preview-${theme}.png`);
+    });
   });
 }
 

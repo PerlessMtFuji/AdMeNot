@@ -108,7 +108,14 @@
     "list": { "label": "Pliki w folderze", "name": "Nazwa", "size": "Rozmiar", "date": "Data", "folder": "folder" },
     "locked_row": "Bez dostępu",
     "locked": { "title": "Android nie pozwala zajrzeć do tego folderu", "text": "Telefon nie udostępnia go przez kabel — zwykle to dane aplikacji, które Android chroni przed innymi programami." },
-    "empty": { "folder": "Ten folder jest pusty", "filter": "Nic tu nie pasuje do filtra ani wyszukiwania" },
+    "empty": { "folder": "Ten folder jest pusty", "folder_text": "Wgraj tu pliki z komputera — przeciągnij je na okno albo użyj „Wgraj tutaj”.", "filter": "Nic tu nie pasuje do filtra ani wyszukiwania", "filter_text": "Zmień filtr typu albo wyczyść pole wyszukiwania." },
+    "storage": {
+      "label": "Pamięć telefonu",
+      "level": "Zajęte {percent}% pamięci telefonu",
+      "used_of": "{used} z {total}",
+      "free": "wolne {size}",
+      "group": { "photos": "Zdjęcia", "videos": "Filmy", "whatsapp": "WhatsApp", "other": "Inne" }
+    },
     "loading": "Wczytuję folder…",
     "skipped": { "one": "Pominięto {count} pozycję, której nazwy nie da się odczytać.", "few": "Pominięto {count} pozycje, których nazw nie da się odczytać.", "many": "Pominięto {count} pozycji, których nazw nie da się odczytać.", "other": "Pominięto {count} pozycji, których nazw nie da się odczytać." },
     "offline": { "title": "Telefon odłączony", "text": "Podłącz kabel ponownie — eksplorator wznowi się sam." },
@@ -253,7 +260,8 @@
     "drop": {
       "title": "Upuść, żeby wgrać do {folder}",
       "items": { "one": "{count} element", "few": "{count} elementy", "many": "{count} elementów", "other": "{count} elementu" },
-      "preparing": "Przygotowuję wgrywanie do {folder}…"
+      "preparing": "Przygotowuję wgrywanie do {folder}…",
+      "free": "wolne miejsce: {size}"
     },
     "clipboard_empty": "W schowku nie ma plików — skopiuj je w Eksploratorze Windows (Ctrl+C) i wróć tu z Ctrl+V."
   },

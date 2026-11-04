@@ -235,3 +235,56 @@ test('phone state: a site fix on an app from the plan runs as one row with the a
   await expect(page.getByRole('complementary', { name: 'Zlecenie' }).getByText('com.wlive.forecast')).toHaveCount(1);
   expect(errors).toEqual([]);
 });
+
+test('explorer: open, enter Camera, select a day, preview, Esc, back', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.clock.setFixedTime(new Date('2026-10-11T09:41:00'));
+  await page.goto('/?scenario=explorer');
+  await expect(page.getByRole('heading', { name: 'Połączono' })).toBeVisible();
+  await page.getByRole('button', { name: 'Pliki' }).click();
+  const places = page.getByRole('navigation', { name: 'Miejsca' });
+  await expect(places).toBeVisible();
+  // pamięć telefonu: sylwetka z „cieczą” i legenda
+  await expect(page.getByRole('img', { name: /Zajęte \d+% pamięci telefonu/ })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Pamięć telefonu' }).getByText('Zdjęcia', { exact: true })).toBeVisible();
+  // wejście w Aparat (z innego miejsca)
+  await places.getByRole('button', { name: /Pobrane/ }).click();
+  await expect(places.getByRole('button', { name: /Pobrane/ })).toHaveAttribute('aria-current', 'location');
+  await places.getByRole('button', { name: /Aparat/ }).click();
+  await expect(places.getByRole('button', { name: /Aparat/ })).toHaveAttribute('aria-current', 'location');
+  const list = page.getByRole('listbox', { name: 'Pliki w folderze' });
+  await expect(list.getByRole('option').first()).toBeVisible();
+  // zaznaczenie dnia
+  await page.getByRole('button', { name: /^Zaznacz pliki z dnia/ }).first().click();
+  await expect(list.locator('[role="option"][aria-selected="true"]').first()).toBeVisible();
+  await expect(page.getByText(/zaznaczon/i).first()).toBeVisible();
+  // podgląd i Esc
+  await list.getByRole('option').first().dblclick();
+  const preview = page.getByRole('dialog', { name: /^Podgląd pliku/ });
+  await expect(preview).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(preview).toBeHidden();
+  // „Wróć” na ekran „Połącz”
+  await page.getByRole('button', { name: 'Wróć' }).click();
+  await expect(page.getByRole('heading', { name: 'Połączono' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test.describe('explorer folder zoom (motion on)', () => {
+  test.use({ reducedMotion: 'no-preference' });
+
+  test('entering a folder leaves a zooming snapshot of the old content that disappears afterwards', async ({ page }) => {
+    await page.goto('/?scenario=explorer');
+    await page.getByRole('button', { name: 'Pliki' }).click();
+    const places = page.getByRole('navigation', { name: 'Miejsca' });
+    await places.getByRole('button', { name: /Cała pamięć/ }).click();
+    const list = page.getByRole('listbox', { name: 'Pliki w folderze' });
+    await expect(list.getByRole('option', { name: /DCIM/ })).toBeVisible();
+    await list.getByRole('option', { name: /DCIM/ }).dblclick();
+    const ghost = page.locator('section[aria-label] > [inert]');
+    await expect(ghost).toHaveCount(1);
+    await expect(ghost).toHaveCount(0, { timeout: 3000 });
+    await expect(page.getByRole('navigation', { name: 'Ścieżka' }).getByRole('button', { name: 'DCIM' })).toBeVisible();
+  });
+});

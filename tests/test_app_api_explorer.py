@@ -121,6 +121,43 @@ def test_open_returns_session_and_counts_places(tmp_path):
                                                        "music": 1, "all": 6}
 
 
+def test_storage_groups(tmp_path):
+    host = _host(tmp_path)
+    storage = _storage_of(host)
+    storage.total_kb, storage.free_kb = 1000, 400
+    movie = storage.root / "sdcard" / "Movies" / "film.mp4"
+    movie.parent.mkdir(parents=True)
+    movie.write_bytes(b"F" * 2048)
+    api, _ = _api(host)
+    api.explorer_open(SERIAL)
+    got = api.explorer_storage()
+    groups = got["groups"]
+    assert got["total"] == 1000 * 1024 and got["used"] == 600 * 1024
+    assert groups["photos"] == len(_photo()) + 1 and groups["videos"] == 2048 and groups["whatsapp"] == 1
+    assert groups["other"] == got["used"] - groups["photos"] - 2048 - 1  # ukryte pliki też zajmują miejsce
+    api.explorer_close()
+
+
+def test_storage_requires_open_explorer(tmp_path):
+    api, _ = _api(_host(tmp_path))
+    assert api.explorer_storage()["error"]["key"] == "explorer_not_open"
+
+
+def test_storage_event_after_upload_to_phone(tmp_path):
+    api, rec, host, _ = _opened(tmp_path)
+    assert not rec.of("explorer:storage")
+    local = _pc_dir(tmp_path, "z komputera")
+    (local / "a.jpg").write_bytes(b"J" * 10)
+    started = api.explorer_upload([str(local / "a.jpg")], "/sdcard/Download")
+    _wait_task(api, started["task"], "done")
+    deadline = time.monotonic() + 5
+    while not rec.of("explorer:storage") and time.monotonic() < deadline:
+        time.sleep(0.02)
+    event = rec.of("explorer:storage")[-1]
+    assert set(event) == {"total", "used", "groups"} and set(event["groups"]) == {"photos", "videos", "whatsapp", "other"}
+    api.explorer_close()
+
+
 def test_place_count_failure_leaves_place_without_count(tmp_path):
     host = _host(tmp_path)
     _storage_of(host).deny_list_prefixes |= {"/sdcard/Music"}

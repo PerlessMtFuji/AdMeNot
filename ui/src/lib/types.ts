@@ -465,6 +465,13 @@ export interface PlaceView {
   icon: 'camera' | 'screenshot' | 'download' | 'chat' | 'film' | 'music' | 'document' | 'phone';
 }
 
+/** Pamięć telefonu (`explorer_storage`, zdarzenie `explorer:storage`): bajty całości i zajęte oraz podział zajętych. */
+export interface StorageView {
+  total: number;
+  used: number;
+  groups: { photos: number; videos: number; whatsapp: number; other: number };
+}
+
 export type FileKind = 'image' | 'video' | 'audio' | 'text' | 'apk' | 'doc' | 'other';
 
 /** Wpis folderu telefonu. Folder: `type` „other”, `ext` pusty. `label` — ludzka nazwa folderu aplikacji;
@@ -919,6 +926,7 @@ export interface Api {
   /** Eksplorator plików: trzyma blokadę telefonu do `explorer_close`; zajęty telefon → `explorer_busy`. */
   explorer_open(serial: string): R<ExplorerOpenView>;
   explorer_close(): R<Record<string, never>>;
+  explorer_storage(): R<StorageView>;
   explorer_list(path: string): R<ExplorerListView>;
   explorer_meta(path: string): R<{ meta: EntryMeta }>;
   explorer_text(path: string, more: boolean): R<{ text: string; encoding: string; truncated: boolean }>;
@@ -999,6 +1007,8 @@ export interface EventMap {
   'explorer:online': { serial: string };
   /** Most zamknął eksplorator: podłączono inny telefon albo otwarto eksplorator innego telefonu. */
   'explorer:closed': { serial: string; reason: 'other_phone' | 'switched' };
+  /** Pamięć telefonu po zadaniu wgrywania (poziom „cieczy” w Miejscach rośnie na żywo). */
+  'explorer:storage': StorageView;
   'explorer:task': { task: TaskView };
   /** Pliki upuszczone z Eksploratora Windows (liczba plików i bajty z folderami). */
   'explorer:drop': { paths: string[]; count: number; bytes: number };

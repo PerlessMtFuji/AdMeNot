@@ -10,7 +10,7 @@ from admenot.engine.explorer.guard import ExplorerAdb
 from admenot.engine.explorer.listing import LIST_TIMEOUT, list_error
 from admenot.engine.transfer.guard import STAT_TAIL, q
 
-__all__ = ["Place", "count_place", "find_places"]
+__all__ = ["Place", "count_place", "find_places", "place_bytes"]
 
 _ROOT = "/sdcard"
 # (klucz, ikona, kandydaci — pierwszy istniejący wygrywa)
@@ -78,3 +78,13 @@ def count_place(adb: ExplorerAdb, place: Place) -> int:
         if line.startswith(root + "/") and not any(seg.startswith(".") for seg in rel.split("/")):
             count += 1
     return count
+
+
+def place_bytes(adb: ExplorerAdb, place: Place) -> int:
+    """Suma rozmiarów plików miejsca (rekurencyjnie, jednym `find -exec stat`) — powolne, wołać w tle."""
+    root = place.path.rstrip("/")
+    try:
+        out = adb.shell(f"find {q(root + '/')} -type f -exec stat -c %s {{}} +", timeout=LIST_TIMEOUT)
+    except AdbError as exc:
+        raise list_error(exc) from exc
+    return sum(int(line) for line in out.split("\n") if line.strip().isdigit())

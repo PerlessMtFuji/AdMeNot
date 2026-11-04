@@ -1,5 +1,5 @@
 import { SvelteSet } from 'svelte/reactivity';
-import type { ApiErrorBody, CrumbView, EntryView, ExplorerProblem, PhoneCard, PlaceView, TaskView } from '../types';
+import type { ApiErrorBody, CrumbView, EntryView, ExplorerProblem, PhoneCard, PlaceView, StorageView, TaskView } from '../types';
 import { type ExplorerFilter, type ExplorerView, ROOT, type SortSpec } from './logic';
 
 /** Komunikat na „Połącz” po nieudanym otwarciu albo zamknięciu eksploratora przez most. */
@@ -12,6 +12,8 @@ export class ExplorerState {
   serial = $state<string | null>(null);
   device = $state<PhoneCard | null>(null);
   places = $state<PlaceView[]>([]);
+  /** Pamięć telefonu (null: jeszcze nie odczytana albo odczyt się nie udał). */
+  storage = $state.raw<StorageView | null>(null);
   /** „Ostatnio” — ostatnio odwiedzone foldery, najnowszy pierwszy (most zapisuje je w ustawieniach). */
   recent = $state<string[]>([]);
   path = $state(ROOT);

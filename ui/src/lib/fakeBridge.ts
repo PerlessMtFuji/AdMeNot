@@ -319,6 +319,9 @@ export function createFakeBridge(name: string,
         return { resumed: null, overlays: [], errors: [] };
       case 'adb_shell':
         return { ok: true, output: `(atrapa) ${String(args[0])}\n` };
+      case 'explorer_storage':
+        return { total: 128 * 1024 ** 3, used: 71 * 1024 ** 3,
+          groups: { photos: 28 * 1024 ** 3, videos: 17 * 1024 ** 3, whatsapp: 6 * 1024 ** 3, other: 20 * 1024 ** 3 } };
       case 'explorer_close':
       case 'explorer_pause':
       case 'explorer_resume':

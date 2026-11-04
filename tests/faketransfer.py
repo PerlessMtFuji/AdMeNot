@@ -274,6 +274,11 @@ class FakeStoragePhone:
         if expr == ["-type", "f"]:  # zliczanie plików miejsca: jedna ścieżka na linię
             assert len(roots) == 1, args
             return self._list_files(roots[0])
+        if expr == ["-type", "f", "-exec", "stat", "-c", "%s", "{}", "+"]:  # suma rozmiarów miejsca
+            assert len(roots) == 1, args
+            return "".join(f"{(self.local(f).stat().st_size)}\n"
+                           for f in self._list_files(roots[0]).decode().split("\n") if f
+                           and self.local(f).is_file()).encode()
         prune_paths: set[str] = set()
         prune_names: set[str] = set()
         j = 0
