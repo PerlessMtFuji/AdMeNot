@@ -21,7 +21,13 @@ from pathlib import Path
 from typing import Literal
 
 from admenot.engine.adb.transport import AdbError
-from admenot.engine.explorer.guard import TMP_PREFIX, TMP_SUFFIX, ExplorerAdb, is_tmp_name
+from admenot.engine.explorer.guard import (
+    TMP_PREFIX,
+    TMP_SUFFIX,
+    ExplorerAdb,
+    explorer_pusher,
+    is_tmp_name,
+)
 from admenot.engine.explorer.queue import (
     _CONNECTION_KINDS,
     _DENIED,
@@ -147,8 +153,8 @@ def make_text(adb: ExplorerAdb, pusher: Pusher, parent: str, name: str, text: st
 
 
 def _push(adb: ExplorerAdb, pusher: Pusher, local: Path, tmp: str) -> None:
-    try:
-        res = pusher.push([local], tmp, lambda: False, lambda: None)
+    try:  # strażnik eksploratora: tylko nasz plik tymczasowy pod /sdcard/
+        res = explorer_pusher(pusher).push([local], tmp, lambda: False, lambda: None)
     except AdbError as exc:
         raise _failure(adb, exc) from exc
     if res.rc != 0:

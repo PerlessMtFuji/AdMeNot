@@ -32,7 +32,13 @@ from typing import Literal
 
 from admenot.engine import paths
 from admenot.engine.adb.transport import AdbError
-from admenot.engine.explorer.guard import TMP_PREFIX, TMP_SUFFIX, ExplorerAdb, is_tmp_name
+from admenot.engine.explorer.guard import (
+    TMP_PREFIX,
+    TMP_SUFFIX,
+    ExplorerAdb,
+    explorer_pusher,
+    is_tmp_name,
+)
 from admenot.engine.explorer.listing import ListError, list_dir
 from admenot.engine.explorer.plan import Item, TaskPlan, side_name
 from admenot.engine.transfer.backup import _cmd_batches
@@ -262,7 +268,7 @@ class TransferQueue:
                  streams: int = STREAMS, big_file: int = BIG_FILE, id_prefix: str = "t") -> None:
         self._adb_factory = adb_factory
         self._puller = puller
-        self._pusher = pusher
+        self._pusher = explorer_pusher(pusher)  # tylko do naszego pliku tymczasowego pod /sdcard/
         self._emit_fn = emit
         self._is_connected = is_connected
         self._connected_serials = connected_serials

@@ -5,13 +5,16 @@ import pytest
 from admenot.engine.explorer.guard import (
     STREAM_BLOCK,
     ExplorerAdb,
+    ExplorerPusher,
     UnsafeCommand,
     assert_explorer,
+    explorer_pusher,
     is_tmp_name,
     safe_read_path,
     stream_args,
 )
 from admenot.engine.transfer.guard import SCAN_VOLUME_CMD, q
+from admenot.engine.transfer.puller import PullResult
 
 TMP = "/sdcard/Download/.admenot-0123456789ab.part"
 
@@ -181,3 +184,40 @@ def test_explorer_adb_filters():
     with pytest.raises(UnsafeCommand):
         adb.shell("cp a b")
     assert len(rec.calls) == n
+
+
+class PushRecorder:
+    def __init__(self) -> None:
+        self.calls: list[tuple[list, str]] = []
+
+    def push(self, locals_, remote, should_stop, tick):
+        self.calls.append((list(locals_), remote))
+        return PullResult(0, ["1 file pushed"], False)
+
+
+@pytest.mark.parametrize("remote", [
+    "/sdcard/Download/a.jpg",  # cudzy plik — nigdy wprost
+    "/sdcard/Download/",  # folder
+    "/sdcard/Download/.admenot-0123456789AB.part",  # wielkie litery
+    "/sdcard/Download/.admenot-0123456789a.part",  # 11 znaków
+    "/sdcard/Download/x.admenot-0123456789ab.part",
+    "/data/local/tmp/.admenot-0123456789ab.part",  # poza /sdcard/
+    "/data/local/tmp/admenot/input.json",  # katalog pomocnika (`safe_push_target` by go przepuścił)
+    "/sdcard/../data/.admenot-0123456789ab.part",
+    "/sdcard/a\n/.admenot-0123456789ab.part",
+])
+def test_explorer_pusher_refuses_non_tmp_targets(tmp_path, remote):
+    inner = PushRecorder()
+    with pytest.raises(UnsafeCommand):
+        ExplorerPusher(inner).push([tmp_path / "a.jpg"], remote, lambda: False, lambda: None)
+    assert inner.calls == []  # adb nawet nie ruszył
+
+
+def test_explorer_pusher_accepts_tmp_target_and_delegates(tmp_path):
+    inner = PushRecorder()
+    pusher = explorer_pusher(inner)
+    assert explorer_pusher(pusher) is pusher  # bez podwójnego owijania
+    res = pusher.push([tmp_path / "a.jpg"], TMP, lambda: False, lambda: None)
+    assert res.rc == 0 and inner.calls == [([tmp_path / "a.jpg"], TMP)]
+    with pytest.raises(UnsafeCommand):  # jeden plik na raz (cel to plik, nie folder)
+        pusher.push([tmp_path / "a.jpg", tmp_path / "b.jpg"], TMP, lambda: False, lambda: None)

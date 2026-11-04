@@ -7,7 +7,7 @@ from faketransfer import FakeStoragePhone
 
 from admenot.engine.adb.transport import AdbError
 from admenot.engine.explorer.create import CreateError, make_folder, make_text
-from admenot.engine.explorer.guard import ExplorerAdb, is_tmp_name
+from admenot.engine.explorer.guard import ExplorerAdb, ExplorerPusher, UnsafeCommand, is_tmp_name
 from admenot.engine.explorer.queue import read_tmp_folders, record_tmp_folder
 
 
@@ -158,3 +158,24 @@ def test_listed_folder_stays_listed(adb, phone, dirs):
     record_tmp_folder("FAKE", "/sdcard/Docs", directory=dirs[0])
     text(adb, phone, dirs, "a")
     assert read_tmp_folders("FAKE", directory=dirs[0]) == ["/sdcard/Docs"]
+
+
+def test_make_text_pushes_only_through_the_explorer_guard(adb, phone, dirs):
+    seen: list[str] = []
+
+    class Spy:
+        def push(self, locals_, remote, should_stop, tick):
+            seen.append(remote)
+            return phone.push(locals_, remote, should_stop, tick)
+
+    assert text(adb, Spy(), dirs, "a", "x") == "/sdcard/Docs/a.txt"
+    assert len(seen) == 1 and is_tmp_name(seen[0].rsplit("/", 1)[1])
+    # token spoza wzorca: strażnik odmawia, zanim cokolwiek trafi do `adb push`
+    seen.clear()
+    with pytest.raises((CreateError, UnsafeCommand)):
+        text(adb, Spy(), dirs, "b", "x", token=lambda: "0123456789AB")
+    assert seen == [] and not phone.local("/sdcard/Docs/b.txt").exists()
+    # wrapper sam: cel inny niż nasz plik tymczasowy — odmowa
+    with pytest.raises(UnsafeCommand):
+        ExplorerPusher(Spy()).push([dirs[1] / "x"], "/sdcard/Docs/a.txt", lambda: False, lambda: None)
+    assert seen == []

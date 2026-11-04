@@ -9,7 +9,7 @@ import pytest
 from faketransfer import FakeStoragePhone
 
 from admenot.engine.adb.transport import AdbError
-from admenot.engine.explorer.guard import ExplorerAdb, is_tmp_name
+from admenot.engine.explorer.guard import ExplorerAdb, ExplorerPusher, is_tmp_name
 from admenot.engine.explorer.plan import plan_to_pc, plan_to_phone
 from admenot.engine.explorer.queue import (
     HASH_BASE_TIMEOUT,
@@ -550,3 +550,17 @@ def test_emit_callback_can_read_tasks(phone, adb, pc, make_queue):
     holder["q"] = q
     q.wait_for(q.add(plan), "done")
     assert holder["stuck"] == 0 and holder["seen"] == 1
+
+
+def test_queue_pushes_only_through_the_explorer_guard(phone, adb, tmp_path, make_queue):
+    src = tmp_path / "src"
+    local_tree(src, {"a.jpg": b"a", "b.jpg": b"b"})
+    phone.local("/sdcard/Up").mkdir(parents=True)
+    q = make_queue()
+    assert isinstance(q._pusher, ExplorerPusher) and q._pusher.inner is phone
+    st = q.wait_for(q.add(plan_to_phone(adb, [src / "a.jpg"], "/sdcard/Up")), "done")
+    assert st.done_files == 1 and all(TMP_ON_PHONE.fullmatch(p.rsplit("/", 1)[1]) for p in phone.pushed)
+    # token spoza wzorca: nic nie idzie do `adb push`
+    bad = make_queue(token=lambda: "../../x")
+    st = bad.wait_for(bad.add(plan_to_phone(adb, [src / "b.jpg"], "/sdcard/Up")), "done")
+    assert st.failed == [(str(src / "b.jpg"), "error")] and phone.push_calls == 1

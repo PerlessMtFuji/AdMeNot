@@ -39,7 +39,13 @@ from admenot.engine.clientpaths import client_paths
 from admenot.engine.device.info import DeviceInfo, read_device_info
 from admenot.engine.explorer import hostfs
 from admenot.engine.explorer.create import CreateError, make_folder, make_text
-from admenot.engine.explorer.guard import ExplorerAdb, UnsafeCommand, is_tmp_name, safe_read_path
+from admenot.engine.explorer.guard import (
+    ExplorerAdb,
+    UnsafeCommand,
+    explorer_pusher,
+    is_tmp_name,
+    safe_read_path,
+)
 from admenot.engine.explorer.listing import ListError, list_dir, list_error
 from admenot.engine.explorer.media import MediaServer
 from admenot.engine.explorer.meta import image_meta, media_meta
@@ -559,7 +565,7 @@ class ExplorerMixin:
                 sess.pump = None if self._sync else _Pump(self._emit)
                 sess.queue = TransferQueue(
                     lambda: sess.adb, self._puller_factory(adb_path, serial, sess.log),
-                    self._pusher_factory(adb_path, serial, sess.log),
+                    explorer_pusher(self._pusher_factory(adb_path, serial, sess.log)),
                     lambda _name, detail: self._explorer_task_event(sess, detail),
                     lambda: serial in self._ready_serials(), sdk=lambda: sess.device.sdk,
                     id_prefix=f"s{self._explorer_seq}t")
@@ -717,7 +723,7 @@ class ExplorerMixin:
         self._explorer_temp.mkdir(parents=True, exist_ok=True)
         try:
             with self._explorer_errors(sess):
-                pusher = self._pusher_factory(self._settings.adb_path, sess.serial, sess.log)
+                pusher = explorer_pusher(self._pusher_factory(self._settings.adb_path, sess.serial, sess.log))
                 made = make_text(sess.adb, pusher, parent, name, text, temp_dir=self._explorer_temp)
         except AppError as exc:
             raise _bad_name(exc) from None

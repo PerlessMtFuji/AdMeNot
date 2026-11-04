@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import re
 import shlex
-from pathlib import PurePosixPath
+from collections.abc import Callable
+from pathlib import Path, PurePosixPath
 
 from admenot.engine.adb.transport import AdbTransport
 from admenot.engine.transfer.guard import (
@@ -22,10 +23,13 @@ from admenot.engine.transfer.guard import (
     q,
     safe_target,
 )
+from admenot.engine.transfer.puller import PullResult
+from admenot.engine.transfer.pusher import Pusher
 
 __all__ = [
     "HEAD_LIMIT", "SCAN_VOLUME_CMD", "STREAM_BLOCK", "TMP_PREFIX", "TMP_SUFFIX", "ExplorerAdb",
-    "UnsafeCommand", "assert_explorer", "is_tmp_name", "safe_read_path", "stream_args",
+    "ExplorerPusher", "UnsafeCommand", "assert_explorer", "explorer_pusher", "is_tmp_name", "safe_read_path",
+    "stream_args",
 ]
 
 TMP_PREFIX = ".admenot-"
@@ -228,3 +232,23 @@ class ExplorerAdb:
             raise UnsafeCommand(f"Odczyt binarny spoza allowlisty: {' '.join(args)[:120]}")
         assert_explorer(args[1])
         return self.inner.run_bytes(args, timeout=timeout)
+
+
+class ExplorerPusher:
+    """`Pusher` eksploratora: `push` jednego pliku wyłącznie do naszego pliku tymczasowego
+    `.admenot-<12 hex>.part` pod `/sdcard/` (jak `ExplorerAdb.run(["push", …])`); inny cel — `UnsafeCommand`
+    przed uruchomieniem `adb`. Reszta (log bez nazw, przerywanie) — w `inner` (np. `RealPusher`)."""
+
+    def __init__(self, inner: Pusher) -> None:
+        self.inner = inner
+
+    def push(self, locals_: list[Path], remote: str, should_stop: Callable[[], bool],
+             tick: Callable[[], None]) -> PullResult:
+        if len(locals_) != 1:
+            raise UnsafeCommand("Eksplorator wgrywa jeden plik na raz")
+        return self.inner.push(locals_, _tmp_path(remote), should_stop, tick)
+
+
+def explorer_pusher(pusher: Pusher) -> ExplorerPusher:
+    """Owija `pusher` strażnikiem eksploratora (bez podwójnego owijania)."""
+    return pusher if isinstance(pusher, ExplorerPusher) else ExplorerPusher(pusher)
