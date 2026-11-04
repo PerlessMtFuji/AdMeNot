@@ -1,6 +1,6 @@
 // Atrapa mostu: odtwarza scenariusze nagrane z prawdziwego Api (scripts/record_bridge_fixtures.py).
 import type { Bridge } from './bridge';
-import type { Api, ApiError, EntryView, ExplorerListView, CopyView, CrashSummary, DeviceCheck, EventMap, EventName, Lang, PlanView, ScanView, ServiceInfo, Settings, ShotView, TelemetrySample, UpdateView } from './types';
+import type { Api, ApiError, EntryView, ExplorerListView, CopyView, CrashSummary, DeviceCheck, EventMap, EventName, Lang, PlanView, ScanView, ServiceInfo, Settings, ShotView, TaskView, TelemetrySample, UpdateView } from './types';
 // Wynik `telemetry_events.sample()` z Pythona (Task 7 planu kroku H) — ten sam kształt co prawdziwe zdarzenia.
 import SAMPLE from './telemetrySample.json';
 
@@ -33,6 +33,7 @@ export type FakeBridge = Bridge & {
   setCrashes(reports: CrashSummary[], startup: string[]): void;
   failNextCrashSend(key: string): void;
   failNext(method: string, key: string, message?: string): void;  // następne wywołanie `method` zwraca błąd `key`
+  answerNext(method: string, result: unknown): void;  // następne wywołanie `method` zwraca `result` (np. problemy planu)
   setChecks(checks: DeviceCheck[]): void;  // co zwróci następny `recheck_site_notifications` (i kolejne skany)
   setCopies(copies: CopyView[]): void;  // kopie danych na komputerze (`transfers` bez nagrania w scenariuszu)
   calls: { method: string; args: unknown[] }[];
@@ -111,6 +112,11 @@ export function createFakeBridge(name: string,
   let checksChanged = false; // odpytywanie w tle (`whenDebugging`) dostaje odczyt tylko po zmianie
   let copies: CopyView[] = [];
   let planCode = 'K7F3'; // kod ostatniego podglądu planu: udostępnienie liczy ten sam plan
+  let taskSeq = 0;
+  const fakeTask = (kind: TaskView['kind'], dest: string): TaskView => ({
+    id: `s1t${++taskSeq}`, kind, status: 'queued', done_files: 0, total_files: 2, done_bytes: 0, total_bytes: 2048,
+    speed: 0, eta_s: null, skipped: 0, renamed: 0, failed: [], verified: null, dest });
+  const answers = new Map<string, unknown>();
   const SHOT_IMAGE = 'data:image/svg+xml,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="200"><rect width="90" height="200" rx="8" fill="#1f2937"/>'
     + '<rect x="8" y="40" width="74" height="90" rx="6" fill="#f59e0b"/></svg>');
@@ -314,7 +320,26 @@ export function createFakeBridge(name: string,
       case 'adb_shell':
         return { ok: true, output: `(atrapa) ${String(args[0])}\n` };
       case 'explorer_close':
+      case 'explorer_pause':
+      case 'explorer_resume':
+      case 'explorer_cancel':
+      case 'explorer_open_folder':
         return {};
+      // Kopia i wgrywanie nie mają nagrania (kolejka w tle): zadanie w kolejce, postęp wstrzykują testy (`emit`).
+      case 'explorer_copy':
+        return { task: fakeTask('to_pc', String(args[1] ?? settings.explorer_dest ?? '')) };
+      case 'explorer_upload':
+        return { task: fakeTask('to_phone', String(args[1])) };
+      case 'explorer_pick_dest':
+        settings = { ...settings, explorer_dest: 'D:\\Serwis\\Kowalska' };
+        return { path: 'D:\\Serwis\\Kowalska' };
+      case 'explorer_pick_upload':
+        return { paths: args[0] === 'folder' ? ['C:\\Users\\serwis\\Desktop\\Faktury_2026']
+          : ['C:\\Users\\serwis\\Desktop\\zdjecie.jpg', 'C:\\Users\\serwis\\Desktop\\umowa.pdf'] };
+      case 'explorer_clipboard':
+        return { paths: ['C:\\Users\\serwis\\Documents\\faktura.pdf'] };
+      case 'explorer_tasks':
+        return { tasks: [] };
       case 'watch_devices':
       case 'stop':
       case 'reopen_screen':
@@ -407,6 +432,11 @@ export function createFakeBridge(name: string,
       failures.delete(method);
       return { error: { ...failure } };
     }
+    if (answers.has(method)) {
+      const result = answers.get(method);
+      answers.delete(method);
+      return structuredClone(result);
+    }
     if (BY_PATH.has(method)) {
       const hit = data.calls.find((c) => c.method === method && c.args[0] === args[0]);
       if (hit) {
@@ -446,6 +476,7 @@ export function createFakeBridge(name: string,
     setCrashes: (reports, startup) => { crashes = [...reports]; crashStartup = [...startup]; },
     failNextCrashSend: (key) => { failSend = key; },
     failNext: (method, key, message = '') => { failures.set(method, { key, message }); },
+    answerNext: (method, result) => { answers.set(method, result); },
     setChecks: (next) => { checks = structuredClone(next); checksChanged = true; },
     setCopies: (next) => { copies = structuredClone(next); },
   };

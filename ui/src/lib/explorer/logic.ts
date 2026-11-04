@@ -129,6 +129,15 @@ export function shortDate(mtime: number, now: Date): string {
 const UNITS = ['B', 'KB', 'MB', 'GB', 'TB'];
 
 /** Rozmiar pliku: do 10 jednostek z jednym miejscem po przecinku („1,5 KB”), wyżej w całości. */
+/** Folder na komputerze, w którym kopia umieściła plik `src` z telefonu: kopia odtwarza strukturę od
+ *  zaznaczonej pozycji (`dest\<nazwa zaznaczenia>\…`). Null — plik spoza zaznaczenia. */
+export function pcFolderOf(src: string, selection: readonly string[], dest: string): string | null {
+  const root = selection.find((p) => src === p || src.startsWith(`${p}/`));
+  if (root === undefined) return null;
+  const rel = [root.split('/').pop()!, ...src.slice(root.length).split('/').filter(Boolean)].slice(0, -1);
+  return rel.length ? [dest.replace(/[\\/]+$/, ''), ...rel].join('\\') : dest;
+}
+
 export function formatBytes(bytes: number, lang: string): string {
   let value = Math.max(0, bytes);
   let unit = 0;

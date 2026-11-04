@@ -143,4 +143,155 @@ describe('Explorer', () => {
     expect(s.screen).toBe('explorer');
     expect(bridge.calls.some((c) => c.method === 'explorer_close')).toBe(false);
   });
+
+  test('double-clicking "Files" opens the explorer once', async () => {
+    const env = await setupCtl('explorer');
+    render(App, { props: { ctl: env.ctl } });
+    const files = screen.getByRole('button', { name: 'Pliki' });
+    // drugi klik, zanim most odpowie na pierwszy
+    void fireEvent.click(files);
+    void fireEvent.click(files);
+    await vi.waitFor(() => expect(env.s.screen).toBe('explorer'));
+    expect(env.bridge.calls.filter((c) => c.method === 'explorer_open')).toHaveLength(1);
+  });
+
+  test('"Upload" from the history closes the explorer first, so the phone is free', async () => {
+    const { ctl, bridge } = await openExplorer();
+    await ctl.planRestore('OLD/20261031-173908');
+    const methods = bridge.calls.map((c) => c.method);
+    expect(methods.indexOf('explorer_close')).toBeGreaterThan(-1);
+    expect(methods.indexOf('explorer_close')).toBeLessThan(methods.indexOf('restore_plan'));
+    expect(ctl.explorer.state.open).toBe(false);
+  });
+
+  test('the selection bar copies to the remembered PC folder; the first copy asks for the folder', async () => {
+    const { bridge, ctl } = await openExplorer();
+    await fireEvent.click(rows()[0]);
+    await fireEvent.click(rows()[1], { ctrlKey: true });
+    const bar = await screen.findByRole('region', { name: 'Zaznaczenie' });
+    expect(bar.textContent).toContain('2 zaznaczone');
+    expect(within(bar).getByRole('button', { name: /Wybierz folder na komputerze/ })).toBeTruthy();
+    await fireEvent.click(within(bar).getByRole('button', { name: 'Kopiuj' }));
+    await vi.waitFor(() => expect(bridge.calls.some((c) => c.method === 'explorer_copy')).toBe(true));
+    const methods = bridge.calls.map((c) => c.method);
+    expect(methods.indexOf('explorer_pick_dest')).toBeLessThan(methods.indexOf('explorer_copy'));
+    const copy = bridge.calls.find((c) => c.method === 'explorer_copy')!;
+    expect(copy.args[1]).toBe('D:\\Serwis\\Kowalska');
+    expect(copy.args[2]).toBe(false);
+    expect((copy.args[0] as string[]).length).toBe(2);
+    await vi.waitFor(() => expect(screen.getByText('Kopiowanie na komputer')).toBeTruthy());
+    // druga kopia: folder zapamiętany, „Sprawdź co do bajtu” z menu „⋯”
+    await fireEvent.click(rows()[2]);
+    const bar2 = await screen.findByRole('region', { name: 'Zaznaczenie' });
+    expect(within(bar2).getByRole('button', { name: /Kowalska/ })).toBeTruthy();
+    await fireEvent.click(within(bar2).getByRole('button', { name: 'Więcej' }));
+    await fireEvent.click(screen.getByRole('menuitem', { name: /Sprawdź co do bajtu/ }));
+    await vi.waitFor(() => expect(bridge.calls.filter((c) => c.method === 'explorer_copy')).toHaveLength(2));
+    expect(bridge.calls.filter((c) => c.method === 'explorer_copy')[1].args.slice(1)).toEqual(['D:\\Serwis\\Kowalska', true]);
+    expect(bridge.calls.filter((c) => c.method === 'explorer_pick_dest')).toHaveLength(1);
+    expect(ctl.explorer.state.tasks).toHaveLength(2);
+  });
+
+  test('Ctrl+V uploads the Windows clipboard to the current folder; not inside the search box', async () => {
+    const { bridge } = await openExplorer();
+    await fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'v', ctrlKey: true });
+    expect(bridge.calls.some((c) => c.method === 'explorer_clipboard')).toBe(false);
+    await fireEvent.keyDown(window, { key: 'v', ctrlKey: true });
+    await vi.waitFor(() => expect(bridge.calls.some((c) => c.method === 'explorer_upload')).toBe(true));
+    expect(bridge.calls.find((c) => c.method === 'explorer_upload')?.args)
+      .toEqual([['C:\\Users\\serwis\\Documents\\faktura.pdf'], '/sdcard/DCIM/Camera']);
+  });
+
+  test('"Upload here" picks files or a folder and uploads them to the current folder', async () => {
+    const { bridge } = await openExplorer();
+    await fireEvent.click(screen.getByRole('button', { name: 'Wgraj tutaj' }));
+    await fireEvent.click(screen.getByRole('menuitem', { name: /Folder/ }));
+    await vi.waitFor(() => expect(bridge.calls.some((c) => c.method === 'explorer_upload')).toBe(true));
+    expect(bridge.calls.find((c) => c.method === 'explorer_pick_upload')?.args).toEqual(['folder']);
+    expect(bridge.calls.find((c) => c.method === 'explorer_upload')?.args)
+      .toEqual([['C:\\Users\\serwis\\Desktop\\Faktury_2026'], '/sdcard/DCIM/Camera']);
+  });
+
+  test('problems before the start open a dialog with the concrete reason; nothing starts', async () => {
+    const { bridge, ctl } = await openExplorer();
+    bridge.answerNext('explorer_upload', { problems: [{ key: 'no_space',
+      detail: { need: 3 * 1024 ** 3, free: 1.8 * 1024 ** 3, missing: 1.2 * 1024 ** 3 } }] });
+    await fireEvent.keyDown(window, { key: 'v', ctrlKey: true });
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog.textContent).toContain('brakuje 1,2 GB');
+    expect(ctl.explorer.state.tasks).toHaveLength(0);
+    await fireEvent.click(within(dialog).getByRole('button', { name: 'Zamknij' }));
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  test('FAT32: the dialog lists files over 4 GB and can unselect them', async () => {
+    const { bridge, ctl } = await openExplorer();
+    const ex = ctl.explorer;
+    ex.state.dest = 'E:\\';
+    const [a, b] = rows().map((r) => r.dataset.path!);
+    ex.select(a);
+    ex.select(b, { ctrl: true });
+    const big = a.split('/').pop()!;
+    bridge.answerNext('explorer_copy', { problems: [{ key: 'fat32_big', detail: { names: [big], max: 4294967295 } }] });
+    await ex.copySelected();
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog.textContent).toContain('FAT32');
+    expect(within(dialog).getByText(big)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /mimo/i })).toBeNull();
+    await fireEvent.click(within(dialog).getByRole('button', { name: 'Odznacz te pliki' }));
+    expect([...ex.state.selected]).toEqual([b]);
+  });
+
+  test('"New" creates a folder and a text file; a taken name is shown in the dialog', async () => {
+    const { bridge } = await openExplorer();
+    const create = async (item: RegExp) => {
+      await fireEvent.click(screen.getByRole('button', { name: /^Nowy/ }));
+      await fireEvent.click(screen.getByRole('menuitem', { name: item }));
+      return screen.findByRole('dialog');
+    };
+    let dialog = await create(/^Folder/);
+    const name = within(dialog).getByRole('textbox', { name: 'Nazwa' }) as HTMLInputElement;
+    expect(name.value).toBe('Nowy folder');
+    await fireEvent.click(within(dialog).getByRole('button', { name: 'Utwórz' }));
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(bridge.calls.find((c) => c.method === 'explorer_mkdir')?.args).toEqual(['/sdcard/DCIM/Camera', 'Nowy folder']);
+
+    dialog = await create(/Plik tekstowy/);
+    await fireEvent.input(within(dialog).getByRole('textbox', { name: 'Nazwa' }), { target: { value: 'Lista zakupów' } });
+    await fireEvent.input(within(dialog).getByRole('textbox', { name: 'Treść' }), { target: { value: 'mleko\nchleb' } });
+    await fireEvent.click(within(dialog).getByRole('button', { name: 'Utwórz' }));
+    await vi.waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(bridge.calls.find((c) => c.method === 'explorer_new_text')?.args)
+      .toEqual(['/sdcard/DCIM/Camera', 'Lista zakupów', 'mleko\nchleb']);
+
+    dialog = await create(/^Folder/);
+    await fireEvent.click(within(dialog).getByRole('button', { name: 'Utwórz' }));
+    await vi.waitFor(() => expect(within(dialog).getByText('Plik albo folder o tej nazwie już tu jest.')).toBeTruthy());
+    expect(screen.getByRole('dialog')).toBeTruthy();
+  });
+
+  test('files dropped from Windows show the drop zone and are uploaded to the current folder', async () => {
+    const { bridge } = await openExplorer();
+    const section = screen.getByRole('region', { name: 'Camera' });
+    await fireEvent.dragEnter(section, { dataTransfer: { types: ['Files'], items: [{}, {}] } });
+    expect(screen.getByText('Upuść, żeby wgrać do Camera')).toBeTruthy();
+    bridge.emit('explorer:drop', { paths: ['C:\\Faktury_2026'], count: 660, bytes: 1.2 * 1024 ** 3 });
+    await vi.waitFor(() => expect(bridge.calls.find((c) => c.method === 'explorer_upload')?.args)
+      .toEqual([['C:\\Faktury_2026'], '/sdcard/DCIM/Camera']));
+    await vi.waitFor(() => expect(screen.queryByText('Upuść, żeby wgrać do Camera')).toBeNull());
+  });
+
+  test('a finished upload to the current folder refreshes it once', async () => {
+    const { bridge, ctl } = await openExplorer();
+    await ctl.explorer.uploadPaths(['C:\\a.jpg']);
+    const task = ctl.explorer.state.tasks[0];
+    const lists = () => bridge.calls.filter((c) => c.method === 'explorer_list').length;
+    const before = lists();
+    bridge.emit('explorer:task', { task: { ...task, status: 'running' } });
+    bridge.emit('explorer:task', { task: { ...task, status: 'done', done_files: 2 } });
+    await vi.waitFor(() => expect(lists()).toBe(before + 1));
+    bridge.emit('explorer:task', { task: { ...task, status: 'done', done_files: 2 } });
+    await tick();
+    expect(lists()).toBe(before + 1);
+  });
 });

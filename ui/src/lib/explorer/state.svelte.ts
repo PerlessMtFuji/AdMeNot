@@ -1,5 +1,5 @@
 import { SvelteSet } from 'svelte/reactivity';
-import type { ApiErrorBody, CrumbView, EntryView, PhoneCard, PlaceView, TaskView } from '../types';
+import type { ApiErrorBody, CrumbView, EntryView, ExplorerProblem, PhoneCard, PlaceView, TaskView } from '../types';
 import { type ExplorerFilter, type ExplorerView, ROOT, type SortSpec } from './logic';
 
 /** Komunikat na „Połącz” po nieudanym otwarciu albo zamknięciu eksploratora przez most. */
@@ -43,4 +43,26 @@ export class ExplorerState {
   error = $state<ApiErrorBody | null>(null);
   /** Baner na „Połącz”: telefon zajęty albo eksplorator zamknięty przez most. */
   notice = $state<ExplorerNotice | null>(null);
+  /** Problemy planu zadania — nic nie wystartowało, okno mówi dlaczego. */
+  problems = $state<ExplorerProblems | null>(null);
+  /** Strefa upuszczania: przeciąganie plików nad oknem (`count` — liczba przeciąganych pozycji, jeśli znana)
+   *  albo upuszczone pliki w trakcie planowania wgrania (`bytes` z mostu). */
+  drop = $state<DropInfo | null>(null);
+  /** Trwa planowanie kopii lub wgrania (przyciski nie startują drugiego zadania). */
+  starting = $state(false);
+  /** Wpisy, które pojawiły się przy ostatnim odświeżeniu folderu (wskakują, `pop-in`). */
+  fresh = new SvelteSet<string>();
+  /** Ctrl+V bez plików w schowku Windows — podpowiedź do zamknięcia. */
+  clipboardEmpty = $state(false);
+}
+
+export interface ExplorerProblems {
+  kind: TaskView['kind'];
+  list: ExplorerProblem[];
+}
+
+export interface DropInfo {
+  count: number | null;
+  bytes: number | null;
+  dropped: boolean;
 }
