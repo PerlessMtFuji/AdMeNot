@@ -51,7 +51,12 @@ from admenot.engine.explorer.thumbs import EXIF_HEAD
 from admenot.engine.oplock import DeviceBusy, device_lock
 from admenot.engine.paths import journal_path
 from admenot.engine.phones.provider import PhoneMatch
-from admenot.engine.settings import EXPLORER_RECENT_MAX, SettingsTooNew, save_internal
+from admenot.engine.settings import (
+    EXPLORER_RECENT_MAX,
+    EXPLORER_RECENT_PHONES,
+    SettingsTooNew,
+    save_internal,
+)
 from admenot.engine.tools import resolve_adb
 from admenot.engine.transfer.guard import STAT_TAIL, q
 
@@ -298,7 +303,8 @@ class ExplorerMixin:
 
     def _explorer_view(self, sess: _Session, leftovers: int) -> dict[str, Any]:
         return {"device": sess.card, "places": [place_view(p) for p in sess.places],
-                "media": sess.base, "sdk": sess.device.sdk, "leftovers": leftovers}
+                "media": sess.base, "sdk": sess.device.sdk, "leftovers": leftovers,
+                "recent": list(self._settings.explorer_recents.get(sess.serial, []))}
 
     def _explorer_count(self, sess: _Session) -> None:
         """Liczby plików Miejsc w tle; po każdym miejscu `explorer:places` (nieudane — bez liczby)."""
@@ -325,15 +331,23 @@ class ExplorerMixin:
         else:
             threading.Thread(target=run, name="explorer-places", daemon=True).start()
 
-    def _explorer_remember(self, path: str) -> None:
-        """„Ostatnio” — ostatnie odwiedzone foldery (bez korzenia pamięci)."""
+    def _explorer_remember(self, serial: str, path: str) -> None:
+        """„Ostatnio” — ostatnie odwiedzone foldery (bez korzenia pamięci), osobno dla każdego telefonu:
+        foldery poprzedniego klienta nie pokazują się przy następnym telefonie. Pamiętamy
+        `EXPLORER_RECENT_PHONES` telefonów; najdawniej używany wypada."""
         if path == ROOT:
             return
-        recent = [path, *(p for p in self._settings.explorer_recent if p != path)][:EXPLORER_RECENT_MAX]
-        if recent == self._settings.explorer_recent:
+        recents = self._settings.explorer_recents
+        old = recents.get(serial, [])
+        recent = [path, *(p for p in old if p != path)][:EXPLORER_RECENT_MAX]
+        if recent == old and next(reversed(recents), None) == serial:
             return
+        updated = {k: v for k, v in recents.items() if k != serial}
+        updated[serial] = recent  # na koniec: ostatnio używany
+        while len(updated) > EXPLORER_RECENT_PHONES:
+            del updated[next(iter(updated))]
         try:
-            self._settings = save_internal({"explorer_recent": recent})
+            self._settings = save_internal({"explorer_recents": updated})
         except (OSError, ValueError, TimeoutError, SettingsTooNew) as exc:
             log_exception(exc, scrub=client_paths)
 
@@ -635,7 +649,7 @@ class ExplorerMixin:
                 sess.locked.add(path)
             sess.locked.update(e.path for e in entries if e.locked)
         if not locked:
-            self._explorer_remember(path)
+            self._explorer_remember(sess.serial, path)
         return {"path": path, "crumbs": crumbs(path, sess.name, apps),
                 "entries": [entry_view(e, sess.media) for e in entries], "skipped": skipped, "locked": locked}
 

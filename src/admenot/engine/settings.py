@@ -42,7 +42,7 @@ KEYS = ("lang", "mode", "adb_path", "backups_dir", "report_pdf_dir", "theme", "m
 # ustawień: UI nie może podstawić własnego ID instalacji ani „zaakceptować” ostrzeżenia bokiem.
 INTERNAL_KEYS = ("welcome_version", "welcome_at", "telemetry", "telemetry_packages",
                  "telemetry_id", "telemetry_at", "telemetry_start_day",
-                 "donate_count", "donate_shown_at", "donate_off", "explorer_dest", "explorer_recent")
+                 "donate_count", "donate_shown_at", "donate_off", "explorer_dest", "explorer_recents")
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 LOGO_TYPES = {
@@ -51,7 +51,8 @@ LOGO_TYPES = {
 }
 MAX_LOGO_BYTES = 1_000_000
 SCHEMA_KEY = "schema"
-EXPLORER_RECENT_MAX = 8  # „Ostatnio” w eksploratorze plików
+EXPLORER_RECENT_MAX = 8  # „Ostatnio” w eksploratorze plików (na telefon)
+EXPLORER_RECENT_PHONES = 20  # tylu telefonów „Ostatnio” pamiętamy; najdawniej używany wypada
 
 
 def _v1(data: dict[str, Any]) -> dict[str, Any]:
@@ -98,7 +99,10 @@ class Settings:
     donate_shown_at: str | None = None  # dzień (lokalny) ostatniego przypomnienia
     donate_off: bool = False  # „Już wspieram, nie pokazuj więcej”
     explorer_dest: str | None = None  # eksplorator: ostatni folder docelowy na komputerze
-    explorer_recent: list[str] = field(default_factory=list)  # eksplorator: ostatnie foldery telefonu
+    # eksplorator: numer seryjny telefonu → jego ostatnie foldery (kolejność: najdawniej używany telefon
+    # pierwszy). Stary klucz `explorer_recent` (jedna lista dla wszystkich telefonów) jest pomijany przy
+    # odczycie — nazwy folderów poprzedniego klienta nie trafią do „Ostatnio” innego telefonu.
+    explorer_recents: dict[str, list[str]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -230,11 +234,16 @@ def archive_dir_ok(value: str) -> bool:
     return not same
 
 
+def _recent_ok(value: Any) -> bool:
+    return (isinstance(value, list) and len(value) <= EXPLORER_RECENT_MAX
+            and all(isinstance(p, str) and (p == "/sdcard" or p.startswith("/sdcard/")) and "\n" not in p
+                    for p in value))
+
+
 def _valid(key: str, value: Any) -> bool:
-    if key == "explorer_recent":
-        return (isinstance(value, list) and len(value) <= EXPLORER_RECENT_MAX
-                and all(isinstance(p, str) and (p == "/sdcard" or p.startswith("/sdcard/")) and "\n" not in p
-                        for p in value))
+    if key == "explorer_recents":
+        return (isinstance(value, dict) and len(value) <= EXPLORER_RECENT_PHONES
+                and all(isinstance(k, str) and k and "\n" not in k and _recent_ok(v) for k, v in value.items()))
     if key == "donate_count":
         return isinstance(value, int) and not isinstance(value, bool) and value >= 0
     if key == "donate_off":

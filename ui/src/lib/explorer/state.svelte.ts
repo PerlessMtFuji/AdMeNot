@@ -14,7 +14,8 @@ export class ExplorerState {
   places = $state<PlaceView[]>([]);
   /** Pamięć telefonu (null: jeszcze nie odczytana albo odczyt się nie udał). */
   storage = $state.raw<StorageView | null>(null);
-  /** „Ostatnio” — ostatnio odwiedzone foldery, najnowszy pierwszy (most zapisuje je w ustawieniach). */
+  /** „Ostatnio” — ostatnio odwiedzone foldery tego telefonu, najnowszy pierwszy (most zapisuje je osobno
+   *  dla każdego telefonu i oddaje w `explorer_open`). */
   recent = $state<string[]>([]);
   path = $state(ROOT);
   crumbs = $state<CrumbView[]>([]);

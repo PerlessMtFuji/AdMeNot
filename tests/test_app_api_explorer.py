@@ -24,7 +24,12 @@ from admenot.engine.explorer.plan import TaskPlan
 from admenot.engine.explorer.queue import read_tmp_folders, record_tmp_folder
 from admenot.engine.oplock import DeviceBusy, device_lock
 from admenot.engine.paths import journal_path, logs_dir, telemetry_path
-from admenot.engine.settings import load_settings
+from admenot.engine.settings import (
+    EXPLORER_RECENT_MAX,
+    EXPLORER_RECENT_PHONES,
+    load_settings,
+    save_internal,
+)
 from admenot.engine.transfer.puller import RealPuller
 
 OTHER = "R58W20NEW01"
@@ -230,9 +235,9 @@ def test_list_and_crumbs(tmp_path):
     root = api.explorer_list("/sdcard")
     assert root["crumbs"] == [{"label": name, "path": "/sdcard"}]
     assert {e["name"] for e in root["entries"] if e["kind"] == "dir"} >= {"DCIM", "Download", "Android"}
-    # „Ostatnio”: najnowszy pierwszy, bez korzenia pamięci
-    assert load_settings().explorer_recent == ["/sdcard/Download", "/sdcard/Android/media/com.whatsapp",
-                                               "/sdcard/DCIM/Camera"]
+    # „Ostatnio”: najnowszy pierwszy, bez korzenia pamięci, osobno dla tego telefonu
+    assert load_settings().explorer_recents == {SERIAL: ["/sdcard/Download", "/sdcard/Android/media/com.whatsapp",
+                                                         "/sdcard/DCIM/Camera"]}
 
 
 def test_list_denied_folder(tmp_path):
@@ -241,7 +246,7 @@ def test_list_denied_folder(tmp_path):
     assert data["locked"] is True
     inside = api.explorer_list("/sdcard/Android/data")
     assert inside["entries"] == [] and inside["locked"] is True
-    assert "/sdcard/Android/data" not in load_settings().explorer_recent
+    assert "/sdcard/Android/data" not in load_settings().explorer_recents.get(SERIAL, [])
     assert api.explorer_list("/sdcard/Nie ma")["error"]["key"] == "explorer_missing"
     assert api.explorer_list("/sdcard/../data")["error"]["key"] == "bad_request"
     api.explorer_close()
@@ -849,6 +854,70 @@ def test_close_failure_still_records_telemetry(tmp_path):
     events = [json.loads(x) for x in telemetry_path().read_text("utf-8").splitlines()]
     assert [e["type"] for e in events].count("explorer") == 1
     assert _lock_free()
+
+
+# --- „Ostatnio” osobno dla każdego telefonu ----------------------------------------------------------
+
+
+def test_recent_folders_are_kept_per_phone(tmp_path):
+    api, _, host, opened = _opened(tmp_path, other=True)
+    assert opened["recent"] == []
+    api.explorer_list("/sdcard/Download")
+    api.explorer_list("/sdcard/DCIM/Camera")
+    api.explorer_close()
+    assert api.explorer_open(SERIAL)["recent"] == ["/sdcard/DCIM/Camera", "/sdcard/Download"]
+    api.explorer_close()
+    # telefon B (inny klient) nie widzi folderów telefonu A — ani w `explorer_open`, ani w ustawieniach okna
+    host.connected.add(OTHER)
+    _storage_of(host, OTHER).local("/sdcard/Music").mkdir(parents=True)
+    other = api.explorer_open(OTHER)
+    assert "error" not in other and other["recent"] == []
+    assert "explorer_recents" not in api.get_settings() and "explorer_recent" not in api.get_settings()
+    api.explorer_list("/sdcard/Music")
+    api.explorer_close()
+    assert api.explorer_open(OTHER)["recent"] == ["/sdcard/Music"]
+    api.explorer_close()
+    assert api.explorer_open(SERIAL)["recent"] == ["/sdcard/DCIM/Camera", "/sdcard/Download"]
+    api.explorer_close()
+
+
+def test_recent_caps_folders_and_phones(tmp_path):
+    api, _, host, _ = _opened(tmp_path)
+    storage = _storage_of(host)
+    for i in range(EXPLORER_RECENT_MAX + 3):
+        storage.local(f"/sdcard/F{i}").mkdir(parents=True)
+        api.explorer_list(f"/sdcard/F{i}")
+    api.explorer_close()
+    mine = load_settings().explorer_recents[SERIAL]
+    assert mine == [f"/sdcard/F{i}" for i in range(EXPLORER_RECENT_MAX + 2, 2, -1)]
+    # najdawniej używany telefon wypada; nasz (używany przed chwilą) przesuwa się na koniec
+    others = {f"PHONE{i:02d}": ["/sdcard/DCIM"] for i in range(EXPLORER_RECENT_PHONES - 1)}
+    save_internal({"explorer_recents": {**others, SERIAL: mine}})
+    api._settings = load_settings()
+    api.explorer_open(SERIAL)
+    api.explorer_list("/sdcard/F0")
+    api._explorer_remember("NEWPHONE", "/sdcard/DCIM")
+    api.explorer_close()
+    recents = load_settings().explorer_recents
+    assert len(recents) == EXPLORER_RECENT_PHONES
+    assert "PHONE00" not in recents and list(recents)[-2:] == [SERIAL, "NEWPHONE"]
+    assert recents[SERIAL][0] == "/sdcard/F0"
+
+
+def test_old_flat_recent_list_is_ignored(tmp_path):
+    path = Path(os.environ["LOCALAPPDATA"]) / "AdMeNot" / "settings.json"
+    api, _ = _api(_host(tmp_path))  # ustawienia testu już istnieją
+    data = json.loads(path.read_text("utf-8"))
+    data["explorer_recent"] = ["/sdcard/Klient A/Faktury", "/sdcard/DCIM/Camera"]  # format sprzed I2
+    path.write_text(json.dumps(data, ensure_ascii=False), "utf-8")
+    assert load_settings().explorer_recents == {}  # bez błędu
+    api, _ = _api(_host(tmp_path / "again"))
+    opened = api.explorer_open(SERIAL)
+    assert "error" not in opened and opened["recent"] == []
+    assert "Klient A" not in json.dumps(api.get_settings(), ensure_ascii=False)
+    api.explorer_list("/sdcard/Download")
+    assert load_settings().explorer_recents == {SERIAL: ["/sdcard/Download"]}
+    api.explorer_close()
 
 
 # --- wyjście z programu przy trwającym zadaniu ----------------------------------------------------

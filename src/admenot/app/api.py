@@ -798,7 +798,10 @@ class Api(ExplorerMixin):
 
     @_api
     def get_settings(self) -> dict[str, Any]:
-        return {**asdict(self._settings), "lang": self._lang,
+        # „Ostatnio” eksploratora (foldery wszystkich telefonów) nie idzie do UI — tylko lista otwartego
+        # telefonu w `explorer_open`
+        view = {k: v for k, v in asdict(self._settings).items() if k != "explorer_recents"}
+        return {**view, "lang": self._lang,
                 "welcome_current": welcome.WELCOME_VERSION,
                 "telemetry_delete_pending": telemetry.delete_pending(),
                 "donate_reminders": not self._settings.donate_off}

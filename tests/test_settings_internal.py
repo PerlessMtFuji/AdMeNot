@@ -37,18 +37,31 @@ def test_internal_keys_round_trip():
 
 
 def test_explorer_keys_round_trip():
-    assert (load_settings().explorer_dest, load_settings().explorer_recent) == (None, [])
-    save_internal({"explorer_dest": "D:\\Klienci", "explorer_recent": ["/sdcard/DCIM/Camera", "/sdcard"]})
+    assert (load_settings().explorer_dest, load_settings().explorer_recents) == (None, {})
+    recents = {"R58T": ["/sdcard/DCIM/Camera", "/sdcard"], "79SS": ["/sdcard/Download"]}
+    save_internal({"explorer_dest": "D:\\Klienci", "explorer_recents": recents})
     s = load_settings()
-    assert (s.explorer_dest, s.explorer_recent) == ("D:\\Klienci", ["/sdcard/DCIM/Camera", "/sdcard"])
+    assert (s.explorer_dest, s.explorer_recents) == ("D:\\Klienci", recents)
+    assert list(s.explorer_recents) == ["R58T", "79SS"]  # kolejność telefonów zachowana
 
 
-@pytest.mark.parametrize("recent", [
-    ["/data/local/tmp"], ["/sdcard/a\nb"], "/sdcard/DCIM", [f"/sdcard/{i}" for i in range(9)], [1],
+@pytest.mark.parametrize("recents", [
+    {"S": ["/data/local/tmp"]}, {"S": ["/sdcard/a\nb"]}, {"S": "/sdcard/DCIM"},
+    {"S": [f"/sdcard/{i}" for i in range(9)]}, {"S": [1]}, ["/sdcard/DCIM"], {"": ["/sdcard"]},
+    {"a\nb": ["/sdcard"]}, {f"P{i}": [] for i in range(21)},
 ])
-def test_explorer_recent_rejects_bad_values(recent):
+def test_explorer_recents_rejects_bad_values(recents):
     with pytest.raises(ValueError):
-        save_internal({"explorer_recent": recent})
+        save_internal({"explorer_recents": recents})
+
+
+def test_old_flat_explorer_recent_is_ignored(tmp_path):
+    path = tmp_path / "settings.json"
+    path.write_text(json.dumps({"schema": 1, "explorer_recent": ["/sdcard/Klient/Faktury"], "theme": "dark"}), "utf-8")
+    s = load_settings(path)  # stary format (jedna lista dla wszystkich telefonów): bez błędu, pominięty
+    assert s.explorer_recents == {} and s.theme == "dark" and not hasattr(s, "explorer_recent")
+    s = save_internal({"explorer_recents": {"S1": ["/sdcard/DCIM"]}}, path)
+    assert s.explorer_recents == {"S1": ["/sdcard/DCIM"]}
 
 
 def test_ui_save_cannot_touch_internal_keys():

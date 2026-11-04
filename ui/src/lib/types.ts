@@ -36,8 +36,6 @@ export interface Settings {
   apk_mode_default: ApkModeDefault;
   /** Eksplorator: ostatni folder docelowy kopii na komputerze (zapisuje most). */
   explorer_dest?: string | null;
-  /** Eksplorator: ostatnio odwiedzone foldery telefonu, najnowszy pierwszy („Ostatnio”). */
-  explorer_recent?: string[];
 }
 
 export interface TelemetrySample {
@@ -506,6 +504,8 @@ export interface ExplorerOpenView {
   sdk: number;
   /** Ile naszych plików tymczasowych z poprzednich otwarć usunięto z telefonu. */
   leftovers: number;
+  /** „Ostatnio” tego telefonu (najnowszy pierwszy); foldery innych telefonów most zostawia u siebie. */
+  recent: string[];
 }
 
 export interface ExplorerListView {

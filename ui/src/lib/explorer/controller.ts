@@ -101,7 +101,7 @@ export class ExplorerController {
     this.reset();
     Object.assign(s, {
       open: true, serial, device: r.device, places: this.earlyPlaces ?? r.places, media: r.media,
-      leftovers: r.leftovers, dest: app.settings.explorer_dest ?? null, recent: [...(app.settings.explorer_recent ?? [])],
+      leftovers: r.leftovers, dest: app.settings.explorer_dest ?? null, recent: [...(r.recent ?? [])],
     });
     this.earlyPlaces = null;
     app.screen = 'explorer';
@@ -587,8 +587,7 @@ export class ExplorerController {
 
   /** Koniec sesji po stronie UI: stan od nowa, ekran eksploratora wraca na „Połącz”. */
   private leave(): void {
-    // „Ostatnio” zapisuje most; kopia w ustawieniach okna pokaże je przy następnym otwarciu
-    if (this.state.open) this.app.settings = { ...this.app.settings, explorer_recent: [...this.state.recent] };
+    // „Ostatnio” zapisuje most (osobno dla każdego telefonu) i oddaje przy następnym otwarciu
     this.reset();
     if (this.app.screen === 'explorer') this.app.screen = 'main';
   }
