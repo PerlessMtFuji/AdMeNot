@@ -1,5 +1,6 @@
 // Atrapa mostu: odtwarza scenariusze nagrane z prawdziwego Api (scripts/record_bridge_fixtures.py).
 import type { Bridge } from './bridge';
+import { live } from './fakeBridgeLive';
 import type { Api, ApiError, EntryView, ExplorerListView, CopyView, CrashSummary, DeviceCheck, EventMap, EventName, Lang, PlanView, ScanView, ServiceInfo, Settings, ShotView, TaskView, TelemetrySample, UpdateView } from './types';
 // Wynik `telemetry_events.sample()` z Pythona (Task 7 planu kroku H) — ten sam kształt co prawdziwe zdarzenia.
 import SAMPLE from './telemetrySample.json';
@@ -38,7 +39,10 @@ export type FakeBridge = Bridge & {
   setCopies(copies: CopyView[]): void;  // kopie danych na komputerze (`transfers` bez nagrania w scenariuszu)
   calls: { method: string; args: unknown[] }[];
   emit<K extends EventName>(name: K, detail: EventMap[K]): void;
+  /** Koniec atrapy: spóźnione zdarzenia (łańcuch `replay`, timery) już nic nie wysyłają. */
+  dispose(): void;
 };
+
 
 const isError = (result: unknown): boolean => typeof result === 'object' && result !== null && 'error' in result
   && (result as { error: unknown }).error !== null;
@@ -121,7 +125,16 @@ export function createFakeBridge(name: string,
     '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="200"><rect width="90" height="200" rx="8" fill="#1f2937"/>'
     + '<rect x="8" y="40" width="74" height="90" rx="6" fill="#f59e0b"/></svg>');
 
+  let disposed = false;
+  const dispose = () => {
+    disposed = true;
+    live.delete(dispose);
+  };
+  live.add(dispose);  // `disposeFakeBridges()` po każdym teście
+
   const dispatch = (event: string, detail: unknown) => {
+    // po końcu atrapy (albo środowiska jsdom po teście) zdarzenie nie ma już odbiorcy
+    if (disposed || typeof CustomEvent === 'undefined') return;
     if (checks && (event === 'scan:done' || event === 'apk:done' || event === 'apk:manual')) {
       // Kopia: nagrania są wspólne dla wszystkich atrap w procesie, więc ich zdarzeń nie wolno zmieniać.
       const scan = (detail as { scan: ScanView }).scan;
@@ -498,5 +511,6 @@ export function createFakeBridge(name: string,
     answerNext: (method, result) => { answers.set(method, result); },
     setChecks: (next) => { checks = structuredClone(next); checksChanged = true; },
     setCopies: (next) => { copies = structuredClone(next); },
+    dispose,
   };
 }

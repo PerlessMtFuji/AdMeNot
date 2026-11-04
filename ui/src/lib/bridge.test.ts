@@ -1,9 +1,31 @@
 import { describe, expect, test, vi } from 'vitest';
 import { isApiError } from './bridge';
 import { createFakeBridge, scenarioNames } from './fakeBridge';
+import { disposeFakeBridges } from './fakeBridgeLive';
 import type { EventName } from './types';
 
 describe('fake bridge', () => {
+  test('events still pending after the test (teardown) are dropped, not thrown as unhandled rejections', async () => {
+    const bridge = createFakeBridge('adware', { delay: 0 });
+    const seen: string[] = [];
+    bridge.on('scan:done', () => seen.push('scan:done'));
+    const rejections: unknown[] = [];
+    const onRejection = (reason: unknown) => { rejections.push(reason); };
+    process.on('unhandledRejection', onRejection);
+    try {
+      expect(await bridge.api.start_scan('R58T00TEST', 'Anna K.')).toEqual({ job_id: 'job-1' });
+      disposeFakeBridges();  // jak `afterEach` w test-setup.ts: zdarzenia skanu jeszcze w łańcuchu `replay`
+      vi.stubGlobal('CustomEvent', undefined);  // jak po zniknięciu jsdom
+      await new Promise((r) => setTimeout(r, 30));
+      bridge.emit('explorer:offline', { serial: 'R58T00TEST' });
+    } finally {
+      vi.unstubAllGlobals();
+      process.off('unhandledRejection', onRejection);
+    }
+    expect(seen).toEqual([]);
+    expect(rejections).toEqual([]);
+  });
+
   test('knows the recorded scenarios', () => {
     expect(scenarioNames().sort()).toEqual(
       ['adware', 'adware-en', 'clean', 'disconnect', 'empty', 'explorer', 'manual', 'many', 'report', 'transfer', 'transfer_export', 'transfer_restore', 'transfer_restore_tel', 'unauthorized'].sort());

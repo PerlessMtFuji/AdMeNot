@@ -1,5 +1,6 @@
 import { cleanup } from '@testing-library/svelte';
 import { afterEach, vi } from 'vitest';
+import { disposeFakeBridges } from './lib/fakeBridgeLive';
 
 // jsdom nie ma matchMedia: testy działają jak przy prefers-reduced-motion (czasy animacji 0)
 // i jasnym motywie systemu. Pojedyncze testy podmieniają window.matchMedia (vi.stubGlobal).
@@ -60,7 +61,10 @@ if (!('inert' in HTMLElement.prototype)) {
   });
 }
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  disposeFakeBridges();  // spóźnione zdarzenia atrapy mostu nie trafią do następnego testu ani po końcu jsdom
+});
 
 // jsdom nie przewija: tabela eksperta woła scrollIntoView na podświetlonym wierszu.
 if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {};
