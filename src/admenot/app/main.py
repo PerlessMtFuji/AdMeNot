@@ -18,6 +18,7 @@ from admenot.app import crash
 from admenot.app.api import Api
 from admenot.app.errors import log_exception
 from admenot.app.events import WindowEmitter
+from admenot.app.gpu import prefer_low_power_gpu
 from admenot.engine.clientpaths import client_paths
 from admenot.engine.settings import effective_lang, load_settings
 
@@ -131,6 +132,7 @@ def run_gui() -> int:
         api._start_updates()
         api._start_telemetry()
         window.events.closing += api._on_closing
+        prefer_low_power_gpu()
         try:
             webview.start(gui="edgechromium", http_server=True)
         except Exception as exc:  # noqa: BLE001 — np. brak WebView2 na Windows 10
