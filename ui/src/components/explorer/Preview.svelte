@@ -62,6 +62,9 @@
     return () => { stale = true; };
   });
 
+  // Muzyka, której nie da się odtworzyć: jak nieobsługiwany format — ikona, metadane, kopiowanie (plan R9).
+  $effect(() => { if (audioFailed && entry) broken = entry.path; });
+
   const files = $derived(ex.items.filter((e) => e.kind === 'file'));
   const at = $derived(files.findIndex((e) => e.path === entry?.path));
   const strip = $derived(entry?.type === 'image' ? files.slice(Math.max(0, at - NEIGHBOURS), at + NEIGHBOURS + 1) : []);

@@ -48,7 +48,7 @@
   function outcome(x: TaskView): string {
     if (x.status === 'cancelled') return t('explorer.task.cancelled');
     if (x.status === 'failed') return t('explorer.task.failed');
-    if (x.failed.length) return t('explorer.task.with_errors');
+    if (x.failed.length || x.omitted) return t('explorer.task.with_errors');
     return tp(x.kind === 'to_pc' ? 'explorer.task.copied' : 'explorer.task.uploaded', x.done_files);
   }
 </script>
@@ -102,17 +102,19 @@
 
 {#snippet doneRow(x: TaskView)}
   {@const bad = x.failed.length}
+  {@const warn = bad || x.omitted || x.status !== 'done'}
   {@const hurt = damaged(x)}
   <div class="flex flex-col gap-2">
     <div class="flex min-w-0 items-center gap-3">
-      <span class="grid h-8 w-8 flex-none place-items-center rounded-full {bad || x.status !== 'done' ? 'bg-warn-strong/25 text-warn' : 'bg-ok/15 text-ok'}">
-        <Icon name={bad || x.status !== 'done' ? 'triangle-alert' : 'check'} size={16} />
+      <span class="grid h-8 w-8 flex-none place-items-center rounded-full {warn ? 'bg-warn-strong/25 text-warn' : 'bg-ok/15 text-ok'}">
+        <Icon name={warn ? 'triangle-alert' : 'check'} size={16} />
       </span>
       <div class="flex min-w-0 flex-1 flex-col">
         <b class="truncate text-sm text-ink">{outcome(x)}</b>
         <span class="flex flex-wrap gap-x-2.5 text-2xs text-mut">
           {#if bad}<span>{tp(x.kind === 'to_pc' ? 'explorer.task.failed_pc' : 'explorer.task.failed_phone', bad)}</span>{/if}
           {#if hurt}<span>{tp('explorer.task.damaged', hurt)}</span>{/if}
+          {#if x.omitted}<span>{tp('explorer.task.omitted', x.omitted)}</span>{/if}
           {#if x.skipped}<span>{tp('explorer.task.skipped', x.skipped)}</span>{/if}
           {#if x.renamed}
             <span title={t(x.kind === 'to_pc' ? 'explorer.task.renamed_title_pc' : 'explorer.task.renamed_title_phone')}>{tp('explorer.task.renamed', x.renamed)}</span>
@@ -120,7 +122,10 @@
           {#if x.verified === 'hash' && !bad}<span>{t('explorer.task.verified')}</span>{/if}
         </span>
       </div>
-      {#if x.status === 'done'}
+      {#if hurt}
+        <Button size="sm" onclick={() => ex.retry(x.id)}>{t('explorer.task.retry')}</Button>
+      {/if}
+      {#if x.status === 'done' && x.dest}
         {#if x.kind === 'to_pc'}
           <Button size="sm" onclick={() => ex.openFolder(x)}>{t('explorer.task.open_folder')}</Button>
         {:else}

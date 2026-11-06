@@ -25,6 +25,7 @@
   const STEP_MS = 25;
   const STEP_MAX = 12;
   const DIRS = '/dirs';
+  const FILES = '/files';
 
   let box: HTMLElement;
   let content: HTMLElement;
@@ -32,11 +33,13 @@
   let focusPath = $state<string | null>(null);
   let lasso = $state<Rect | null>(null);
 
-  // Foldery na górze, pliki po dniach (kolejność dni jak w sortowaniu listy).
+  // Foldery na górze, pliki po dniach (kolejność dni jak w sortowaniu listy); po nazwie albo rozmiarze — jedną grupą.
   const groups = $derived.by((): GroupIn[] => {
     const dirs = items.filter((e) => e.kind === 'dir');
     const files = items.filter((e) => e.kind === 'file');
-    return [...(dirs.length ? [{ key: DIRS, label: t('explorer.gallery.folders'), items: dirs }] : []), ...days(files, now)];
+    const byDay = s.sort.key === 'date';
+    return [...(dirs.length ? [{ key: DIRS, label: t('explorer.gallery.folders'), items: dirs }] : []),
+      ...(byDay ? days(files, now) : files.length ? [{ key: FILES, label: t('explorer.gallery.all_files'), items: files }] : [])];
   });
   const layout = $derived(gridLayout(groups, Math.max(1, vp.width - 2 * PAD)));
   const order = $derived(layout.order.map((e) => e.path));
@@ -148,12 +151,11 @@
 
   /** Folder — wchodzi do niego, plik — otwiera podgląd (zdjęcie rośnie z kafla). */
   function open(e: EntryView): void {
-    ex.cancelClick();
     if (e.kind === 'dir') void ex.go(e.path);
     else void openMorph(e.path, () => ex.openPreview(e.path));
   }
 
-  /** Klawiatura w siatce: Enter wchodzi do folderu albo otwiera podgląd, Spacja przełącza zaznaczenie, strzałki przesuwają
+  /** Klawiatura w siatce: Enter wchodzi do folderu albo otwiera podgląd, Spacja podgląda plik, Ctrl+Spacja przełącza zaznaczenie, strzałki przesuwają
    *  (z Shift — zakres). */
   function onkey(ev: KeyboardEvent, e: EntryView, i: number): void {
     if (ev.key === 'Enter') {
@@ -161,7 +163,8 @@
       open(e);
     } else if (ev.key === ' ') {
       ev.preventDefault();
-      ex.select(e.path, { ctrl: true }, order);
+      if (e.kind === 'file' && !ev.ctrlKey) open(e);
+      else ex.select(e.path, { ctrl: true }, order);
     } else if (ev.key.startsWith('Arrow')) {
       const next = neighbour(layout, i, ev.key);
       ev.preventDefault();
@@ -227,11 +230,12 @@
   <div bind:this={content} class="relative" style:height="{layout.height + PAD}px" style:margin="0 {PAD}px">
     {#each slices as { section } (section.key)}
       {@const all = daySelected(section)}
-      {@const color = section.key === DIRS ? null : dayColor(section)}
+      {@const plain = section.key === DIRS || section.key === FILES}
+      {@const color = plain ? null : dayColor(section)}
       <!-- Pas sekcji (cała wysokość dnia) tylko po to, żeby nagłówek był przyklejony w jej granicach. -->
       <div class="pointer-events-none absolute inset-x-0 z-10" style:top="{section.top}px" style:height="{section.height}px">
         <div class="sticky top-0 flex items-center" style:height="{GRID.header}px">
-          {#if section.key === DIRS}
+          {#if plain}
             <span data-day class="glass-pill pointer-events-auto rounded-full px-3 py-1 text-xs font-extrabold text-ink">
               {section.label}
             </span>

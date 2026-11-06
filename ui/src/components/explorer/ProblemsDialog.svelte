@@ -18,10 +18,6 @@
     ex.dismissProblems();
     await ex.pickDest();
   }
-  function unselect(list: string[]): void {
-    ex.unselectNames(list);
-    ex.dismissProblems();
-  }
 </script>
 
 <Dialog title={t(`explorer.problems.title_${side}`)} oncancel={() => ex.dismissProblems()}>
@@ -38,16 +34,16 @@
         {:else if p.key === 'fat32_big'}
           {t('explorer.problems.fat32')}
           <ul class="mt-1.5 ml-4 list-disc text-mut">
-            {#each names(p.detail.names) as n (n)}<li class="break-all">{n}</li>{/each}
+            {#each names(p.detail.names) as n, i (i)}<li class="break-all">{n}</li>{/each}
           </ul>
-          <Button size="sm" class="mt-2" onclick={() => unselect(names(p.detail.names))}>{t('explorer.problems.unselect')}</Button>
+          <Button size="sm" class="mt-2" onclick={() => ex.copyWithout(names(p.detail.paths))}>{t('explorer.problems.skip')}</Button>
         {:else}
           {t(`explorer.problems.denied_${side}`)}
           <ul class="mt-1.5 ml-4 list-disc text-mut">
             {#each names(p.detail.paths).map(base) as n, i (i)}<li class="break-all">{n}</li>{/each}
           </ul>
           {#if problems.kind === 'to_pc'}
-            <Button size="sm" class="mt-2" onclick={() => unselect(names(p.detail.paths).map(base))}>{t('explorer.problems.unselect')}</Button>
+            <Button size="sm" class="mt-2" onclick={() => ex.copyWithout(names(p.detail.paths))}>{t('explorer.problems.skip')}</Button>
           {/if}
         {/if}
       </li>

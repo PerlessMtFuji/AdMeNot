@@ -15,7 +15,10 @@
   let paused = $state(true);
   let progress = $state(0);
   let bars: HTMLElement[] = [];
-  const color = $derived((playing?.cover ? thumbs.get(playing.cover)?.color : '') || 'var(--glow-accent)');
+  /** Okładka, której plik nie ma (adres dostaje każdy MP3/FLAC). */
+  let missing = $state<string | null>(null);
+  const cover = $derived(playing?.cover && playing.cover !== missing ? playing.cover : null);
+  const color = $derived((cover ? thumbs.get(cover)?.color : '') || 'var(--glow-accent)');
   const IDLE = 0.12;
 
   function sync(): void {
@@ -54,8 +57,8 @@
       <span aria-hidden="true" class="breathe absolute -inset-2 rounded-full opacity-60 blur-[14px]" class:running={!paused}
         style:background={color}></span>
       <span class="relative grid h-10 w-10 place-items-center overflow-hidden rounded-[10px] text-white"
-        style:background={playing.cover ? undefined : 'linear-gradient(135deg,#a78bfa,#6d28d9)'}>
-        {#if playing.cover}<img src={playing.cover} alt="" draggable="false" class="h-full w-full object-cover" />
+        style:background={cover ? undefined : 'linear-gradient(135deg,#a78bfa,#6d28d9)'}>
+        {#if cover}<img src={cover} alt="" draggable="false" class="h-full w-full object-cover" onerror={() => (missing = cover)} />
         {:else}<Icon name="music" size={18} />{/if}
       </span>
     </div>

@@ -468,6 +468,8 @@ export interface PlaceView {
 export interface StorageView {
   total: number;
   used: number;
+  /** Wolne jak w planie wgrywania (`df`, kolumna Available). */
+  free: number;
   groups: { photos: number; videos: number; whatsapp: number; other: number };
 }
 
@@ -537,6 +539,8 @@ export interface TaskView {
   failed: { path: string; reason: 'denied' | 'size' | 'mismatch' | 'missing' | 'error' }[];
   verified: 'size' | 'hash' | 'mismatch' | null;
   dest: string;
+  /** Pozycje, których plan nie mógł odczytać: nie zostały skopiowane. */
+  omitted: number;
 }
 
 export interface ExplorerProblem {
@@ -934,8 +938,9 @@ export interface Api {
   explorer_mkdir(parent: string, name: string): R<{ path: string }>;
   explorer_new_text(parent: string, name: string, text: string): R<{ path: string }>;
   explorer_open_map(lat: number, lon: number): R<Record<string, never>>;
-  explorer_copy(paths: string[], dest: string | null, verifyHash: boolean): R<ExplorerStart>;
-  explorer_upload(paths: string[], remoteDir: string): R<ExplorerStart>;
+  explorer_copy(paths: string[], dest: string | null, verifyHash: boolean, exclude?: string[]): R<ExplorerStart>;
+  explorer_upload(paths: string[], remoteDir: string, verifyHash: boolean): R<ExplorerStart>;
+  explorer_retry(taskId: string): R<{ task: string | null }>;
   explorer_pick_dest(): R<{ path: string | null }>;
   explorer_pick_upload(kind: 'files' | 'folder'): R<{ paths: string[] }>;
   explorer_clipboard(): R<{ paths: string[] }>;

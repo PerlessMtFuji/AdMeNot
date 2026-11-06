@@ -8,10 +8,17 @@
 
   type Props = { crumbs: CrumbView[]; ongo: (path: string) => void };
   let { crumbs, ongo }: Props = $props();
+  let nav: HTMLElement;
+
+  // Długa ścieżka nie mieści się w pasku: widać ma być bieżący folder, nie początek.
+  $effect(() => {
+    void crumbs;
+    nav.scrollLeft = nav.scrollWidth;
+  });
 </script>
 
 <!-- Okruszki ścieżki: każdy człon klikalny; pierwszy to pamięć telefonu (jego nazwa). -->
-<nav aria-label={t('explorer.crumbs_label')} class="min-w-0 flex-1 overflow-x-auto">
+<nav bind:this={nav} aria-label={t('explorer.crumbs_label')} class="min-w-0 flex-1 overflow-x-auto [scrollbar-width:none]">
   <ol class="flex min-w-0 items-center gap-0.5 text-md font-semibold">
     {#each crumbs as c, i (c.path)}
       {@const last = i === crumbs.length - 1}

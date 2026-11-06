@@ -291,6 +291,47 @@ def test_thumb_png_full():
     assert result[1] == "#0000ff"
 
 
+def id3(art: bytes, version: int = 3, desc: bytes = b"opis", encoding: int = 0) -> bytes:
+    body = bytes([encoding]) + b"image/jpeg\0" + b"\x03" + desc + b"\0" + art
+    size = len(body)
+    length = (bytes((size >> s) & 0x7F for s in (21, 14, 7, 0)) if version == 4 else size.to_bytes(4, "big"))
+    frame = b"APIC" + length + b"\0\0" + body
+    total = len(frame)
+    return b"ID3" + bytes([version, 0, 0]) + bytes((total >> s) & 0x7F for s in (21, 14, 7, 0)) + frame + b"\xff\xfbaudio"
+
+
+def flac(art: bytes) -> bytes:
+    mime = b"image/jpeg"
+    pic = (3).to_bytes(4, "big") + len(mime).to_bytes(4, "big") + mime + (0).to_bytes(4, "big") + bytes(16) \
+        + len(art).to_bytes(4, "big") + art
+    info = bytes([0]) + (34).to_bytes(3, "big") + bytes(34)
+    return b"fLaC" + info + bytes([0x80 | 6]) + len(pic).to_bytes(3, "big") + pic
+
+
+@pytest.mark.parametrize("version", [3, 4])
+def test_thumb_from_mp3_cover(version):
+    data = id3(jpeg_of((200, 10, 10)), version=version)
+    result = thumbnail(lambda n: data[:n], lambda: b"", 128, "utwor.MP3")
+    assert result is not None and result[1].startswith("#c")
+
+
+def test_thumb_from_mp3_cover_with_utf16_description():
+    data = id3(jpeg_of((200, 10, 10)), desc=b"\xff\xfe\xf3\x00\x00", encoding=1)  # helper dokłada drugie 00 końca
+    assert thumbnail(lambda n: data[:n], lambda: b"", 128, "a.mp3") is not None
+
+
+def test_thumb_from_flac_cover():
+    data = flac(jpeg_of((200, 10, 10)))
+    assert thumbnail(lambda n: data[:n], lambda: b"", 128, "utwor.flac") is not None
+
+
+def test_audio_without_cover_or_with_cut_tag_has_no_thumb():
+    assert thumbnail(lambda n: b"\xff\xfbaudio", lambda: b"", 128, "a.mp3") is None
+    cut = id3(jpeg_of())[:30]
+    assert thumbnail(lambda n: cut, lambda: b"", 128, "a.mp3") is None
+    assert thumbnail(lambda n: b"fLaC\x80", lambda: b"", 128, "a.flac") is None
+
+
 def test_thumb_video_and_unknown_are_none():
     assert thumbnail(lambda n: b"", lambda: b"x", 128, "v.mp4") is None
     assert thumbnail(lambda n: b"", lambda: b"x", 128, "notes.txt") is None

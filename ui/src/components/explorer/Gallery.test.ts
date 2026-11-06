@@ -87,16 +87,16 @@ describe('Gallery', () => {
     expect([...ex.state.selected].sort()).toEqual([...first.slice(0, 3), first[7]].sort());
   });
 
-  test('click selects, Space toggles the focused tile, arrows move by row', async () => {
+  test('click selects, Ctrl+Space toggles the focused tile, arrows move by row', async () => {
     const { ex } = await setup(photos(20));
     await fireEvent.click(tiles()[0]);
     expect([...ex.state.selected]).toEqual([tiles()[0].dataset.path]);
     await fireEvent.keyDown(tiles()[0], { key: 'ArrowDown' });
     const below = tiles().find((t) => t.dataset.path === photos(20)[7].path)!;
     expect(ex.state.selected.has(below.dataset.path!)).toBe(true);
-    await fireEvent.keyDown(below, { key: ' ' });
+    await fireEvent.keyDown(below, { key: ' ', ctrlKey: true });
     expect(ex.state.selected.has(below.dataset.path!)).toBe(false);
-    await fireEvent.keyDown(below, { key: ' ' });
+    await fireEvent.keyDown(below, { key: ' ', ctrlKey: true });
     expect(ex.state.selected.has(below.dataset.path!)).toBe(true);
   });
 

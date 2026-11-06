@@ -11,7 +11,7 @@ const DEST = 'D:\\Serwis\\Kowalska';
 function task(over: Partial<TaskView> = {}): TaskView {
   return { id: 's1t1', kind: 'to_pc', status: 'running', done_files: 3, total_files: 10, done_bytes: 3 * 1024 * 1024,
     total_bytes: 10 * 1024 * 1024, speed: 2 * 1024 * 1024, eta_s: 150, skipped: 0, renamed: 0, failed: [], verified: null,
-    dest: DEST, ...over };
+    dest: DEST, omitted: 0, ...over };
 }
 
 async function setup() {
@@ -30,6 +30,22 @@ const calls = (bridge: { calls: { method: string; args: unknown[] }[] }, method:
   bridge.calls.filter((c) => c.method === method).map((c) => c.args);
 
 describe('TaskBar', () => {
+  test('unreadable items are reported as a problem, not as identical files', async () => {
+    const { emit } = await setup();
+    await emit(task({ status: 'done', omitted: 2, done_files: 0, total_files: 0, dest: '' }));
+    expect(screen.getByText(/2 pozycje nieodczytane/)).toBeTruthy();
+    expect(screen.getByText('Gotowe z błędami')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Otwórz folder' })).toBeNull();  // nic nie powstało
+  });
+
+  test('damaged files can be sent again', async () => {
+    const { emit, ex, bridge } = await setup();
+    await emit(task({ status: 'done', verified: 'mismatch', failed: [{ path: '/sdcard/a.jpg', reason: 'mismatch' }] }));
+    await fireEvent.click(screen.getByRole('button', { name: 'Ponów uszkodzone' }));
+    await vi.waitFor(() => expect(calls(bridge, 'explorer_retry')).toEqual([['s1t1']]));
+    expect(ex.state.tasks.some((x) => x.id === 's1t1')).toBe(false);
+  });
+
   test('a running copy shows progress, file count, speed and time left', async () => {
     const { emit } = await setup();
     await emit(task());
@@ -92,13 +108,12 @@ describe('TaskBar', () => {
     await vi.waitFor(() => expect(calls(bridge, 'explorer_list').at(-1)).toEqual(['/sdcard/Download']));
   });
 
-  test('a damaged copy is marked as damaged, without a manual retry', async () => {
+  test('a damaged copy is marked as damaged', async () => {
     const { emit } = await setup();
     await emit(task({ status: 'done', done_files: 9, verified: 'mismatch',
       failed: [{ path: '/sdcard/DCIM/Camera/2026/IMG_1.jpg', reason: 'mismatch' }] }));
     expect(screen.getByText(/1 uszkodzony/)).toBeTruthy();
     expect(screen.getByText(/IMG_1\.jpg — kopia uszkodzona/)).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /Ponów/ })).toBeNull();
   });
 
   test('a finished task can be dismissed', async () => {

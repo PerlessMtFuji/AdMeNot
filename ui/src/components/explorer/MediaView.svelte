@@ -29,7 +29,10 @@
   // Czas trwania z metadanych (ms z MediaStore), zanim element go pozna.
   const metaLength = $derived(Number(meta?.duration) > 0 ? Number(meta?.duration) / 1000 : 0);
   const total = $derived(length > 0 && Number.isFinite(length) ? length : metaLength);
-  const color = $derived((entry.thumb ? thumbs.get(entry.thumb)?.color : '') || 'var(--glow-accent)');
+  /** Most podaje adres okładki każdemu MP3/FLAC; plik bez okładki odpowiada błędem. */
+  let noCover = $state(false);
+  const cover = $derived(noCover ? null : entry.thumb);
+  const color = $derived((cover ? thumbs.get(cover)?.color : '') || 'var(--glow-accent)');
 
   function sync(): void {
     const el = media;
@@ -51,6 +54,9 @@
     for (const name of events) el.addEventListener(name, sync);
     return () => { for (const name of events) el.removeEventListener(name, sync); };
   });
+
+  // Film rusza sam, więc grająca w tle muzyka musi ustąpić.
+  $effect(() => { if (isVideo) ex.audio.pause(); });
 
   // Poświata filmu: mała kopia bieżącej klatki, rozmyta w CSS. Przy reduced-motion tylko po przewinięciu.
   function paint(): void {
@@ -104,7 +110,7 @@
       class="pointer-events-none absolute inset-0 h-full w-full scale-125 opacity-70 blur-[40px] saturate-[1.4]"></canvas>
     <!-- svelte-ignore a11y_media_has_caption -->
     <div class="absolute inset-0 bottom-[110px]">
-      <video bind:this={video} src={entry.url} preload="metadata" playsinline onerror={onfail} onloadedmetadata={loaded}
+      <video bind:this={video} src={entry.url} preload="metadata" playsinline autoplay onerror={onfail} onloadedmetadata={loaded}
         onclick={toggle} class="absolute inset-0 h-full w-full cursor-pointer object-contain"></video>
     </div>
   {:else}
@@ -113,9 +119,9 @@
         class:running={!paused} style:background={color}></span>
       <div class="relative grid h-[280px] w-[280px] place-items-center overflow-hidden rounded-[28px] text-white
         shadow-[0_24px_60px_-20px_rgb(0_0_0/.8)]"
-        style:background={entry.thumb ? undefined : 'linear-gradient(135deg,#a78bfa,#6d28d9)'}>
-        {#if entry.thumb}
-          <img src={entry.thumb} alt="" draggable="false" class="h-full w-full object-cover" />
+        style:background={cover ? undefined : 'linear-gradient(135deg,#a78bfa,#6d28d9)'}>
+        {#if cover}
+          <img src={cover} alt="" draggable="false" class="h-full w-full object-cover" onerror={() => (noCover = true)} />
         {:else}
           <Icon name="music" size={96} strokeWidth={1.5} />
         {/if}

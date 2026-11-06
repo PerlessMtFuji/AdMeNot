@@ -102,7 +102,7 @@ test('explorer: picker and drop upload paths render tasks without JavaScript err
   await page.goto('/?scenario=explorer');
   await page.getByRole('button', { name: 'Pliki' }).click();
   await page.getByRole('button', { name: 'Wgraj tutaj' }).click();
-  await page.getByRole('menuitem', { name: /Pliki/ }).click();
+  await page.getByRole('menuitem', { name: /^Pliki…/ }).click();
   await expect(page.getByText('Wgrywanie na telefon', { exact: true }).first()).toBeVisible();
   await page.evaluate(() => {
     (window as any).__admenot.bridge.emit('explorer:drop', { paths: ['C:\\film.mp4'], count: 1, bytes: 20 });
@@ -151,4 +151,41 @@ test('portrait video fits above controls and reports decoded dimensions without 
       && bounds.bottom <= dialog.bottom - 100 && bounds.right <= dialog.right;
   });
   expect(fits).toBe(true);
+});
+
+for (const scan of ['scan-ccitt', 'scan-jpx']) {
+  test(`${scan}: a scanned PDF shows its picture, not a blank page`, async ({ page }) => {
+    await page.route(`http://127.0.0.1:4173/${scan}.pdf`, route => route.fulfill({
+      body: readFileSync(new URL(`./fixtures/${scan}.pdf`, import.meta.url)),
+      contentType: 'application/pdf', headers: { 'Access-Control-Allow-Origin': '*' },
+    }));
+    await page.goto('/?scenario=explorer');
+    await page.getByRole('button', { name: 'Pliki', exact: true }).click();
+    await page.evaluate((scan) => {
+      const ex = (window as any).__admenot.ctl.explorer;
+      const entry = { ...ex.state.entries[0], path: `/sdcard/${scan}.pdf`, name: `${scan}.pdf`, kind: 'file',
+        type: 'doc', ext: 'pdf', url: `http://127.0.0.1:4173/${scan}.pdf`, thumb: null };
+      ex.state.entries.push(entry);
+      ex.openPreview(entry.path);
+    }, scan);
+    await expect.poll(() => page.evaluate(() => {
+      const c = document.querySelector('[role=dialog] canvas') as HTMLCanvasElement | null;
+      if (!c || c.width < 300) return 0;
+      const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
+      let dark = 0;
+      for (let i = 0; i < d.length; i += 4) if (d[i] < 128) dark++;
+      return dark / (d.length / 4);
+    }), { timeout: 10_000 }).toBeGreaterThan(0.1);
+  });
+}
+
+test('deep path: the current folder stays visible in the breadcrumbs', async ({ page }) => {
+  await page.goto('/?scenario=explorer');
+  await page.getByRole('button', { name: 'Pliki', exact: true }).click();
+  await page.evaluate(() => {
+    const ex = (window as any).__admenot.ctl.explorer;
+    ex.state.crumbs = Array.from({ length: 7 }, (_, i) => ({ label: `bardzo długa nazwa folderu numer ${i}`, path: `/sdcard/${i}` }));
+  });
+  const last = page.getByRole('navigation', { name: 'Ścieżka' }).getByRole('button').last();
+  await expect(last).toBeInViewport({ ratio: 0.95 });
 });

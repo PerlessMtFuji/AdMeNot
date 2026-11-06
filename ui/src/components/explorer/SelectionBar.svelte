@@ -16,7 +16,7 @@
   const spring = (t: number) => 1 - Math.cos(t * Math.PI * 4.5) * Math.exp(-t * 6);
 </script>
 
-{#if s.selected.size && s.preview === null && !s.loading}
+{#if s.selected.size && !s.barHeld && s.preview === null && !s.loading}
   <section aria-label={t('explorer.selection.label')} transition:fly={{ y: 40, duration: ms(DUR.success), easing: spring }}
     class="flex flex-none flex-wrap items-center gap-3 rounded-2xl card px-4 py-2.5">
     <b class="text-sm text-ink tabular-nums">

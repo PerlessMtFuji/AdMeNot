@@ -1,6 +1,10 @@
 import { expect, test } from 'vitest';
 import { findMatches } from './find';
 
+test('stops at the match limit instead of building a huge list', () => {
+  expect(findMatches('a'.repeat(50), 'a', false, 10)).toHaveLength(10);
+});
+
 test('literal case-insensitive search with Polish whole-word boundaries', () => {
   const text = 'ŻÓŁĆ żółć żółci [x] a.b 😀żółć';
   expect(findMatches(text, 'żółć', true)).toHaveLength(3);

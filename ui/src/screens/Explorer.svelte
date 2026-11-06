@@ -14,7 +14,7 @@
   import SelectionBar from '../components/explorer/SelectionBar.svelte';
   import TaskBar from '../components/explorer/TaskBar.svelte';
   import type { Controller } from '../lib/controller';
-  import { type ExplorerFilter, FILTERS, formatBytes } from '../lib/explorer/logic';
+  import { type ExplorerFilter, FILTERS, formatBytes, SORTS } from '../lib/explorer/logic';
   import { mediaFetcher, ThumbQueue } from '../lib/explorer/thumbs';
   import { ERROR_KEYS, i18n, t, tp } from '../lib/i18n/index.svelte';
   import { enter } from '../lib/motion';
@@ -170,6 +170,14 @@
       value={s.filter} onchange={(e) => ex.setFilter(e.currentTarget.value as ExplorerFilter)}>
       {#each FILTERS as f (f)}<option value={f}>{t(`explorer.filter.${f}`)}</option>{/each}
     </select>
+    {#if s.view === 'grid'}
+      <select class="field flex-none rounded-xl px-3 py-2 text-sm font-semibold text-ink" aria-label={t('explorer.sort.label')}
+        value={`${s.sort.key}:${s.sort.dir}`} onchange={(e) => ex.setSortTo(e.currentTarget.value)}>
+        {#each SORTS as [key, dir] (`${key}:${dir}`)}
+          <option value={`${key}:${dir}`}>{t(`explorer.sort.${key}_${dir === 1 ? 'asc' : 'desc'}`)}</option>
+        {/each}
+      </select>
+    {/if}
     <Menu title={t('explorer.new_menu.label')} menuLabel={t('explorer.new_menu.label')} disabled={s.locked}
       class="btn-secondary rounded-[10px] px-3 py-2 text-sm text-ink"
       items={[
@@ -183,6 +191,10 @@
       items={[
         { id: 'files', label: t('explorer.upload_menu.files'), onselect: () => void ex.pickUpload('files') },
         { id: 'folder', label: t('explorer.upload_menu.folder'), onselect: () => void ex.pickUpload('folder') },
+        { id: 'files-verify', label: t('explorer.upload_menu.files_verify'), sub: t('explorer.upload_menu.verify_sub'),
+          onselect: () => void ex.pickUpload('files', true) },
+        { id: 'folder-verify', label: t('explorer.upload_menu.folder_verify'), sub: t('explorer.upload_menu.verify_sub'),
+          onselect: () => void ex.pickUpload('folder', true) },
       ]}>
       <Icon name="upload" size={15} />{t('explorer.upload_here')}<Icon name="chevron-down" size={14} />
     </Menu>
@@ -230,7 +242,7 @@
           {#if s.skipped > 0}<p class="px-3 pt-1 text-2xs text-soft">{tp('explorer.skipped', s.skipped)}</p>{/if}
         {/if}
       </div>
-      {#if s.drop}<DropZone drop={s.drop} folder={folderName} free={s.storage ? Math.max(0, s.storage.total - s.storage.used) : null} />{/if}
+      {#if s.drop}<DropZone drop={s.drop} folder={folderName} free={s.storage?.free ?? null} />{/if}
     </section>
   </div>
 

@@ -43,7 +43,7 @@
   {#if usage}
     <div class="text-center text-2xs font-semibold text-mut tabular-nums">
       {t('explorer.storage.used_of', { used: size(usage.used), total: size(usage.total) })}
-      <br />{t('explorer.storage.free', { size: size(Math.max(0, usage.total - usage.used)) })}
+      <br />{t('explorer.storage.free', { size: size(usage.free) })}
     </div>
     <div class="flex h-1.5 w-full overflow-hidden rounded-full bg-neutral-soft" aria-hidden="true">
       {#each GROUPS as [key, color] (key)}

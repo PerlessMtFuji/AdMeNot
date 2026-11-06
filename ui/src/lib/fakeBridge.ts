@@ -120,7 +120,7 @@ export function createFakeBridge(name: string,
   const tasks: TaskView[] = [];
   const fakeTask = (kind: TaskView['kind'], dest: string): TaskView => ({
     id: `s1t${++taskSeq}`, kind, status: 'queued', done_files: 0, total_files: 2, done_bytes: 0, total_bytes: 2048,
-    speed: 0, eta_s: null, skipped: 0, renamed: 0, failed: [], verified: null, dest });
+    speed: 0, eta_s: null, skipped: 0, renamed: 0, failed: [], verified: null, dest, omitted: 0 });
   const answers = new Map<string, unknown>();
   const SHOT_IMAGE = 'data:image/svg+xml,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="200"><rect width="90" height="200" rx="8" fill="#1f2937"/>'
@@ -334,7 +334,7 @@ export function createFakeBridge(name: string,
       case 'adb_shell':
         return { ok: true, output: `(atrapa) ${String(args[0])}\n` };
       case 'explorer_storage':
-        return { total: 128 * 1024 ** 3, used: 71 * 1024 ** 3,
+        return { total: 128 * 1024 ** 3, used: 71 * 1024 ** 3, free: 57 * 1024 ** 3,
           groups: { photos: 28 * 1024 ** 3, videos: 17 * 1024 ** 3, whatsapp: 6 * 1024 ** 3, other: 20 * 1024 ** 3 } };
       case 'explorer_close':
       case 'explorer_pause':
@@ -358,6 +358,11 @@ export function createFakeBridge(name: string,
           : ['C:\\Users\\serwis\\Desktop\\zdjecie.jpg', 'C:\\Users\\serwis\\Desktop\\umowa.pdf'] };
       case 'explorer_clipboard':
         return { paths: ['C:\\Users\\serwis\\Documents\\faktura.pdf'] };
+      case 'explorer_retry': {
+        const task = fakeTask('to_pc', settings.explorer_dest ?? '');
+        tasks.push(task);
+        return { task: task.id };
+      }
       case 'explorer_tasks':
         return { tasks: [...tasks] };
       case 'watch_devices':

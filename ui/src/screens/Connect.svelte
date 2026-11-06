@@ -123,8 +123,8 @@
         <form class="flex gap-2" onsubmit={(e) => { e.preventDefault(); if (!cleaning) void ctl.startScan(); }}>
           <input class="field flex-1 rounded-xl px-3.5 py-2.5" bind:value={s.client}
             placeholder={t('connect.client_placeholder')} aria-label={t('connect.client_label')} maxlength="80" />
-          <Button type="submit" variant="primary" size="lg" disabled={!s.serial || cleaning}>{t('connect.scan')}</Button>
-          <Button variant="secondary" size="lg" disabled={!s.serial || cleaning} onclick={() => ctl.startTransfer()}>{t('transfer.start')}</Button>
+          <Button type="submit" variant="primary" size="lg" disabled={!s.serial || cleaning} title={filesReason ?? undefined}>{t('connect.scan')}</Button>
+          <Button variant="secondary" size="lg" disabled={!s.serial || cleaning} title={filesReason ?? undefined} onclick={() => ctl.startTransfer()}>{t('transfer.start')}</Button>
           <Button variant="secondary" size="lg" disabled={filesReason !== null} title={filesReason ?? undefined}
             onclick={() => { if (s.serial) void ctl.explorer.open(s.serial); }}>
             <Icon name="folder-open" size={18} />{t('explorer.files')}

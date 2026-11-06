@@ -132,8 +132,9 @@
       "pdf_zoom_in": "Powiększ PDF", "pdf_zoom_out": "Pomniejsz PDF", "pdf_index": "Przeszukano {current} z {total} stron",
       "pdf_no_text": "Ten PDF nie zawiera warstwy tekstowej. Możesz go przeglądać, ale wyszukiwanie wymaga rozpoznania tekstu (OCR).",
       "find_label": "Szukaj w treści", "find_placeholder": "Szukaj w treści… (Ctrl+F)", "find_whole": "Całe wyrazy",
-      "find_count": "{current} z {total}", "find_prev": "Poprzednie trafienie", "find_next": "Następne trafienie",
+      "find_count": "{current} z {total}", "find_count_many": "{current} z {total}+", "find_prev": "Poprzednie trafienie", "find_next": "Następne trafienie",
       "find_partial": "Szukanie obejmuje wczytaną część pliku.", "find_load_all": "Wczytaj całość",
+      "text_limit": "Podgląd obejmuje pierwsze {size}. Resztę obejrzysz po skopiowaniu pliku na komputer.",
       "label": "Podgląd pliku {name}",
       "close": "Zamknij podgląd",
       "copy": "Kopiuj na komputer",
@@ -174,13 +175,15 @@
     "day": { "today": "Dziś · {date}", "yesterday": "Wczoraj" },
     "gallery": {
       "folders": "Foldery",
+      "all_files": "Pliki",
       "select_day": "Zaznacz pliki z dnia: {day}",
       "unselect_day": "Odznacz pliki z dnia: {day}",
       "files": { "one": "{count} plik", "few": "{count} pliki", "many": "{count} plików", "other": "{count} pliku" }
     },
     "date": { "today": "dziś, {time}", "yesterday": "wczoraj, {time}" },
     "new_menu": { "label": "Utwórz w tym folderze", "folder": "Folder", "text": "Plik tekstowy" },
-    "upload_menu": { "label": "Wgraj z komputera", "files": "Pliki…", "folder": "Folder…" },
+    "upload_menu": { "label": "Wgraj z komputera", "files": "Pliki…", "folder": "Folder…", "files_verify": "Pliki ze sprawdzeniem…", "folder_verify": "Folder ze sprawdzeniem…", "verify_sub": "porównanie sumy kontrolnej każdego pliku — wolniej" },
+    "sort": { "label": "Sortuj", "date_desc": "Najnowsze", "date_asc": "Najstarsze", "name_asc": "Nazwa A–Z", "name_desc": "Nazwa Z–A", "size_desc": "Największe", "size_asc": "Najmniejsze" },
     "new_dialog": {
       "folder_title": "Nowy folder",
       "text_title": "Nowy plik tekstowy",
@@ -227,6 +230,8 @@
       "uploaded": { "one": "Wgrano {count} plik", "few": "Wgrano {count} pliki", "many": "Wgrano {count} plików", "other": "Wgrano {count} pliku" },
       "failed_pc": { "one": "{count} pliku nie udało się skopiować", "few": "{count} plików nie udało się skopiować", "many": "{count} plików nie udało się skopiować", "other": "{count} pliku nie udało się skopiować" },
       "failed_phone": { "one": "{count} pliku nie udało się wgrać", "few": "{count} plików nie udało się wgrać", "many": "{count} plików nie udało się wgrać", "other": "{count} pliku nie udało się wgrać" },
+      "omitted": { "one": "{count} pozycja nieodczytana — nie skopiowana", "few": "{count} pozycje nieodczytane — nie skopiowane", "many": "{count} pozycji nieodczytanych — nie skopiowanych", "other": "{count} pozycji nieodczytanych — nie skopiowanych" },
+      "retry": "Ponów uszkodzone",
       "skipped": { "one": "{count} identyczny pominięty", "few": "{count} identyczne pominięte", "many": "{count} identycznych pominiętych", "other": "{count} identycznego pominiętego" },
       "renamed": { "one": "{count} zapisany obok", "few": "{count} zapisane obok", "many": "{count} zapisanych obok", "other": "{count} zapisanego obok" },
       "renamed_title_pc": "Plik o tej nazwie już był — kopia zapisana obok jako „nazwa (z telefonu)”",
@@ -262,7 +267,7 @@
       "denied_pc": "Telefon nie pozwala odczytać tych folderów — odznacz je:",
       "denied_phone": "Telefon nie pozwala zapisywać w tym folderze — wybierz inny folder na telefonie:",
       "change_dest": "Zmień folder",
-      "unselect": "Odznacz te pliki"
+      "skip": "Kopiuj bez tych plików"
     },
     "drop": {
       "title": "Upuść, żeby wgrać do {folder}",

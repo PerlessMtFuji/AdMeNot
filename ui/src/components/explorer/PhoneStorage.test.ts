@@ -8,7 +8,7 @@ import PhoneStorage from './PhoneStorage.svelte';
 
 const GB = 1024 ** 3;
 const usage = (used: number, over: Partial<StorageView['groups']> = {}): StorageView => ({
-  total: 100 * GB, used: used * GB, groups: { photos: 20 * GB, videos: 10 * GB, whatsapp: 5 * GB, other: (used - 35) * GB, ...over },
+  total: 100 * GB, used: used * GB, free: (100 - used) * GB, groups: { photos: 20 * GB, videos: 10 * GB, whatsapp: 5 * GB, other: (used - 35) * GB, ...over },
 });
 
 describe('PhoneStorage', () => {

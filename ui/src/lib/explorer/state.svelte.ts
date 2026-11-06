@@ -30,6 +30,8 @@ export class ExplorerState {
   filter = $state<ExplorerFilter>('all');
   query = $state('');
   selected = new SvelteSet<string>();
+  /** Pierwszy klik mógł być początkiem dwukliku: pasek zaznaczenia jeszcze czeka. */
+  barHeld = $state(false);
   /** Kotwica zaznaczenia zakresem (Shift+klik). */
   anchor = $state<string | null>(null);
   /** Zadania kolejki; raw — zdarzenia podmieniają je w całości, bez głębokich proxy. */

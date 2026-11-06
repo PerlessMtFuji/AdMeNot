@@ -22,7 +22,7 @@ _TYPES: dict[str, frozenset[str]] = {
     "apk": frozenset({"apk", "apks", "xapk"}),
     "doc": frozenset({"pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp", "rtf", "epub"}),
 }
-_THUMBS = frozenset({"jpg", "jpeg", "jpe", "png", "webp", "gif", "bmp"})  # miniatury z serwera (thumbs.py)
+_THUMBS = frozenset({"jpg", "jpeg", "jpe", "png", "webp", "gif", "bmp", "mp3", "flac"})  # miniatury z serwera (thumbs.py)
 _STREAMED = frozenset({"image", "video", "audio"})  # podgląd przez adres pliku na serwerze mediów
 
 

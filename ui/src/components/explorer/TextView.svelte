@@ -1,13 +1,14 @@
 <script lang="ts">
-  import { tick } from 'svelte';
-  import { findMatches } from '../../lib/explorer/find';
+  import { findMatches, MARK_WINDOW, MAX_TEXT } from '../../lib/explorer/find';
   import { type ExplorerController } from '../../lib/explorer/controller';
   import { highlight, type Token } from '../../lib/explorer/highlight';
-  import { t, tp } from '../../lib/i18n/index.svelte';
+  import { formatBytes } from '../../lib/explorer/logic';
+  import { i18n, t, tp } from '../../lib/i18n/index.svelte';
   import type { EntryView } from '../../lib/types';
   import Banner from '../../ui/Banner.svelte';
   import Button from '../../ui/Button.svelte';
   import Icon from '../../ui/Icon.svelte';
+  import FindBar from './FindBar.svelte';
 
   /** Podgląd tekstu: czcionka stała, numery linii, kodowanie, „Kopiuj tekst”, „Pokaż więcej” i kolorowanie JSON/XML. */
   let { ex, entry }: { ex: ExplorerController; entry: EntryView } = $props();
@@ -23,11 +24,14 @@
   let query = $state('');
   let whole = $state(false);
   let current = $state(0);
-  let searchInput: HTMLInputElement;
   let content: HTMLElement;
   let loadingAll = $state(false);
   let disposed = false;
   const matches = $derived(findMatches(text, query, whole));
+  /** Więcej pliku nie wczytamy, choć jeszcze jest. */
+  const capped = $derived(truncated && text.length >= MAX_TEXT);
+  const markFrom = $derived(Math.max(0, current - MARK_WINDOW));
+  const marked = $derived(matches.slice(markFrom, current + MARK_WINDOW));
   const foundTokens = $derived.by(() => {
     let offset = 0;
     let hit = 0;
@@ -36,34 +40,30 @@
       const end = offset + token.text.length;
       let at = offset;
       while (at < end) {
-        while (hit < matches.length && matches[hit].end <= at) hit++;
-        const match = matches[hit];
-        const marked = match && match.start <= at;
-        const to = Math.min(end, match ? marked ? match.end : match.start : end);
-        out.push({ text: token.text.slice(at - offset, to - offset), cls: token.cls, hit: marked ? hit : -1 });
+        while (hit < marked.length && marked[hit].end <= at) hit++;
+        const match = marked[hit];
+        const inside = match && match.start <= at;
+        const to = Math.min(end, match ? inside ? match.end : match.start : end);
+        out.push({ text: token.text.slice(at - offset, to - offset), cls: token.cls, hit: inside ? markFrom + hit : -1 });
         at = to;
       }
       offset = end;
     }
     return out;
   });
-  $effect(() => { void query; void whole; current = 0; });
   $effect(() => { void matches; content?.querySelector<HTMLElement>(`[data-hit="${current}"]`)?.scrollIntoView?.({ block: 'center' }); });
 
+  function search(q: string, w: boolean): void {
+    query = q;
+    whole = w;
+    current = 0;
+  }
   function step(delta: number): void {
     if (matches.length) current = (current + delta + matches.length) % matches.length;
   }
-  async function onkey(e: KeyboardEvent): Promise<void> {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
-      e.preventDefault();
-      await tick();
-      searchInput?.focus();
-      searchInput?.select();
-    }
-  }
   async function loadAll(): Promise<void> {
     loadingAll = true;
-    try { while (truncated && !failed && !disposed) await load(true); }
+    try { while (truncated && !capped && !failed && !disposed) await load(true); }
     finally { loadingAll = false; }
   }
 
@@ -105,8 +105,6 @@
   }
 </script>
 
-<svelte:window onkeydown={onkey} />
-
 <div class="absolute inset-0 flex flex-col gap-3 p-6">
   <div class="flex flex-none items-center gap-3 text-xs text-white/70">
     {#if encoding}<span class="rounded-full bg-white/10 px-2.5 py-0.5 font-semibold">{t('explorer.preview.encoding', { encoding })}</span>{/if}
@@ -118,17 +116,10 @@
       <Icon name={copied ? 'check' : 'copy'} size={14} />{copied ? t('explorer.preview.text_copied') : t('explorer.preview.copy_text')}
     </button>
   </div>
-  <div class="flex flex-none flex-wrap items-center gap-2 text-xs text-white/80">
-    <input bind:this={searchInput} bind:value={query} type="search" aria-label={t('explorer.preview.find_label')}
-      placeholder={t('explorer.preview.find_placeholder')} class="min-w-0 flex-1 rounded-lg bg-white/10 px-3 py-2 outline-none focus:ring-2 focus:ring-accent"
-      onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); step(e.shiftKey ? -1 : 1); }
-        if (e.key === 'Escape') { e.stopPropagation(); query = ''; } }} />
-    <label class="flex items-center gap-1.5"><input type="checkbox" bind:checked={whole} />{t('explorer.preview.find_whole')}</label>
-    <span role="status" aria-live="polite">{t('explorer.preview.find_count', { current: matches.length ? current + 1 : 0, total: matches.length })}</span>
-    <button type="button" disabled={!matches.length} onclick={() => step(-1)} aria-label={t('explorer.preview.find_prev')} class="rounded-lg bg-white/10 p-2 disabled:opacity-40"><Icon name="chevron-left" size={14} /></button>
-    <button type="button" disabled={!matches.length} onclick={() => step(1)} aria-label={t('explorer.preview.find_next')} class="rounded-lg bg-white/10 p-2 disabled:opacity-40"><Icon name="chevron-right" size={14} /></button>
-  </div>
-  {#if query && truncated}
+  <FindBar total={matches.length} {current} onsearch={search} onstep={step} />
+  {#if capped}
+    <p class="flex-none text-xs text-white/70">{t('explorer.preview.text_limit', { size: formatBytes(MAX_TEXT, i18n.lang) })}</p>
+  {:else if query && truncated}
     <div class="flex flex-none items-center justify-between gap-3 text-xs text-white/70">
       <span>{t('explorer.preview.find_partial')}</span>
       <Button size="sm" disabled={loading || loadingAll} onclick={loadAll}>{t('explorer.preview.find_load_all')}</Button>
@@ -144,7 +135,7 @@
       </div>
       {#if loading}<span class="spin m-4 inline-block" role="status" aria-label={t('explorer.preview.loading')}></span>{/if}
     {/if}
-    {#if truncated && !loading}
+    {#if truncated && !capped && !loading}
       <div class="sticky left-0 p-4">
         <Button size="sm" variant="secondary" disabled={loadingAll} onclick={() => load(true)}>{t('explorer.preview.more')}</Button>
       </div>

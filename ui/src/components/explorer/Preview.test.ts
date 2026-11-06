@@ -3,6 +3,7 @@ import { tick } from 'svelte';
 import { describe, expect, test, vi } from 'vitest';
 import App from '../../App.svelte';
 import { setupCtl } from '../../test-utils';
+import { MAX_TEXT } from '../../lib/explorer/find';
 import type { EntryView } from '../../lib/types';
 
 vi.mock('pdfjs-dist', () => ({
@@ -32,6 +33,78 @@ async function openExplorer() {
 const dialog = () => screen.getByRole('dialog');
 
 describe('Preview', () => {
+  test('Esc in an empty search box closes the preview', async () => {
+    const { ex, bridge } = await openExplorer();
+    await ex.go('/sdcard/Download');
+    bridge.answerNext('explorer_text', { text: 'tekst', encoding: 'utf-8', truncated: false });
+    ex.openPreview(NOTE);
+    const input = await screen.findByRole('searchbox', { name: 'Szukaj w treści' });
+    await fireEvent.keyDown(input, { key: 'Escape' });
+    expect(ex.state.preview).toBeNull();
+  });
+
+  test('only matches around the current one are marked, the count stays full', async () => {
+    const { ex, bridge } = await openExplorer();
+    await ex.go('/sdcard/Download');
+    bridge.answerNext('explorer_text', { text: 'ab '.repeat(5000), encoding: 'utf-8', truncated: false });
+    ex.openPreview(NOTE);
+    const input = await screen.findByRole('searchbox', { name: 'Szukaj w treści' });
+    await fireEvent.input(input, { target: { value: 'a' } });
+    await vi.waitFor(() => expect(dialog().textContent).toContain('1 z 5000'));
+    expect(dialog().querySelectorAll('mark').length).toBeLessThanOrEqual(500);
+  });
+
+  test('"Load all" stops at the preview limit and says so', async () => {
+    const { ex, bridge } = await openExplorer();
+    await ex.go('/sdcard/Download');
+    const chunk = 'x'.repeat(MAX_TEXT / 2);
+    bridge.answerNext('explorer_text', { text: chunk, encoding: 'utf-8', truncated: true });
+    ex.openPreview(NOTE);
+    const input = await screen.findByRole('searchbox', { name: 'Szukaj w treści' });
+    await fireEvent.input(input, { target: { value: 'x' } });
+    const texts = () => bridge.calls.filter((c) => c.method === 'explorer_text').length;
+    bridge.answerNext('explorer_text', { text: chunk, encoding: 'utf-8', truncated: true });
+    await fireEvent.click(await screen.findByRole('button', { name: 'Wczytaj całość' }));
+    await vi.waitFor(() => expect(dialog().textContent).toContain('Podgląd obejmuje pierwsze'));
+    expect(texts()).toBe(2);
+    expect(screen.queryByRole('button', { name: 'Wczytaj całość' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Pokaż więcej' })).toBeNull();
+  });
+
+  test('a video starts by itself and pauses the music', async () => {
+    const { ex } = await openExplorer();
+    const movie = entry('film.mp4', 'video', 'mp4');
+    ex.state.entries = [...ex.state.entries, movie];
+    const pause = vi.spyOn(ex.audio, 'pause');
+    ex.openPreview(movie.path);
+    await tick();
+    expect(dialog().querySelector('video')?.autoplay).toBe(true);
+    expect(pause).toHaveBeenCalled();
+  });
+
+  test('a track without a cover shows the note instead of a broken image', async () => {
+    const { ex } = await openExplorer();
+    const song = { ...entry('bez-okladki.mp3', 'audio', 'mp3'), thumb: 'http://127.0.0.1:1/thumb' };
+    ex.state.entries = [...ex.state.entries, song];
+    ex.openPreview(song.path);
+    await tick();
+    const img = dialog().querySelector('img')!;
+    await fireEvent.error(img);
+    expect(dialog().querySelector('img')).toBeNull();
+  });
+
+  test('audio that cannot play falls back to the icon and metadata', async () => {
+    const { ex } = await openExplorer();
+    const song = entry('zly.mp3', 'audio', 'mp3');
+    ex.state.entries = [...ex.state.entries, song];
+    ex.openPreview(song.path);
+    ex.state.playing = { path: song.path, title: song.name, cover: null, url: song.url! };
+    ex.state.playError = true;
+    await tick();
+    await tick();
+    expect(screen.getByRole('complementary', { name: 'Informacje o pliku' })).toBeTruthy();
+  });
+
   test('text search highlights literal matches and moves between them', async () => {
     const { ex, bridge } = await openExplorer();
     await ex.go('/sdcard/Download');
@@ -39,13 +112,13 @@ describe('Preview', () => {
     ex.openPreview(NOTE);
     const input = await screen.findByRole('searchbox', { name: 'Szukaj w treści' });
     await fireEvent.input(input, { target: { value: 'żół' } });
-    expect(dialog().querySelectorAll('mark')).toHaveLength(3);
+    await vi.waitFor(() => expect(dialog().querySelectorAll('mark')).toHaveLength(3));
     await fireEvent.click(screen.getByRole('checkbox', { name: 'Całe wyrazy' }));
-    expect(dialog().querySelectorAll('mark')).toHaveLength(0);
+    await vi.waitFor(() => expect(dialog().querySelectorAll('mark')).toHaveLength(0));
     await fireEvent.input(input, { target: { value: 'żółć' } });
-    expect(dialog().querySelectorAll('mark')).toHaveLength(2);
+    await vi.waitFor(() => expect(dialog().querySelectorAll('mark')).toHaveLength(2));
     await fireEvent.click(screen.getByRole('button', { name: 'Następne trafienie' }));
-    expect(dialog().querySelector('mark.active')?.getAttribute('data-hit')).toBe('1');
+    await vi.waitFor(() => expect(dialog().querySelector('mark.active')?.getAttribute('data-hit')).toBe('1'));
     expect(dialog().querySelector('script')).toBeNull();
     await fireEvent.keyDown(input, { key: 'Escape' });
     expect(ex.state.preview).toBe(NOTE);

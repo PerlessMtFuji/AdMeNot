@@ -132,8 +132,9 @@
       "pdf_zoom_in": "Zoom in PDF", "pdf_zoom_out": "Zoom out PDF", "pdf_index": "Searched {current} of {total} pages",
       "pdf_no_text": "This PDF has no text layer. You can view it, but searching requires text recognition (OCR).",
       "find_label": "Find in text", "find_placeholder": "Find in text… (Ctrl+F)", "find_whole": "Whole words",
-      "find_count": "{current} of {total}", "find_prev": "Previous match", "find_next": "Next match",
+      "find_count": "{current} of {total}", "find_count_many": "{current} of {total}+", "find_prev": "Previous match", "find_next": "Next match",
       "find_partial": "Search covers the loaded part of the file.", "find_load_all": "Load entire file",
+      "text_limit": "The preview covers the first {size}. Copy the file to the computer to see the rest.",
       "label": "Preview of {name}",
       "close": "Close preview",
       "copy": "Copy to computer",
@@ -174,13 +175,15 @@
     "day": { "today": "Today · {date}", "yesterday": "Yesterday" },
     "gallery": {
       "folders": "Folders",
+      "all_files": "Files",
       "select_day": "Select files from: {day}",
       "unselect_day": "Deselect files from: {day}",
       "files": { "one": "{count} file", "few": "{count} files", "many": "{count} files", "other": "{count} files" }
     },
     "date": { "today": "today, {time}", "yesterday": "yesterday, {time}" },
     "new_menu": { "label": "Create in this folder", "folder": "Folder", "text": "Text file" },
-    "upload_menu": { "label": "Upload from the computer", "files": "Files…", "folder": "Folder…" },
+    "upload_menu": { "label": "Upload from the computer", "files": "Files…", "folder": "Folder…", "files_verify": "Files with verification…", "folder_verify": "Folder with verification…", "verify_sub": "compares the checksum of every file — slower" },
+    "sort": { "label": "Sort", "date_desc": "Newest", "date_asc": "Oldest", "name_asc": "Name A–Z", "name_desc": "Name Z–A", "size_desc": "Largest", "size_asc": "Smallest" },
     "new_dialog": {
       "folder_title": "New folder",
       "text_title": "New text file",
@@ -227,6 +230,8 @@
       "uploaded": { "one": "Uploaded {count} file", "few": "Uploaded {count} files", "many": "Uploaded {count} files", "other": "Uploaded {count} files" },
       "failed_pc": { "one": "{count} file could not be copied", "few": "{count} files could not be copied", "many": "{count} files could not be copied", "other": "{count} files could not be copied" },
       "failed_phone": { "one": "{count} file could not be uploaded", "few": "{count} files could not be uploaded", "many": "{count} files could not be uploaded", "other": "{count} files could not be uploaded" },
+      "omitted": { "one": "{count} item unreadable — not copied", "few": "{count} items unreadable — not copied", "many": "{count} items unreadable — not copied", "other": "{count} items unreadable — not copied" },
+      "retry": "Retry damaged",
       "skipped": { "one": "{count} identical skipped", "few": "{count} identical skipped", "many": "{count} identical skipped", "other": "{count} identical skipped" },
       "renamed": { "one": "{count} saved alongside", "few": "{count} saved alongside", "many": "{count} saved alongside", "other": "{count} saved alongside" },
       "renamed_title_pc": "A file with that name was already there — the copy was saved alongside as “name (z telefonu)”",
@@ -262,7 +267,7 @@
       "denied_pc": "The phone does not allow reading these folders — unselect them:",
       "denied_phone": "The phone does not allow writing to this folder — choose another folder on the phone:",
       "change_dest": "Change folder",
-      "unselect": "Unselect these files"
+      "skip": "Copy without these files"
     },
     "drop": {
       "title": "Drop to upload to {folder}",

@@ -36,11 +36,11 @@ describe('FileList', () => {
     expect(rows().length).toBeLessThan(100);
   });
 
-  test('Space toggles the focused row; arrows move the selection', async () => {
+  test('Ctrl+Space toggles the focused row; arrows move the selection', async () => {
     const { ex } = await setup(files(5));
-    await fireEvent.keyDown(rows()[1], { key: ' ' });
+    await fireEvent.keyDown(rows()[1], { key: ' ', ctrlKey: true });
     expect([...ex.state.selected]).toEqual([files(5)[1].path]);
-    await fireEvent.keyDown(rows()[1], { key: ' ' });
+    await fireEvent.keyDown(rows()[1], { key: ' ', ctrlKey: true });
     expect(ex.state.selected.size).toBe(0);
     await fireEvent.keyDown(rows()[1], { key: 'ArrowDown' });
     expect([...ex.state.selected]).toEqual([files(5)[2].path]);

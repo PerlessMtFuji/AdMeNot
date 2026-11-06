@@ -10,6 +10,8 @@ const RECENT_MAX = 8;
 /** Jak długo nowe wpisy po odświeżeniu są „świeże” (animacja `pop-in`). */
 const FRESH_MS = 700;
 /** Zadania, które wyjście z eksploratora anuluje (most zamyka kolejkę razem z sesją). */
+/** Windows pozwala wydłużyć dwuklik do ok. 500 ms (domyślny próg też jest tej wielkości). */
+const DOUBLE_CLICK_MS = 500;
 const ACTIVE: ReadonlySet<TaskView['status']> = new Set(['queued', 'running', 'paused', 'waiting']);
 
 export interface SelectMods {
@@ -25,9 +27,10 @@ export class ExplorerController {
   private opening = false;
   private earlyPlaces: PlaceView[] | null = null;  // liczby Miejsc, które przyszły przed wynikiem otwarcia
   private freshTimer: ReturnType<typeof setTimeout> | undefined;
-  private clickTimer: ReturnType<typeof setTimeout> | undefined;
-  private pendingClick: { path: string; apply: () => void } | null = null;
+  private holdTimer: ReturnType<typeof setTimeout> | undefined;
   private lastClick: { path: string; selected: string[]; anchor: string | null } | null = null;
+  /** Ostatnia kopia: „Kopiuj bez tych plików” powtarza ją z dodatkowymi wyłączeniami. */
+  private lastCopy: { paths: string[]; dest: string; verify: boolean; exclude: string[]; clear: boolean } | null = null;
   private viewWrites: Promise<unknown> = Promise.resolve();
   private dismissedTasks = new Set<string>();
   private player: AudioPlayer | null = null;
@@ -71,13 +74,12 @@ export class ExplorerController {
       if (this.dismissedTasks.has(task.id)) return;
       const before = s.tasks.find((x) => x.id === task.id);
       s.tasks = before ? s.tasks.map((x) => (x.id === task.id ? task : x)) : [...s.tasks, task];
-      // skończone wgranie do oglądanego folderu: nowe pliki od razu na ekranie
-      if (task.kind === 'to_phone' && task.status === 'done' && before?.status !== 'done' && task.dest === s.path) {
-        void this.refresh();
-      }
+      // koniec wgrywania do oglądanego folderu: nowe pliki od razu na ekranie (też po anulowaniu w połowie)
+      const ended = !ACTIVE.has(task.status) && (!before || ACTIVE.has(before.status));
+      if (task.kind === 'to_phone' && ended && task.done_files > 0 && task.dest === s.path) void this.refresh();
     });
     on('explorer:drop', (d) => {
-      if (!s.open) return;
+      if (!s.open || this.app.screen !== 'explorer') return;  // sesja żyje też na Ustawieniach i Historii
       s.drop = { count: d.count, bytes: d.bytes, dropped: true };
       void this.uploadPaths(d.paths).finally(() => { s.drop = null; });
     });
@@ -182,7 +184,6 @@ export class ExplorerController {
   async go(path: string, refresh = false): Promise<void> {
     const s = this.state;
     if (!s.open) return;
-    this.cancelClick();
     const seq = ++this.seq;
     s.loading = true;
     let r: ExplorerListView | ApiError;
@@ -234,41 +235,35 @@ export class ExplorerController {
   }
 
   setView(view: ExplorerView): void {
-    this.cancelClick();
     this.state.view = view;
     this.app.settings = { ...this.app.settings, explorer_view: view };
     // Kolejne szybkie kliknięcia zapisują się w tej samej kolejności co wybory.
     this.viewWrites = this.viewWrites.then(() => this.request(() => this.api.save_settings({ explorer_view: view })));
   }
 
-  /** Zwykły klik czeka na rozstrzygnięcie gestu. Dwuklik nigdy nie zmienia zaznaczenia. */
+  /** Klik zaznacza od razu; dwuklik przywraca zaznaczenie sprzed pierwszego kliku (otwiera, nie zaznacza).
+   *  Pierwsze zaznaczenie wstrzymuje tylko pasek, żeby nie mignął przy dwukliku. */
   clickSelect(path: string, detail: number, mods: SelectMods = {}, order?: readonly string[]): void {
+    const s = this.state;
     if (detail > 1) {
-      this.cancelClick();
-      // Windows pozwala wydłużyć próg dwukliku ponad 500 ms. Odtwarzamy
-      // także wybór sprzed pierwszego kliku, jeśli jego timer już upłynął.
       if (this.lastClick?.path === path) {
-        this.state.selected.clear();
-        for (const p of this.lastClick.selected) this.state.selected.add(p);
-        this.state.anchor = this.lastClick.anchor;
+        s.selected.clear();
+        for (const p of this.lastClick.selected) s.selected.add(p);
+        s.anchor = this.lastClick.anchor;
       }
       this.lastClick = null;
       return;
     }
-    const previous = this.pendingClick;
-    this.cancelClick();
-    if (previous && previous.path !== path) previous.apply();
-    const before = { path, selected: [...this.state.selected], anchor: this.state.anchor };
+    const before = { path, selected: [...s.selected], anchor: s.anchor };
+    if (detail > 0 && !s.selected.size) this.holdBar();
+    this.select(path, mods, order);
     this.lastClick = before;
-    const apply = () => { this.select(path, mods, order); this.lastClick = before; };
-    if (detail === 0) { apply(); return; } // aktywacja dostępności / klawiatura
-    this.pendingClick = { path, apply };
-    this.clickTimer = setTimeout(() => { this.cancelClick(); apply(); }, 500);
   }
 
-  cancelClick(): void {
-    clearTimeout(this.clickTimer);
-    this.pendingClick = null;
+  private holdBar(): void {
+    clearTimeout(this.holdTimer);
+    this.state.barHeld = true;
+    this.holdTimer = setTimeout(() => { this.state.barHeld = false; }, DOUBLE_CLICK_MS);
   }
 
   /** Ta sama kolumna odwraca kierunek; nowa zaczyna od `SORT_START`. */
@@ -277,14 +272,18 @@ export class ExplorerController {
     s.sort = s.sort.key === key ? { key, dir: s.sort.dir === 1 ? -1 : 1 } : { key, dir: SORT_START[key] };
   }
 
+  /** Lista wyboru w siatce: `klucz:kierunek`. */
+  setSortTo(value: string): void {
+    const [key, dir] = value.split(':');
+    this.state.sort = { key: key as SortKey, dir: Number(dir) === 1 ? 1 : -1 };
+  }
+
   setFilter(filter: ExplorerFilter): void {
-    this.cancelClick();
     this.state.filter = filter;
     this.keepVisibleSelection();
   }
 
   setQuery(query: string): void {
-    this.cancelClick();
     this.state.query = query;
     this.keepVisibleSelection();
   }
@@ -293,7 +292,6 @@ export class ExplorerController {
    *  (z Ctrl dopisany do zaznaczenia). `order` — kolejność na ekranie, gdy inna niż `items`
    *  (galeria układa pliki po dniach). */
   select(path: string, mods: SelectMods = {}, order?: readonly string[]): void {
-    this.cancelClick();
     const s = this.state;
     const sel = s.selected;
     if (mods.shift && s.anchor) {
@@ -317,7 +315,6 @@ export class ExplorerController {
 
   /** Klik w nagłówek dnia: zaznacza pliki tego dnia, a gdy już są zaznaczone — odznacza. */
   selectDay(day: string): void {
-    this.cancelClick();
     const sel = this.state.selected;
     const group = days(this.items.filter((e) => e.kind === 'file'), new Date()).find((g) => g.key === day);
     if (!group) return;
@@ -330,19 +327,16 @@ export class ExplorerController {
 
   /** Zaznaczanie prostokątem; `additive` (Ctrl) — dopisuje do dotychczasowego. */
   selectRect(paths: string[], additive: boolean): void {
-    this.cancelClick();
     const sel = this.state.selected;
     if (!additive) sel.clear();
     for (const p of paths) sel.add(p);
   }
 
   selectAll(): void {
-    this.cancelClick();
     for (const e of this.items) this.state.selected.add(e.path);
   }
 
   clear(): void {
-    this.cancelClick();
     this.state.selected.clear();
     this.state.anchor = null;
   }
@@ -367,7 +361,6 @@ export class ExplorerController {
   }
 
   openPreview(path: string): void {
-    this.cancelClick();
     if (!this.state.entries.some((e) => e.path === path && e.kind === 'file')) return;
     this.state.preview = path;
     this.state.error = null;  // baner w podglądzie mówi tylko o jego własnych działaniach
@@ -406,7 +399,7 @@ export class ExplorerController {
     const path = s.preview;
     if (path === null || s.starting) return false;
     if (!s.dest && !(await this.pickDest())) return false;
-    return this.copy([path], s.dest!, false);
+    return this.copy({ paths: [path], dest: s.dest!, verify: false, exclude: [], clear: false });
   }
 
   private track(e: EntryView): PlayingTrack {
@@ -456,7 +449,8 @@ export class ExplorerController {
   async skipTrack(): Promise<void> {
     const next = this.nextTrack;
     if (!next) return;
-    if (this.state.preview !== null) this.openPreview(next.path);  // okno podglądu idzie za utworem
+    const s = this.state;
+    if (s.preview !== null && s.preview === s.playing?.path) this.openPreview(next.path);  // podgląd tego utworu idzie za nim
     await this.begin(next);
   }
 
@@ -485,20 +479,20 @@ export class ExplorerController {
     const paths = [...s.selected];
     if (!paths.length || s.starting) return;
     if (!s.dest && !(await this.pickDest())) return;
-    if (await this.copy(paths, s.dest!, verifyHash)) this.clear();
+    await this.copy({ paths, dest: s.dest!, verify: verifyHash, exclude: [], clear: true });
   }
 
   /** Wgranie plików i folderów z komputera do bieżącego folderu telefonu. */
-  async uploadPaths(paths: string[]): Promise<void> {
+  async uploadPaths(paths: string[], verifyHash = false): Promise<void> {
     const s = this.state;
     if (!paths.length || !s.open || s.locked) return;
-    await this.start('to_phone', () => this.api.explorer_upload(paths, s.path));
+    await this.start('to_phone', () => this.api.explorer_upload(paths, s.path, verifyHash));
   }
 
   /** „Wgraj tutaj”: systemowe okno wyboru plików albo folderu. */
-  async pickUpload(kind: 'files' | 'folder'): Promise<void> {
+  async pickUpload(kind: 'files' | 'folder', verifyHash = false): Promise<void> {
     const r = await this.request(() => this.api.explorer_pick_upload(kind));
-    if (r) await this.uploadPaths(r.paths);
+    if (r) await this.uploadPaths(r.paths, verifyHash);
   }
 
   /** Ctrl+V: pliki skopiowane w Eksploratorze Windows. */
@@ -523,6 +517,14 @@ export class ExplorerController {
     await this.request(() => this.api.explorer_cancel(id));
   }
 
+  /** „Ponów uszkodzone”: nieudane pliki zadania idą nowym zadaniem, stare podsumowanie znika. */
+  async retry(id: string): Promise<void> {
+    const r = await this.request(() => this.api.explorer_retry(id));
+    if (!r?.task) return;
+    this.dismissTask(id);
+    await this.loadTasks();
+  }
+
   /** „Otwórz folder” po kopii — folder na komputerze w Eksploratorze Windows. */
   async openFolder(task: TaskView): Promise<void> {
     await this.request(() => this.api.explorer_open_folder(task.dest));
@@ -543,10 +545,11 @@ export class ExplorerController {
     this.state.problems = null;
   }
 
-  /** Z okna problemów FAT32: odznacza pliki za duże dla pendrive'a (most podaje same nazwy). */
-  unselectNames(names: readonly string[]): void {
-    const wanted = new Set(names);
-    for (const p of [...this.state.selected]) if (wanted.has(p.split('/').pop()!)) this.state.selected.delete(p);
+  /** Z okna problemów: ta sama kopia bez plików, które się nie uda (działa też dla plików z zaznaczonego folderu). */
+  async copyWithout(paths: readonly string[]): Promise<void> {
+    const last = this.lastCopy;
+    this.state.problems = null;
+    if (last) await this.copy({ ...last, exclude: [...last.exclude, ...paths] });
   }
 
   /** Strefa upuszczania przy przeciąganiu nad oknem (przed upuszczeniem; samo wgranie — `explorer:drop`). */
@@ -587,8 +590,13 @@ export class ExplorerController {
     return null;
   }
 
-  private async copy(paths: string[], dest: string, verifyHash: boolean): Promise<boolean> {
-    return (await this.start('to_pc', () => this.api.explorer_copy(paths, dest, verifyHash))) !== null;
+  private async copy(job: NonNullable<typeof this.lastCopy>): Promise<boolean> {
+    this.lastCopy = job;
+    const { paths, dest, verify, exclude } = job;
+    const started = await this.start('to_pc', () => (exclude.length
+      ? this.api.explorer_copy(paths, dest, verify, exclude) : this.api.explorer_copy(paths, dest, verify)));
+    if (started !== null && job.clear) this.clear();
+    return started !== null;
   }
 
   /** Plan zadania w moście: problemy → okno (nic nie startuje), zadanie → pasek zadań. Id zadania albo null. */
@@ -606,8 +614,12 @@ export class ExplorerController {
       s.problems = { kind, list: r.problems };
       return null;
     }
-    // Nowe zadanie zastępuje stare potwierdzenia; kolejka aktywnych pozostaje.
-    for (const task of s.tasks) if (task.id !== r.task && !ACTIVE.has(task.status)) this.dismissTask(task.id);
+    // Nowe zadanie zastępuje stare potwierdzenia; kolejka aktywnych i podsumowania z problemami zostają.
+    for (const task of s.tasks) {
+      if (task.id !== r.task && !ACTIVE.has(task.status) && task.status !== 'failed' && !task.failed.length && !task.omitted) {
+        this.dismissTask(task.id);
+      }
+    }
     // Wynik zawiera tylko id. Pełne widoki przychodzą zdarzeniami; odczyt listy
     // wypełnia pasek także wtedy, gdy zdarzenie jeszcze czeka na wysłanie.
     await this.loadTasks();
@@ -664,8 +676,9 @@ export class ExplorerController {
 
   private reset(): void {
     const s = this.state;
-    this.cancelClick();
+    clearTimeout(this.holdTimer);
     this.lastClick = null;
+    this.lastCopy = null;
     this.dismissedTasks.clear();
     // sesji już nie ma (np. most zamknął ją sam): pytanie o anulowanie zadań nie ma sensu — wyjście idzie dalej
     if (this.leaveAnswer) this.answerLeave(true);
@@ -674,7 +687,7 @@ export class ExplorerController {
     s.selected.clear();
     this.markFresh([]);
     Object.assign(s, {
-      storage: null, problems: null, drop: null, starting: false, clipboardEmpty: false,
+      storage: null, problems: null, drop: null, starting: false, clipboardEmpty: false, barHeld: false,
       open: false, serial: null, device: null, places: [], recent: [], path: ROOT, crumbs: [], entries: [],
       locked: false, skipped: 0, loading: false, view: 'list', filter: 'all', query: '', anchor: null, tasks: [],
       offline: false, preview: null, playing: null, queue: [], playError: false, dest: null, leftovers: 0, media: '', error: null,

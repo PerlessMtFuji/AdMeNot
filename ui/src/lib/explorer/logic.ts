@@ -19,6 +19,8 @@ export interface DayGroup {
 
 export const FILTERS: readonly ExplorerFilter[] = ['all', 'image', 'video', 'doc', 'apk'];
 /** Pierwsze kliknięcie kolumny: nazwa rosnąco, data i rozmiar — najnowsze/największe na górze. */
+/** Wybór sortowania w siatce (lista sortuje nagłówkami kolumn). */
+export const SORTS = [['date', -1], ['date', 1], ['name', 1], ['name', -1], ['size', -1], ['size', 1]] as const;
 export const SORT_START: Record<SortKey, 1 | -1> = { name: 1, date: -1, size: -1 };
 
 // Te same listy co `explorer_present._TYPES` (most daje `type` dla plików telefonu; tu — dla plików z komputera).

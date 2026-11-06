@@ -9,6 +9,7 @@
   import { observeSize } from '../../lib/resize';
   import Banner from '../../ui/Banner.svelte';
   import Icon from '../../ui/Icon.svelte';
+  import FindBar from './FindBar.svelte';
 
   let { entry }: { entry: EntryView } = $props();
   let pdf = $state.raw<PDFDocumentProxy | null>(null);
@@ -22,10 +23,13 @@
   let current = $state(0);
   let failed = $state(false);
   let loading = $state(true);
-  let searchInput: HTMLInputElement;
   let canvas: HTMLCanvasElement;
   let textBox: HTMLDivElement;
   const hits = $derived(texts.flatMap((text, i) => findMatches(text, query, whole).map(m => ({ ...m, page: i + 1 }))));
+  /** Strona bieżącego trafienia: rośnie tylko przy zmianie trafienia, nie przy dalszym indeksowaniu pliku. */
+  const hitPage = $derived(hits[current]?.page ?? null);
+  /** Dekodery skanów (JBIG2, CCITT, JPEG 2000), mapy znaków CJK i czcionki bazowe; pliki kopiuje `vite.config.ts`. */
+  const assets = (dir: string) => new URL(`pdfjs/${dir}/`, document.baseURI).href;
 
   $effect(() => {
     const url = entry.url;
@@ -36,7 +40,8 @@
         const lib = await import('pdfjs-dist');
         if (stale) return;
         lib.GlobalWorkerOptions.workerSrc = workerUrl;
-        const task = lib.getDocument({ url: url!, useWasm: false });
+        const task = lib.getDocument({ url: url!, wasmUrl: assets('wasm'), cMapUrl: assets('cmaps'),
+          standardFontDataUrl: assets('standard_fonts'), iccUrl: assets('iccs') });
         destroy = () => task.destroy();
         const doc = await task.promise;
         if (stale) return;
@@ -60,7 +65,7 @@
     if (!doc || !canvas || !textBox) return;
     let stale = false;
     let cancel: (() => void) | undefined;
-    untrack(() => { layer = null; loading = true; });
+    untrack(() => { layer = null; loading = true; failed = false; });
     void (async () => {
       try {
         const lib = await import('pdfjs-dist');
@@ -90,8 +95,7 @@
     return () => { stale = true; cancel?.(); };
   });
 
-  $effect(() => { void query; void whole; current = 0; });
-  $effect(() => { const hit = hits[current]; if (hit) number = hit.page; });
+  $effect(() => { if (hitPage !== null) number = hitPage; });
   $effect(() => {
     if (!layer) return;
     const pageHits = findMatches(layer.textContentItemsStr.join(' '), query, whole);
@@ -119,26 +123,19 @@
     textBox.querySelector('.pdf-active')?.scrollIntoView?.({ block: 'center' });
   });
 
+  function search(q: string, w: boolean): void {
+    query = q;
+    whole = w;
+    current = 0;
+  }
   function step(delta: number): void { if (hits.length) current = (current + delta + hits.length) % hits.length; }
   function observe(node: HTMLElement) {
     return { destroy: observeSize(node, (size) => { width = size.width || 700; }) };
   }
-  function onkey(e: KeyboardEvent): void {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') { e.preventDefault(); searchInput?.focus(); searchInput?.select(); }
-  }
 </script>
 
-<svelte:window onkeydown={onkey} />
 <div class="absolute inset-0 flex flex-col gap-2 p-4" aria-label={t('explorer.preview.pdf_label')}>
-  <div class="flex flex-none flex-wrap items-center gap-2 text-xs text-white/80">
-    <input bind:this={searchInput} bind:value={query} type="search" aria-label={t('explorer.preview.find_label')}
-      placeholder={t('explorer.preview.find_placeholder')} class="min-w-0 flex-1 rounded-lg bg-white/10 px-3 py-2 outline-none focus:ring-2 focus:ring-accent"
-      onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); step(e.shiftKey ? -1 : 1); } if (e.key === 'Escape') { e.stopPropagation(); query = ''; } }} />
-    <label class="flex items-center gap-1"><input type="checkbox" bind:checked={whole} />{t('explorer.preview.find_whole')}</label>
-    <span role="status" aria-live="polite">{t('explorer.preview.find_count', { current: hits.length ? current + 1 : 0, total: hits.length })}</span>
-    <button type="button" disabled={!hits.length} onclick={() => step(-1)} aria-label={t('explorer.preview.find_prev')} class="rounded-lg bg-white/10 p-2 disabled:opacity-40"><Icon name="chevron-left" size={14} /></button>
-    <button type="button" disabled={!hits.length} onclick={() => step(1)} aria-label={t('explorer.preview.find_next')} class="rounded-lg bg-white/10 p-2 disabled:opacity-40"><Icon name="chevron-right" size={14} /></button>
-  </div>
+  <FindBar total={hits.length} {current} onsearch={search} onstep={step} />
   <div class="flex flex-none items-center gap-3 text-xs text-white/80">
     <button type="button" onclick={() => number--} disabled={number <= 1} aria-label={t('explorer.preview.pdf_prev')} class="rounded-lg bg-white/10 p-2 disabled:opacity-40"><Icon name="chevron-left" size={14} /></button>
     <label class="flex items-center gap-2">{t('explorer.preview.pdf_page')}<input type="number" min="1" max={pdf?.numPages ?? 1} value={number}

@@ -80,12 +80,11 @@
 
   /** Folder — wchodzi do niego, plik — otwiera podgląd. */
   function open(entry: EntryView): void {
-    ex.cancelClick();
     if (entry.kind === 'dir') void ex.go(entry.path);
     else ex.openPreview(entry.path);
   }
 
-  /** Klawiatura w liście: Enter wchodzi do folderu albo otwiera podgląd, Spacja przełącza zaznaczenie, strzałki przesuwają
+  /** Klawiatura w liście: Enter wchodzi do folderu albo otwiera podgląd, Spacja podgląda plik, Ctrl+Spacja przełącza zaznaczenie, strzałki przesuwają
    *  zaznaczenie (z Shift — zakres). */
   function onkey(e: KeyboardEvent, entry: EntryView, i: number): void {
     if (e.key === 'Enter') {
@@ -93,7 +92,8 @@
       open(entry);
     } else if (e.key === ' ') {
       e.preventDefault();
-      ex.select(entry.path, { ctrl: true });
+      if (entry.kind === 'file' && !e.ctrlKey) open(entry);
+      else ex.select(entry.path, { ctrl: true });
     } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       const next = items[i + (e.key === 'ArrowDown' ? 1 : -1)];
