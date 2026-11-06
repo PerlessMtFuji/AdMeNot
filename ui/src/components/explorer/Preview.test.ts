@@ -157,7 +157,7 @@ describe('Preview', () => {
     ex.openPreview(pdf.path);
     await tick();
     expect(within(dialog()).getByRole('searchbox', { name: 'Szukaj w treści' })).toBeTruthy();
-    expect(dialog().querySelector('canvas')?.getAttribute('aria-label')).toBe('Podgląd PDF');
+    expect(dialog().querySelector('[aria-label="Podgląd PDF"]')).toBeTruthy();
   });
 
   test('video dimensions decoded by the player fill in an empty MediaStore reply', async () => {

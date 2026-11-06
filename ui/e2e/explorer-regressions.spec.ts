@@ -44,11 +44,11 @@ test('PDF renders, searches all pages, highlights matches and handles page/zoom 
     ex.openPreview(entry.path);
   });
   const dialog = page.getByRole('dialog');
-  await expect(dialog.locator('.textLayer')).toContainText('alpha beta alpha');
+  await expect(dialog.locator('[data-page="1"] .textLayer')).toContainText('alpha beta alpha');
   const search = dialog.getByRole('searchbox', { name: 'Szukaj w treści' });
   await search.fill('alpha');
   await expect(dialog.getByRole('status').filter({ hasText: '1 z 3' })).toBeVisible();
-  await expect(dialog.locator('mark')).toHaveCount(2);
+  await expect(dialog.locator('[data-page="1"] mark')).toHaveCount(2);
   await dialog.getByRole('button', { name: 'Następne trafienie' }).click();
   await dialog.getByRole('button', { name: 'Następne trafienie' }).click();
   await expect(dialog.getByRole('spinbutton', { name: 'Strona' })).toHaveValue('2');
@@ -56,10 +56,53 @@ test('PDF renders, searches all pages, highlights matches and handles page/zoom 
   await search.fill('gamma');
   await expect(dialog.getByRole('status').filter({ hasText: '1 z 1' })).toBeVisible();
   await dialog.getByRole('button', { name: 'Powiększ PDF' }).click();
-  await expect(dialog.locator('.textLayer')).toContainText('gamma alpha');
+  await expect(dialog.locator('[data-page="2"] .textLayer')).toContainText('gamma alpha');
   await search.fill('absent');
   await expect(dialog.getByRole('status').filter({ hasText: '0 z 0' })).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+async function openPdf(page: import('@playwright/test').Page) {
+  await page.route('http://127.0.0.1:4173/test-search.pdf', route => route.fulfill({
+    body: readFileSync(new URL('./fixtures/search.pdf', import.meta.url)),
+    contentType: 'application/pdf', headers: { 'Access-Control-Allow-Origin': '*' },
+  }));
+  await page.goto('/?scenario=explorer');
+  await page.getByRole('button', { name: 'Pliki', exact: true }).click();
+  await page.evaluate(() => {
+    const ex = (window as any).__admenot.ctl.explorer;
+    const entry = { ...ex.state.entries[0], path: '/sdcard/search.pdf', name: 'search.pdf', kind: 'file',
+      type: 'doc', ext: 'pdf', url: 'http://127.0.0.1:4173/test-search.pdf', thumb: null };
+    ex.state.entries.push(entry);
+    ex.openPreview(entry.path);
+  });
+  const dialog = page.getByRole('dialog');
+  await dialog.locator('[data-page="1"] canvas').waitFor();
+  return dialog;
+}
+
+test('PDF: the wheel scrolls through the pages and the page number follows', async ({ page }) => {
+  const dialog = await openPdf(page);
+  const scroller = dialog.locator('[data-pdf-scroll]');
+  await scroller.hover();
+  const pageBox = dialog.getByRole('spinbutton', { name: 'Strona' });
+  await expect(pageBox).toHaveValue('1');
+  for (let i = 0; i < 40; i++) await page.mouse.wheel(0, 300);
+  await expect(pageBox).toHaveValue('2');
+  await expect(dialog.locator('[data-page="2"] canvas')).toBeVisible();
+});
+
+test('PDF: Ctrl+wheel zooms the document, not the program', async ({ page }) => {
+  const dialog = await openPdf(page);
+  await dialog.locator('[data-pdf-scroll]').hover();
+  const width = () => dialog.locator('[data-page="1"]').evaluate((el) => el.getBoundingClientRect().width);
+  const before = await width();
+  await page.keyboard.down('Control');
+  await page.mouse.wheel(0, -200);
+  await page.keyboard.up('Control');
+  await expect.poll(width).toBeGreaterThan(before);
+  await expect(dialog.getByText('110%')).toBeVisible();
+  expect(await page.evaluate(() => window.visualViewport!.scale)).toBe(1);
 });
 
 test('view choice survives folder navigation', async ({ page }) => {
