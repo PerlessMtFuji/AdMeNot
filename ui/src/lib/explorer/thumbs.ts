@@ -2,8 +2,8 @@
 // i pamięcią podręczną adresów `blob:` (zwalnianych przy wypadaniu z pamięci).
 import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
-/** Ile miniatur trzymamy w pamięci (ok. 400 × 20 KB). */
-export const THUMB_CACHE = 400;
+/** Ile miniatur trzymamy w pamięci (ok. 1500 × 20 KB). */
+export const THUMB_CACHE = 1500;
 /** Najdłużej czekamy na klatkę filmu — zawieszony strumień nie może blokować miejsca w kolejce. */
 const VIDEO_TIMEOUT_MS = 15_000;
 /** Szerokość klatki filmu na kaflu (miniatury zdjęć z serwera mają 256 px). */
@@ -208,6 +208,11 @@ export function videoFrame(url: string, signal: AbortSignal): Promise<Fetched> {
       fail(permanent ? new ThumbDecodeError('video codec') : new Error('video network'));
     });
     video.addEventListener('loadedmetadata', () => {
+      // dźwięk jest, a obrazu okno nie zdekoduje (np. MPEG-4 Part 2): lepsza ikona niż czarny kafel
+      if (!video.videoWidth) {
+        fail(new ThumbDecodeError('no picture'));
+        return;
+      }
       // pierwsza klatka bywa czarna — bierzemy chwilę dalej, ale nie poza krótki film
       video.currentTime = Math.min(1, (video.duration || 0) / 4);
     });

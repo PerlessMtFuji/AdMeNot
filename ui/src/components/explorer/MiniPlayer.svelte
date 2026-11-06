@@ -53,6 +53,8 @@
 {#if playing}
   <section aria-label={t('explorer.mini.label')} transition:fly={{ y: 24, duration: ms(DUR.enter) }}
     class="relative flex flex-none items-center gap-3 overflow-hidden rounded-2xl card px-3 py-2">
+    <button type="button" onclick={() => ex.openPlaying()} aria-label={t('explorer.mini.open')} title={t('explorer.mini.open')}
+      class="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left transition duration-150 hover:brightness-110">
     <div class="relative h-10 w-10 flex-none">
       <span aria-hidden="true" class="breathe absolute -inset-2 rounded-full opacity-60 blur-[14px]" class:running={!paused}
         style:background={color}></span>
@@ -63,6 +65,7 @@
       </span>
     </div>
     <b class="min-w-0 flex-1 truncate text-sm text-ink">{playing.title}</b>
+    </button>
     {#if ex.state.playError}
       <span role="alert" class="flex flex-none items-center gap-1.5 text-xs font-semibold text-bad">
         <Icon name="triangle-alert" size={14} />{t('explorer.mini.error')}

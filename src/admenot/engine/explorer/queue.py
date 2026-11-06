@@ -83,6 +83,7 @@ PROGRESS_MIN = 16 * 1024 * 1024  # od tego rozmiaru wgrywany plik pokazuje post�
 PROGRESS_INTERVAL = 1.0  # s między odczytami rozmiaru pliku tymczasowego na telefonie
 _HASH_POLL = 0.1  # s między sprawdzeniami pauzy/anulowania w czasie liczenia sumy
 _HASH_CHUNK = 1024 * 1024
+_MAX_TARGETS = 500  # tyle miejsc docelowych zadania zna UI; większe zadanie „Pokaż” zaznaczy częściowo
 _COMMIT_TRIES = 50  # kolejne nazwy obok, gdy cel ciągle się pojawia
 _CONNECTION_KINDS = frozenset({"offline", "no_device", "unauthorized", "adb_missing"})
 _DENIED = ("permission denied", "read-only file system")
@@ -111,6 +112,7 @@ class TaskState:
     verified: Literal["size", "hash", "mismatch"] | None
     dest: str  # folder docelowy (na PC albo na telefonie)
     omitted: int = 0  # pozycje, których plan nie mógł odczytać: nie zostały skopiowane
+    targets: list[str] = field(default_factory=list)  # (na telefon) gdzie trafiły pliki: „Pokaż” je wskazuje
 
 
 # ---------------------------------------------------------------------------------------------
@@ -494,7 +496,7 @@ class TransferQueue:
             task.stop = reason
 
     def _snapshot(self, task: _Task) -> TaskState:
-        st = replace(task.state, failed=list(task.state.failed))
+        st = replace(task.state, failed=list(task.state.failed), targets=list(task.state.targets))
         if task.inflight:  # postęp dużego pliku pobieranego na komputer
             extra = 0
             for idx, part in list(task.inflight.items()):
@@ -708,6 +710,7 @@ class TransferQueue:
             if kind == "skipped":
                 task.status[idx] = "skipped"
                 st.skipped += 1
+                self._note_target(task, item.dst)
                 st.total_files -= 1
                 st.total_bytes -= item.size
             elif kind == "failed":
@@ -722,7 +725,14 @@ class TransferQueue:
                 st.done_bytes += item.size
                 if result[1] == "1":
                     st.renamed += 1
+                if len(result) > 2:
+                    self._note_target(task, result[2])
             self._emit(task)
+
+    @staticmethod
+    def _note_target(task: _Task, path: str) -> None:
+        if task.plan.kind == "to_phone" and len(task.state.targets) < _MAX_TARGETS:
+            task.state.targets.append(path)
 
     def _taken(self, task: _Task, folder: str, existing: Iterable[str]) -> set[str]:
         with self._lock:
@@ -938,7 +948,7 @@ class TransferQueue:
                     if _is_media(target):
                         with self._lock:
                             task.media.append(target)
-                    return ("done", "1" if renamed else "0")
+                    return ("done", "1" if renamed else "0", target)
                 # cel pojawił się w trakcie: `mv -n` zostawił oba pliki — nazwa obok
                 target = self._phone_side(task, folder, name)
                 renamed = True
@@ -1069,7 +1079,7 @@ class TransferQueue:
                         with self._lock:
                             task.media.append(target)
                     item = task.plan.items[idx]
-                    self._settle(task, idx, item, ("done", "1" if target != item.dst else "0"))
+                    self._settle(task, idx, item, ("done", "1" if target != item.dst else "0", target))
                     continue
             if not self._rm_tmp(task, tmp) and strict:
                 if not self._online():

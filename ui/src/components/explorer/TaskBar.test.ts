@@ -11,7 +11,7 @@ const DEST = 'D:\\Serwis\\Kowalska';
 function task(over: Partial<TaskView> = {}): TaskView {
   return { id: 's1t1', kind: 'to_pc', status: 'running', done_files: 3, total_files: 10, done_bytes: 3 * 1024 * 1024,
     total_bytes: 10 * 1024 * 1024, speed: 2 * 1024 * 1024, eta_s: 150, skipped: 0, renamed: 0, failed: [], verified: null,
-    dest: DEST, omitted: 0, ...over };
+    dest: DEST, omitted: 0, targets: [], ...over };
 }
 
 async function setup() {

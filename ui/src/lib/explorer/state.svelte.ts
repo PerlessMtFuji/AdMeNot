@@ -32,6 +32,10 @@ export class ExplorerState {
   selected = new SvelteSet<string>();
   /** Pierwszy klik mógł być początkiem dwukliku: pasek zaznaczenia jeszcze czeka. */
   barHeld = $state(false);
+  /** Pozycja pod kursorem: Spacja otwiera ją bez klikania. */
+  hover = $state<string | null>(null);
+  /** Lista ma się przewinąć do tej pozycji („Pokaż” po wgraniu). */
+  reveal = $state<string | null>(null);
   /** Kotwica zaznaczenia zakresem (Shift+klik). */
   anchor = $state<string | null>(null);
   /** Zadania kolejki; raw — zdarzenia podmieniają je w całości, bez głębokich proxy. */

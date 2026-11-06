@@ -862,3 +862,19 @@ def test_retry_of_task_without_failures_does_nothing(phone, adb, pc, make_queue)
     tid = q.add(plan_to_pc(adb, ["/sdcard/a.bin"], pc, **OK))
     q.wait_for(tid, "done")
     assert q.retry(tid) is None
+
+
+def test_finished_upload_lists_where_the_files_landed(phone, adb, tmp_path, make_queue):
+    src = tmp_path / "src"
+    local_tree(src, {"a.bin": b"new", "b.bin": b"same"})
+    put(phone, "/sdcard/Up/b.bin", b"same")
+    plan = plan_to_phone(adb, [src / "a.bin", src / "b.bin"], "/sdcard/Up")
+    q = make_queue()
+    st = q.wait_for(q.add(plan), "done")
+    assert sorted(st.targets) == ["/sdcard/Up/a.bin", "/sdcard/Up/b.bin"]  # także pominięty identyczny: „Pokaż” go wskaże
+
+
+def test_copy_to_pc_lists_no_phone_targets(phone, adb, pc, make_queue):
+    put(phone, "/sdcard/a.bin", b"x")
+    q = make_queue()
+    assert q.wait_for(q.add(plan_to_pc(adb, ["/sdcard/a.bin"], pc, **OK)), "done").targets == []

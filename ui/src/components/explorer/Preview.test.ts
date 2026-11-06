@@ -82,6 +82,17 @@ describe('Preview', () => {
     expect(pause).toHaveBeenCalled();
   });
 
+  test('a video whose picture cannot be decoded says so and keeps the sound', async () => {
+    const { ex } = await openExplorer();
+    const movie = entry('stary.mp4', 'video', 'mp4');
+    ex.state.entries = [...ex.state.entries, movie];
+    ex.openPreview(movie.path);
+    await tick();
+    await fireEvent.loadedMetadata(dialog().querySelector('video')!);  // videoWidth 0: kodek obrazu nieobsługiwany
+    expect(dialog().textContent).toContain('Dźwięk gra dalej');
+    expect(dialog().querySelector('video')).toBeTruthy();
+  });
+
   test('a track without a cover shows the note instead of a broken image', async () => {
     const { ex } = await openExplorer();
     const song = { ...entry('bez-okladki.mp3', 'audio', 'mp3'), thumb: 'http://127.0.0.1:1/thumb' };

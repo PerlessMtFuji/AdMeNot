@@ -78,22 +78,34 @@
     box.querySelector<HTMLElement>(`[data-path="${CSS.escape(path)}"]`)?.focus();
   }
 
+  $effect(() => {
+    const path = s.reveal;
+    if (!path) return;
+    s.reveal = null;
+    void reveal(path);
+  });
+
+  /** Spacja na ekranie: plik pod kursorem albo z fokusem. */
+  export function openPath(path: string): void {
+    const entry = items.find((e) => e.path === path);
+    if (entry) open(entry);
+  }
+
   /** Folder — wchodzi do niego, plik — otwiera podgląd. */
   function open(entry: EntryView): void {
     if (entry.kind === 'dir') void ex.go(entry.path);
     else ex.openPreview(entry.path);
   }
 
-  /** Klawiatura w liście: Enter wchodzi do folderu albo otwiera podgląd, Spacja podgląda plik, Ctrl+Spacja przełącza zaznaczenie, strzałki przesuwają
+  /** Klawiatura w liście: Enter wchodzi do folderu albo otwiera podgląd, Ctrl+Spacja przełącza zaznaczenie (samą Spację obsługuje ekran), strzałki przesuwają
    *  zaznaczenie (z Shift — zakres). */
   function onkey(e: KeyboardEvent, entry: EntryView, i: number): void {
     if (e.key === 'Enter') {
       e.preventDefault();
       open(entry);
-    } else if (e.key === ' ') {
+    } else if (e.key === ' ' && e.ctrlKey) {
       e.preventDefault();
-      if (entry.kind === 'file' && !e.ctrlKey) open(entry);
-      else ex.select(entry.path, { ctrl: true });
+      ex.select(entry.path, { ctrl: true });
     } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       const next = items[i + (e.key === 'ArrowDown' ? 1 : -1)];
@@ -125,7 +137,7 @@
     {@attach viewport((v) => (vp = v))}
     onfocusin={(ev) => { const p = (ev.target as HTMLElement).dataset?.path; if (p) focusPath = p; }}
     class="scroll-fade min-h-0 flex-1 overflow-y-auto outline-none">
-    <div class="relative" style:height="{items.length * ROW_H + 2 * PAD_Y}px">
+    <div class="relative" style:height="calc({items.length * ROW_H + 2 * PAD_Y}px + var(--dock-h, 0px))">
       {#each rendered as i (items[i].path)}
         {@const e = items[i]}
         {@const sel = s.selected.has(e.path)}
@@ -134,6 +146,7 @@
           onclick={(ev) => ex.clickSelect(e.path, ev.detail, { ctrl: ev.ctrlKey || ev.metaKey, shift: ev.shiftKey })}
           ondblclick={() => open(e)}
           onkeydown={(ev) => onkey(ev, e, i)}
+          onmouseenter={() => (s.hover = e.path)} onmouseleave={() => { if (s.hover === e.path) s.hover = null; }}
           style:top="{PAD_Y + i * ROW_H}px" style:height="{ROW_H}px"
           class="group {COLS} absolute inset-x-0 cursor-default rounded-xl px-3 select-none transition-colors duration-150
             {sel ? 'bg-accent-soft shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--color-accent)_35%,transparent)]'

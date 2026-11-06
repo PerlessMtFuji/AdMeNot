@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { type Fetched, THUMB_CACHE, ThumbDecodeError, ThumbQueue } from './thumbs';
+import { type Fetched, THUMB_CACHE, ThumbDecodeError, ThumbQueue, videoFrame } from './thumbs';
 
 /** Atrapa pobierania: każde wywołanie czeka, aż test je rozstrzygnie. */
 function deferredFetcher() {
@@ -125,14 +125,14 @@ describe('ThumbQueue', () => {
     expect(q.failed('u')).toBe(true);
   });
 
-  test('the cache keeps 400 thumbnails and revokes the object URL of the one that falls out', async () => {
+  test('the cache keeps 1500 thumbnails and revokes the object URL of the one that falls out', async () => {
     const fetcher = async () => ({ blob: blob(), color: '#abcdef' });
     const q = new ThumbQueue(fetcher);
     for (let i = 0; i <= THUMB_CACHE; i++) {
       q.want(`u${i}`, 0);
       await flush();
     }
-    expect(THUMB_CACHE).toBe(400);
+    expect(THUMB_CACHE).toBe(1500);
     expect(revoked).toEqual(['blob:1']);
     expect(q.get('u0')).toBeNull();
     expect(q.get(`u${THUMB_CACHE}`)?.src).toBe(`blob:${THUMB_CACHE + 1}`);
@@ -153,4 +153,18 @@ describe('ThumbQueue', () => {
     expect(q.get('keep')).not.toBeNull();
     expect(q.get('u0')).toBeNull();
   });
+});
+
+test('a video without a decodable picture gets the icon for good, no black tile', async () => {
+  const real = document.createElement.bind(document);
+  let video!: HTMLVideoElement;
+  const spy = vi.spyOn(document, 'createElement').mockImplementation((name: string) => {
+    const el = real(name);
+    if (name === 'video') video = el as HTMLVideoElement;
+    return el;
+  });
+  const frame = videoFrame('http://127.0.0.1:1/f', new AbortController().signal);
+  spy.mockRestore();
+  video.dispatchEvent(new Event('loadedmetadata'));
+  await expect(frame).rejects.toBeInstanceOf(ThumbDecodeError);
 });

@@ -134,6 +134,7 @@
       "find_label": "Szukaj w treści", "find_placeholder": "Szukaj w treści… (Ctrl+F)", "find_whole": "Całe wyrazy",
       "find_count": "{current} z {total}", "find_count_many": "{current} z {total}+", "find_prev": "Poprzednie trafienie", "find_next": "Następne trafienie",
       "find_partial": "Szukanie obejmuje wczytaną część pliku.", "find_load_all": "Wczytaj całość",
+      "no_picture": "Tego obrazu okno programu nie pokaże: film używa nieobsługiwanego kodeka. Dźwięk gra dalej, a obraz zobaczysz po skopiowaniu pliku na komputer.",
       "text_limit": "Podgląd obejmuje pierwsze {size}. Resztę obejrzysz po skopiowaniu pliku na komputer.",
       "label": "Podgląd pliku {name}",
       "close": "Zamknij podgląd",
@@ -171,7 +172,7 @@
         "width": "Szerokość", "height": "Wysokość", "alt": "Wysokość n.p.m."
       }
     },
-    "mini": { "label": "Mini odtwarzacz", "stop": "Zatrzymaj i zamknij", "error": "Nie udało się odtworzyć" },
+    "mini": { "open": "Otwórz odtwarzacz", "label": "Mini odtwarzacz", "stop": "Zatrzymaj i zamknij", "error": "Nie udało się odtworzyć" },
     "day": { "today": "Dziś · {date}", "yesterday": "Wczoraj" },
     "gallery": {
       "folders": "Foldery",

@@ -6,6 +6,7 @@
   import { reducedMotion } from '../../lib/motion';
   import type { EntryMeta, EntryView } from '../../lib/types';
   import Icon from '../../ui/Icon.svelte';
+  import FileIcon from './FileIcon.svelte';
 
   /** Film (`<video>`, poświata z bieżącej klatki) albo muzyka (okładka, wspólny odtwarzacz z mini-odtwarzaczem). */
   type Props = { ex: ExplorerController; entry: EntryView; meta: EntryMeta | null; thumbs: ThumbQueue; onfail: () => void;
@@ -41,7 +42,10 @@
     length = el ? el.duration : 0;
     buffered = el && el.buffered.length ? el.buffered.end(el.buffered.length - 1) : 0;
   }
+  /** Kodek obrazu, którego okno nie obsługuje (np. MPEG-4 Part 2): dźwięk gra, obrazu nie ma. */
+  let noPicture = $state(false);
   function loaded(): void {
+    noPicture = !!video && !video.videoWidth;
     if (!video || !video.videoWidth || !video.videoHeight) return;
     onmetadata?.({ width: video.videoWidth, height: video.videoHeight,
       ...(Number.isFinite(video.duration) ? { duration: video.duration * 1000 } : {}) });
@@ -112,6 +116,12 @@
     <div class="absolute inset-0 bottom-[110px]">
       <video bind:this={video} src={entry.url} preload="metadata" playsinline autoplay onerror={onfail} onloadedmetadata={loaded}
         onclick={toggle} class="absolute inset-0 h-full w-full cursor-pointer object-contain"></video>
+      {#if noPicture}
+        <div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center">
+          <FileIcon kind="file" type="video" ext={entry.ext} size={96} />
+          <p class="max-w-md text-sm text-white/80">{t('explorer.preview.no_picture')}</p>
+        </div>
+      {/if}
     </div>
   {:else}
     <div class="relative mb-24 grid place-items-center">

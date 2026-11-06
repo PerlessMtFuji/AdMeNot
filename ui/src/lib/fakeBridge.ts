@@ -120,7 +120,7 @@ export function createFakeBridge(name: string,
   const tasks: TaskView[] = [];
   const fakeTask = (kind: TaskView['kind'], dest: string): TaskView => ({
     id: `s1t${++taskSeq}`, kind, status: 'queued', done_files: 0, total_files: 2, done_bytes: 0, total_bytes: 2048,
-    speed: 0, eta_s: null, skipped: 0, renamed: 0, failed: [], verified: null, dest, omitted: 0 });
+    speed: 0, eta_s: null, skipped: 0, renamed: 0, failed: [], verified: null, dest, omitted: 0, targets: [] });
   const answers = new Map<string, unknown>();
   const SHOT_IMAGE = 'data:image/svg+xml,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="200"><rect width="90" height="200" rx="8" fill="#1f2937"/>'

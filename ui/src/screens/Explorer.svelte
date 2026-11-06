@@ -19,6 +19,7 @@
   import { ERROR_KEYS, i18n, t, tp } from '../lib/i18n/index.svelte';
   import { enter } from '../lib/motion';
   import { zoomRun, zoomSnapshot } from '../lib/explorer/zoom';
+  import { observeSize } from '../lib/resize';
   import Banner from '../ui/Banner.svelte';
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
@@ -101,12 +102,32 @@
     } else if (mod && e.key.toLowerCase() === 'v') {
       e.preventDefault();
       void ex.paste();
+    } else if (e.key === ' ' && !mod) {
+      spaceOpen(e, el);
     } else if (e.key === 'Escape') {
       ex.clear();
     } else if (e.key === 'F5') {
       e.preventDefault();
       void ex.refresh();
     }
+  }
+
+  let list = $state<{ openPath(path: string): void }>();
+
+  /** Spacja jak w podglądzie macOS: plik pod kursorem, a bez kursora nad listą — ten z fokusem. */
+  function spaceOpen(e: KeyboardEvent, el: Element | null): void {
+    const focused = el?.closest<HTMLElement>('[data-path]')?.dataset.path ?? null;
+    const path = s.hover ?? focused;
+    if (!path || (!s.hover && el?.closest('button, a'))) return;
+    e.preventDefault();
+    const entry = s.entries.find((x) => x.path === path);
+    if (entry?.kind === 'file') list?.openPath(path);
+    else if (entry) ex.select(path, { ctrl: true });
+  }
+
+  /** Wysokość pasków na dole: tyle dodatkowego miejsca dostaje lista, żeby dało się dojść do jej końca. */
+  function dock(node: HTMLElement) {
+    return observeSize(node, ({ height }) => section?.style.setProperty('--dock-h', `${height ? height + 16 : 0}px`));
   }
 
   let creating = $state<'folder' | 'text' | null>(null);
@@ -200,27 +221,6 @@
     </Menu>
   </div>
 
-  {#if s.offline}
-    <Banner tone="warn" icon="wifi-off" title={t('explorer.offline.title')}>{t('explorer.offline.text')}</Banner>
-  {/if}
-  {#if s.error}
-    <Banner tone="bad" icon="triangle-alert" title={errorText}>
-      {#snippet actions()}<Button size="sm" variant="ghost" onclick={() => (s.error = null)}>{t('common.close')}</Button>{/snippet}
-    </Banner>
-  {/if}
-  {#if s.clipboardEmpty}
-    <Banner tone="info" icon="info">
-      {t('explorer.clipboard_empty')}
-      {#snippet actions()}<Button size="sm" variant="ghost" onclick={() => ex.dismissClipboard()}>{t('common.close')}</Button>{/snippet}
-    </Banner>
-  {/if}
-  {#if s.leftovers > 0}
-    <Banner tone="ok" icon="check">
-      {tp('explorer.leftovers', s.leftovers)}
-      {#snippet actions()}<Button size="sm" variant="ghost" onclick={() => ex.dismissLeftovers()}>{t('common.close')}</Button>{/snippet}
-    </Banner>
-  {/if}
-
   <div class="flex min-h-0 flex-1 gap-3.5">
     <Places places={s.places} recent={s.recent} path={s.path} storage={s.storage} ongo={(p) => ex.go(p)} />
     <section bind:this={section} aria-label={folderName} onpointerdown={remember}
@@ -230,9 +230,9 @@
           <EmptyState kind="locked" />
         {:else}
           {#if s.view === 'grid'}
-            <Gallery {ex} {items} {now} {thumbs} />
+            <Gallery bind:this={list} {ex} {items} {now} {thumbs} />
           {:else}
-            <FileList {ex} {items} {now} />
+            <FileList bind:this={list} {ex} {items} {now} />
           {/if}
           {#if !items.length && !s.loading}
             <div class="pointer-events-none absolute inset-0 grid place-items-center">
@@ -243,12 +243,36 @@
         {/if}
       </div>
       {#if s.drop}<DropZone drop={s.drop} folder={folderName} free={s.storage?.free ?? null} />{/if}
+      <!-- Komunikaty i paski leżą nad plikami: Miejsca i obszar plików nie zmieniają przez nie rozmiaru. -->
+      <div class="pointer-events-none absolute inset-x-2 top-2 z-20 flex flex-col gap-2 *:pointer-events-auto">
+      {#if s.offline}
+        <Banner tone="warn" icon="wifi-off" title={t('explorer.offline.title')}>{t('explorer.offline.text')}</Banner>
+      {/if}
+      {#if s.error}
+        <Banner tone="bad" icon="triangle-alert" title={errorText}>
+          {#snippet actions()}<Button size="sm" variant="ghost" onclick={() => (s.error = null)}>{t('common.close')}</Button>{/snippet}
+        </Banner>
+      {/if}
+      {#if s.clipboardEmpty}
+        <Banner tone="info" icon="info">
+          {t('explorer.clipboard_empty')}
+          {#snippet actions()}<Button size="sm" variant="ghost" onclick={() => ex.dismissClipboard()}>{t('common.close')}</Button>{/snippet}
+        </Banner>
+      {/if}
+      {#if s.leftovers > 0}
+        <Banner tone="ok" icon="check">
+          {tp('explorer.leftovers', s.leftovers)}
+          {#snippet actions()}<Button size="sm" variant="ghost" onclick={() => ex.dismissLeftovers()}>{t('common.close')}</Button>{/snippet}
+        </Banner>
+      {/if}
+      </div>
+      <div {@attach dock} class="pointer-events-none absolute inset-x-2 bottom-2 z-20 flex flex-col gap-2 *:pointer-events-auto *:shadow-[0_10px_28px_-10px_rgb(0_0_0/.45)]">
+        <SelectionBar {ex} />
+        <MiniPlayer {ex} {thumbs} />
+        <TaskBar {ex} />
+      </div>
     </section>
   </div>
-
-  <SelectionBar {ex} />
-  <MiniPlayer {ex} {thumbs} />
-  <TaskBar {ex} />
 </main>
 
 {#if creating}

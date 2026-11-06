@@ -134,6 +134,7 @@
       "find_label": "Find in text", "find_placeholder": "Find in text… (Ctrl+F)", "find_whole": "Whole words",
       "find_count": "{current} of {total}", "find_count_many": "{current} of {total}+", "find_prev": "Previous match", "find_next": "Next match",
       "find_partial": "Search covers the loaded part of the file.", "find_load_all": "Load entire file",
+      "no_picture": "The program window cannot show this picture: the video uses an unsupported codec. The sound keeps playing; copy the file to the computer to see the picture.",
       "text_limit": "The preview covers the first {size}. Copy the file to the computer to see the rest.",
       "label": "Preview of {name}",
       "close": "Close preview",
@@ -171,7 +172,7 @@
         "width": "Width", "height": "Height", "alt": "Altitude"
       }
     },
-    "mini": { "label": "Mini player", "stop": "Stop and close", "error": "Playback failed" },
+    "mini": { "open": "Open the player", "label": "Mini player", "stop": "Stop and close", "error": "Playback failed" },
     "day": { "today": "Today · {date}", "yesterday": "Yesterday" },
     "gallery": {
       "folders": "Folders",

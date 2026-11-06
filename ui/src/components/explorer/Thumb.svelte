@@ -43,10 +43,11 @@
       <span class="w-full truncate text-center text-2xs font-semibold text-ink">{entry.label ?? entry.name}</span>
     </div>
   {/if}
-  {#if entry.type === 'video' && !noThumb}
+  {#if (entry.type === 'video' || entry.type === 'audio') && !noThumb}
     <span class="absolute inset-0 grid place-items-center text-white">
       <span class="grid h-9 w-9 place-items-center rounded-full bg-black/35 shadow-[inset_0_0_0_1px_rgb(255_255_255/.35)] backdrop-blur-sm">
-        <Icon name="play" size={16} strokeWidth={2.6} class="translate-x-px fill-current" />
+        <Icon name={entry.type === 'audio' ? 'music' : 'play'} size={16} strokeWidth={2.6}
+          class={entry.type === 'audio' ? '' : 'translate-x-px fill-current'} />
       </span>
     </span>
     {#if thumb?.duration && Number.isFinite(thumb.duration)}

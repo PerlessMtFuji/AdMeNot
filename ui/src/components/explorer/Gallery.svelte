@@ -149,22 +149,34 @@
     box.querySelector<HTMLElement>(`[data-path="${CSS.escape(path)}"]`)?.focus();
   }
 
+  $effect(() => {
+    const path = s.reveal;
+    if (!path) return;
+    s.reveal = null;
+    void reveal(path);
+  });
+
+  /** Spacja na ekranie: plik pod kursorem albo z fokusem. */
+  export function openPath(path: string): void {
+    const entry = items.find((e) => e.path === path);
+    if (entry) open(entry);
+  }
+
   /** Folder — wchodzi do niego, plik — otwiera podgląd (zdjęcie rośnie z kafla). */
   function open(e: EntryView): void {
     if (e.kind === 'dir') void ex.go(e.path);
     else void openMorph(e.path, () => ex.openPreview(e.path));
   }
 
-  /** Klawiatura w siatce: Enter wchodzi do folderu albo otwiera podgląd, Spacja podgląda plik, Ctrl+Spacja przełącza zaznaczenie, strzałki przesuwają
+  /** Klawiatura w siatce: Enter wchodzi do folderu albo otwiera podgląd, Ctrl+Spacja przełącza zaznaczenie (samą Spację obsługuje ekran), strzałki przesuwają
    *  (z Shift — zakres). */
   function onkey(ev: KeyboardEvent, e: EntryView, i: number): void {
     if (ev.key === 'Enter') {
       ev.preventDefault();
       open(e);
-    } else if (ev.key === ' ') {
+    } else if (ev.key === ' ' && ev.ctrlKey) {
       ev.preventDefault();
-      if (e.kind === 'file' && !ev.ctrlKey) open(e);
-      else ex.select(e.path, { ctrl: true }, order);
+      ex.select(e.path, { ctrl: true }, order);
     } else if (ev.key.startsWith('Arrow')) {
       const next = neighbour(layout, i, ev.key);
       ev.preventDefault();
@@ -227,7 +239,7 @@
   {@attach viewport((v) => (vp = v))} {onmousedown}
   onfocusin={(ev) => { const p = (ev.target as HTMLElement).dataset?.path; if (p) focusPath = p; }}
   class="relative min-h-0 flex-1 overflow-y-auto overscroll-contain outline-none select-none">
-  <div bind:this={content} class="relative" style:height="{layout.height + PAD}px" style:margin="0 {PAD}px">
+  <div bind:this={content} class="relative" style:height="calc({layout.height + PAD}px + var(--dock-h, 0px))" style:margin="0 {PAD}px">
     {#each slices as { section } (section.key)}
       {@const all = daySelected(section)}
       {@const plain = section.key === DIRS || section.key === FILES}
@@ -264,7 +276,8 @@
         style:transform="translate({rect.x}px, {rect.y}px)" style:width="{rect.w}px" style:height="{rect.h}px"
         onclick={(ev) => onclick(ev, e)}
         ondblclick={(ev) => { if (!(ev.target instanceof Element && ev.target.closest('[data-check]'))) open(e); }}
-        onkeydown={(ev) => onkey(ev, e, i)}>
+        onkeydown={(ev) => onkey(ev, e, i)}
+        onmouseenter={() => (s.hover = e.path)} onmouseleave={() => { if (s.hover === e.path) s.hover = null; }}>
         <div class="h-full w-full {s.fresh.has(e.path) ? '[animation:pop-in_.35s]' : ''}">
           <Thumb entry={e} thumb={url ? thumbs.get(url) : null} noThumb={!url || thumbs.failed(url)} selected={sel}
             cascadeAt={cascadeAt(e.path)} onbroken={() => { if (url) thumbs.broken(url); }} />

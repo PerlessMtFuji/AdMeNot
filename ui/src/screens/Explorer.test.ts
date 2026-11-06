@@ -36,6 +36,73 @@ describe('Explorer', () => {
     expect(ex.state.view).toBe('list');
   });
 
+  test('"Show" in the current folder selects and reveals what arrived', async () => {
+    const { ctl } = await openExplorer();
+    const ex = ctl.explorer;
+    const here = ex.state.entries.filter((e) => e.kind === 'file').slice(0, 2).map((e) => e.path);
+    await ex.show({ dest: ex.state.path, targets: here } as never);
+    expect([...ex.state.selected].sort()).toEqual([...here].sort());
+    await tick();
+    expect(ex.state.reveal).toBeNull();  // lista już przewinęła
+  });
+
+  test('"Show" of an uploaded folder selects that folder, not files inside it', async () => {
+    const { ctl } = await openExplorer();
+    const ex = ctl.explorer;
+    await ex.go('/sdcard');
+    const dir = ex.state.entries.find((e) => e.kind === 'dir')!;
+    await ex.show({ dest: '/sdcard', targets: [`${dir.path}/plik.txt`] } as never);
+    expect([...ex.state.selected]).toEqual([dir.path]);
+  });
+
+  test('a visited folder shows at once from memory and refreshes quietly', async () => {
+    const { ctl, bridge } = await openExplorer();
+    const ex = ctl.explorer;
+    const camera = ex.state.path;
+    await ex.go('/sdcard/Download');
+    const entries = ex.state.entries.map((e) => e.path);
+    await ex.go(camera);
+    const lists = () => bridge.calls.filter((c) => c.method === 'explorer_list').length;
+    const before = lists();
+    const going = ex.go('/sdcard/Download');
+    // bez czekania na most: treść z pamięci jest na ekranie w tej samej chwili
+    expect(ex.state.path).toBe('/sdcard/Download');
+    expect(ex.state.entries.map((e) => e.path)).toEqual(entries);
+    expect(ex.state.loading).toBe(false);
+    await going;
+    expect(lists()).toBe(before + 1);
+  });
+
+  test('Space opens the file under the cursor, also with the focus elsewhere', async () => {
+    const { ctl } = await openExplorer();
+    const ex = ctl.explorer;
+    const [, second] = rows();
+    await fireEvent.mouseEnter(second);
+    await fireEvent.keyDown(document.body, { key: ' ' });
+    await vi.waitFor(() => expect(ex.state.preview).toBe(second.dataset.path));
+  });
+
+  test('Space in the search box still types', async () => {
+    const { ctl } = await openExplorer();
+    const [, second] = rows();
+    await fireEvent.mouseEnter(second);
+    await fireEvent.keyDown(screen.getByRole('searchbox'), { key: ' ' });
+    await tick();
+    expect(ctl.explorer.state.preview).toBeNull();
+  });
+
+  test('returning to the player opens its preview, from another folder too', async () => {
+    const { ctl } = await openExplorer();
+    const ex = ctl.explorer;
+    await ex.go('/sdcard/Download');
+    const song = ex.state.entries.find((e) => e.kind === 'file')!;
+    ex.state.playing = { path: song.path, title: song.name, cover: null, url: 'http://127.0.0.1:1/f' };
+    await ex.go('/sdcard/DCIM/Camera');
+    await fireEvent.click(await screen.findByRole('button', { name: 'Otwórz odtwarzacz' }));
+    await vi.waitFor(() => expect(ex.state.preview).toBe(song.path));
+    expect(ex.state.path).toBe('/sdcard/Download');
+  });
+
   test('a click selects at once; only the selection bar waits out a possible double click', async () => {
     const { ctl } = await openExplorer();
     const ex = ctl.explorer;

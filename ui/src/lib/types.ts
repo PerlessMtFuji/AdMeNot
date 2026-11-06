@@ -541,6 +541,8 @@ export interface TaskView {
   dest: string;
   /** Pozycje, których plan nie mógł odczytać: nie zostały skopiowane. */
   omitted: number;
+  /** Gdzie trafiły pliki na telefonie (`Pokaż` je zaznacza). */
+  targets: string[];
 }
 
 export interface ExplorerProblem {

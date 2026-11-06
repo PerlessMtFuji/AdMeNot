@@ -189,3 +189,38 @@ test('deep path: the current folder stays visible in the breadcrumbs', async ({ 
   const last = page.getByRole('navigation', { name: 'Ścieżka' }).getByRole('button').last();
   await expect(last).toBeInViewport({ ratio: 0.95 });
 });
+
+test('notices and action bars do not move the side panel or the file area', async ({ page }) => {
+  await page.goto('/?scenario=explorer');
+  await page.getByRole('button', { name: 'Pliki', exact: true }).click();
+  const list = page.getByRole('listbox', { name: 'Pliki w folderze' });
+  await list.getByRole('option').first().waitFor();
+  const places = page.getByRole('navigation', { name: 'Miejsca' }).locator('xpath=ancestor::aside');
+  const area = list.locator('xpath=ancestor::section[1]');
+  const before = [await places.boundingBox(), await area.boundingBox()];
+  await list.getByRole('option').first().click();
+  await expect(page.getByRole('region', { name: 'Zaznaczenie' })).toBeVisible();
+  await page.evaluate(() => {
+    const { ctl, bridge } = (window as any).__admenot;
+    ctl.explorer.state.error = { key: 'explorer_denied', message: '' };
+    bridge.emit('explorer:task', { task: { id: 'x', kind: 'to_phone', status: 'running', done_files: 1, total_files: 3,
+      done_bytes: 1, total_bytes: 3, speed: 1, eta_s: 5, skipped: 0, renamed: 0, failed: [], verified: null, dest: '/sdcard', omitted: 0, targets: [] } });
+  });
+  await expect(page.getByRole('region', { name: 'Zadania' })).toBeVisible();
+  expect([await places.boundingBox(), await area.boundingBox()]).toEqual(before);
+});
+
+test('the last row can still be scrolled above the action bars', async ({ page }) => {
+  await page.goto('/?scenario=explorer');
+  await page.getByRole('button', { name: 'Pliki', exact: true }).click();
+  await page.getByRole('button', { name: 'Lista', exact: true }).click();
+  const list = page.getByRole('listbox', { name: 'Pliki w folderze' });
+  await list.getByRole('option').first().click();
+  const bar = page.getByRole('region', { name: 'Zaznaczenie' });
+  await expect(bar).toBeVisible();
+  await list.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  await page.waitForTimeout(200);
+  const last = await list.getByRole('option').last().boundingBox();
+  const dock = await bar.boundingBox();
+  expect(last!.y + last!.height).toBeLessThanOrEqual(dock!.y);
+});

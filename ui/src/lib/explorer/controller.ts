@@ -12,6 +12,7 @@ const FRESH_MS = 700;
 /** Zadania, które wyjście z eksploratora anuluje (most zamyka kolejkę razem z sesją). */
 /** Windows pozwala wydłużyć dwuklik do ok. 500 ms (domyślny próg też jest tej wielkości). */
 const DOUBLE_CLICK_MS = 500;
+const FOLDER_MEMORY = 40;
 const ACTIVE: ReadonlySet<TaskView['status']> = new Set(['queued', 'running', 'paused', 'waiting']);
 
 export interface SelectMods {
@@ -33,6 +34,8 @@ export class ExplorerController {
   private lastCopy: { paths: string[]; dest: string; verify: boolean; exclude: string[]; clear: boolean } | null = null;
   private viewWrites: Promise<unknown> = Promise.resolve();
   private dismissedTasks = new Set<string>();
+  /** Odwiedzone foldery: wejście pokazuje je od razu, a świeża lista dochodzi w tle. */
+  private folders = new Map<string, ExplorerListView>();
   private player: AudioPlayer | null = null;
   private leaveAnswer: ((ok: boolean) => void) | null = null;  // okno „N zadań zostanie anulowanych”
 
@@ -185,7 +188,9 @@ export class ExplorerController {
     const s = this.state;
     if (!s.open) return;
     const seq = ++this.seq;
-    s.loading = true;
+    const known = refresh ? undefined : this.folders.get(path);
+    if (known) this.showList(known, false);
+    s.loading = !known;
     let r: ExplorerListView | ApiError;
     try {
       r = await this.api.explorer_list(path);
@@ -203,7 +208,19 @@ export class ExplorerController {
       }
       return;
     }
-    const same = refresh && r.path === s.path;
+    this.remember(r);
+    this.showList(r, (refresh || !!known) && r.path === s.path);
+  }
+
+  private remember(r: ExplorerListView): void {
+    this.folders.delete(r.path);
+    this.folders.set(r.path, r);
+    if (this.folders.size > FOLDER_MEMORY) this.folders.delete(this.folders.keys().next().value!);
+  }
+
+  /** Lista na ekran; `same` — ten sam folder odświeżony (zaznaczenie i podgląd zostają). */
+  private showList(r: ExplorerListView, same: boolean): void {
+    const s = this.state;
     if (same) {
       const old = new Set(s.entries.map((e) => e.path));
       this.markFresh(r.entries.filter((e) => !old.has(e.path)).map((e) => e.path));
@@ -446,6 +463,16 @@ export class ExplorerController {
     return at >= 0 ? queue[at + 1] : undefined;
   }
 
+  /** Z mini-odtwarzacza z powrotem do pełnego podglądu, także gdy oglądany jest już inny folder. */
+  async openPlaying(): Promise<void> {
+    const s = this.state;
+    const path = s.playing?.path;
+    if (!path) return;
+    const folder = parentPath(path);
+    if (folder && folder !== s.path) await this.go(folder);
+    this.openPreview(path);
+  }
+
   async skipTrack(): Promise<void> {
     const next = this.nextTrack;
     if (!next) return;
@@ -530,9 +557,19 @@ export class ExplorerController {
     await this.request(() => this.api.explorer_open_folder(task.dest));
   }
 
-  /** „Pokaż” po wgraniu — folder na telefonie. */
-  show(task: TaskView): Promise<void> {
-    return this.go(task.dest);
+  /** „Pokaż” po wgraniu: folder na telefonie z zaznaczonymi wgranymi pozycjami, przewinięty do pierwszej. */
+  async show(task: TaskView): Promise<void> {
+    const s = this.state;
+    await this.go(task.dest, task.dest === s.path);
+    Object.assign(s, { query: '', filter: 'all', preview: null });
+    const prefix = `${task.dest.replace(/\/$/, '')}/`;
+    const tops = new Set(task.targets.filter((p) => p.startsWith(prefix))
+      .map((p) => prefix + p.slice(prefix.length).split('/')[0]));
+    s.selected.clear();
+    const shown = this.items.filter((e) => tops.has(e.path)).map((e) => e.path);
+    for (const p of shown) s.selected.add(p);
+    s.anchor = shown[0] ?? null;
+    s.reveal = shown[0] ?? null;
   }
 
   /** Skończone zadanie znika z paska zadań. */
@@ -679,6 +716,7 @@ export class ExplorerController {
     clearTimeout(this.holdTimer);
     this.lastClick = null;
     this.lastCopy = null;
+    this.folders.clear();
     this.dismissedTasks.clear();
     // sesji już nie ma (np. most zamknął ją sam): pytanie o anulowanie zadań nie ma sensu — wyjście idzie dalej
     if (this.leaveAnswer) this.answerLeave(true);
@@ -687,7 +725,7 @@ export class ExplorerController {
     s.selected.clear();
     this.markFresh([]);
     Object.assign(s, {
-      storage: null, problems: null, drop: null, starting: false, clipboardEmpty: false, barHeld: false,
+      storage: null, problems: null, drop: null, starting: false, clipboardEmpty: false, barHeld: false, hover: null, reveal: null,
       open: false, serial: null, device: null, places: [], recent: [], path: ROOT, crumbs: [], entries: [],
       locked: false, skipped: 0, loading: false, view: 'list', filter: 'all', query: '', anchor: null, tasks: [],
       offline: false, preview: null, playing: null, queue: [], playError: false, dest: null, leftovers: 0, media: '', error: null,
