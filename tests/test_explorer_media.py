@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import http.client
 import io
+import socket
+import subprocess
+import threading
 import urllib.request
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -12,7 +15,7 @@ from faketransfer import FakeStoragePhone
 from PIL import Image
 
 from admenot.engine.explorer.guard import ExplorerAdb, stream_args
-from admenot.engine.explorer.media import MediaServer, parse_range, stat_size
+from admenot.engine.explorer.media import MediaServer, parse_range, socket_stream, stat_size
 from admenot.engine.explorer.meta import _segments
 from admenot.engine.explorer.thumbs import EXIF_HEAD, ThumbCache, thumbnail
 
@@ -365,3 +368,65 @@ def test_thumb_cache_lru_evicts_by_size():
     cache.get("a")
     cache.put("c", (b"1234", "#000000"))
     assert cache.get("b") is None and cache.get("a") is not None and cache.get("c") is not None
+
+
+# ---- strumień przez serwer adb ---------------------------------------------------------------
+class FakeAdbServer:
+    """Serwer adb na gnieździe: `host:transport:<serial>`, potem `exec:<polecenie>` i dane."""
+
+    def __init__(self, data: bytes = b"", refuse: bool = False) -> None:
+        self.data = data
+        self.refuse = refuse
+        self.requests: list[str] = []
+        self.closed = threading.Event()
+        self.sock = socket.create_server(("127.0.0.1", 0))
+        self.port = self.sock.getsockname()[1]
+        threading.Thread(target=self.serve, daemon=True).start()
+
+    def request(self, conn) -> str:
+        size = int(conn.recv(4), 16)
+        text = conn.recv(size).decode()
+        self.requests.append(text)
+        return text
+
+    def serve(self) -> None:
+        conn, _ = self.sock.accept()
+        with conn:
+            self.request(conn)
+            if self.refuse:
+                conn.sendall(b"FAIL0009no device")
+                return
+            conn.sendall(b"OKAY")
+            self.request(conn)
+            conn.sendall(b"OKAY")
+            try:
+                conn.sendall(self.data)
+            except OSError:
+                pass
+        self.closed.set()
+
+
+def test_socket_stream_reads_through_the_adb_server():
+    server = FakeAdbServer(b"zawartosc")
+    stream = socket_stream(server.port, "SER1", "dd if=/sdcard/a bs=65536 skip=0 status=none")
+    out = bytearray()
+    while chunk := stream.read(4):
+        out += chunk
+    stream.close()
+    assert bytes(out) == b"zawartosc"
+    assert server.requests == ["host:transport:SER1", "exec:dd if=/sdcard/a bs=65536 skip=0 status=none"]
+
+
+def test_socket_stream_refused_raises_so_the_process_fallback_can_run():
+    server = FakeAdbServer(refuse=True)
+    with pytest.raises(OSError):
+        socket_stream(server.port, "SER1", "dd")
+
+
+def test_closing_a_socket_stream_early_starts_no_process(monkeypatch):
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: pytest.fail("zamknięcie nie może uruchamiać procesu"))
+    server = FakeAdbServer(b"x" * 1000)
+    stream = socket_stream(server.port, "SER1", "dd")
+    assert stream.read(10)
+    stream.close()
+    assert server.closed.wait(2)

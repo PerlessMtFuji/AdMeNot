@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import logging
 import mimetypes
+import os
 import re
 import secrets
+import socket
 import subprocess
 import sys
 import threading
@@ -38,6 +40,8 @@ _CHUNK = 65536
 _RANGE = re.compile(r"bytes=(\d*)-(\d*)")
 _DEFAULT_THUMB = 256
 _MAX_THUMB = 1024
+_ADB_PORT = 5037
+_ADB_TIMEOUT = 30.0  # s: telefon, który przestał odpowiadać, nie może trzymać wątku serwera bez końca
 _NO: Literal["unsatisfiable"] = "unsatisfiable"
 _QUIET = (ConnectionError, TimeoutError)  # przerwane połączenia (przewijanie filmu) nie są błędem
 
@@ -66,10 +70,64 @@ class _ProcStream:
             self._out.close()
 
 
+class _SocketStream:
+    """Wyjście polecenia na telefonie prosto z serwera adb. Zamknięcie gniazda kończy `dd` na telefonie, bez
+    `taskkill`: na Windows sam `_kill_tree` trwał 0,5 s i to on, nie odczyt, spowalniał miniatury i przewijanie."""
+
+    def __init__(self, sock: socket.socket) -> None:
+        self._sock = sock
+
+    def read(self, n: int, /) -> bytes:
+        return self._sock.recv(n)
+
+    def close(self) -> None:
+        self._sock.close()
+
+
+def _adb_request(sock: socket.socket, message: str) -> None:
+    data = message.encode()
+    sock.sendall(b"%04x" % len(data) + data)
+    status = b""
+    while len(status) < 4:
+        chunk = sock.recv(4 - len(status))
+        if not chunk:
+            break
+        status += chunk
+    if status != b"OKAY":
+        raise ConnectionError("adb server refused the request")
+
+
+def adb_server_port() -> int:
+    try:
+        return int(os.environ.get("ANDROID_ADB_SERVER_PORT", ""))
+    except ValueError:
+        return _ADB_PORT
+
+
+def socket_stream(port: int, serial: str, command: str) -> Stream:
+    """`exec:` przez lokalny serwer adb, bez nowego procesu; OSError — wywołujący wraca do `adb exec-out`."""
+    sock = socket.create_connection(("127.0.0.1", port), timeout=_ADB_TIMEOUT)
+    try:
+        sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        _adb_request(sock, f"host:transport:{serial}")
+        _adb_request(sock, f"exec:{command}")
+    except OSError:
+        sock.close()
+        raise
+    return _SocketStream(sock)
+
+
 def _adb_stream(adb_path: str, serial: str) -> Callable[[str, int], Stream]:
+    port = adb_server_port()
+
     def open_stream(path: str, start: int) -> Stream:
+        args = stream_args(path, start)
+        try:
+            return socket_stream(port, serial, args[1])
+        except OSError:
+            _LOG.info("adb server socket unavailable, using adb exec-out")
         flags = _CREATE_NO_WINDOW if sys.platform == "win32" else 0
-        proc = subprocess.Popen([adb_path, "-s", serial, *stream_args(path, start)], stdout=subprocess.PIPE,
+        proc = subprocess.Popen([adb_path, "-s", serial, *args], stdout=subprocess.PIPE,
                                 stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, creationflags=flags)
         return _ProcStream(proc)
     return open_stream
