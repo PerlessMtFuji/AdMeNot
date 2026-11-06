@@ -207,6 +207,15 @@ def test_polish_and_emoji_path_roundtrip(phone, served):
     assert r.headers["Content-Type"].startswith("text/plain")
 
 
+def test_pdf_range_headers_are_available_to_the_browser(served, phone):
+    server, _ = served
+    phone.local("/sdcard/DCIM/document.pdf").write_bytes(b"%PDF-1.7 test")
+    response = get(server.file_url("/sdcard/DCIM/document.pdf"), {"Origin": APP, "Range": "bytes=0-3"})
+    assert response.status == 206 and response.read() == b"%PDF"
+    assert response.headers["Content-Type"] == "application/pdf"
+    assert "Accept-Ranges" in response.headers["Access-Control-Expose-Headers"]
+
+
 def test_read_range_helper(served):
     server, _ = served
     assert server.read_range("/sdcard/DCIM/clip.bin", 70_000, 300) == DATA[70_000:70_300]
@@ -218,6 +227,25 @@ def jpeg_of(color=(10, 20, 200), size=(400, 300)) -> bytes:
     out = io.BytesIO()
     Image.new("RGB", size, color).save(out, "JPEG")
     return out.getvalue()
+
+
+def test_listing_size_and_small_jpeg_head_avoid_redundant_adb_calls():
+    data = jpeg_of()
+    reads = []
+
+    def stream(path, start):
+        reads.append((path, start))
+        return io.BytesIO(data)
+
+    def no_stat(path):
+        raise AssertionError("size already supplied by listing")
+
+    server = MediaServer("adb", "serial", lambda _: False, open_stream=stream, size_of=no_stat)
+    server.remember_size("/sdcard/test.jpg", len(data))
+    assert server.thumb("/sdcard/test.jpg", 128) is not None
+    assert reads == [("/sdcard/test.jpg", 0)]
+    assert server.thumb("/sdcard/test.jpg", 128) is not None
+    assert len(reads) == 1
 
 
 def test_thumb_from_exif_reads_only_head():

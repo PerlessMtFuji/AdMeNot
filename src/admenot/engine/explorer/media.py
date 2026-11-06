@@ -158,7 +158,7 @@ class _Handler(BaseHTTPRequestHandler):
         origin = self.headers.get("Origin")
         if origin and self.owner.allow_origin(origin):
             self.send_header("Access-Control-Allow-Origin", origin)
-            self.send_header("Access-Control-Expose-Headers", "X-Color, Content-Range")
+            self.send_header("Access-Control-Expose-Headers", "X-Color, Content-Range, Accept-Ranges")
             self.send_header("Vary", "Origin")
 
     def _reply(self, status: int, body: bytes = b"", headers: dict[str, str] | None = None, head: bool = False) -> None:
@@ -325,6 +325,11 @@ class MediaServer:
             for path in [p for p in self._sizes if p.startswith(prefix) and "/" not in p[len(prefix):]]:
                 del self._sizes[path]
 
+    def remember_size(self, path: str, size: int) -> None:
+        """Listowanie już odczytało stat; miniatura nie musi pytać telefonu drugi raz."""
+        with self._sizes_lock:
+            self._sizes[path] = size
+
     def read_range(self, path: str, start: int, length: int) -> bytes:
         """`length` bajtów pliku od `start` tą samą drogą co serwer (np. podgląd tekstu)."""
         stream = self.open_stream(path, start)
@@ -354,10 +359,19 @@ class MediaServer:
         if cached is not None:
             return cached
 
-        def read_all() -> bytes:
-            return self.read_range(path, 0, file_size) if file_size <= FULL_IMAGE_LIMIT else b""
+        head = b""
 
-        result = thumbnail(lambda n: self.read_range(path, 0, min(n, file_size)), read_all, size,
+        def read_head(n: int) -> bytes:
+            nonlocal head
+            head = self.read_range(path, 0, min(n, file_size))
+            return head
+
+        def read_all() -> bytes:
+            if file_size > FULL_IMAGE_LIMIT:
+                return b""
+            return head if len(head) == file_size else self.read_range(path, 0, file_size)
+
+        result = thumbnail(read_head, read_all, size,
                            PurePosixPath(path).name)
         if result is not None:
             self.cache.put(key, result)

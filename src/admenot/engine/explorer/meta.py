@@ -178,6 +178,12 @@ def media_meta(adb: ExplorerAdb, path: str) -> dict[str, Any]:
     if not rows:
         return {}
     meta = {k: v for k, v in rows[0].items() if v is not None}
+    for key in ("_size", "duration", "width", "height", "bitrate", "datetaken"):
+        if key in meta:
+            try:
+                meta[key] = int(meta[key])
+            except (TypeError, ValueError):
+                meta.pop(key)
     if "datetaken" in meta:
         meta["date_taken"] = meta.pop("datetaken")
     if "_size" in meta:

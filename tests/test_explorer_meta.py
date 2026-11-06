@@ -87,9 +87,9 @@ def test_media_meta_from_mediastore(tmp_path: Path):
          "mime_type": "video/mp4", "datetaken": "1760000000000", "title": "Wesele, część 1", "artist": None,
          "album": "Rodzina"}], cols)
     meta = media_meta(ExplorerAdb(phone), "/sdcard/DCIM/Camera/VID_1.mp4")
-    assert meta["duration"] == "61000" and meta["width"] == "1920" and meta["bitrate"] == "8000000"
+    assert meta["duration"] == 61000 and meta["width"] == 1920 and meta["height"] == 1080 and meta["bitrate"] == 8000000
     assert meta["title"] == "Wesele, część 1" and meta["album"] == "Rodzina" and "artist" not in meta
-    assert meta["mime_type"] == "video/mp4" and meta["date_taken"] == "1760000000000"
+    assert meta["mime_type"] == "video/mp4" and meta["date_taken"] == 1760000000000
     assert where_of(phone) == "_data='/storage/emulated/0/DCIM/Camera/VID_1.mp4'"
 
 

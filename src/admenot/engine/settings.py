@@ -34,7 +34,7 @@ SELECT_LEVELS = ("silence", "disable", "remove")  # poziomy akcji (actions/plann
 APK_MODES = ("ask", "full", "manual")  # co po szybkim skanie: pytać, pełna analiza APK, tryb ręczny
 RETENTION_DAYS = (30, 60, 90, 180, 365)  # okres przechowywania zleceń do wyboru; None = nie usuwaj
 DEFAULT_RETENTION_DAYS = 60  # RODO: domyślnie ograniczone przechowywanie danych klientów
-KEYS = ("lang", "mode", "adb_path", "backups_dir", "report_pdf_dir", "theme", "mirror_auto",
+KEYS = ("lang", "mode", "adb_path", "backups_dir", "report_pdf_dir", "theme", "mirror_auto", "explorer_view",
         "apk_cache_limit_gb", "apk_cache_clear_after_repair", "select_level",
         "check_updates", "dismissed_update", "last_run_version", "retention_days",
         "apk_mode_default")
@@ -99,6 +99,7 @@ class Settings:
     donate_shown_at: str | None = None  # dzień (lokalny) ostatniego przypomnienia
     donate_off: bool = False  # „Już wspieram, nie pokazuj więcej”
     explorer_dest: str | None = None  # eksplorator: ostatni folder docelowy na komputerze
+    explorer_view: str | None = None  # None: domyślny dla miejsca, potem jawny wybór użytkownika
     # eksplorator: numer seryjny telefonu → jego ostatnie foldery (kolejność: najdawniej używany telefon
     # pierwszy). Stary klucz `explorer_recent` (jedna lista dla wszystkich telefonów) jest pomijany przy
     # odczycie — nazwy folderów poprzedniego klienta nie trafią do „Ostatnio” innego telefonu.
@@ -241,6 +242,8 @@ def _recent_ok(value: Any) -> bool:
 
 
 def _valid(key: str, value: Any) -> bool:
+    if key == "explorer_view":
+        return value is None or value in ("list", "grid")
     if key == "explorer_recents":
         return (isinstance(value, dict) and len(value) <= EXPLORER_RECENT_PHONES
                 and all(isinstance(k, str) and k and "\n" not in k and _recent_ok(v) for k, v in value.items()))

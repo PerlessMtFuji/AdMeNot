@@ -659,6 +659,9 @@ class ExplorerMixin:
                 sess.locked.add(path)
             sess.locked.update(e.path for e in entries if e.locked)
         sess.media.forget_sizes(path)  # świeże rozmiary plików folderu (miniatury, podgląd)
+        for entry in entries:
+            if entry.kind == "file":
+                sess.media.remember_size(entry.path, entry.size)
         if not locked:
             self._explorer_remember(sess.serial, path)
         return {"path": path, "crumbs": crumbs(path, sess.name, apps),
