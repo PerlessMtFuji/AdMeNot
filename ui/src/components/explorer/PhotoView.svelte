@@ -107,7 +107,6 @@
 </button>
 
 <style>
-  .glow { filter: blur(40px) saturate(1.4); animation: drift 24s ease-in-out infinite alternate; }
-  @keyframes drift { from { transform: scale(1.25) translate(-2%, -1%); } to { transform: scale(1.35) translate(2%, 1.5%); } }
-  @media (prefers-reduced-motion: reduce) { .glow { animation: none; } }
+  /* Bez ruchu: pełnoekranowe rozmycie w animacji przerysowuje się co klatkę (2 rdzenie, klatkowanie innych programów). */
+  .glow { filter: blur(40px) saturate(1.4); }
 </style>

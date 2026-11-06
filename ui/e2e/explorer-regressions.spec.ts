@@ -267,3 +267,39 @@ test('the last row can still be scrolled above the action bars', async ({ page }
   const dock = await bar.boundingBox();
   expect(last!.y + last!.height).toBeLessThanOrEqual(dock!.y);
 });
+
+test('an idle photo preview does no work every frame', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.route('http://127.0.0.1:4173/idle.png', route => route.fulfill({
+    body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64'),
+    contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' },
+  }));
+  await page.goto('/?scenario=explorer');
+  await page.getByRole('button', { name: 'Pliki', exact: true }).click();
+  await page.evaluate(() => {
+    const ex = (window as any).__admenot.ctl.explorer;
+    const entry = { ...ex.state.entries[0], path: '/sdcard/idle.png', name: 'idle.png', kind: 'file', type: 'image', ext: 'png',
+      url: 'http://127.0.0.1:4173/idle.png', thumb: 'http://127.0.0.1:4173/idle.png' };
+    ex.state.entries.push(entry);
+    ex.openPreview(entry.path);
+  });
+  await expect(page.getByRole('dialog').locator('.glow')).toHaveCount(1);  // poświata jest, tylko nie pracuje bez przerwy
+  // Pełnoekranowe rozmycie w ruchu przerysowuje się co klatkę: na 165 Hz zabierało dwa rdzenie i klatkowało grę w tle.
+  // Bezgłowy Chromium tego nie pokazuje w licznikach, więc pilnujemy samej przyczyny.
+  expect(await page.locator('.glow').evaluate((el) => el.getAnimations().length)).toBe(0);
+});
+
+test('the storage wave rests when nothing happens and moves during a task', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/?scenario=explorer');
+  await page.getByRole('button', { name: 'Pliki', exact: true }).click();
+  await page.getByTestId('phone-storage').waitFor();
+  // Stała animacja to 165 klatek na sekundę w bezczynności: 0,7 rdzenia, zmierzone na monitorze 165 Hz.
+  const count = () => page.locator('.wave').first().evaluate((el) => getComputedStyle(el).animationIterationCount);
+  expect(await count()).not.toBe('infinite');
+  await page.evaluate(() => {
+    (window as any).__admenot.bridge.emit('explorer:task', { task: { id: 'x', kind: 'to_phone', status: 'running', done_files: 1, total_files: 3,
+      done_bytes: 1, total_bytes: 3, speed: 1, eta_s: 5, skipped: 0, renamed: 0, failed: [], verified: null, dest: '/sdcard', omitted: 0, targets: [] } });
+  });
+  await expect.poll(count).toBe('infinite');
+});

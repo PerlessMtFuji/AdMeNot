@@ -222,7 +222,7 @@
   </div>
 
   <div class="flex min-h-0 flex-1 gap-3.5">
-    <Places places={s.places} recent={s.recent} path={s.path} storage={s.storage} ongo={(p) => ex.go(p)} />
+    <Places places={s.places} recent={s.recent} path={s.path} storage={s.storage} busy={ex.activeTasks > 0} ongo={(p) => ex.go(p)} />
     <section bind:this={section} aria-label={folderName} onpointerdown={remember}
       class="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-2xl card px-2 pt-3 pb-1.5">
       <div bind:this={stage} class="relative flex min-h-0 flex-1 flex-col">

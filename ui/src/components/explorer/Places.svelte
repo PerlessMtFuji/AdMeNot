@@ -4,8 +4,8 @@
   import Icon, { type IconName } from '../../ui/Icon.svelte';
   import PhoneStorage from './PhoneStorage.svelte';
 
-  type Props = { places: PlaceView[]; recent: string[]; path: string; storage?: StorageView | null; ongo: (path: string) => void };
-  let { places, recent, path, storage = null, ongo }: Props = $props();
+  type Props = { places: PlaceView[]; recent: string[]; path: string; storage?: StorageView | null; busy?: boolean; ongo: (path: string) => void };
+  let { places, recent, path, storage = null, busy = false, ongo }: Props = $props();
 
   // Ikona i barwa rodzaju danych (spec §5.6 — „Miejsca z ikoną i kolorem rodzaju”).
   const LOOK: Record<PlaceView['icon'], { icon: IconName; color: string }> = {
@@ -57,5 +57,5 @@
       {/each}
     </nav>
   {/if}
-  <div class="mt-auto"><PhoneStorage usage={storage} /></div>
+  <div class="mt-auto"><PhoneStorage usage={storage} {busy} /></div>
 </aside>
