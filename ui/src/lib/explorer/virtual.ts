@@ -2,6 +2,7 @@
 // Układ liczony arytmetycznie, bez mierzenia elementów — ten sam układ służy do zaznaczania prostokątem
 // i do strzałek, także dla kafli, których akurat nie ma w DOM.
 import type { EntryView } from '../types';
+import { observeSize } from '../resize';
 
 /** Ile wierszy ponad i pod widocznymi trzymamy w DOM. */
 export const OVERSCAN = 2;
@@ -167,13 +168,17 @@ export function measure(node: HTMLElement): Viewport {
 /** Załącznik (`{@attach}`) zgłaszający przewinięcie i zmianę rozmiaru obszaru przewijanego. */
 export function viewport(onchange: (v: Viewport) => void) {
   return (node: HTMLElement) => {
-    const update = () => onchange(measure(node));
-    update();
-    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
-    ro?.observe(node);
+    let previous: Viewport | undefined;
+    const update = () => {
+      const value = measure(node);
+      if (previous?.top === value.top && previous.width === value.width && previous.height === value.height) return;
+      previous = value;
+      onchange(value);
+    };
+    const stop = observeSize(node, update);
     node.addEventListener('scroll', update, { passive: true });
     return () => {
-      ro?.disconnect();
+      stop();
       node.removeEventListener('scroll', update);
     };
   };

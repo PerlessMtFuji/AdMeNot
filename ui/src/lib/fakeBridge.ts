@@ -117,6 +117,7 @@ export function createFakeBridge(name: string,
   let copies: CopyView[] = [];
   let planCode = 'K7F3'; // kod ostatniego podglądu planu: udostępnienie liczy ten sam plan
   let taskSeq = 0;
+  const tasks: TaskView[] = [];
   const fakeTask = (kind: TaskView['kind'], dest: string): TaskView => ({
     id: `s1t${++taskSeq}`, kind, status: 'queued', done_files: 0, total_files: 2, done_bytes: 0, total_bytes: 2048,
     speed: 0, eta_s: null, skipped: 0, renamed: 0, failed: [], verified: null, dest });
@@ -343,9 +344,12 @@ export function createFakeBridge(name: string,
         return {};
       // Kopia i wgrywanie nie mają nagrania (kolejka w tle): zadanie w kolejce, postęp wstrzykują testy (`emit`).
       case 'explorer_copy':
-        return { task: fakeTask('to_pc', String(args[1] ?? settings.explorer_dest ?? '')) };
-      case 'explorer_upload':
-        return { task: fakeTask('to_phone', String(args[1])) };
+      case 'explorer_upload': {
+        const task = fakeTask(method === 'explorer_copy' ? 'to_pc' : 'to_phone',
+          String(args[1] ?? settings.explorer_dest ?? ''));
+        tasks.push(task);
+        return { task: task.id };
+      }
       case 'explorer_pick_dest':
         settings = { ...settings, explorer_dest: 'D:\\Serwis\\Kowalska' };
         return { path: 'D:\\Serwis\\Kowalska' };
@@ -355,7 +359,7 @@ export function createFakeBridge(name: string,
       case 'explorer_clipboard':
         return { paths: ['C:\\Users\\serwis\\Documents\\faktura.pdf'] };
       case 'explorer_tasks':
-        return { tasks: [] };
+        return { tasks: [...tasks] };
       case 'watch_devices':
       case 'stop':
       case 'reopen_screen':

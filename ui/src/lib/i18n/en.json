@@ -128,6 +128,12 @@
       "switched": "Files of another phone were opened — the previous explorer was closed."
     },
     "preview": {
+      "pdf_label": "PDF preview", "pdf_page": "Page", "pdf_prev": "Previous page", "pdf_next": "Next page",
+      "pdf_zoom_in": "Zoom in PDF", "pdf_zoom_out": "Zoom out PDF", "pdf_index": "Searched {current} of {total} pages",
+      "pdf_no_text": "This PDF has no text layer. You can view it, but searching requires text recognition (OCR).",
+      "find_label": "Find in text", "find_placeholder": "Find in text… (Ctrl+F)", "find_whole": "Whole words",
+      "find_count": "{current} of {total}", "find_prev": "Previous match", "find_next": "Next match",
+      "find_partial": "Search covers the loaded part of the file.", "find_load_all": "Load entire file",
       "label": "Preview of {name}",
       "close": "Close preview",
       "copy": "Copy to computer",
@@ -153,7 +159,7 @@
       "meta": {
         "photo": "Photo", "video": "Video", "audio": "Track", "camera": "Camera", "location": "Location", "file": "File",
         "coords": "Coordinates", "map": "Show on map", "name": "Name", "path": "Path", "size": "Size", "modified": "Modified",
-        "dimensions": "Dimensions"
+        "dimensions": "Dimensions", "format": "Format"
       },
       "field": {
         "Make": "Make", "Model": "Model", "LensModel": "Lens", "LensMake": "Lens make", "Software": "Software",

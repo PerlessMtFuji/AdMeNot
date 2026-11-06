@@ -128,6 +128,12 @@
       "switched": "Otwarto pliki innego telefonu — poprzedni eksplorator został zamknięty."
     },
     "preview": {
+      "pdf_label": "Podgląd PDF", "pdf_page": "Strona", "pdf_prev": "Poprzednia strona", "pdf_next": "Następna strona",
+      "pdf_zoom_in": "Powiększ PDF", "pdf_zoom_out": "Pomniejsz PDF", "pdf_index": "Przeszukano {current} z {total} stron",
+      "pdf_no_text": "Ten PDF nie zawiera warstwy tekstowej. Możesz go przeglądać, ale wyszukiwanie wymaga rozpoznania tekstu (OCR).",
+      "find_label": "Szukaj w treści", "find_placeholder": "Szukaj w treści… (Ctrl+F)", "find_whole": "Całe wyrazy",
+      "find_count": "{current} z {total}", "find_prev": "Poprzednie trafienie", "find_next": "Następne trafienie",
+      "find_partial": "Szukanie obejmuje wczytaną część pliku.", "find_load_all": "Wczytaj całość",
       "label": "Podgląd pliku {name}",
       "close": "Zamknij podgląd",
       "copy": "Kopiuj na komputer",
@@ -153,7 +159,7 @@
       "meta": {
         "photo": "Zdjęcie", "video": "Film", "audio": "Utwór", "camera": "Aparat", "location": "Lokalizacja", "file": "Plik",
         "coords": "Współrzędne", "map": "Pokaż na mapie", "name": "Nazwa", "path": "Ścieżka", "size": "Rozmiar", "modified": "Zmieniony",
-        "dimensions": "Wymiary"
+        "dimensions": "Wymiary", "format": "Format"
       },
       "field": {
         "Make": "Producent", "Model": "Model", "LensModel": "Obiektyw", "LensMake": "Producent obiektywu", "Software": "Oprogramowanie",

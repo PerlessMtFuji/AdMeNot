@@ -25,6 +25,11 @@ export class ExplorerController {
   private opening = false;
   private earlyPlaces: PlaceView[] | null = null;  // liczby Miejsc, które przyszły przed wynikiem otwarcia
   private freshTimer: ReturnType<typeof setTimeout> | undefined;
+  private clickTimer: ReturnType<typeof setTimeout> | undefined;
+  private pendingClick: { path: string; apply: () => void } | null = null;
+  private lastClick: { path: string; selected: string[]; anchor: string | null } | null = null;
+  private viewWrites: Promise<unknown> = Promise.resolve();
+  private dismissedTasks = new Set<string>();
   private player: AudioPlayer | null = null;
   private leaveAnswer: ((ok: boolean) => void) | null = null;  // okno „N zadań zostanie anulowanych”
 
@@ -63,6 +68,7 @@ export class ExplorerController {
     on('explorer:task', (d) => {
       if (!s.open) return;
       const task = d.task;
+      if (this.dismissedTasks.has(task.id)) return;
       const before = s.tasks.find((x) => x.id === task.id);
       s.tasks = before ? s.tasks.map((x) => (x.id === task.id ? task : x)) : [...s.tasks, task];
       // skończone wgranie do oglądanego folderu: nowe pliki od razu na ekranie
@@ -119,7 +125,7 @@ export class ExplorerController {
       if (isApiError(r) || !s.open || s.serial !== serial) return;
       // zdarzenia `explorer:task`, które przyszły w międzyczasie, są nowsze — zostają
       const known = new Set(s.tasks.map((x) => x.id));
-      const missing = r.tasks.filter((x) => !known.has(x.id));
+      const missing = r.tasks.filter((x) => !known.has(x.id) && !this.dismissedTasks.has(x.id));
       if (missing.length) s.tasks = [...missing, ...s.tasks];
     } catch {
       // bez listy pasek zadań wypełnią kolejne zdarzenia kolejki
@@ -176,6 +182,7 @@ export class ExplorerController {
   async go(path: string, refresh = false): Promise<void> {
     const s = this.state;
     if (!s.open) return;
+    this.cancelClick();
     const seq = ++this.seq;
     s.loading = true;
     let r: ExplorerListView | ApiError;
@@ -212,7 +219,7 @@ export class ExplorerController {
     } else {
       s.selected.clear();
       Object.assign(s, { anchor: null, query: '', preview: null,
-        view: defaultView(placeAt(s.places, r.path)?.key ?? null) });
+        view: this.app.settings.explorer_view ?? defaultView(placeAt(s.places, r.path)?.key ?? null) });
     }
     if (!r.locked && r.path !== ROOT) s.recent = [r.path, ...s.recent.filter((p) => p !== r.path)].slice(0, RECENT_MAX);
   }
@@ -227,7 +234,41 @@ export class ExplorerController {
   }
 
   setView(view: ExplorerView): void {
+    this.cancelClick();
     this.state.view = view;
+    this.app.settings = { ...this.app.settings, explorer_view: view };
+    // Kolejne szybkie kliknięcia zapisują się w tej samej kolejności co wybory.
+    this.viewWrites = this.viewWrites.then(() => this.request(() => this.api.save_settings({ explorer_view: view })));
+  }
+
+  /** Zwykły klik czeka na rozstrzygnięcie gestu. Dwuklik nigdy nie zmienia zaznaczenia. */
+  clickSelect(path: string, detail: number, mods: SelectMods = {}, order?: readonly string[]): void {
+    if (detail > 1) {
+      this.cancelClick();
+      // Windows pozwala wydłużyć próg dwukliku ponad 500 ms. Odtwarzamy
+      // także wybór sprzed pierwszego kliku, jeśli jego timer już upłynął.
+      if (this.lastClick?.path === path) {
+        this.state.selected.clear();
+        for (const p of this.lastClick.selected) this.state.selected.add(p);
+        this.state.anchor = this.lastClick.anchor;
+      }
+      this.lastClick = null;
+      return;
+    }
+    const previous = this.pendingClick;
+    this.cancelClick();
+    if (previous && previous.path !== path) previous.apply();
+    const before = { path, selected: [...this.state.selected], anchor: this.state.anchor };
+    this.lastClick = before;
+    const apply = () => { this.select(path, mods, order); this.lastClick = before; };
+    if (detail === 0) { apply(); return; } // aktywacja dostępności / klawiatura
+    this.pendingClick = { path, apply };
+    this.clickTimer = setTimeout(() => { this.cancelClick(); apply(); }, 500);
+  }
+
+  cancelClick(): void {
+    clearTimeout(this.clickTimer);
+    this.pendingClick = null;
   }
 
   /** Ta sama kolumna odwraca kierunek; nowa zaczyna od `SORT_START`. */
@@ -237,11 +278,13 @@ export class ExplorerController {
   }
 
   setFilter(filter: ExplorerFilter): void {
+    this.cancelClick();
     this.state.filter = filter;
     this.keepVisibleSelection();
   }
 
   setQuery(query: string): void {
+    this.cancelClick();
     this.state.query = query;
     this.keepVisibleSelection();
   }
@@ -250,6 +293,7 @@ export class ExplorerController {
    *  (z Ctrl dopisany do zaznaczenia). `order` — kolejność na ekranie, gdy inna niż `items`
    *  (galeria układa pliki po dniach). */
   select(path: string, mods: SelectMods = {}, order?: readonly string[]): void {
+    this.cancelClick();
     const s = this.state;
     const sel = s.selected;
     if (mods.shift && s.anchor) {
@@ -273,6 +317,7 @@ export class ExplorerController {
 
   /** Klik w nagłówek dnia: zaznacza pliki tego dnia, a gdy już są zaznaczone — odznacza. */
   selectDay(day: string): void {
+    this.cancelClick();
     const sel = this.state.selected;
     const group = days(this.items.filter((e) => e.kind === 'file'), new Date()).find((g) => g.key === day);
     if (!group) return;
@@ -285,16 +330,19 @@ export class ExplorerController {
 
   /** Zaznaczanie prostokątem; `additive` (Ctrl) — dopisuje do dotychczasowego. */
   selectRect(paths: string[], additive: boolean): void {
+    this.cancelClick();
     const sel = this.state.selected;
     if (!additive) sel.clear();
     for (const p of paths) sel.add(p);
   }
 
   selectAll(): void {
+    this.cancelClick();
     for (const e of this.items) this.state.selected.add(e.path);
   }
 
   clear(): void {
+    this.cancelClick();
     this.state.selected.clear();
     this.state.anchor = null;
   }
@@ -319,6 +367,7 @@ export class ExplorerController {
   }
 
   openPreview(path: string): void {
+    this.cancelClick();
     if (!this.state.entries.some((e) => e.path === path && e.kind === 'file')) return;
     this.state.preview = path;
     this.state.error = null;  // baner w podglądzie mówi tylko o jego własnych działaniach
@@ -486,6 +535,7 @@ export class ExplorerController {
 
   /** Skończone zadanie znika z paska zadań. */
   dismissTask(id: string): void {
+    this.dismissedTasks.add(id);
     this.state.tasks = this.state.tasks.filter((x) => x.id !== id);
   }
 
@@ -556,9 +606,12 @@ export class ExplorerController {
       s.problems = { kind, list: r.problems };
       return null;
     }
-    // zdarzenia kolejki mogły przyjść przed wynikiem — nowszy stan zostaje
-    if (!s.tasks.some((x) => x.id === r.task.id)) s.tasks = [...s.tasks, r.task];
-    return r.task.id;
+    // Nowe zadanie zastępuje stare potwierdzenia; kolejka aktywnych pozostaje.
+    for (const task of s.tasks) if (task.id !== r.task && !ACTIVE.has(task.status)) this.dismissTask(task.id);
+    // Wynik zawiera tylko id. Pełne widoki przychodzą zdarzeniami; odczyt listy
+    // wypełnia pasek także wtedy, gdy zdarzenie jeszcze czeka na wysłanie.
+    await this.loadTasks();
+    return r.task;
   }
 
   /** Wywołanie mostu z błędem w banerze nad listą (sesja zamknięta → powrót na „Połącz”); `banner = false` —
@@ -611,6 +664,9 @@ export class ExplorerController {
 
   private reset(): void {
     const s = this.state;
+    this.cancelClick();
+    this.lastClick = null;
+    this.dismissedTasks.clear();
     // sesji już nie ma (np. most zamknął ją sam): pytanie o anulowanie zadań nie ma sensu — wyjście idzie dalej
     if (this.leaveAnswer) this.answerLeave(true);
     this.seq += 1;  // spóźniona lista poprzedniej sesji nie trafi na ekran

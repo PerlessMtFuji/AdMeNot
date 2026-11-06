@@ -80,6 +80,7 @@
 
   /** Folder — wchodzi do niego, plik — otwiera podgląd. */
   function open(entry: EntryView): void {
+    ex.cancelClick();
     if (entry.kind === 'dir') void ex.go(entry.path);
     else ex.openPreview(entry.path);
   }
@@ -130,7 +131,7 @@
         {@const sel = s.selected.has(e.path)}
         <div role="option" aria-selected={sel} data-path={e.path} tabindex={tabPath === e.path ? 0 : -1}
           in:rowIn={{ i, on: fresh }}
-          onclick={(ev) => ex.select(e.path, { ctrl: ev.ctrlKey || ev.metaKey, shift: ev.shiftKey })}
+          onclick={(ev) => ex.clickSelect(e.path, ev.detail, { ctrl: ev.ctrlKey || ev.metaKey, shift: ev.shiftKey })}
           ondblclick={() => open(e)}
           onkeydown={(ev) => onkey(ev, e, i)}
           style:top="{PAD_Y + i * ROW_H}px" style:height="{ROW_H}px"

@@ -8,8 +8,9 @@
   import Icon from '../../ui/Icon.svelte';
 
   /** Film (`<video>`, poświata z bieżącej klatki) albo muzyka (okładka, wspólny odtwarzacz z mini-odtwarzaczem). */
-  type Props = { ex: ExplorerController; entry: EntryView; meta: EntryMeta | null; thumbs: ThumbQueue; onfail: () => void };
-  let { ex, entry, meta, thumbs, onfail }: Props = $props();
+  type Props = { ex: ExplorerController; entry: EntryView; meta: EntryMeta | null; thumbs: ThumbQueue; onfail: () => void;
+    onmetadata?: (meta: Record<string, number>) => void };
+  let { ex, entry, meta, thumbs, onfail, onmetadata }: Props = $props();
 
   const GLOW_MS = 250;
   const GLOW_W = 48;
@@ -36,6 +37,11 @@
     time = el ? el.currentTime : 0;
     length = el ? el.duration : 0;
     buffered = el && el.buffered.length ? el.buffered.end(el.buffered.length - 1) : 0;
+  }
+  function loaded(): void {
+    if (!video || !video.videoWidth || !video.videoHeight) return;
+    onmetadata?.({ width: video.videoWidth, height: video.videoHeight,
+      ...(Number.isFinite(video.duration) ? { duration: video.duration * 1000 } : {}) });
   }
   $effect(() => {
     const el = media;
@@ -97,8 +103,10 @@
     <canvas bind:this={canvas} width={GLOW_W} height={GLOW_H} aria-hidden="true"
       class="pointer-events-none absolute inset-0 h-full w-full scale-125 opacity-70 blur-[40px] saturate-[1.4]"></canvas>
     <!-- svelte-ignore a11y_media_has_caption -->
-    <video bind:this={video} src={entry.url} preload="metadata" playsinline onerror={onfail}
-      onclick={toggle} class="relative max-h-[calc(100%-110px)] max-w-full cursor-pointer rounded-xl shadow-[0_20px_60px_-20px_rgb(0_0_0/.8)]"></video>
+    <div class="absolute inset-0 bottom-[110px]">
+      <video bind:this={video} src={entry.url} preload="metadata" playsinline onerror={onfail} onloadedmetadata={loaded}
+        onclick={toggle} class="absolute inset-0 h-full w-full cursor-pointer object-contain"></video>
+    </div>
   {:else}
     <div class="relative mb-24 grid place-items-center">
       <span aria-hidden="true" class="breathe absolute -inset-10 rounded-full opacity-60 blur-[48px]"

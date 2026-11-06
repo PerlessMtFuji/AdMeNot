@@ -5,6 +5,11 @@ import App from '../../App.svelte';
 import { setupCtl } from '../../test-utils';
 import type { EntryView } from '../../lib/types';
 
+vi.mock('pdfjs-dist', () => ({
+  GlobalWorkerOptions: {},
+  getDocument: () => ({ promise: new Promise(() => {}), destroy: async () => {} }),
+}));
+
 const GPS_FILE = '/sdcard/DCIM/Camera/IMG_20260926_0000.jpg';
 const NOTE = '/sdcard/Download/notatka.txt';
 
@@ -27,6 +32,69 @@ async function openExplorer() {
 const dialog = () => screen.getByRole('dialog');
 
 describe('Preview', () => {
+  test('text search highlights literal matches and moves between them', async () => {
+    const { ex, bridge } = await openExplorer();
+    await ex.go('/sdcard/Download');
+    bridge.answerNext('explorer_text', { text: 'Żółć żółci żółć <script>', encoding: 'utf-8', truncated: false });
+    ex.openPreview(NOTE);
+    const input = await screen.findByRole('searchbox', { name: 'Szukaj w treści' });
+    await fireEvent.input(input, { target: { value: 'żół' } });
+    expect(dialog().querySelectorAll('mark')).toHaveLength(3);
+    await fireEvent.click(screen.getByRole('checkbox', { name: 'Całe wyrazy' }));
+    expect(dialog().querySelectorAll('mark')).toHaveLength(0);
+    await fireEvent.input(input, { target: { value: 'żółć' } });
+    expect(dialog().querySelectorAll('mark')).toHaveLength(2);
+    await fireEvent.click(screen.getByRole('button', { name: 'Następne trafienie' }));
+    expect(dialog().querySelector('mark.active')?.getAttribute('data-hit')).toBe('1');
+    expect(dialog().querySelector('script')).toBeNull();
+    await fireEvent.keyDown(input, { key: 'Escape' });
+    expect(ex.state.preview).toBe(NOTE);
+  });
+
+  test('full text search loads the remaining chunks and updates the match count', async () => {
+    const { ex, bridge } = await openExplorer();
+    await ex.go('/sdcard/Download');
+    bridge.answerNext('explorer_text', { text: 'first needle', encoding: 'utf-8', truncated: true });
+    ex.openPreview(NOTE);
+    const input = await screen.findByRole('searchbox', { name: 'Szukaj w treści' });
+    await fireEvent.input(input, { target: { value: 'needle' } });
+    await vi.waitFor(() => expect(dialog().querySelectorAll('mark')).toHaveLength(1));
+    expect(dialog().textContent).toContain('Szukanie obejmuje wczytaną część');
+    bridge.answerNext('explorer_text', { text: ' second needle', encoding: 'utf-8', truncated: false });
+    await fireEvent.click(screen.getByRole('button', { name: 'Wczytaj całość' }));
+    await vi.waitFor(() => expect(dialog().querySelectorAll('mark')).toHaveLength(2));
+    expect(dialog().textContent).not.toContain('Szukanie obejmuje wczytaną część');
+  });
+
+  test('PDF opens the isolated reader instead of unsupported-file view', async () => {
+    const { ex } = await openExplorer();
+    const pdf = entry('dokument.pdf', 'doc', 'pdf');
+    ex.state.entries.push(pdf);
+    ex.openPreview(pdf.path);
+    await tick();
+    expect(within(dialog()).getByRole('searchbox', { name: 'Szukaj w treści' })).toBeTruthy();
+    expect(dialog().querySelector('canvas')?.getAttribute('aria-label')).toBe('Podgląd PDF');
+  });
+
+  test('video dimensions decoded by the player fill in an empty MediaStore reply', async () => {
+    const { ex, bridge } = await openExplorer();
+    const movie = entry('pionowy.mp4', 'video', 'mp4');
+    ex.state.entries = [...ex.state.entries, movie];
+    bridge.answerNext('explorer_meta', { meta: { path: movie.path, size: movie.size, mtime: movie.mtime } });
+    ex.openPreview(movie.path);
+    await tick();
+    const video = dialog().querySelector('video')!;
+    Object.defineProperties(video, {
+      videoWidth: { value: 1080 }, videoHeight: { value: 1920 }, duration: { value: 12 },
+    });
+    await fireEvent.loadedMetadata(video);
+    await fireEvent.click(screen.getByRole('button', { name: 'Informacje o pliku' }));
+    const panel = screen.getByRole('complementary', { name: 'Informacje o pliku' });
+    expect(panel.textContent).toContain('1080 × 1920');
+    expect(within(panel).getByText('MP4')).toBeTruthy();
+    expect(dialog().querySelector('header')?.textContent).toContain('1080 × 1920');
+  });
+
   test('arrow keys move only through the files visible after the filter; Esc closes', async () => {
     const { ex } = await openExplorer();
     ex.setQuery('20260926_001');

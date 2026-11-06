@@ -22,6 +22,86 @@ const row = (name: string) => rows().find((r) => r.textContent?.includes(name))!
 const selected = () => rows().filter((r) => r.getAttribute('aria-selected') === 'true').length;
 
 describe('Explorer', () => {
+  test('explicit view choice survives folders and closing the explorer', async () => {
+    const { ctl, bridge } = await openExplorer();
+    const ex = ctl.explorer;
+    ex.setView('list');
+    await ex.go('/sdcard/Download');
+    expect(ex.state.view).toBe('list');
+    await ex.go('/sdcard/DCIM/Camera');
+    expect(ex.state.view).toBe('list');
+    await vi.waitFor(() => expect(bridge.calls.some(c => c.method === 'save_settings' && (c.args[0] as any).explorer_view === 'list')).toBe(true));
+    await ex.close();
+    await ex.open(SERIAL);
+    expect(ex.state.view).toBe('list');
+  });
+
+  test('pointer double click leaves the previous selection unchanged after closing preview', async () => {
+    const { ctl } = await openExplorer();
+    const ex = ctl.explorer;
+    const [first, second] = rows();
+    const selectedPath = first.dataset.path!;
+    ex.select(selectedPath);
+    await fireEvent.click(second, { detail: 1 });
+    expect([...ex.state.selected]).toEqual([selectedPath]);
+    await fireEvent.click(second, { detail: 2 });
+    await fireEvent.dblClick(second);
+    ex.closePreview();
+    expect([...ex.state.selected]).toEqual([selectedPath]);
+    await new Promise(resolve => setTimeout(resolve, 550));
+    expect([...ex.state.selected]).toEqual([selectedPath]);
+  });
+
+  test('dismissed task is not restored by task listing or late events', async () => {
+    const { ctl, bridge } = await openExplorer();
+    const ex = ctl.explorer;
+    await ex.uploadPaths(['C:\\one.txt']);
+    const task = { ...ex.state.tasks[0], status: 'done' as const };
+    bridge.emit('explorer:task', { task });
+    ex.dismissTask(task.id);
+    bridge.emit('explorer:task', { task });
+    await ex.uploadPaths(['C:\\two.txt']);
+    expect(ex.state.tasks.some(t => t.id === task.id)).toBe(false);
+    expect(ex.state.tasks).toHaveLength(1);
+  });
+
+  test('a new operation replaces completed notices while preserving active tasks', async () => {
+    const { ctl, bridge } = await openExplorer();
+    const ex = ctl.explorer;
+    await ex.uploadPaths(['C:\\one.txt']);
+    const first = ex.state.tasks[0];
+    bridge.emit('explorer:task', { task: { ...first, status: 'done' } });
+    await ex.uploadPaths(['C:\\two.txt']);
+    expect(ex.state.tasks).toHaveLength(1);
+    expect(ex.state.tasks[0].id).not.toBe(first.id);
+  });
+
+  test('a slow OS double click restores selection even after the single click timer', async () => {
+    const { ctl } = await openExplorer();
+    const ex = ctl.explorer;
+    const [first, second] = rows().map(e => e.dataset.path!);
+    ex.select(first);
+    ex.clickSelect(second, 1);
+    await new Promise(resolve => setTimeout(resolve, 550));
+    expect([...ex.state.selected]).toEqual([second]);
+    ex.clickSelect(second, 2);
+    expect([...ex.state.selected]).toEqual([first]);
+  });
+
+  test('a real bridge task id is resolved to a full view before rendering the task bar', async () => {
+    const { ctl, bridge } = await openExplorer();
+    bridge.answerNext('explorer_upload', { task: 'real-task-id' });
+    bridge.answerNext('explorer_tasks', { tasks: [{
+      id: 'real-task-id', kind: 'to_phone', status: 'done', done_files: 1, total_files: 1,
+      done_bytes: 10, total_bytes: 10, speed: 0, eta_s: null, skipped: 0, renamed: 0,
+      failed: [], verified: 'size', dest: '/sdcard/DCIM/Camera',
+    }] });
+    await ctl.explorer.uploadPaths(['C:\\zdjecie.jpg']);
+    await tick();
+    expect(ctl.explorer.state.tasks[0].id).toBe('real-task-id');
+    expect(screen.getByText('Wgrano 1 plik')).toBeTruthy();
+  });
+
   test('"Files" opens the explorer at the first place; place counts arrive in the background', async () => {
     const { s, bridge } = await openExplorer();
     expect(bridge.calls.find((c) => c.method === 'explorer_open')?.args).toEqual([SERIAL]);

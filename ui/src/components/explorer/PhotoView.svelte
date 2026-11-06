@@ -2,6 +2,7 @@
   import { fade } from 'svelte/transition';
   import { DUR, ms } from '../../lib/motion';
   import { t } from '../../lib/i18n/index.svelte';
+  import { observeSize } from '../../lib/resize';
   import type { EntryView } from '../../lib/types';
   import Icon from '../../ui/Icon.svelte';
 
@@ -21,13 +22,11 @@
   let natural = $state({ w: 0, h: 0 });
   let stage = $state<HTMLElement>();
 
-  // Rozmiar okna zdjęcia (do dopasowania po obrocie); w testach bez ResizeObserver zostaje 0 i obrót tylko obraca.
+  // Rozmiar okna zdjęcia do dopasowania po obrocie.
   $effect(() => {
     const el = stage;
-    if (!el || typeof ResizeObserver === 'undefined') return;
-    const watch = new ResizeObserver(() => { box = { w: el.clientWidth, h: el.clientHeight }; });
-    watch.observe(el);
-    return () => watch.disconnect();
+    if (!el) return;
+    return observeSize(el, ({ width, height }) => { box = { w: width, h: height }; });
   });
 
   // Obrócone o 90° zdjęcie ma zamienione boki: zmniejszamy je, żeby nadal mieściło się w oknie.

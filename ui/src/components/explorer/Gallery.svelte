@@ -22,8 +22,8 @@
   /** Margines treści w obszarze przewijanym (poświata zaznaczonego kafla nie jest ucinana). */
   const PAD = 6;
   /** Kaskada wyostrzania: odstęp między kolejnymi kaflami i najdalszy kafel z własnym opóźnieniem. */
-  const STEP_MS = 55;
-  const STEP_MAX = 20;
+  const STEP_MS = 25;
+  const STEP_MAX = 12;
   const DIRS = '/dirs';
 
   let box: HTMLElement;
@@ -124,7 +124,8 @@
 
   function onclick(ev: MouseEvent, e: EntryView): void {
     const check = ev.target instanceof Element && ev.target.closest('[data-check]');
-    ex.select(e.path, check ? { ctrl: true } : { ctrl: ev.ctrlKey || ev.metaKey, shift: ev.shiftKey }, order);
+    if (check) ex.select(e.path, { ctrl: true }, order);
+    else ex.clickSelect(e.path, ev.detail, { ctrl: ev.ctrlKey || ev.metaKey, shift: ev.shiftKey }, order);
   }
 
   /** Przewija tak, żeby kafel był cały widoczny (pod nagłówkiem dnia), i daje mu fokus. */
@@ -147,6 +148,7 @@
 
   /** Folder — wchodzi do niego, plik — otwiera podgląd (zdjęcie rośnie z kafla). */
   function open(e: EntryView): void {
+    ex.cancelClick();
     if (e.kind === 'dir') void ex.go(e.path);
     else void openMorph(e.path, () => ex.openPreview(e.path));
   }
@@ -257,7 +259,7 @@
         class="group absolute top-0 left-0 rounded-[12px] outline-offset-2"
         style:transform="translate({rect.x}px, {rect.y}px)" style:width="{rect.w}px" style:height="{rect.h}px"
         onclick={(ev) => onclick(ev, e)}
-        ondblclick={() => open(e)}
+        ondblclick={(ev) => { if (!(ev.target instanceof Element && ev.target.closest('[data-check]'))) open(e); }}
         onkeydown={(ev) => onkey(ev, e, i)}>
         <div class="h-full w-full {s.fresh.has(e.path) ? '[animation:pop-in_.35s]' : ''}">
           <Thumb entry={e} thumb={url ? thumbs.get(url) : null} noThumb={!url || thumbs.failed(url)} selected={sel}

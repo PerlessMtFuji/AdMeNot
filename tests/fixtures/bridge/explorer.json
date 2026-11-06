@@ -1197,7 +1197,7 @@
       "type": "doc",
       "ext": "pdf",
       "thumb": null,
-      "url": null
+      "url": "http://127.0.0.1:0/TOKEN/file?p=%2Fsdcard%2FDownload%2Ffaktura.pdf"
      },
      {
       "name": "notatka.txt",

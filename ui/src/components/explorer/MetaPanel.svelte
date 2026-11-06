@@ -55,6 +55,7 @@
     }
     const file: Row[] = [
       [t('explorer.preview.meta.name'), entry.label ?? entry.name],
+      [t('explorer.preview.meta.format'), entry.ext.toUpperCase()],
       [t('explorer.preview.meta.path'), String(m.path ?? entry.path)],
       [t('explorer.preview.meta.size'), formatBytes(Number(m.size ?? entry.size), i18n.lang)],
       [t('explorer.preview.meta.modified'), new Date(Number(m.mtime ?? entry.mtime) * 1000)

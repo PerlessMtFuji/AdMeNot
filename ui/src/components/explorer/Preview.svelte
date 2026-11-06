@@ -15,6 +15,7 @@
   import MetaPanel from './MetaPanel.svelte';
   import PhotoView from './PhotoView.svelte';
   import TextView from './TextView.svelte';
+  import PdfView from './PdfView.svelte';
 
   /** Okno podglądu nad eksploratorem: ciemne tło, pasek u góry, Esc / ← / → / Spacja. */
   let { ex, thumbs }: { ex: ExplorerController; thumbs: ThumbQueue } = $props();
@@ -25,6 +26,8 @@
 
   let info = $state(false);
   let meta = $state<EntryMeta | null>(null);
+  let decoded = $state<Record<string, number>>({});
+  const displayMeta = $derived<EntryMeta | null>(entry ? { ...meta, ...decoded, size: entry.size, mtime: entry.mtime, path: entry.path } : null);
   let broken = $state<string | null>(null);  // plik, którego nie dało się zdekodować
   let box = $state<HTMLElement>();
   let media = $state<{ toggle(): void }>();
@@ -43,6 +46,7 @@
     if (!entry || broken === entry.path) return 'unsupported';
     if (entry.type === 'image') return entry.url && NATIVE_IMAGE.includes(entry.ext.toLowerCase()) ? 'photo' : 'unsupported';
     if (entry.type === 'video' || entry.type === 'audio') return entry.url ? 'media' : 'unsupported';
+    if (entry.ext.toLowerCase() === 'pdf' && entry.url) return 'pdf';
     return entry.type === 'text' ? 'text' : 'unsupported';
   });
   const showInfo = $derived(view === 'unsupported' || info);
@@ -50,6 +54,7 @@
   $effect(() => {
     const path = entry?.path;
     meta = null;
+    decoded = {};
     started = false;
     if (!path) return;
     let stale = false;
@@ -64,8 +69,8 @@
   const facts = $derived.by(() => {
     if (!entry) return [];
     const out = [formatBytes(entry.size, i18n.lang)];
-    if (typeof meta?.width === 'number' && typeof meta?.height === 'number') out.push(`${meta.width} × ${meta.height}`);
-    if (Number(meta?.duration) > 0) out.push(clock(Number(meta?.duration) / 1000));
+    if (typeof displayMeta?.width === 'number' && typeof displayMeta?.height === 'number') out.push(`${displayMeta.width} × ${displayMeta.height}`);
+    if (Number(displayMeta?.duration) > 0) out.push(clock(Number(displayMeta?.duration) / 1000));
     for (const k of ['artist', 'album']) if (typeof meta?.[k] === 'string') out.push(String(meta[k]));
     out.push(new Date(entry.mtime * 1000).toLocaleDateString(i18n.lang === 'pl' ? 'pl-PL' : 'en-US', { dateStyle: 'medium' }));
     return out;
@@ -158,9 +163,11 @@
             {#if view === 'photo'}
               <PhotoView {entry} onfail={() => (broken = entry.path)} />
             {:else if view === 'media'}
-              <MediaView bind:this={media} {ex} {entry} {meta} {thumbs} onfail={() => (broken = entry.path)} />
+              <MediaView bind:this={media} {ex} {entry} meta={displayMeta} {thumbs} onmetadata={(m) => (decoded = m)} onfail={() => (broken = entry.path)} />
             {:else if view === 'text'}
               <TextView {ex} {entry} />
+            {:else if view === 'pdf'}
+              <PdfView {entry} />
             {:else}
               <div class="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center">
                 <FileIcon kind="file" type={entry.type} ext={entry.ext} size={96} />
@@ -174,7 +181,7 @@
           aria-label={t('explorer.preview.next')} title={t('explorer.preview.next')}><Icon name="chevron-right" size={22} /></button>
       </div>
       {#if showInfo}
-        <MetaPanel {entry} {meta} onmap={(lat, lon) => ex.openMap(lat, lon)} />
+        <MetaPanel {entry} meta={displayMeta} onmap={(lat, lon) => ex.openMap(lat, lon)} />
       {/if}
     </div>
 

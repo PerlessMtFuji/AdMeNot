@@ -8,7 +8,7 @@ import { defineConfig } from 'vitest/config';
 // Eksplorator plików: miniatury, podgląd i strumienie z lokalnego serwera mediów (127.0.0.1, losowy port), blob: z pamięci.
 const CSP = [
   "default-src 'self'", "script-src 'self'", "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: http://127.0.0.1:*", "media-src http://127.0.0.1:* blob:", "font-src 'self' data:",
+  "img-src 'self' data: blob: http://127.0.0.1:*", "media-src http://127.0.0.1:* blob:", "font-src 'self' data: blob:",
   "connect-src 'self' http://127.0.0.1:*",
   "object-src 'none'", "base-uri 'none'", "form-action 'none'",
 ].join('; ');

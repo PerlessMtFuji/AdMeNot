@@ -43,7 +43,7 @@ def entry_view(entry: Entry, media: MediaServer) -> dict[str, Any]:
     else:
         kind, ext = file_type(entry.name)
         thumb = media.thumb_url(entry.path) if ext in _THUMBS else None
-        url = media.file_url(entry.path) if kind in _STREAMED else None
+        url = media.file_url(entry.path) if kind in _STREAMED or ext == "pdf" else None
     return {"name": entry.name, "path": entry.path, "kind": entry.kind, "size": entry.size,
             "mtime": entry.mtime, "label": entry.label, "locked": entry.locked, "type": kind, "ext": ext,
             "thumb": thumb, "url": url}

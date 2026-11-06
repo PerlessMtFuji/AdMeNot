@@ -230,7 +230,8 @@ def test_list_and_crumbs(tmp_path):
     wa = api.explorer_list("/sdcard/Android/media/com.whatsapp")
     assert wa["crumbs"][-1] == {"label": "WhatsApp", "path": "/sdcard/Android/media/com.whatsapp"}
     downloads = {e["name"]: e for e in api.explorer_list("/sdcard/Download")["entries"]}
-    assert downloads["faktura.pdf"]["type"] == "doc" and downloads["faktura.pdf"]["url"] is None
+    assert downloads["faktura.pdf"]["type"] == "doc"
+    assert downloads["faktura.pdf"]["url"].startswith(opened["media"] + "/file?p=")
     assert downloads["notatka Łódź.txt"]["type"] == "text" and downloads["notatka Łódź.txt"]["thumb"] is None
     root = api.explorer_list("/sdcard")
     assert root["crumbs"] == [{"label": name, "path": "/sdcard"}]

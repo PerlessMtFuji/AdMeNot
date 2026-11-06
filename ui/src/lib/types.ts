@@ -36,6 +36,7 @@ export interface Settings {
   apk_mode_default: ApkModeDefault;
   /** Eksplorator: ostatni folder docelowy kopii na komputerze (zapisuje most). */
   explorer_dest?: string | null;
+  explorer_view?: 'list' | 'grid' | null;
 }
 
 export interface TelemetrySample {
@@ -543,7 +544,7 @@ export interface ExplorerProblem {
   detail: Record<string, unknown>;
 }
 
-export type ExplorerStart = { task: TaskView } | { problems: ExplorerProblem[] };
+export type ExplorerStart = { task: string } | { problems: ExplorerProblem[] };
 
 // --- przenoszenie danych: kopia starego telefonu (present.inventory_view / copy_view / backup_result_view)
 
