@@ -51,7 +51,7 @@ from admenot.engine.explorer.media import MediaServer
 from admenot.engine.explorer.meta import image_meta, media_meta
 from admenot.engine.explorer.places import Place, count_place, find_places, place_bytes
 from admenot.engine.explorer.plan import Problem, TaskPlan, plan_to_pc, plan_to_phone
-from admenot.engine.explorer.queue import TransferQueue, sweep_recorded
+from admenot.engine.explorer.queue import TransferQueue, sweep_parts, sweep_recorded
 from admenot.engine.explorer.textview import TEXT_LIMIT, decode_chunk
 from admenot.engine.explorer.thumbs import EXIF_HEAD
 from admenot.engine.oplock import DeviceBusy, device_lock
@@ -216,6 +216,7 @@ class ExplorerMixin:
         self._pick_files_fn: Callable[[], list[str]] | None = None
         self._explorer_seq = 0  # kolejne kolejki zadań (przedrostek identyfikatorów)
         self._explorer_clean_temp()
+        self._explorer_sweep_parts(set())  # po padzie programu: połówki plików klienta na komputerze
 
     # --- pomocnicze -----------------------------------------------------------------------
 
@@ -304,6 +305,14 @@ class ExplorerMixin:
         try:
             return sweep_recorded(sess_adb, serial, skip=skip)
         except (AdbError, UnsafeCommand, OSError) as exc:
+            log_exception(exc, scrub=client_paths)
+            return 0
+
+    @staticmethod
+    def _explorer_sweep_parts(skip: set[str]) -> int:
+        try:
+            return sweep_parts(skip=skip)
+        except OSError as exc:
             log_exception(exc, scrub=client_paths)
             return 0
 
@@ -461,11 +470,12 @@ class ExplorerMixin:
         reszta zajętego miejsca to „inne”."""
         with self._explorer_errors(sess):
             out = sess.adb.shell("df -k /sdcard")
-        total = used = 0
+        total = used = free = 0
         for line in reversed(out.splitlines()):
             cols = line.split()
             if len(cols) >= 4 and cols[1].isdigit() and cols[2].isdigit():
                 total, used = int(cols[1]) * 1024, int(cols[2]) * 1024
+                free = int(cols[3]) * 1024 if cols[3].isdigit() else max(0, total - used)  # jak plan wgrywania
                 break
         else:
             raise AppError("explorer_offline")
@@ -480,7 +490,7 @@ class ExplorerMixin:
             except (ListError, AdbError):
                 continue  # miejsce bez rozmiaru — wchodzi do „inne”
         sizes["other"] = max(0, used - sum(sizes.values()))
-        return {"total": total, "used": used, "groups": sizes}
+        return {"total": total, "used": used, "free": free, "groups": sizes}
 
     def _explorer_start(self, sess: _Session, plan: TaskPlan, verify_hash: bool) -> dict[str, Any]:
         """Problemy planu → nic nie startuje, UI je pokazuje; inaczej zadanie trafia do kolejki."""
@@ -586,6 +596,7 @@ class ExplorerMixin:
                     # ponowne otwarcie (np. odświeżone okno): ta sama sesja; foldery z plikami tymczasowymi
                     # pilnowanymi przez żywą kolejkę zostają
                     skip = sess.queue.tracked_folders() if sess.queue is not None else set()
+                    self._explorer_sweep_parts(sess.queue.tracked_parts() if sess.queue is not None else set())
                     return self._explorer_view(sess, self._explorer_sweep(sess.adb, serial, skip))
                 job = self._jobs.current()
                 if job is not None:
@@ -750,15 +761,18 @@ class ExplorerMixin:
     # --- kopiowanie i wgrywanie -------------------------------------------------------------
 
     @_bridge
-    def explorer_copy(self, paths: list[str], dest: str | None = None,
-                      verify_hash: bool = False) -> dict[str, Any]:
+    def explorer_copy(self, paths: list[str], dest: str | None = None, verify_hash: bool = False,
+                      exclude: list[str] | None = None) -> dict[str, Any]:
         """Kopia zaznaczenia z telefonu do folderu na komputerze (`dest` None → ostatni wybrany).
-        Problemy planu (miejsce, FAT32, zapis, odmowa) wracają przed startem zamiast zadania."""
+        Problemy planu (miejsce, FAT32, zapis, odmowa) wracają przed startem zamiast zadania; `exclude` —
+        pliki i foldery, które serwisant pominął w oknie problemów."""
         sess = self._explorer_session()
         if not isinstance(paths, list) or not paths:
             raise AppError("bad_request", "paths")
         if not isinstance(verify_hash, bool):
             raise AppError("bad_request", "verify_hash")
+        if exclude is not None and not (isinstance(exclude, list) and all(isinstance(p, str) for p in exclude)):
+            raise AppError("bad_request", "exclude")
         remote = [self._explorer_path(p, file=True) for p in paths]
         if dest is None:
             dest = self._settings.explorer_dest
@@ -767,23 +781,25 @@ class ExplorerMixin:
         if not dest or not os.path.isabs(dest) or not os.path.isdir(dest):  # np. odłączony pendrive
             raise AppError("explorer_no_dest")
         with self._explorer_errors(sess):
-            plan = plan_to_pc(sess.adb, remote, Path(dest))
+            plan = plan_to_pc(sess.adb, remote, Path(dest), exclude=frozenset(exclude or ()))
         self._explorer_save_dest(dest)
         return self._explorer_start(sess, plan, verify_hash)
 
     @_bridge
-    def explorer_upload(self, locals_: list[str], remote_dir: str) -> dict[str, Any]:
+    def explorer_upload(self, locals_: list[str], remote_dir: str, verify_hash: bool = False) -> dict[str, Any]:
         """Wgranie plików/folderów z komputera (okno wyboru, upuszczenie, Ctrl+V) do folderu telefonu."""
         sess = self._explorer_session()
         if not isinstance(locals_, list) or not locals_ or not all(
                 isinstance(p, str) and os.path.isabs(p) for p in locals_):
             raise AppError("bad_request", "paths")
+        if not isinstance(verify_hash, bool):
+            raise AppError("bad_request", "verify_hash")
         remote_dir = self._explorer_path(remote_dir)
         with self._explorer_lock:
             locked = frozenset(sess.locked)
         with self._explorer_errors(sess):  # `df` przy odłączonym telefonie → explorer_offline
             plan = plan_to_phone(sess.adb, [Path(p) for p in locals_], remote_dir, locked=locked)
-        return self._explorer_start(sess, plan, False)
+        return self._explorer_start(sess, plan, verify_hash)
 
     @_bridge
     def explorer_pick_dest(self) -> dict[str, Any]:
@@ -833,6 +849,12 @@ class ExplorerMixin:
         if queue_ is not None:
             queue_.resume(task_id)
         return {}
+
+    @_bridge
+    def explorer_retry(self, task_id: str) -> dict[str, Any]:
+        """„Ponów” przy pliku uszkodzonym w kopii: nieudane pliki zadania idą nowym zadaniem."""
+        queue_ = self._explorer_task_queue(task_id)
+        return {"task": queue_.retry(task_id) if queue_ is not None else None}
 
     @_bridge
     def explorer_cancel(self, task_id: str) -> dict[str, Any]:

@@ -20,7 +20,7 @@ from faketransfer import FakeStoragePhone, PhoneHost, TransferPhone
 from admenot.app import explorer_api
 from admenot.engine.adb.sessionlog import session_log_path
 from admenot.engine.device.info import GETPROP
-from admenot.engine.explorer.plan import TaskPlan
+from admenot.engine.explorer.plan import TaskPlan, phone_free_bytes
 from admenot.engine.explorer.queue import read_tmp_folders, record_tmp_folder
 from admenot.engine.oplock import DeviceBusy, device_lock
 from admenot.engine.paths import journal_path, logs_dir, telemetry_path
@@ -151,7 +151,7 @@ def test_storage_requires_open_explorer(tmp_path):
 
 
 def test_storage_event_after_upload_to_phone(tmp_path):
-    api, rec, host, _ = _opened(tmp_path)
+    api, rec, _, _ = _opened(tmp_path)
     assert not rec.of("explorer:storage")
     local = _pc_dir(tmp_path, "z komputera")
     (local / "a.jpg").write_bytes(b"J" * 10)
@@ -161,7 +161,7 @@ def test_storage_event_after_upload_to_phone(tmp_path):
     while not rec.of("explorer:storage") and time.monotonic() < deadline:
         time.sleep(0.02)
     event = rec.of("explorer:storage")[-1]
-    assert set(event) == {"total", "used", "groups"} and set(event["groups"]) == {"photos", "videos", "whatsapp", "other"}
+    assert set(event) == {"total", "used", "free", "groups"} and set(event["groups"]) == {"photos", "videos", "whatsapp", "other"}
     api.explorer_close()
 
 
@@ -561,7 +561,7 @@ def test_copy_uses_saved_dest(tmp_path):
 def test_copy_problems_returned_before_start(tmp_path, monkeypatch):
     real = explorer_api.plan_to_pc
     monkeypatch.setattr(explorer_api, "plan_to_pc",
-                        lambda adb, paths, dest: real(adb, paths, dest, free_bytes=lambda p: 3))
+                        lambda adb, paths, dest, **kw: real(adb, paths, dest, free_bytes=lambda p: 3, **kw))
     api, rec, _, _ = _opened(tmp_path)
     pc = _pc_dir(tmp_path)
     out = api.explorer_copy(["/sdcard/Download/faktura.pdf"], str(pc))
@@ -1044,3 +1044,67 @@ def test_switch_phone_emits_closed_outside_the_session_lock(tmp_path):
     assert held == [False]
     assert rec.of("explorer:closed") == [{"serial": SERIAL, "reason": "switched"}]
     api.explorer_close()
+
+
+def test_second_window_close_waits_for_the_first(tmp_path):
+    api, _, _, _ = _opened(tmp_path)
+    queue = api._explorer_queue()
+    queue.active = lambda: 1  # zadania trwają: zamykanie idzie osobnym wątkiem
+    entered, leave = threading.Event(), threading.Event()
+    calls: list[str] = []
+
+    def slow_quit() -> None:
+        entered.set()
+        leave.wait(5)
+
+    api._explorer_quit = slow_quit
+    api._shutdown = lambda: calls.append("shutdown")
+    assert api._on_closing() is False
+    assert entered.wait(5)
+    assert api._on_closing() is False  # drugi krzyżyk: to samo zamykanie, bez skrótu do `_shutdown`
+    assert calls == []
+    leave.set()
+
+
+def test_storage_reports_free_space_like_the_upload_plan(tmp_path):
+    api, _, _, _ = _opened(tmp_path)
+    usage = api.explorer_storage()
+    assert usage["free"] == phone_free_bytes(api._explorer.adb)
+
+
+def test_upload_can_verify_by_hash(tmp_path):
+    api, _, _, _ = _opened(tmp_path)
+    local = _pc_dir(tmp_path, "z komputera") / "a.txt"
+    local.write_bytes(b"x")
+    task = api.explorer_upload([str(local)], "/sdcard/Download", True)["task"]
+    done = api._explorer_queue().wait_for(task, "done")
+    assert done.verified == "hash"
+
+
+def test_copy_leaves_out_excluded_paths(tmp_path):
+    api, _, _, _ = _opened(tmp_path)
+    dest = _pc_dir(tmp_path, "cel")
+    paths = ["/sdcard/Download/faktura.pdf", "/sdcard/Download/notatka Łódź.txt"]
+    task = api.explorer_copy(paths, str(dest), False, [paths[0]])["task"]
+    api._explorer_queue().wait_for(task, "done")
+    assert [p.name for p in dest.iterdir()] == ["notatka Łódź.txt"]
+
+
+def test_retry_bridge_starts_a_new_task_only_for_failed_files(tmp_path):
+    api, _, host, _ = _opened(tmp_path)
+    assert api.explorer_retry("nie-ma") == {"task": None}
+    dest = _pc_dir(tmp_path, "cel")
+    storage = _storage_of(host)
+    bad = {"on": True}
+
+    def corrupt(cmd: str) -> None:
+        if cmd.startswith("sha256sum ") and bad["on"]:
+            storage.local("/sdcard/Download/faktura.pdf").write_bytes(os.urandom(storage.local("/sdcard/Download/faktura.pdf").stat().st_size))
+
+    storage.on_shell = corrupt
+    task = api.explorer_copy(["/sdcard/Download/faktura.pdf"], str(dest), True)["task"]
+    queue = api._explorer_queue()
+    assert queue.wait_for(task, "done").verified == "mismatch"
+    bad["on"] = False
+    again = api.explorer_retry(task)["task"]
+    assert queue.wait_for(again, "done").verified == "hash"

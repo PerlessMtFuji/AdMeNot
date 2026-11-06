@@ -417,6 +417,7 @@ class Api(ExplorerMixin):
         self._pick_folder_fn: Callable[[], str | None] | None = None
         self._close_fn: Callable[[], None] | None = None
         self._quitting = False
+        self._closing_window = False  # krzyżyk czeka już na koniec kopii albo kolejki eksploratora
         self._open_file = open_file
         self._report_lock = threading.Lock()
         self._sync = sync_jobs
@@ -2386,6 +2387,8 @@ class Api(ExplorerMixin):
     def _on_closing(self) -> bool:
         if self._quitting:
             return True
+        if self._closing_window:  # drugi krzyżyk w czasie czekania: to samo zamykanie, bez skrótów
+            return False
         job = self._order_in_progress()
         if job is not None:
             # `closing` biegnie na wątku GUI, a `run_js` czeka na ten sam wątek (zakleszczenie),
@@ -2399,6 +2402,7 @@ class Api(ExplorerMixin):
             # stan zapisany) i zamykamy okno po jej końcu. Nigdy nie czekamy na wątku GUI: zdarzenia
             # zadania (`run_js`) czekają na ten sam wątek.
             self._jobs.stop(job.id)
+            self._closing_window = True
             threading.Thread(target=self._close_after, args=(job,), daemon=True,
                              name="admenot-quit").start()
             return False
@@ -2406,6 +2410,7 @@ class Api(ExplorerMixin):
             # Jak przy kopii: bez pytania (UI pyta przy wyjściu z eksploratora, okno zamyka serwisant),
             # zadania eksploratora są anulowane, a okno zamyka się dopiero po końcu wątku kolejki (zabity
             # `adb`, usunięte `.admenot-part`) — na osobnym wątku, nigdy na wątku GUI.
+            self._closing_window = True
             threading.Thread(target=self._close, daemon=True, name="admenot-quit").start()
             return False
         self._shutdown()

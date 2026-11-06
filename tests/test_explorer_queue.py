@@ -16,8 +16,11 @@ from admenot.engine.explorer.queue import (
     HASH_MIN_SPEED,
     TransferQueue,
     hash_timeout,
+    read_part_folders,
     read_tmp_folders,
+    record_part_folder,
     record_tmp_folder,
+    sweep_parts,
     sweep_recorded,
     sweep_tmp,
 )
@@ -687,3 +690,175 @@ def test_queue_pushes_only_through_the_explorer_guard(phone, adb, tmp_path, make
     bad = make_queue(token=lambda: "../../x")
     st = bad.wait_for(bad.add(plan_to_phone(adb, [src / "b.jpg"], "/sdcard/Up")), "done")
     assert st.failed == [(str(src / "b.jpg"), "error")] and phone.push_calls == 1
+
+
+# ---- poprawki po przeglądzie 2026-11-06 ---------------------------------------------------------
+
+
+def test_items_the_plan_could_not_read_are_not_counted_as_identical(phone, adb, pc, make_queue):
+    put(phone, "/sdcard/jest.txt")
+    plan = plan_to_pc(adb, ["/sdcard/zniknal.txt"], pc, **OK)
+    q = make_queue()
+    st = q.wait_for(q.add(plan), "done")
+    assert st.skipped == 0 and st.omitted == 1
+
+
+def test_identical_file_in_queue_twice_is_skipped_not_saved_beside(phone, adb, tmp_path, make_queue):
+    src = tmp_path / "src"
+    local_tree(src, {"a.bin": b"same"})
+    phone.local("/sdcard/Up").mkdir(parents=True)
+    first = plan_to_phone(adb, [src / "a.bin"], "/sdcard/Up")
+    second = plan_to_phone(adb, [src / "a.bin"], "/sdcard/Up")  # liczony, zanim pierwszy się wykonał
+    q = make_queue()
+    q.wait_for(q.add(first), "done")
+    st = q.wait_for(q.add(second), "done")
+    assert phone_files(phone, "/sdcard/Up") == {"a.bin": b"same"}
+    assert st.skipped == 1 and st.renamed == 0 and no_phone_tmp(phone)
+
+
+def test_different_file_appearing_during_upload_still_goes_beside(phone, adb, tmp_path, make_queue):
+    src = tmp_path / "src"
+    local_tree(src, {"a.bin": b"mine"})
+    phone.local("/sdcard/Up").mkdir(parents=True)
+    plan = plan_to_phone(adb, [src / "a.bin"], "/sdcard/Up")
+    put(phone, "/sdcard/Up/a.bin", b"them")  # ten sam rozmiar, inna treść
+    q = make_queue()
+    st = q.wait_for(q.add(plan), "done")
+    assert phone_files(phone, "/sdcard/Up") == {"a.bin": b"them", "a (z komputera).bin": b"mine"}
+    assert st.renamed == 1
+
+
+def test_identical_file_on_pc_in_queue_twice_is_skipped(phone, adb, pc, make_queue):
+    put(phone, "/sdcard/a.bin", b"same")
+    first = plan_to_pc(adb, ["/sdcard/a.bin"], pc, **OK)
+    second = plan_to_pc(adb, ["/sdcard/a.bin"], pc, **OK)
+    q = make_queue()
+    q.wait_for(q.add(first), "done")
+    st = q.wait_for(q.add(second), "done")
+    assert pc_files(pc) == {"a.bin": b"same"}
+    assert st.skipped == 1 and st.renamed == 0
+
+
+def test_pause_answers_at_once_during_phone_hash(phone, adb, pc, make_queue):
+    put(phone, "/sdcard/a.bin", b"data")
+    release = threading.Event()
+    holder: dict[str, str] = {}
+
+    def slow(cmd: str) -> None:  # `sha256sum` wielkiego pliku trwa minutami
+        if cmd.startswith("sha256sum "):
+            q.pause(holder["id"])
+            release.wait(10)
+
+    phone.on_shell = slow
+    plan = plan_to_pc(adb, ["/sdcard/a.bin"], pc, **OK)
+    q = make_queue()
+    holder["id"] = tid = q.add(plan, verify_hash=True)
+    try:
+        st = q.wait_for(tid, "paused", timeout=3)
+        assert st.failed == []  # przerwane, nie nieudane
+        assert pc_files(pc) == {}  # plik w toku nie zostaje
+    finally:
+        release.set()
+
+
+def test_part_file_folder_is_on_disk_during_copy_and_forgotten_after(phone, adb, pc, tmp_dir, make_queue):
+    put(phone, "/sdcard/a.bin", b"data")
+    seen: list[list[str]] = []
+
+    class Spy:
+        def pull(self, remotes, target, should_stop, tick):
+            seen.append(read_part_folders(directory=tmp_dir))
+            return phone.pull(remotes, target, should_stop, tick)
+
+    q = make_queue(puller=Spy())
+    q.wait_for(q.add(plan_to_pc(adb, ["/sdcard/a.bin"], pc, **OK)), "done")
+    assert len(seen) == 1 and len(seen[0]) == 1 and seen[0][0].endswith(pc.name)
+    assert read_part_folders(directory=tmp_dir) == []
+
+
+def test_sweep_removes_only_our_parts_from_recorded_folders(tmp_path, tmp_dir):
+    folder = tmp_path / "dest"
+    folder.mkdir()
+    (folder / "film.mp4.admenot-part").write_bytes(b"pol pliku")
+    (folder / "film.mp4").write_bytes(b"plik klienta")
+    other = tmp_path / "other"
+    other.mkdir()
+    (other / "obcy.admenot-part").write_bytes(b"nie z listy")
+    record_part_folder(str(folder), directory=tmp_dir)
+    assert sweep_parts(directory=tmp_dir) == 1
+    assert sorted(p.name for p in folder.iterdir()) == ["film.mp4"]
+    assert (other / "obcy.admenot-part").exists()
+    assert read_part_folders(directory=tmp_dir) == []
+
+
+def test_sweep_skips_folders_of_a_live_queue(tmp_path, tmp_dir):
+    folder = tmp_path / "dest"
+    folder.mkdir()
+    (folder / "x.admenot-part").write_bytes(b"w toku")
+    record_part_folder(str(folder), directory=tmp_dir)
+    assert sweep_parts(directory=tmp_dir, skip={str(folder)}) == 0
+    assert (folder / "x.admenot-part").exists()
+    assert read_part_folders(directory=tmp_dir) == [str(folder)]
+
+
+def test_upload_shows_progress_inside_one_big_file(phone, adb, tmp_path, make_queue):
+    src = tmp_path / "src"
+    local_tree(src, {"film.bin": b"F" * 1000})
+    phone.local("/sdcard/Up").mkdir(parents=True)
+    seen: list[int] = []
+
+    class Half:
+        def push(self, locals_, remote, should_stop, tick):
+            phone.local(remote).write_bytes(b"F" * 400)
+            tick()
+            seen.append(q.tasks()[0].done_bytes)
+            return phone.push(locals_, remote, should_stop, tick)
+
+    q = make_queue(pusher=Half(), progress_min=100, progress_interval=0)
+    st = q.wait_for(q.add(plan_to_phone(adb, [src / "film.bin"], "/sdcard/Up")), "done")
+    assert seen == [400]
+    assert st.done_bytes == 1000  # bajty w toku nie liczą się podwójnie
+
+
+def test_closing_with_a_paused_upload_removes_its_tmp(phone, adb, tmp_path, make_queue):
+    src = tmp_path / "src"
+    local_tree(src, {"big.bin": b"B" * 400})
+    phone.local("/sdcard/Up").mkdir(parents=True)
+    q = make_queue(big_file=100)
+    tid = q.add(plan_to_phone(adb, [src / "big.bin"], "/sdcard/Up"))
+    q.wait_for(tid, "done")
+    leftover = "/sdcard/Up/.admenot-0123456789ab.part"
+    put(phone, leftover, b"x")
+    task = q._tasks[tid]
+    task.tmps.add(leftover)
+    task.state.status = "paused"
+    q.shutdown()
+    assert no_phone_tmp(phone)
+
+
+def test_retry_runs_only_the_failed_files_again(phone, adb, pc, make_queue):
+    put(phone, "/sdcard/P/a.jpg", b"good")
+    put(phone, "/sdcard/P/b.jpg", b"fine")
+    state = {"bad": True}
+
+    def corrupt(cmd: str) -> None:
+        if cmd.startswith("sha256sum ") and "a.jpg" in cmd and state["bad"]:
+            phone.local("/sdcard/P/a.jpg").write_bytes(os.urandom(4))
+
+    phone.on_shell = corrupt
+    q = make_queue()
+    tid = q.add(plan_to_pc(adb, ["/sdcard/P"], pc, **OK), verify_hash=True)
+    assert q.wait_for(tid, "done").verified == "mismatch"
+    state["bad"] = False
+    st = q.wait_for(q.retry(tid), "done")
+    assert st.verified == "hash" and st.failed == [] and (st.done_files, st.total_files) == (1, 1)
+    assert "P/a.jpg" in pc_files(pc)
+    assert q.retry("nie-ma") is None
+
+
+def test_retry_of_task_without_failures_does_nothing(phone, adb, pc, make_queue):
+    put(phone, "/sdcard/a.bin", b"x")
+    q = make_queue()
+    tid = q.add(plan_to_pc(adb, ["/sdcard/a.bin"], pc, **OK))
+    q.wait_for(tid, "done")
+    assert q.retry(tid) is None

@@ -25,6 +25,7 @@ __all__ = [
     "Item",
     "Problem",
     "TaskPlan",
+    "phone_free_bytes",
     "plan_to_pc",
     "plan_to_phone",
     "side_name",
@@ -136,9 +137,11 @@ class _PcSide:
 def plan_to_pc(adb: ExplorerAdb, paths: list[str], dest: Path, *,
                free_bytes: Callable[[Path], int] = hostfs.free_bytes,
                filesystem: Callable[[Path], str] = hostfs.filesystem,
-               writable: Callable[[Path], bool] = hostfs.writable) -> TaskPlan:
+               writable: Callable[[Path], bool] = hostfs.writable,
+               exclude: Collection[str] = ()) -> TaskPlan:
     """Plan kopii zaznaczenia z telefonu do folderu `dest`: foldery rozwijane rekurencyjnie (z ukrytymi plikami),
-    struktura zachowana pod `dest/<nazwa zaznaczenia>/…`, każdy element nazwy przez `sanitize_component`."""
+    struktura zachowana pod `dest/<nazwa zaznaczenia>/…`, każdy element nazwy przez `sanitize_component`.
+    `exclude` — ścieżki plików i folderów, które serwisant pominął w oknie problemów."""
     items: list[Item] = []
     dirs: list[str] = []
     problems: list[Problem] = []
@@ -171,7 +174,7 @@ def plan_to_pc(adb: ExplorerAdb, paths: list[str], dest: Path, *,
             raise
         skipped += res.skipped
         for e in res.entries:
-            if is_tmp_name(e.name):
+            if is_tmp_name(e.name) or e.path in exclude:
                 continue
             if e.kind == "dir":
                 child, child_new = add_dir(local, is_new, e.name)
@@ -181,6 +184,8 @@ def plan_to_pc(adb: ExplorerAdb, paths: list[str], dest: Path, *,
 
     parents: dict[str, dict[str, Any]] = {}
     for p in paths:
+        if p.rstrip("/") in exclude:
+            continue
         parent = posixpath.dirname(p.rstrip("/"))
         if parent not in parents:
             parents[parent] = {e.path: e for e in list_dir(adb, parent, include_hidden=True).entries}
@@ -202,9 +207,10 @@ def plan_to_pc(adb: ExplorerAdb, paths: list[str], dest: Path, *,
     if total > free:
         problems.append(Problem("no_space", {"need": total, "free": free, "missing": total - free}))
     if filesystem(dest).upper() == "FAT32":
-        big = [posixpath.basename(i.src) for i in items if i.size > FAT32_MAX_FILE]
+        big = [i.src for i in items if i.size > FAT32_MAX_FILE]
         if big:
-            problems.append(Problem("fat32_big", {"names": big, "max": FAT32_MAX_FILE}))
+            problems.append(Problem("fat32_big", {"names": [posixpath.basename(p) for p in big], "paths": big,
+                                                  "max": FAT32_MAX_FILE}))
     too_long = [i.dst for i in items if len(i.dst.removeprefix("\\\\?\\")) > hostfs.MAX_LONG_PATH]
     if too_long:
         problems.append(Problem("path_too_long", {"count": len(too_long), "limit": hostfs.MAX_LONG_PATH}))
@@ -215,7 +221,7 @@ def plan_to_pc(adb: ExplorerAdb, paths: list[str], dest: Path, *,
 # komputer -> telefon
 
 
-def _phone_free_bytes(adb: ExplorerAdb) -> int | None:
+def phone_free_bytes(adb: ExplorerAdb) -> int | None:
     """Wolne miejsce z `df -k /sdcard` (kolumna „Available”, KiB: token tuż przed kolumną `Use%`)."""
     lines = [ln for ln in adb.shell("df -k /sdcard").splitlines() if ln.strip()]
     for ln in reversed(lines):
@@ -319,7 +325,7 @@ def plan_to_phone(adb: ExplorerAdb, locals_: list[Path], remote_dir: str, *,
     total = sum(i.size for i in items)
     if denied:
         problems.append(Problem("denied", {"paths": denied}))
-    free = _phone_free_bytes(adb)
+    free = phone_free_bytes(adb)
     if free is not None and total > free:
         problems.append(Problem("no_space", {"need": total, "free": free, "missing": total - free}))
     too_long = [i.dst for i in items if len(i.dst.encode("utf-8")) > PHONE_MAX_PATH]

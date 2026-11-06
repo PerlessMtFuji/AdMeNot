@@ -175,3 +175,23 @@ def test_hostfs_real_volume(tmp_path):
     if os.name == "nt":
         assert filesystem(tmp_path)
         assert long_path("C:\\" + "a" * 300).startswith("\\\\?\\C:\\")
+
+
+def test_exclude_leaves_chosen_files_and_folders_out(phone, adb, dest):
+    put(phone, "/sdcard/P/big.mp4", b"b")
+    put(phone, "/sdcard/P/ok.jpg", b"o")
+    put(phone, "/sdcard/P/Blok/x.jpg", b"x")
+    plan = plan_to_pc(adb, ["/sdcard/P"], dest, exclude={"/sdcard/P/big.mp4", "/sdcard/P/Blok"}, **OK)
+    assert [i.src for i in plan.items] == ["/sdcard/P/ok.jpg"]
+    assert plan.skipped == 0
+
+
+def test_fat32_problem_carries_full_paths_for_exclude(phone, adb, dest):
+    phone.local("/sdcard/V").mkdir(parents=True)
+    phone.listing_extra["/sdcard/V"] = [("huge.mkv", 4 * GIB + 1, 1)]
+    plan = plan_to_pc(adb, ["/sdcard/V"], dest, **{**OK, "filesystem": lambda p: "FAT32"})
+    (fat,) = [p for p in plan.problems if p.key == "fat32_big"]
+    assert fat.detail["paths"] == ["/sdcard/V/huge.mkv"]
+    again = plan_to_pc(adb, ["/sdcard/V"], dest, exclude=set(fat.detail["paths"]),
+                       **{**OK, "filesystem": lambda p: "FAT32"})
+    assert again.problems == [] and again.items == []
