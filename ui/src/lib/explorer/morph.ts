@@ -72,7 +72,9 @@ export function openMorph(path: string, change: () => void): Promise<void> {
   return morph(tileImage(path), change, photoImage);
 }
 
-/** Zdjęcie w oknie podglądu → kafel (gdy go widać). */
+/** Zdjęcie w oknie podglądu → kafel (gdy go widać). Przybliżone zamyka się bez przejścia: przeglądarka robi
+ *  zrzut elementu razem z powiększeniem, a przy 8× to 2,5 GB pamięci karty i klatkowanie całego komputera. */
 export function closeMorph(path: string, change: () => void): Promise<void> {
-  return morph(photoImage(), change, () => tileImage(path));
+  const photo = photoImage();
+  return morph(photo?.dataset.zoomed === undefined ? photo : null, change, () => tileImage(path));
 }

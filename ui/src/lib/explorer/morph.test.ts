@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { morph } from './morph';
+import { closeMorph, morph } from './morph';
 
 const motionOn = () => vi.stubGlobal('matchMedia', () => ({ matches: false }));
 
@@ -47,5 +47,36 @@ describe('morph', () => {
     expect(frames[0].transform).toBe('translate(-140px, -30px) scale(0.25, 0.5)');
     expect(frames[1].transform).toBe('none');
     expect(options.duration).toBe(300);
+  });
+});
+
+describe('closeMorph', () => {
+  const photo = (): HTMLElement => {
+    const el = document.body.appendChild(document.createElement('div'));
+    el.dataset.morph = 'photo';
+    return el;
+  };
+  const stubTransition = () => {
+    const start = vi.fn((cb: () => Promise<void>) => ({ finished: cb() }));
+    (document as unknown as { startViewTransition: unknown }).startViewTransition = start;
+    return start;
+  };
+
+  test('a photo at normal size shrinks back with a view transition', async () => {
+    motionOn();
+    photo();
+    const start = stubTransition();
+    await closeMorph('/sdcard/a.jpg', () => {});
+    expect(start).toHaveBeenCalledOnce();
+  });
+
+  test('a zoomed photo closes without one: its snapshot at 8x took 2.5 GB of graphics memory', async () => {
+    motionOn();
+    photo().dataset.zoomed = '';
+    const start = stubTransition();
+    const change = vi.fn();
+    await closeMorph('/sdcard/a.jpg', change);
+    expect(start).not.toHaveBeenCalled();
+    expect(change).toHaveBeenCalledOnce();
   });
 });

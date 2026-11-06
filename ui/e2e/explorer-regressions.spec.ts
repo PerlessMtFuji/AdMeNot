@@ -289,6 +289,45 @@ test('an idle photo preview does no work every frame', async ({ page }) => {
   expect(await page.locator('.glow').evaluate((el) => el.getAnimations().length)).toBe(0);
 });
 
+test('closing a zoomed photo takes no snapshot of it', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.route('http://127.0.0.1:4173/zoom.png', route => route.fulfill({
+    body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64'),
+    contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' },
+  }));
+  await page.goto('/?scenario=explorer');
+  await page.getByRole('button', { name: 'Pliki', exact: true }).click();
+  await page.evaluate(() => {
+    const start = document.startViewTransition.bind(document);
+    (window as any).__transitions = 0;
+    document.startViewTransition = ((cb: () => void) => { (window as any).__transitions++; return start(cb); }) as typeof document.startViewTransition;
+    const ex = (window as any).__admenot.ctl.explorer;
+    ex.state.entries.push({ ...ex.state.entries[0], path: '/sdcard/zoom.png', name: 'zoom.png', kind: 'file', type: 'image', ext: 'png',
+      url: 'http://127.0.0.1:4173/zoom.png', thumb: 'http://127.0.0.1:4173/zoom.png' });
+  });
+  const open = () => page.evaluate(() => (window as any).__admenot.ctl.explorer.openPreview('/sdcard/zoom.png'));
+  const transitions = () => page.evaluate(() => (window as any).__transitions);
+  const dialog = page.getByRole('dialog');
+
+  await open();
+  const photo = dialog.locator('[data-morph="photo"]');
+  await photo.waitFor();
+  const box = (await photo.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.wheel(0, -120);
+  await expect(photo).toHaveAttribute('style', /scale\(1\.25\)/);
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  // Zrzut elementu ze scale(8) to 593 MB na klatkę, zmierzone 2,5 GB: zapełniał kartę i klatkował cały komputer.
+  expect(await transitions()).toBe(0);
+
+  await open();
+  await photo.waitFor();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  expect(await transitions()).toBe(1);  // zwykłe zdjęcie nadal kurczy się płynnie
+});
+
 test('the storage wave rests when nothing happens and moves during a task', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/?scenario=explorer');

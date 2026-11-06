@@ -86,7 +86,7 @@
 <div class="absolute inset-0 touch-none overflow-hidden {zoom > 1 ? (dragging ? 'cursor-grabbing' : 'cursor-grab') : ''}"
   bind:this={stage}
   role="presentation" onwheel={wheel} onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={up}>
-  <div data-morph="photo" class="absolute inset-0 {dragging ? '' : 'transition-transform duration-150 ease-out motion-reduce:transition-none'}"
+  <div data-morph="photo" data-zoomed={zoom > 1 ? '' : undefined} class="absolute inset-0 {dragging ? '' : 'transition-transform duration-150 ease-out motion-reduce:transition-none'}"
     style:transform={transform}>
     <img src={entry.thumb ?? ''} alt="" draggable="false" class="absolute inset-0 h-full w-full object-contain select-none"
       onload={measure} />
