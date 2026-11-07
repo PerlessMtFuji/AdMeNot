@@ -374,3 +374,110 @@ test('Eksplorator: recent phones use the Polish plural and Wyczyść clears them
   expect(bridge.calls.at(-1)).toEqual({ method: 'explorer_clear_recents', args: [] });
   expect(screen.getByText('Nic nie zapamiętano')).toBeTruthy();
 });
+
+const saves = (bridge: { calls: { method: string; args: unknown[] }[] }) =>
+  bridge.calls.filter((c) => c.method === 'save_service');
+
+test('Serwis: a field is saved on blur only when changed, one call with that one key', async () => {
+  const { bridge } = await renderWith(Settings, 'empty');
+  await open('Serwis i protokoły');
+  const name = await screen.findByLabelText('Nazwa serwisu');
+  await fireEvent.blur(name);
+  expect(saves(bridge)).toHaveLength(0);
+  await fireEvent.input(name, { target: { value: 'Serwis Ząb' } });
+  expect(saves(bridge)).toHaveLength(0);
+  await fireEvent.blur(name);
+  await vi.waitFor(() => expect(saves(bridge)).toHaveLength(1));
+  expect(saves(bridge)[0].args).toEqual([{ name: 'Serwis Ząb' }]);
+  await fireEvent.blur(name);
+  expect(saves(bridge)).toHaveLength(1);
+  const cases: [string, string, string][] = [['Adres serwisu', 'address', 'ul. Długa 1'], ['Telefon serwisu', 'phone', '600 000 000'],
+    ['E-mail serwisu', 'email', 'a@b.pl'], ['NIP serwisu', 'nip', '123'], ['Strona serwisu', 'website', 'b.pl'],
+    ['Serwisant na tym komputerze', 'technician', 'Jan'], ['Stopka protokołu', 'footer', 'Gwarancja\n30 dni']];
+  for (const [label, key, value] of cases) {
+    const field = screen.getByLabelText(label);
+    await fireEvent.input(field, { target: { value } });
+    await fireEvent.blur(field);
+    await vi.waitFor(() => expect(saves(bridge).at(-1)?.args).toEqual([{ [key]: value }]));
+  }
+  expect(await screen.findByText('Zapisano')).toBeTruthy();
+});
+
+test('Serwis: logo is picked and saved; a logo error shows at the logo row, not on the error card', async () => {
+  const { s, bridge } = await renderWith(Settings, 'empty');
+  await open('Serwis i protokoły');
+  const logoBtn = () => within(document.querySelector('[data-setting-id="service_logo"]') as HTMLElement).getByRole('button', { name: 'Zmień…' });
+  await fireEvent.click(await vi.waitFor(logoBtn));
+  await vi.waitFor(() => expect(saves(bridge).at(-1)?.args).toEqual([{ logo: 'D:\\AdMeNot\\logo.png' }]));
+  bridge.failNext('save_service', 'logo_type', 'D:\\AdMeNot\\logo.png');
+  await fireEvent.click(logoBtn());
+  expect(await screen.findByText('Logo musi być plikiem PNG, JPG, WebP albo SVG.')).toBeTruthy();
+  expect(s.error).toBeNull();
+});
+
+test('Serwis: the preview follows typing before save; empty name shows the missing-name notice', async () => {
+  const { container } = await renderWith(Settings, 'empty');
+  await open('Serwis i protokoły');
+  const preview = await vi.waitFor(() => {
+    const el = container.querySelector('[data-protocol-preview]') as HTMLElement;
+    expect(el).toBeTruthy();
+    return el;
+  });
+  expect(within(preview).getByText('Brak nazwy serwisu')).toBeTruthy();
+  await fireEvent.input(screen.getByLabelText('Nazwa serwisu'), { target: { value: 'Serwis Ząb' } });
+  await fireEvent.input(screen.getByLabelText('E-mail serwisu'), { target: { value: 'a@b.pl' } });
+  await fireEvent.input(screen.getByLabelText('Serwisant na tym komputerze'), { target: { value: 'Jan Kowalski' } });
+  await fireEvent.input(screen.getByLabelText('Stopka protokołu'), { target: { value: '<b>Gwarancja</b>\n30 dni' } });
+  await tick();
+  expect(within(preview).getByText('Serwis Ząb')).toBeTruthy();
+  expect(within(preview).getByText(/a@b\.pl/)).toBeTruthy();
+  expect(within(preview).getByText('Jan Kowalski')).toBeTruthy();
+  expect(within(preview).queryByText('Brak nazwy serwisu')).toBeNull();
+  expect(preview.querySelector('b')?.textContent).toBe('Serwis Ząb'); // HTML ze stopki jest tekstem, nie znacznikiem
+  expect(preview.textContent).toContain('<b>Gwarancja</b>');
+});
+
+test('Serwis: a footer over 500 characters turns the counter red and is not saved', async () => {
+  const { bridge } = await renderWith(Settings, 'empty');
+  await open('Serwis i protokoły');
+  const footer = await screen.findByLabelText('Stopka protokołu');
+  await fireEvent.input(footer, { target: { value: 'x'.repeat(501) } });
+  await tick();
+  const counter = screen.getByText('501/500');
+  expect(counter.className).toContain('text-bad');
+  await fireEvent.blur(footer);
+  expect(saves(bridge)).toHaveLength(0);
+  await fireEvent.input(footer, { target: { value: 'x'.repeat(500) } });
+  await tick();
+  expect(screen.getByText('500/500').className).not.toContain('text-bad');
+  await fireEvent.blur(footer);
+  await vi.waitFor(() => expect(saves(bridge)).toHaveLength(1));
+});
+
+test('Serwis: form fields are found by search', async () => {
+  const { container } = await renderWith(Settings, 'empty');
+  await search('nip');
+  const rows = [...container.querySelectorAll('[data-setting-id]')].filter((e) => !(e as HTMLElement).hidden);
+  expect(rows.map((e) => e.getAttribute('data-setting-id'))).toEqual(['service_nip']);
+});
+
+test('Serwis: PDF folder is picked, a bad folder shows the message at the row, report_open toggles', async () => {
+  const { s, bridge } = await renderWith(Settings, 'empty');
+  await open('Serwis i protokoły');
+  expect(screen.queryByText('Język protokołu')).toBeNull();
+  const row = () => document.querySelector('[data-setting-id="report_pdf_dir"]') as HTMLElement;
+  await fireEvent.click(within(row()).getByRole('button', { name: 'Zmień…' }));
+  await vi.waitFor(() => expect(s.settings.report_pdf_dir).toBe('D:\\AdMeNot\\kopie'));
+  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ report_pdf_dir: 'D:\\AdMeNot\\kopie' }] });
+  await fireEvent.click(within(row()).getByRole('button', { name: 'Domyślny' }));
+  await vi.waitFor(() => expect(s.settings.report_pdf_dir).toBeNull());
+  bridge.failNext('save_settings', 'bad_request', 'report_pdf_dir');
+  await fireEvent.click(within(row()).getByRole('button', { name: 'Zmień…' }));
+  expect(await screen.findByText(/Podaj pełną ścieżkę folderu/)).toBeTruthy();
+  expect(s.error).toBeNull();
+  const toggle = screen.getByRole('switch', { name: 'Otwieraj protokół po utworzeniu' });
+  expect(toggle.getAttribute('aria-checked')).toBe('true');
+  await fireEvent.click(toggle);
+  await vi.waitFor(() => expect(s.settings.report_open).toBe(false));
+  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ report_open: false }] });
+});
