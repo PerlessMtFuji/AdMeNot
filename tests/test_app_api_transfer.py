@@ -1391,3 +1391,28 @@ def test_tel_choice_keeps_resume_banner_between_files_and_tel(tmp_path, no_tap_w
     assert (entry.status, entry.resumable) == ("complete", True)
     (entry,) = read_restores(copy)
     assert entry.resumable is True
+
+
+def test_changing_transfers_dir_remembers_old_root(tmp_path):
+    from admenot.engine.paths import transfers_dir
+    from admenot.engine.settings import load_settings
+    copy = store.create_copy(SERIAL, _device(), None, NOW)
+    old_root = transfers_dir()
+    api, _ = _api(_phone(tmp_path))
+    first = tmp_path / "pierwszy"
+    assert api.save_settings({"transfers_dir": str(first)})["transfers_dir"] == str(first)
+    assert load_settings().transfer_roots == [str(old_root)]
+    assert [c["id"] for c in api.transfers()["copies"]] == [copy.read_meta().id]
+    # z pustego folderu nic nie zapamiętujemy
+    api.save_settings({"transfers_dir": str(tmp_path / "drugi")})
+    assert load_settings().transfer_roots == [str(old_root)]
+    error = api.save_settings({"transfers_dir": "względny"})["error"]
+    assert (error["key"], error["message"]) == ("bad_request", "transfers_dir")
+
+
+def test_bridge_uses_transfer_keep_days(tmp_path):
+    api, _ = _api(_phone(tmp_path))
+    api.save_settings({"transfer_keep_days": 30})
+    copy = store.create_copy(SERIAL, _device(), None, NOW)
+    view = api.extend_transfer(copy.read_meta().id)["copy"]
+    assert view["expires"] == (NOW + timedelta(days=37)).isoformat(timespec="seconds")

@@ -55,7 +55,7 @@ from admenot.engine.transfer.restore import RestoreResult
 from admenot.engine.transfer.restore_plan import UPLOAD_GROUPS, GroupTotals, RestorePlan
 from admenot.engine.transfer.restore_state import read_restores
 from admenot.engine.transfer.restore_tel import TelResult
-from admenot.engine.transfer.store import CopyDir, CopyMeta
+from admenot.engine.transfer.store import CopyDir, CopyMeta, resolve
 from admenot.engine.transfer.telplan import TelPlan
 from admenot.engine.workflow import OrderPlan, OrderResult
 
@@ -488,7 +488,10 @@ def copy_view(meta: CopyMeta, now: datetime, restoring: str | None = None) -> di
     `restoring`: id kopii, którą właśnie wgrywa zadanie `restore`; stan `running` bez takiego
     zadania został po twardym zamknięciu programu — pokazujemy go jako `stopped`."""
     left = (meta.expires - now).total_seconds()
-    copy = CopyDir(transfers_dir() / meta.id)
+    try:
+        copy = resolve(meta.id)  # kopia może leżeć w folderze używanym wcześniej
+    except ValueError:  # zniknęła między odczytem a widokiem: bez notatki i wgrywań
+        copy = CopyDir(transfers_dir() / meta.id)
     restores = read_restores(copy)
     return {"id": meta.id, "serial": meta.serial, "model": meta.model, "manufacturer": meta.manufacturer,
             "client": meta.client, "created": meta.created.isoformat(timespec="seconds"),

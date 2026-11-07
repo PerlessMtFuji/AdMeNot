@@ -345,3 +345,105 @@ def test_extend_broken_meta_is_value_error():
     copy.meta_path.write_text("{", encoding="utf-8")
     with pytest.raises(ValueError):
         store.extend(f"{device_dir_name('ABC123')}/20261025-120000")
+
+
+# ---- folder i czas trzymania kopii z ustawień ---------------------------------------------
+
+def _use_dir(path, roots=()) -> None:
+    from admenot.engine.settings import save_internal, save_settings
+    save_settings({"transfers_dir": str(path)})
+    save_internal({"transfer_roots": [str(r) for r in roots]})
+
+
+def test_create_copy_uses_keep_days():
+    meta = store.create_copy("ABC123", _device(), None, NOW, keep_days=14).read_meta()
+    assert meta.expires - meta.created == timedelta(days=14)
+
+
+def test_extend_adds_keep_days():
+    meta = _copy().read_meta()
+    result = store.extend(meta.id, 30)
+    assert result.expires == meta.expires + timedelta(days=30)
+    assert store.list_copies()[0].expires == meta.expires + timedelta(days=30)
+
+
+def test_copies_in_previous_root_stay_listed_and_resolvable(tmp_path):
+    old = _copy()  # domyślny folder
+    old_root = transfers_dir()
+    old_id = old.read_meta().id
+    new_root = tmp_path / "nowy"
+    _use_dir(new_root, [old_root])
+    assert transfers_dir() == new_root
+    assert store.copy_roots()[0] == new_root
+    fresh = _copy(now=NOW + timedelta(hours=1))
+    assert fresh.path.is_relative_to(new_root)
+    assert [m.id for m in store.list_copies()] == [fresh.read_meta().id, old_id]
+    assert store.resolve(old_id).path.is_relative_to(old_root.resolve())
+    assert store.extend(old_id, 7).expires == NOW + timedelta(days=14)
+    store.delete(old_id)
+    assert not old.path.exists() and fresh.path.exists()
+
+
+def test_copy_roots_skip_missing_and_duplicates(tmp_path):
+    new_root = tmp_path / "nowy"
+    _use_dir(new_root, [new_root, tmp_path / "brak", transfers_dir()])
+    new_root.mkdir()
+    default = tmp_path / "data" / "AdMeNot" / "transfers"
+    default.mkdir(parents=True)
+    assert store.copy_roots() == [new_root, default]
+
+
+def test_resolve_rejects_id_outside_roots(tmp_path):
+    with pytest.raises(ValueError):
+        store.resolve("../x/20260101-000000")
+    stray = _copy()  # w domyślnym folderze, który po zmianie nie jest zapamiętany
+    stray_id = stray.read_meta().id
+    _use_dir(tmp_path / "nowy")
+    assert store.list_copies() == []
+    with pytest.raises(ValueError):
+        store.resolve(stray_id)
+    with pytest.raises(ValueError):
+        store.delete(stray_id)
+    assert stray.path.exists()
+
+
+def test_same_id_in_two_roots_first_root_wins(tmp_path):
+    old = _copy()
+    old_root = transfers_dir()
+    new_root = tmp_path / "nowy"
+    _use_dir(new_root, [old_root])
+    fresh = _copy()  # ten sam telefon i ta sama sekunda, ale inny folder
+    assert fresh.read_meta().id == old.read_meta().id
+    assert [c.path for c in [store.resolve(fresh.read_meta().id)]] == [fresh.path.resolve()]
+    assert len(store.list_copies()) == 1
+
+
+def test_purge_removes_expired_in_previous_root(tmp_path):
+    expired = _copy(now=NOW - timedelta(days=8))
+    expired_id = expired.read_meta().id
+    old_root = transfers_dir()
+    _use_dir(tmp_path / "nowy", [old_root])
+    assert store.purge_expired(NOW, lambda serial: False, lambda copy_id: False) == [expired_id]
+    assert not expired.path.exists()
+
+
+def test_purge_forgets_roots_without_copies(tmp_path):
+    from admenot.engine.settings import load_settings
+    kept = _copy(now=NOW - timedelta(days=1))
+    old_root = transfers_dir()
+    empty = tmp_path / "pusty"
+    empty.mkdir()
+    unplugged = tmp_path / "pendrive"  # nie istnieje: może wrócić, więc zostaje na liście
+    _use_dir(tmp_path / "nowy", [old_root, empty, unplugged])
+    store.purge_expired(NOW, lambda serial: False, lambda copy_id: False)
+    assert load_settings().transfer_roots == [str(old_root), str(unplugged)]
+    store.delete(kept.read_meta().id)
+    store.purge_expired(NOW, lambda serial: False, lambda copy_id: False)
+    assert load_settings().transfer_roots == [str(unplugged)]
+
+
+def test_root_has_copies(tmp_path):
+    assert not store.root_has_copies(transfers_dir())
+    _copy()
+    assert store.root_has_copies(transfers_dir())
+    assert not store.root_has_copies(tmp_path / "brak")

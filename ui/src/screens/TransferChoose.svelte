@@ -178,7 +178,7 @@
       </dl>
       {#if noSpace}<Banner tone="warn" icon="triangle-alert" title={t('transfer.no_space')} />{/if}
       <div class="flex items-start gap-2.5 rounded-xl bg-neutral-soft p-3 text-sm text-mut">
-        <span class="mt-0.5 flex-none text-soft"><Icon name="lock" size={15} /></span><span>{t('transfer.privacy')}</span>
+        <span class="mt-0.5 flex-none text-soft"><Icon name="lock" size={15} /></span><span>{t('transfer.privacy', { days: s.settings.transfer_keep_days })}</span>
       </div>
       <Button variant="primary" size="lg" class="flex-col !gap-0" disabled={blocked} onclick={() => ctl.startBackup()}>
         {t('transfer.begin')}

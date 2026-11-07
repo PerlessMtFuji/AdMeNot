@@ -11,7 +11,8 @@
   import Icon from '../ui/Icon.svelte';
   import Pill from '../ui/Pill.svelte';
 
-  // Kopie danych starych telefonów (przenoszenie): usuwane po 7 dniach, „Przedłuż” dodaje kolejne 7.
+  // Kopie danych starych telefonów (przenoszenie): usuwane po `transfer_keep_days` dniach (ustawienie),
+  // „Przedłuż” dodaje kolejne tyle samo.
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
   let confirming = $state<CopyView | null>(null);
@@ -44,7 +45,7 @@
 
 {#if s.transfer.copies.length}
   <section id="transfer-copies" aria-label={t('transfer.copies_title')} class="flex scroll-mt-4 flex-col gap-2">
-    <p class="text-mut">{t('transfer.copies_sub')}</p>
+    <p class="text-mut">{t('transfer.copies_sub', { days: s.settings.transfer_keep_days })}</p>
     {#each s.transfer.copies as c, i (c.id)}
       <article aria-label={title(c)} class="flex items-center gap-3 rounded-2xl card px-5 py-3" in:enter={{ delay: stagger(i) }}>
         <div class="min-w-0 flex-1">

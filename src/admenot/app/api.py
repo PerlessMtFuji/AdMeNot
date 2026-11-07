@@ -103,7 +103,13 @@ from admenot.engine.journal.db import (
 )
 from admenot.engine.mirror import Mirror, MirrorUnavailable
 from admenot.engine.oplock import DeviceBusy, device_lock
-from admenot.engine.paths import incident_path, journal_path, logs_dir, screenshot_files
+from admenot.engine.paths import (
+    incident_path,
+    journal_path,
+    logs_dir,
+    screenshot_files,
+    transfers_dir,
+)
 from admenot.engine.phones.provider import PhoneMatch, PhoneProvider
 from admenot.engine.report.files import UnknownOrder, write_report
 from admenot.engine.report.render import data_uri
@@ -120,6 +126,8 @@ from admenot.engine.settings import (
     load_settings,
     save_service,
     save_settings,
+    settings_transaction,
+    transfers_dir_ok,
 )
 from admenot.engine.texts import (
     browser_name,
@@ -521,7 +529,7 @@ class Api(ExplorerMixin):
         self._purge_transfers()
 
     def _purge_transfers(self) -> None:
-        """Kopie danych po terminie (7 dni od utworzenia, chyba że przedłużone)."""
+        """Kopie danych po terminie (z `meta.json` każdej kopii) we wszystkich folderach kopii."""
         try:
             store.purge_expired(self._now(), self._transfer_busy, self._copy_busy)
         except Exception as exc:  # noqa: BLE001 — sprzątanie nie może zablokować okna
@@ -864,7 +872,16 @@ class Api(ExplorerMixin):
         pdf_dir = changes.get("report_pdf_dir")
         if isinstance(pdf_dir, str) and pdf_dir.strip() and not archive_dir_ok(pdf_dir.strip()):
             raise AppError("bad_request", "report_pdf_dir")  # UI pokazuje to przy polu
-        self._settings = save_settings(dict(changes))
+        folder = changes.get("transfers_dir")
+        if folder is not None and not (isinstance(folder, str) and folder.strip() and transfers_dir_ok(folder.strip())):
+            raise AppError("bad_request", "transfers_dir")  # UI pokazuje to przy wierszu
+        with settings_transaction():  # stary folder kopii i zapis bez przeplotu z tworzeniem kopii
+            old_root = transfers_dir() if "transfers_dir" in changes else None
+            self._settings = save_settings(dict(changes))
+            if old_root is not None:
+                # kopie ze starego folderu zostają tam i dalej są w Historii (`store.copy_roots`)
+                store.remember_root(old_root)
+                self._settings = load_settings()
         if "lang" in changes:
             self._lang = effective_lang(self._settings)
         if "adb_path" in changes:
@@ -1858,15 +1875,17 @@ class Api(ExplorerMixin):
     def _run_backup(self, job: Job, adb: SessionLogAdb, raw: AdbTransport, device: DeviceInfo,
                     inventory: Inventory, client: str | None,
                     chosen: Selection) -> tuple[BackupResult, store.CopyDir]:
+        keep_days = self._settings.transfer_keep_days
         copy = store.find_resumable(device.serial) or store.create_copy(
-            device.serial, device, client, self._now())
+            device.serial, device, client, self._now(), keep_days)
         # Id kopii od razu: serwisant może dopisać notatkę jeszcze w czasie kopiowania.
         self._emit("transfer:copy", {"copy": self._copy_view(copy.read_meta())})
         puller = self._puller_factory(self._settings.adb_path, device.serial, adb.tagged("pull"))
         progress, wait_device = self._transfer_events(job, raw, "transfer:progress")
         # Surowy transport (z logiem sesji), nie `ReadOnlyAdb`: silnik opakowuje go sam.
         result = run_backup(adb, puller, device, copy, inventory, chosen, on_progress=progress,
-                            should_stop=job.should_stop, wait_device=wait_device, now=self._now())
+                            should_stop=job.should_stop, wait_device=wait_device, now=self._now(),
+                            keep_days=keep_days)
 
         return result, copy
 
@@ -2096,7 +2115,7 @@ class Api(ExplorerMixin):
         if not isinstance(copy_id, str):
             raise AppError("bad_request", "copy_id")
         try:
-            meta = store.extend(copy_id)
+            meta = store.extend(copy_id, self._settings.transfer_keep_days)
         except OSError:  # meta.json zablokowany przez inny program; ścieżka nie idzie do raportu
             raise AppError("transfer_in_use") from None
         return {"copy": self._copy_view(meta)}

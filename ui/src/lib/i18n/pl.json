@@ -837,7 +837,7 @@
     "eta_value": "ok. {min} min",
     "free": "Wolne miejsce na dysku",
     "no_space": "Za mało miejsca na dysku komputera na tę kopię.",
-    "privacy": "Kopia zawiera prywatne dane klienta. Usunę ją automatycznie po 7 dniach — wcześniej lub później zmienisz to w Historii.",
+    "privacy": "Kopia zawiera prywatne dane klienta. Usunę ją automatycznie po {days} dniach — wcześniej lub później zmienisz to w Historii.",
     "begin": "Rozpocznij kopię",
     "resume_title": "Wznów przerwaną kopię z {when}",
     "resume_text": "Skopiowane już pliki zostają — program dokończy resztę.",
@@ -898,7 +898,7 @@
     },
     "finish": "Zakończ",
     "copies_title": "Kopie danych na komputerze",
-    "copies_sub": "Ze wszystkich telefonów. Każda kopia znika po 7 dniach, chyba że ją przedłużysz.",
+    "copies_sub": "Ze wszystkich telefonów. Każda kopia znika po {days} dniach, chyba że ją przedłużysz.",
     "note": { "label": "Notatka serwisanta", "add": "Dodaj notatkę", "edit": "Edytuj", "placeholder": "Np. czego klient potrzebuje, co sprawdzić przy wgrywaniu…" },
     "contents": {
       "contacts": "Kontakty", "sms": "SMS", "mms": "MMS", "calls": "Połączenia", "files": "Pliki",

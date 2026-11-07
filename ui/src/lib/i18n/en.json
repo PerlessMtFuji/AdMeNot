@@ -837,7 +837,7 @@
     "eta_value": "about {min} min",
     "free": "Free disk space",
     "no_space": "Not enough disk space on this computer for this copy.",
-    "privacy": "The copy contains the customer's private data. It is deleted automatically after 7 days — change that in History.",
+    "privacy": "The copy contains the customer's private data. It is deleted automatically after {days} days — change that in History.",
     "begin": "Start copy",
     "resume_title": "Resume the interrupted copy from {when}",
     "resume_text": "Files already copied stay — the program finishes the rest.",
@@ -898,7 +898,7 @@
     },
     "finish": "Finish",
     "copies_title": "Data copies on this computer",
-    "copies_sub": "From all phones. Each copy is deleted after 7 days unless you extend it.",
+    "copies_sub": "From all phones. Each copy is deleted after {days} days unless you extend it.",
     "note": { "label": "Technician's note", "add": "Add a note", "edit": "Edit", "placeholder": "E.g. what the customer needs, what to check when restoring…" },
     "contents": {
       "contacts": "Contacts", "sms": "SMS", "mms": "MMS", "calls": "Calls", "files": "Files",

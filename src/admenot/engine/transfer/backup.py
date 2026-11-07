@@ -145,26 +145,27 @@ def run_backup(adb: AdbTransport, puller: Puller, device: DeviceInfo, copy: Copy
                selection: Selection, *, on_progress: Callable[[Progress], None],
                should_stop: Callable[[], bool], wait_device: Callable[[], None],
                free_bytes: Callable[[Path], int] = _disk_free,
-               now: datetime | None = None) -> BackupResult:
+               now: datetime | None = None, keep_days: int = KEEP_DAYS) -> BackupResult:
     """Kopiuje wybrane dane do `copy`, wznawiając jej stan.
 
     `adb` to surowy transport (nie `ReadOnlyAdb`): silnik sam opakowuje go w `ReadOnlyAdb`, a na
     kopię APK w `ApkReadAdb` — przez gotowy `ReadOnlyAdb` kopia aplikacji by się nie udała.
     `BackupError` i `stopped` zostawiają kopię `in_progress` (do wznowienia); koniec to `complete`
     albo `incomplete` (zapisane w `meta.json`). Wznowienie z terminem krótszym niż dzień od `now`
-    dostaje `KEEP_DAYS` dni od wznowienia.
+    dostaje `keep_days` dni od wznowienia (most podaje `Settings.transfer_keep_days`).
     """
     return _Backup(adb, puller, device, copy, inventory, selection, on_progress, should_stop,
-                   wait_device, free_bytes, now or datetime.now()).run()
+                   wait_device, free_bytes, now or datetime.now(), keep_days).run()
 
 
 class _Backup:
     def __init__(self, adb: AdbTransport, puller: Puller, device: DeviceInfo, copy: CopyDir,
                  inventory: Inventory, selection: Selection, on_progress: Callable[[Progress], None],
                  should_stop: Callable[[], bool], wait_device: Callable[[], None],
-                 free_bytes: Callable[[Path], int], now: datetime) -> None:
+                 free_bytes: Callable[[Path], int], now: datetime, keep_days: int = KEEP_DAYS) -> None:
         self.raw = adb
         self.now = now
+        self.keep_days = keep_days
         self.adb = ReadOnlyAdb(adb)
         self.puller, self.device, self.copy, self.inventory = puller, device, copy, inventory
         self.sel = selection
@@ -198,7 +199,7 @@ class _Backup:
         meta.selection = self.sel.to_json()
         if meta.expires < self.now + timedelta(days=1):
             # wznowienie kopii tuż przed (albo po) terminie: po zakończeniu nie znika od razu
-            meta.expires = max(meta.expires, self.now + timedelta(days=KEEP_DAYS))
+            meta.expires = max(meta.expires, self.now + timedelta(days=self.keep_days))
         self.copy.write_meta(meta)
         self.copy.write_verdicts(self.inventory.apps + self.inventory.skipped_apps)
         t0 = time.monotonic()

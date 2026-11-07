@@ -170,12 +170,13 @@ export function createFakeBridge(name: string,
       case 'extend_transfer': {
         const copy = copies.find((c) => c.id === args[0]);
         if (!copy) return { error: { key: 'bad_request', message: 'copy_id' } };
-        // jak most: +7 dni od obecnej daty wygaśnięcia, czas lokalny bez strefy
+        // jak most: +`transfer_keep_days` dni od obecnej daty wygaśnięcia, czas lokalny bez strefy
+        const days = settings.transfer_keep_days;
         const d = new Date(copy.expires);
-        d.setDate(d.getDate() + 7);
+        d.setDate(d.getDate() + days);
         const p = (n: number) => String(n).padStart(2, '0');
         const expires = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-        Object.assign(copy, { expires, days_left: copy.days_left + 7 });
+        Object.assign(copy, { expires, days_left: copy.days_left + days });
         return { copy: structuredClone(copy) };
       }
       case 'set_transfer_note': {

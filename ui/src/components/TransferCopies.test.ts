@@ -40,6 +40,14 @@ describe('TransferCopies', () => {
     expect(screen.getByText('wgrywanie przerwane: NEW2')).toBeTruthy();
   });
 
+  test('the subtitle names the retention from settings', async () => {
+    const env = await show([COPY], null);
+    expect(screen.getByText(/Każda kopia znika po 7 dniach/)).toBeTruthy();
+    env.s.settings = { ...env.s.settings, transfer_keep_days: 30 };
+    await tick();
+    expect(screen.getByText(/Każda kopia znika po 30 dniach/)).toBeTruthy();
+  });
+
   test('deleting a copy asks first, then deletes that copy', async () => {
     const env = await show([COPY], null);
     const del = vi.spyOn(env.ctl, 'deleteTransfer').mockResolvedValue();

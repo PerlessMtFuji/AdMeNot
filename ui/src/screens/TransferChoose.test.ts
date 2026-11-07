@@ -235,6 +235,14 @@ describe('TransferChoose', () => {
     expect((screen.getByRole('button', { name: /Rozpocznij kopię/ }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+  test('the privacy note names the retention from settings', async () => {
+    const { s } = await show();
+    expect(screen.getByText(/Usunę ją automatycznie po 7 dniach/)).toBeTruthy();
+    s.settings = { ...s.settings, transfer_keep_days: 14 };
+    await tick();
+    expect(screen.getByText(/Usunę ją automatycznie po 14 dniach/)).toBeTruthy();
+  });
+
   test('the side panel shows the serial of the phone being copied', async () => {
     const { s } = await show();
     s.serial = 'OTHER123';

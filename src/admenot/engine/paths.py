@@ -27,8 +27,13 @@ def backups_dir() -> Path:
 
 
 def transfers_dir() -> Path:
-    """Kopie danych starych telefonów (przenoszenie danych), każda w `<telefon>/<RRRRMMDD-GGMMSS>`."""
-    return data_dir() / "transfers"
+    """Folder nowych kopii danych starych telefonów (przenoszenie danych), każda w
+    `<telefon>/<RRRRMMDD-GGMMSS>`: z ustawienia `transfers_dir` albo domyślny w danych programu.
+    Kopie z poprzednich folderów zna `transfer.store.copy_roots()`."""
+    from admenot.engine.settings import load_settings  # settings importuje paths
+
+    custom = (load_settings().transfers_dir or "").strip()
+    return Path(custom) if custom else data_dir() / "transfers"
 
 
 def device_dir_name(serial: str) -> str:
