@@ -173,6 +173,8 @@ for (const view of ['grid', 'list']) {
       expect(box.y).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width).toBeLessThanOrEqual(1280);
       expect(box.y + box.height).toBeLessThanOrEqual(800);
+      // Wiersz listy ma całą szerokość: bez zakotwiczenia przy kursorze dymek przyklejałby się do lewej krawędzi i zasłaniał nazwę.
+      if (view === 'list') expect(box.x).toBeGreaterThan(8);
 
       await one(page, 'drugi.txt').hover();
       await expect(peek).toContainText('drugi.txt', { timeout: 200 });  // w przejeździe bez opóźnienia

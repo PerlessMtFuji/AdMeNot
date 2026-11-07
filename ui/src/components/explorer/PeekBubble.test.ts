@@ -50,14 +50,14 @@ const SONG2 = entry('drugi.mp3', 'audio', 'mp3');
 const DOC = entry('faktura.pdf', 'doc', 'pdf');
 const NOTE = entry('notatka.txt', 'text', 'txt');
 const DIR: EntryView = { ...entry('Folder', 'other', ''), kind: 'dir' };
-const ODD = entry(`dziwny "plik" o'nazwie.jpg`, 'image', 'jpg');
+const ODD = entry(`dziwny "plik" o'nazwie zażółć gęślą jaźń.jpg`, 'image', 'jpg');
 const ALL = [PHOTO, PHOTO2, HEIC, MOVIE, SONG, SONG2, DOC, NOTE, DIR, ODD];
 
 const bubble = () => document.querySelector<HTMLElement>('[data-testid="peek"]');
 
 /** Sygnał zdarzenia wskaźnika: jsdom nie zawsze ma PointerEvent, a nas interesuje tylko `pointerType`. */
-function pointer(type: string, pointerType: string): void {
-  window.dispatchEvent(Object.assign(new Event(type), { pointerType }));
+function pointer(type: string, pointerType: string, clientX = 0): void {
+  window.dispatchEvent(Object.assign(new Event(type), { pointerType, clientX }));
 }
 
 describe('PeekBubble', () => {
@@ -87,6 +87,28 @@ describe('PeekBubble', () => {
     flushSync();
     await tick();
     flushSync();
+  }
+
+  /** Muzyka gra w tle; `calls` to zapis wywołań na głównym odtwarzaczu, `paused` ustawia stan elementu. */
+  function backgroundMusic() {
+    ex.state.playing = { path: '/sdcard/x.mp3', title: 'x', cover: null, url: 'http://127.0.0.1:1/x.mp3' };
+    const music = ex.audio;
+    music.el.setAttribute('src', 'http://127.0.0.1:1/x.mp3');
+    const paused = (value: boolean) => Object.defineProperty(music.el, 'paused', { configurable: true, value });
+    paused(false);
+    return { calls: (music as unknown as { calls: string[] }).calls, paused, music };
+  }
+
+  /** Najechanie, zjazd z pliku i powrót przed końcem przejazdu. */
+  async function backAgain(e: EntryView): Promise<void> {
+    await hover(e);
+    ex.state.hover = null;
+    flushSync();
+    vi.advanceTimersByTime(100);
+    ex.state.hover = e.path;
+    await settle();
+    vi.advanceTimersByTime(1000);
+    await settle();
   }
 
   beforeEach(async () => {
@@ -271,6 +293,18 @@ describe('PeekBubble', () => {
     expect(bubble()).toBeNull();
   });
 
+  it('kafel znika z DOM przy otwartym dymku: dymek się zamyka bez błędu', async () => {
+    await hover(NOTE);
+    expect(bubble()).not.toBeNull();
+    document.querySelector(`[data-path="${CSS.escape(NOTE.path)}"]`)?.remove();
+    await settle();
+    expect(bubble()).toBeNull();
+    expect(ex.state.error).toBeNull();
+    vi.advanceTimersByTime(1000);
+    await settle();
+    expect(bubble()).toBeNull();
+  });
+
   it('kafla nie ma w DOM przy otwarciu: dymka nie ma', async () => {
     document.querySelector(`[data-path="${CSS.escape(NOTE.path)}"]`)?.remove();
     await hover(NOTE);
@@ -352,6 +386,72 @@ describe('PeekBubble', () => {
     await settle();
     vi.advanceTimersByTime(RESUME_WAIT_MS * 2);
     expect(calls).toEqual(['pause']);
+  });
+
+  it('odłączony telefon zatrzymuje własny odtwarzacz i nie wznawia muzyki z martwego strumienia', async () => {
+    const { calls, paused } = backgroundMusic();
+    await hover(SONG);
+    expect(calls).toEqual(['pause']);
+    paused(true);
+    ex.state.offline = true;
+    await settle();
+    expect(bubble()).toBeNull();
+    const own = players.find((p) => p.calls.includes('play'))!;
+    expect(own.calls.at(-1)).toBe('stop');
+    vi.advanceTimersByTime(1000);
+    expect(calls).toEqual(['pause']);
+  });
+
+  it('odłączenie w czasie oczekiwania na wznowienie też porzuca muzykę', async () => {
+    const { calls, paused } = backgroundMusic();
+    await hover(MOVIE);
+    paused(true);
+    await fireEvent.mouseDown(window);
+    await settle();
+    vi.advanceTimersByTime(100);
+    ex.state.offline = true;
+    await settle();
+    vi.advanceTimersByTime(1000);
+    expect(calls).toEqual(['pause']);
+  });
+
+  it.each([
+    ['blur okna', () => fireEvent.blur(window)],
+    ['opuszczenie dokumentu', () => fireEvent.mouseLeave(document.documentElement)],
+  ])('%s przy grającym dymku zatrzymuje go i wznawia muzykę raz po 400 ms', async (_name, act) => {
+    const { calls, paused, music } = backgroundMusic();
+    await hover(SONG);
+    paused(true);
+    await act();
+    await settle();
+    expect(bubble()).toBeNull();
+    const own = players.find((p) => p !== (music as unknown))!;
+    expect(own.calls.at(-1)).toBe('stop');
+    vi.advanceTimersByTime(RESUME_WAIT_MS - 1);
+    expect(calls).toEqual(['pause']);
+    vi.advanceTimersByTime(1);
+    expect(calls).toEqual(['pause', 'play']);
+    vi.advanceTimersByTime(1000);
+    expect(calls).toEqual(['pause', 'play']);
+  });
+
+  it('powrót na ten sam plik w przejeździe nie zaczyna muzyki od nowa', async () => {
+    await backAgain(SONG);
+    expect(bubble()?.textContent).toContain('utwor.mp3');
+    expect(players[0].calls).toEqual([`load ${SONG.url}`, 'play']);
+  });
+
+  it('powrót na ten sam plik w przejeździe nie rysuje PDF od nowa', async () => {
+    await backAgain(DOC);
+    expect(bubble()?.textContent).toContain('faktura.pdf');
+    expect(pdf.draw).toHaveBeenCalledTimes(1);
+  });
+
+  it('powrót na ten sam plik w przejeździe nie czyta tekstu od nowa', async () => {
+    const head = vi.spyOn(ex, 'textHead');
+    await backAgain(NOTE);
+    expect(bubble()?.textContent).toContain('notatka.txt');
+    expect(head).toHaveBeenCalledTimes(1);
   });
 
   it('czas trwania dochodzi do stopki z loadedmetadata', async () => {
@@ -482,8 +582,24 @@ describe('PeekBubble', () => {
   it('pozycja przy kaflu ze ścieżką ze znakami specjalnymi', async () => {
     document.querySelector(`[data-path="${CSS.escape(ODD.path)}"]`)?.remove();
     tile(ODD, 250);
+    ex.state.view = 'grid';
+    pointer('pointermove', 'mouse', 700);  // w siatce kursor nie ma znaczenia
     await hover(ODD);
     expect(bubble()?.style.left).toBe('362px');  // prawa krawędź 350 + odstęp 12
+  });
+
+  it('na liście dymek stoi przy kursorze, bo wiersz zajmuje całą szerokość', async () => {
+    ex.state.view = 'list';
+    pointer('pointermove', 'mouse', 300);
+    await hover(NOTE);
+    expect(bubble()?.style.left).toBe('312px');  // kursor 300 + odstęp 12
+  });
+
+  it('na liście bez miejsca po prawej dymek staje po lewej od kursora', async () => {
+    ex.state.view = 'list';
+    pointer('pointermove', 'mouse', 900);
+    await hover(NOTE);
+    expect(bubble()?.style.left).toBe('448px');  // kursor 900 - odstęp 12 - szerokość 440
   });
 
   it('koniec ekranu zwalnia własny odtwarzacz i worker PDF', async () => {

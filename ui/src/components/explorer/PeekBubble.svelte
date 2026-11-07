@@ -18,10 +18,12 @@
   /** Tyle ciszy po kółku lub przewijaniu, zanim plik pod kursorem znów może dostać dymek. */
   const QUIET_MS = 120;
 
-  type Open = { entry: EntryView; kind: PeekKind; x: number; y: number; w: number; h: number };
+  type Open = { entry: EntryView; kind: PeekKind; tile: Element; x: number; y: number; w: number; h: number };
   /** Migawka z chwili otwarcia: odświeżenie folderu nie zaczyna odtwarzania od nowa. */
   let open = $state.raw<Open | null>(null);
   let pointerType = $state('mouse');
+  /** Ostatnia pozycja kursora w poziomie: na liście to przy niej stoi dymek. */
+  let mouseX = 0;
   let pressed = $state(false);
   let dragging = $state(false);
   let scrolling = $state(false);
@@ -52,6 +54,7 @@
     || pressed || dragging || scrolling);
 
   function show(path: string): void {
+    if (open?.entry.path === path) return;  // powrót w przejeździe: to, co gra lub się rysuje, zostaje
     const entry = s.byPath.get(path);
     const kind = entry ? peekKind(entry) : null;
     const tile = document.querySelector(`[data-path="${CSS.escape(path)}"]`);
@@ -60,8 +63,11 @@
       return;
     }
     const size = peekSize(kind);
-    const at = placeBubble(tile.getBoundingClientRect(), size, { w: window.innerWidth, h: window.innerHeight });
-    open = { entry, kind, ...at, ...size };
+    const box = tile.getBoundingClientRect();
+    // Wiersz listy ma całą szerokość okna plików: obok niego nie ma miejsca, więc dymek staje obok kursora.
+    const anchor = s.view === 'list' ? { left: mouseX, right: mouseX, top: box.top, bottom: box.bottom } : box;
+    const at = placeBubble(anchor, size, { w: window.innerWidth, h: window.innerHeight });
+    open = { entry, kind, tile, ...at, ...size };
   }
 
   function hide(): void {
@@ -86,9 +92,17 @@
   $effect(() => {
     if (open && !s.byPath.has(open.entry.path)) untrack(close);
   });
-  // Pełny podgląd przejmuje dźwięk: muzyka w tle nie może wrócić mu w poprzek.
+  // Kafle są wirtualizowane: plik pod kursorem może zniknąć z DOM bez żadnego zdarzenia myszy.
   $effect(() => {
-    if (s.preview !== null) untrack(() => hold.forget());
+    const tile = open?.tile;
+    if (!tile?.parentNode) return;
+    const watch = new MutationObserver(() => { if (!tile.isConnected) close(); });
+    watch.observe(tile.parentNode, { childList: true });
+    return () => watch.disconnect();
+  });
+  // Pełny podgląd przejmuje dźwięk, a po odłączeniu telefonu strumień jest martwy: wznowienie skończyłoby się błędem.
+  $effect(() => {
+    if (s.preview !== null || s.offline) untrack(() => hold.forget());
   });
 
   function scrolled(): void {
@@ -101,7 +115,7 @@
     const stop = new AbortController();
     const early = { capture: true, signal: stop.signal };
     const light = { ...early, passive: true };
-    const seen = (e: PointerEvent) => { pointerType = e.pointerType; };
+    const seen = (e: PointerEvent) => { pointerType = e.pointerType; mouseX = e.clientX; };
     const released = () => { pressed = false; dragging = false; };
     window.addEventListener('pointerdown', seen, light);
     window.addEventListener('pointermove', seen, light);
