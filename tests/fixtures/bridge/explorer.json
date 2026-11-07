@@ -1283,6 +1283,42 @@
    ]
   },
   {
+   "method": "explorer_text_head",
+   "args": [
+    "/sdcard/Download/notatka.txt"
+   ],
+   "result": {
+    "text": "Zażółć gęślą jaźń",
+    "truncated": false
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "host:exec-out dd if=/sdcard/Download/notatka.txt bs=65536 skip=0 status=none",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "<17 B>",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "stat -c '%f|%s|%Y|%n' /sdcard/Download/notatka.txt 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "81b0|17|1790409600|/sdcard/Download/notatka.txt\n",
+      "tag": null
+     }
+    ]
+   ]
+  },
+  {
    "method": "explorer_mkdir",
    "args": [
     "/sdcard/Download",

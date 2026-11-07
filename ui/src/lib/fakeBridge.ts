@@ -477,6 +477,10 @@ export function createFakeBridge(name: string,
       return structuredClone(result);
     }
     if (method === 'explorer_text') return fakeText(String(args[0]), args[1] === true);
+    if (method === 'explorer_text_head') {
+      const { text } = fakeText(String(args[0]), false);
+      return { text, truncated: false };
+    }
     if (BY_PATH.has(method)) {
       const hit = data.calls.find((c) => c.method === method && c.args[0] === args[0]);
       if (hit) {

@@ -1,9 +1,9 @@
 <script lang="ts">
   import { tick, untrack } from 'svelte';
   import type { PDFDocumentProxy } from 'pdfjs-dist';
-  import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
   import 'pdfjs-dist/web/pdf_viewer.css';
   import { findMatches } from '../../lib/explorer/find';
+  import { pdfAssets, pdfLib } from '../../lib/explorer/pdf';
   import type { EntryView } from '../../lib/types';
   import { t } from '../../lib/i18n/index.svelte';
   import { observeSize } from '../../lib/resize';
@@ -46,8 +46,6 @@
   const hit = $derived(hits[current] ?? null);
   /** Strona bieżącego trafienia: zmienia się tylko przy zmianie trafienia, nie przy dalszym indeksowaniu pliku. */
   const hitPage = $derived(hit?.page ?? null);
-  /** Dekodery skanów (JBIG2, CCITT, JPEG 2000), mapy znaków CJK i czcionki bazowe; pliki kopiuje `vite.config.ts`. */
-  const assets = (dir: string) => new URL(`pdfjs/${dir}/`, document.baseURI).href;
 
   const pages = $derived.by(() => {
     if (!pdf) return [];
@@ -79,11 +77,9 @@
     let destroy: (() => Promise<void>) | undefined;
     void (async () => {
       try {
-        const lib = await import('pdfjs-dist');
+        const lib = await pdfLib();
         if (stale) return;
-        lib.GlobalWorkerOptions.workerSrc = workerUrl;
-        const task = lib.getDocument({ url: url!, wasmUrl: assets('wasm'), cMapUrl: assets('cmaps'),
-          standardFontDataUrl: assets('standard_fonts'), iccUrl: assets('iccs') });
+        const task = lib.getDocument({ url: url!, ...pdfAssets() });
         destroy = () => task.destroy();
         const doc = await task.promise;
         if (stale) return;

@@ -298,6 +298,25 @@ def test_text_more_reads_next_chunk(tmp_path, monkeypatch):
     assert "".join(parts) == body and len(parts) > 2
 
 
+def test_text_head_is_light_and_leaves_the_reader_alone(tmp_path):
+    api, _, host, _ = _opened(tmp_path)
+    storage = _storage_of(host)
+    body = "ąę żółw " * 4000  # znaki dwubajtowe: 16 KB tnie się w środku znaku
+    storage.local("/sdcard/Download/długi.txt").write_bytes(body.encode("utf-8"))
+    api.explorer_text("/sdcard/Download/długi.txt")
+    state = api._explorer.text
+    previews = dict(api._explorer.stats.previews)
+
+    got = api.explorer_text_head("/sdcard/Download/długi.txt")
+    assert got["truncated"] is True and body.startswith(got["text"])
+    assert 0 < len(got["text"].encode("utf-8")) <= 16 * 1024 and "�" not in got["text"]
+    short = api.explorer_text_head("/sdcard/Download/notatka Łódź.txt")
+    assert short == {"text": TEXT_PL, "truncated": False}
+    assert api.explorer_text_head("/sdcard/Download")["error"]["key"] == "bad_request"
+    assert api._explorer.text == state  # czytnik pełnego tekstu nietknięty
+    assert dict(api._explorer.stats.previews) == previews  # a podgląd w dymku się nie liczy
+
+
 def test_mkdir_and_new_text(tmp_path):
     api, _, host, _ = _opened(tmp_path)
     storage = _storage_of(host)

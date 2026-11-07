@@ -53,7 +53,7 @@ from admenot.engine.explorer.meta import image_meta, media_meta
 from admenot.engine.explorer.places import Place, count_place, find_places, scan_place
 from admenot.engine.explorer.plan import Problem, TaskPlan, plan_to_pc, plan_to_phone
 from admenot.engine.explorer.queue import TransferQueue, sweep_parts, sweep_recorded
-from admenot.engine.explorer.textview import TEXT_LIMIT, decode_chunk
+from admenot.engine.explorer.textview import TEXT_HEAD, TEXT_LIMIT, decode_chunk
 from admenot.engine.explorer.thumbs import EXIF_HEAD
 from admenot.engine.oplock import DeviceBusy, device_lock
 from admenot.engine.paths import journal_path
@@ -740,6 +740,23 @@ class ExplorerMixin:
         sess.text = (path, offset, codec)
         return {"text": text, "encoding": "utf-16" if codec.startswith("utf-16") else codec,
                 "truncated": offset < size}
+
+    @_bridge
+    def explorer_text_head(self, path: str) -> dict[str, Any]:
+        """Początek tekstu (`TEXT_HEAD` bajtów) do dymku przy najechaniu: bez `sess.text` i bez statystyki,
+        więc nie rusza czytnika pełnego podglądu."""
+        sess = self._explorer_session()
+        path = self._explorer_path(path, file=True)
+        is_dir, size, _mtime = self._explorer_stat(sess, path)
+        if is_dir:
+            raise AppError("bad_request", "path")
+        want = min(TEXT_HEAD, size)
+        with self._explorer_errors(sess):
+            data = sess.media.read_range(path, 0, want) if want else b""
+            if want and not data:  # strumień urwany od razu
+                raise AdbError("command_failed", "empty read")
+        text, _codec, _used = decode_chunk(data, None, final=size <= TEXT_HEAD)
+        return {"text": text, "truncated": size > TEXT_HEAD}
 
     @_bridge
     def explorer_mkdir(self, parent: str, name: str) -> dict[str, Any]:

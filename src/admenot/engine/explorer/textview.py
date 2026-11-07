@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import codecs
 
-__all__ = ["TEXT_LIMIT", "decode_chunk", "decode_text"]
+__all__ = ["TEXT_HEAD", "TEXT_LIMIT", "decode_chunk", "decode_text"]
 
 TEXT_LIMIT = 2 * 1024 * 1024
+TEXT_HEAD = 16 * 1024  # początek pliku do dymku podglądu przy najechaniu
 _UTF8_TAIL = 3  # ucięty na końcu wielobajtowy znak (podgląd czyta tylko początek pliku)
 _BOMS = {b"\xef\xbb\xbf": "utf-8", b"\xff\xfe": "utf-16-le", b"\xfe\xff": "utf-16-be"}
 

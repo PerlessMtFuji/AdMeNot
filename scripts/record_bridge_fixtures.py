@@ -425,6 +425,7 @@ def _explorer(r: Recorder, phone: Any) -> None:
     r.call("explorer_meta", "/sdcard/DCIM/Camera/IMG_20260926_0000.jpg")
     r.call("explorer_list", "/sdcard/Download")
     r.call("explorer_text", "/sdcard/Download/notatka.txt", False)
+    r.call("explorer_text_head", "/sdcard/Download/notatka.txt")
     r.call("explorer_mkdir", "/sdcard/Download", "Nowy folder")
     with mock.patch.object(explorer_create.secrets, "token_hex", lambda n: "0123456789ab"):
         r.call("explorer_new_text", "/sdcard/Download", "Lista zakupów", "mleko\nchleb")

@@ -427,6 +427,11 @@ export class ExplorerController {
     return this.request(() => this.api.explorer_text(path, more), false);
   }
 
+  /** Początek tekstu do dymku przy najechaniu: lekki odczyt, który nie rusza czytnika pełnego podglądu. */
+  textHead(path: string) {
+    return this.request(() => this.api.explorer_text_head(path), false);
+  }
+
   async openMap(lat: number, lon: number): Promise<void> {
     await this.request(() => this.api.explorer_open_map(lat, lon));
   }

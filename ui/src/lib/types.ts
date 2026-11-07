@@ -938,6 +938,7 @@ export interface Api {
   explorer_list(path: string): R<ExplorerListView>;
   explorer_meta(path: string): R<{ meta: EntryMeta }>;
   explorer_text(path: string, more: boolean): R<{ text: string; encoding: string; truncated: boolean }>;
+  explorer_text_head(path: string): R<{ text: string; truncated: boolean }>;
   explorer_mkdir(parent: string, name: string): R<{ path: string }>;
   explorer_new_text(parent: string, name: string, text: string): R<{ path: string }>;
   explorer_open_map(lat: number, lon: number): R<Record<string, never>>;
