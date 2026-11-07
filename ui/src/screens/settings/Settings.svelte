@@ -70,21 +70,22 @@
 </script>
 
 <div class="flex min-h-0 min-w-0 flex-1">
-  <aside class="flex w-[200px] flex-none flex-col gap-0.5 border-r border-line px-2.5 py-[18px] max-[1200px]:w-[180px]">
-    <h1 class="mx-2 mb-2.5 text-xl font-extrabold">{t('settings.title')}</h1>
-    <div class="relative mx-1 mb-2.5">
-      <span class="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-soft"><Icon name="search" size={14} /></span>
-      <input type="search" class="field w-full rounded-[10px] py-1.5 pr-2.5 pl-8 text-xs" bind:value={search.query} {onkeydown}
+  <aside class="flex w-[260px] flex-none flex-col gap-1 border-r border-line px-3.5 py-5 max-[1200px]:w-[220px] max-[1200px]:px-2.5">
+    <h1 class="mx-2.5 mb-3 text-2xl font-extrabold tracking-[-.01em]">{t('settings.title')}</h1>
+    <div class="relative mb-3">
+      <span class="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-soft"><Icon name="search" size={16} /></span>
+      <input type="search" class="field w-full rounded-xl py-2 pr-3 pl-9 text-sm" bind:value={search.query} {onkeydown}
         placeholder={t('settings.search')} aria-label={t('settings.search')} />
     </div>
-    <nav aria-label={t('settings.categories')} class="flex flex-col gap-0.5">
+    <nav aria-label={t('settings.categories')} class="flex flex-col gap-1">
       {#each CATEGORIES as c (c.id)}
         {@const on = c.id === current.id}
         <button type="button" data-category={c.id} aria-current={on ? 'page' : undefined} onclick={() => select(c.id)}
-          class="flex w-full items-center gap-[9px] rounded-[10px] px-[9px] py-[7px] text-left text-xs font-semibold transition-colors duration-150
-            {on ? 'bg-surface text-ink shadow-card' : 'text-mut hover:text-ink'}">
-          <span class="grid h-[22px] w-[22px] flex-none place-items-center rounded-[7px] {on ? 'bg-accent text-white' : 'bg-neutral-soft'}">
-            <Icon name={c.icon} size={13} />
+          class="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left text-sm font-semibold transition duration-150
+            {on ? 'rail-now text-accent' : 'text-mut hover:bg-neutral-soft hover:text-ink'}">
+          <span class="grid h-7 w-7 flex-none place-items-center rounded-lg transition-colors duration-150
+            {on ? 'bg-accent text-white' : 'bg-neutral-soft'}">
+            <Icon name={c.icon} size={16} />
           </span>
           <span class="min-w-0 flex-1">{t(c.labelKey)}</span>
           {#if c.id === 'service' && s.serviceNameMissing}
