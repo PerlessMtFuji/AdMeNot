@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import { flushSync, tick } from 'svelte';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
-import { PEEK_DELAY_MS, PREFETCH_MAX } from '../../lib/explorer/peek';
+import { PEEK_DELAY_MS, PEEK_FULL_WAIT_MS, PREFETCH_MAX } from '../../lib/explorer/peek';
 import { RESUME_WAIT_MS } from '../../lib/explorer/musichold';
 import { ThumbQueue } from '../../lib/explorer/thumbs';
 import type { ExplorerController } from '../../lib/explorer/controller';
@@ -44,7 +44,7 @@ const entry = (name: string, type: EntryView['type'], ext: string, over: Partial
 const PHOTO = entry('a.jpg', 'image', 'jpg', { thumb: 'http://127.0.0.1:1/thumb-a' });
 const PHOTO2 = entry('b.jpg', 'image', 'jpg');
 const HEIC = entry('c.heic', 'image', 'heic');
-const MOVIE = entry('film.mp4', 'video', 'mp4', { thumb: 'http://127.0.0.1:1/thumb-film' });
+const MOVIE = entry('film.mp4', 'video', 'mp4');
 const SONG = entry('utwor.mp3', 'audio', 'mp3');
 const SONG2 = entry('drugi.mp3', 'audio', 'mp3');
 const DOC = entry('faktura.pdf', 'doc', 'pdf');
@@ -60,11 +60,56 @@ function pointer(type: string, pointerType: string, clientX = 0): void {
   window.dispatchEvent(Object.assign(new Event(type), { pointerType, clientX }));
 }
 
+let blobs = 0;
+
 describe('PeekBubble', () => {
   let ex: ExplorerController;
   let bridge: Awaited<ReturnType<typeof setupCtl>>['bridge'];
   let view: ReturnType<typeof render>;
   let load: ReturnType<typeof vi.spyOn>;
+  let thumbs: ThumbQueue;
+  let decode: Mock<() => Promise<void>>;
+
+  /** Miniatura w pamięci galerii, jak po pobraniu przez kolejkę; zwraca jej adres `blob:`. */
+  async function seed(url: string): Promise<string> {
+    thumbs.want(url, 0);
+    await vi.waitFor(() => expect(thumbs.get(url)).not.toBeNull());
+    return thumbs.get(url)!.src;
+  }
+
+  /** Dymek postał na zdjęciu: pełny plik rusza. */
+  async function dwell(e: EntryView): Promise<HTMLImageElement> {
+    vi.advanceTimersByTime(PEEK_FULL_WAIT_MS);
+    await settle();
+    return bubble()!.querySelector<HTMLImageElement>(`img[src="${e.url}"]`)!;
+  }
+
+  /** Wczytane i zdekodowane. */
+  async function loaded(img: HTMLImageElement): Promise<void> {
+    await fireEvent.load(img);
+    await vi.advanceTimersByTimeAsync(0);
+    await settle();
+  }
+
+  /** Obraz o znanych wymiarach kończy wczytywanie. */
+  async function sized(img: HTMLImageElement, w: number, h: number): Promise<void> {
+    Object.defineProperty(img, 'naturalWidth', { configurable: true, value: w });
+    Object.defineProperty(img, 'naturalHeight', { configurable: true, value: h });
+    await loaded(img);
+  }
+
+  /** Metadane filmu o znanych wymiarach. */
+  async function metadata(video: HTMLVideoElement, w: number, h: number): Promise<void> {
+    Object.defineProperty(video, 'videoWidth', { configurable: true, value: w });
+    Object.defineProperty(video, 'videoHeight', { configurable: true, value: h });
+    await fireEvent.loadedMetadata(video);
+    await settle();
+  }
+
+  /** Własny odtwarzacz dymka. */
+  const own = () => players.find((p) => p.calls.includes('play'))!;
+
+  const size = () => [bubble()?.style.width, bubble()?.style.height];
 
   /** Kafel na ekranie: dymek szuka go po `data-path`. */
   function tile(e: EntryView, left = 100): HTMLElement {
@@ -113,6 +158,11 @@ describe('PeekBubble', () => {
 
   beforeEach(async () => {
     players.length = 0;
+    vi.spyOn(document, 'hasFocus').mockReturnValue(true);  // jsdom bez aktywnego elementu mówi `false`
+    decode = vi.fn(async () => {});
+    HTMLImageElement.prototype.decode = decode;
+    URL.createObjectURL = vi.fn(() => `blob:${++blobs}`);
+    URL.revokeObjectURL = vi.fn();
     pdf.draw = vi.fn(async () => {});
     pdf.close = vi.fn();
     const env = await setupCtl('explorer');
@@ -123,8 +173,10 @@ describe('PeekBubble', () => {
     vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
     vi.spyOn(window.HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
     load = vi.spyOn(window.HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+    thumbs = new ThumbQueue(async () => ({ blob: new Blob(), color: '#112233' }));
+    await seed(PHOTO.thumb!);
     vi.useFakeTimers();
-    view = render(PeekBubble, { props: { ex, thumbs: new ThumbQueue(async () => { throw new Error('bez sieci'); }) } });
+    view = render(PeekBubble, { props: { ex, thumbs } });
     flushSync();
   });
 
@@ -148,30 +200,163 @@ describe('PeekBubble', () => {
     expect(bubble()?.getAttribute('aria-hidden')).toBe('true');
     expect(bubble()?.className).toContain('pointer-events-none');
     expect(bubble()?.parentElement).toBe(document.body);
-    expect(bubble()?.querySelector('img')?.getAttribute('src')).toBe(PHOTO.thumb);
+    expect(bubble()?.querySelector('img')?.getAttribute('src')).toBe(thumbs.get(PHOTO.thumb!)?.src);
   });
 
   it('zdjęcie wyostrza się po wczytaniu pełnego pliku, a duże zostaje przy miniaturze', async () => {
     await hover(PHOTO);
-    const full = bubble()!.querySelector<HTMLImageElement>(`img[src="${PHOTO.url}"]`)!;
+    const full = await dwell(PHOTO);
     expect(full.className).toContain('opacity-0');
-    await fireEvent.load(full);
+    await loaded(full);
     expect(full.className).not.toContain('opacity-0');
     await hover(null);
     vi.advanceTimersByTime(1000);
     await settle();
 
-    const big = { ...PHOTO, path: '/sdcard/Test/duze.jpg', size: PREFETCH_MAX + 1 };
+    const big = { ...PHOTO, path: '/sdcard/Test/duze.jpg', size: PREFETCH_MAX + 1, thumb: 'http://127.0.0.1:1/thumb-duze' };
     ex.state.entries = [...ALL, big];
     tile(big);
     await hover(big);
+    await dwell(big);
     expect(bubble()!.querySelectorAll('img')).toHaveLength(1);
-    expect(bubble()!.querySelector('img')?.getAttribute('src')).toBe(PHOTO.thumb);
+    expect(bubble()!.querySelector('img')?.getAttribute('src')).toBe(big.thumb);  // poza pamięcią: tylko serwer ją ma
+  });
+
+  it('zdjęcie z pełnym plikiem nie pyta serwera o miniaturę, której nie ma w pamięci', async () => {
+    const cold = { ...PHOTO, path: '/sdcard/Test/zimne.jpg', thumb: 'http://127.0.0.1:1/thumb-zimne' };
+    ex.state.entries = [...ALL, cold];
+    tile(cold);
+    await hover(cold);
+    expect(bubble()!.querySelectorAll('img')).toHaveLength(0);
+    expect(bubble()!.querySelector('[data-peek-icon]')).not.toBeNull();
+    await dwell(cold);
+    expect([...bubble()!.querySelectorAll('img')].map((i) => i.getAttribute('src'))).toEqual([cold.url]);
+  });
+
+  it('pełne zdjęcie rusza dopiero po chwili w dymku, a miniatura od razu', async () => {
+    await hover(PHOTO);
+    expect(bubble()!.querySelectorAll('img')).toHaveLength(1);
+    vi.advanceTimersByTime(PEEK_FULL_WAIT_MS - 1);
+    await settle();
+    expect(bubble()!.querySelector(`img[src="${PHOTO.url}"]`)).toBeNull();
+    vi.advanceTimersByTime(1);
+    await settle();
+    expect(bubble()!.querySelector(`img[src="${PHOTO.url}"]`)).not.toBeNull();
+  });
+
+  it('w przejeździe zdjęcia krótsze niż czekanie nie ruszają pełnego pliku', async () => {
+    await hover(PHOTO);
+    vi.advanceTimersByTime(PEEK_FULL_WAIT_MS - 30);
+    ex.state.hover = PHOTO2.path;
+    await settle();
+    vi.advanceTimersByTime(PEEK_FULL_WAIT_MS - 30);
+    await settle();
+    expect(bubble()!.querySelectorAll('img')).toHaveLength(0);
+    vi.advanceTimersByTime(30);
+    await settle();
+    expect(bubble()!.querySelector(`img[src="${PHOTO2.url}"]`)).not.toBeNull();
+    expect(bubble()!.querySelector(`img[src="${PHOTO.url}"]`)).toBeNull();
+  });
+
+  it('pełne zdjęcie pokazuje się dopiero po dekodowaniu; odrzucenie go nie chowa', async () => {
+    let done!: () => void;
+    decode.mockReturnValueOnce(new Promise((resolve) => { done = resolve; }));
+    await hover(PHOTO);
+    const full = await dwell(PHOTO);
+    await loaded(full);
+    expect(decode).toHaveBeenCalledTimes(1);
+    expect(full.className).toContain('opacity-0');
+    done();
+    await vi.advanceTimersByTimeAsync(0);
+    await settle();
+    expect(full.className).not.toContain('opacity-0');
+
+    await hover(null);
+    vi.advanceTimersByTime(1000);
+    await settle();
+    decode.mockRejectedValueOnce(new Error('EncodingError'));
+    await hover(PHOTO2);
+    const other = await dwell(PHOTO2);
+    await loaded(other);
+    expect(other.className).not.toContain('opacity-0');
+    expect(bubble()).not.toBeNull();
+  });
+
+  it('dekodowanie skończone po odjechaniu nie zmienia dymka następnego pliku', async () => {
+    let done!: () => void;
+    decode.mockReturnValueOnce(new Promise((resolve) => { done = resolve; }));
+    await hover(PHOTO);
+    const full = await dwell(PHOTO);
+    await sized(full, 1000, 3000);
+    ex.state.hover = NOTE.path;
+    await settle();
+    done();
+    await vi.advanceTimersByTimeAsync(0);
+    await settle();
+    expect(bubble()?.textContent).toContain('notatka.txt');
+    expect(size()).toEqual(['440px', '460px']);
+  });
+
+  it('zdjęcie przyjmuje proporcje miniatury, a pełny plik je poprawia', async () => {
+    await hover(PHOTO);
+    expect(size()).toEqual(['440px', '330px']);
+    await sized(bubble()!.querySelector('img')!, 192, 256);
+    expect(size()).toEqual(['440px', '623px']);
+    expect(bubble()?.style.top).toBe('8px');  // ponownie ustawiony: wyższy dymek trzyma się okna
+    await sized(await dwell(PHOTO), 4000, 2000);
+    expect(size()).toEqual(['440px', '256px']);
+    expect(bubble()?.style.top).toBe('22px');
+  });
+
+  it('film 9:16 przyjmuje kształt z metadanych bez zakładania treści od nowa', async () => {
+    const play = vi.mocked(window.HTMLMediaElement.prototype.play);
+    await hover(MOVIE);
+    const video = bubble()!.querySelector('video')!;
+    await metadata(video, 1080, 1920);
+    expect(size()).toEqual(['340px', '640px']);
+    expect(bubble()!.querySelector('video')).toBe(video);
+    expect(play).toHaveBeenCalledTimes(1);
+  });
+
+  it('film przyjmuje kształt już z klatki w pamięci, przed metadanymi', async () => {
+    await seed(MOVIE.url!);
+    await hover(MOVIE);
+    await sized(bubble()!.querySelector('img')!, 144, 256);
+    expect(size()).toEqual(['340px', '640px']);
+  });
+
+  it('kształt dymka nie drga o zaokrąglenie', async () => {
+    await hover(PHOTO);
+    await sized(bubble()!.querySelector('img')!, 256, 192);
+    expect(size()).toEqual(['440px', '366px']);
+    const before = bubble()!.style.top;
+    await sized(await dwell(PHOTO), 4000, 3010);  // sam pomiar dałby 367 px
+    expect(size()).toEqual(['440px', '366px']);
+    expect(bubble()!.style.top).toBe(before);
+  });
+
+  it('PDF zostaje przy 424x640', async () => {
+    await hover(DOC);
+    expect(size()).toEqual(['424px', '640px']);
+  });
+
+  it('otwarty dymek wstrzymuje zapas miniatur, a koniec dymka i ekranu go wznawia', async () => {
+    const pause = vi.spyOn(thumbs, 'pauseSpare');
+    await hover(NOTE);
+    expect(pause).toHaveBeenLastCalledWith(true);
+    await hover(null);
+    vi.advanceTimersByTime(1000);
+    await settle();
+    expect(pause).toHaveBeenLastCalledWith(false);
+    await hover(NOTE);
+    expect(pause).toHaveBeenLastCalledWith(true);
+    view.unmount();
+    expect(pause).toHaveBeenLastCalledWith(false);
   });
 
   it('zamknięcie dymka przerywa pobieranie pełnego zdjęcia', async () => {
     await hover(PHOTO);
-    const full = bubble()!.querySelector<HTMLImageElement>(`img[src="${PHOTO.url}"]`)!;
+    const full = await dwell(PHOTO);
     await fireEvent.mouseDown(window);
     await settle();
     expect(bubble()).toBeNull();
@@ -232,6 +417,43 @@ describe('PeekBubble', () => {
     await act();
     await settle();
     expect(bubble()).toBeNull();
+  });
+
+  it('okno w tle: blur wstrzymuje dymki, a focus je oddaje', async () => {
+    await fireEvent.blur(window);
+    await hover(NOTE);
+    vi.advanceTimersByTime(1000);
+    await settle();
+    expect(bubble()).toBeNull();
+    await fireEvent.focus(window);
+    await settle();
+    vi.advanceTimersByTime(PEEK_DELAY_MS);
+    await settle();
+    expect(bubble()?.textContent).toContain('notatka.txt');
+  });
+
+  it('okno bez fokusu od startu nie gra, dopóki nie przyjdzie focus albo klik', async () => {
+    view.unmount();
+    vi.mocked(document.hasFocus).mockReturnValue(false);
+    view = render(PeekBubble, { props: { ex, thumbs } });
+    flushSync();
+    await hover(MOVIE);
+    expect(bubble()).toBeNull();
+    await fireEvent.focus(window);
+    await settle();
+    vi.advanceTimersByTime(PEEK_DELAY_MS);
+    await settle();
+    expect(bubble()?.querySelector('video')).not.toBeNull();
+
+    view.unmount();
+    await hover(null);
+    view = render(PeekBubble, { props: { ex, thumbs } });
+    flushSync();
+    await fireEvent.mouseDown(window);
+    await fireEvent.mouseUp(window);
+    await settle();
+    await hover(NOTE);
+    expect(bubble()).not.toBeNull();
   });
 
   it('blur pola tekstowego nie jest blurem okna', async () => {
@@ -326,8 +548,8 @@ describe('PeekBubble', () => {
 
     await hover(MOVIE);
     const video = bubble()!.querySelector('video')!;
-    expect(video.autoplay).toBe(true);
-    expect(video.getAttribute('poster')).toBe(MOVIE.thumb);
+    expect(calls).toEqual([]);  // dopiero gdy film naprawdę gra
+    await fireEvent.playing(video);
     expect(calls).toEqual(['pause']);
     Object.defineProperty(music.el, 'paused', { configurable: true, value: true });
 
@@ -345,13 +567,88 @@ describe('PeekBubble', () => {
 
     Object.defineProperty(music.el, 'paused', { configurable: true, value: false });
     await hover(SONG);
+    expect(calls).toEqual(['pause', 'play']);
+    const mine = players.find((p) => p !== (music as unknown))!;
+    await fireEvent.playing(mine.el);
     expect(calls).toEqual(['pause', 'play', 'pause']);
-    const own = players.find((p) => p !== (music as unknown))!;
-    expect(own.calls).toEqual([`load ${SONG.url}`, 'play']);
+    expect(mine.calls).toEqual([`load ${SONG.url}`, 'play']);
     await hover(null);
     vi.advanceTimersByTime(1000);
     await settle();
-    expect(own.calls.at(-1)).toBe('stop');
+    expect(mine.calls.at(-1)).toBe('stop');
+  });
+
+  it('film woła play() zamiast autoplay, a odrzucenie przechodzi po cichu', async () => {
+    const play = vi.mocked(window.HTMLMediaElement.prototype.play);
+    play.mockClear();
+    play.mockRejectedValueOnce(new DOMException('bez gestu', 'NotAllowedError'));
+    const seen = ex.state.error;
+    await hover(MOVIE);
+    await vi.advanceTimersByTimeAsync(0);
+    const video = bubble()!.querySelector('video')!;
+    expect(video.hasAttribute('autoplay')).toBe(false);
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(play.mock.contexts[0]).toBe(video);
+    expect(ex.state.error).toBe(seen);
+  });
+
+  it('klatka filmu idzie z pamięci galerii, a sam adres pliku nigdy nie jest plakatem', async () => {
+    await hover(MOVIE);
+    const video = bubble()!.querySelector('video')!;
+    expect(video.hasAttribute('poster')).toBe(false);
+    expect(bubble()!.querySelector('[data-peek-icon]')).not.toBeNull();
+    const src = await seed(MOVIE.url!);
+    await settle();
+    expect(video.getAttribute('poster')).toBe(src);
+    expect(src).not.toBe(MOVIE.url);
+    expect(bubble()!.querySelector('[data-peek-icon]')).toBeNull();
+  });
+
+  it.each([
+    ['film', MOVIE, async () => { await fireEvent.error(bubble()!.querySelector('video')!); }],
+    ['muzyka', SONG, async () => { own().onerror?.(); }],
+  ])('%s, którego okno nie zagra, nie pauzuje muzyki w tle', async (_name, e, act) => {
+    const { calls } = backgroundMusic();
+    await hover(e);
+    await act();
+    await settle();
+    expect(bubble()).toBeNull();
+    vi.advanceTimersByTime(1000);
+    expect(calls).toEqual([]);
+  });
+
+  it('drugie `playing` po buforowaniu nie pauzuje muzyki, którą serwisant włączył w czasie dymka', async () => {
+    const { calls, paused } = backgroundMusic();
+    paused(true);
+    await hover(MOVIE);
+    const video = bubble()!.querySelector('video')!;
+    await fireEvent.playing(video);
+    paused(false);
+    await fireEvent.playing(video);
+    expect(calls).toEqual([]);
+  });
+
+  it('utwór z mini-odtwarzacza nie dostaje dymka i gra dalej', async () => {
+    const { calls } = backgroundMusic();
+    ex.state.playing = { path: SONG.path, title: 'utwór', cover: null, url: SONG.url! };
+    await hover(SONG);
+    vi.advanceTimersByTime(1000);
+    await settle();
+    expect(bubble()).toBeNull();
+    expect(calls).toEqual([]);
+    expect(players.flatMap((p) => p.calls)).toEqual([]);
+    await hover(SONG2);
+    expect(bubble()?.textContent).toContain('drugi.mp3');
+  });
+
+  it('utwór, który właśnie zaczął grać w mini-odtwarzaczu, zamyka swój dymek', async () => {
+    await hover(SONG);
+    ex.state.playing = { path: SONG.path, title: 'utwór', cover: null, url: SONG.url! };
+    await settle();
+    vi.advanceTimersByTime(1000);
+    await settle();
+    expect(bubble()).toBeNull();
+    expect(own().calls.at(-1)).toBe('stop');
   });
 
   it('bez grającej muzyki dymek nie tworzy głównego odtwarzacza i ma jeden własny', async () => {
@@ -378,6 +675,7 @@ describe('PeekBubble', () => {
     Object.defineProperty(music.el, 'paused', { configurable: true, value: false });
     const calls = (music as unknown as { calls: string[] }).calls;
     await hover(MOVIE);
+    await fireEvent.playing(bubble()!.querySelector('video')!);
     expect(calls).toEqual(['pause']);
     Object.defineProperty(music.el, 'paused', { configurable: true, value: true });
     await fireEvent.mouseDown(window);
@@ -391,13 +689,13 @@ describe('PeekBubble', () => {
   it('odłączony telefon zatrzymuje własny odtwarzacz i nie wznawia muzyki z martwego strumienia', async () => {
     const { calls, paused } = backgroundMusic();
     await hover(SONG);
+    await fireEvent.playing(own().el);
     expect(calls).toEqual(['pause']);
     paused(true);
     ex.state.offline = true;
     await settle();
     expect(bubble()).toBeNull();
-    const own = players.find((p) => p.calls.includes('play'))!;
-    expect(own.calls.at(-1)).toBe('stop');
+    expect(own().calls.at(-1)).toBe('stop');
     vi.advanceTimersByTime(1000);
     expect(calls).toEqual(['pause']);
   });
@@ -405,6 +703,7 @@ describe('PeekBubble', () => {
   it('odłączenie w czasie oczekiwania na wznowienie też porzuca muzykę', async () => {
     const { calls, paused } = backgroundMusic();
     await hover(MOVIE);
+    await fireEvent.playing(bubble()!.querySelector('video')!);
     paused(true);
     await fireEvent.mouseDown(window);
     await settle();
@@ -419,14 +718,14 @@ describe('PeekBubble', () => {
     ['blur okna', () => fireEvent.blur(window)],
     ['opuszczenie dokumentu', () => fireEvent.mouseLeave(document.documentElement)],
   ])('%s przy grającym dymku zatrzymuje go i wznawia muzykę raz po 400 ms', async (_name, act) => {
-    const { calls, paused, music } = backgroundMusic();
+    const { calls, paused } = backgroundMusic();
     await hover(SONG);
+    await fireEvent.playing(own().el);
     paused(true);
     await act();
     await settle();
     expect(bubble()).toBeNull();
-    const own = players.find((p) => p !== (music as unknown))!;
-    expect(own.calls.at(-1)).toBe('stop');
+    expect(own().calls.at(-1)).toBe('stop');
     vi.advanceTimersByTime(RESUME_WAIT_MS - 1);
     expect(calls).toEqual(['pause']);
     vi.advanceTimersByTime(1);
@@ -474,16 +773,13 @@ describe('PeekBubble', () => {
   it('zdjęcie i film bez miniatury mają ikonę typu do pierwszej treści', async () => {
     await hover(PHOTO2);
     expect(bubble()!.querySelector('[data-peek-icon]')).not.toBeNull();
-    await fireEvent.load(bubble()!.querySelector('img')!);
+    await loaded(await dwell(PHOTO2));
     expect(bubble()!.querySelector('[data-peek-icon]')).toBeNull();
     await hover(null);
     vi.advanceTimersByTime(1000);
     await settle();
 
-    const bare = { ...MOVIE, path: '/sdcard/Test/bez.mp4', thumb: null };
-    ex.state.entries = [...ALL, bare];
-    tile(bare);
-    await hover(bare);
+    await hover(MOVIE);
     const video = bubble()!.querySelector('video')!;
     expect(bubble()!.querySelector('[data-peek-icon]')).not.toBeNull();
     await fireEvent.loadedData(video);
@@ -560,7 +856,7 @@ describe('PeekBubble', () => {
     ['tekst', NOTE, async () => {}],
     ['film', MOVIE, async () => { await fireEvent.error(bubble()!.querySelector('video')!); }],
     ['muzyka', SONG, async () => { players[0].onerror?.(); }],
-    ['zdjęcie', PHOTO2, async () => { await fireEvent.error(bubble()!.querySelector('img')!); }],
+    ['zdjęcie', PHOTO2, async () => { await fireEvent.error(await dwell(PHOTO2)); }],
   ])('błąd (%s) zamyka dymek bez s.error', async (_name, e, act) => {
     pdf.draw = vi.fn(async () => { throw new Error('zły plik'); });
     bridge.failNext('explorer_text_head', 'explorer_read');

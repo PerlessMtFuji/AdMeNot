@@ -317,6 +317,15 @@ def test_text_head_is_light_and_leaves_the_reader_alone(tmp_path):
     assert dict(api._explorer.stats.previews) == previews  # a podgląd w dymku się nie liczy
 
 
+def test_failed_text_head_is_not_a_session_error(tmp_path):
+    api, _, _, _ = _opened(tmp_path)
+    assert api.explorer_text_head("/sdcard/Download")["error"]["key"] == "bad_request"
+    assert api.explorer_text_head("/sdcard/Download/nie ma.txt")["error"]["key"] == "explorer_missing"
+    assert not api._explorer.stats.errors  # najechanie to nie działanie serwisanta
+    assert api.explorer_text("/sdcard/Download/nie ma.txt")["error"]["key"] == "explorer_missing"
+    assert api._explorer.stats.errors == {"explorer_missing": 1}  # zwykłe odczyty liczą się dalej
+
+
 def test_mkdir_and_new_text(tmp_path):
     api, _, host, _ = _opened(tmp_path)
     storage = _storage_of(host)

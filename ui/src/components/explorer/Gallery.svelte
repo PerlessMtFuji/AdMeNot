@@ -3,7 +3,7 @@
   import type { ExplorerController } from '../../lib/explorer/controller';
   import { days } from '../../lib/explorer/logic';
   import { openMorph } from '../../lib/explorer/morph';
-  import type { ThumbQueue } from '../../lib/explorer/thumbs';
+  import { SPARE, type ThumbQueue } from '../../lib/explorer/thumbs';
   import {
     FALLBACK, GRID, type GroupIn, gridLayout, inView, locate, neighbour, type Rect, tileRect, tilesInRect, type Viewport,
     viewport, visibleSlices,
@@ -28,8 +28,6 @@
   /** Miniatury pobierane na zapas (kafle): w kierunku przewijania i za plecami. */
   const AHEAD = 120;
   const BEHIND = 40;
-  /** Priorytet zapasu: po kaflach w DOM. */
-  const SPARE = 200_000;
   /** Skok o pół okna i więcej: kafle zaraz znikną, więc z pobieraniem czekamy, aż przewijanie zwolni. */
   const FLING_WAIT_MS = 60;
   const DIRS = '/dirs';

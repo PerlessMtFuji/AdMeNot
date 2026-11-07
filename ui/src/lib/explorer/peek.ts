@@ -8,6 +8,8 @@ export const PEEK_SWEEP_MS = 180;
 export const NATIVE_IMAGE: readonly string[] = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif', 'svg'];
 /** Większych zdjęć nie trzymamy w pamięci na zapas ani nie pokazujemy w dymku w całości. */
 export const PREFETCH_MAX = 40 * 1024 * 1024;
+/** Tyle dymek musi postać na zdjęciu, zanim ruszy pełny plik: w przejeździe dekodowanie wielkich zdjęć rwie klatki. */
+export const PEEK_FULL_WAIT_MS = 150;
 
 export type PeekKind = 'photo' | 'video' | 'audio' | 'pdf' | 'text';
 
@@ -45,6 +47,23 @@ export type PeekRect = { left: number; top: number; right: number; bottom: numbe
 
 const GAP = 12;
 const MARGIN = 8;
+/** Wysokość stopki z nazwą. */
+const FOOTER = 36;
+/** Poniżej tego stopka nie mieści nazwy, a bardzo wąska treść stoi w pasach (`object-contain`). */
+const MIN_W = 240;
+const MIN_AREA_H = 120;
+
+/** Dymek zdjęcia lub filmu o proporcjach treści (`ratio` = szerokość / wysokość): tak szeroki jak zwykły, tak wysoki
+ *  jak PDF, zawsze w oknie. */
+export function fitBubble(ratio: number, win: { w: number; h: number }): { w: number; h: number } {
+  const maxW = Math.min(peekSize('photo').w, win.w - 2 * MARGIN);
+  const maxH = Math.min(peekSize('pdf').h, win.h - 2 * MARGIN) - FOOTER;
+  const w = Math.min(maxW, maxH * ratio);
+  return {
+    w: Math.round(Math.min(maxW, Math.max(MIN_W, w))),
+    h: Math.round(Math.min(maxH, Math.max(MIN_AREA_H, w / ratio))) + FOOTER,
+  };
+}
 
 /** Dymek obok kafla: po prawej, a bez miejsca — po lewej; zawsze cały w oknie. */
 export function placeBubble(

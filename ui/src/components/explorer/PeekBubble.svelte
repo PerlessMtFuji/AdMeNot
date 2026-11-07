@@ -6,7 +6,7 @@
   import type { ExplorerController } from '../../lib/explorer/controller';
   import { MusicHold } from '../../lib/explorer/musichold';
   import { closePdfWorker } from '../../lib/explorer/pdf';
-  import { peekKind, peekSize, PeekTimer, placeBubble, type PeekKind } from '../../lib/explorer/peek';
+  import { fitBubble, peekKind, peekSize, PeekTimer, placeBubble, type PeekKind, type PeekRect } from '../../lib/explorer/peek';
   import type { ThumbQueue } from '../../lib/explorer/thumbs';
   import { DUR, ms } from '../../lib/motion';
   import type { EntryView } from '../../lib/types';
@@ -18,15 +18,18 @@
   /** Tyle ciszy po kółku lub przewijaniu, zanim plik pod kursorem znów może dostać dymek. */
   const QUIET_MS = 120;
 
-  type Open = { entry: EntryView; kind: PeekKind; tile: Element; x: number; y: number; w: number; h: number };
+  type Open = { entry: EntryView; kind: PeekKind; tile: Element; anchor: PeekRect; x: number; y: number; w: number; h: number };
   /** Migawka z chwili otwarcia: odświeżenie folderu nie zaczyna odtwarzania od nowa. */
   let open = $state.raw<Open | null>(null);
+  const showing = $derived(open !== null);
   let pointerType = $state('mouse');
   /** Ostatnia pozycja kursora w poziomie: na liście to przy niej stoi dymek. */
   let mouseX = 0;
   let pressed = $state(false);
   let dragging = $state(false);
   let scrolling = $state(false);
+  /** Okno w tle nie gra: `hasFocus` bywa nieaktualne (pod CDP zostało `true`), więc dalej prowadzą je zdarzenia okna. */
+  let focused = $state(document.hasFocus());
   let quiet: ReturnType<typeof setTimeout> | undefined;
 
   const timer = new PeekTimer(show, hide);
@@ -38,20 +41,21 @@
     pause: () => ex.audio.pause(),
     play: () => { void ex.audio.play().catch(() => {}); },
   });
-  const take = () => untrack(() => hold.take());
+  const take = () => hold.take();
 
   let own: AudioPlayer | null = null;
   const player = () => (own ??= new AudioPlayer());
 
-  /** Plik pod kursorem, o ile dymek ma mu co pokazać; reszta (folder, HEIC) liczy się jak „poza plikami”. */
+  /** Plik pod kursorem, o ile dymek ma mu co pokazać; reszta (folder, HEIC) liczy się jak „poza plikami”.
+   *  Utwór z mini-odtwarzacza też: dymek przerwałby to, czego serwisant właśnie słucha. */
   const target = $derived.by(() => {
     if (pointerType !== 'mouse' || s.hover === null) return null;
     const entry = s.byPath.get(s.hover);
-    return entry && peekKind(entry) ? entry.path : null;
+    return entry && peekKind(entry) && entry.path !== s.playing?.path ? entry.path : null;
   });
   /** Wszystkie powody wstrzymania w jednej wartości: `hold` dostaje tylko zmiany. */
   const held = $derived(!s.peek || s.offline || s.preview !== null || s.problems !== null || s.leaveAsk > 0 || s.drop !== null
-    || pressed || dragging || scrolling);
+    || pressed || dragging || scrolling || !focused);
 
   function show(path: string): void {
     if (open?.entry.path === path) return;  // powrót w przejeździe: to, co gra lub się rysuje, zostaje
@@ -67,7 +71,17 @@
     // Wiersz listy ma całą szerokość okna plików: obok niego nie ma miejsca, więc dymek staje obok kursora.
     const anchor = s.view === 'list' ? { left: mouseX, right: mouseX, top: box.top, bottom: box.bottom } : box;
     const at = placeBubble(anchor, size, { w: window.innerWidth, h: window.innerHeight });
-    open = { entry, kind, tile, ...at, ...size };
+    open = { entry, kind, tile, anchor, ...at, ...size };
+  }
+
+  /** Znane proporcje zdjęcia lub filmu: dymek przyjmuje ich kształt, tylko gdy to widać (miniatura i plik różnią się
+   *  o zaokrąglenie). */
+  function fit(w: number, h: number): void {
+    if (!open || !w || !h) return;
+    const win = { w: window.innerWidth, h: window.innerHeight };
+    const size = fitBubble(w / h, win);
+    if (Math.abs(size.w - open.w) < 3 && Math.abs(size.h - open.h) < 3) return;
+    open = { ...open, ...size, ...placeBubble(open.anchor, size, win) };
   }
 
   function hide(): void {
@@ -100,6 +114,11 @@
     watch.observe(tile.parentNode, { childList: true });
     return () => watch.disconnect();
   });
+  // Pełne zdjęcie z dymka czeka za miniaturami na zapas nawet kilka razy dłużej (pomiar: 361 ms zamiast 55 ms).
+  $effect(() => {
+    const on = showing;
+    untrack(() => thumbs.pauseSpare(on));
+  });
   // Pełny podgląd przejmuje dźwięk, a po odłączeniu telefonu strumień jest martwy: wznowienie skończyłoby się błędem.
   $effect(() => {
     if (s.preview !== null || s.offline) untrack(() => hold.forget());
@@ -119,7 +138,8 @@
     const released = () => { pressed = false; dragging = false; };
     window.addEventListener('pointerdown', seen, light);
     window.addEventListener('pointermove', seen, light);
-    window.addEventListener('mousedown', () => { close(); pressed = true; }, early);
+    // Naciśnięcie w stronie to dowód fokusu, gdyby okno nie zgłosiło `focus`.
+    window.addEventListener('mousedown', () => { close(); pressed = true; focused = true; }, early);
     window.addEventListener('mouseup', released, early);
     window.addEventListener('keydown', close, early);
     window.addEventListener('dragstart', () => { close(); dragging = true; }, early);
@@ -128,7 +148,8 @@
     window.addEventListener('wheel', scrolled, light);
     window.addEventListener('scroll', scrolled, light);
     // Bez fazy przechwytywania: tu trafia tylko blur okna, a nie każdego pola, i tylko wyjście z całej strony.
-    window.addEventListener('blur', () => { close(); released(); }, { signal: stop.signal });
+    window.addEventListener('blur', () => { close(); released(); focused = false; }, { signal: stop.signal });
+    window.addEventListener('focus', () => { focused = true; }, { signal: stop.signal });
     document.documentElement.addEventListener('mouseleave', close, { signal: stop.signal });
     return () => stop.abort();
   });
@@ -137,6 +158,7 @@
     clearTimeout(quiet);
     timer.destroy();
     hold.forget();
+    thumbs.pauseSpare(false);
     own?.dispose();
     closePdfWorker();
   });
@@ -153,7 +175,7 @@
     class="card pointer-events-none fixed z-30 overflow-hidden rounded-2xl"
     style:left="{open.x}px" style:top="{open.y}px" style:width="{open.w}px" style:height="{open.h}px">
     {#key open.entry.path}
-      <PeekContent {ex} {thumbs} entry={open.entry} kind={open.kind} audio={player} ontake={take} onfail={close} />
+      <PeekContent {ex} {thumbs} entry={open.entry} kind={open.kind} audio={player} ontake={take} onsize={fit} onfail={close} />
     {/key}
   </div>
 {/if}

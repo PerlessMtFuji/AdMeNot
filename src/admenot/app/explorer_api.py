@@ -95,6 +95,11 @@ def _bridge(method: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, An
     return counted
 
 
+def _uncounted(method: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]:
+    """Metoda mostu dymka: log jak w `_bridge`, ale nieudany odczyt przy najechaniu nie jest błędem sesji."""
+    return bridge(method, scrub=client_paths)
+
+
 def explorer_temp_dir() -> Path:
     """`%TEMP%/AdMeNot/explorer` — pliki robocze eksploratora; czyszczony przy zamknięciu i starcie."""
     return Path(tempfile.gettempdir()) / "AdMeNot" / "explorer"
@@ -741,7 +746,7 @@ class ExplorerMixin:
         return {"text": text, "encoding": "utf-16" if codec.startswith("utf-16") else codec,
                 "truncated": offset < size}
 
-    @_bridge
+    @_uncounted
     def explorer_text_head(self, path: str) -> dict[str, Any]:
         """Początek tekstu (`TEXT_HEAD` bajtów) do dymku przy najechaniu: bez `sess.text` i bez statystyki,
         więc nie rusza czytnika pełnego podglądu."""

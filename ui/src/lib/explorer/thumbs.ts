@@ -12,6 +12,8 @@ const VIDEO_FRAME_PX = 256;
  *  pokazuje ikonę, aż do zmiany folderu albo powrotu telefonu (`retryFailed`). */
 const RETRIES = 3;
 const RETRY_BASE_MS = 1000;
+/** Od tego priorytetu zaczyna się zapas: kafle spoza DOM, pobierane na przyszłe przewinięcie. */
+export const SPARE = 200_000;
 
 /** Pliku nie da się pokazać i ponawianie nic nie da (brak kodeka, nieczytelny obraz, „skażony” canvas). */
 export class ThumbDecodeError extends Error {}
@@ -43,6 +45,7 @@ export class ThumbQueue {
   private readonly pending = new Map<string, number>();
   private readonly running = new Map<string, AbortController>();
   private keep = new Set<string>();
+  private spareOff = false;
 
   constructor(private readonly fetcher: ThumbFetcher, private readonly concurrency = 6) {}
 
@@ -115,6 +118,13 @@ export class ThumbQueue {
     this.bad.add(url);
   }
 
+  /** Otwarty dymek ma pierwszeństwo przed zapasem: zapas czeka w kolejce, widoczne kafle ruszają jak zawsze.
+   *  To, co już się pobiera, kończy się samo (serwer i tak nie przerwie miniatury). */
+  pauseSpare(on: boolean): void {
+    this.spareOff = on;
+    if (!on) this.pump();
+  }
+
   /** Koniec eksploratora: wszystko anulowane, adresy `blob:` zwolnione. */
   clear(): void {
     this.cancelAllExcept(new Set());
@@ -135,6 +145,7 @@ export class ThumbQueue {
           next = url;
         }
       }
+      if (this.spareOff && best >= SPARE) return;  // najpilniejszy jest zapasem, więc reszta też
       this.pending.delete(next);
       this.start(next);
     }

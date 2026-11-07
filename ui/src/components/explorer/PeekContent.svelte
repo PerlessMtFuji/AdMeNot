@@ -3,7 +3,7 @@
   import type { ExplorerController } from '../../lib/explorer/controller';
   import { clock, formatBytes } from '../../lib/explorer/logic';
   import { drawFirstPage } from '../../lib/explorer/pdf';
-  import { peekSize, PREFETCH_MAX, type PeekKind } from '../../lib/explorer/peek';
+  import { PEEK_FULL_WAIT_MS, peekSize, PREFETCH_MAX, type PeekKind } from '../../lib/explorer/peek';
   import type { ThumbQueue } from '../../lib/explorer/thumbs';
   import { i18n } from '../../lib/i18n/index.svelte';
   import { DUR, ms, reducedMotion } from '../../lib/motion';
@@ -12,19 +12,23 @@
   import FileIcon from './FileIcon.svelte';
 
   /** Treść dymka dla jednego pliku; `PeekBubble` zakłada ją od nowa przy każdym pliku, więc odmontowanie
-   *  przerywa pobieranie. `ontake` — dźwięk zaraz ruszy; `onfail` — pliku nie da się pokazać (dymek znika po cichu). */
+   *  przerywa pobieranie. `ontake` — dźwięk ruszył; `onsize` — znane wymiary treści; `onfail` — pliku nie da się pokazać
+   *  (dymek znika po cichu). */
   type Props = { ex: ExplorerController; entry: EntryView; kind: PeekKind; thumbs: ThumbQueue; audio: () => AudioPlayer;
-    ontake: () => void; onfail: () => void };
-  let { ex, entry, kind, thumbs, audio, ontake, onfail }: Props = $props();
+    ontake: () => void; onsize: (w: number, h: number) => void; onfail: () => void };
+  let { ex, entry, kind, thumbs, audio, ontake, onsize, onfail }: Props = $props();
 
   const IDLE = 0.12;
   /** Most podaje adres okładki każdemu MP3/FLAC; plik bez okładki odpowiada błędem. */
   let noCover = $state(false);
   const cover = $derived(noCover ? null : entry.thumb);
-  /** Miniatura z pamięci galerii, a gdy jej tam nie ma — z serwera. */
-  const thumb = $derived(cover ? thumbs.get(cover) : null);
-  const thumbSrc = $derived(cover ? thumb?.src ?? cover : undefined);
   const wantFull = $derived(kind === 'photo' && entry.size <= PREFETCH_MAX);
+  /** Miniatura z pamięci galerii. Z serwera tylko wtedy, gdy pełnego pliku nie będzie: tego odczytu nie da się przerwać,
+   *  a dla PNG to czytanie całego pliku. */
+  const thumb = $derived(cover ? thumbs.get(cover) : null);
+  const thumbSrc = $derived(cover ? thumb?.src ?? (wantFull ? undefined : cover) : undefined);
+  /** Klatka filmu: galeria trzyma ją pod adresem pliku, a sam adres pliku nie jest obrazem. */
+  const frame = $derived(kind === 'video' && entry.url ? thumbs.get(entry.url)?.src : undefined);
 
   let duration = $state(0);
   function metadata(el: HTMLMediaElement): void {
@@ -33,6 +37,26 @@
 
   // Zdjęcie: samo odpięcie <img> z DOM nie przerywa pobierania, zdjęcie `src` — tak.
   let sharp = $state(false);
+  let fullDue = $state(false);
+  $effect(() => {
+    if (!wantFull) return;
+    const wait = setTimeout(() => (fullDue = true), PEEK_FULL_WAIT_MS);
+    return () => clearTimeout(wait);
+  });
+  /** Pokazuje zdjęcie dopiero zdekodowane, żeby dekodowanie nie trafiło w klatkę. Odrzucenie po wczytaniu to tylko brak
+   *  tej gwarancji, a zdjęty `src` to koniec dymka. */
+  function fullLoaded(e: Event): void {
+    const el = e.currentTarget as HTMLImageElement;
+    void el.decode().catch(() => {}).then(() => {
+      if (!el.hasAttribute('src')) return;
+      onsize(el.naturalWidth, el.naturalHeight);
+      sharp = true;
+    });
+  }
+  function imageSize(e: Event): void {
+    const el = e.currentTarget as HTMLImageElement;
+    onsize(el.naturalWidth, el.naturalHeight);
+  }
   function cancelLoad(node: HTMLImageElement) {
     return { destroy: () => node.removeAttribute('src') };
   }
@@ -48,6 +72,7 @@
   let progress = $state(0);
   function videoLoaded(el: HTMLVideoElement): void {
     noPicture = !el.videoWidth;
+    onsize(el.videoWidth, el.videoHeight);
     metadata(el);
   }
   function videoTime(el: HTMLVideoElement): void {
@@ -56,8 +81,11 @@
   $effect(() => {
     const el = video;
     if (!el) return;
-    ontake();
+    // Muzyka staje dopiero przy pierwszym `playing`: typ, którego okno nie zagra, nie robi w niej dziury.
+    el.addEventListener('playing', ontake, { once: true });
+    void el.play().catch(() => {});
     return () => {
+      el.removeEventListener('playing', ontake);
       el.pause();
       el.removeAttribute('src');
       el.load();
@@ -76,13 +104,14 @@
     const events = ['play', 'pause', 'ended'];
     for (const name of events) el.addEventListener(name, sync);
     el.addEventListener('loadedmetadata', loaded);
+    el.addEventListener('playing', ontake, { once: true });
     player.onerror = onfail;
-    ontake();
     player.load(entry.url);
     void player.play().catch(() => {});
     return () => {
       for (const name of events) el.removeEventListener(name, sync);
       el.removeEventListener('loadedmetadata', loaded);
+      el.removeEventListener('playing', ontake);
       player.onerror = null;
       player.stop();
     };
@@ -141,10 +170,11 @@
     {#if kind === 'photo'}
       <div class="absolute inset-0" style:background={thumb?.color || undefined}>
         {#if thumbSrc}
-          <img use:cancelLoad src={thumbSrc} alt="" draggable="false" onerror={thumbFailed} class="absolute inset-0 h-full w-full object-contain" />
+          <img use:cancelLoad src={thumbSrc} alt="" draggable="false" onerror={thumbFailed} class="absolute inset-0 h-full w-full object-contain"
+            onload={imageSize} />
         {/if}
-        {#if wantFull}
-          <img use:cancelLoad src={entry.url} alt="" draggable="false" decoding="async" onload={() => (sharp = true)} onerror={onfail}
+        {#if wantFull && fullDue}
+          <img use:cancelLoad src={entry.url} alt="" draggable="false" decoding="async" onload={fullLoaded} onerror={onfail}
             class="absolute inset-0 h-full w-full object-contain transition-opacity {sharp ? '' : 'opacity-0'}"
             style:transition-duration="{ms(DUR.micro)}ms" />
         {/if}
@@ -152,10 +182,14 @@
       {#if !thumbSrc && !sharp}{@render typeIcon()}{/if}
     {:else if kind === 'video'}
       <!-- svelte-ignore a11y_media_has_caption -->
-      <video bind:this={video} src={entry.url} poster={thumbSrc} preload="metadata" autoplay playsinline onerror={onfail}
+      <video bind:this={video} src={entry.url} poster={frame} preload="metadata" playsinline onerror={onfail}
         onloadedmetadata={(e) => videoLoaded(e.currentTarget)} onloadeddata={() => (noFrame = false)} ontimeupdate={(e) => videoTime(e.currentTarget)}
         class="absolute inset-0 h-full w-full bg-black object-contain"></video>
-      {#if noPicture || (noFrame && !thumbSrc)}{@render typeIcon()}{/if}
+      <!-- Plakat nie zdradza swoich wymiarów, a do metadanych filmu bywa daleko. -->
+      {#if frame}
+        <img src={frame} alt="" hidden onload={imageSize} />
+      {/if}
+      {#if noPicture || (noFrame && !frame)}{@render typeIcon()}{/if}
       <span class="absolute inset-x-0 bottom-0 h-[3px] origin-left bg-accent" style:transform="scaleX({progress})"></span>
     {:else if kind === 'audio'}
       <div class="absolute inset-0 flex items-center gap-4 px-4">

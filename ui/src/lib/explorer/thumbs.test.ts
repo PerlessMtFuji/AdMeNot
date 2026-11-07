@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { type Fetched, THUMB_CACHE, ThumbDecodeError, ThumbQueue, videoFrame } from './thumbs';
+import { type Fetched, SPARE, THUMB_CACHE, ThumbDecodeError, ThumbQueue, videoFrame } from './thumbs';
 
 /** Atrapa pobierania: każde wywołanie czeka, aż test je rozstrzygnie. */
 function deferredFetcher() {
@@ -112,6 +112,43 @@ describe('ThumbQueue', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  test('pauseSpare: zapas czeka, widoczne kafle ruszają, a po wznowieniu zapas rusza sam', async () => {
+    const { calls, fetcher } = deferredFetcher();
+    const q = new ThumbQueue(fetcher, 2);
+    q.pauseSpare(true);
+    q.plan([['zapas1', SPARE + 1], ['widoczny', 5], ['w-dom', 100_000]]);
+    await flush();
+    expect(calls.map((c) => c.url)).toEqual(['widoczny', 'w-dom']);
+    calls[0].resolve({ blob: blob(), color: '' });
+    await flush();
+    expect(calls).toHaveLength(2);  // wolne miejsce nie idzie na zapas
+    q.want('zapas2', SPARE + 2);
+    await flush();
+    expect(calls).toHaveLength(2);
+    q.want('nowy', 1);  // widoczny kafel po przewinięciu
+    await flush();
+    expect(calls.map((c) => c.url).slice(2)).toEqual(['nowy']);
+    calls[1].resolve({ blob: blob(), color: '' });
+    calls[2].resolve({ blob: blob(), color: '' });
+    await flush();
+    expect(calls).toHaveLength(3);
+    q.pauseSpare(false);
+    await flush();
+    expect(calls.map((c) => c.url).slice(3)).toEqual(['zapas1', 'zapas2']);
+  });
+
+  test('pauseSpare nie przerywa zapasu, który już się pobiera', async () => {
+    const { calls, fetcher } = deferredFetcher();
+    const q = new ThumbQueue(fetcher);
+    q.want('zapas', SPARE);
+    await flush();
+    q.pauseSpare(true);
+    expect(calls[0].signal.aborted).toBe(false);
+    calls[0].resolve({ blob: blob(), color: '#010203' });
+    await flush();
+    expect(q.get('zapas')?.color).toBe('#010203');
   });
 
   test('an image the browser cannot decode is released and falls back to the icon', async () => {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EntryView } from '../types';
-import { PeekTimer, peekKind, peekSize, placeBubble } from './peek';
+import { fitBubble, PeekTimer, peekKind, peekSize, placeBubble } from './peek';
 
 describe('PeekTimer', () => {
   let show: ReturnType<typeof vi.fn<(path: string) => void>>;
@@ -89,6 +89,27 @@ describe('placeBubble', () => {
   });
   it('okno węższe niż dymek: x = 8', () => {
     expect(placeBubble({ left: 10, top: 100, right: 120, bottom: 210 }, { w: 400, h: 300 }, { w: 300, h: 800 }).x).toBe(8);
+  });
+});
+
+describe('fitBubble', () => {
+  const win = { w: 1280, h: 800 };
+
+  it('film 9:16 wypełnia wysokość PDF zamiast stać w pasach', () => {
+    expect(fitBubble(9 / 16, win)).toEqual({ w: 340, h: 640 });
+  });
+  it('zdjęcia 3:4, 4:3 i kwadrat mają szerokość zwykłego dymka', () => {
+    expect(fitBubble(3 / 4, win)).toEqual({ w: 440, h: 623 });
+    expect(fitBubble(4 / 3, win)).toEqual({ w: 440, h: 366 });
+    expect(fitBubble(1, { w: 1280, h: 1000 })).toEqual({ w: 440, h: 476 });
+  });
+  it('małe okno ścina dymek, a proporcje zostają', () => {
+    expect(fitBubble(9 / 16, { w: 1010, h: 400 })).toEqual({ w: 240, h: 384 });
+    expect(fitBubble(16 / 9, { w: 300, h: 800 })).toEqual({ w: 284, h: 196 });
+  });
+  it('skrajne proporcje nie zgniatają stopki i nie wychodzą poza okno', () => {
+    expect(fitBubble(1 / 20, win)).toEqual({ w: 240, h: 640 });
+    expect(fitBubble(20, win)).toEqual({ w: 440, h: 156 });
   });
 });
 
