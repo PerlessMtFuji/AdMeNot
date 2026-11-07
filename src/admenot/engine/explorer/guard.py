@@ -38,6 +38,8 @@ HEAD_LIMIT = 1048576  # największy odczyt `head -c` (1 MiB)
 STREAM_BLOCK = 65536  # rozmiar bloku `dd`; wywołujący sam odrzuca `offset % STREAM_BLOCK` bajtów
 _TMP_NAME = re.compile(r"\.admenot-[0-9a-f]{12}\.part")
 _STAT_FORMAT = "%f|%s|%Y|%n"
+_COUNT_PLACE = ["-type", "f"]
+_SCAN_PLACE = ["-type", "f", "-exec", "stat", "-c", "%s|%n", "{}", "+"]
 _SCAN_FILE_PREFIX = ["content", "call", "--uri", "content://media", "--method", "scan_file", "--arg"]
 _ALLOWED_CMDS = {"find", "stat", "sha256sum", "df", "ls", "head", "tail", "dd", "getprop", "content",
                  "mkdir", "mv", "rm"}
@@ -70,8 +72,8 @@ def assert_explorer(cmd: str) -> None:
     """Rzuca UnsafeCommand, jeśli polecenie nie jest jednym z dozwolonych poleceń eksploratora."""
     if cmd.endswith(STAT_TAIL):
         rest = cmd[: -len(STAT_TAIL)]
-        if not rest.startswith("stat "):
-            raise UnsafeCommand(f"Przyrostek dozwolony tylko po 'stat': {cmd[:120]}")
+        if not rest.startswith(("stat ", "find ")):
+            raise UnsafeCommand(f"Przyrostek dozwolony tylko po 'stat' i 'find': {cmd[:120]}")
         cmd = rest
     elif cmd.endswith(CONTENT_TAIL):
         rest = cmd[: -len(CONTENT_TAIL)]
@@ -95,7 +97,7 @@ def assert_explorer(cmd: str) -> None:
     name = t[0]
 
     if name == "find":
-        if len(t) == 4 and t[2:] == ["-type", "f"] or len(t) == 10 and t[2:] == ["-type", "f", "-exec", "stat", "-c", "%s", "{}", "+"]:  # zliczanie plików miejsca
+        if t[2:] in (_COUNT_PLACE, _SCAN_PLACE):  # liczba i rozmiar plików miejsca
             safe_read_path(t[1])
         elif (len(t) != 12 or t[2:] != ["-mindepth", "1", "-maxdepth", "1", "-exec", "stat", "-c",
                                       _STAT_FORMAT, "{}", "+"]):

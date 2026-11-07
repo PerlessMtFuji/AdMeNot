@@ -38,6 +38,7 @@ from admenot.engine.adb.transport import AdbError
 from admenot.engine.clientpaths import client_paths
 from admenot.engine.device.info import DeviceInfo, read_device_info
 from admenot.engine.explorer import hostfs
+from admenot.engine.explorer.adbsocket import fast_puller, fast_shell
 from admenot.engine.explorer.create import CreateError, make_folder, make_text
 from admenot.engine.explorer.guard import (
     ExplorerAdb,
@@ -49,7 +50,7 @@ from admenot.engine.explorer.guard import (
 from admenot.engine.explorer.listing import ListError, list_dir, list_error
 from admenot.engine.explorer.media import MediaServer
 from admenot.engine.explorer.meta import image_meta, media_meta
-from admenot.engine.explorer.places import Place, count_place, find_places, place_bytes
+from admenot.engine.explorer.places import Place, count_place, find_places, scan_place
 from admenot.engine.explorer.plan import Problem, TaskPlan, plan_to_pc, plan_to_phone
 from admenot.engine.explorer.queue import TransferQueue, sweep_parts, sweep_recorded
 from admenot.engine.explorer.textview import TEXT_LIMIT, decode_chunk
@@ -73,6 +74,8 @@ _LOCAL_ORIGIN = re.compile(r"http://(?:127\.0\.0\.1|localhost)(?::\d{1,5})?")
 _END = frozenset({"done", "cancelled", "failed"})  # końcowe stany zadania kolejki
 _PREVIEW_KINDS = frozenset({"image", "video", "audio"})  # podgląd przez `explorer_meta` (tekst: `explorer_text`)
 EXPLORER_QUIT_WAIT = 10.0  # s; wyjście z programu czeka na wątek kolejki (zabicie `adb`, sprzątanie)
+USAGE_WAIT = 60.0  # s; pamięć telefonu czeka na rozmiary Miejsc z ich przejścia w tle
+_GROUPS = {"camera": "photos", "screenshots": "photos", "movies": "videos", "whatsapp": "whatsapp"}  # Miejsce → grupa pamięci
 
 
 def _bridge(method: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]:
@@ -191,6 +194,8 @@ class _Session:
     text: tuple[str, int, str] | None = None  # podgląd tekstu: (ścieżka, następny bajt, kodek)
     stats: _Stats = field(default_factory=_Stats)  # liczby do telemetrii przy zamknięciu
     locked: set[str] = field(default_factory=set)  # foldery z kłódką wg sondy listowania (R5) — do planu wgrywania
+    sizes: dict[str, int] = field(default_factory=dict)  # Miejsce → bajty z przejścia w tle
+    sized: threading.Event = field(default_factory=threading.Event)  # rozmiary Miejsc z `_GROUPS` już są
     card: dict[str, Any] = field(init=False)  # karta telefonu (nazwa w okruszkach)
 
     def __post_init__(self) -> None:
@@ -322,24 +327,39 @@ class ExplorerMixin:
                 "recent": list(self._settings.explorer_recents.get(sess.serial, []))}
 
     def _explorer_count(self, sess: _Session) -> None:
-        """Liczby plików Miejsc w tle; po każdym miejscu `explorer:places` (nieudane — bez liczby)."""
+        """Liczby plików Miejsc w tle, a dla Miejsc z grup pamięci także rozmiary, jednym przejściem; po każdym
+        `explorer:places` (nieudane — bez liczby). Grupy idą pierwsze: czeka na nie sylwetka telefonu."""
         def run() -> None:
-            for i, place in enumerate(list(sess.places)):
-                if self._explorer is not sess:
-                    return
-                try:
-                    count: int | None = count_place(sess.adb, place)
-                except (ListError, AdbError):
-                    count = None
-                except Exception as exc:  # noqa: BLE001 — jedno miejsce bez liczby, reszta liczy się dalej
-                    log_exception(exc, scrub=client_paths)
-                    count = None
-                with self._explorer_lock:
+            try:
+                order = sorted(enumerate(list(sess.places)), key=lambda p: p[1].key not in _GROUPS)
+                left = {p.key for p in sess.places if p.key in _GROUPS}
+                for i, place in order:
                     if self._explorer is not sess:
                         return
-                    sess.places[i] = replace(place, count=count)
-                    views = [place_view(p) for p in sess.places]
-                self._emit("explorer:places", {"places": views})
+                    count: int | None = None
+                    size: int | None = None
+                    try:
+                        if place.key in _GROUPS:
+                            count, size = scan_place(sess.adb, place)
+                        else:
+                            count = count_place(sess.adb, place)
+                    except (ListError, AdbError):
+                        pass
+                    except Exception as exc:  # noqa: BLE001 — jedno miejsce bez liczby, reszta liczy się dalej
+                        log_exception(exc, scrub=client_paths)
+                    with self._explorer_lock:
+                        if self._explorer is not sess:
+                            return
+                        sess.places[i] = replace(place, count=count)
+                        if size is not None:
+                            sess.sizes[place.key] = size
+                        views = [place_view(p) for p in sess.places]
+                    left.discard(place.key)
+                    if not left:
+                        sess.sized.set()
+                    self._emit("explorer:places", {"places": views})
+            finally:
+                sess.sized.set()
 
         if self._sync:
             run()
@@ -454,6 +474,9 @@ class ExplorerMixin:
         def run() -> None:
             try:
                 if self._explorer is sess:
+                    for place in list(sess.places):
+                        if place.key in _GROUPS:
+                            sess.sizes[place.key] = scan_place(sess.adb, place)[1]
                     self._emit("explorer:storage", self._explorer_usage(sess))
             except (ListError, AdbError, UnsafeCommand, AppError):
                 pass
@@ -466,8 +489,8 @@ class ExplorerMixin:
             threading.Thread(target=run, name="explorer-storage", daemon=True).start()
 
     def _explorer_usage(self, sess: _Session) -> dict[str, Any]:
-        """Pamięć telefonu: `df -k /sdcard` + rozmiary Miejsc podzielone na zdjęcia, filmy i WhatsApp;
-        reszta zajętego miejsca to „inne”."""
+        """Pamięć telefonu: `df -k /sdcard` + rozmiary Miejsc z przejścia w tle podzielone na zdjęcia, filmy
+        i WhatsApp; reszta zajętego miejsca to „inne” (także Miejsce bez rozmiaru)."""
         with self._explorer_errors(sess):
             out = sess.adb.shell("df -k /sdcard")
         total = used = free = 0
@@ -479,16 +502,12 @@ class ExplorerMixin:
                 break
         else:
             raise AppError("explorer_offline")
+        sess.sized.wait(USAGE_WAIT)
         sizes = {"photos": 0, "videos": 0, "whatsapp": 0}
-        group = {"camera": "photos", "screenshots": "photos", "movies": "videos", "whatsapp": "whatsapp"}
-        for place in list(sess.places):
-            key = group.get(place.key)
-            if key is None:
-                continue
-            try:
-                sizes[key] += place_bytes(sess.adb, place)
-            except (ListError, AdbError):
-                continue  # miejsce bez rozmiaru — wchodzi do „inne”
+        with self._explorer_lock:
+            for place_key, size in sess.sizes.items():
+                if place_key in _GROUPS:
+                    sizes[_GROUPS[place_key]] += size
         sizes["other"] = max(0, used - sum(sizes.values()))
         return {"total": total, "used": used, "free": free, "groups": sizes}
 
@@ -574,7 +593,7 @@ class ExplorerMixin:
                 adb_path = self._settings.adb_path
                 sess.pump = None if self._sync else _Pump(self._emit)
                 sess.queue = TransferQueue(
-                    lambda: sess.adb, self._puller_factory(adb_path, serial, sess.log),
+                    lambda: sess.adb, fast_puller(self._puller_factory(adb_path, serial, sess.log), serial),
                     explorer_pusher(self._pusher_factory(adb_path, serial, sess.log)),
                     lambda _name, detail: self._explorer_task_event(sess, detail),
                     lambda: serial in self._ready_serials(), sdk=lambda: sess.device.sdk,
@@ -617,6 +636,7 @@ class ExplorerMixin:
                     except DeviceBusy:
                         raise AppError("explorer_busy", "device") from None
                     log = self._session(serial)
+                    log.inner = fast_shell(log.inner)
                     with self._explorer_errors(None):
                         device = read_device_info(log)
                     match = self._provider.match(device)

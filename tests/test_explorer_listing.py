@@ -9,7 +9,7 @@ from faketransfer import FakeStoragePhone
 from admenot.engine.adb.transport import AdbError
 from admenot.engine.explorer.guard import ExplorerAdb
 from admenot.engine.explorer.listing import ListError, folder_label, list_dir, locked_paths
-from admenot.engine.explorer.places import Place, count_place, find_places
+from admenot.engine.explorer.places import Place, count_place, find_places, scan_place
 
 
 def put(phone: FakeStoragePhone, remote: str, data: bytes = b"x", mtime: int | None = None) -> None:
@@ -182,7 +182,7 @@ def test_whatsapp_new_path_preferred(phone, adb):
         "/sdcard/Android/media/com.whatsapp/WhatsApp/Media"
 
 
-def test_count_place_counts_recursively_visible_files(phone, adb):
+def test_scan_place_counts_recursively_visible_files(phone, adb):
     put(phone, "/sdcard/Music/a.mp3")
     put(phone, "/sdcard/Music/Album/b.mp3")
     put(phone, "/sdcard/Music/Album/Disc 2/c.mp3")
@@ -190,21 +190,52 @@ def test_count_place_counts_recursively_visible_files(phone, adb):
     assert count_place(adb, Place("music", "/sdcard/Music", None, "music")) == 3
 
 
-def test_count_place_is_one_call_and_skips_hidden_components(phone, adb):
+def test_scan_place_is_one_call_and_skips_hidden_components(phone, adb):
     put(phone, "/sdcard/Music/.hidden/d.mp3")
     put(phone, "/sdcard/Music/Album/.nomedia")
     put(phone, "/sdcard/Music/Album/e.mp3")
     put(phone, "/sdcard/Music/f.mp3")
     phone.commands.clear()
-    assert count_place(adb, Place("music", "/sdcard/Music", None, "music")) == 2
-    assert phone.commands == ["find /sdcard/Music/ -type f"]
+    assert scan_place(adb, Place("music", "/sdcard/Music", None, "music"))[0] == 2
+    assert phone.commands == ["find /sdcard/Music/ -type f -exec stat -c '%s|%n' {} + 2>&1 || true"]
 
 
-def test_count_place_denied_raises_list_error(phone, adb):
+def test_scan_place_keeps_hidden_files_in_the_size_only(phone, adb):
+    put(phone, "/sdcard/Music/.hidden/d.mp3", b"12345")
+    put(phone, "/sdcard/Music/e.mp3", b"123")
+    assert scan_place(adb, Place("music", "/sdcard/Music", None, "music")) == (1, 8)
+
+
+def test_scan_place_cut_short_counts_with_plain_find(adb):
+    place = Place("all", "/sdcard", None, "phone")
+
+    class Cut:
+        """Toybox przerywa `-exec … +`: urwany wynik i błąd na stdout (`STAT_TAIL`)."""
+        calls: list[str] = []
+
+        def shell(self, command, timeout=20.0):
+            self.calls.append(command)
+            if "-exec" in command:
+                return "5|/sdcard/a.jpg\nfind: exec stat: Argument list too long\n"
+            return "/sdcard/a.jpg\n/sdcard/b.jpg\n/sdcard/.ukryty\nfind: /sdcard/x: Permission denied\n"
+
+    assert scan_place(Cut(), place) == (2, 5)
+    assert len(Cut.calls) == 2
+
+
+def test_count_place_survives_a_denied_folder_on_the_way():
+    class Denied:
+        def shell(self, command, timeout=20.0):
+            return "/sdcard/a.jpg\nfind: /sdcard/Android/data/x: Permission denied\n/sdcard/b.jpg\n"
+
+    assert count_place(Denied(), Place("all", "/sdcard", None, "phone")) == 2
+
+
+def test_scan_place_denied_raises_list_error(phone, adb):
     mkdir(phone, "/sdcard/Android/data")
     phone.deny_list_prefixes = {"/sdcard/Android/data/"}
     with pytest.raises(ListError) as exc:
-        count_place(adb, Place("x", "/sdcard/Android/data", None, "phone"))
+        scan_place(adb, Place("x", "/sdcard/Android/data", None, "phone"))
     assert exc.value.kind == "denied"
 
 

@@ -223,6 +223,11 @@ class FakeStoragePhone:
             self.on_shell(command)
         if command.endswith(STAT_TAIL):  # `stat … 2>&1 || true`: błędy jako linie wyniku, kod 0
             argv = shlex.split(command[: -len(STAT_TAIL)])
+            if argv[0] == "find":  # błąd `find` na stdout (jak `2>&1`), kod 0
+                try:
+                    return self._find(argv[1:])
+                except AdbError as exc:
+                    return exc.message.encode("utf-8")
             assert argv[0] == "stat", argv
             return self._stat(argv[1:], tolerant=True)
         if command.endswith(CONTENT_TAIL):  # `content query … 2>&1`: błąd providera na stdout
@@ -274,11 +279,10 @@ class FakeStoragePhone:
         if expr == ["-type", "f"]:  # zliczanie plików miejsca: jedna ścieżka na linię
             assert len(roots) == 1, args
             return self._list_files(roots[0])
-        if expr == ["-type", "f", "-exec", "stat", "-c", "%s", "{}", "+"]:  # suma rozmiarów miejsca
+        if expr == ["-type", "f", "-exec", "stat", "-c", "%s|%n", "{}", "+"]:  # przejście Miejsca
             assert len(roots) == 1, args
-            return "".join(f"{(self.local(f).stat().st_size)}\n"
-                           for f in self._list_files(roots[0]).decode().split("\n") if f
-                           and self.local(f).is_file()).encode()
+            files = [f for f in self._list_files(roots[0]).decode().split("\n") if f]
+            return "".join(f"{self.local(f).stat().st_size if self.local(f).is_file() else 0}|{f}\n" for f in files).encode()
         prune_paths: set[str] = set()
         prune_names: set[str] = set()
         j = 0

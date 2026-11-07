@@ -45,9 +45,9 @@ class Recorder:
     "find '/sdcard/' -mindepth 1 -maxdepth 1 -exec stat -c '%f|%s|%Y|%n' {} +",
     "find '/sdcard/DCIM/' -mindepth 1 -maxdepth 1 -exec stat -c '%f|%s|%Y|%n' {} +",
     "stat -c '%f|%s|%Y|%n' '/sdcard/a b' 2>&1 || true",
-    "find '/sdcard/Download/' -type f",
-    "find /sdcard/ -type f",
-    "find '/sdcard/DCIM/Camera/' -type f -exec stat -c %s {} +",
+    "find '/sdcard/Download/' -type f -exec stat -c '%s|%n' {} + 2>&1 || true",
+    "find /sdcard/ -type f -exec stat -c '%s|%n' {} + 2>&1 || true",
+    "find '/sdcard/Download/' -type f 2>&1 || true",
     "sha256sum '/sdcard/x'",
     "df -k /sdcard",
     "ls '/sdcard/DCIM/'",
@@ -128,15 +128,18 @@ def test_allows_writes_under_sdcard(cmd):
     "rm\xa0-rf\xa0/sdcard",
     "rm\x0b-rf /sdcard/x",
     "head x",
-    # Task 14: sumowanie rozmiarów `find <p> -type f -exec stat -c %s {} +`
-    "find '/data/' -type f -exec stat -c %s {} +",
-    "find /data/media/0 -type f -exec stat -c %s {} +",
-    "find '/sdcard/../data/' -type f -exec stat -c %s {} +",
-    "find '/sdcard/DCIM/..' -type f -exec stat -c %s {} +",
-    "find '/sdcard/DCIM/' -type f -exec stat -c %s {} +; reboot",
-    "find '/sdcard/DCIM/' -type f -exec stat -c %s {} + ; reboot",
-    r"find '/sdcard/DCIM/' -type f -exec stat -c %s {} \;",
-    "find '/sdcard/DCIM/' -type f -exec stat -c %s {} ';'",
+    # przejście Miejsca: tylko ta postać, tylko pod /sdcard/
+    "find '/data/' -type f -exec stat -c '%s|%n' {} + 2>&1 || true",
+    "find /data/media/0 -type f -exec stat -c '%s|%n' {} + 2>&1 || true",
+    "find '/sdcard/../data/' -type f -exec stat -c '%s|%n' {} + 2>&1 || true",
+    "find '/sdcard/DCIM/..' -type f -exec stat -c '%s|%n' {} + 2>&1 || true",
+    "find '/data/' -type f 2>&1 || true",
+    "find '/sdcard/DCIM/' -type f -exec stat -c '%s|%n' {} +; reboot 2>&1 || true",
+    "find '/sdcard/DCIM/' -type f -exec rm {} + 2>&1 || true",
+    "find '/sdcard/DCIM/' -type f -delete 2>&1 || true",
+    "find '/sdcard/DCIM/' -type f -exec stat -c %s {} +",
+    "ls '/sdcard/a' 2>&1 || true",
+    "rm -rf /sdcard 2>&1 || true",
 ])
 def test_refuses(cmd):
     with pytest.raises(UnsafeCommand):

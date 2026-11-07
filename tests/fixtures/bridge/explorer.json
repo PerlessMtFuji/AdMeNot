@@ -209,10 +209,10 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "find /sdcard/DCIM/Camera/ -type f",
+      "command": "find /sdcard/DCIM/Camera/ -type f -exec stat -c '%s|%n' {} + 2>&1 || true",
       "status": "ok",
       "duration": 0.0,
-      "output": "/sdcard/DCIM/Camera/IMG_20260924_0028.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0029.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0030.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0031.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0032.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0033.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0034.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0035.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0036.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0037.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0038.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0039.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0014.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0015.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0016.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0017.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0018.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0019.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0020.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0021.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0022.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0023.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0024.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0025.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0026.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0027.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0000.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0001.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0002.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0003.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0004.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0005.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0006.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0007.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0008.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0009.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0010.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0011.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0012.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0013.jpg\n",
+      "output": "676|/sdcard/DCIM/Camera/IMG_20260924_0028.jpg\n676|/sdcard/DCIM/Camera/IMG_20260924_0029.jpg\n676|/sdcard/DCIM/Camera/IMG_20260924_0030.jpg\n676|/sdcard/DCIM/Camera/IMG_20260924_0031.jpg\n676|/sdcard/DCIM/Camera/IMG_20260924_0032.jpg\n676|/sdcard/DCIM/Camera/IMG_20260924_0033.jpg\n676|/sdcard/DCIM/Camera/IMG_20260924_0034.jpg\n676|/sdcard/DCIM/Camera/IMG_20260924_0035.jpg\n676|/sdcard/DCIM/Camera/IMG_20260924_0036.jpg\n676|/sdcard/DCIM/Camera/IMG_20260924_0037.jpg\n677|/sdcard/DCIM/Camera/IMG_20260924_0038.jpg\n676|/sdcard/DCIM/Camera/IMG_20260924_0039.jpg\n676|/sdcard/DCIM/Camera/IMG_20260925_0014.jpg\n676|/sdcard/DCIM/Camera/IMG_20260925_0015.jpg\n675|/sdcard/DCIM/Camera/IMG_20260925_0016.jpg\n675|/sdcard/DCIM/Camera/IMG_20260925_0017.jpg\n675|/sdcard/DCIM/Camera/IMG_20260925_0018.jpg\n676|/sdcard/DCIM/Camera/IMG_20260925_0019.jpg\n676|/sdcard/DCIM/Camera/IMG_20260925_0020.jpg\n675|/sdcard/DCIM/Camera/IMG_20260925_0021.jpg\n676|/sdcard/DCIM/Camera/IMG_20260925_0022.jpg\n675|/sdcard/DCIM/Camera/IMG_20260925_0023.jpg\n675|/sdcard/DCIM/Camera/IMG_20260925_0024.jpg\n676|/sdcard/DCIM/Camera/IMG_20260925_0025.jpg\n676|/sdcard/DCIM/Camera/IMG_20260925_0026.jpg\n676|/sdcard/DCIM/Camera/IMG_20260925_0027.jpg\n833|/sdcard/DCIM/Camera/IMG_20260926_0000.jpg\n677|/sdcard/DCIM/Camera/IMG_20260926_0001.jpg\n677|/sdcard/DCIM/Camera/IMG_20260926_0002.jpg\n677|/sdcard/DCIM/Camera/IMG_20260926_0003.jpg\n677|/sdcard/DCIM/Camera/IMG_20260926_0004.jpg\n677|/sdcard/DCIM/Camera/IMG_20260926_0005.jpg\n677|/sdcard/DCIM/Camera/IMG_20260926_0006.jpg\n677|/sdcard/DCIM/Camera/IMG_20260926_0007.jpg\n677|/sdcard/DCIM/Camera/IMG_20260926_0008.jpg\n677|/sdcard/DCIM/Camera/IMG_20260926_0009.jpg\n677|/sdcard/DCIM/Camera/IMG_20260926_0010.jpg\n676|/sdcard/DCIM/Camera/IMG_20260926_0011.jpg\n676|/sdcard/DCIM/Camera/IMG_20260926_0012.jpg\n676|/sdcard/DCIM/Camera/IMG_20260926_0013.jpg\n",
       "tag": null
      }
     ],
@@ -342,10 +342,10 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "find /sdcard/Download/ -type f",
+      "command": "find /sdcard/Movies/ -type f -exec stat -c '%s|%n' {} + 2>&1 || true",
       "status": "ok",
       "duration": 0.0,
-      "output": "/sdcard/Download/aplikacja.apk\n/sdcard/Download/faktura.pdf\n/sdcard/Download/notatka.txt\n/sdcard/Download/umowa.docx\n",
+      "output": "5012|/sdcard/Movies/film 1.mp4\n5012|/sdcard/Movies/film 2.mp4\n",
       "tag": null
      }
     ],
@@ -362,13 +362,13 @@
        {
         "key": "downloads",
         "path": "/sdcard/Download",
-        "count": 4,
+        "count": null,
         "icon": "download"
        },
        {
         "key": "movies",
         "path": "/sdcard/Movies",
-        "count": null,
+        "count": 2,
         "icon": "film"
        },
        {
@@ -391,10 +391,10 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "find /sdcard/Movies/ -type f",
+      "command": "find /sdcard/Download/ -type f 2>&1 || true",
       "status": "ok",
       "duration": 0.0,
-      "output": "/sdcard/Movies/film 1.mp4\n/sdcard/Movies/film 2.mp4\n",
+      "output": "/sdcard/Download/aplikacja.apk\n/sdcard/Download/faktura.pdf\n/sdcard/Download/notatka.txt\n/sdcard/Download/umowa.docx\n",
       "tag": null
      }
     ],
@@ -440,7 +440,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "find /sdcard/Music/ -type f",
+      "command": "find /sdcard/Music/ -type f 2>&1 || true",
       "status": "ok",
       "duration": 0.0,
       "output": "/sdcard/Music/utwór 1.mp3\n/sdcard/Music/utwór 2.mp3\n/sdcard/Music/utwór 3.mp3\n",
@@ -489,7 +489,7 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
-      "command": "find /sdcard/ -type f",
+      "command": "find /sdcard/ -type f 2>&1 || true",
       "status": "ok",
       "duration": 0.0,
       "output": "/sdcard/Android/data/com.example/cache.bin\n/sdcard/DCIM/Camera/IMG_20260924_0028.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0029.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0030.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0031.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0032.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0033.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0034.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0035.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0036.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0037.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0038.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0039.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0014.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0015.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0016.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0017.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0018.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0019.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0020.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0021.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0022.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0023.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0024.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0025.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0026.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0027.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0000.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0001.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0002.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0003.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0004.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0005.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0006.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0007.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0008.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0009.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0010.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0011.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0012.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0013.jpg\n/sdcard/Download/aplikacja.apk\n/sdcard/Download/faktura.pdf\n/sdcard/Download/notatka.txt\n/sdcard/Download/umowa.docx\n/sdcard/Movies/film 1.mp4\n/sdcard/Movies/film 2.mp4\n/sdcard/Music/utwór 1.mp3\n/sdcard/Music/utwór 2.mp3\n/sdcard/Music/utwór 3.mp3\n",
