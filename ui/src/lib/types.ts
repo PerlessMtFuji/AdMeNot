@@ -939,6 +939,10 @@ export interface Api {
   explorer_meta(path: string): R<{ meta: EntryMeta }>;
   explorer_text(path: string, more: boolean): R<{ text: string; encoding: string; truncated: boolean }>;
   explorer_text_head(path: string): R<{ text: string; truncated: boolean }>;
+  /** Arkusz (XLSX/XLSM/XLS/CSV/TSV): wszystkie arkusze jako tekst komórek albo `problem`, gdy się nie da. */
+  explorer_sheet(path: string): R<SheetBookView | SheetProblem>;
+  /** Początek pierwszego arkusza do dymku, z nazwami wszystkich arkuszy. */
+  explorer_sheet_head(path: string): R<SheetHeadView | SheetProblem>;
   explorer_mkdir(parent: string, name: string): R<{ path: string }>;
   explorer_new_text(parent: string, name: string, text: string): R<{ path: string }>;
   explorer_open_map(lat: number, lon: number): R<Record<string, never>>;
@@ -1025,3 +1029,28 @@ export interface EventMap {
 }
 
 export type EventName = keyof EventMap;
+
+/** Arkusz w podglądzie: wiersze jako tekst komórek (puste na końcu wiersza obcięte). CSV ma jeden arkusz bez nazwy. */
+export interface SheetView {
+  name: string;
+  rows: string[][];
+  truncated: boolean;
+  hidden: boolean;
+}
+
+export interface SheetBookView {
+  sheets: SheetView[];
+  delimiter: string | null;
+  encoding: string | null;
+}
+
+export interface SheetHeadView {
+  names: string[];
+  rows: string[][];
+  truncated: boolean;
+}
+
+/** Arkusza nie pokażemy: za duży, z hasłem albo nie do odczytania (np. „.xls” będący stroną HTML). */
+export interface SheetProblem {
+  problem: 'too_big' | 'encrypted' | 'unreadable';
+}

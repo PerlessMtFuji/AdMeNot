@@ -426,7 +426,7 @@ export function createFakeBridge(name: string,
 
   // Eksplorator: odczyty zależą od ścieżki — nagranie tej samej ścieżki, a folder bez nagrania składany
   // z nagranych list (podfoldery z dłuższych ścieżek), żeby dało się chodzić po drzewie.
-  const BY_PATH = new Set(['explorer_list', 'explorer_meta', 'explorer_text']);
+  const BY_PATH = new Set(['explorer_list', 'explorer_meta', 'explorer_text', 'explorer_sheet', 'explorer_sheet_head']);
   const recordedLists = () => data.calls.filter((c) => c.method === 'explorer_list' && !isError(c.result))
     .map((c) => c.result as ExplorerListView);
   const fakeListing = (path: string): ExplorerListView | ApiError => {
@@ -464,6 +464,16 @@ export function createFakeBridge(name: string,
     return { text: hit?.text ?? 'Przykładowy tekst pliku.', encoding, truncated: true };
   };
 
+  // Arkusz bez nagrania: dwa arkusze z polskimi znakami i sto wierszy (przewijanie, szukanie między arkuszami).
+  const fakeSheet = () => ({
+    sheets: [
+      { name: 'Faktury', truncated: false, hidden: false, rows: [['Nr', 'Klient', 'Kwota', 'Data'],
+        ...Array.from({ length: 100 }, (_, i) => [`F/${i + 1}`, i % 3 ? 'Gdańsk' : 'Łódź', String((i + 1) * 12.5), '2026-09-01'])] },
+      { name: 'Notatki', truncated: false, hidden: false, rows: [['Klient z Łodzi płaci przelewem']] },
+    ],
+    delimiter: null, encoding: null,
+  });
+
   const invoke = (method: string, args: unknown[]): unknown => {
     calls.push({ method, args });
     const failure = failures.get(method);
@@ -489,6 +499,11 @@ export function createFakeBridge(name: string,
       }
       if (method === 'explorer_list' && queues.has(method)) return fakeListing(String(args[0]));
       if (method === 'explorer_meta') return fakeMeta(String(args[0]));
+      if (method === 'explorer_sheet') return fakeSheet();
+      if (method === 'explorer_sheet_head') {
+        const { sheets } = fakeSheet();
+        return { names: sheets.map((s) => s.name), rows: sheets[0].rows.slice(0, 30), truncated: true };
+      }
     }
     const queue = queues.get(method);
     if (!queue || queue.length === 0) return fallback(method, args);

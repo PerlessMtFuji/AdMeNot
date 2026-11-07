@@ -5,10 +5,11 @@
   import { clock, formatBytes } from '../../lib/explorer/logic';
   import { drawFirstPage } from '../../lib/explorer/pdf';
   import { PEEK_FULL_WAIT_MS, peekSize, PREFETCH_MAX, type PeekKind } from '../../lib/explorer/peek';
+  import { colName } from '../../lib/explorer/sheet';
   import type { ThumbQueue } from '../../lib/explorer/thumbs';
-  import { i18n } from '../../lib/i18n/index.svelte';
+  import { i18n, tp } from '../../lib/i18n/index.svelte';
   import { DUR, ms, reducedMotion } from '../../lib/motion';
-  import type { EntryView } from '../../lib/types';
+  import type { EntryView, SheetHeadView } from '../../lib/types';
   import Icon from '../../ui/Icon.svelte';
   import FileIcon from './FileIcon.svelte';
 
@@ -158,6 +159,21 @@
     });
     return () => { stale = true; };
   });
+
+  // Arkusz: początek pierwszego arkusza; plik z hasłem albo nie do odczytania — dymek znika jak przy błędzie.
+  const SHEET_COLS = 8;
+  let head = $state.raw<SheetHeadView | null>(null);
+  const headCols = $derived(Math.min(SHEET_COLS, Math.max(0, ...(head?.rows ?? []).map((r) => r.length))));
+  $effect(() => {
+    if (kind !== 'sheet') return;
+    let stale = false;
+    void ex.sheetHead(entry.path).then((r) => {
+      if (stale) return;
+      if (r && !('problem' in r) && r.rows.length) head = r;
+      else onfail();
+    });
+    return () => { stale = true; };
+  });
 </script>
 
 {#snippet typeIcon()}
@@ -211,6 +227,23 @@
     {:else if kind === 'pdf'}
       <canvas bind:this={canvas} class="block w-full bg-white"></canvas>
       {#if !drawn}{@render typeIcon()}{/if}
+    {:else if kind === 'sheet' && head}
+      <table data-peek-sheet class="absolute inset-0 w-full table-fixed border-collapse bg-surface text-2xs text-ink">
+        <thead><tr class="bg-surface-2 text-mut">
+          <th class="w-8 border border-line"></th>
+          {#each Array.from({ length: headCols }, (_, c) => c) as c (c)}<th class="border border-line px-1 font-semibold">{colName(c)}</th>{/each}
+        </tr></thead>
+        <tbody>
+          {#each head.rows as row, r (r)}
+            <tr>
+              <td class="border border-line bg-surface-2 pr-1 text-right text-mut tabular-nums">{r + 1}</td>
+              {#each Array.from({ length: headCols }, (_, c) => c) as c (c)}
+                <td class="truncate border border-line px-1 leading-5 {r === 0 ? 'font-semibold' : ''}">{row[c] ?? ''}</td>
+              {/each}
+            </tr>
+          {/each}
+        </tbody>
+      </table>
     {:else if text}
       <pre class="mono absolute inset-0 overflow-hidden p-3 text-xs leading-relaxed break-words whitespace-pre-wrap text-ink">{text}</pre>
     {:else}
@@ -220,7 +253,7 @@
   <footer class="flex flex-none items-center gap-3 px-3 py-2">
     <b class="min-w-0 flex-1 truncate text-sm text-ink">{entry.label ?? entry.name}</b>
     <span class="flex-none text-2xs text-mut tabular-nums">
-      {formatBytes(entry.size, i18n.lang)}{duration ? ` · ${clock(duration)}` : ''}
+      {head && head.names.length > 1 ? `${tp('explorer.preview.sheet_count', head.names.length)} · ` : ''}{formatBytes(entry.size, i18n.lang)}{duration ? ` · ${clock(duration)}` : ''}
     </span>
   </footer>
 </div>

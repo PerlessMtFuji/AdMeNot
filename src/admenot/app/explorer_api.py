@@ -53,6 +53,7 @@ from admenot.engine.explorer.meta import image_meta, media_meta
 from admenot.engine.explorer.places import Place, count_place, find_places, scan_place
 from admenot.engine.explorer.plan import Problem, TaskPlan, plan_to_pc, plan_to_phone
 from admenot.engine.explorer.queue import TransferQueue, sweep_parts, sweep_recorded
+from admenot.engine.explorer.sheets import HEAD_BYTES, SHEET_BYTES, Book, SheetError, read_book
 from admenot.engine.explorer.textview import TEXT_HEAD, TEXT_LIMIT, decode_chunk
 from admenot.engine.explorer.thumbs import EXIF_HEAD
 from admenot.engine.oplock import DeviceBusy, device_lock
@@ -72,6 +73,7 @@ __all__ = ["ExplorerMixin", "MediaFactory", "explorer_temp_dir"]
 MediaFactory = Callable[[str, ExplorerAdb, Callable[[str], bool]], MediaServer]
 _LOCAL_ORIGIN = re.compile(r"http://(?:127\.0\.0\.1|localhost)(?::\d{1,5})?")
 _END = frozenset({"done", "cancelled", "failed"})  # końcowe stany zadania kolejki
+SHEET_HEAD_ROWS, SHEET_HEAD_COLS = 30, 12  # dymek arkusza: więcej i tak się nie zmieści
 _PREVIEW_KINDS = frozenset({"image", "video", "audio"})  # podgląd przez `explorer_meta` (tekst: `explorer_text`)
 EXPLORER_QUIT_WAIT = 10.0  # s; wyjście z programu czeka na wątek kolejki (zabicie `adb`, sprzątanie)
 USAGE_WAIT = 60.0  # s; pamięć telefonu czeka na rozmiary Miejsc z ich przejścia w tle
@@ -762,6 +764,43 @@ class ExplorerMixin:
                 raise AdbError("command_failed", "empty read")
         text, _codec, _used = decode_chunk(data, None, final=size <= TEXT_HEAD)
         return {"text": text, "truncated": size > TEXT_HEAD}
+
+    def _explorer_book(self, path: Any, limit: int, **kw: Any) -> Book | dict[str, Any]:
+        """Arkusz z telefonu; zamiast niego `{"problem": …}`, gdy za duży, z hasłem albo nie do odczytania."""
+        sess = self._explorer_session()
+        path = self._explorer_path(path, file=True)
+        is_dir, size, _mtime = self._explorer_stat(sess, path)
+        if is_dir:
+            raise AppError("bad_request", "path")
+        if size > limit:
+            return {"problem": "too_big"}
+        with self._explorer_errors(sess):
+            data = sess.media.read_range(path, 0, size) if size else b""
+            if len(data) < size:  # strumień urwany: pół arkusza to nie arkusz
+                raise AdbError("command_failed", "short read")
+        try:
+            return read_book(data, **kw)
+        except SheetError as exc:
+            return {"problem": exc.kind}
+
+    @_bridge
+    def explorer_sheet(self, path: str) -> dict[str, Any]:
+        """Cały arkusz (wszystkie arkusze pliku) jako tekst komórek, w granicach limitów `sheets.py`."""
+        book = self._explorer_book(path, SHEET_BYTES)
+        if isinstance(book, dict):
+            return book
+        return {"sheets": [{"name": s.name, "rows": s.rows, "truncated": s.truncated, "hidden": s.hidden}
+                           for s in book.sheets],
+                "delimiter": book.delimiter, "encoding": book.encoding}
+
+    @_uncounted
+    def explorer_sheet_head(self, path: str) -> dict[str, Any]:
+        """Początek pierwszego arkusza do dymku przy najechaniu, z nazwami wszystkich arkuszy."""
+        book = self._explorer_book(path, HEAD_BYTES, rows=SHEET_HEAD_ROWS, cols=SHEET_HEAD_COLS, first_only=True)
+        if isinstance(book, dict):
+            return book
+        first = book.sheets[0] if book.sheets else None
+        return {"names": book.names, "rows": first.rows if first else [], "truncated": bool(first and first.truncated)}
 
     @_bridge
     def explorer_mkdir(self, parent: str, name: str) -> dict[str, Any]:

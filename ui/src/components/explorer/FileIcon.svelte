@@ -5,7 +5,7 @@
   const EXT_COLORS: [string, string[]][] = [
     ['#dc2626', ['pdf']],
     ['#2563eb', ['doc', 'docx', 'odt', 'rtf']],
-    ['#16a34a', ['xls', 'xlsx', 'ods', 'csv']],
+    ['#16a34a', ['xls', 'xlsx', 'xlsm', 'ods', 'csv', 'tsv']],
     ['#ea580c', ['ppt', 'pptx', 'odp']],
     ['#7c3aed', ['json', 'xml', 'html', 'htm', 'yml', 'yaml', 'ini', 'cfg', 'conf']],
     ['#0891b2', ['vcf', 'srt', 'epub', 'md']],

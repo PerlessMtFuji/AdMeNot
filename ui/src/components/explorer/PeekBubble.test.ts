@@ -834,6 +834,35 @@ describe('PeekBubble', () => {
     expect(bubble()?.textContent).toContain('a.jpg');
   });
 
+  it('arkusz: początek pierwszego arkusza w tabeli, liczba arkuszy w stopce', async () => {
+    const sheet = entry('zestawienie.xlsx', 'doc', 'xlsx');
+    ex.state.entries = [...ALL, sheet];
+    tile(sheet);
+    bridge.answerNext('explorer_sheet_head', { names: ['Faktury', 'Notatki'], rows: [['Nr', 'Klient'], ['F/1', 'Łódź']], truncated: false });
+    await hover(sheet);
+    await vi.waitFor(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+      expect(bubble()!.querySelector('[data-peek-sheet]')).not.toBeNull();
+    });
+    const table = bubble()!.querySelector('[data-peek-sheet]')!;
+    expect([...table.querySelectorAll('th')].map((th) => th.textContent)).toEqual(['', 'A', 'B']);
+    expect(table.textContent).toContain('Łódź');
+    expect(bubble()!.textContent).toContain('2 arkusze');
+    expect(bridge.calls.map((c) => c.method)).not.toContain('explorer_sheet');
+  });
+
+  it('arkusz z hasłem albo nie do odczytania: dymek znika po cichu', async () => {
+    const sheet = entry('haslo.xlsx', 'doc', 'xlsx');
+    ex.state.entries = [...ALL, sheet];
+    tile(sheet);
+    bridge.answerNext('explorer_sheet_head', { problem: 'encrypted' });
+    await hover(sheet);
+    await vi.waitFor(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+      expect(bubble()).toBeNull();
+    });
+  });
+
   it('PDF: ikona do czasu treści, odjechanie przerywa rysowanie bez zamykania następnego dymka', async () => {
     let fail!: (e: Error) => void;
     pdf.draw = vi.fn(() => new Promise((_, reject) => { fail = reject; }));

@@ -275,9 +275,9 @@ describe('Explorer', () => {
     expect(rows()).toHaveLength(40);
     expect(screen.getByText('40 plików · 27 KB')).toBeTruthy();
     const places = screen.getByRole('navigation', { name: 'Miejsca' });
-    await vi.waitFor(() => expect(within(places).getByRole('button', { name: /Cała pamięć/ }).textContent).toContain('50'));
+    await vi.waitFor(() => expect(within(places).getByRole('button', { name: /Cała pamięć/ }).textContent).toContain('51'));
     expect(within(places).getByRole('button', { name: /Aparat/ }).textContent).toContain('40');
-    expect(within(places).getByRole('button', { name: /Pobrane/ }).textContent).toContain('4');
+    expect(within(places).getByRole('button', { name: /Pobrane/ }).textContent).toContain('5');
     expect(within(places).getByRole('button', { name: /Aparat/ }).getAttribute('aria-current')).toBe('location');
   });
 
@@ -339,12 +339,12 @@ describe('Explorer', () => {
     await fireEvent.click(screen.getByRole('button', { name: /Cała pamięć/ }));
     await vi.waitFor(() => expect(row('Download')).toBeTruthy());
     await fireEvent.dblClick(row('Download'));
-    await vi.waitFor(() => expect(rows()).toHaveLength(4));
+    await vi.waitFor(() => expect(rows()).toHaveLength(5));
     await fireEvent.click(screen.getByRole('button', { name: /^Nazwa/ }));
     const names = () => rows().map((r) => r.dataset.path!.split('/').pop());
-    expect(names()).toEqual(['aplikacja.apk', 'faktura.pdf', 'notatka.txt', 'umowa.docx']);
+    expect(names()).toEqual(['aplikacja.apk', 'faktura.pdf', 'notatka.txt', 'umowa.docx', 'zestawienie.csv']);
     await fireEvent.click(screen.getByRole('button', { name: /^Nazwa/ }));
-    expect(names()).toEqual(['umowa.docx', 'notatka.txt', 'faktura.pdf', 'aplikacja.apk']);
+    expect(names()).toEqual(['zestawienie.csv', 'umowa.docx', 'notatka.txt', 'faktura.pdf', 'aplikacja.apk']);
     await fireEvent.change(screen.getByRole('combobox', { name: 'Pokaż' }), { target: { value: 'apk' } });
     expect(names()).toEqual(['aplikacja.apk']);
   });

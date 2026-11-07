@@ -326,6 +326,45 @@ def test_failed_text_head_is_not_a_session_error(tmp_path):
     assert api._explorer.stats.errors == {"explorer_missing": 1}  # zwykłe odczyty liczą się dalej
 
 
+def test_sheet_reads_every_sheet_and_head_only_the_first(tmp_path):
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    wb.active.title = "Faktury"
+    wb.active.append(["Nr", "Kwota"])
+    wb.active.append(["F/1", 12.5])
+    wb.create_sheet("Notatki")["A1"] = "zażółć"
+    api, _, host, _ = _opened(tmp_path)
+    wb.save(_storage_of(host).local("/sdcard/Download/zestawienie.xlsx"))
+    previews = dict(api._explorer.stats.previews)
+
+    got = api.explorer_sheet("/sdcard/Download/zestawienie.xlsx")
+    assert got == {"sheets": [
+        {"name": "Faktury", "rows": [["Nr", "Kwota"], ["F/1", "12.5"]], "truncated": False, "hidden": False},
+        {"name": "Notatki", "rows": [["zażółć"]], "truncated": False, "hidden": False},
+    ], "delimiter": None, "encoding": None}
+    head = api.explorer_sheet_head("/sdcard/Download/zestawienie.xlsx")
+    assert head == {"names": ["Faktury", "Notatki"], "rows": [["Nr", "Kwota"], ["F/1", "12.5"]], "truncated": False}
+    assert dict(api._explorer.stats.previews) == previews  # arkusze nie mają klucza w telemetrii (jak PDF)
+
+
+def test_sheet_csv_and_problems(tmp_path, monkeypatch):
+    api, _, host, _ = _opened(tmp_path)
+    storage = _storage_of(host)
+    storage.local("/sdcard/Download/lista.csv").write_bytes("Klient;Kwota\r\nŁódź;1,5\r\n".encode("cp1250"))
+    got = api.explorer_sheet("/sdcard/Download/lista.csv")
+    assert got["sheets"][0]["rows"] == [["Klient", "Kwota"], ["Łódź", "1,5"]]
+    assert (got["delimiter"], got["encoding"]) == (";", "cp1250")
+
+    storage.local("/sdcard/Download/strona.xls").write_bytes(b"<html><table></table></html>")
+    assert api.explorer_sheet("/sdcard/Download/strona.xls") == {"problem": "unreadable"}
+    monkeypatch.setattr(explorer_api, "HEAD_BYTES", 4)
+    assert api.explorer_sheet_head("/sdcard/Download/lista.csv") == {"problem": "too_big"}
+    assert api.explorer_sheet("/sdcard/Download")["error"]["key"] == "bad_request"
+    assert api.explorer_sheet_head("/sdcard/Download/nie ma.csv")["error"]["key"] == "explorer_missing"
+    assert api._explorer.stats.errors == {"bad_request": 1}  # tylko pełny podgląd; dymek błędów nie liczy
+
+
 def test_mkdir_and_new_text(tmp_path):
     api, _, host, _ = _opened(tmp_path)
     storage = _storage_of(host)

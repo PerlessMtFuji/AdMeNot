@@ -296,7 +296,7 @@
       "command": "stat -c '%f|%s|%Y|%n' /sdcard/DCIM/Camera/ /sdcard/Pictures/Screenshots/ /sdcard/DCIM/Screenshots/ /sdcard/Download/ /sdcard/Android/media/com.whatsapp/WhatsApp/Media/ /sdcard/WhatsApp/Media/ /sdcard/Movies/ /sdcard/Music/ /sdcard/Documents/ 2>&1 || true",
       "status": "ok",
       "duration": 0.0,
-      "output": "41f9|12288|1790413200|/sdcard/DCIM/Camera/\nstat: '/sdcard/Pictures/Screenshots/': No such file or directory\nstat: '/sdcard/DCIM/Screenshots/': No such file or directory\n41f9|0|1790413200|/sdcard/Download/\nstat: '/sdcard/Android/media/com.whatsapp/WhatsApp/Media/': No such file or directory\nstat: '/sdcard/WhatsApp/Media/': No such file or directory\n41f9|0|1790413200|/sdcard/Movies/\n41f9|0|1790413200|/sdcard/Music/\nstat: '/sdcard/Documents/': No such file or directory\n",
+      "output": "41f9|12288|1790413200|/sdcard/DCIM/Camera/\nstat: '/sdcard/Pictures/Screenshots/': No such file or directory\nstat: '/sdcard/DCIM/Screenshots/': No such file or directory\n41f9|4096|1790413200|/sdcard/Download/\nstat: '/sdcard/Android/media/com.whatsapp/WhatsApp/Media/': No such file or directory\nstat: '/sdcard/WhatsApp/Media/': No such file or directory\n41f9|0|1790413200|/sdcard/Movies/\n41f9|0|1790413200|/sdcard/Music/\nstat: '/sdcard/Documents/': No such file or directory\n",
       "tag": null
      }
     ],
@@ -394,7 +394,7 @@
       "command": "find /sdcard/Download/ -type f 2>&1 || true",
       "status": "ok",
       "duration": 0.0,
-      "output": "/sdcard/Download/aplikacja.apk\n/sdcard/Download/faktura.pdf\n/sdcard/Download/notatka.txt\n/sdcard/Download/umowa.docx\n",
+      "output": "/sdcard/Download/aplikacja.apk\n/sdcard/Download/faktura.pdf\n/sdcard/Download/notatka.txt\n/sdcard/Download/umowa.docx\n/sdcard/Download/zestawienie.csv\n",
       "tag": null
      }
     ],
@@ -411,7 +411,7 @@
        {
         "key": "downloads",
         "path": "/sdcard/Download",
-        "count": 4,
+        "count": 5,
         "icon": "download"
        },
        {
@@ -460,7 +460,7 @@
        {
         "key": "downloads",
         "path": "/sdcard/Download",
-        "count": 4,
+        "count": 5,
         "icon": "download"
        },
        {
@@ -492,7 +492,7 @@
       "command": "find /sdcard/ -type f 2>&1 || true",
       "status": "ok",
       "duration": 0.0,
-      "output": "/sdcard/Android/data/com.example/cache.bin\n/sdcard/DCIM/Camera/IMG_20260924_0028.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0029.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0030.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0031.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0032.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0033.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0034.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0035.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0036.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0037.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0038.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0039.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0014.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0015.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0016.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0017.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0018.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0019.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0020.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0021.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0022.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0023.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0024.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0025.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0026.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0027.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0000.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0001.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0002.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0003.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0004.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0005.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0006.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0007.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0008.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0009.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0010.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0011.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0012.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0013.jpg\n/sdcard/Download/aplikacja.apk\n/sdcard/Download/faktura.pdf\n/sdcard/Download/notatka.txt\n/sdcard/Download/umowa.docx\n/sdcard/Movies/film 1.mp4\n/sdcard/Movies/film 2.mp4\n/sdcard/Music/utwór 1.mp3\n/sdcard/Music/utwór 2.mp3\n/sdcard/Music/utwór 3.mp3\n",
+      "output": "/sdcard/Android/data/com.example/cache.bin\n/sdcard/DCIM/Camera/IMG_20260924_0028.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0029.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0030.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0031.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0032.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0033.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0034.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0035.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0036.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0037.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0038.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0039.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0014.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0015.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0016.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0017.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0018.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0019.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0020.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0021.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0022.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0023.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0024.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0025.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0026.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0027.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0000.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0001.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0002.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0003.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0004.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0005.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0006.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0007.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0008.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0009.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0010.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0011.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0012.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0013.jpg\n/sdcard/Download/aplikacja.apk\n/sdcard/Download/faktura.pdf\n/sdcard/Download/notatka.txt\n/sdcard/Download/umowa.docx\n/sdcard/Download/zestawienie.csv\n/sdcard/Movies/film 1.mp4\n/sdcard/Movies/film 2.mp4\n/sdcard/Music/utwór 1.mp3\n/sdcard/Music/utwór 2.mp3\n/sdcard/Music/utwór 3.mp3\n",
       "tag": null
      }
     ],
@@ -509,7 +509,7 @@
        {
         "key": "downloads",
         "path": "/sdcard/Download",
-        "count": 4,
+        "count": 5,
         "icon": "download"
        },
        {
@@ -527,7 +527,7 @@
        {
         "key": "all",
         "path": "/sdcard",
-        "count": 50,
+        "count": 51,
         "icon": "phone"
        }
       ]
@@ -1224,6 +1224,19 @@
       "ext": "docx",
       "thumb": null,
       "url": null
+     },
+     {
+      "name": "zestawienie.csv",
+      "path": "/sdcard/Download/zestawienie.csv",
+      "kind": "file",
+      "size": 66,
+      "mtime": 1790409600,
+      "label": null,
+      "locked": false,
+      "type": "text",
+      "ext": "csv",
+      "thumb": null,
+      "url": null
      }
     ],
     "skipped": 0,
@@ -1238,7 +1251,7 @@
       "command": "find /sdcard/Download/ -mindepth 1 -maxdepth 1 -exec stat -c '%f|%s|%Y|%n' {} +",
       "status": "ok",
       "duration": 0.0,
-      "output": "81b0|7|1790409600|/sdcard/Download/aplikacja.apk\n81b0|16|1790409600|/sdcard/Download/faktura.pdf\n81b0|17|1790409600|/sdcard/Download/notatka.txt\n81b0|9|1790409600|/sdcard/Download/umowa.docx\n",
+      "output": "81b0|7|1790409600|/sdcard/Download/aplikacja.apk\n81b0|16|1790409600|/sdcard/Download/faktura.pdf\n81b0|17|1790409600|/sdcard/Download/notatka.txt\n81b0|9|1790409600|/sdcard/Download/umowa.docx\n81b0|66|1790409600|/sdcard/Download/zestawienie.csv\n",
       "tag": null
      }
     ]
@@ -1313,6 +1326,121 @@
       "status": "ok",
       "duration": 0.0,
       "output": "81b0|17|1790409600|/sdcard/Download/notatka.txt\n",
+      "tag": null
+     }
+    ]
+   ]
+  },
+  {
+   "method": "explorer_sheet",
+   "args": [
+    "/sdcard/Download/zestawienie.csv"
+   ],
+   "result": {
+    "sheets": [
+     {
+      "name": "",
+      "rows": [
+       [
+        "Klient",
+        "Kwota",
+        "Data"
+       ],
+       [
+        "Łódź",
+        "1234,50",
+        "2026-09-01"
+       ],
+       [
+        "Gdańsk",
+        "99",
+        "2026-09-02"
+       ]
+      ],
+      "truncated": false,
+      "hidden": false
+     }
+    ],
+    "delimiter": ";",
+    "encoding": "cp1250"
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "host:exec-out dd if=/sdcard/Download/zestawienie.csv bs=65536 skip=0 status=none",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "<66 B>",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "stat -c '%f|%s|%Y|%n' /sdcard/Download/zestawienie.csv 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "81b0|66|1790409600|/sdcard/Download/zestawienie.csv\n",
+      "tag": null
+     }
+    ]
+   ]
+  },
+  {
+   "method": "explorer_sheet_head",
+   "args": [
+    "/sdcard/Download/zestawienie.csv"
+   ],
+   "result": {
+    "names": [
+     ""
+    ],
+    "rows": [
+     [
+      "Klient",
+      "Kwota",
+      "Data"
+     ],
+     [
+      "Łódź",
+      "1234,50",
+      "2026-09-01"
+     ],
+     [
+      "Gdańsk",
+      "99",
+      "2026-09-02"
+     ]
+    ],
+    "truncated": false
+   },
+   "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "host:exec-out dd if=/sdcard/Download/zestawienie.csv bs=65536 skip=0 status=none",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "<66 B>",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "stat -c '%f|%s|%Y|%n' /sdcard/Download/zestawienie.csv 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "81b0|66|1790409600|/sdcard/Download/zestawienie.csv\n",
       "tag": null
      }
     ]

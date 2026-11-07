@@ -432,6 +432,16 @@ export class ExplorerController {
     return this.request(() => this.api.explorer_text_head(path), false);
   }
 
+  /** Cały arkusz do pełnego podglądu. */
+  sheet(path: string) {
+    return this.request(() => this.api.explorer_sheet(path), false);
+  }
+
+  /** Początek pierwszego arkusza do dymku przy najechaniu. */
+  sheetHead(path: string) {
+    return this.request(() => this.api.explorer_sheet_head(path), false);
+  }
+
   async openMap(lat: number, lon: number): Promise<void> {
     await this.request(() => this.api.explorer_open_map(lat, lon));
   }

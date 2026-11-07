@@ -1,4 +1,5 @@
 import type { EntryView } from '../types';
+import { isSheet } from './sheet';
 
 /** Tyle kursor musi stać na pliku, zanim wyskoczy pierwszy dymek. */
 export const PEEK_DELAY_MS = 300;
@@ -11,8 +12,10 @@ export const PREFETCH_MAX = 40 * 1024 * 1024;
 /** W przejeździe tyle dymek musi postać na zdjęciu, zanim ruszy pełny plik: dekodowanie wielkich zdjęć rwie klatki.
  *  Dymek po zwykłym opóźnieniu nie czeka, bo kursor już stał na pliku. */
 export const PEEK_FULL_WAIT_MS = 150;
+/** Arkusz w dymku: XLSX trzeba pobrać w całości (zgodnie z `HEAD_BYTES` w `sheets.py`). Większy CSV/TSV pokazuje dymek tekstu. */
+export const SHEET_PEEK_MAX = 8 * 1024 * 1024;
 
-export type PeekKind = 'photo' | 'video' | 'audio' | 'pdf' | 'text';
+export type PeekKind = 'photo' | 'video' | 'audio' | 'pdf' | 'sheet' | 'text';
 
 /** Co dymek może pokazać dla pliku (zgodnie z pełnym podglądem); `null` — dymka nie ma. */
 export function peekKind(e: EntryView): PeekKind | null {
@@ -25,6 +28,7 @@ export function peekKind(e: EntryView): PeekKind | null {
   if (e.type === 'video') return e.url ? 'video' : null;
   if (e.type === 'audio') return e.url ? 'audio' : null;
   if (ext === 'pdf' && e.url) return 'pdf';
+  if (isSheet(e) && e.size <= SHEET_PEEK_MAX) return 'sheet';
   // Tekst idzie mostkiem, adres serwera mediów nie jest potrzebny.
   return e.type === 'text' ? 'text' : null;
 }
@@ -39,6 +43,8 @@ export function peekSize(kind: PeekKind): { w: number; h: number } {
       return { w: 424, h: 640 };
     case 'text':
       return { w: 440, h: 460 };
+    case 'sheet':
+      return { w: 560, h: 380 };
     case 'audio':
       return { w: 320, h: 210 };
   }
