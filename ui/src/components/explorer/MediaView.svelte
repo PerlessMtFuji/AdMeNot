@@ -77,7 +77,7 @@
     const el = video;
     const events = ['loadeddata', 'seeked'];
     for (const name of events) el.addEventListener(name, paint);
-    const timer = reducedMotion() ? undefined : setInterval(paint, GLOW_MS);
+    const timer = reducedMotion() ? undefined : setInterval(() => { if (!el.paused) paint(); }, GLOW_MS);
     return () => {
       for (const name of events) el.removeEventListener(name, paint);
       clearInterval(timer);

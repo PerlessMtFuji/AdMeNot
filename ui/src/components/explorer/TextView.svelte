@@ -1,8 +1,11 @@
 <script lang="ts">
+  import { tick, untrack } from 'svelte';
   import { findMatches, MARK_WINDOW, MAX_TEXT } from '../../lib/explorer/find';
   import { type ExplorerController } from '../../lib/explorer/controller';
   import { highlight, type Token } from '../../lib/explorer/highlight';
   import { formatBytes } from '../../lib/explorer/logic';
+  import { rowAt, rowSegments, textRows, tokenStarts } from '../../lib/explorer/textrows';
+  import { FALLBACK, type Viewport, viewport } from '../../lib/explorer/virtual';
   import { i18n, t, tp } from '../../lib/i18n/index.svelte';
   import type { EntryView } from '../../lib/types';
   import Banner from '../../ui/Banner.svelte';
@@ -14,6 +17,15 @@
   let { ex, entry }: { ex: ExplorerController; entry: EntryView } = $props();
 
   const COPIED_MS = 1500;
+  /** Wysokość wiersza (13 px × 1,6), odstęp treści od góry i dołu. */
+  const ROW_H = 20.8;
+  const PAD_Y = 12;
+  /** Tyle wierszy pokazujemy w całości: krótki plik zaznacza się i kopiuje jak zwykły tekst. Dłuższy ma w DOM tylko
+   *  okno wokół ekranu (całość kopiuje przycisk). */
+  const FULL_ROWS = 1500;
+  const AROUND = 60;
+  /** Powyżej tego kolorowanie (obiekt na każdy token) kosztowałoby więcej niż jest warte. */
+  const HIGHLIGHT_MAX = 4 * 1024 * 1024;
   let text = $state('');
   let encoding = $state('');
   let truncated = $state(false);
@@ -32,26 +44,33 @@
   const capped = $derived(truncated && text.length >= MAX_TEXT);
   const markFrom = $derived(Math.max(0, current - MARK_WINDOW));
   const marked = $derived(matches.slice(markFrom, current + MARK_WINDOW));
-  const foundTokens = $derived.by(() => {
-    let offset = 0;
-    let hit = 0;
-    const out: { text: string; cls: string; hit: number }[] = [];
-    for (const token of tokens) {
-      const end = offset + token.text.length;
-      let at = offset;
-      while (at < end) {
-        while (hit < marked.length && marked[hit].end <= at) hit++;
-        const match = marked[hit];
-        const inside = match && match.start <= at;
-        const to = Math.min(end, match ? inside ? match.end : match.start : end);
-        out.push({ text: token.text.slice(at - offset, to - offset), cls: token.cls, hit: inside ? markFrom + hit : -1 });
-        at = to;
-      }
-      offset = end;
+  let vp = $state.raw<Viewport>({ top: 0, ...FALLBACK });
+  const kind = $derived(({ json: 'json', xml: 'xml' } as const)[entry.ext.toLowerCase() as 'json' | 'xml']);
+  const tokens = $derived<Token[]>(kind && text.length <= HIGHLIGHT_MAX ? highlight(text, kind) : [{ cls: '', text }]);
+  const starts = $derived(tokenStarts(tokens));
+  const rows = $derived(textRows(text));
+  const first = $derived(rows.count <= FULL_ROWS ? 0 : Math.max(0, Math.floor((vp.top - PAD_Y) / ROW_H) - AROUND));
+  const last = $derived(rows.count <= FULL_ROWS ? rows.count : Math.min(rows.count, Math.ceil((vp.top + vp.height) / ROW_H) + AROUND));
+  const pieces = $derived(rowSegments(text, rows, tokens, starts, first, last, marked, markFrom));
+  const gutter = $derived(Array.from(rows.lines.subarray(first, last), (n) => n || '').join('\n'));
+
+  /** Bieżące trafienie na ekran: najpierw wiersz (może go nie być w DOM), potem znacznik w poziomie. */
+  async function showHit(): Promise<void> {
+    const hit = matches[current];
+    if (!hit || !content) return;
+    const target = PAD_Y + rowAt(rows, hit.start) * ROW_H;
+    if (target < content.scrollTop || target + ROW_H > content.scrollTop + content.clientHeight) {
+      content.scrollTop = target - content.clientHeight / 2;
+      vp = { ...vp, top: content.scrollTop };
     }
-    return out;
+    await tick();
+    content?.querySelector<HTMLElement>(`[data-hit="${current}"]`)?.scrollIntoView?.({ block: 'nearest', inline: 'center' });
+  }
+  $effect(() => {
+    void matches;
+    void current;
+    untrack(() => void showHit());
   });
-  $effect(() => { void matches; content?.querySelector<HTMLElement>(`[data-hit="${current}"]`)?.scrollIntoView?.({ block: 'center' }); });
 
   function search(q: string, w: boolean): void {
     query = q;
@@ -67,10 +86,7 @@
     finally { loadingAll = false; }
   }
 
-  const kind = $derived(({ json: 'json', xml: 'xml' } as const)[entry.ext.toLowerCase() as 'json' | 'xml']);
-  const lines = $derived(text === '' ? 0 : text.split('\n').length - (text.endsWith('\n') ? 1 : 0));
-  const tokens = $derived<Token[]>(kind ? highlight(text, kind) : [{ cls: '', text }]);
-  const gutter = $derived(Array.from({ length: lines }, (_, i) => i + 1).join('\n'));
+  const lines = $derived(rows.total);
 
   async function load(more: boolean): Promise<void> {
     const path = entry.path;
@@ -125,13 +141,18 @@
       <Button size="sm" disabled={loading || loadingAll} onclick={loadAll}>{t('explorer.preview.find_load_all')}</Button>
     </div>
   {/if}
-  <div bind:this={content} class="min-h-0 flex-1 overflow-auto rounded-2xl bg-white/[.06] shadow-[inset_0_0_0_1px_rgb(255_255_255/.08)]">
+  <div bind:this={content} {@attach viewport((v) => (vp = v))}
+    class="min-h-0 flex-1 overflow-auto rounded-2xl bg-white/[.06] shadow-[inset_0_0_0_1px_rgb(255_255_255/.08)]">
     {#if failed}
       <div class="p-4"><Banner tone="bad" icon="triangle-alert">{t('explorer.preview.failed')}</Banner></div>
     {:else}
-      <div class="flex min-w-max font-mono text-[13px] leading-[1.6] text-white/90">
-        <pre aria-hidden="true" class="sticky left-0 flex-none bg-[#11141b] px-3 py-3 text-right text-white/35 select-none">{gutter}</pre>
-        <pre class="flex-1 px-4 py-3">{#each foundTokens as tok, i (i)}{#if tok.hit >= 0}<mark data-hit={tok.hit} class:active={tok.hit === current}>{tok.text}</mark>{:else}<span class={tok.cls}>{tok.text}</span>{/if}{/each}</pre>
+      <div class="relative font-mono text-[13px] leading-[1.6] text-white/90" data-lines
+        style:height="{rows.count * ROW_H + 2 * PAD_Y}px" style:min-width="calc({rows.width}ch + {String(rows.total).length}ch + 3.5rem)">
+        <div class="absolute inset-x-0 flex min-w-max" style:top="{first * ROW_H}px">
+          <pre aria-hidden="true" class="sticky left-0 flex-none bg-[#11141b] px-3 py-3 text-right text-white/35 select-none"
+            style:min-width="calc({String(rows.total).length}ch + 1.5rem)">{gutter}</pre>
+          <pre class="flex-1 px-4 py-3">{#each pieces as tok, i (i)}{#if tok.hit >= 0}<mark data-hit={tok.hit} class:active={tok.hit === current}>{tok.text}</mark>{:else}<span class={tok.cls}>{tok.text}</span>{/if}{/each}</pre>
+        </div>
       </div>
       {#if loading}<span class="spin m-4 inline-block" role="status" aria-label={t('explorer.preview.loading')}></span>{/if}
     {/if}

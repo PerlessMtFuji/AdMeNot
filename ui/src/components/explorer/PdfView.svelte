@@ -24,6 +24,8 @@
   const WHEEL_STEP = 1.1;
   /** Ile ekranów nad i pod widocznym trzymamy gotowych. */
   const AHEAD = 1;
+  /** Co tyle stron indeks trafia do stanu: każda aktualizacja przelicza układ wszystkich stron i wyszukiwanie. */
+  const INDEX_BATCH = 16;
 
   type Size = { w: number; h: number };
   let pdf = $state.raw<PDFDocumentProxy | null>(null);
@@ -91,13 +93,19 @@
         sizes = [{ w: width, h: height }];
         pdf = doc;
         // Indeksujemy wszystkie strony do szukania; rysowane są tylko widoczne.
+        const nextSizes: Size[] = [];
+        const nextTexts: string[] = [];
         for (let i = 1; i <= doc.numPages && !stale; i++) {
           const page = await doc.getPage(i);
           const content = await page.getTextContent();
           if (stale) return;
           const box = page.getViewport({ scale: 1 });
-          sizes = [...sizes.slice(0, i - 1), { w: box.width, h: box.height }];
-          texts = [...texts, content.items.flatMap(item => 'str' in item ? [item.str] : []).join(' ')];
+          nextSizes.push({ w: box.width, h: box.height });
+          nextTexts.push(content.items.flatMap(item => 'str' in item ? [item.str] : []).join(' '));
+          if (i % INDEX_BATCH === 0 || i === doc.numPages) {
+            sizes = [...nextSizes];
+            texts = [...nextTexts];
+          }
         }
       } catch { if (!stale) { failed = true; loading = false; } }
     })();

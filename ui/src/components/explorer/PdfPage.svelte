@@ -17,6 +17,7 @@
   let host: HTMLDivElement;
   let layer = $state.raw<PdfTextLayer | null>(null);
   let drawn = false;
+  let marked = false;  // warstwa tekstu ma podświetlenia
 
   async function draw(zoom: number, isStale: () => boolean, setCancel: (cancel: () => void) => void): Promise<void> {
     const lib = await import('pdfjs-dist');
@@ -49,6 +50,7 @@
     if (isStale()) return;
     host.prepend(canvas);
     for (const el of old) el.remove();
+    marked = false;  // nowa warstwa jest czysta
     layer = text;
     drawn = true;
     onrendered();
@@ -72,6 +74,8 @@
   $effect(() => {
     if (!layer) return;
     const hits = findMatches(layer.textContentItemsStr.join(' '), query, whole);
+    if (!hits.length && !marked) return;  // tysiące spanów strony bez zmian
+    marked = hits.length > 0;
     let offset = 0;
     for (let i = 0; i < layer.textDivs.length; i++) {
       const span = layer.textDivs[i];
