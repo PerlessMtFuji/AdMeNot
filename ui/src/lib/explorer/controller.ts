@@ -485,6 +485,7 @@ export class ExplorerController {
     const s = this.state;
     const st = this.app.settings;
     if (st.explorer_dest_mode === 'ask' || !s.dest) {
+      if (st.explorer_dest_mode === 'fixed') s.destMissing = true;  // stały folder nie jest ustawiony
       if (!(await this.pickDest())) return undefined;
       return s.dest;
     }
@@ -719,6 +720,9 @@ export class ExplorerController {
       return this.copy({ ...job, dest: this.state.dest });
     }
     if (started !== null && job.dest === null) this.state.destMissing = false;  // stały folder znów działa
+    // w trybie „stały” wybrany folder obowiązuje jedną kopię; następna wraca do stałego (i sprawdza go od nowa)
+    const st = this.app.settings;
+    if (st.explorer_dest_mode === 'fixed') this.state.dest = st.explorer_dest_fixed ?? null;
     if (started !== null && job.clear) this.clear();
     return started !== null;
   }

@@ -562,6 +562,33 @@ describe('Explorer', () => {
       expect(ctl.state.settings.explorer_dest_fixed).toBe('E:\\Pendrive');
     });
 
+    test('fixed mode: a one-off pick applies to one copy only, the next goes back to the fixed folder', async () => {
+      const { bridge, ctl } = await openExplorer();
+      ctl.state.settings = { ...ctl.state.settings, explorer_dest_mode: 'fixed', explorer_dest_fixed: 'E:\\Pendrive' };
+      ctl.explorer.state.dest = 'E:\\Pendrive';
+      bridge.failNext('explorer_copy', 'explorer_no_dest');
+      const bar = await select();
+      await fireEvent.click(within(bar).getByRole('button', { name: 'Kopiuj' }));
+      await vi.waitFor(() => expect(copies(bridge)).toHaveLength(2));
+      await vi.waitFor(() => expect(ctl.explorer.state.dest).toBe('E:\\Pendrive'));
+      await fireEvent.click(rows()[1]);
+      const bar2 = await screen.findByRole('region', { name: 'Zaznaczenie' });
+      await fireEvent.click(within(bar2).getByRole('button', { name: 'Kopiuj' }));
+      await vi.waitFor(() => expect(copies(bridge)).toHaveLength(3));
+      expect(copies(bridge)[2].args[1]).toBeNull();
+    });
+
+    test('fixed mode without a fixed folder shows the notice and asks for a folder', async () => {
+      const { bridge, ctl } = await openExplorer();
+      ctl.state.settings = { ...ctl.state.settings, explorer_dest_mode: 'fixed', explorer_dest_fixed: null };
+      ctl.explorer.state.dest = null;
+      const bar = await select();
+      await fireEvent.click(within(bar).getByRole('button', { name: 'Kopiuj' }));
+      await vi.waitFor(() => expect(copies(bridge)).toHaveLength(1));
+      expect(bridge.calls.some((c) => c.method === 'explorer_pick_dest')).toBe(true);
+      expect(screen.getByText(/Stały folder jest niedostępny/)).toBeTruthy();
+    });
+
     test('verify on: plain copy verifies and the menu offers copying without verification', async () => {
       const { bridge, ctl } = await openExplorer();
       ctl.state.settings = { ...ctl.state.settings, verify_copies: true };
