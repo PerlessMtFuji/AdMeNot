@@ -105,7 +105,7 @@
     {/if}
     {#if link === 'adb_missing'}
       <Banner tone="bad" icon="triangle-alert" title={t('connect.adb_missing')}>
-        {#snippet actions()}<Button onclick={() => ctl.openSettings()}>{t('connect.open_settings')}</Button>{/snippet}
+        {#snippet actions()}<Button onclick={() => ctl.openSettings('program')}>{t('connect.open_settings')}</Button>{/snippet}
       </Banner>
     {:else if link === 'ready' || link === 'many'}
       <div class="flex flex-col gap-2.5" in:enter>

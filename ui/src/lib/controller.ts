@@ -1,7 +1,7 @@
 import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
 import { actedAfter, changedVerdicts, defaultSelection, defaultUploadChoice, keptUploadChoice, otherGroup, TEL_KINDS, telWrite, resumableCopy, UPLOAD_GROUPS, resumeSelection, rescanSelection, TRANSFER_CATEGORIES, transferNeed, transferTotals, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
-import { EMPTY_TRANSFER_SELECTION, emptyRestore, type AppState } from './state.svelte';
+import { EMPTY_TRANSFER_SELECTION, emptyRestore, type AppState, type SettingsCategory } from './state.svelte';
 import { ExplorerController } from './explorer/controller';
 import { applyTheme } from './theme';
 import type {
@@ -1216,7 +1216,9 @@ export class Controller {
     await this.refreshHistory();
   }
 
-  openSettings(): void {
+  /** Bez argumentu: ostatnia kategoria z tej sesji okna (na start „Ogólne”). */
+  openSettings(category?: SettingsCategory): void {
+    if (category) this.state.settingsCategory = category;
     this.state.screen = 'settings';
   }
 
@@ -1225,10 +1227,15 @@ export class Controller {
     this.state.screen = this.explorer.state.open ? 'explorer' : 'main';
   }
 
+  /**
+   * Nigdy nie odrzuca obietnicy: błąd mostu trafia na kartę błędu, a wynik to `null`
+   * (przełączniki w Ustawieniach wracają wtedy do zapisanej wartości i nie ma „✓ Zapisano”).
+   */
   async saveSettings(changes: Partial<Settings>): Promise<Settings | null> {
     const r = await this.call(this.api.save_settings(changes));
     if (!r) return null;
     this.applySettings(r);
+    this.state.settingsSaved = Date.now();
     if ('lang' in changes) {
       const view = await this.call(this.api.rerender());
       if (view?.scan) this.state.scan = view.scan;
@@ -1244,7 +1251,9 @@ export class Controller {
 
   async setTelemetry(telemetry: boolean, packages: boolean): Promise<void> {
     const r = await this.call(this.api.set_telemetry(telemetry, packages && telemetry));
-    if (r) this.applySettings(r);
+    if (!r) return;
+    this.applySettings(r);
+    this.state.settingsSaved = Date.now();
   }
 
   telemetrySample(): Promise<TelemetrySample | null> {
@@ -1261,7 +1270,9 @@ export class Controller {
 
   async setDonateReminders(on: boolean): Promise<void> {
     const r = await this.call(this.api.set_donate_reminders(on));
-    if (r) this.applySettings(r);
+    if (!r) return;
+    this.applySettings(r);
+    this.state.settingsSaved = Date.now();
   }
 
   closeDonate(): void {
@@ -1388,12 +1399,18 @@ export class Controller {
     }
   }
 
-  loadService() {
-    return this.call(this.api.service());
+  async loadService(): Promise<ServiceInfo | null> {
+    const r = await this.call(this.api.service());
+    if (r) this.state.serviceNameMissing = !r.name?.trim();
+    return r;
   }
 
-  saveService(changes: Partial<ServiceInfo>) {
-    return this.call(this.api.save_service(changes));
+  async saveService(changes: Partial<ServiceInfo>): Promise<ServiceInfo | null> {
+    const r = await this.call(this.api.save_service(changes));
+    if (!r) return null;
+    this.state.serviceNameMissing = !r.name?.trim();
+    this.state.settingsSaved = Date.now();
+    return r;
   }
 
   pickLogo() {

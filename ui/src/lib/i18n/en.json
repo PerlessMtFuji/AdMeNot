@@ -606,7 +606,22 @@
     "cache_clear_after": "Clear the APK cache after a finished repair",
     "cache_clear_after_hint": "Backups of removed apps are kept.",
     "cache_clear_now": "Clear now",
-    "cache_cleared": "Removed {gb} GB."
+    "cache_cleared": "Removed {gb} GB.",
+    "search": "Search settings…",
+    "no_results": "No setting matches your search.",
+    "categories": "Settings categories",
+    "service_missing": "Service name missing",
+    "cat": { "general": "General", "repair": "Repair", "transfer": "Data transfer", "explorer": "File explorer",
+      "service": "Service and reports", "privacy": "Privacy and data", "program": "Program" },
+    "lead": {
+      "general": "How the program looks and how you work at the bench.",
+      "repair": "Scanning, app analysis and removal.",
+      "transfer": "Copies of data from the old phone on this computer.",
+      "explorer": "Browsing and copying files from the phone.",
+      "service": "Details in the header and footer of the customer report.",
+      "privacy": "Customer data on this computer and statistics for the program's author.",
+      "program": "Version, updates and tools for advanced users."
+    }
   },
   "apk_cache": {
     "estimate": { "one": "The analysis will download about {size} ({count} app)", "few": "The analysis will download about {size} ({count} apps)", "many": "The analysis will download about {size} ({count} apps)", "other": "The analysis will download about {size} ({count} apps)" },

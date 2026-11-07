@@ -6,6 +6,8 @@ import type {
 } from './types';
 
 export type Screen = 'main' | 'history' | 'settings' | 'explorer';
+/** Kategorie ekranu Ustawienia w kolejności kolumny (spec ustawień §4). */
+export type SettingsCategory = 'general' | 'repair' | 'transfer' | 'explorer' | 'service' | 'privacy' | 'program';
 const ORDER_KINDS = ['exec', 'resume', 'undo'];
 
 export const EMPTY_TRANSFER_SELECTION: TransferSelection = {
@@ -77,6 +79,12 @@ export class AppState {
     explorer_hidden: false, explorer_dest_mode: 'last', explorer_dest_fixed: null, report_open: true,
     explorer_recent_phones: 0 });
   settingsLoaded = $state(false);  // ekran powitalny dopiero po odczycie ustawień
+  /** Ostatnio otwarta kategoria Ustawień — pamiętana do zamknięcia okna. */
+  settingsCategory = $state<SettingsCategory>('general');
+  /** Chwila (Date.now()) ostatniego udanego zapisu ustawień; 0 = jeszcze nic. Ekran pokazuje wtedy „✓ Zapisano”. */
+  settingsSaved = $state(0);
+  /** Dane serwisu bez nazwy — kropka przy kategorii „Serwis i protokoły”. */
+  serviceNameMissing = $state(false);
   devices = $state<DeviceEntry[]>([]);
   devicesError = $state<string | null>(null);
   knownSerials = $state<string[]>([]);

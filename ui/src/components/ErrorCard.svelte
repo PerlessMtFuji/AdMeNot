@@ -46,7 +46,7 @@
       {#if s.error.log}<div class="mt-1 text-xs text-mut">{t('error.log', { path: s.error.log })}</div>{/if}
     </div>
     {#if key === 'adb_missing'}
-      <Button size="sm" onclick={() => { ctl.dismissError(); ctl.openSettings(); }}>{t('connect.open_settings')}</Button>
+      <Button size="sm" onclick={() => { ctl.dismissError(); ctl.openSettings('program'); }}>{t('connect.open_settings')}</Button>
     {/if}
     {#if s.error.crash}
       <Button size="sm" onclick={() => ctl.openCrash(s.error!.crash!)}>{t('crash.send')}</Button>

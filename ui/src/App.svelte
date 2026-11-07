@@ -12,7 +12,7 @@
   import History from './screens/History.svelte';
   import Results from './screens/Results.svelte';
   import Scan from './screens/Scan.svelte';
-  import Settings from './screens/Settings.svelte';
+  import Settings from './screens/settings/Settings.svelte';
   import TransferBackup from './screens/TransferBackup.svelte';
   import TransferChoose from './screens/TransferChoose.svelte';
   import TransferRestore from './screens/TransferRestore.svelte';

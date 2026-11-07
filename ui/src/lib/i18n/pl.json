@@ -606,7 +606,22 @@
     "cache_clear_after": "Po zakończonej naprawie usuń pamięć podręczną APK",
     "cache_clear_after_hint": "Kopie zapasowe usuniętych aplikacji zostają.",
     "cache_clear_now": "Wyczyść teraz",
-    "cache_cleared": "Usunięto {gb} GB."
+    "cache_cleared": "Usunięto {gb} GB.",
+    "search": "Szukaj ustawienia…",
+    "no_results": "Żadne ustawienie nie pasuje do wyszukiwania.",
+    "categories": "Kategorie ustawień",
+    "service_missing": "Brak nazwy serwisu",
+    "cat": { "general": "Ogólne", "repair": "Naprawa", "transfer": "Przenoszenie danych", "explorer": "Eksplorator plików",
+      "service": "Serwis i protokoły", "privacy": "Prywatność i dane", "program": "Program" },
+    "lead": {
+      "general": "Wygląd programu i sposób pracy przy stanowisku.",
+      "repair": "Skanowanie, analiza aplikacji i usuwanie.",
+      "transfer": "Kopie danych ze starego telefonu na komputerze.",
+      "explorer": "Przeglądanie i kopiowanie plików z telefonu.",
+      "service": "Dane w nagłówku i stopce protokołu dla klienta.",
+      "privacy": "Dane klientów na tym komputerze i statystyki dla autora programu.",
+      "program": "Wersja, aktualizacje i narzędzia dla zaawansowanych."
+    }
   },
   "apk_cache": {
     "estimate": { "one": "Analiza pobierze ok. {size} ({count} aplikacja)", "few": "Analiza pobierze ok. {size} ({count} aplikacje)", "many": "Analiza pobierze ok. {size} ({count} aplikacji)", "other": "Analiza pobierze ok. {size} ({count} aplikacji)" },

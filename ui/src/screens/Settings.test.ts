@@ -1,172 +1,113 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { expect, test, vi } from 'vitest';
-import App from '../App.svelte';
-import { i18n } from '../lib/i18n/index.svelte';
+import ErrorCard from '../components/ErrorCard.svelte';
 import { renderWith, setupCtl } from '../test-utils';
-import Settings from './Settings.svelte';
+import { CATEGORIES } from './settings/categories';
+import Settings from './settings/Settings.svelte';
 
-const flush = () => new Promise((r) => setTimeout(r, 0));
+// Kategorie z wierszami do wyszukiwania; pozostałe zostają zaślepkami (wypełniają je kolejne zadania).
+vi.mock('./settings/General.svelte', async () => ({ default: (await import('./settings/GeneralRows.test.svelte')).default }));
+vi.mock('./settings/Program.svelte', async () => ({ default: (await import('./settings/ProgramRows.test.svelte')).default }));
 
-test('settings: theme, language, mode, adb check, folder and save', async () => {
-  const { ctl, s, bridge } = await setupCtl('empty');
-  render(App, { props: { ctl } });
-  await fireEvent.click(screen.getByRole('button', { name: 'Ustawienia' }));
+const NAMES = ['Ogólne', 'Naprawa', 'Przenoszenie danych', 'Eksplorator plików', 'Serwis i protokoły',
+  'Prywatność i dane', 'Program'];
+
+const nav = () => screen.getByRole('navigation', { name: 'Kategorie ustawień' });
+const active = () => within(nav()).getAllByRole('button').find((b) => b.getAttribute('aria-current') === 'page');
+
+async function search(value: string): Promise<HTMLInputElement> {
+  const input = screen.getByRole('searchbox', { name: 'Szukaj ustawienia…' }) as HTMLInputElement;
+  await fireEvent.input(input, { target: { value } });
   await tick();
-  expect(screen.getByRole('group', { name: 'Motyw' })).toBeTruthy();
-  await fireEvent.click(screen.getByRole('button', { name: 'Ciemny' }));
-  await vi.waitFor(() => expect(document.documentElement.dataset.theme).toBe('dark'));
-  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ theme: 'dark' }] });
-  await fireEvent.click(screen.getByRole('button', { name: 'System' }));
-  await vi.waitFor(() => expect(document.documentElement.dataset.theme).toBe('light'));
-  await fireEvent.click(screen.getByRole('button', { name: 'Ekspercki' }));
-  await vi.waitFor(() => expect(s.settings.mode).toBe('expert'));
-  const adb = screen.getByLabelText('Ścieżka do adb.exe');
-  await fireEvent.input(adb, { target: { value: 'C:\\pt\\adb.exe' } });
-  await fireEvent.click(screen.getByRole('button', { name: 'Sprawdź' }));
-  expect(await screen.findByText(/Działa: Android Debug Bridge/)).toBeTruthy();
-  expect(bridge.calls.at(-1)).toEqual({ method: 'check_adb', args: ['C:\\pt\\adb.exe'] });
-  const [chooseBackups, choosePdf] = screen.getAllByRole('button', { name: 'Wybierz…' });
-  await fireEvent.click(chooseBackups);
-  await vi.waitFor(() => expect((screen.getByLabelText('Katalog kopii APK') as HTMLInputElement).value)
-    .toBe('D:\\AdMeNot\\kopie'));
-  await fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
-  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings',
-    args: [{ adb_path: 'C:\\pt\\adb.exe', backups_dir: 'D:\\AdMeNot\\kopie', report_pdf_dir: null }] });
-  await fireEvent.click(choosePdf);
-  await vi.waitFor(() => expect((screen.getByLabelText('Folder protokołów PDF') as HTMLInputElement).value)
-    .toBe('D:\\AdMeNot\\kopie'));
-  await fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
-  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings',
-    args: [{ adb_path: 'C:\\pt\\adb.exe', backups_dir: 'D:\\AdMeNot\\kopie', report_pdf_dir: 'D:\\AdMeNot\\kopie' }] });
-  expect(await screen.findByText(/Zapisano/)).toBeTruthy();
-  // ścieżka względna: komunikat przy polu, nie ogólna karta błędu
-  await fireEvent.input(screen.getByLabelText('Folder protokołów PDF'), { target: { value: 'protokoly' } });
-  await fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
-  expect(await screen.findByText(/Podaj pełną ścieżkę folderu/)).toBeTruthy();
+  await tick();
+  return input;
+}
+
+test('seven categories in spec order, „Ogólne” active with its header and lead', async () => {
+  await renderWith(Settings);
+  expect(CATEGORIES.map((c) => c.id)).toEqual(['general', 'repair', 'transfer', 'explorer', 'service', 'privacy', 'program']);
+  const buttons = within(nav()).getAllByRole('button');
+  expect(buttons.map((b) => b.textContent?.trim())).toEqual(NAMES);
+  expect(active()?.textContent?.trim()).toBe('Ogólne');
+  expect(screen.getByRole('heading', { level: 2, name: 'Ogólne' })).toBeTruthy();
+  expect(screen.getByText('Wygląd programu i sposób pracy przy stanowisku.')).toBeTruthy();
+});
+
+test('clicking a category shows its header and is remembered for the session', async () => {
+  const { s, ctl } = await renderWith(Settings);
+  await fireEvent.click(within(nav()).getByRole('button', { name: 'Naprawa' }));
+  expect(screen.getByRole('heading', { level: 2, name: 'Naprawa' })).toBeTruthy();
+  expect(s.settingsCategory).toBe('repair');
+  ctl.back();
+  ctl.openSettings();
+  expect(s.screen).toBe('settings');
+  expect(s.settingsCategory).toBe('repair');
+});
+
+test('openSettings(category) switches the active category', async () => {
+  const { ctl } = await renderWith(Settings);
+  ctl.openSettings('program');
+  await tick();
+  expect(active()?.textContent?.trim()).toBe('Program');
+  expect(screen.getByRole('heading', { level: 2, name: 'Program' })).toBeTruthy();
+});
+
+test('search shows matching rows under their category name, no hits shows one line, Esc clears', async () => {
+  const { container } = await renderWith(Settings);
+  const input = await search('ADB');
+  const sections = [...container.querySelectorAll('[data-settings-section]')].filter((e) => !(e as HTMLElement).hidden);
+  expect(sections.map((e) => e.getAttribute('data-settings-section'))).toEqual(['program']);
+  expect(within(sections[0] as HTMLElement).getByRole('heading', { level: 2, name: 'Program' })).toBeTruthy();
+  expect((container.querySelector('[data-setting-id="adb_path"]') as HTMLElement).hidden).toBe(false);
+  await search('motyw');
+  const shown = [...container.querySelectorAll('[data-settings-section]')].filter((e) => !(e as HTMLElement).hidden);
+  expect(shown.map((e) => e.getAttribute('data-settings-section'))).toEqual(['general']);
+  await search('zzz');
+  expect(screen.getByText('Żadne ustawienie nie pasuje do wyszukiwania.')).toBeTruthy();
+  await fireEvent.keyDown(input, { key: 'Escape' });
+  await tick();
+  expect(input.value).toBe('');
+  expect(screen.queryByText('Żadne ustawienie nie pasuje do wyszukiwania.')).toBeNull();
+  expect(screen.getByRole('heading', { level: 2, name: 'Ogólne' })).toBeTruthy();
+});
+
+test('„Zapisano” bubble after a successful save, gone after 2 s; not after a failed one', async () => {
+  const { ctl, bridge } = await renderWith(Settings);
+  expect(screen.queryByRole('status')).toBeNull();
+  bridge.failNext('save_settings', 'internal');
+  expect(await ctl.saveSettings({ mirror_auto: true })).toBeNull();
+  await tick();
+  expect(screen.queryByText('Zapisano')).toBeNull();
+  expect(await ctl.saveSettings({ mirror_auto: true })).not.toBeNull();
+  await tick();
+  expect(screen.getByRole('status').textContent).toContain('Zapisano');
+  await vi.waitFor(() => expect(screen.queryByText('Zapisano')).toBeNull(), { timeout: 3000 });
+});
+
+test('a save made before opening Settings does not show the bubble', async () => {
+  const { ctl } = await setupCtl('empty');
+  await ctl.saveSettings({ mirror_auto: true });
+  render(Settings, { context: new Map([['ctl', ctl]]) });
+  await tick();
+  expect(screen.queryByText('Zapisano')).toBeNull();
+});
+
+test('orange dot at „Serwis i protokoły” while the service name is empty', async () => {
+  const { ctl, container } = await renderWith(Settings);
+  await vi.waitFor(() => expect(container.querySelector('[data-category="service"] [data-dot]')).toBeTruthy());
+  expect(container.querySelectorAll('[data-dot]')).toHaveLength(1);
+  await ctl.saveService({ name: 'Serwis Ząb' });
+  await tick();
+  expect(container.querySelector('[data-dot]')).toBeNull();
+});
+
+test('„Otwórz ustawienia” on the adb_missing error card opens „Program”', async () => {
+  const { s } = await renderWith(ErrorCard);
+  s.error = { key: 'adb_missing', message: '' };
+  await tick();
+  await fireEvent.click(screen.getByRole('button', { name: 'Otwórz ustawienia' }));
+  expect(s.screen).toBe('settings');
+  expect(s.settingsCategory).toBe('program');
   expect(s.error).toBeNull();
-  await fireEvent.input(screen.getByLabelText('Folder protokołów PDF'), { target: { value: 'D:\\AdMeNot\\kopie' } });
-  await fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
-  await vi.waitFor(() => expect(screen.queryByText(/Podaj pełną ścieżkę folderu/)).toBeNull());
-  await fireEvent.click(screen.getByRole('button', { name: 'English' }));
-  await vi.waitFor(() => expect(i18n.lang).toBe('en'));
-  await tick();
-  expect(screen.getByRole('heading', { name: 'Settings' })).toBeTruthy();
-  await fireEvent.click(screen.getByRole('button', { name: 'Polski' }));
-  await vi.waitFor(() => expect(i18n.lang).toBe('pl'));
-});
-
-test('settings: service details and logo', async () => {
-  const { ctl, bridge } = await setupCtl('empty');
-  render(App, { props: { ctl } });
-  await fireEvent.click(screen.getByRole('button', { name: 'Ustawienia' }));
-  const name = await screen.findByLabelText('Nazwa serwisu');
-  await fireEvent.input(name, { target: { value: 'Serwis Ząb' } });
-  await fireEvent.input(screen.getByLabelText('Telefon serwisu'), { target: { value: '600 000 000' } });
-  await fireEvent.click(screen.getByRole('button', { name: 'Wybierz logo…' }));
-  await vi.waitFor(() => expect((screen.getByLabelText('Logo') as HTMLInputElement).value)
-    .toBe('D:\\AdMeNot\\logo.png'));
-  await fireEvent.click(screen.getByRole('button', { name: 'Zapisz dane serwisu' }));
-  expect(bridge.calls.at(-1)).toEqual({ method: 'save_service', args: [{
-    name: 'Serwis Ząb', address: null, phone: '600 000 000', logo: 'D:\\AdMeNot\\logo.png' }] });
-  expect(await screen.findByText(/Zapisano/)).toBeTruthy();
-});
-
-test('screen view setting and adb source', async () => {
-  const { s, bridge } = await renderWith(Settings, 'empty');
-  const toggle = screen.getByRole('checkbox', { name: 'Otwieraj podgląd ekranu po podłączeniu telefonu' });
-  await fireEvent.click(toggle);
-  await flush();
-  expect(s.settings.mirror_auto).toBe(true);
-  expect(bridge.calls.some((c) => c.method === 'save_settings' && (c.args[0] as { mirror_auto?: boolean }).mirror_auto === true)).toBe(true);
-  await fireEvent.click(screen.getByRole('button', { name: 'Sprawdź' }));
-  await flush();
-  expect(screen.getByText(/· dołączony$/)).toBeTruthy();
-});
-
-test('action when an app is selected', async () => {
-  const { s, bridge } = await renderWith(Settings, 'empty');
-  const group = screen.getByRole('group', { name: 'Akcja po zaznaczeniu' });
-  expect(within(group).getByRole('button', { name: 'Wycisz' }).getAttribute('aria-pressed')).toBe('true');
-  await fireEvent.click(within(group).getByRole('button', { name: 'Wyłącz' }));
-  await flush();
-  expect(s.settings.select_level).toBe('disable');
-  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ select_level: 'disable' }] });
-});
-
-test('APK analysis after the scan: “always by hand” is saved', async () => {
-  const { s, bridge } = await renderWith(Settings, 'empty');
-  const group = screen.getByRole('group', { name: 'Analiza APK po skanie' });
-  expect(within(group).getByRole('button', { name: 'Zawsze pełna' }).getAttribute('aria-pressed')).toBe('true');
-  await fireEvent.click(within(group).getByRole('button', { name: 'Zawsze ręcznie' }));
-  await flush();
-  expect(s.settings.apk_mode_default).toBe('manual');
-  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ apk_mode_default: 'manual' }] });
-});
-
-test('settings: APK cache limit, status, clear after repair and clear now', async () => {
-  const { ctl, bridge } = await setupCtl('empty');
-  render(App, { props: { ctl } });
-  await fireEvent.click(screen.getByRole('button', { name: 'Ustawienia' }));
-  expect(await screen.findByText(/Zajęte: 3,4 GB · limit 10 GB · teraz zmieści się 5,4 GB/)).toBeTruthy();
-  const limit = screen.getByLabelText('Limit (GB)');
-  await fireEvent.input(limit, { target: { value: '200' } });
-  await fireEvent.click(screen.getByRole('button', { name: 'Zapisz limit' }));
-  expect(await screen.findByText(/Limit nie może być większy niż dysk/)).toBeTruthy();
-  await fireEvent.input(limit, { target: { value: '5' } });
-  await fireEvent.click(screen.getByRole('button', { name: 'Zapisz limit' }));
-  await vi.waitFor(() => expect(bridge.calls).toContainEqual({ method: 'save_settings', args: [{ apk_cache_limit_gb: 5 }] }));
-  await fireEvent.click(screen.getByLabelText('Po zakończonej naprawie usuń pamięć podręczną APK'));
-  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ apk_cache_clear_after_repair: true }] });
-  await fireEvent.click(screen.getByRole('button', { name: 'Wyczyść teraz' }));
-  expect(await screen.findByText(/Usunięto 3,4 GB/)).toBeTruthy();
-});
-
-test('automatic update checks can be turned off', async () => {
-  const { bridge } = await renderWith(Settings, 'empty');
-  const box = screen.getByRole('checkbox', { name: 'Sprawdzaj aktualizacje automatycznie' });
-  expect((box as HTMLInputElement).checked).toBe(true);
-  await fireEvent.click(box);
-  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ check_updates: false }] });
-  expect(screen.getByText(/nie dowie się o nowej ani o wycofanej wersji/)).toBeTruthy();
-});
-
-test('prywatność: zgoda pokazuje ID, wyłączenie pokazuje oczekujące usunięcie', async () => {
-  const { bridge } = await renderWith(Settings, 'empty');
-  await fireEvent.click(screen.getByLabelText(/Wysyłaj anonimowe statystyki użycia/));
-  await screen.findByText('3f2a9c1e-5b7d-4e8f-9a0b-1c2d3e4f5a6b');
-  await fireEvent.click(screen.getByLabelText(/Wysyłaj anonimowe statystyki użycia/));
-  await screen.findByText('Usuwanie danych z serwera czeka na połączenie z internetem.');
-  expect(screen.queryByText('3f2a9c1e-5b7d-4e8f-9a0b-1c2d3e4f5a6b')).toBeNull();
-  expect(bridge.calls.filter((c) => c.method === 'set_telemetry').map((c) => c.args)).toEqual([[true, false], [false, false]]);
-});
-
-test('„Pokaż ostrzeżenie” otwiera treść ostrzeżenia', async () => {
-  await renderWith(Settings, 'empty');
-  await fireEvent.click(screen.getByRole('button', { name: 'Pokaż ostrzeżenie' }));
-  await screen.findByText('AdMeNot jest w wersji beta i może zawierać błędy.');
-});
-
-test('prywatność: nieudany zapis zgody nie zostawia zaznaczonego pola', async () => {
-  const { bridge } = await renderWith(Settings, 'empty');
-  bridge.failNext('set_telemetry', 'internal');
-  const box = screen.getByLabelText(/Wysyłaj anonimowe statystyki użycia/) as HTMLInputElement;
-  await fireEvent.click(box);
-  await vi.waitFor(() => expect(bridge.calls.some((c) => c.method === 'set_telemetry')).toBe(true));
-  await vi.waitFor(() => expect(box.checked).toBe(false));
-});
-
-test('wsparcie: przycisk otwiera stronę, przełącznik zapisuje i wraca po błędzie', async () => {
-  const { bridge, s } = await renderWith(Settings, 'empty');
-  await fireEvent.click(screen.getByRole('button', { name: 'Wesprzyj projekt' }));
-  await vi.waitFor(() => expect(bridge.calls.at(-1)).toEqual({ method: 'open_donate', args: [] }));
-  const box = screen.getByLabelText('Przypominaj o wsparciu') as HTMLInputElement;
-  expect(box.checked).toBe(true);
-  await fireEvent.click(box);
-  await vi.waitFor(() => expect(s.settings.donate_reminders).toBe(false));
-  expect(box.checked).toBe(false);
-  bridge.failNext('set_donate_reminders', 'internal');
-  await fireEvent.click(box);
-  await vi.waitFor(() => expect(bridge.calls.at(-1)?.method).toBe('set_donate_reminders'));
-  await vi.waitFor(() => expect(box.checked).toBe(false));
 });

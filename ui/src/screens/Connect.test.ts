@@ -338,5 +338,6 @@ describe('Connect', () => {
     await tick();
     await fireEvent.click(screen.getByRole('button', { name: 'Otwórz ustawienia' }));
     expect(s.screen).toBe('settings');
+    expect(s.settingsCategory).toBe('program');
   });
 });

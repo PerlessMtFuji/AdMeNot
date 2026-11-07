@@ -58,6 +58,9 @@
   import ScanLine from '@lucide/svelte/icons/scan-line';
   import Upload from '@lucide/svelte/icons/upload';
   import WifiOff from '@lucide/svelte/icons/wifi-off';
+  import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
+  import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+  import Wrench from '@lucide/svelte/icons/wrench';
 
   export const ICONS = {
     megaphone: Megaphone, 'bell-ring': BellRing, lock: Lock, 'lock-open': LockOpen, eye: Eye,
@@ -71,6 +74,7 @@
     'folder-lock': FolderLock, 'folder-open': FolderOpen, 'hard-drive': HardDrive, image: ImageIcon,
     'layout-grid': LayoutGrid, list: List, 'message-circle': MessageCircle, music: Music, package: Package, play: Play,
     'scan-line': ScanLine, 'chevron-left': ChevronLeft, 'map-pin': MapPin, 'rotate-cw': RotateCw, 'skip-forward': SkipForward, upload: Upload, 'wifi-off': WifiOff,
+    'arrow-left-right': ArrowLeftRight, 'sliders-horizontal': SlidersHorizontal, wrench: Wrench,
   } as const;
   export type IconName = keyof typeof ICONS;
 </script>

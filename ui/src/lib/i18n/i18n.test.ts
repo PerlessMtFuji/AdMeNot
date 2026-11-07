@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { FILTERS } from '../explorer/logic';
+import { CATEGORIES } from '../../screens/settings/categories';
 import { USB_GROUPS, USB_STEPS, type UsbGroup } from '../usb';
 import en from './en.json';
 import { CRASH_ERROR_KEYS, ERROR_KEYS, i18n, LEVEL_KEYS, PLURAL_KEYS, RESTORE_ERROR_KEYS, SCAN_STAGES, t, tp, UPDATE_ERROR_KEYS } from './index.svelte';
@@ -56,6 +57,7 @@ describe('dictionaries', () => {
       ...['on', 'off'].map((v) => `explorer.peek.${v}`),
       ...['name', 'size', 'date'].map((c) => `explorer.list.${c}`),
       ...['busy', 'other_phone', 'switched'].map((n) => `explorer.notice.${n}`),
+      ...CATEGORIES.flatMap((c) => [c.labelKey, c.leadKey]),
     ];
     expect(wanted.filter((k) => !keys.has(k))).toEqual([]);
   });
