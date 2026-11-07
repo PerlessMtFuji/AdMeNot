@@ -1,11 +1,11 @@
 <script lang="ts">
   import { untrack } from 'svelte';
-  import { clock } from '../../lib/explorer/logic';
+  import { clock, formatBytes } from '../../lib/explorer/logic';
   import type { Thumb } from '../../lib/explorer/thumbs';
   import { reducedMotion } from '../../lib/motion';
   import type { EntryView } from '../../lib/types';
   import Icon from '../../ui/Icon.svelte';
-  import { t } from '../../lib/i18n/index.svelte';
+  import { i18n, t } from '../../lib/i18n/index.svelte';
   import FileIcon, { mediaGradient } from './FileIcon.svelte';
 
   type Props = {
@@ -30,6 +30,8 @@
   const delay = $derived(thumb && cascadeAt !== null ? Math.max(0, Math.round(cascadeAt - performance.now())) : 0);
   const tint = $derived(thumb?.color || mediaGradient(entry.type));
   const glow = $derived(thumb?.color || 'var(--glow-accent)');
+  // Rozmiar jak w widoku listy; plik pod kłódką ma z `stat` rozmiar dowiązania, nie celu — bez rozmiaru.
+  const size = $derived(entry.kind === 'file' && !entry.locked ? formatBytes(entry.size, i18n.lang) : null);
 </script>
 
 <!-- Zaznaczony kafel kurczy się lekko w ramce akcentu, z poświatą w kolorze zdjęcia. -->
@@ -48,8 +50,15 @@
         <span data-folder-stats class="w-full truncate text-center text-[10.5px] text-mut tabular-nums" title={folder?.hint || undefined}>
           {folder ? (folder.size === '—' ? folder.files : `${folder.files} · ${folder.size}`) : t('explorer.folder_stats.counting')}
         </span>
+      {:else if size}
+        <span data-file-size class="w-full truncate text-center text-[10.5px] text-mut tabular-nums">{size}</span>
       {/if}
     </div>
+  {/if}
+  {#if size && !noThumb}
+    <span data-file-size class="absolute right-2 bottom-1.5 text-2xs font-bold text-white tabular-nums [text-shadow:0_1px_2px_rgb(0_0_0/.6)]">
+      {size}
+    </span>
   {/if}
   {#if (entry.type === 'video' || entry.type === 'audio') && !noThumb}
     <span class="absolute inset-0 grid place-items-center text-white">

@@ -164,6 +164,28 @@ describe('Thumb', () => {
     expect(live.container.textContent).not.toMatch(/Infinity|NaN/);
   });
 
+  test('a file tile without a thumbnail shows its size under the name; a folder keeps its stats', () => {
+    const doc = { ...photos(1)[0], name: 'umowa.pdf', type: 'doc' as const, ext: 'pdf', size: 1536, thumb: null };
+    const { container, unmount } = render(Thumb, { props: { ...props, entry: doc, noThumb: true, thumb: null } });
+    expect(container.querySelector('[data-file-size]')?.textContent?.trim()).toBe('1,5 KB');
+    unmount();
+    const dir = { ...doc, name: 'Movies', kind: 'dir' as const, type: 'other' as const, ext: '', size: 4096 };
+    const folder = render(Thumb, { props: { ...props, entry: dir, noThumb: true, thumb: null,
+      folder: { files: '3 pliki', size: '1,2 GB', hint: '' } } });
+    expect(folder.container.querySelector('[data-file-size]')).toBeNull();
+    expect(folder.container.querySelector('[data-folder-stats]')?.textContent?.trim()).toBe('3 pliki · 1,2 GB');
+  });
+
+  test('a photo or video thumbnail carries a small size badge', () => {
+    const photo = { ...photos(1)[0], size: 2.5 * 1024 ** 2 };
+    const { container, unmount } = render(Thumb, { props: { ...props, entry: photo, thumb: { src: 'blob:1', color: '' } } });
+    expect(container.querySelector('[data-file-size]')?.textContent?.trim()).toBe('2,5 MB');
+    unmount();
+    const clip = render(Thumb, { props: { ...props, entry: { ...video, size: 310 * 1024 }, thumb: { src: 'blob:1', color: '#000000', duration: 42.4 } } });
+    expect(clip.container.querySelector('[data-file-size]')?.textContent?.trim()).toBe('310 KB');
+    expect(clip.container.textContent).toContain('0:42');
+  });
+
   test('an image that cannot be decoded reports itself (falls back to the icon)', async () => {
     const onbroken = vi.fn();
     const { container } = render(Thumb, { props: { ...props, entry: photos(1)[0], onbroken, thumb: { src: 'blob:1', color: '' } } });
