@@ -58,6 +58,13 @@ describe('PeekTimer', () => {
     vi.advanceTimersByTime(1); expect(show).toHaveBeenLastCalledWith('b');
   });
 
+  it('dwa razy hold(false) nie zostawia drugiego licznika', () => {
+    t.hover('a'); t.hold(true);
+    t.hold(false); t.hold(false);
+    vi.advanceTimersByTime(1000);
+    expect(show).toHaveBeenCalledTimes(1);
+  });
+
   it('hold nie otwiera ponownie pliku zamkniętego przez dismiss', () => {
     t.hover('a'); vi.advanceTimersByTime(300); show.mockClear();
     t.dismiss(); t.hold(true); t.hold(false);

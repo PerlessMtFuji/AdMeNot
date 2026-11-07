@@ -76,6 +76,15 @@ describe('MusicHold', () => {
     expect(music.play).not.toHaveBeenCalled();
   });
 
+  it('forget w czasie oczekiwania porzuca wznowienie', () => {
+    hold.take();
+    hold.release();
+    vi.advanceTimersByTime(100);
+    hold.forget();
+    vi.advanceTimersByTime(RESUME_WAIT_MS);
+    expect(music.play).toHaveBeenCalledTimes(0);
+  });
+
   it('forget porzuca wznowienie', () => {
     hold.take();
     hold.forget();

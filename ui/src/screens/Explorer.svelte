@@ -9,6 +9,7 @@
   import Menu from '../components/explorer/Menu.svelte';
   import MiniPlayer from '../components/explorer/MiniPlayer.svelte';
   import NewDialog from '../components/explorer/NewDialog.svelte';
+  import PeekBubble from '../components/explorer/PeekBubble.svelte';
   import Preview from '../components/explorer/Preview.svelte';
   import ProblemsDialog from '../components/explorer/ProblemsDialog.svelte';
   import SelectionBar from '../components/explorer/SelectionBar.svelte';
@@ -295,4 +296,5 @@
     onsubmit={(name, text) => (creating === 'folder' ? ex.newFolder(name) : ex.newText(name, text))} />
 {/if}
 {#if s.preview !== null}<Preview {ex} {thumbs} />{/if}
+<PeekBubble {ex} {thumbs} />
 {#if s.problems}<ProblemsDialog {ex} problems={s.problems} />{/if}

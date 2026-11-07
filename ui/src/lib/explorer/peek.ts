@@ -99,6 +99,7 @@ export class PeekTimer {
   }
 
   hold(on: boolean): void {
+    if (on === this.held) return;  // drugie puszczenie założyłoby drugi licznik, którego nikt już nie skasuje
     this.held = on;
     if (on) {
       this.close();

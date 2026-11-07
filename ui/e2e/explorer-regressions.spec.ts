@@ -139,6 +139,134 @@ for (const view of ['grid', 'list']) {
   });
 }
 
+for (const view of ['grid', 'list']) {
+  test.describe(`hover preview in ${view}`, () => {
+    const one = (page: import('@playwright/test').Page, name: string) => page.locator(`[data-path="/sdcard/peek/${name}"]`);
+    async function openFiles(page: import('@playwright/test').Page, errors: string[]) {
+      page.on('pageerror', (e) => errors.push(e.message));
+      await page.goto('/?scenario=explorer');
+      await page.getByRole('button', { name: 'Pliki', exact: true }).click();
+      await page.getByRole('button', { name: view === 'grid' ? 'Siatka' : 'Lista', exact: true }).click();
+      await page.evaluate(() => {
+        const ex = (window as any).__admenot.ctl.explorer;
+        const file = (name: string, type: string, ext: string, url: string | null) => ({ ...ex.state.entries[0], kind: 'file', label: null,
+          path: `/sdcard/peek/${name}`, name, type, ext, url, thumb: null, size: 2048 });
+        ex.state.entries = [
+          file('pierwszy.txt', 'text', 'txt', null), file('drugi.txt', 'text', 'txt', null),
+          file('search.pdf', 'doc', 'pdf', 'http://127.0.0.1:4173/peek-search.pdf'),
+          file('zdjecie.png', 'image', 'png', 'http://127.0.0.1:4173/peek.png'),
+          file('zepsute.png', 'image', 'png', 'http://127.0.0.1:4173/peek-404.png'),
+        ];
+      });
+    }
+
+    test('stays in the window, swaps at once, the wheel closes it, a click still selects', async ({ page }) => {
+      const errors: string[] = [];
+      await openFiles(page, errors);
+      const peek = page.getByTestId('peek');
+      await one(page, 'pierwszy.txt').hover();
+      await expect(peek).toBeVisible();
+      await expect(peek).toContainText('pierwszy.txt');
+      await expect(peek.locator('pre')).toContainText('Przykładowy tekst');
+      const box = (await peek.boundingBox())!;
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.y).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(1280);
+      expect(box.y + box.height).toBeLessThanOrEqual(800);
+
+      await one(page, 'drugi.txt').hover();
+      await expect(peek).toContainText('drugi.txt', { timeout: 200 });  // w przejeździe bez opóźnienia
+
+      await page.mouse.wheel(0, 40);
+      await expect(peek).toHaveCount(0);
+      await expect(peek).toBeVisible();  // cisza i zwykłe opóźnienie: plik pod kursorem wraca
+
+      await one(page, 'drugi.txt').click();
+      await expect(peek).toHaveCount(0);
+      expect(await page.evaluate(() => (window as any).__admenot.ctl.explorer.state.selected.has('/sdcard/peek/drugi.txt'))).toBe(true);
+      expect(errors).toEqual([]);
+    });
+
+    test('PDF and photo show their content; an unreadable file closes silently', async ({ page }) => {
+      const errors: string[] = [];
+      await page.route('http://127.0.0.1:4173/peek-search.pdf', route => route.fulfill({
+        body: readFileSync(new URL('./fixtures/search.pdf', import.meta.url)),
+        contentType: 'application/pdf', headers: { 'Access-Control-Allow-Origin': '*' },
+      }));
+      await page.route('http://127.0.0.1:4173/peek.png', route => route.fulfill({
+        body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64'),
+        contentType: 'image/png', headers: { 'Access-Control-Allow-Origin': '*' },
+      }));
+      await page.route('http://127.0.0.1:4173/peek-404.png', route => route.fulfill({ status: 404, body: '' }));
+      await openFiles(page, errors);
+      const peek = page.getByTestId('peek');
+
+      await one(page, 'search.pdf').hover();
+      await expect(peek.locator('canvas')).toBeVisible();
+      await expect(peek.locator('[data-peek-icon]')).toHaveCount(0, { timeout: 10_000 });
+      expect(await peek.locator('canvas').evaluate((c: HTMLCanvasElement) => c.width)).toBeGreaterThan(300);
+
+      await one(page, 'zdjecie.png').hover();
+      await expect(peek.locator('img')).toHaveCount(1);
+      await expect(peek.locator('img')).not.toHaveClass(/opacity-0/);
+
+      await one(page, 'zepsute.png').hover();
+      await expect(peek).toHaveCount(0);
+      await expect(page.getByRole('alert')).toHaveCount(0);
+      expect(await page.evaluate(() => (window as any).__admenot.ctl.explorer.state.error)).toBeNull();
+      expect(errors).toEqual([]);
+    });
+  });
+}
+
+test('hover preview: a video plays with sound, leaving frees it, nothing keeps animating', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.goto('/?scenario=explorer');
+  await page.getByRole('button', { name: 'Pliki', exact: true }).click();
+  await page.evaluate(async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 160;
+    canvas.height = 120;
+    const stream = canvas.captureStream(10);
+    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = (event) => chunks.push(event.data);
+    const recorded = new Promise<Blob>((resolve) => { recorder.onstop = () => resolve(new Blob(chunks, { type: 'video/webm' })); });
+    recorder.start();
+    const ctx = canvas.getContext('2d')!;
+    for (let i = 0; i < 12; i++) {
+      ctx.fillStyle = i % 2 ? '#222' : '#ddd';
+      ctx.fillRect(0, 0, 160, 120);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    recorder.stop();
+    const url = URL.createObjectURL(await recorded);
+    stream.getTracks().forEach((track) => track.stop());
+    const ex = (window as any).__admenot.ctl.explorer;
+    ex.state.entries = [{ ...ex.state.entries[0], kind: 'file', label: null, path: '/sdcard/peek/film.webm', name: 'film.webm',
+      type: 'video', ext: 'webm', url, thumb: null }];
+  });
+  await page.locator('[data-path="/sdcard/peek/film.webm"]').hover();
+  const peek = page.getByTestId('peek');
+  const video = peek.locator('video');
+  await expect(video).toBeVisible();
+  await expect.poll(() => video.evaluate((el: HTMLVideoElement) => el.currentTime)).toBeGreaterThan(0);
+  expect(await video.evaluate((el: HTMLVideoElement) => el.muted)).toBe(false);
+  await page.waitForTimeout(250);  // wejście dymka minęło
+  const endless = await peek.evaluate((el) => el.getAnimations({ subtree: true })
+    .filter((a) => a.effect?.getComputedTiming().iterations === Infinity).length);
+  expect(endless).toBe(0);
+  expect(await peek.evaluate((el) => getComputedStyle(el).backdropFilter)).toBe('none');
+
+  await video.evaluate((el) => { (window as any).__peekVideo = el; });
+  await page.mouse.move(2, 2);
+  await expect(peek).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).__peekVideo.hasAttribute('src'))).toBe(false);
+  expect(errors).toEqual([]);
+});
+
 test('explorer: picker and drop upload paths render tasks without JavaScript errors', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
