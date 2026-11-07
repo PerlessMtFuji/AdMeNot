@@ -608,7 +608,7 @@
     "cache_clear_now": "Clear now",
     "cache_cleared": "Removed {gb} GB.",
     "search": "Search settings…",
-    "no_results": "No setting matches your search.",
+    "no_results": "Nothing found",
     "categories": "Settings categories",
     "service_missing": "Service name missing",
     "cat": { "general": "General", "repair": "Repair", "transfer": "Data transfer", "explorer": "File explorer",

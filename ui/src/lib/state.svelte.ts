@@ -81,6 +81,8 @@ export class AppState {
   settingsLoaded = $state(false);  // ekran powitalny dopiero po odczycie ustawień
   /** Ostatnio otwarta kategoria Ustawień — pamiętana do zamknięcia okna. */
   settingsCategory = $state<SettingsCategory>('general');
+  /** Rośnie przy każdym `openSettings(kategoria)` — ekran kończy wtedy wyszukiwanie, także gdy kategoria się nie zmienia. */
+  settingsOpened = $state(0);
   /** Chwila (Date.now()) ostatniego udanego zapisu ustawień; 0 = jeszcze nic. Ekran pokazuje wtedy „✓ Zapisano”. */
   settingsSaved = $state(0);
   /** Dane serwisu bez nazwy — kropka przy kategorii „Serwis i protokoły”. */

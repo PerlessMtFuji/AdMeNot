@@ -9,6 +9,7 @@ import Settings from './settings/Settings.svelte';
 // Kategorie z wierszami do wyszukiwania; pozostałe zostają zaślepkami (wypełniają je kolejne zadania).
 vi.mock('./settings/General.svelte', async () => ({ default: (await import('./settings/GeneralRows.test.svelte')).default }));
 vi.mock('./settings/Program.svelte', async () => ({ default: (await import('./settings/ProgramRows.test.svelte')).default }));
+vi.mock('./settings/Repair.svelte', async () => ({ default: (await import('./settings/AsyncRows.test.svelte')).default }));
 
 const NAMES = ['Ogólne', 'Naprawa', 'Przenoszenie danych', 'Eksplorator plików', 'Serwis i protokoły',
   'Prywatność i dane', 'Program'];
@@ -64,12 +65,34 @@ test('search shows matching rows under their category name, no hits shows one li
   const shown = [...container.querySelectorAll('[data-settings-section]')].filter((e) => !(e as HTMLElement).hidden);
   expect(shown.map((e) => e.getAttribute('data-settings-section'))).toEqual(['general']);
   await search('zzz');
-  expect(screen.getByText('Żadne ustawienie nie pasuje do wyszukiwania.')).toBeTruthy();
+  expect(screen.getByText('Nic nie znaleziono')).toBeTruthy();
   await fireEvent.keyDown(input, { key: 'Escape' });
   await tick();
   expect(input.value).toBe('');
-  expect(screen.queryByText('Żadne ustawienie nie pasuje do wyszukiwania.')).toBeNull();
+  expect(screen.queryByText('Nic nie znaleziono')).toBeNull();
   expect(screen.getByRole('heading', { level: 2, name: 'Ogólne' })).toBeTruthy();
+});
+
+test('a matching row that appears after an async load shows its category without another keystroke', async () => {
+  const { container } = await renderWith(Settings);
+  await search('limit');
+  const repair = () => container.querySelector('[data-settings-section="repair"]') as HTMLElement;
+  await vi.waitFor(() => expect(repair().hidden).toBe(false));
+  expect(within(repair()).getByRole('heading', { level: 2, name: 'Naprawa' })).toBeTruthy();
+  expect(screen.queryByText('Nic nie znaleziono')).toBeNull();
+});
+
+test('openSettings(current category) ends an ongoing search', async () => {
+  const { ctl } = await renderWith(Settings);
+  ctl.openSettings('program');
+  await tick();
+  const input = await search('adb');
+  expect(screen.queryByRole('heading', { level: 2, name: 'Program' })).toBeTruthy(); // nagłówek sekcji wyników
+  expect(screen.queryByText('Wersja, aktualizacje i narzędzia dla zaawansowanych.')).toBeNull();
+  ctl.openSettings('program');
+  await tick();
+  expect(input.value).toBe('');
+  expect(screen.getByText('Wersja, aktualizacje i narzędzia dla zaawansowanych.')).toBeTruthy();
 });
 
 test('„Zapisano” bubble after a successful save, gone after 2 s; not after a failed one', async () => {

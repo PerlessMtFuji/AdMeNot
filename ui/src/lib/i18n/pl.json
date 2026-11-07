@@ -608,7 +608,7 @@
     "cache_clear_now": "Wyczyść teraz",
     "cache_cleared": "Usunięto {gb} GB.",
     "search": "Szukaj ustawienia…",
-    "no_results": "Żadne ustawienie nie pasuje do wyszukiwania.",
+    "no_results": "Nic nie znaleziono",
     "categories": "Kategorie ustawień",
     "service_missing": "Brak nazwy serwisu",
     "cat": { "general": "Ogólne", "repair": "Naprawa", "transfer": "Przenoszenie danych", "explorer": "Eksplorator plików",

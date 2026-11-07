@@ -18,17 +18,30 @@
       .filter((row) => !row.closest<HTMLElement>('[data-setting-group]')?.hidden).length;
   }
 
+  function check(root: HTMLElement): void {
+    hits = visibleRows(root) > 0;
+    onhits(category.id, hits);
+  }
+
   $effect(() => {
     const q = search.query;
     const root = el;
     if (!root) return;
     let live = true;
     tick().then(() => {
-      if (!live || q !== search.query) return;
-      hits = visibleRows(root) > 0;
-      onhits(category.id, hits);
+      if (live && q === search.query) check(root);
     });
     return () => { live = false; };
+  });
+
+  // Wiersze kategorii mogą dojść później (dane wczytywane po zamontowaniu, np. `{#if cache}`):
+  // każda zmiana treści albo widoczności w sekcji sprawdza trafienia od nowa, bez czekania na kolejny znak.
+  $effect(() => {
+    const root = el;
+    if (!root) return;
+    const observer = new MutationObserver(() => check(root));
+    observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+    return () => observer.disconnect();
   });
 </script>
 

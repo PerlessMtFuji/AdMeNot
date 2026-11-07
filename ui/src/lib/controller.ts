@@ -1218,7 +1218,10 @@ export class Controller {
 
   /** Bez argumentu: ostatnia kategoria z tej sesji okna (na start „Ogólne”). */
   openSettings(category?: SettingsCategory): void {
-    if (category) this.state.settingsCategory = category;
+    if (category) {
+      this.state.settingsCategory = category;
+      this.state.settingsOpened += 1;
+    }
     this.state.screen = 'settings';
   }
 

@@ -37,9 +37,10 @@
     if (!searching) untrack(() => hits.clear());
   });
 
-  // Zmiana kategorii (klik albo `openSettings(kategoria)`) kończy wyszukiwanie.
+  // Zmiana kategorii albo `openSettings(kategoria)` (także tej samej) kończy wyszukiwanie.
   $effect(() => {
     void s.settingsCategory;
+    void s.settingsOpened;
     untrack(() => { search.query = ''; });
   });
 
