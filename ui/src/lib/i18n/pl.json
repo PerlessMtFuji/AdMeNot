@@ -493,7 +493,7 @@
     "copied": "Skopiowano",
     "id_hint": "Podaj go w mailu, jeśli chcesz usunięcia danych. Wyłączenie statystyk usuwa dane z serwera.",
     "delete_pending": "Usuwanie danych z serwera czeka na połączenie z internetem.",
-    "show_warning": "Pokaż ostrzeżenie"
+    "show_warning": "Pokaż ostrzeżenie o ryzyku"
   },
   "donate": {
     "title": "Wesprzyj projekt",
@@ -630,6 +630,7 @@
     "transfer_apps": "Zaznaczaj aplikacje do przeniesienia", "transfer_apps_hint": "Podejrzane aplikacje nigdy nie są zaznaczone",
     "verify": "Sprawdzaj bajt po bajcie", "verify_hint": "Wolniej, ale wykrywa uszkodzone pliki. Dotyczy też kopiowania w eksploratorze.",
     "verify_same_hint": "To samo ustawienie co w „Przenoszeniu danych”",
+    "group_customer_data": "Dane klientów", "group_stats": "Statystyki",
     "group_explorer_view": "Wyświetlanie", "group_explorer_copy": "Kopiowanie na komputer", "group_explorer_history": "Historia",
     "explorer_view": "Widok", "explorer_view_hint": "Automatyczny: siatka w folderach ze zdjęciami, lista w pozostałych",
     "view_auto": "Automatyczny", "view_list": "Lista", "view_grid": "Siatka",

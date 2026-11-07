@@ -499,3 +499,82 @@ test('Serwis: the form is a two-column grid with each field still its own row', 
     'service_website', 'service_technician', 'service_logo', 'service_footer']);
   expect(grid.querySelector('[data-setting-id="service_address"]')?.className).toContain('col-span-2');
 });
+
+const PRIVACY_ID = '3f2a9c1e-5b7d-4e8f-9a0b-1c2d3e4f5a6b';
+
+test('Prywatność: retention list has „nie usuwaj” and 30…365 and saves at once', async () => {
+  const { s, bridge } = await renderWith(Settings, 'empty');
+  await open('Prywatność i dane');
+  const select = screen.getByRole('combobox', { name: 'Usuwaj zlecenia starsze niż' }) as HTMLSelectElement;
+  expect([...select.options].map((o) => o.textContent?.trim())).toEqual(
+    ['nie usuwaj', '30 dni', '60 dni', '90 dni', '180 dni', '365 dni']);
+  expect(select.value).toBe('60');
+  await fireEvent.change(select, { target: { value: '' } });
+  await vi.waitFor(() => expect(s.settings.retention_days).toBeNull());
+  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ retention_days: null }] });
+  await fireEvent.change(select, { target: { value: '365' } });
+  await vi.waitFor(() => expect(s.settings.retention_days).toBe(365));
+  expect(screen.queryByText(/Miejsce na dysku/)).toBeNull();
+});
+
+test('Prywatność: consent shows the ID, withdrawing shows the pending deletion; packages row follows', async () => {
+  const { bridge } = await renderWith(Settings, 'empty');
+  await open('Prywatność i dane');
+  const stats = screen.getByRole('switch', { name: 'Wysyłaj anonimowe statystyki użycia' });
+  const pkgs = screen.getByRole('switch', { name: /Dołącz nazwy pakietów/ }) as HTMLButtonElement;
+  expect(pkgs.disabled).toBe(true);
+  expect(pkgs.closest('[data-setting-id]')?.className).toContain('bg-surface-2');
+  await fireEvent.click(stats);
+  await screen.findByText(PRIVACY_ID);
+  expect(pkgs.disabled).toBe(false);
+  await fireEvent.click(stats);
+  await screen.findByText('Usuwanie danych z serwera czeka na połączenie z internetem.');
+  expect(screen.queryByText(PRIVACY_ID)).toBeNull();
+  expect(bridge.calls.filter((c) => c.method === 'set_telemetry').map((c) => c.args)).toEqual([[true, false], [false, false]]);
+});
+
+test('Prywatność: a failed consent save puts the switch back', async () => {
+  const { bridge } = await renderWith(Settings, 'empty');
+  await open('Prywatność i dane');
+  bridge.failNext('set_telemetry', 'internal');
+  const stats = screen.getByRole('switch', { name: 'Wysyłaj anonimowe statystyki użycia' });
+  await fireEvent.click(stats);
+  await vi.waitFor(() => expect(bridge.calls.some((c) => c.method === 'set_telemetry')).toBe(true));
+  await vi.waitFor(() => expect(stats.getAttribute('aria-checked')).toBe('false'));
+});
+
+test('Prywatność: Skopiuj copies the ID; a refused clipboard raises no unhandled rejection', async () => {
+  const { s } = await renderWith(Settings, 'empty');
+  s.settings.telemetry = true;
+  s.settings.telemetry_id = PRIVACY_ID;
+  await open('Prywatność i dane');
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+  await fireEvent.click(screen.getByRole('button', { name: 'Skopiuj' }));
+  expect(writeText).toHaveBeenCalledWith(PRIVACY_ID);
+  await screen.findByText('Skopiowano');
+  const seen = vi.fn();
+  window.addEventListener('unhandledrejection', seen);
+  vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText: () => Promise.reject(new Error('denied')) } });
+  await fireEvent.click(screen.getByRole('button', { name: 'Skopiuj' }));
+  await new Promise((r) => setTimeout(r, 20));
+  window.removeEventListener('unhandledrejection', seen);
+  vi.unstubAllGlobals();
+  expect(seen).not.toHaveBeenCalled();
+});
+
+test('Prywatność: the delete-pending notice is a banner shown only while pending', async () => {
+  const { s } = await renderWith(Settings, 'empty');
+  await open('Prywatność i dane');
+  expect(screen.queryByText('Usuwanie danych z serwera czeka na połączenie z internetem.')).toBeNull();
+  s.settings.telemetry_delete_pending = true;
+  await tick();
+  expect(screen.getByText('Usuwanie danych z serwera czeka na połączenie z internetem.')).toBeTruthy();
+});
+
+test('Prywatność: „Pokaż ostrzeżenie o ryzyku” opens the warning dialog', async () => {
+  await renderWith(Settings, 'empty');
+  await open('Prywatność i dane');
+  await fireEvent.click(screen.getByRole('button', { name: 'Pokaż ostrzeżenie o ryzyku' }));
+  await screen.findByText('AdMeNot jest w wersji beta i może zawierać błędy.');
+});

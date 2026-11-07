@@ -493,7 +493,7 @@
     "copied": "Copied",
     "id_hint": "Include it in an email if you want your data deleted. Turning statistics off deletes the data from the server.",
     "delete_pending": "Deleting data from the server is waiting for an internet connection.",
-    "show_warning": "Show warning"
+    "show_warning": "Show risk warning"
   },
   "donate": {
     "title": "Support the project",
@@ -630,6 +630,7 @@
     "transfer_apps": "Preselect apps to transfer", "transfer_apps_hint": "Suspicious apps are never preselected",
     "verify": "Verify byte by byte", "verify_hint": "Slower, but detects damaged files. Also applies to copying in the file explorer.",
     "verify_same_hint": "The same setting as in \"Data transfer\"",
+    "group_customer_data": "Customer data", "group_stats": "Statistics",
     "group_explorer_view": "Display", "group_explorer_copy": "Copying to the computer", "group_explorer_history": "History",
     "explorer_view": "View", "explorer_view_hint": "Automatic: grid in folders with photos, list elsewhere",
     "view_auto": "Automatic", "view_list": "List", "view_grid": "Grid",
