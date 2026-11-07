@@ -445,11 +445,14 @@ test('Serwis: a footer over 500 characters turns the counter red and is not save
   await tick();
   const counter = screen.getByText('501/500');
   expect(counter.className).toContain('text-bad');
+  expect(screen.getByText(/Stopka jest za długa \(maks\. 500 znaków\) — nie zapisano/)).toBeTruthy();
+  expect(document.querySelector('[data-protocol-preview]')?.textContent).not.toContain('xxxxx');
   await fireEvent.blur(footer);
   expect(saves(bridge)).toHaveLength(0);
   await fireEvent.input(footer, { target: { value: 'x'.repeat(500) } });
   await tick();
   expect(screen.getByText('500/500').className).not.toContain('text-bad');
+  expect(screen.queryByText(/Stopka jest za długa/)).toBeNull();
   await fireEvent.blur(footer);
   await vi.waitFor(() => expect(saves(bridge)).toHaveLength(1));
 });
@@ -480,4 +483,19 @@ test('Serwis: PDF folder is picked, a bad folder shows the message at the row, r
   await fireEvent.click(toggle);
   await vi.waitFor(() => expect(s.settings.report_open).toBe(false));
   expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ report_open: false }] });
+});
+
+test('Serwis: the form is a two-column grid with each field still its own row', async () => {
+  const { container } = await renderWith(Settings, 'empty');
+  await open('Serwis i protokoły');
+  const grid = (await vi.waitFor(() => {
+    const g = container.querySelector('[data-setting-id="service_nip"]')?.parentElement as HTMLElement;
+    expect(g).toBeTruthy();
+    return g;
+  }));
+  expect(grid.className).toContain('grid-cols-2');
+  const ids = [...grid.querySelectorAll(':scope > [data-setting-id]')].map((e) => e.getAttribute('data-setting-id'));
+  expect(ids).toEqual(['service_name', 'service_address', 'service_phone', 'service_email', 'service_nip',
+    'service_website', 'service_technician', 'service_logo', 'service_footer']);
+  expect(grid.querySelector('[data-setting-id="service_address"]')?.className).toContain('col-span-2');
 });

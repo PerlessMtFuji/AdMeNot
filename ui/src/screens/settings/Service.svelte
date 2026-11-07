@@ -75,28 +75,31 @@
 </script>
 
 <SettingGroup title={t('settings.service_title')}>
-  {#each FIELDS as f (f.id)}
-    <SettingRow id={f.id} label={t(f.label)} hint={f.key === 'name' ? t('settings.service_hint') : undefined} keywords={f.keywords}>
-      <input type={f.type ?? 'text'} aria-label={t(f.label)} bind:value={draft[f.key]} onblur={() => commit(f.key)}
-        class="field w-[300px] rounded-[10px] px-2.5 py-1.5 text-sm {f.key === 'name' && draft.name.trim() === '' ? 'border-warn-strong' : ''}" />
+  <div class="grid grid-cols-1 min-[900px]:grid-cols-2 min-[900px]:gap-x-2">
+    {#each FIELDS as f (f.id)}
+      <SettingRow id={f.id} label={t(f.label)} hint={f.key === 'name' ? t('settings.service_hint') : undefined}
+        keywords={f.keywords} stacked wide={f.key === 'name' || f.key === 'address'}>
+        <input type={f.type ?? 'text'} aria-label={t(f.label)} bind:value={draft[f.key]} onblur={() => commit(f.key)}
+          class="field w-full rounded-[10px] px-2.5 py-1.5 text-sm {f.key === 'name' && draft.name.trim() === '' ? 'border-warn-strong' : ''}" />
+      </SettingRow>
+    {/each}
+    <SettingRow id="service_technician" label={t('settings.service_technician')} hint={t('settings.service_technician_hint')}
+      keywords="podpis" stacked>
+      <input type="text" aria-label={t('settings.service_technician')} bind:value={draft.technician}
+        onblur={() => commit('technician')} class="field w-full rounded-[10px] px-2.5 py-1.5 text-sm" />
     </SettingRow>
-  {/each}
-  <SettingRow id="service_logo" label={t('settings.service_logo')} hint={t('settings.logo_hint')} error={logoError}>
-    <PathPicker value={logo} placeholder={t('settings.logo_none')} pick={pickLogo} onchange={saveLogo} clearable />
-  </SettingRow>
-  <SettingRow id="service_technician" label={t('settings.service_technician')} hint={t('settings.service_technician_hint')}
-    keywords="podpis">
-    <input type="text" aria-label={t('settings.service_technician')} bind:value={draft.technician}
-      onblur={() => commit('technician')} class="field w-[300px] rounded-[10px] px-2.5 py-1.5 text-sm" />
-  </SettingRow>
-  <SettingRow id="service_footer" label={t('settings.service_footer')} hint={t('settings.service_footer_hint')}
-    keywords="gwarancja">
-    <span class="flex w-[300px] flex-col items-end gap-1">
+    <SettingRow id="service_logo" label={t('settings.service_logo')} hint={t('settings.logo_hint')} error={logoError} stacked>
+      <span class="flex items-center gap-2">
+        <PathPicker value={logo} placeholder={t('settings.logo_none')} pick={pickLogo} onchange={saveLogo} clearable />
+      </span>
+    </SettingRow>
+    <SettingRow id="service_footer" label={t('settings.service_footer')} hint={t('settings.service_footer_hint')}
+      keywords="gwarancja" error={footerTooLong ? t('settings.service_footer_long') : null} stacked wide>
       <textarea rows="3" aria-label={t('settings.service_footer')} bind:value={draft.footer} onblur={() => commit('footer')}
         class="field w-full resize-y rounded-[10px] px-2.5 py-1.5 text-sm"></textarea>
-      <span class="text-xs {footerTooLong ? 'font-bold text-bad' : 'text-soft'}">{draft.footer.length}/{FOOTER_MAX}</span>
-    </span>
-  </SettingRow>
+      <span class="self-end text-xs {footerTooLong ? 'font-bold text-bad' : 'text-soft'}">{draft.footer.length}/{FOOTER_MAX}</span>
+    </SettingRow>
+  </div>
 </SettingGroup>
 
 <SettingGroup title={t('settings.group_protocols')}>
@@ -112,5 +115,5 @@
 </SettingGroup>
 
 {#if search.query.trim() === ''}
-  <ProtocolPreview info={{ ...draft, logo }} />
+  <ProtocolPreview info={{ ...draft, footer: footerTooLong ? '' : draft.footer, logo }} />
 {/if}

@@ -601,6 +601,7 @@
     "service_email": "E-mail serwisu", "service_nip": "NIP serwisu", "service_website": "Strona serwisu",
     "service_technician": "Serwisant na tym komputerze", "service_technician_hint": "Imię i nazwisko nad miejscem na podpis w protokole",
     "service_footer": "Stopka protokołu", "service_footer_hint": "Na końcu protokołu, np. warunki gwarancji. Nowe wiersze zostają zachowane.",
+    "service_footer_long": "Stopka jest za długa (maks. 500 znaków) — nie zapisano.",
     "service_name_missing": "Brak nazwy serwisu", "logo_none": "bez logo",
     "group_protocols": "Protokoły", "report_pdf_default": "katalog programu",
     "report_open": "Otwieraj protokół po utworzeniu", "report_open_hint": "Po zapisaniu protokołu otwiera się jego PDF",
