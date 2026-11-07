@@ -573,6 +573,7 @@
   "settings": {
     "apk_mode_default": "APK analysis after the scan", "apk_mode_ask": "Ask", "apk_mode_full": "Always full", "apk_mode_manual": "Always by hand",
     "appearance": "Appearance", "theme": "Theme", "theme_system": "System", "theme_light": "Light", "theme_dark": "Dark", "paths": "Programs and folders",
+    "change": "Change…", "default": "Default",
     "title": "Settings", "lang": "Language", "mode": "Default mode", "mode_simple": "Simple", "mode_expert": "Expert",
     "adb": "Path to adb.exe", "adb_hint": "Empty = adb bundled with the program (or adb from PATH without it)", "check": "Check", "adb_ok": "Works: {version}", "adb_fail": "Does not work: {message}",
     "backups": "APK backup folder", "backups_hint": "Empty = default folder in %LOCALAPPDATA%\\AdMeNot", "report_pdf": "PDF report folder", "report_pdf_hint": "Empty = the program folder. A chosen folder gets only the PDF, which stays when the order is deleted; the working HTML stays in the program.", "report_pdf_bad": "Enter a full folder path (e.g. D:\\Reports), other than the program folder.", "choose": "Choose…",
