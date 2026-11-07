@@ -752,6 +752,38 @@ describe('tryb ręczny', () => {
     expect(ctl.state.scan?.apk_mode).toBe('manual');
   });
 
+  test('pełna analiza nie błyska; analiza na żądanie błyska raz i znacznik znika po 2 s', async () => {
+    const { s, bridge } = await scanned();
+    const pkg = s.scan!.apps[0].package;
+    const flipped = () => {
+      const scan = snap(s.scan);
+      scan.apps = scan.apps.map((a: { package: string; verdict: string }) =>
+        a.package === pkg ? { ...a, verdict: a.verdict === 'safe' ? 'review' : 'safe' } : a);
+      return scan;
+    };
+    expect(s.apkScope).toBe('all');
+    bridge.emit('apk:done', { scan: flipped() });
+    expect(s.apk.changed).toEqual([]);
+
+    vi.useFakeTimers();
+    try {
+      s.apkScope = 'selected';
+      bridge.emit('apk:done', { scan: flipped() });
+      expect(s.apk.changed).toEqual([pkg]);
+      vi.advanceTimersByTime(2000);
+      expect(s.apk.changed).toEqual([]);
+
+      s.apkScope = 'all';
+      s.job = { id: 'job-deep', kind: 'deep' };
+      bridge.emit('apk:done', { scan: flipped() });
+      expect(s.apk.changed).toEqual([pkg]);
+      vi.advanceTimersByTime(2000);
+      expect(s.apk.changed).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test('apk:done w trybie częściowym nie dokleja domyślnych zaznaczeń', async () => {
     const { ctl, s, bridge } = await scanned();
     bridge.emit('apk:manual', { scan: { ...snap(s.scan), apk_mode: 'manual' } });

@@ -9,6 +9,7 @@ import type {
 } from './types';
 
 const CONSOLE_LIMIT = 500;
+const FLASH_MS = 2000;  // czas animacji `.flash` z app.css
 
 export class Controller {
   private ended = new Set<string>();
@@ -19,6 +20,7 @@ export class Controller {
   private resumeAfterScan = false;  // „Wznów” z ekranu Połącz: po odczycie telefonu kopia rusza sama
   private uiErrorSent = false;
   private rechecking = false;  // odczyt kontroli w tle: następny nie startuje, póki poprzedni trwa
+  private flashToken = 0;  // błysk zmienionych werdyktów: zdejmuje go tylko timer ostatniego apk:done
   private etaSeq = 0;  // szacunek dla zaznaczenia: liczy się tylko odpowiedź na ostatnie zapytanie
 
   /** Eksplorator plików telefonu (ekran `explorer`). */
@@ -164,7 +166,15 @@ export class Controller {
     });
     on('apk:done', (d) => {
       if (stale(d)) return;
-      const changed = changedVerdicts(s.scan?.apps ?? [], d.scan.apps);
+      // Błysk „werdykt się zmienił” tylko po analizie na żądanie (głęboka, zaznaczone): po pełnej
+      // zmienia się prawie każdy wiersz „Do sprawdzenia” i błysk niczego nie wyróżnia.
+      const onDemand = s.job?.kind === 'deep' || s.apkScope === 'selected';
+      const changed = onDemand ? changedVerdicts(s.scan?.apps ?? [], d.scan.apps) : [];
+      // Znacznik znika po jednym błysku, żeby ponowne zamontowanie wiersza go nie powtarzało.
+      const token = ++this.flashToken;
+      if (changed.length) {
+        setTimeout(() => { if (token === this.flashToken) s.apk = { ...s.apk, changed: [] }; }, FLASH_MS);
+      }
       // Tryb częściowy: werdykty spoza analizy na żądanie są ukryte — bez domyślnych zaznaczeń.
       if (!isManual(d.scan)) s.selection = mergeSelection(s.selection, d.scan.apps, s.touched);
       s.scan = d.scan;
