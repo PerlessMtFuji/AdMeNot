@@ -1410,6 +1410,22 @@ def test_changing_transfers_dir_remembers_old_root(tmp_path):
     assert (error["key"], error["message"]) == ("bad_request", "transfers_dir")
 
 
+def test_changing_transfers_dir_remembers_unplugged_old_root(tmp_path):
+    from admenot.engine.settings import load_settings
+    api, _ = _api(_phone(tmp_path))
+    usb = tmp_path / "pendrive" / "kopie"
+    usb.mkdir(parents=True)
+    api.save_settings({"transfers_dir": str(usb)})
+    copy = store.create_copy(SERIAL, _device(), None, NOW)
+    copy_id = copy.read_meta().id
+    (tmp_path / "pendrive").rename(tmp_path / "odlaczony")  # pendrive odłączony
+    api.save_settings({"transfers_dir": str(tmp_path / "nowy")})
+    assert load_settings().transfer_roots == [str(usb)]
+    assert api.transfers()["copies"] == []
+    (tmp_path / "odlaczony").rename(tmp_path / "pendrive")  # podłączony znowu
+    assert [c["id"] for c in api.transfers()["copies"]] == [copy_id]
+
+
 def test_bridge_uses_transfer_keep_days(tmp_path):
     api, _ = _api(_phone(tmp_path))
     api.save_settings({"transfer_keep_days": 30})

@@ -259,29 +259,62 @@ def _copy_dirs() -> list[CopyDir]:
     return _newest_first(found)
 
 
+RootState = Literal["copies", "empty", "missing", "unreadable"]
+
+
+def _root_state(root: Path) -> RootState:
+    """Co wiadomo o folderze kopii. `empty` tylko wtedy, gdy folder istnieje, cały dał się
+    przejrzeć i nie ma w nim katalogu kopii z `meta.json` (także nieczytelnym — takiej kopii nie
+    usuwamy, więc folderu też nie zapominamy). Błąd odczytu to `unreadable`, nie `empty`."""
+    try:
+        devices = [d for d in root.iterdir() if d.is_dir()]
+    except FileNotFoundError:
+        return "missing"
+    except OSError:  # brak dostępu, dysk sieciowy offline, „urządzenie nie jest gotowe”
+        return "unreadable"
+    try:
+        for device in devices:
+            for c in device.iterdir():
+                if _STAMP.fullmatch(c.name) and (c / META).is_file():
+                    return "copies"
+    except OSError:
+        return "unreadable"
+    return "empty"
+
+
 def root_has_copies(root: Path) -> bool:
-    """Czy w folderze leży choć jeden katalog kopii z `meta.json` (także nieczytelnym — takiej
-    kopii nie usuwamy, więc folderu też nie zapominamy)."""
-    return any(c.meta_path.is_file() for c in _root_dirs(root))
+    """Czy w folderze na pewno leży choć jeden katalog kopii z `meta.json`."""
+    return _root_state(root) == "copies"
+
+
+def _may_hold_copies(root: Path) -> bool:
+    """Przy zmianie folderu: czy poprzedni folder trzeba zapamiętać. Nie tylko gdy widać w nim
+    kopie, ale też gdy nie da się go teraz odczytać (odłączony pendrive, dysk sieciowy offline):
+    jego kopie wrócą po podłączeniu. Pomijamy tylko folder na pewno pusty oraz folder, którego
+    brak, choć jego nadrzędny folder jest dostępny (nigdy nie powstał albo go usunięto)."""
+    state = _root_state(root)
+    if state == "missing":
+        return not root.parent.is_dir()
+    return state != "empty"
 
 
 def forget_empty_roots() -> None:
-    """Usuwa z `Settings.transfer_roots` istniejące foldery bez żadnej kopii. Nieistniejący folder
-    zostaje (odłączony dysk). Pod blokadą ustawień, żeby nie zgubić folderu dopisanego właśnie
-    przy zmianie folderu kopii."""
+    """Usuwa z `Settings.transfer_roots` foldery na pewno puste (`_root_state` == `empty`).
+    Nieistniejący albo nieczytelny folder zostaje (odłączony dysk). Pod blokadą ustawień, żeby
+    nie zgubić folderu dopisanego właśnie przy zmianie folderu kopii."""
     with settings_transaction():
         roots = load_settings().transfer_roots
-        keep = [p for p in roots if not Path(p).is_dir() or root_has_copies(Path(p))]
+        keep = [p for p in roots if _root_state(Path(p)) != "empty"]
         if keep != roots:
             save_internal({"transfer_roots": keep})
 
 
 def remember_root(root: Path) -> None:
     """Po zmianie folderu kopii: dopisuje poprzedni folder `root` do `Settings.transfer_roots`, gdy
-    leżą w nim kopie (pusty nie jest potrzebny). Najpierw zapomina foldery bez kopii; przy pełnej
+    mogą w nim leżeć kopie (`_may_hold_copies`). Najpierw zapomina foldery bez kopii; przy pełnej
     liście (`TRANSFER_ROOTS_MAX`) wypada najdawniej zapamiętany."""
     with settings_transaction():
-        if _path_key(root) == _path_key(transfers_dir()) or not root_has_copies(root):
+        if _path_key(root) == _path_key(transfers_dir()) or not _may_hold_copies(root):
             return
         forget_empty_roots()
         roots = load_settings().transfer_roots

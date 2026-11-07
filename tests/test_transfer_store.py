@@ -447,3 +447,49 @@ def test_root_has_copies(tmp_path):
     _copy()
     assert store.root_has_copies(transfers_dir())
     assert not store.root_has_copies(tmp_path / "brak")
+
+
+def test_remember_root_keeps_unreachable_old_root(tmp_path):
+    from admenot.engine.settings import load_settings
+    unplugged = tmp_path / "pendrive" / "kopie"  # cały pendrive odłączony: nie ma nawet rodzica
+    _use_dir(tmp_path / "nowy")
+    store.remember_root(unplugged)
+    assert load_settings().transfer_roots == [str(unplugged)]
+    store.purge_expired(NOW, lambda serial: False, lambda copy_id: False)
+    assert load_settings().transfer_roots == [str(unplugged)]  # nadal pamiętany
+    # po podłączeniu kopie wracają do listy (kopię kładziemy tam bezpośrednio, jak na pendrive)
+    _use_dir(unplugged)
+    back = _copy()
+    _use_dir(tmp_path / "nowy", [unplugged])
+    assert [m.id for m in store.list_copies()] == [back.read_meta().id]
+
+
+def test_remember_root_keeps_unreadable_old_root(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from admenot.engine.settings import load_settings
+    locked = tmp_path / "siec"
+    locked.mkdir()
+    real_iterdir = Path.iterdir
+
+    def iterdir(self):
+        if self == locked:
+            raise PermissionError("offline")
+        return real_iterdir(self)
+
+    monkeypatch.setattr(Path, "iterdir", iterdir)
+    _use_dir(tmp_path / "nowy")
+    store.remember_root(locked)
+    assert load_settings().transfer_roots == [str(locked)]
+    store.purge_expired(NOW, lambda serial: False, lambda copy_id: False)
+    assert load_settings().transfer_roots == [str(locked)]
+
+
+def test_remember_root_skips_empty_or_never_created_root(tmp_path):
+    from admenot.engine.settings import load_settings
+    empty = tmp_path / "pusty"
+    empty.mkdir()
+    _use_dir(tmp_path / "nowy")
+    store.remember_root(empty)
+    store.remember_root(tmp_path / "nigdy")  # rodzic dostępny, folderu brak
+    assert load_settings().transfer_roots == []
