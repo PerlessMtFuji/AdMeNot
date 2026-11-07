@@ -27,6 +27,24 @@ def test_defaults_without_a_file():
     assert settings_path().name == "settings.json"
 
 
+def test_explorer_view_persists_and_rejects_invalid_values():
+    for view in ("list", "grid", None):
+        S.save_settings({"explorer_view": view})
+        assert S.load_settings().explorer_view == view
+    for view in ("auto", True, 0, []):
+        with pytest.raises(ValueError):
+            S.save_settings({"explorer_view": view})
+
+
+def test_explorer_peek_defaults_on_and_persists():
+    assert S.load_settings().explorer_peek is True
+    S.save_settings({"explorer_peek": False})
+    assert S.load_settings().explorer_peek is False
+    for value in (None, "tak", 0):
+        with pytest.raises(ValueError):
+            S.save_settings({"explorer_peek": value})
+
+
 def test_save_and_load_keeps_unknown_keys():
     path = settings_path()
     path.parent.mkdir(parents=True)

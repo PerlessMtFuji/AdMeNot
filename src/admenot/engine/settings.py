@@ -20,7 +20,7 @@ import threading
 import time
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +34,7 @@ SELECT_LEVELS = ("silence", "disable", "remove")  # poziomy akcji (actions/plann
 APK_MODES = ("ask", "full", "manual")  # co po szybkim skanie: pytać, pełna analiza APK, tryb ręczny
 RETENTION_DAYS = (30, 60, 90, 180, 365)  # okres przechowywania zleceń do wyboru; None = nie usuwaj
 DEFAULT_RETENTION_DAYS = 60  # RODO: domyślnie ograniczone przechowywanie danych klientów
-KEYS = ("lang", "mode", "adb_path", "backups_dir", "report_pdf_dir", "theme", "mirror_auto",
+KEYS = ("lang", "mode", "adb_path", "backups_dir", "report_pdf_dir", "theme", "mirror_auto", "explorer_view", "explorer_peek",
         "apk_cache_limit_gb", "apk_cache_clear_after_repair", "select_level",
         "check_updates", "dismissed_update", "last_run_version", "retention_days",
         "apk_mode_default")
@@ -42,7 +42,7 @@ KEYS = ("lang", "mode", "adb_path", "backups_dir", "report_pdf_dir", "theme", "m
 # ustawień: UI nie może podstawić własnego ID instalacji ani „zaakceptować” ostrzeżenia bokiem.
 INTERNAL_KEYS = ("welcome_version", "welcome_at", "telemetry", "telemetry_packages",
                  "telemetry_id", "telemetry_at", "telemetry_start_day",
-                 "donate_count", "donate_shown_at", "donate_off")
+                 "donate_count", "donate_shown_at", "donate_off", "explorer_dest", "explorer_recents")
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 LOGO_TYPES = {
@@ -51,6 +51,8 @@ LOGO_TYPES = {
 }
 MAX_LOGO_BYTES = 1_000_000
 SCHEMA_KEY = "schema"
+EXPLORER_RECENT_MAX = 8  # „Ostatnio” w eksploratorze plików (na telefon)
+EXPLORER_RECENT_PHONES = 20  # tylu telefonów „Ostatnio” pamiętamy; najdawniej używany wypada
 
 
 def _v1(data: dict[str, Any]) -> dict[str, Any]:
@@ -96,6 +98,13 @@ class Settings:
     donate_count: int = 0  # udane zlecenia od ostatniego przypomnienia o wsparciu (spec kroku J §4)
     donate_shown_at: str | None = None  # dzień (lokalny) ostatniego przypomnienia
     donate_off: bool = False  # „Już wspieram, nie pokazuj więcej”
+    explorer_dest: str | None = None  # eksplorator: ostatni folder docelowy na komputerze
+    explorer_view: str | None = None  # None: domyślny dla miejsca, potem jawny wybór użytkownika
+    explorer_peek: bool = True  # eksplorator: podgląd pliku w dymku po najechaniu
+    # eksplorator: numer seryjny telefonu → jego ostatnie foldery (kolejność: najdawniej używany telefon
+    # pierwszy). Stary klucz `explorer_recent` (jedna lista dla wszystkich telefonów) jest pomijany przy
+    # odczycie — nazwy folderów poprzedniego klienta nie trafią do „Ostatnio” innego telefonu.
+    explorer_recents: dict[str, list[str]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -227,7 +236,18 @@ def archive_dir_ok(value: str) -> bool:
     return not same
 
 
+def _recent_ok(value: Any) -> bool:
+    return (isinstance(value, list) and len(value) <= EXPLORER_RECENT_MAX
+            and all(isinstance(p, str) and (p == "/sdcard" or p.startswith("/sdcard/")) and "\n" not in p
+                    for p in value))
+
+
 def _valid(key: str, value: Any) -> bool:
+    if key == "explorer_view":
+        return value is None or value in ("list", "grid")
+    if key == "explorer_recents":
+        return (isinstance(value, dict) and len(value) <= EXPLORER_RECENT_PHONES
+                and all(isinstance(k, str) and k and "\n" not in k and _recent_ok(v) for k, v in value.items()))
     if key == "donate_count":
         return isinstance(value, int) and not isinstance(value, bool) and value >= 0
     if key == "donate_off":
@@ -240,7 +260,7 @@ def _valid(key: str, value: Any) -> bool:
         return value is None or (isinstance(value, int) and not isinstance(value, bool) and value >= 1)
     if key == "telemetry_id":
         return value is None or (isinstance(value, str) and UUID_RE.match(value) is not None)
-    if key in ("mirror_auto", "apk_cache_clear_after_repair", "check_updates"):
+    if key in ("mirror_auto", "apk_cache_clear_after_repair", "check_updates", "explorer_peek"):
         return isinstance(value, bool)
     if key == "apk_cache_limit_gb":
         # bool to podklasa int — True nie może znaczyć „1 GB"
@@ -278,7 +298,8 @@ def save_settings(changes: dict[str, Any], path: Path | None = None) -> Settings
 
 
 def save_internal(changes: dict[str, Any], path: Path | None = None) -> Settings:
-    """Zapis kluczy wewnętrznych (`INTERNAL_KEYS`) — tylko z `welcome`, `app.telemetry` i `donate`."""
+    """Zapis kluczy wewnętrznych (`INTERNAL_KEYS`) — tylko z `welcome`, `app.telemetry`, `donate`
+    i eksploratora plików (`app.explorer_api`)."""
     path = path or settings_path()
     unknown = sorted(set(changes) - set(INTERNAL_KEYS))
     bad = sorted(k for k, v in changes.items() if k in INTERNAL_KEYS and not _valid(k, v))

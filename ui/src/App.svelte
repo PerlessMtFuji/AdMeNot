@@ -3,11 +3,12 @@
   import CrashDialog from './components/CrashDialog.svelte';
   import ErrorCard from './components/ErrorCard.svelte';
   import type { Controller } from './lib/controller';
-  import { t } from './lib/i18n/index.svelte';
+  import { t, tp } from './lib/i18n/index.svelte';
   import { needsWelcome } from './lib/logic';
   import { screenIn } from './lib/motion';
   import Connect from './screens/Connect.svelte';
   import Execute from './screens/Execute.svelte';
+  import Explorer from './screens/Explorer.svelte';
   import History from './screens/History.svelte';
   import Results from './screens/Results.svelte';
   import Scan from './screens/Scan.svelte';
@@ -30,7 +31,7 @@
   // Ostrzeżenie przy pierwszym starcie (spec kroku H §3.1): zamiast zwykłego widoku, bez panelu kroków.
   const welcome = $derived(s.settingsLoaded && needsWelcome(s.settings));
 
-  const ORDER = ['connect', 'transfer_choose', 'transfer_backup', 'transfer_restore_plan', 'transfer_restore', 'scanning', 'results', 'executing', 'history', 'settings', 'fatal'];
+  const ORDER = ['connect', 'transfer_choose', 'transfer_backup', 'transfer_restore_plan', 'transfer_restore', 'scanning', 'results', 'executing', 'explorer', 'history', 'settings', 'fatal'];
   const view = $derived(s.fatal ? 'fatal' : s.screen !== 'main' ? s.screen
     : s.phase === 'done' ? 'executing' : s.phase === 'transfer_done' ? 'transfer_backup'
     : s.phase === 'transfer_restored' ? 'transfer_restore' : s.phase);
@@ -55,6 +56,8 @@
         <History />
       {:else if s.screen === 'settings'}
         <Settings />
+      {:else if s.screen === 'explorer'}
+        <Explorer />
       {:else if s.phase === 'connect'}
         <Connect />
       {:else if s.phase === 'scanning'}
@@ -83,6 +86,18 @@
     {#snippet actions()}
       <Button onclick={() => (s.closeRequested = false)}>{t('common.cancel')}</Button>
       <Button variant="danger" onclick={() => ctl.quit()}>{t('close.confirm')}</Button>
+    {/snippet}
+  </Dialog>
+{/if}
+
+{#if ctl.explorer.state.leaveAsk > 0}
+  <!-- wyjście z eksploratora („Wróć”, skan, kopia danych…) przy trwających zadaniach: kolejka zamyka się razem z sesją -->
+  <Dialog title={t('explorer.leave.title')} oncancel={() => ctl.explorer.answerLeave(false)}>
+    <p>{tp('explorer.leave.message', ctl.explorer.state.leaveAsk)}</p>
+    <p class="mt-2 text-sm">{t('explorer.leave.hint')}</p>
+    {#snippet actions()}
+      <Button onclick={() => ctl.explorer.answerLeave(false)}>{t('explorer.leave.stay')}</Button>
+      <Button variant="danger" onclick={() => ctl.explorer.answerLeave(true)}>{t('explorer.leave.confirm')}</Button>
     {/snippet}
   </Dialog>
 {/if}

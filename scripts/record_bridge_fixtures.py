@@ -27,12 +27,14 @@ sys.path.insert(0, str(ROOT / "tests"))  # conftest.py, fakephone.py, apphelpers
 
 from apphelpers import Disk, make_api, policy_factory
 from conftest import GETPROP_OUT, SERIAL
+from exifbuild import ASCII, RATIONAL, build_exif, jpeg_bytes, segment, with_segments
 from fakephone import make_cli_phone
 from faketransfer import FakeStoragePhone, PhoneHost, TransferPhone
 from telephony_fixtures import install_telephony
 
 from admenot.engine.apk import cache as C
 from admenot.engine.device.info import GETPROP
+from admenot.engine.explorer import create as explorer_create
 from admenot.engine.report.pdf import PdfError
 from admenot.engine.settings import save_settings
 from admenot.engine.transfer import helper, phonesetup, restore_tel
@@ -89,6 +91,7 @@ class Recorder:
 
 
 _PART_DIR = re.compile(r"\.(part|unverified)-[A-Za-z0-9_]+")
+_MEDIA_PORT = re.compile(r"http://127\.0\.0\.1:\d+/")  # serwer mediów eksploratora: losowy port
 
 
 def _normalize(value: Any, tmp: str) -> Any:
@@ -105,7 +108,7 @@ def _normalize(value: Any, tmp: str) -> Any:
         return [_normalize(v, tmp) for v in value]
     if isinstance(value, str):
         text = value.replace(tmp, "<tmp>").replace(tmp.replace("\\", "/"), "<tmp>")
-        return _PART_DIR.sub(r".\1-X", text)
+        return _MEDIA_PORT.sub("http://127.0.0.1:0/", _PART_DIR.sub(r".\1-X", text))
     return value
 
 
@@ -369,6 +372,70 @@ def _transfer_restore_tel(r: Recorder, phone: Any) -> None:
     r.call("transfers")  # Historia: „wgrano na …”
 
 
+EXPLORER_DAY = 1_790_413_200  # 2026-09-26 09:00 UTC (dzień nagrania)
+
+
+def _explorer_phone(tmp: Path) -> TransferPhone:
+    """Telefon do eksploratora: Aparat 40 zdjęć z 3 dni (pierwsze z GPS), Pobrane (PDF, DOCX, APK, TXT
+    w cp1250), Muzyka 3 pliki, Filmy 2, `Android/data` bez dostępu (sonda kłódki dostaje odmowę)."""
+    gps = [(1, ASCII, "N"), (2, RATIONAL, [(52, 1), (13, 1), (472, 10)]),
+           (3, ASCII, "E"), (4, RATIONAL, [(21, 1), (0, 1), (421, 10)])]
+    photo = with_segments(jpeg_bytes((64, 48)), [segment(0xE1, build_exif([(0x010F, ASCII, "OPPO")], None, gps))])
+    files: dict[str, tuple[bytes, int]] = {}
+    for i in range(40):
+        day, slot = divmod(i, 14)  # 14 + 14 + 12 zdjęć: dziś, wczoraj, przedwczoraj
+        files[f"DCIM/Camera/IMG_202609{26 - day:02d}_{i:04d}.jpg"] = (
+            photo if i == 0 else jpeg_bytes((64, 48), (i * 6, 90, 200 - i * 4)),
+            EXPLORER_DAY - day * 86_400 - slot * 600)
+    downloads = {"faktura.pdf": b"%PDF-1.4 faktura", "umowa.docx": b"PK\x03\x04umowa",
+                 "aplikacja.apk": b"PK\x03\x04apk", "notatka.txt": "Zażółć gęślą jaźń".encode("cp1250")}
+    for name, data in downloads.items():
+        files[f"Download/{name}"] = (data, EXPLORER_DAY - 3_600)
+    for i in range(3):
+        files[f"Music/utwór {i + 1}.mp3"] = (b"ID3" + b"m" * (1000 * (i + 1)), EXPLORER_DAY - 7 * 86_400)
+    for i in range(2):
+        files[f"Movies/film {i + 1}.mp4"] = (b"\x00\x00\x00\x18ftypmp42" + b"v" * 5000, EXPLORER_DAY - 2 * 86_400)
+    files["Android/data/com.example/cache.bin"] = (b"x", EXPLORER_DAY)
+    root = tmp / "phone"
+    for rel, (data, mtime) in files.items():
+        path = root / "sdcard" / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        os.utime(path, (mtime, mtime))
+    storage = _FixedClockStorage(root, serial=SERIAL)
+    storage.deny_list_prefixes = {"/sdcard/Android/data"}
+    return TransferPhone(make_cli_phone(), storage)
+
+
+class _FixedClockStorage(FakeStoragePhone):
+    """Pamięć z zegarem nagrania: przed każdym poleceniem pliki i foldery nowsze niż dzień nagrania
+    (foldery z fixtury, nowy folder, wgrany TXT) dostają czas `EXPLORER_DAY` — `stat` jest powtarzalny."""
+
+    def _shell(self, command: str) -> bytes:
+        for path in [self.root, *self.root.rglob("*")]:
+            if path.stat().st_mtime > EXPLORER_DAY:
+                os.utime(path, (EXPLORER_DAY, EXPLORER_DAY))
+        return super()._shell(command)
+
+
+def _explorer(r: Recorder, phone: Any) -> None:
+    r.call("list_devices")
+    r.call("explorer_open", SERIAL)
+    r.call("explorer_list", "/sdcard/DCIM/Camera")
+    r.call("explorer_meta", "/sdcard/DCIM/Camera/IMG_20260926_0000.jpg")
+    r.call("explorer_list", "/sdcard/Download")
+    r.call("explorer_text", "/sdcard/Download/notatka.txt", False)
+    r.call("explorer_text_head", "/sdcard/Download/notatka.txt")
+    r.call("explorer_mkdir", "/sdcard/Download", "Nowy folder")
+    with mock.patch.object(explorer_create.secrets, "token_hex", lambda n: "0123456789ab"):
+        r.call("explorer_new_text", "/sdcard/Download", "Lista zakupów", "mleko\nchleb")
+    r.call("explorer_mkdir", "/sdcard/Download", "Nowy folder")  # nazwa zajęta: explorer_exists
+    r.call("explorer_list", "/sdcard/Android")  # `data` z kłódką
+    r.call("explorer_list", "/sdcard/Android/data")
+    r.call("explorer_list", "/sdcard")
+    r.call("explorer_close")
+
+
 def _stable_transfer(data: dict[str, Any]) -> dict[str, Any]:
     """`transfer:progress`, `transfer:restore_progress` i `transfer:tel_progress` są dławione co 0,5 s,
     więc ich liczba zależy od szybkości komputera: zostaje pierwsze zdarzenie każdego etapu (telefonia:
@@ -452,6 +519,7 @@ def record_all() -> dict[str, dict[str, Any]]:
                                                        phone_factory=_restore_phones)),
         "transfer_restore_tel": _stable_transfer(_scenario("transfer_restore_tel", _transfer_restore_tel,
                                                            phone_factory=_restore_tel_phones)),
+        "explorer": _scenario("explorer", _explorer, phone_factory=_explorer_phone),
         "unauthorized": _scenario("unauthorized", _devices_only(unauthorized)),
         "many": _scenario("many", _devices_only(many)),
         "empty": _scenario("empty", _devices_only("List of devices attached\n\n")),

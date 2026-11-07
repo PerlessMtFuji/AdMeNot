@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import traceback
 from collections.abc import Callable
 from datetime import datetime
@@ -58,13 +59,15 @@ def log_exception(exc: BaseException, scrub: Callable[[str], str] | None = None)
     return path
 
 
-def report_error(exc: BaseException, context: dict[str, Any] | None = None) -> dict[str, Any]:
+def report_error(exc: BaseException, context: dict[str, Any] | None = None,
+                 scrub: Callable[[str], str] | None = None) -> dict[str, Any]:
     """Payload błędu dla UI. Log i raport awarii to dodatki: pełny dysk albo brak uprawnień
-    nie może zamienić pierwotnej przyczyny w drugi wyjątek (audyt 2026-10-11, EDGE-02)."""
+    nie może zamienić pierwotnej przyczyny w drugi wyjątek (audyt 2026-10-11, EDGE-02).
+    `scrub` czyści wpis w lokalnym logu (np. ścieżki plików klienta)."""
     payload = error_payload(exc)
     if payload["key"] == "internal":
         try:
-            payload["log"] = str(log_exception(exc))
+            payload["log"] = str(log_exception(exc) if scrub is None else log_exception(exc, scrub=scrub))
         except OSError:
             payload["log_failed"] = True
         try:
@@ -74,3 +77,17 @@ def report_error(exc: BaseException, context: dict[str, Any] | None = None) -> d
         if crash_id:
             payload["crash"] = crash_id
     return payload
+
+
+def bridge(method: Callable[..., dict[str, Any]], *,
+           scrub: Callable[[str], str] | None = None) -> Callable[..., dict[str, Any]]:
+    """Metoda mostu dla JS: wyjątek nigdy nie leci do okna — wynik to `{"error": payload}`.
+    `scrub` czyści wpis nieoczekiwanego błędu w lokalnym logu (`report_error`)."""
+    @functools.wraps(method)
+    def wrapper(self: Any, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        try:
+            return method(self, *args, **kwargs)
+        except Exception as exc:  # noqa: BLE001 — do JS nigdy nie leci wyjątek
+            return {"error": report_error(exc, {"call": method.__name__}, scrub=scrub)}
+
+    return wrapper

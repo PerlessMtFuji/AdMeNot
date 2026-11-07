@@ -1,6 +1,7 @@
 // Atrapa mostu: odtwarza scenariusze nagrane z prawdziwego Api (scripts/record_bridge_fixtures.py).
 import type { Bridge } from './bridge';
-import type { Api, CopyView, CrashSummary, DeviceCheck, EventMap, EventName, Lang, PlanView, ScanView, ServiceInfo, Settings, ShotView, TelemetrySample, UpdateView } from './types';
+import { live } from './fakeBridgeLive';
+import type { Api, ApiError, EntryView, ExplorerListView, CopyView, CrashSummary, DeviceCheck, EventMap, EventName, Lang, PlanView, ScanView, ServiceInfo, Settings, ShotView, TaskView, TelemetrySample, UpdateView } from './types';
 // Wynik `telemetry_events.sample()` z Pythona (Task 7 planu kroku H) — ten sam kształt co prawdziwe zdarzenia.
 import SAMPLE from './telemetrySample.json';
 
@@ -33,11 +34,18 @@ export type FakeBridge = Bridge & {
   setCrashes(reports: CrashSummary[], startup: string[]): void;
   failNextCrashSend(key: string): void;
   failNext(method: string, key: string, message?: string): void;  // następne wywołanie `method` zwraca błąd `key`
+  answerNext(method: string, result: unknown): void;  // następne wywołanie `method` zwraca `result` (np. problemy planu)
   setChecks(checks: DeviceCheck[]): void;  // co zwróci następny `recheck_site_notifications` (i kolejne skany)
   setCopies(copies: CopyView[]): void;  // kopie danych na komputerze (`transfers` bez nagrania w scenariuszu)
   calls: { method: string; args: unknown[] }[];
   emit<K extends EventName>(name: K, detail: EventMap[K]): void;
+  /** Koniec atrapy: spóźnione zdarzenia (łańcuch `replay`, timery) już nic nie wysyłają. */
+  dispose(): void;
 };
+
+
+const isError = (result: unknown): boolean => typeof result === 'object' && result !== null && 'error' in result
+  && (result as { error: unknown }).error !== null;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -108,11 +116,26 @@ export function createFakeBridge(name: string,
   let checksChanged = false; // odpytywanie w tle (`whenDebugging`) dostaje odczyt tylko po zmianie
   let copies: CopyView[] = [];
   let planCode = 'K7F3'; // kod ostatniego podglądu planu: udostępnienie liczy ten sam plan
+  let taskSeq = 0;
+  const tasks: TaskView[] = [];
+  const fakeTask = (kind: TaskView['kind'], dest: string): TaskView => ({
+    id: `s1t${++taskSeq}`, kind, status: 'queued', done_files: 0, total_files: 2, done_bytes: 0, total_bytes: 2048,
+    speed: 0, eta_s: null, skipped: 0, renamed: 0, failed: [], verified: null, dest, omitted: 0, targets: [] });
+  const answers = new Map<string, unknown>();
   const SHOT_IMAGE = 'data:image/svg+xml,' + encodeURIComponent(
     '<svg xmlns="http://www.w3.org/2000/svg" width="90" height="200"><rect width="90" height="200" rx="8" fill="#1f2937"/>'
     + '<rect x="8" y="40" width="74" height="90" rx="6" fill="#f59e0b"/></svg>');
 
+  let disposed = false;
+  const dispose = () => {
+    disposed = true;
+    live.delete(dispose);
+  };
+  live.add(dispose);  // `disposeFakeBridges()` po każdym teście
+
   const dispatch = (event: string, detail: unknown) => {
+    // po końcu atrapy (albo środowiska jsdom po teście) zdarzenie nie ma już odbiorcy
+    if (disposed || typeof CustomEvent === 'undefined') return;
     if (checks && (event === 'scan:done' || event === 'apk:done' || event === 'apk:manual')) {
       // Kopia: nagrania są wspólne dla wszystkich atrap w procesie, więc ich zdarzeń nie wolno zmieniać.
       const scan = (detail as { scan: ScanView }).scan;
@@ -310,6 +333,38 @@ export function createFakeBridge(name: string,
         return { resumed: null, overlays: [], errors: [] };
       case 'adb_shell':
         return { ok: true, output: `(atrapa) ${String(args[0])}\n` };
+      case 'explorer_storage':
+        return { total: 128 * 1024 ** 3, used: 71 * 1024 ** 3, free: 57 * 1024 ** 3,
+          groups: { photos: 28 * 1024 ** 3, videos: 17 * 1024 ** 3, whatsapp: 6 * 1024 ** 3, other: 20 * 1024 ** 3 } };
+      case 'explorer_close':
+      case 'explorer_pause':
+      case 'explorer_resume':
+      case 'explorer_cancel':
+      case 'explorer_open_folder':
+        return {};
+      // Kopia i wgrywanie nie mają nagrania (kolejka w tle): zadanie w kolejce, postęp wstrzykują testy (`emit`).
+      case 'explorer_copy':
+      case 'explorer_upload': {
+        const task = fakeTask(method === 'explorer_copy' ? 'to_pc' : 'to_phone',
+          String(args[1] ?? settings.explorer_dest ?? ''));
+        tasks.push(task);
+        return { task: task.id };
+      }
+      case 'explorer_pick_dest':
+        settings = { ...settings, explorer_dest: 'D:\\Serwis\\Kowalska' };
+        return { path: 'D:\\Serwis\\Kowalska' };
+      case 'explorer_pick_upload':
+        return { paths: args[0] === 'folder' ? ['C:\\Users\\serwis\\Desktop\\Faktury_2026']
+          : ['C:\\Users\\serwis\\Desktop\\zdjecie.jpg', 'C:\\Users\\serwis\\Desktop\\umowa.pdf'] };
+      case 'explorer_clipboard':
+        return { paths: ['C:\\Users\\serwis\\Documents\\faktura.pdf'] };
+      case 'explorer_retry': {
+        const task = fakeTask('to_pc', settings.explorer_dest ?? '');
+        tasks.push(task);
+        return { task: task.id };
+      }
+      case 'explorer_tasks':
+        return { tasks: [...tasks] };
       case 'watch_devices':
       case 'stop':
       case 'reopen_screen':
@@ -369,12 +424,71 @@ export function createFakeBridge(name: string,
     return { ...plan, apps: [...plan.apps, ...rows], runnable: plan.runnable + rows.length, code: `${plan.code}F` };
   };
 
+  // Eksplorator: odczyty zależą od ścieżki — nagranie tej samej ścieżki, a folder bez nagrania składany
+  // z nagranych list (podfoldery z dłuższych ścieżek), żeby dało się chodzić po drzewie.
+  const BY_PATH = new Set(['explorer_list', 'explorer_meta', 'explorer_text']);
+  const recordedLists = () => data.calls.filter((c) => c.method === 'explorer_list' && !isError(c.result))
+    .map((c) => c.result as ExplorerListView);
+  const fakeListing = (path: string): ExplorerListView | ApiError => {
+    const lists = recordedLists();
+    if (!lists.length) return { error: { key: 'explorer_missing', message: '' } };
+    const root = lists[0].crumbs[0];
+    const known = new Map(lists.flatMap((l) => l.entries).map((e) => [e.path, e]));
+    const prefix = path === root.path ? `${root.path}/` : `${path}/`;
+    const children = new Map<string, EntryView>();
+    for (const p of [...known.keys(), ...lists.map((l) => l.path)]) {
+      if (!p.startsWith(prefix)) continue;
+      const name = p.slice(prefix.length).split('/')[0];
+      const child = prefix + name;
+      if (!children.has(child)) {
+        children.set(child, known.get(child) ?? { name, path: child, kind: 'dir', size: 4096, mtime: 1790413200,
+          label: null, locked: false, type: 'other', ext: '', thumb: null, url: null });
+      }
+    }
+    const parts = path.slice(root.path.length).split('/').filter(Boolean);
+    const crumbs = [root, ...parts.map((part, i) => ({ label: part, path: `${root.path}/${parts.slice(0, i + 1).join('/')}` }))];
+    return { path, crumbs, entries: [...children.values()], skipped: 0, locked: false };
+  };
+
+  // Podgląd: nagrany jest jeden plik z GPS (`IMG_20260926_0000.jpg`) i jeden tekst w cp1250; reszta składana tak,
+  // żeby podgląd działał na każdym pliku. Tekst oddaje się dwoma kawałkami („Pokaż więcej”).
+  const fakeMeta = (path: string) => {
+    const known = recordedLists().flatMap((l) => l.entries).find((e) => e.path === path);
+    return { meta: { gps: null, width: 64, height: 48, size: known?.size ?? 0, mtime: known?.mtime ?? 0, path } };
+  };
+  const fakeText = (path: string, more: boolean) => {
+    const hit = data.calls.find((c) => c.method === 'explorer_text' && c.args[0] === path)?.result as
+      { text: string; encoding: string } | undefined;
+    const encoding = hit?.encoding ?? 'utf-8';
+    if (more) return { text: '\nDalszy ciąg pliku — drugi kawałek.', encoding, truncated: false };
+    return { text: hit?.text ?? 'Przykładowy tekst pliku.', encoding, truncated: true };
+  };
+
   const invoke = (method: string, args: unknown[]): unknown => {
     calls.push({ method, args });
     const failure = failures.get(method);
     if (failure) {
       failures.delete(method);
       return { error: { ...failure } };
+    }
+    if (answers.has(method)) {
+      const result = answers.get(method);
+      answers.delete(method);
+      return structuredClone(result);
+    }
+    if (method === 'explorer_text') return fakeText(String(args[0]), args[1] === true);
+    if (method === 'explorer_text_head') {
+      const { text } = fakeText(String(args[0]), false);
+      return { text, truncated: false };
+    }
+    if (BY_PATH.has(method)) {
+      const hit = data.calls.find((c) => c.method === method && c.args[0] === args[0]);
+      if (hit) {
+        replay(hit.events);
+        return structuredClone(hit.result);
+      }
+      if (method === 'explorer_list' && queues.has(method)) return fakeListing(String(args[0]));
+      if (method === 'explorer_meta') return fakeMeta(String(args[0]));
     }
     const queue = queues.get(method);
     if (!queue || queue.length === 0) return fallback(method, args);
@@ -407,7 +521,9 @@ export function createFakeBridge(name: string,
     setCrashes: (reports, startup) => { crashes = [...reports]; crashStartup = [...startup]; },
     failNextCrashSend: (key) => { failSend = key; },
     failNext: (method, key, message = '') => { failures.set(method, { key, message }); },
+    answerNext: (method, result) => { answers.set(method, result); },
     setChecks: (next) => { checks = structuredClone(next); checksChanged = true; },
     setCopies: (next) => { copies = structuredClone(next); },
+    dispose,
   };
 }

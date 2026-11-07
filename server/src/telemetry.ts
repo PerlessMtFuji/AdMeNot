@@ -90,6 +90,23 @@ const RESTORE_COUNTS = ["files", "exists", "renamed", "denied", "failed", "unsel
   "apk_suspicious_skipped"] as const;
 const RESTORE_GROUPS = ["photos", "videos", "downloads", "whatsapp", "others"] as const;
 const MAX_STREAMS = 8; // telemetry_events.MAX_STREAMS
+// Eksplorator plików: same liczby. Klucze błędów to kody (`explorer_denied`), nigdy nazwa pliku ani
+// ścieżka — stąd ścisły wzorzec (telemetry_events._ERROR_KEY) i liczbowe wartości.
+const EXPLORER_FIELDS = ["device", "seconds", "copied_files", "copied_mb", "uploaded_files", "uploaded_mb",
+  "previews", "created", "errors", "mb_s"] as const;
+const EXPLORER_PREVIEWS = ["image", "video", "audio", "text"] as const;
+const EXPLORER_CREATED = ["folder", "text"] as const;
+const ERROR_KEY = /^[a-z0-9_]{1,64}$/;
+
+function explorerErrors(v: unknown): Obj {
+  need(isObj(v) && Object.keys(v as Obj).length <= MAX_ERRORS);
+  const out: Obj = {};
+  for (const [k, n] of Object.entries(v as Obj)) {
+    need(ERROR_KEY.test(k) && int(n));
+    out[k] = n;
+  }
+  return out;
+}
 
 // Obiekt z dokładnie tymi kluczami (wartości logiczne).
 function flags(v: unknown, keys: readonly string[]): Obj {
@@ -220,6 +237,17 @@ function body(e: Obj): Obj {
       return { ...out, streams: e.streams, hashed: e.hashed, media_scan: e.media_scan,
         groups: flags(e.groups, RESTORE_GROUPS), ...restoreTel(e) };
     }
+    case "explorer":
+      need(Object.keys(e).every((k) => (COMMON as readonly string[]).includes(k)
+        || (EXPLORER_FIELDS as readonly string[]).includes(k)));
+      need(int(e.seconds, 86_400) && int(e.copied_files) && int(e.copied_mb, MAX_MB) && int(e.uploaded_files)
+        && int(e.uploaded_mb, MAX_MB) && (e.mb_s === null || int(e.mb_s, MAX_MB)));
+      return {
+        device: device(e.device), seconds: e.seconds, copied_files: e.copied_files, copied_mb: e.copied_mb,
+        uploaded_files: e.uploaded_files, uploaded_mb: e.uploaded_mb,
+        previews: counts(e.previews, EXPLORER_PREVIEWS), created: counts(e.created, EXPLORER_CREATED),
+        errors: explorerErrors(e.errors), mb_s: e.mb_s,
+      };
     default:
       throw new Invalid();
   }

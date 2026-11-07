@@ -195,6 +195,38 @@
         "calls": true
       },
       "cleanup_ok": true
+    },
+    {
+      "install": "00000000-0000-4000-8000-000000000000",
+      "type": "explorer",
+      "t": "2026-10-10T14:00:00Z",
+      "app": "0.9.5",
+      "os": "Windows 10.0.26100",
+      "lang": "pl",
+      "device": {
+        "manufacturer": "OPPO",
+        "model": "CPH2483",
+        "android": "14"
+      },
+      "seconds": 612,
+      "copied_files": 148,
+      "copied_mb": 1920,
+      "uploaded_files": 6,
+      "uploaded_mb": 41,
+      "previews": {
+        "image": 23,
+        "video": 2,
+        "audio": 1,
+        "text": 1
+      },
+      "created": {
+        "folder": 1,
+        "text": 0
+      },
+      "errors": {
+        "explorer_denied": 1
+      },
+      "mb_s": 31
     }
   ],
   "packages": [
@@ -426,6 +458,38 @@
         "calls": true
       },
       "cleanup_ok": true
+    },
+    {
+      "install": "00000000-0000-4000-8000-000000000000",
+      "type": "explorer",
+      "t": "2026-10-10T14:00:00Z",
+      "app": "0.9.5",
+      "os": "Windows 10.0.26100",
+      "lang": "pl",
+      "device": {
+        "manufacturer": "OPPO",
+        "model": "CPH2483",
+        "android": "14"
+      },
+      "seconds": 612,
+      "copied_files": 148,
+      "copied_mb": 1920,
+      "uploaded_files": 6,
+      "uploaded_mb": 41,
+      "previews": {
+        "image": 23,
+        "video": 2,
+        "audio": 1,
+        "text": 1
+      },
+      "created": {
+        "folder": 1,
+        "text": 0
+      },
+      "errors": {
+        "explorer_denied": 1
+      },
+      "mb_s": 31
     }
   ]
 }

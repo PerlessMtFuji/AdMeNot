@@ -10,7 +10,6 @@ Protokół i dane serwisu nie dotykają telefonu, więc idą bez JobRunner (pywe
 from __future__ import annotations
 
 import contextlib
-import functools
 import os
 import re
 import secrets
@@ -26,8 +25,9 @@ from typing import Any
 
 from admenot import __version__
 from admenot.app import crash, telemetry
-from admenot.app.errors import AppError, error_payload, log_exception, report_error
+from admenot.app.errors import AppError, bridge, error_payload, log_exception, report_error
 from admenot.app.events import Emitter
+from admenot.app.explorer_api import ExplorerMixin, MediaFactory
 from admenot.app.jobs import Job, JobRunner, Stopped
 from admenot.app.present import (
     app_name,
@@ -349,18 +349,10 @@ def _transfer_errors(kind: str) -> Iterator[None]:
         raise AppError("transfer_failed", type(exc).__name__, **extra) from None
 
 
-def _api(method: Callable[..., dict[str, Any]]) -> Callable[..., dict[str, Any]]:
-    @functools.wraps(method)
-    def wrapper(self: Api, *args: Any, **kwargs: Any) -> dict[str, Any]:
-        try:
-            return method(self, *args, **kwargs)
-        except Exception as exc:  # noqa: BLE001 — do JS nigdy nie leci wyjątek
-            return {"error": report_error(exc, {"call": method.__name__})}
-
-    return wrapper
+_api = bridge
 
 
-class Api:
+class Api(ExplorerMixin):
     def __init__(
         self,
         emitter: Emitter,
@@ -386,6 +378,9 @@ class Api:
         puller_factory: PullerFactory = _real_puller,
         pusher_factory: PusherFactory = _real_pusher,
         transfer_purge_s: float | None = TRANSFER_PURGE_S,
+        explorer_media: MediaFactory | None = None,
+        explorer_temp: Path | None = None,
+        explorer_clipboard: Callable[[], list[str]] | None = None,
     ) -> None:
         self._emitter = emitter
         self._host_factory = host_factory
@@ -422,6 +417,7 @@ class Api:
         self._pick_folder_fn: Callable[[], str | None] | None = None
         self._close_fn: Callable[[], None] | None = None
         self._quitting = False
+        self._closing_window = False  # krzyżyk czeka już na koniec kopii albo kolejki eksploratora
         self._open_file = open_file
         self._report_lock = threading.Lock()
         self._sync = sync_jobs
@@ -463,6 +459,8 @@ class Api:
         # (RLock: zadanie synchroniczne w testach woła wejścia z wnętrza sprzątania).
         self._cleanup_lock = threading.RLock()
         self._purge_stop = threading.Event()
+        # Eksplorator plików (`ExplorerMixin`): sesja, serwer mediów (podmieniany w testach), `%TEMP%`.
+        self._explorer_setup(explorer_media, explorer_temp, explorer_clipboard)
         self._clean_screenshots()
         self._purge_old_data()
         # Zegar dobowy: okno bywa otwarte dniami, a kopie po 7 dniach mają zniknąć. Testy
@@ -651,6 +649,7 @@ class Api:
             return {"devices": [], "error": error_payload(exc)["key"]}
         crash.note_serials(e.serial for e in entries)
         ready = {e.serial for e in entries if e.state == "device"}
+        self._explorer_presence(ready)
         for serial in set(self._identities) - ready:
             self._identities.pop(serial, None)  # odłączony: przy następnym podłączeniu czytamy od nowa
         with self._cleanup_lock:
@@ -800,7 +799,10 @@ class Api:
 
     @_api
     def get_settings(self) -> dict[str, Any]:
-        return {**asdict(self._settings), "lang": self._lang,
+        # „Ostatnio” eksploratora (foldery wszystkich telefonów) nie idzie do UI — tylko lista otwartego
+        # telefonu w `explorer_open`
+        view = {k: v for k, v in asdict(self._settings).items() if k != "explorer_recents"}
+        return {**view, "lang": self._lang,
                 "welcome_current": welcome.WELCOME_VERSION,
                 "telemetry_delete_pending": telemetry.delete_pending(),
                 "donate_reminders": not self._settings.donate_off}
@@ -889,6 +891,7 @@ class Api:
     def start_scan(self, serial: str, client: str | None = None) -> dict[str, Any]:
         if not isinstance(serial, str) or not serial.strip():
             raise AppError("bad_request", "serial")
+        self._require_explorer_free(serial)
         self._require_cleaned(serial)
         self._abandon_apk(notify=False)
         with self._shots_lock:
@@ -1091,6 +1094,7 @@ class Api:
     def deep_analyze(self, package: str) -> dict[str, Any]:
         """Głęboka analiza jednej aplikacji (ścieżki w kodzie) — tylko na żądanie, ocena §6, §8."""
         self._require_scan()
+        self._require_explorer_free(self._serial or "")
         if self._apk_factory is None:
             raise AppError("bad_request", "apk")
         report = self._report
@@ -1107,6 +1111,7 @@ class Api:
     def analyze_selected(self, packages: list[str]) -> dict[str, Any]:
         """Analiza tylko wskazanych aplikacji (tryb ręczny, spec §2.2)."""
         self._require_scan()
+        self._require_explorer_free(self._serial or "")
         if self._apk_factory is None:
             raise AppError("bad_request", "apk")
         report = self._report
@@ -1125,6 +1130,7 @@ class Api:
     def analyze_all(self) -> dict[str, Any]:
         """Pełna analiza z trybu ręcznego — bez ponownego pytania o tryb."""
         self._require_scan()
+        self._require_explorer_free(self._serial or "")
         if self._apk_factory is None:
             raise AppError("bad_request", "apk")
         adb, report = self._adb, self._report
@@ -1751,6 +1757,7 @@ class Api:
             raise AppError("bad_request", "serial")
         if client is not None and not isinstance(client, str):
             raise AppError("bad_request", "client")
+        self._require_explorer_free(serial)
         self._require_cleaned(serial)
         self._abandon_apk(notify=False)
         adb = self._session(serial.strip())
@@ -1922,6 +1929,7 @@ class Api:
             raise AppError("bad_request", "copy_id") from None
         if meta.status == "in_progress":  # wgrywać można tylko kopię skończoną (spec §4.1)
             raise AppError("bad_request", "copy_status")
+        self._require_explorer_free(serial)
         self._require_cleaned(serial)
         self._abandon_apk(notify=False)
         adb = self._session(serial.strip())
@@ -2349,10 +2357,12 @@ class Api:
         return {"path": self._pick_folder_fn() if self._pick_folder_fn else None}
 
     def _attach(self, pick_folder: Callable[[], str | None], close: Callable[[], None],
-                pick_file: Callable[[], str | None] | None = None) -> None:
+                pick_file: Callable[[], str | None] | None = None,
+                pick_files: Callable[[], list[str]] | None = None) -> None:
         self._pick_folder_fn = pick_folder
         self._close_fn = close
         self._pick_file_fn = pick_file
+        self._pick_files_fn = pick_files  # eksplorator: „Wgraj tutaj” (wiele plików)
 
     def _transfer_job(self) -> Job | None:
         job = self._jobs.current()
@@ -2360,6 +2370,10 @@ class Api:
 
     def _shutdown(self) -> None:
         self._purge_stop.set()
+        try:
+            self._explorer_end()
+        except Exception as exc:  # noqa: BLE001 — zamknięcie okna nie może utknąć na eksploratorze
+            log_exception(exc)
         job = self._transfer_job()
         if job is not None:
             self._jobs.stop(job.id)  # bez czekania: `_shutdown` bywa wołane z wątku GUI
@@ -2373,6 +2387,8 @@ class Api:
     def _on_closing(self) -> bool:
         if self._quitting:
             return True
+        if self._closing_window:  # drugi krzyżyk w czasie czekania: to samo zamykanie, bez skrótów
+            return False
         job = self._order_in_progress()
         if job is not None:
             # `closing` biegnie na wątku GUI, a `run_js` czeka na ten sam wątek (zakleszczenie),
@@ -2386,8 +2402,16 @@ class Api:
             # stan zapisany) i zamykamy okno po jej końcu. Nigdy nie czekamy na wątku GUI: zdarzenia
             # zadania (`run_js`) czekają na ten sam wątek.
             self._jobs.stop(job.id)
+            self._closing_window = True
             threading.Thread(target=self._close_after, args=(job,), daemon=True,
                              name="admenot-quit").start()
+            return False
+        if self._explorer_active():
+            # Jak przy kopii: bez pytania (UI pyta przy wyjściu z eksploratora, okno zamyka serwisant),
+            # zadania eksploratora są anulowane, a okno zamyka się dopiero po końcu wątku kolejki (zabity
+            # `adb`, usunięte `.admenot-part`) — na osobnym wątku, nigdy na wątku GUI.
+            self._closing_window = True
+            threading.Thread(target=self._close, daemon=True, name="admenot-quit").start()
             return False
         self._shutdown()
         return True
@@ -2411,6 +2435,9 @@ class Api:
         self._close()
 
     def _close(self) -> None:
+        """Zamknięcie programu poza wątkiem GUI (`quit`, `_close_after`, `_on_closing` z zadaniami
+        eksploratora): najpierw czeka na koniec kolejki eksploratora, potem reszta `_shutdown`."""
+        self._explorer_quit()
         self._shutdown()
         self._quitting = True
         if self._close_fn is not None:

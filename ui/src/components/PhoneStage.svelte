@@ -61,7 +61,7 @@
   .check { width: 54px; height: 54px; border-radius: 50%; background: #16a34a; display: grid; place-items: center; color: #fff; font-size: 28px; font-weight: 800; }
   .shown .check { animation: pop-in .5s cubic-bezier(.2, .8, .2, 1); }
   .dlg { width: 86px; background: #fff; border-radius: 9px; padding: 7px; font-size: 8.5px; color: #111; line-height: 1.3; }
-  .allow { margin-top: 6px; background: #4f46e5; color: #fff; text-align: center; border-radius: 6px; padding: 3px; font-weight: 700; animation: tap 1.4s infinite; }
+  .allow { margin-top: 6px; background: #4f46e5; color: #fff; text-align: center; border-radius: 6px; padding: 3px; font-weight: 700; }
   .ring { position: absolute; left: 40px; top: 33px; width: 170px; height: 170px; border-radius: 50%; border: 2px solid var(--color-accent); opacity: 0; z-index: 1; }
   .cable { position: absolute; inset: 0; z-index: 2; overflow: visible; }
   .plug { transition: transform .7s cubic-bezier(.3, 1.3, .5, 1); }
@@ -71,6 +71,7 @@
   .spark { transform-origin: 125px 226px; }
   .led { fill: #9ca3af; transition: fill .3s; }
   [data-state="wait"] .plug { transform: translateY(24px); animation: hover 2.2s ease-in-out infinite; }
+  [data-state="auth"] .allow { animation: tap 1.4s infinite; }
   [data-state="auth"] .ring { animation: ring 1.8s ease-out infinite; }
   [data-state="auth"] .pulse { opacity: 1; animation: flow .7s linear infinite; }
   [data-state="auth"] .spark { animation: spark .6s ease-out 1; }

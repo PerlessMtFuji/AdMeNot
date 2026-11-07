@@ -156,6 +156,10 @@ class FakeStoragePhone:
         self.install_blocked = False
         self.host_commands: list[list[str]] = []  # polecenia hosta (`install`)
         self.accounts: list[tuple[str, str]] = []
+        # eksplorator plików
+        self.deny_list_prefixes: set[str] = set()  # listowanie (`find`, `ls`) pod takim prefiksem -> Permission denied
+        self.listing_extra: dict[str, list[tuple[str, int, int]]] = {}  # folder -> (nazwa, rozmiar, mtime) tylko w listingu
+        self.scanned: list[str] = []  # ścieżki z `content call … scan_file`
 
     # ---- stan ---------------------------------------------------------------------------
     def get_state(self) -> str:
@@ -219,10 +223,20 @@ class FakeStoragePhone:
             self.on_shell(command)
         if command.endswith(STAT_TAIL):  # `stat … 2>&1 || true`: błędy jako linie wyniku, kod 0
             argv = shlex.split(command[: -len(STAT_TAIL)])
+            if argv[0] == "find":  # błąd `find` na stdout (jak `2>&1`), kod 0
+                try:
+                    return self._find(argv[1:])
+                except AdbError as exc:
+                    return exc.message.encode("utf-8")
             assert argv[0] == "stat", argv
             return self._stat(argv[1:], tolerant=True)
         if command.endswith(CONTENT_TAIL):  # `content query … 2>&1`: błąd providera na stdout
             argv = shlex.split(command[: -len(CONTENT_TAIL)])
+            if argv[0] == "ls":  # błąd `ls` na stdout (jak `2>&1`), kod 0
+                try:
+                    return self._ls(argv[1:])
+                except AdbError as exc:
+                    return exc.message.encode("utf-8")
             assert argv[:2] == ["content", "query"], argv
             return self._content(argv[1:], merged=True)
         argv = shlex.split(command)
@@ -236,9 +250,16 @@ class FakeStoragePhone:
                 raise AdbError("command_failed", f"head: {argv[3]}: No such file or directory")
             with path.open("rb") as fh:
                 return fh.read(int(argv[2]))
+        if argv[:2] == ["tail", "-c"] and len(argv) == 4 and argv[2].startswith("+"):
+            path = self.local(argv[3])
+            if not path.is_file():
+                raise AdbError("command_failed", f"tail: {argv[3]}: No such file or directory")
+            return path.read_bytes()[int(argv[2][1:]) - 1:]
+        if argv[0] == "dd":
+            return self._dd(argv[1:])
         handler = {"find": self._find, "stat": self._stat, "df": self._df,
                    "sha256sum": self._sha256, "content": self._content, "ls": self._ls,
-                   "mkdir": self._mkdir}.get(argv[0])
+                   "mkdir": self._mkdir, "mv": self._mv, "rm": self._rm}.get(argv[0])
         if handler is None:
             raise AdbError("command_failed", f"{argv[0]}: inaccessible or not found")
         return handler(argv[1:])
@@ -252,6 +273,16 @@ class FakeStoragePhone:
             roots.append(args[i])
             i += 1
         expr = args[i:]
+        if expr[:4] == ["-mindepth", "1", "-maxdepth", "1"]:  # listing folderu eksploratora
+            assert expr[4:] == ["-exec", "stat", "-c", "%f|%s|%Y|%n", "{}", "+"] and len(roots) == 1, args
+            return self._list(roots[0])
+        if expr == ["-type", "f"]:  # zliczanie plików miejsca: jedna ścieżka na linię
+            assert len(roots) == 1, args
+            return self._list_files(roots[0])
+        if expr == ["-type", "f", "-exec", "stat", "-c", "%s|%n", "{}", "+"]:  # przejście Miejsca
+            assert len(roots) == 1, args
+            files = [f for f in self._list_files(roots[0]).decode().split("\n") if f]
+            return "".join(f"{self.local(f).stat().st_size if self.local(f).is_file() else 0}|{f}\n" for f in files).encode()
         prune_paths: set[str] = set()
         prune_names: set[str] = set()
         j = 0
@@ -287,17 +318,81 @@ class FakeStoragePhone:
                     out.append(f"{st.st_size}|{int(st.st_mtime)}|{rdir}/{name}")
         return ("\n".join(sorted(out)) + "\n").encode("utf-8") if out else b""
 
-    def _ls(self, args: list[str]) -> bytes:
-        assert args[0] == "-1" and len(args) == 2, args
-        base = self.local(args[1])
+    def _list(self, remote: str) -> bytes:
+        """`find '<folder>/' -mindepth 1 -maxdepth 1 -exec stat -c '%f|%s|%Y|%n' {} +` (tryb hex jak toybox)."""
+        if any(remote.startswith(p) for p in self.deny_list_prefixes):
+            raise AdbError("command_failed", f"find: '{remote}': Permission denied")
+        base = self.local(remote)
         if not base.is_dir():
-            raise AdbError("command_failed", f"ls: {args[1]}: No such file or directory")
+            raise AdbError("command_failed", f"find: '{remote}': No such file or directory")
+        prefix = remote.rstrip("/") + "/"
+        out: list[str] = []
+        for p in sorted(base.iterdir()):
+            st = p.stat()
+            out.append(f"{0x41f9 if p.is_dir() else 0x81b0:x}|{4096 if p.is_dir() else st.st_size}"
+                       f"|{int(st.st_mtime)}|{prefix}{p.name}")
+        out += [f"81b0|{size}|{mtime}|{prefix}{name}" for name, size, mtime in self.listing_extra.get(prefix[:-1], [])]
+        return ("\n".join(out) + "\n").encode("utf-8") if out else b""
+
+    def _list_files(self, remote: str) -> bytes:
+        """`find '<folder>/' -type f`: wszystkie pliki rekurencyjnie (też ukryte), pojedynczy `/` w ścieżkach."""
+        if any(remote.startswith(p) for p in self.deny_list_prefixes):
+            raise AdbError("command_failed", f"find: '{remote}': Permission denied")
+        base = self.local(remote)
+        if not base.is_dir():
+            raise AdbError("command_failed", f"find: '{remote}': No such file or directory")
+        prefix = remote.rstrip("/")
+        out = [f"{prefix}/{p.relative_to(base).as_posix()}" for p in sorted(base.rglob("*")) if p.is_file()]
+        for folder, extra in self.listing_extra.items():
+            if (folder + "/").startswith(prefix + "/"):
+                out += [f"{folder}/{name}" for name, _, _ in extra]
+        return ("\n".join(out) + "\n").encode("utf-8") if out else b""
+
+    def _ls(self, args: list[str]) -> bytes:
+        assert args[:1] == ["-1"] and len(args) == 2 or len(args) == 1, args
+        if any(args[-1].startswith(p) for p in self.deny_list_prefixes):
+            raise AdbError("command_failed", f"ls: {args[-1]}: Permission denied")
+        base = self.local(args[-1])
+        if not base.is_dir():
+            raise AdbError("command_failed", f"ls: {args[-1]}: No such file or directory")
         return "".join(f"{p.name}\n" for p in sorted(base.iterdir())).encode("utf-8")
+
+    def _dd(self, args: list[str]) -> bytes:
+        """`dd if=<plik> bs=N skip=K status=none [count=C]` — bloki po `bs` bajtów."""
+        opts = dict(a.split("=", 1) for a in args)
+        path = self.local(opts["if"])
+        if not path.is_file():
+            raise AdbError("command_failed", f"dd: {opts['if']}: No such file or directory")
+        bs = int(opts["bs"])
+        data = path.read_bytes()[int(opts["skip"]) * bs:]
+        return data[: int(opts["count"]) * bs] if "count" in opts else data
+
+    def _mv(self, args: list[str]) -> bytes:
+        """`mv -n <src> <dst>`: nigdy nie nadpisuje (jak toybox: cichy brak działania)."""
+        assert args[0] == "-n" and len(args) == 3, args
+        src, dst = self.local(args[1]), self.local(args[2])
+        if not src.exists():
+            raise AdbError("command_failed", f"mv: '{args[1]}': No such file or directory")
+        if dst.is_dir():  # jak toybox: cel-folder → plik ląduje w środku (pod własną nazwą)
+            dst = dst / src.name
+        if not dst.exists():
+            src.rename(dst)
+        return b""
+
+    def _rm(self, args: list[str]) -> bytes:
+        """`rm -f <plik>` (eksplorator: tylko nasz plik tymczasowy pod `/sdcard/`); brak pliku — bez błędu."""
+        assert args[0] == "-f" and len(args) == 2, args
+        path = self.local(args[1])
+        if path.is_dir():
+            raise AdbError("command_failed", f"rm: {args[1]}: Is a directory")
+        path.unlink(missing_ok=True)
+        return b""
 
     def _stat(self, args: list[str], tolerant: bool = False) -> bytes:
         """Jak toybox + `adb shell`: błąd = kod 1 (`AdbError`, wynik ginie), chyba że `tolerant`
         (przyrostek `STAT_TAIL`) — wtedy linia błędu na każdy plik i dalej."""
-        assert args[0] == "-c" and args[1] == "%s|%Y|%n", args
+        with_mode = args[1] == "%f|%s|%Y|%n"
+        assert args[0] == "-c" and (with_mode or args[1] == "%s|%Y|%n"), args
         out: list[str] = []
         for remote in args[2:]:
             path = self.local(remote)
@@ -313,7 +408,8 @@ class FakeStoragePhone:
                 out.append(error)
                 continue
             st = path.stat()
-            out.append(f"{st.st_size}|{int(st.st_mtime)}|{remote}")
+            mode = f"{0x41f9 if path.is_dir() else 0x81b0:x}|" if with_mode else ""
+            out.append(f"{mode}{st.st_size}|{int(st.st_mtime)}|{remote}")
         return ("\n".join(out) + "\n").encode("utf-8")
 
     def _df(self, args: list[str]) -> bytes:
@@ -352,6 +448,10 @@ class FakeStoragePhone:
         return b""
 
     def _content(self, args: list[str], merged: bool = False) -> bytes:
+        if args[0] == "call" and args[-2] == "--arg" and "scan_file" in args:
+            assert args[1:-1] == ["--uri", "content://media", "--method", "scan_file", "--arg"], args
+            self.scanned.append(args[-1])
+            return b"Result: Bundle[{}]\n"
         if args[0] == "call":
             assert args[1:] == ["--uri", "content://media", "--method", "scan_volume",
                                 "--arg", "external_primary"], args
@@ -713,7 +813,7 @@ def _render(rows: list[dict[str, str | None]], cols: list[str] | None) -> str:
                    for i, r in enumerate(rows))
 
 
-_STORAGE_TOOLS = {"find", "stat", "ls", "df", "content", "sha256sum", "mkdir", "head"}
+_STORAGE_TOOLS = {"find", "stat", "ls", "df", "content", "sha256sum", "mkdir", "head", "tail", "dd", "mv"}
 _TEL_HEADS = (["am", "instrument"], ["dumpsys", "role"], ["dumpsys", "account"], ["rm", "-rf"],
               ["cmd", "role", "add-role-holder"], ["cmd", "role", "remove-role-holder"])
 _TEL_INTENTS = (f"{helper.PACKAGE}/.RoleActivity", "android.settings.MANAGE_DEFAULT_APPS_SETTINGS")
@@ -757,6 +857,8 @@ class TransferPhone:
         argv = shlex.split(command)
         if argv[:2] == ["pm", "path"] and len(argv) == 3:
             return argv[2] in self.storage.apps
+        if argv[:2] == ["rm", "-f"]:  # eksplorator: nasz plik tymczasowy pod `/sdcard/`
+            return True
         return (bool(argv) and argv[0] in _STORAGE_TOOLS) or _telephony_cmd(argv)
 
     def shell(self, command: str, timeout: float = 20.0) -> str:

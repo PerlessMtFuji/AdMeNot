@@ -5,7 +5,7 @@ import type {
   PlanView, Question, ReportResult, ScanView, Settings, ShareState, ShotsView, ShotView, StepEvent, UndoDone, UndoSite, UpdateView, UserWait, Verdict, WhoView,
 } from './types';
 
-export type Screen = 'main' | 'history' | 'settings';
+export type Screen = 'main' | 'history' | 'settings' | 'explorer';
 const ORDER_KINDS = ['exec', 'resume', 'undo'];
 
 export const EMPTY_TRANSFER_SELECTION: TransferSelection = {

@@ -12,7 +12,9 @@ export const ERROR_KEYS = ['adb_missing', 'unauthorized', 'offline', 'disconnect
   'logo_size', 'internal', 'mirror_missing', 'mirror_failed', 'unknown_screenshot', 'shot_limit',
   'data_too_new', 'retired', 'unknown_crash', 'device_busy', 'plan_changed',
   'transfer_no_inventory', 'transfer_disk_full', 'transfer_wrong_device', 'transfer_too_many_disconnects', 'transfer_failed',
-  'transfer_in_use', 'transfer_phone_full', 'transfer_copy_missing', 'transfer_no_plan'] as const;
+  'transfer_in_use', 'transfer_phone_full', 'transfer_copy_missing', 'transfer_no_plan',
+  'explorer_busy', 'explorer_offline', 'explorer_denied', 'explorer_missing', 'explorer_exists', 'explorer_bad_name',
+  'explorer_not_open', 'explorer_no_dest', 'explorer_not_folder'] as const;
 // Błędy wgrywania kopii, których wspólny z kopią tekst mówi o kopii — dla zadań wgrywania `transfer.restore.error.*`.
 export const RESTORE_ERROR_KEYS = ['transfer_wrong_device', 'transfer_too_many_disconnects', 'transfer_failed'] as const;
 export const RESTORE_JOB_KINDS = ['restore_plan', 'restore'] as const;
@@ -31,7 +33,11 @@ export const PLURAL_KEYS = ['results.title', 'results.safe', 'expert.days', 'pan
   'undo.done_collapsed', 'transfer.apps_skipped', 'transfer.apps_suspicious', 'transfer.files', 'transfer.messages',
   'transfer.folders', 'transfer.categories', 'transfer.progress_files', 'transfer.expires', 'transfer.days_left',
   'transfer.unreadable_files', 'transfer.restore.missing', 'transfer.restore.apk_skipped', 'transfer.restore.tel.synced',
-  'transfer.restore.tel.messenger'] as const;
+  'transfer.restore.tel.messenger', 'explorer.summary', 'explorer.folders', 'explorer.skipped', 'explorer.leftovers',
+  'explorer.selection.count', 'explorer.preview.lines', 'explorer.task.copied', 'explorer.task.uploaded', 'explorer.task.failed_pc',
+  'explorer.task.failed_phone', 'explorer.task.skipped', 'explorer.task.renamed', 'explorer.task.damaged',
+  'explorer.task.more', 'explorer.problems.path_too_long_pc', 'explorer.problems.path_too_long_phone',
+  'explorer.drop.items', 'explorer.leave.message'] as const;
 
 
 class I18n {

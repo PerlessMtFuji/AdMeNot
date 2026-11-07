@@ -18,7 +18,7 @@ def test_bridge_fixtures_are_up_to_date():
     fresh = _module().record_all()
     assert set(fresh) == {"adware", "adware-en", "clean", "manual", "disconnect", "report",
                           "transfer", "transfer_export", "transfer_restore", "transfer_restore_tel",
-                          "unauthorized", "many", "empty"}
+                          "explorer", "unauthorized", "many", "empty"}
     for name, data in fresh.items():
         path = OUT / f"{name}.json"
         assert path.exists(), f"brak {path} — uruchom: python scripts/record_bridge_fixtures.py"
@@ -92,3 +92,22 @@ def test_transfer_restore_tel_scenario_plans_taps_and_reports_manual_import():
         "contacts": "app_process", "sms": "companion", "calls": "file"}
     assert tel["manual"] == [{"kind": "calls", "name": "admenot-polaczenia-20260926-143100.xml"}]
     assert tel["cleanup"]["ok"] is True and tel["status"] == "incomplete"
+
+
+def test_explorer_scenario_browses_previews_and_creates():
+    data = _module().record_all()["explorer"]
+    calls = {(c["method"], tuple(c["args"])): c for c in data["calls"]}
+    opened = calls[("explorer_open", ("R58T00TEST",))]
+    counts = {p["key"]: p["count"] for p in opened["events"][-1][1]["places"]}
+    assert counts["camera"] == 40 and counts["music"] == 3 and counts["movies"] == 2
+    camera = calls[("explorer_list", ("/sdcard/DCIM/Camera",))]["result"]
+    assert len(camera["entries"]) == 40 and len({e["mtime"] // 86_400 for e in camera["entries"]}) == 3
+    meta = calls[("explorer_meta", ("/sdcard/DCIM/Camera/IMG_20260926_0000.jpg",))]["result"]["meta"]
+    assert meta["gps"]["lat"] > 52
+    text = calls[("explorer_text", ("/sdcard/Download/notatka.txt", False))]["result"]
+    assert text["encoding"] == "cp1250" and text["text"].startswith("Zażółć")
+    android = calls[("explorer_list", ("/sdcard/Android",))]["result"]["entries"]
+    assert next(e for e in android if e["name"] == "data")["locked"] is True
+    assert calls[("explorer_list", ("/sdcard/Android/data",))]["result"]["locked"] is True
+    errors = [c["result"]["error"]["key"] for c in data["calls"] if (c["result"] or {}).get("error")]
+    assert errors == ["explorer_exists"]

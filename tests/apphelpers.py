@@ -1,8 +1,11 @@
 """Atrapy dla testów mostu `Api` (tests/test_app_api_*.py)."""
 
+import io
+import os
 import threading
 from collections import namedtuple
 from datetime import datetime
+from pathlib import Path
 from typing import ClassVar
 
 from admenot.app.api import Api
@@ -11,6 +14,8 @@ from admenot.engine.apk import cache as C
 from admenot.engine.apk.analyze import ApkReport
 from admenot.engine.apk.fetch import FetchedApks, default_cache_dir
 from admenot.engine.apk.providers import DeviceApkProvider
+from admenot.engine.explorer.guard import stream_args
+from admenot.engine.explorer.media import MediaServer, stat_size
 from admenot.engine.settings import save_settings
 
 NOW = datetime(2026, 9, 26, 14, 30, 0)
@@ -82,6 +87,18 @@ def policy_factory(policies):
     return factory
 
 
+def explorer_media(serial, adb, allow_origin):
+    """Serwer mediów eksploratora bez procesu `adb`: strumień to `dd` przez atrapę telefonu (`run_bytes`),
+    token stały (adresy w nagraniach mostu)."""
+    def open_stream(path, start):
+        return io.BytesIO(adb.run_bytes(stream_args(path, start)))
+
+    server = MediaServer("adb", serial, allow_origin, open_stream=open_stream,
+                         size_of=lambda path: stat_size(adb, path))
+    server.token = "TOKEN"
+    return server
+
+
 def make_api(phone, *, sync=True, apk=None, lang="pl", apk_mode="full", **kw):
     # Controller ruling F2: testy nie mogą zależeć od locale Windows — język ustawiony na
     # sztywno przed skonstruowaniem `Api`, które przy starcie wczytuje ustawienia.
@@ -90,6 +107,8 @@ def make_api(phone, *, sync=True, apk=None, lang="pl", apk_mode="full", **kw):
     rec = RecordingEmitter()
     kw.setdefault("open_file", lambda path: None)
     kw.setdefault("app_labels", lambda serial, adb, stop, on_line: {})  # bez scrcpy na komputerze testów
+    kw.setdefault("explorer_media", explorer_media)
+    kw.setdefault("explorer_temp", Path(os.environ["LOCALAPPDATA"]) / "explorer-temp")  # nie prawdziwy %TEMP%
     provider = apk or NoApk()
     api = Api(rec, host_factory=lambda path: phone, apk_factory=lambda adb, policy=None, **kw: provider,
               sync_jobs=sync, now=lambda: NOW, **kw)
