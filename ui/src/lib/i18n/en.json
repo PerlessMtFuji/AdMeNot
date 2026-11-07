@@ -108,6 +108,11 @@
     "upload_here": "Upload here",
     "list": { "label": "Files in folder", "name": "Name", "size": "Size", "date": "Date", "folder": "folder" },
     "locked_row": "No access",
+    "folder_stats": {
+      "counting": "counting…", "empty": "empty", "failed": "could not count",
+      "partial": "Some subfolders are not accessible — the numbers cover the rest.",
+      "approx": "Approximate size: this Android only reports the space used on disk."
+    },
     "locked": { "title": "Android does not allow looking into this folder", "text": "The phone does not share it over the cable — usually it is app data that Android protects from other programs." },
     "empty": { "folder": "This folder is empty", "folder_text": "Upload files from your computer — drag them onto the window or use “Upload here”.", "filter": "Nothing here matches the filter or search", "filter_text": "Change the type filter or clear the search box." },
     "storage": {
@@ -159,6 +164,20 @@
       "more": "Show more",
       "encoding": "Encoding: {encoding}",
       "lines": { "one": "{count} line", "few": "{count} lines", "many": "{count} lines", "other": "{count} lines" },
+      "sheet_label": "Spreadsheet preview", "sheet_tabs": "Sheets in the file", "sheet_hidden": "hidden", "sheet_copy": "Copy sheet",
+      "sheet_count": { "one": "{count} sheet", "few": "{count} sheets", "many": "{count} sheets", "other": "{count} sheets" },
+      "sheet_rows": { "one": "{count} row", "few": "{count} rows", "many": "{count} rows", "other": "{count} rows" },
+      "sheet_hits": { "one": "{count} match", "few": "{count} matches", "many": "{count} matches", "other": "{count} matches" },
+      "sheet_delimiter": "Delimiter: {delimiter}",
+      "sheet_sep": { "semicolon": "semicolon", "comma": "comma", "tab": "tab", "pipe": "vertical bar" },
+      "sheet_empty": "This sheet is empty.",
+      "sheet_more": "More rows in the file",
+      "sheet_truncated": "This sheet is too big to show in full — you can see its beginning. Copy the file to the computer to see all of it.",
+      "sheet_problem": {
+        "too_big": "This file is too big to preview. Copy it to the computer to view it.",
+        "encrypted": "This file is password-protected, so it cannot be previewed. Copy it to the computer and open it in Excel.",
+        "unreadable": "This file cannot be read as a spreadsheet — it may be damaged or in a different format than its name suggests. Copy it to the computer."
+      },
       "meta": {
         "photo": "Photo", "video": "Video", "audio": "Track", "camera": "Camera", "location": "Location", "file": "File",
         "coords": "Coordinates", "map": "Show on map", "name": "Name", "path": "Path", "size": "Size", "modified": "Modified",

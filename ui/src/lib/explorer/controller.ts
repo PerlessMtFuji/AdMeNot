@@ -68,6 +68,15 @@ export class ExplorerController {
       else if (this.opening) this.earlyPlaces = d.places;
     });
     on('explorer:storage', (d) => { if (s.open) s.storage = d; });
+    on('explorer:folders', (d) => {
+      if (!mine(d)) return;
+      const next = { ...s.dirStats };
+      for (const [path, stats] of Object.entries(d.folders)) {
+        if (stats) next[path] = stats;
+        else delete next[path];
+      }
+      s.dirStats = next;
+    });
     on('explorer:offline', (d) => { if (mine(d)) s.offline = true; });
     on('explorer:online', (d) => {
       if (!mine(d)) return;
@@ -217,6 +226,7 @@ export class ExplorerController {
       return;
     }
     this.remember(r);
+    if (r.folders && Object.keys(r.folders).length) s.dirStats = { ...s.dirStats, ...r.folders };
     this.showList(r, (refresh || !!known) && r.path === s.path);
   }
 
@@ -430,6 +440,16 @@ export class ExplorerController {
   /** Początek tekstu do dymku przy najechaniu: lekki odczyt, który nie rusza czytnika pełnego podglądu. */
   textHead(path: string) {
     return this.request(() => this.api.explorer_text_head(path), false);
+  }
+
+  /** Cały arkusz do pełnego podglądu. */
+  sheet(path: string) {
+    return this.request(() => this.api.explorer_sheet(path), false);
+  }
+
+  /** Początek pierwszego arkusza do dymku przy najechaniu. */
+  sheetHead(path: string) {
+    return this.request(() => this.api.explorer_sheet_head(path), false);
   }
 
   async openMap(lat: number, lon: number): Promise<void> {
@@ -752,7 +772,7 @@ export class ExplorerController {
     s.selected.clear();
     this.markFresh([]);
     Object.assign(s, {
-      storage: null, problems: null, drop: null, starting: false, clipboardEmpty: false, barHeld: false, hover: null, reveal: null,
+      dirStats: {}, storage: null, problems: null, drop: null, starting: false, clipboardEmpty: false, barHeld: false, hover: null, reveal: null,
       open: false, serial: null, device: null, places: [], recent: [], path: ROOT, crumbs: [], entries: [],
       locked: false, skipped: 0, loading: false, view: 'list', filter: 'all', query: '', anchor: null, tasks: [],
       offline: false, preview: null, playing: null, queue: [], playError: false, dest: null, leftovers: 0, media: '', error: null,

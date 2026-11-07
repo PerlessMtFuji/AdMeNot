@@ -377,7 +377,7 @@ EXPLORER_DAY = 1_790_413_200  # 2026-09-26 09:00 UTC (dzień nagrania)
 
 def _explorer_phone(tmp: Path) -> TransferPhone:
     """Telefon do eksploratora: Aparat 40 zdjęć z 3 dni (pierwsze z GPS), Pobrane (PDF, DOCX, APK, TXT
-    w cp1250), Muzyka 3 pliki, Filmy 2, `Android/data` bez dostępu (sonda kłódki dostaje odmowę)."""
+    i CSV w cp1250), Muzyka 3 pliki, Filmy 2, `Android/data` bez dostępu (sonda kłódki dostaje odmowę)."""
     gps = [(1, ASCII, "N"), (2, RATIONAL, [(52, 1), (13, 1), (472, 10)]),
            (3, ASCII, "E"), (4, RATIONAL, [(21, 1), (0, 1), (421, 10)])]
     photo = with_segments(jpeg_bytes((64, 48)), [segment(0xE1, build_exif([(0x010F, ASCII, "OPPO")], None, gps))])
@@ -388,7 +388,8 @@ def _explorer_phone(tmp: Path) -> TransferPhone:
             photo if i == 0 else jpeg_bytes((64, 48), (i * 6, 90, 200 - i * 4)),
             EXPLORER_DAY - day * 86_400 - slot * 600)
     downloads = {"faktura.pdf": b"%PDF-1.4 faktura", "umowa.docx": b"PK\x03\x04umowa",
-                 "aplikacja.apk": b"PK\x03\x04apk", "notatka.txt": "Zażółć gęślą jaźń".encode("cp1250")}
+                 "aplikacja.apk": b"PK\x03\x04apk", "notatka.txt": "Zażółć gęślą jaźń".encode("cp1250"),
+                 "zestawienie.csv": "Klient;Kwota;Data\r\nŁódź;1234,50;2026-09-01\r\nGdańsk;99;2026-09-02\r\n".encode("cp1250")}
     for name, data in downloads.items():
         files[f"Download/{name}"] = (data, EXPLORER_DAY - 3_600)
     for i in range(3):
@@ -426,6 +427,8 @@ def _explorer(r: Recorder, phone: Any) -> None:
     r.call("explorer_list", "/sdcard/Download")
     r.call("explorer_text", "/sdcard/Download/notatka.txt", False)
     r.call("explorer_text_head", "/sdcard/Download/notatka.txt")
+    r.call("explorer_sheet", "/sdcard/Download/zestawienie.csv")
+    r.call("explorer_sheet_head", "/sdcard/Download/zestawienie.csv")
     r.call("explorer_mkdir", "/sdcard/Download", "Nowy folder")
     with mock.patch.object(explorer_create.secrets, "token_hex", lambda n: "0123456789ab"):
         r.call("explorer_new_text", "/sdcard/Download", "Lista zakupów", "mleko\nchleb")

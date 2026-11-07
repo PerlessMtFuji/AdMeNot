@@ -520,7 +520,14 @@ export interface ExplorerListView {
   skipped: number;
   /** Cały folder bez dostępu (kłódka zamiast błędu). */
   locked: boolean;
+  /** Liczby podfolderów policzone już w tej sesji; resztę przynosi `explorer:folders`. */
+  folders?: Record<string, FolderStatsView>;
 }
+
+/** Liczba plików i rozmiar folderu razem z podfolderami (także ukrytymi plikami — jak kopia folderu).
+ *  `partial` — część podfolderów bez dostępu; `approx` — rozmiar z bloków dysku (starszy Android).
+ *  `failed` — nie udało się policzyć (np. limit czasu). */
+export type FolderStatsView = { files: number; bytes: number; partial: boolean; approx: boolean } | { failed: true };
 
 export type TaskStatus = 'queued' | 'running' | 'paused' | 'waiting' | 'done' | 'cancelled' | 'failed';
 
@@ -939,6 +946,10 @@ export interface Api {
   explorer_meta(path: string): R<{ meta: EntryMeta }>;
   explorer_text(path: string, more: boolean): R<{ text: string; encoding: string; truncated: boolean }>;
   explorer_text_head(path: string): R<{ text: string; truncated: boolean }>;
+  /** Arkusz (XLSX/XLSM/XLS/CSV/TSV): wszystkie arkusze jako tekst komórek albo `problem`, gdy się nie da. */
+  explorer_sheet(path: string): R<SheetBookView | SheetProblem>;
+  /** Początek pierwszego arkusza do dymku, z nazwami wszystkich arkuszy. */
+  explorer_sheet_head(path: string): R<SheetHeadView | SheetProblem>;
   explorer_mkdir(parent: string, name: string): R<{ path: string }>;
   explorer_new_text(parent: string, name: string, text: string): R<{ path: string }>;
   explorer_open_map(lat: number, lon: number): R<Record<string, never>>;
@@ -1019,9 +1030,36 @@ export interface EventMap {
   'explorer:closed': { serial: string; reason: 'other_phone' | 'switched' };
   /** Pamięć telefonu po zadaniu wgrywania (poziom „cieczy” w Miejscach rośnie na żywo). */
   'explorer:storage': StorageView;
+  /** Liczby folderów z liczenia w tle; `null` — folder do policzenia od nowa (coś do niego wgrano). */
+  'explorer:folders': { serial: string; folders: Record<string, FolderStatsView | null> };
   'explorer:task': { task: TaskView };
   /** Pliki upuszczone z Eksploratora Windows (liczba plików i bajty z folderami). */
   'explorer:drop': { paths: string[]; count: number; bytes: number };
 }
 
 export type EventName = keyof EventMap;
+
+/** Arkusz w podglądzie: wiersze jako tekst komórek (puste na końcu wiersza obcięte). CSV ma jeden arkusz bez nazwy. */
+export interface SheetView {
+  name: string;
+  rows: string[][];
+  truncated: boolean;
+  hidden: boolean;
+}
+
+export interface SheetBookView {
+  sheets: SheetView[];
+  delimiter: string | null;
+  encoding: string | null;
+}
+
+export interface SheetHeadView {
+  names: string[];
+  rows: string[][];
+  truncated: boolean;
+}
+
+/** Arkusza nie pokażemy: za duży, z hasłem albo nie do odczytania (np. „.xls” będący stroną HTML). */
+export interface SheetProblem {
+  problem: 'too_big' | 'encrypted' | 'unreadable';
+}

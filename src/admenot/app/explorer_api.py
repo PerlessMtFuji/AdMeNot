@@ -40,6 +40,7 @@ from admenot.engine.device.info import DeviceInfo, read_device_info
 from admenot.engine.explorer import hostfs
 from admenot.engine.explorer.adbsocket import fast_puller, fast_shell
 from admenot.engine.explorer.create import CreateError, make_folder, make_text
+from admenot.engine.explorer.foldersize import folder_stats
 from admenot.engine.explorer.guard import (
     ExplorerAdb,
     UnsafeCommand,
@@ -53,6 +54,7 @@ from admenot.engine.explorer.meta import image_meta, media_meta
 from admenot.engine.explorer.places import Place, count_place, find_places, scan_place
 from admenot.engine.explorer.plan import Problem, TaskPlan, plan_to_pc, plan_to_phone
 from admenot.engine.explorer.queue import TransferQueue, sweep_parts, sweep_recorded
+from admenot.engine.explorer.sheets import HEAD_BYTES, SHEET_BYTES, Book, SheetError, read_book
 from admenot.engine.explorer.textview import TEXT_HEAD, TEXT_LIMIT, decode_chunk
 from admenot.engine.explorer.thumbs import EXIF_HEAD
 from admenot.engine.oplock import DeviceBusy, device_lock
@@ -72,6 +74,7 @@ __all__ = ["ExplorerMixin", "MediaFactory", "explorer_temp_dir"]
 MediaFactory = Callable[[str, ExplorerAdb, Callable[[str], bool]], MediaServer]
 _LOCAL_ORIGIN = re.compile(r"http://(?:127\.0\.0\.1|localhost)(?::\d{1,5})?")
 _END = frozenset({"done", "cancelled", "failed"})  # końcowe stany zadania kolejki
+SHEET_HEAD_ROWS, SHEET_HEAD_COLS = 30, 12  # dymek arkusza: więcej i tak się nie zmieści
 _PREVIEW_KINDS = frozenset({"image", "video", "audio"})  # podgląd przez `explorer_meta` (tekst: `explorer_text`)
 EXPLORER_QUIT_WAIT = 10.0  # s; wyjście z programu czeka na wątek kolejki (zabicie `adb`, sprzątanie)
 USAGE_WAIT = 60.0  # s; pamięć telefonu czeka na rozmiary Miejsc z ich przejścia w tle
@@ -202,6 +205,13 @@ class _Session:
     sizes: dict[str, int] = field(default_factory=dict)  # Miejsce → bajty z przejścia w tle
     sized: threading.Event = field(default_factory=threading.Event)  # rozmiary Miejsc z `_GROUPS` już są
     card: dict[str, Any] = field(init=False)  # karta telefonu (nazwa w okruszkach)
+    # Liczby folderów dla kafelków (`explorer:folders`): wynik na sesję, kolejka do policzenia (tylko foldery
+    # oglądanego teraz miejsca) i wątek, który ją przerabia.
+    folders: dict[str, dict[str, Any]] = field(default_factory=dict)
+    folder_queue: list[str] = field(default_factory=list)
+    folder_parent: str | None = None  # folder, którego podfoldery są w kolejce (ostatnie `explorer_list`)
+    folder_cv: threading.Condition = field(default_factory=threading.Condition)
+    folder_worker: bool = False
 
     def __post_init__(self) -> None:
         self.card = device_card(self.device, self.match)
@@ -472,7 +482,72 @@ class ExplorerMixin:
             log_exception(exc, scrub=client_paths)
         (sess.pump or self._emit)("explorer:task", {"task": _task_view(detail)})
         if detail.get("kind") == "to_phone" and detail.get("status") in _END:
+            if isinstance(detail.get("dest"), str) and detail.get("done_files"):
+                self._explorer_folders_forget(sess, detail["dest"])
             self._explorer_storage_push(sess)
+
+    def _explorer_folders(self, sess: _Session, parent: str, paths: list[str]) -> None:
+        """Liczby plików i rozmiary `paths` (podfoldery `parent`) w tle, po jednym `explorer:folders` na folder.
+        Nowe `explorer_list` podmienia kolejkę: foldery miejsca, z którego serwisant wyszedł, czekają do powrotu."""
+        with sess.folder_cv:
+            sess.folder_parent = parent
+            sess.folder_queue = [p for p in paths if p not in sess.folders]
+            sess.folder_cv.notify_all()
+            start = not sess.folder_worker and not self._sync and bool(sess.folder_queue)
+            if start:
+                sess.folder_worker = True
+        if self._sync:
+            self._explorer_folders_run(sess, once=True)
+        elif start:
+            threading.Thread(target=self._explorer_folders_run, args=(sess,), name="explorer-folders",
+                             daemon=True).start()
+
+    def _explorer_folders_run(self, sess: _Session, once: bool = False) -> None:
+        try:
+            while True:
+                with sess.folder_cv:
+                    while not sess.folder_queue:
+                        if once or self._explorer is not sess:
+                            return
+                        sess.folder_cv.wait(timeout=1.0)
+                    path = sess.folder_queue.pop(0)
+                if self._explorer is not sess:
+                    return
+                view: dict[str, Any] | None
+                try:
+                    view = folder_stats(sess.adb, path).view()
+                except AdbError as exc:
+                    view = None if exc.kind in ("offline", "no_device", "unauthorized") else {"failed": True}
+                except Exception as exc:  # noqa: BLE001 — jeden folder bez liczb, reszta liczy się dalej
+                    log_exception(exc, scrub=client_paths)
+                    view = {"failed": True}
+                if view is None:  # telefon odłączony: po powrocie `explorer_list` doda folder do kolejki znowu
+                    continue
+                with self._explorer_lock:
+                    if self._explorer is not sess:
+                        return
+                    sess.folders[path] = view
+                self._emit("explorer:folders", {"serial": sess.serial, "folders": {path: view}})
+        finally:
+            with sess.folder_cv:
+                if not once:
+                    sess.folder_worker = False
+
+    def _explorer_folders_forget(self, sess: _Session, path: str) -> None:
+        """Coś przybyło w `path`: liczby jego i wszystkich folderów nad nim są nieaktualne. Te z oglądanego
+        miejsca liczą się od razu od nowa (zdarzenie z `null` — kafelek wraca do „liczę…”)."""
+        stale = {path, *(str(p) for p in PurePosixPath(path).parents if str(p).startswith(ROOT))}
+        with self._explorer_lock:
+            gone = [p for p in stale if sess.folders.pop(p, None) is not None]
+        if not gone:
+            return
+        self._emit("explorer:folders", {"serial": sess.serial, "folders": dict.fromkeys(gone)})
+        parent = sess.folder_parent
+        again = [p for p in gone if parent is not None and str(PurePosixPath(p).parent) == parent]
+        if again:
+            with sess.folder_cv:
+                queued = list(sess.folder_queue)
+            self._explorer_folders(sess, parent, [*queued, *again])
 
     def _explorer_storage_push(self, sess: _Session) -> None:
         """`explorer:storage` po zadaniu do telefonu (w tle — liczenie rozmiarów Miejsc trwa)."""
@@ -700,8 +775,14 @@ class ExplorerMixin:
                 sess.media.remember_size(entry.path, entry.size)
         if not locked:
             self._explorer_remember(sess.serial, path)
-        return {"path": path, "crumbs": crumbs(path, sess.name, apps),
-                "entries": [entry_view(e, sess.media) for e in entries], "skipped": skipped, "locked": locked}
+        dirs = [e.path for e in entries if e.kind == "dir" and not e.locked]
+        with self._explorer_lock:
+            known = {p: sess.folders[p] for p in dirs if p in sess.folders}
+        view = {"path": path, "crumbs": crumbs(path, sess.name, apps),
+                "entries": [entry_view(e, sess.media) for e in entries], "skipped": skipped, "locked": locked,
+                "folders": known}
+        self._explorer_folders(sess, path, dirs)  # reszta dochodzi zdarzeniami `explorer:folders`
+        return view
 
     @_bridge
     def explorer_meta(self, path: str) -> dict[str, Any]:
@@ -763,6 +844,43 @@ class ExplorerMixin:
         text, _codec, _used = decode_chunk(data, None, final=size <= TEXT_HEAD)
         return {"text": text, "truncated": size > TEXT_HEAD}
 
+    def _explorer_book(self, path: Any, limit: int, **kw: Any) -> Book | dict[str, Any]:
+        """Arkusz z telefonu; zamiast niego `{"problem": …}`, gdy za duży, z hasłem albo nie do odczytania."""
+        sess = self._explorer_session()
+        path = self._explorer_path(path, file=True)
+        is_dir, size, _mtime = self._explorer_stat(sess, path)
+        if is_dir:
+            raise AppError("bad_request", "path")
+        if size > limit:
+            return {"problem": "too_big"}
+        with self._explorer_errors(sess):
+            data = sess.media.read_range(path, 0, size) if size else b""
+            if len(data) < size:  # strumień urwany: pół arkusza to nie arkusz
+                raise AdbError("command_failed", "short read")
+        try:
+            return read_book(data, **kw)
+        except SheetError as exc:
+            return {"problem": exc.kind}
+
+    @_bridge
+    def explorer_sheet(self, path: str) -> dict[str, Any]:
+        """Cały arkusz (wszystkie arkusze pliku) jako tekst komórek, w granicach limitów `sheets.py`."""
+        book = self._explorer_book(path, SHEET_BYTES)
+        if isinstance(book, dict):
+            return book
+        return {"sheets": [{"name": s.name, "rows": s.rows, "truncated": s.truncated, "hidden": s.hidden}
+                           for s in book.sheets],
+                "delimiter": book.delimiter, "encoding": book.encoding}
+
+    @_uncounted
+    def explorer_sheet_head(self, path: str) -> dict[str, Any]:
+        """Początek pierwszego arkusza do dymku przy najechaniu, z nazwami wszystkich arkuszy."""
+        book = self._explorer_book(path, HEAD_BYTES, rows=SHEET_HEAD_ROWS, cols=SHEET_HEAD_COLS, first_only=True)
+        if isinstance(book, dict):
+            return book
+        first = book.sheets[0] if book.sheets else None
+        return {"names": book.names, "rows": first.rows if first else [], "truncated": bool(first and first.truncated)}
+
     @_bridge
     def explorer_mkdir(self, parent: str, name: str) -> dict[str, Any]:
         sess = self._explorer_session()
@@ -789,6 +907,7 @@ class ExplorerMixin:
         except AppError as exc:
             raise _bad_name(exc) from None
         sess.stats.note("created", "text")
+        self._explorer_folders_forget(sess, str(PurePosixPath(made).parent))
         return {"path": made}
 
     @_bridge

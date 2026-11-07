@@ -62,6 +62,73 @@ test('PDF renders, searches all pages, highlights matches and handles page/zoom 
   expect(errors).toEqual([]);
 });
 
+test('spreadsheet: a recorded CSV and a two-sheet workbook render a scrollable grid; search switches sheets', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto('/?scenario=explorer');
+  await page.getByRole('button', { name: 'Pliki', exact: true }).click();
+  await page.evaluate(async () => {
+    const ex = (window as any).__admenot.ctl.explorer;
+    await ex.go('/sdcard/Download');
+    ex.openPreview('/sdcard/Download/zestawienie.csv');
+  });
+  const dialog = page.getByRole('dialog');
+  const grid = dialog.locator('[data-grid]');
+  await expect(grid).toContainText('Łódź');
+  await expect(dialog).toContainText('Separator: średnik');
+  await expect(dialog).toContainText('cp1250');
+
+  await page.evaluate(() => {  // atrapa mostka: arkusz bez nagrania to 101 wierszy w dwóch arkuszach
+    const ex = (window as any).__admenot.ctl.explorer;
+    const entry = { ...ex.state.entries[0], path: '/sdcard/Download/duzy.xlsx', name: 'duzy.xlsx', type: 'doc', ext: 'xlsx', url: null };
+    ex.state.entries = [...ex.state.entries, entry];
+    ex.openPreview(entry.path);
+  });
+  await expect(grid).toContainText('F/1');
+  const visibleRows = await grid.locator('[data-row]').count();
+  expect(visibleRows).toBeGreaterThan(10);
+  expect(visibleRows).toBeLessThan(80);  // w DOM tylko okno wokół ekranu
+  await grid.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  await expect(grid).toContainText('F/100');
+  // nagłówek kolumn i numery wierszy zostają na miejscu przy przewijaniu
+  const header = await grid.getByText('A', { exact: true }).boundingBox();
+  const box = await grid.boundingBox();
+  expect(header!.y).toBeGreaterThanOrEqual(box!.y);
+  expect(header!.y).toBeLessThan(box!.y + 30);
+
+  await dialog.getByRole('searchbox', { name: 'Szukaj w treści' }).fill('przelewem');
+  await expect(dialog.getByRole('status').filter({ hasText: '1 z 1' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /Notatki/ })).toHaveAttribute('aria-current', 'true');
+  await expect(dialog.locator('[data-cellbar]')).toContainText('A1');
+  await expect(grid.locator('.cell-active')).toHaveText('Klient z Łodzi płaci przelewem');
+  await page.screenshot({ path: 'test-results/sheet-preview.png' });
+  expect(errors).toEqual([]);
+});
+
+test('folder counts and sizes fit in list rows and grid tiles', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto('/?scenario=explorer');
+  await page.getByRole('button', { name: 'Pliki', exact: true }).click();
+  await page.evaluate(async () => {
+    const ex = (window as any).__admenot.ctl.explorer;
+    ex.setView('list');
+    await ex.go('/sdcard');
+  });
+  const list = page.getByRole('listbox', { name: 'Pliki w folderze' });
+  await expect(list.locator('[data-path="/sdcard/DCIM"]')).toContainText('40 plików');
+  await expect(list.locator('[data-path="/sdcard/DCIM"]')).toContainText('27 KB');
+  await page.screenshot({ path: 'test-results/folders-list.png' });
+  await page.evaluate(() => (window as any).__admenot.ctl.explorer.setView('grid'));
+  const stats = page.locator('[data-path="/sdcard/Movies"] [data-folder-stats]');
+  await expect(stats).toHaveText('2 pliki · 9,8 KB');
+  // tekst mieści się w kaflu (obcięty wielokropkiem, nie wystaje)
+  const fits = await stats.evaluate((el) => el.getBoundingClientRect().right <= el.closest('[data-path]')!.getBoundingClientRect().right + 0.5);
+  expect(fits).toBe(true);
+  await page.screenshot({ path: 'test-results/folders-grid.png' });
+  expect(errors).toEqual([]);
+});
+
 async function openPdf(page: import('@playwright/test').Page) {
   await page.route('http://127.0.0.1:4173/test-search.pdf', route => route.fulfill({
     body: readFileSync(new URL('./fixtures/search.pdf', import.meta.url)),

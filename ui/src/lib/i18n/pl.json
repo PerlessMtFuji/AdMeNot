@@ -108,6 +108,11 @@
     "upload_here": "Wgraj tutaj",
     "list": { "label": "Pliki w folderze", "name": "Nazwa", "size": "Rozmiar", "date": "Data", "folder": "folder" },
     "locked_row": "Bez dostępu",
+    "folder_stats": {
+      "counting": "liczę…", "empty": "pusty", "failed": "nie udało się policzyć",
+      "partial": "Część podfolderów jest bez dostępu — liczby obejmują resztę.",
+      "approx": "Rozmiar przybliżony: ten Android podaje tylko zajęte miejsce na dysku."
+    },
     "locked": { "title": "Android nie pozwala zajrzeć do tego folderu", "text": "Telefon nie udostępnia go przez kabel — zwykle to dane aplikacji, które Android chroni przed innymi programami." },
     "empty": { "folder": "Ten folder jest pusty", "folder_text": "Wgraj tu pliki z komputera — przeciągnij je na okno albo użyj „Wgraj tutaj”.", "filter": "Nic tu nie pasuje do filtra ani wyszukiwania", "filter_text": "Zmień filtr typu albo wyczyść pole wyszukiwania." },
     "storage": {
@@ -159,6 +164,20 @@
       "more": "Pokaż więcej",
       "encoding": "Kodowanie: {encoding}",
       "lines": { "one": "{count} linia", "few": "{count} linie", "many": "{count} linii", "other": "{count} linii" },
+      "sheet_label": "Podgląd arkusza", "sheet_tabs": "Arkusze w pliku", "sheet_hidden": "ukryty", "sheet_copy": "Kopiuj arkusz",
+      "sheet_count": { "one": "{count} arkusz", "few": "{count} arkusze", "many": "{count} arkuszy", "other": "{count} arkusza" },
+      "sheet_rows": { "one": "{count} wiersz", "few": "{count} wiersze", "many": "{count} wierszy", "other": "{count} wiersza" },
+      "sheet_hits": { "one": "{count} trafienie", "few": "{count} trafienia", "many": "{count} trafień", "other": "{count} trafienia" },
+      "sheet_delimiter": "Separator: {delimiter}",
+      "sheet_sep": { "semicolon": "średnik", "comma": "przecinek", "tab": "tabulator", "pipe": "pionowa kreska" },
+      "sheet_empty": "Ten arkusz jest pusty.",
+      "sheet_more": "Dalsze wiersze w pliku",
+      "sheet_truncated": "Ten arkusz jest za duży, żeby pokazać go w całości — widać jego początek. Całość obejrzysz po skopiowaniu pliku na komputer.",
+      "sheet_problem": {
+        "too_big": "Ten plik jest za duży na podgląd. Obejrzysz go po skopiowaniu na komputer.",
+        "encrypted": "Ten plik jest zabezpieczony hasłem, więc podgląd nie jest możliwy. Skopiuj go na komputer i otwórz w Excelu.",
+        "unreadable": "Tego pliku nie da się odczytać jako arkusza — może być uszkodzony albo mieć inny format, niż sugeruje nazwa. Skopiuj go na komputer."
+      },
       "meta": {
         "photo": "Zdjęcie", "video": "Film", "audio": "Utwór", "camera": "Aparat", "location": "Lokalizacja", "file": "Plik",
         "coords": "Współrzędne", "map": "Pokaż na mapie", "name": "Nazwa", "path": "Ścieżka", "size": "Rozmiar", "modified": "Zmieniony",

@@ -326,6 +326,45 @@ def test_failed_text_head_is_not_a_session_error(tmp_path):
     assert api._explorer.stats.errors == {"explorer_missing": 1}  # zwykłe odczyty liczą się dalej
 
 
+def test_sheet_reads_every_sheet_and_head_only_the_first(tmp_path):
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    wb.active.title = "Faktury"
+    wb.active.append(["Nr", "Kwota"])
+    wb.active.append(["F/1", 12.5])
+    wb.create_sheet("Notatki")["A1"] = "zażółć"
+    api, _, host, _ = _opened(tmp_path)
+    wb.save(_storage_of(host).local("/sdcard/Download/zestawienie.xlsx"))
+    previews = dict(api._explorer.stats.previews)
+
+    got = api.explorer_sheet("/sdcard/Download/zestawienie.xlsx")
+    assert got == {"sheets": [
+        {"name": "Faktury", "rows": [["Nr", "Kwota"], ["F/1", "12.5"]], "truncated": False, "hidden": False},
+        {"name": "Notatki", "rows": [["zażółć"]], "truncated": False, "hidden": False},
+    ], "delimiter": None, "encoding": None}
+    head = api.explorer_sheet_head("/sdcard/Download/zestawienie.xlsx")
+    assert head == {"names": ["Faktury", "Notatki"], "rows": [["Nr", "Kwota"], ["F/1", "12.5"]], "truncated": False}
+    assert dict(api._explorer.stats.previews) == previews  # arkusze nie mają klucza w telemetrii (jak PDF)
+
+
+def test_sheet_csv_and_problems(tmp_path, monkeypatch):
+    api, _, host, _ = _opened(tmp_path)
+    storage = _storage_of(host)
+    storage.local("/sdcard/Download/lista.csv").write_bytes("Klient;Kwota\r\nŁódź;1,5\r\n".encode("cp1250"))
+    got = api.explorer_sheet("/sdcard/Download/lista.csv")
+    assert got["sheets"][0]["rows"] == [["Klient", "Kwota"], ["Łódź", "1,5"]]
+    assert (got["delimiter"], got["encoding"]) == (";", "cp1250")
+
+    storage.local("/sdcard/Download/strona.xls").write_bytes(b"<html><table></table></html>")
+    assert api.explorer_sheet("/sdcard/Download/strona.xls") == {"problem": "unreadable"}
+    monkeypatch.setattr(explorer_api, "HEAD_BYTES", 4)
+    assert api.explorer_sheet_head("/sdcard/Download/lista.csv") == {"problem": "too_big"}
+    assert api.explorer_sheet("/sdcard/Download")["error"]["key"] == "bad_request"
+    assert api.explorer_sheet_head("/sdcard/Download/nie ma.csv")["error"]["key"] == "explorer_missing"
+    assert api._explorer.stats.errors == {"bad_request": 1}  # tylko pełny podgląd; dymek błędów nie liczy
+
+
 def test_mkdir_and_new_text(tmp_path):
     api, _, host, _ = _opened(tmp_path)
     storage = _storage_of(host)
@@ -602,6 +641,65 @@ def test_copy_problems_returned_before_start(tmp_path, monkeypatch):
     assert denied == {"problems": [{"key": "denied", "detail": {"paths": ["/sdcard/Android/data"]}}]}
     assert api.explorer_tasks() == {"tasks": []}
     api.explorer_close()
+
+
+def _folder_events(rec) -> dict:
+    out: dict = {}
+    for e in rec.of("explorer:folders"):
+        assert e["serial"] == SERIAL
+        out.update(e["folders"])
+    return out
+
+
+def test_listing_counts_subfolders_once_and_skips_locked(tmp_path):
+    api, rec, host, _ = _opened(tmp_path)
+    _storage_of(host).deny_in_tree = True  # jak Android 11+: `Android/data` w środku drzewa bez dostępu
+    shown = api.explorer_list("/sdcard/Android")
+    assert shown["folders"] == {}  # nic jeszcze nie policzone: liczby dochodzą zdarzeniami
+    folders = _folder_events(rec)
+    assert folders == {"/sdcard/Android/media": {"files": 1, "bytes": 1, "partial": False, "approx": False}}
+    # `Android/data` z kłódką: bez liczenia
+
+    api.explorer_list("/sdcard")
+    every = _folder_events(rec)
+    assert every["/sdcard/DCIM"] == {"files": 2, "bytes": len(FILES["DCIM/Camera/IMG_Ąę 1.jpg"]) + 1,
+                                     "partial": False, "approx": False}  # ukryty plik też, jak przy kopii
+    assert every["/sdcard/Android"]["partial"] is True and every["/sdcard/Android"]["files"] == 1
+    calls = len(_storage_of(host).commands)
+    again = api.explorer_list("/sdcard")
+    assert again["folders"] == {p: v for p, v in every.items() if p.count("/") == 2}  # dzieci /sdcard z pamięci
+    assert not [c for c in _storage_of(host).commands[calls:] if c.startswith("du ")]  # z pamięci sesji
+
+
+def test_old_toybox_sizes_are_approximate(tmp_path):
+    api, rec, host, _ = _opened(tmp_path)
+    _storage_of(host).du_without_b = True
+    api.explorer_list("/sdcard/Download")
+    api.explorer_list("/sdcard")
+    assert _folder_events(rec)["/sdcard/Music"] == {"files": 1, "bytes": 1024, "partial": False, "approx": True}
+
+
+def test_new_text_and_upload_recount_the_folder_and_its_parents(tmp_path):
+    api, rec, _, _ = _opened(tmp_path)
+    api.explorer_list("/sdcard")
+    before = _folder_events(rec)["/sdcard/Download"]
+    rec.events.clear()
+    assert "error" not in api.explorer_new_text("/sdcard/Download", "notatka2", "abc")
+    events = [e["folders"] for e in rec.of("explorer:folders")]
+    assert events[0] == {"/sdcard/Download": None}  # kafelek wraca do „liczę…”
+    after = _folder_events(rec)["/sdcard/Download"]
+    assert after["files"] == before["files"] + 1 and after["bytes"] == before["bytes"] + 3
+
+    api.explorer_list("/sdcard/Download")  # oglądany folder: jego podfoldery
+    rec.events.clear()
+    local = _pc_dir(tmp_path, "z komputera")
+    (local / "a.txt").write_bytes(b"12345")
+    started = api.explorer_upload([str(local / "a.txt")], "/sdcard/Download")
+    _wait_task(api, started["task"], "done")
+    forgotten = {p for e in rec.of("explorer:folders") for p, v in e["folders"].items() if v is None}
+    assert forgotten == {"/sdcard/Download"}  # nad nim tylko /sdcard, którego nikt nie liczy
+    # kafelka Download teraz nie widać: policzy się od nowa przy powrocie do /sdcard
+    assert "/sdcard/Download" not in api._explorer.folders
 
 
 def test_upload_task_events(tmp_path):

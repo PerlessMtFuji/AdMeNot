@@ -17,10 +17,10 @@ _TYPES: dict[str, frozenset[str]] = {
     "image": frozenset({"jpg", "jpeg", "jpe", "png", "webp", "gif", "bmp", "heic", "heif"}),
     "video": frozenset({"mp4", "m4v", "mkv", "webm", "3gp", "mov", "avi", "ts"}),
     "audio": frozenset({"mp3", "m4a", "aac", "ogg", "oga", "opus", "wav", "flac", "amr", "awb", "mid", "midi"}),
-    "text": frozenset({"txt", "log", "json", "xml", "csv", "md", "ini", "cfg", "conf", "vcf", "srt", "html",
+    "text": frozenset({"txt", "log", "json", "xml", "csv", "tsv", "md", "ini", "cfg", "conf", "vcf", "srt", "html",
                        "htm", "yml", "yaml"}),
     "apk": frozenset({"apk", "apks", "xapk"}),
-    "doc": frozenset({"pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp", "rtf", "epub"}),
+    "doc": frozenset({"pdf", "doc", "docx", "xls", "xlsx", "xlsm", "ppt", "pptx", "odt", "ods", "odp", "rtf", "epub"}),
 }
 _THUMBS = frozenset({"jpg", "jpeg", "jpe", "png", "webp", "gif", "bmp", "mp3", "flac"})  # miniatury z serwera (thumbs.py)
 _STREAMED = frozenset({"image", "video", "audio"})  # podgląd przez adres pliku na serwerze mediów

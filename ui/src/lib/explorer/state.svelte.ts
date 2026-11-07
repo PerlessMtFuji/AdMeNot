@@ -1,5 +1,5 @@
 import { SvelteSet } from 'svelte/reactivity';
-import type { ApiErrorBody, CrumbView, EntryView, ExplorerProblem, PhoneCard, PlaceView, StorageView, TaskView } from '../types';
+import type { ApiErrorBody, CrumbView, EntryView, ExplorerProblem, FolderStatsView, PhoneCard, PlaceView, StorageView, TaskView } from '../types';
 import { i18n } from '../i18n/index.svelte';
 import { type ExplorerFilter, type ExplorerView, filterEntries, ROOT, sortEntries, type SortSpec } from './logic';
 
@@ -33,8 +33,11 @@ export class ExplorerState {
   sort = $state<SortSpec>({ key: 'date', dir: -1 });
   filter = $state<ExplorerFilter>('all');
   query = $state('');
-  /** Wpisy po sortowaniu: liczone tylko przy zmianie folderu, sortowania albo języka, nie przy każdym klawiszu. */
-  sorted = $derived(sortEntries(this.entries, this.sort, i18n.lang));
+  /** Liczby plików i rozmiary folderów tej sesji (ścieżka → wynik); raw — zdarzenia podmieniają całość. */
+  dirStats = $state.raw<Record<string, FolderStatsView>>({});
+  /** Wpisy po sortowaniu: liczone tylko przy zmianie folderu, sortowania albo języka, nie przy każdym klawiszu.
+   *  Liczby folderów wchodzą tylko przy sortowaniu po rozmiarze (inaczej każdy policzony folder sortowałby od nowa). */
+  sorted = $derived(sortEntries(this.entries, this.sort, i18n.lang, this.sort.key === 'size' ? this.dirStats : undefined));
   /** Wpisy w kolejności na ekranie (sortowanie, filtr typu, szukanie). */
   items = $derived(filterEntries(this.sorted, this.filter, this.query));
   /** Wpis po ścieżce. */

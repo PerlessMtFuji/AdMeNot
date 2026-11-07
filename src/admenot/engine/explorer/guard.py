@@ -1,6 +1,6 @@
 """Strażnik poleceń eksploratora plików: każde polecenie adb eksploratora przechodzi przez `assert_explorer`.
 
-Allowlista poleceń (odczyt pod `/sdcard/`, `mkdir -p`, `mv -n` i `rm -f` wyłącznie na naszym pliku
+Allowlista poleceń (odczyt i `du` pod `/sdcard/`, `mkdir -p`, `mv -n` i `rm -f` wyłącznie na naszym pliku
 tymczasowym `.admenot-<12 hex>.part`, skan mediów) + odrzucanie metaznaków powłoki poza apostrofami
 (`_unquoted_view` ze strażnika transferu). Nic nie nadpisuje i nie usuwa cudzych plików.
 """
@@ -41,7 +41,7 @@ _STAT_FORMAT = "%f|%s|%Y|%n"
 _COUNT_PLACE = ["-type", "f"]
 _SCAN_PLACE = ["-type", "f", "-exec", "stat", "-c", "%s|%n", "{}", "+"]
 _SCAN_FILE_PREFIX = ["content", "call", "--uri", "content://media", "--method", "scan_file", "--arg"]
-_ALLOWED_CMDS = {"find", "stat", "sha256sum", "df", "ls", "head", "tail", "dd", "getprop", "content",
+_ALLOWED_CMDS = {"find", "stat", "du", "sha256sum", "df", "ls", "head", "tail", "dd", "getprop", "content",
                  "mkdir", "mv", "rm"}
 
 
@@ -72,8 +72,8 @@ def assert_explorer(cmd: str) -> None:
     """Rzuca UnsafeCommand, jeśli polecenie nie jest jednym z dozwolonych poleceń eksploratora."""
     if cmd.endswith(STAT_TAIL):
         rest = cmd[: -len(STAT_TAIL)]
-        if not rest.startswith(("stat ", "find ")):
-            raise UnsafeCommand(f"Przyrostek dozwolony tylko po 'stat' i 'find': {cmd[:120]}")
+        if not rest.startswith(("stat ", "find ", "du ")):
+            raise UnsafeCommand(f"Przyrostek dozwolony tylko po 'stat', 'find' i 'du': {cmd[:120]}")
         cmd = rest
     elif cmd.endswith(CONTENT_TAIL):
         rest = cmd[: -len(CONTENT_TAIL)]
@@ -109,6 +109,10 @@ def assert_explorer(cmd: str) -> None:
             raise bad
         for p in t[3:]:
             safe_read_path(p)
+    elif name == "du":  # rozmiar folderu dla kafelka: bajty albo (stary toybox) bloki
+        if len(t) != 3 or t[1] not in ("-sb", "-sk"):
+            raise bad
+        safe_read_path(t[2])
     elif name == "sha256sum":
         if len(t) != 2:
             raise bad

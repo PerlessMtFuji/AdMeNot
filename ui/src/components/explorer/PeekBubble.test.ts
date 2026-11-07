@@ -371,6 +371,26 @@ describe('PeekBubble', () => {
     expect(full.hasAttribute('src')).toBe(false);
   });
 
+  it('błąd obrazka po zamknięciu dymka (zdjęty `src`) nie rzuca wyjątku', async () => {
+    // Chromium zgłasza `error` na <img>, któremu zdjęto `src`, już po zamknięciu dymka (np. wejście do folderu).
+    await hover(PHOTO);
+    const imgs = [...bubble()!.querySelectorAll('img')];
+    expect(imgs.length).toBeGreaterThan(0);
+    const thrown: unknown[] = [];
+    const catcher = (e: ErrorEvent) => { thrown.push(e.error); e.preventDefault(); };
+    window.addEventListener('error', catcher);
+    try {
+      await fireEvent.mouseDown(window);
+      await settle();
+      expect(bubble()).toBeNull();
+      for (const img of imgs) img.dispatchEvent(new Event('error'));
+      await settle();
+    } finally {
+      window.removeEventListener('error', catcher);
+    }
+    expect(thrown).toEqual([]);
+  });
+
   it('nie otwiera się przy s.peek === false, dla folderu, HEIC ani po dotyku', async () => {
     ex.state.peek = false;
     await hover(PHOTO);
@@ -832,6 +852,35 @@ describe('PeekBubble', () => {
     finish(null);
     await settle();
     expect(bubble()?.textContent).toContain('a.jpg');
+  });
+
+  it('arkusz: początek pierwszego arkusza w tabeli, liczba arkuszy w stopce', async () => {
+    const sheet = entry('zestawienie.xlsx', 'doc', 'xlsx');
+    ex.state.entries = [...ALL, sheet];
+    tile(sheet);
+    bridge.answerNext('explorer_sheet_head', { names: ['Faktury', 'Notatki'], rows: [['Nr', 'Klient'], ['F/1', 'Łódź']], truncated: false });
+    await hover(sheet);
+    await vi.waitFor(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+      expect(bubble()!.querySelector('[data-peek-sheet]')).not.toBeNull();
+    });
+    const table = bubble()!.querySelector('[data-peek-sheet]')!;
+    expect([...table.querySelectorAll('th')].map((th) => th.textContent)).toEqual(['', 'A', 'B']);
+    expect(table.textContent).toContain('Łódź');
+    expect(bubble()!.textContent).toContain('2 arkusze');
+    expect(bridge.calls.map((c) => c.method)).not.toContain('explorer_sheet');
+  });
+
+  it('arkusz z hasłem albo nie do odczytania: dymek znika po cichu', async () => {
+    const sheet = entry('haslo.xlsx', 'doc', 'xlsx');
+    ex.state.entries = [...ALL, sheet];
+    tile(sheet);
+    bridge.answerNext('explorer_sheet_head', { problem: 'encrypted' });
+    await hover(sheet);
+    await vi.waitFor(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+      expect(bubble()).toBeNull();
+    });
   });
 
   it('PDF: ikona do czasu treści, odjechanie przerywa rysowanie bez zamykania następnego dymka', async () => {

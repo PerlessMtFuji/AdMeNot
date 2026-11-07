@@ -240,6 +240,45 @@ describe('Preview', () => {
     expect(bridge.calls.filter((c) => c.method === 'explorer_text').map((c) => c.args)).toEqual([[NOTE, false], [NOTE, true]]);
   });
 
+  test('a spreadsheet shows sheet tabs and search jumps between sheets', async () => {
+    const { ex, bridge } = await openExplorer();
+    const book = entry('zestawienie.xlsx', 'doc', 'xlsx');
+    ex.state.entries = [...ex.state.entries, book];
+    bridge.answerNext('explorer_sheet', { delimiter: null, encoding: null, sheets: [
+      { name: 'Faktury', hidden: false, truncated: false, rows: [['Nr', 'Klient'], ['F/1', 'Gdańsk'], ['F/2', 'Łódź']] },
+      { name: 'Stare', hidden: true, truncated: true, rows: [['tajne']] },
+      { name: 'Notatki', hidden: false, truncated: false, rows: [['', 'Klient z ŁODZI']] },
+    ] });
+    ex.openPreview(book.path);
+    await vi.waitFor(() => expect(within(dialog()).getByRole('navigation', { name: 'Arkusze w pliku' })).toBeTruthy());
+    const tabs = within(within(dialog()).getByRole('navigation', { name: 'Arkusze w pliku' })).getAllByRole('button');
+    expect(tabs.map((b) => b.textContent?.trim())).toEqual(['Faktury', 'Stare(ukryty)', 'Notatki']);
+    expect(dialog().textContent).toContain('Gdańsk');
+
+    const input = within(dialog()).getByRole('searchbox', { name: 'Szukaj w treści' });
+    await fireEvent.input(input, { target: { value: 'ł' } });
+    await vi.waitFor(() => expect(dialog().textContent).toContain('1 z 2'));
+    const bar = dialog().querySelector('[data-cellbar]')!;
+    expect(bar.textContent).toContain('B3');
+    expect(bar.textContent).toContain('Łódź');
+    await fireEvent.click(within(dialog()).getByRole('button', { name: 'Następne trafienie' }));
+    await vi.waitFor(() => expect(tabs[2].getAttribute('aria-current')).toBe('true'));
+    expect(bar.textContent).toContain('B1');
+    expect(bar.textContent).toContain('Klient z ŁODZI');
+
+    await fireEvent.click(tabs[1]);
+    expect(dialog().textContent).toContain('za duży, żeby pokazać go w całości');
+  });
+
+  test('a password-protected spreadsheet says why it cannot be shown', async () => {
+    const { ex, bridge } = await openExplorer();
+    const book = entry('haslo.xlsx', 'doc', 'xlsx');
+    ex.state.entries = [...ex.state.entries, book];
+    bridge.answerNext('explorer_sheet', { problem: 'encrypted' });
+    ex.openPreview(book.path);
+    await vi.waitFor(() => expect(dialog().textContent).toContain('zabezpieczony hasłem'));
+  });
+
   test('closing the preview while music plays leaves the mini player; its X stops it', async () => {
     const { ex } = await openExplorer();
     const song = ex.state.entries.find((e) => e.type === 'audio')!;

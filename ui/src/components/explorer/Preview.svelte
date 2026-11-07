@@ -18,6 +18,8 @@
   import PhotoView from './PhotoView.svelte';
   import TextView from './TextView.svelte';
   import PdfView from './PdfView.svelte';
+  import SheetView from './SheetView.svelte';
+  import { isSheet } from '../../lib/explorer/sheet';
 
   /** Okno podglądu nad eksploratorem: ciemne tło, pasek u góry, Esc / ← / → / Spacja. */
   let { ex, thumbs }: { ex: ExplorerController; thumbs: ThumbQueue } = $props();
@@ -49,6 +51,7 @@
     if (entry.type === 'image') return entry.url && NATIVE_IMAGE.includes(entry.ext.toLowerCase()) ? 'photo' : 'unsupported';
     if (entry.type === 'video' || entry.type === 'audio') return entry.url ? 'media' : 'unsupported';
     if (entry.ext.toLowerCase() === 'pdf' && entry.url) return 'pdf';
+    if (isSheet(entry)) return 'sheet';
     return entry.type === 'text' ? 'text' : 'unsupported';
   });
   const showInfo = $derived(view === 'unsupported' || info);
@@ -188,6 +191,8 @@
               <TextView {ex} {entry} />
             {:else if view === 'pdf'}
               <PdfView {entry} />
+            {:else if view === 'sheet'}
+              <SheetView {ex} {entry} />
             {:else}
               <div class="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8 text-center">
                 <FileIcon kind="file" type={entry.type} ext={entry.ext} size={96} />
