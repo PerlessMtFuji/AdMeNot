@@ -18,7 +18,7 @@
   /** Tyle ciszy po kółku lub przewijaniu, zanim plik pod kursorem znów może dostać dymek. */
   const QUIET_MS = 120;
 
-  type Open = { entry: EntryView; kind: PeekKind; tile: Element; anchor: PeekRect; x: number; y: number; w: number; h: number };
+  type Open = { entry: EntryView; kind: PeekKind; sweep: boolean; tile: Element; anchor: PeekRect; x: number; y: number; w: number; h: number };
   /** Migawka z chwili otwarcia: odświeżenie folderu nie zaczyna odtwarzania od nowa. */
   let open = $state.raw<Open | null>(null);
   const showing = $derived(open !== null);
@@ -57,7 +57,7 @@
   const held = $derived(!s.peek || s.offline || s.preview !== null || s.problems !== null || s.leaveAsk > 0 || s.drop !== null
     || pressed || dragging || scrolling || !focused);
 
-  function show(path: string): void {
+  function show(path: string, sweep: boolean): void {
     if (open?.entry.path === path) return;  // powrót w przejeździe: to, co gra lub się rysuje, zostaje
     const entry = s.byPath.get(path);
     const kind = entry ? peekKind(entry) : null;
@@ -71,7 +71,7 @@
     // Wiersz listy ma całą szerokość okna plików: obok niego nie ma miejsca, więc dymek staje obok kursora.
     const anchor = s.view === 'list' ? { left: mouseX, right: mouseX, top: box.top, bottom: box.bottom } : box;
     const at = placeBubble(anchor, size, { w: window.innerWidth, h: window.innerHeight });
-    open = { entry, kind, tile, anchor, ...at, ...size };
+    open = { entry, kind, sweep, tile, anchor, ...at, ...size };
   }
 
   /** Znane proporcje zdjęcia lub filmu: dymek przyjmuje ich kształt, tylko gdy to widać (miniatura i plik różnią się
@@ -175,7 +175,7 @@
     class="card pointer-events-none fixed z-30 overflow-hidden rounded-2xl"
     style:left="{open.x}px" style:top="{open.y}px" style:width="{open.w}px" style:height="{open.h}px">
     {#key open.entry.path}
-      <PeekContent {ex} {thumbs} entry={open.entry} kind={open.kind} audio={player} ontake={take} onsize={fit} onfail={close} />
+      <PeekContent {ex} {thumbs} entry={open.entry} kind={open.kind} sweep={open.sweep} audio={player} ontake={take} onsize={fit} onfail={close} />
     {/key}
   </div>
 {/if}

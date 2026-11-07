@@ -8,7 +8,8 @@ export const PEEK_SWEEP_MS = 180;
 export const NATIVE_IMAGE: readonly string[] = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif', 'svg'];
 /** Większych zdjęć nie trzymamy w pamięci na zapas ani nie pokazujemy w dymku w całości. */
 export const PREFETCH_MAX = 40 * 1024 * 1024;
-/** Tyle dymek musi postać na zdjęciu, zanim ruszy pełny plik: w przejeździe dekodowanie wielkich zdjęć rwie klatki. */
+/** W przejeździe tyle dymek musi postać na zdjęciu, zanim ruszy pełny plik: dekodowanie wielkich zdjęć rwie klatki.
+ *  Dymek po zwykłym opóźnieniu nie czeka, bo kursor już stał na pliku. */
 export const PEEK_FULL_WAIT_MS = 150;
 
 export type PeekKind = 'photo' | 'video' | 'audio' | 'pdf' | 'text';
@@ -79,7 +80,7 @@ export function placeBubble(
 }
 
 /**
- * Czas dymka: pierwszy po `PEEK_DELAY_MS`, kolejne w przejeździe od razu, przejazd kończy się
+ * Czas dymka: pierwszy po `PEEK_DELAY_MS`, kolejne w przejeździe od razu (`show` dostaje wtedy `sweep`), przejazd kończy się
  * po `PEEK_SWEEP_MS` poza plikami. `dismiss` (klik) zamyka i trzyma zamknięte, dopóki kursor
  * nie zjedzie z pliku; `hold` (przycisk myszy wciśnięty) zamyka i wstrzymuje wszystko.
  */
@@ -92,7 +93,7 @@ export class PeekTimer {
   private delay: ReturnType<typeof setTimeout> | undefined;
   private sweep: ReturnType<typeof setTimeout> | undefined;
 
-  constructor(private readonly show: (path: string) => void, private readonly hide: () => void) {}
+  constructor(private readonly show: (path: string, sweep: boolean) => void, private readonly hide: () => void) {}
 
   hover(path: string | null): void {
     if (path === this.current) return;
@@ -109,8 +110,8 @@ export class PeekTimer {
     if (path !== this.dismissed) this.dismissed = null;
     if (this.held || path === this.dismissed) return;
     clearTimeout(this.sweep);
-    if (this.sweeping) this.open(path);
-    else this.delay = setTimeout(() => this.open(path), PEEK_DELAY_MS);
+    if (this.sweeping) this.open(path, true);
+    else this.delay = setTimeout(() => this.open(path, false), PEEK_DELAY_MS);
   }
 
   dismiss(): void {
@@ -125,7 +126,7 @@ export class PeekTimer {
       this.close();
     } else if (this.current !== null && this.current !== this.dismissed) {
       const path = this.current;
-      this.delay = setTimeout(() => this.open(path), PEEK_DELAY_MS);
+      this.delay = setTimeout(() => this.open(path, false), PEEK_DELAY_MS);
     }
   }
 
@@ -134,10 +135,10 @@ export class PeekTimer {
     clearTimeout(this.sweep);
   }
 
-  private open(path: string): void {
+  private open(path: string, sweep: boolean): void {
     this.shown = true;
     this.sweeping = true;
-    this.show(path);
+    this.show(path, sweep);
   }
 
   private endSweep(): void {

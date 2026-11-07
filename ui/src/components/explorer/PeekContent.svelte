@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { BARS, type AudioPlayer } from '../../lib/explorer/audio';
   import type { ExplorerController } from '../../lib/explorer/controller';
   import { clock, formatBytes } from '../../lib/explorer/logic';
@@ -13,10 +14,10 @@
 
   /** Treść dymka dla jednego pliku; `PeekBubble` zakłada ją od nowa przy każdym pliku, więc odmontowanie
    *  przerywa pobieranie. `ontake` — dźwięk ruszył; `onsize` — znane wymiary treści; `onfail` — pliku nie da się pokazać
-   *  (dymek znika po cichu). */
-  type Props = { ex: ExplorerController; entry: EntryView; kind: PeekKind; thumbs: ThumbQueue; audio: () => AudioPlayer;
+   *  (dymek znika po cichu); `sweep` — dymek z przejazdu, pełne zdjęcie czeka `PEEK_FULL_WAIT_MS`. */
+  type Props = { ex: ExplorerController; entry: EntryView; kind: PeekKind; sweep: boolean; thumbs: ThumbQueue; audio: () => AudioPlayer;
     ontake: () => void; onsize: (w: number, h: number) => void; onfail: () => void };
-  let { ex, entry, kind, thumbs, audio, ontake, onsize, onfail }: Props = $props();
+  let { ex, entry, kind, sweep, thumbs, audio, ontake, onsize, onfail }: Props = $props();
 
   const IDLE = 0.12;
   /** Most podaje adres okładki każdemu MP3/FLAC; plik bez okładki odpowiada błędem. */
@@ -37,9 +38,9 @@
 
   // Zdjęcie: samo odpięcie <img> z DOM nie przerywa pobierania, zdjęcie `src` — tak.
   let sharp = $state(false);
-  let fullDue = $state(false);
+  let fullDue = $state(untrack(() => !sweep));
   $effect(() => {
-    if (!wantFull) return;
+    if (!wantFull || fullDue) return;
     const wait = setTimeout(() => (fullDue = true), PEEK_FULL_WAIT_MS);
     return () => clearTimeout(wait);
   });

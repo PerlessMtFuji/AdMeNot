@@ -3,13 +3,13 @@ import type { EntryView } from '../types';
 import { fitBubble, PeekTimer, peekKind, peekSize, placeBubble } from './peek';
 
 describe('PeekTimer', () => {
-  let show: ReturnType<typeof vi.fn<(path: string) => void>>;
+  let show: ReturnType<typeof vi.fn<(path: string, sweep: boolean) => void>>;
   let hide: ReturnType<typeof vi.fn<() => void>>;
   let t: PeekTimer;
 
   beforeEach(() => {
     vi.useFakeTimers();
-    show = vi.fn<(path: string) => void>();
+    show = vi.fn<(path: string, sweep: boolean) => void>();
     hide = vi.fn<() => void>();
     t = new PeekTimer(show, hide);
   });
@@ -18,11 +18,11 @@ describe('PeekTimer', () => {
     vi.useRealTimers();
   });
 
-  it('pierwszy dymek po 300 ms, następny w przejeździe od razu', () => {
+  it('pierwszy dymek po 300 ms, następny w przejeździe od razu i z oznaczeniem przejazdu', () => {
     t.hover('a'); vi.advanceTimersByTime(299); expect(show).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(1); expect(show).toHaveBeenLastCalledWith('a');
+    vi.advanceTimersByTime(1); expect(show).toHaveBeenLastCalledWith('a', false);
     t.hover(null); vi.advanceTimersByTime(100); t.hover('b');
-    expect(show).toHaveBeenLastCalledWith('b'); expect(hide).not.toHaveBeenCalled();
+    expect(show).toHaveBeenLastCalledWith('b', true); expect(hide).not.toHaveBeenCalled();
   });
 
   it('po 180 ms poza plikami przejazd się kończy', () => {
@@ -31,7 +31,7 @@ describe('PeekTimer', () => {
     vi.advanceTimersByTime(1); expect(hide).toHaveBeenCalledTimes(1);
     show.mockClear();
     t.hover('b'); vi.advanceTimersByTime(299); expect(show).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(1); expect(show).toHaveBeenLastCalledWith('b');
+    vi.advanceTimersByTime(1); expect(show).toHaveBeenLastCalledWith('b', false);
   });
 
   it('szybki przejazd przed upływem opóźnienia nic nie otwiera', () => {
@@ -47,7 +47,7 @@ describe('PeekTimer', () => {
     t.dismiss(); expect(hide).toHaveBeenCalledTimes(1);
     vi.advanceTimersByTime(1000); expect(show).not.toHaveBeenCalled();
     t.hover(null); t.hover('a'); vi.advanceTimersByTime(300);
-    expect(show).toHaveBeenLastCalledWith('a');
+    expect(show).toHaveBeenLastCalledWith('a', false);
   });
 
   it('hold zamyka, a po puszczeniu plik pod kursorem czeka pełne opóźnienie', () => {
@@ -55,7 +55,7 @@ describe('PeekTimer', () => {
     t.hold(true); expect(hide).toHaveBeenCalledTimes(1);
     t.hover('b'); vi.advanceTimersByTime(1000); expect(show).not.toHaveBeenCalled();
     t.hold(false); vi.advanceTimersByTime(299); expect(show).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(1); expect(show).toHaveBeenLastCalledWith('b');
+    vi.advanceTimersByTime(1); expect(show).toHaveBeenLastCalledWith('b', false);
   });
 
   it('dwa razy hold(false) nie zostawia drugiego licznika', () => {
@@ -70,7 +70,7 @@ describe('PeekTimer', () => {
     t.dismiss(); t.hold(true); t.hold(false);
     vi.advanceTimersByTime(1000); expect(show).not.toHaveBeenCalled();
     t.hover(null); t.hover('a'); vi.advanceTimersByTime(300);
-    expect(show).toHaveBeenLastCalledWith('a');
+    expect(show).toHaveBeenLastCalledWith('a', false);
   });
 
   it('destroy odwołuje oczekujące zegary', () => {

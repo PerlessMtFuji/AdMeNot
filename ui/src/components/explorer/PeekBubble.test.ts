@@ -227,15 +227,23 @@ describe('PeekBubble', () => {
     ex.state.entries = [...ALL, cold];
     tile(cold);
     await hover(cold);
-    expect(bubble()!.querySelectorAll('img')).toHaveLength(0);
     expect(bubble()!.querySelector('[data-peek-icon]')).not.toBeNull();
     await dwell(cold);
     expect([...bubble()!.querySelectorAll('img')].map((i) => i.getAttribute('src'))).toEqual([cold.url]);
   });
 
-  it('pełne zdjęcie rusza dopiero po chwili w dymku, a miniatura od razu', async () => {
+  it('dymek po zwykłym opóźnieniu rusza pełne zdjęcie od razu, razem z miniaturą', async () => {
     await hover(PHOTO);
-    expect(bubble()!.querySelectorAll('img')).toHaveLength(1);
+    expect(bubble()!.querySelectorAll('img')).toHaveLength(2);
+    expect(bubble()!.querySelector(`img[src="${PHOTO.url}"]`)).not.toBeNull();
+  });
+
+  it('w przejeździe pełne zdjęcie rusza dopiero po chwili, a miniatura od razu', async () => {
+    await hover(PHOTO2);
+    const blob = await seed(PHOTO.thumb!);
+    ex.state.hover = PHOTO.path;
+    await settle();
+    expect([...bubble()!.querySelectorAll('img')].map((i) => i.getAttribute('src'))).toEqual([blob]);
     vi.advanceTimersByTime(PEEK_FULL_WAIT_MS - 1);
     await settle();
     expect(bubble()!.querySelector(`img[src="${PHOTO.url}"]`)).toBeNull();
