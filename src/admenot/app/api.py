@@ -71,7 +71,15 @@ from admenot.engine.actions.steps import open_site as open_site_on_phone
 from admenot.engine.adb.devices import list_devices
 from admenot.engine.adb.sessionlog import SessionLogAdb, session_log_path
 from admenot.engine.adb.transport import AdbError, AdbTransport, RealAdb
-from admenot.engine.apk.cache import GB, CacheUsage, Estimate, clear_cache, disk_total, usage
+from admenot.engine.apk.cache import (
+    GB,
+    CacheUsage,
+    Estimate,
+    cache_size,
+    clear_cache,
+    disk_total,
+    usage,
+)
 from admenot.engine.apk.fetch import default_cache_dir
 from admenot.engine.apk.providers import ApkProvider, CachePolicy, DeviceApkProvider, ManualMode
 from admenot.engine.apk.timing import (
@@ -1720,7 +1728,10 @@ class Api(ExplorerMixin):
         job = self._jobs.current()
         if job is not None:  # analiza APK albo zlecenie, które może właśnie pobierać kopię
             raise AppError("busy", job.kind)
-        return {"freed_bytes": clear_cache(default_cache_dir())}
+        path = default_cache_dir()
+        freed = clear_cache(path)
+        # Pliki zajęte przez inny proces albo trwające pobranie zostają; UI mówi, ile.
+        return {"freed_bytes": freed, "left_bytes": cache_size(path)}
 
     @_api
     def reopen_screen(self) -> dict[str, Any]:

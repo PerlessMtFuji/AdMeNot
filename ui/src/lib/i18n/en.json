@@ -613,6 +613,7 @@
     "cache_clear_after_hint": "Backups of removed apps are kept.",
     "cache_clear_now": "Clear now",
     "cache_cleared": "Removed {gb} GB.",
+    "cache_left": "{gb} GB could not be removed: the files are open in another program or still downloading.",
     "mode_hint": "Expert shows the table, the ADB console and analysis details",
     "group_scan": "After the scan", "group_backups": "Backups of removed apps", "group_support": "Support", "group_advanced": "Advanced",
     "apk_mode_hint": "What to do after the quick scan",

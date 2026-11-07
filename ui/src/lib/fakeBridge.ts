@@ -275,7 +275,7 @@ export function createFakeBridge(name: string,
       case 'deep_analyze':
         return { job_id: 'job-deep' };
       case 'clear_apk_cache':
-        return { freed_bytes: 3.4 * 1024 ** 3 };
+        return { freed_bytes: 3.4 * 1024 ** 3, left_bytes: 0 };
       case 'rerender':
         return { scan: lastScan };
       case 'list_devices':

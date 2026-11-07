@@ -69,6 +69,9 @@ export interface CacheUsage {
   limit_bytes: number; effective_bytes: number; path: string;
 }
 
+/** Wynik „Wyczyść teraz”: zwolnione bajty i to, co zostało (pliki zajęte albo pobranie w toku). */
+export interface CacheCleared { freed_bytes: number; left_bytes: number }
+
 export interface EtaView {
   eta_s: number | null;
   eta_kind: 'measured' | 'rough' | null;
@@ -889,7 +892,7 @@ export interface Api {
   open_donate(): R<{ ok: boolean }>;
   set_donate_reminders(on: boolean): R<Settings>;
   apk_cache(): R<CacheUsage>;
-  clear_apk_cache(): R<{ freed_bytes: number }>;
+  clear_apk_cache(): R<CacheCleared>;
   list_devices(): R<DevicesPayload>;
   watch_devices(on: boolean): R<{ ok: boolean }>;
   start_scan(serial: string, client: string | null): R<{ job_id: string }>;

@@ -201,7 +201,17 @@ def test_apk_cache_status_and_clear(monkeypatch):
     assert status["size_bytes"] == 1 and status["limit_bytes"] == 10 * C.GB
     assert status["effective_bytes"] == 2 * C.GB + 1
     assert status["path"] == str(default_cache_dir())
-    assert api.clear_apk_cache() == {"freed_bytes": 1}
+    assert api.clear_apk_cache() == {"freed_bytes": 1, "left_bytes": 0}
+
+
+def test_clear_apk_cache_reports_what_could_not_be_removed(monkeypatch):
+    monkeypatch.setattr(C, "disk_usage", lambda path: Disk(120 * C.GB, 0, 4 * C.GB))
+    api, _ = make_api(make_cli_phone())
+    fake_fetch(default_cache_dir(), "com.a")
+    live = default_cache_dir() / "com.b" / ".part-live"  # trwające pobranie zostaje
+    live.mkdir(parents=True)
+    (live / "base.apk").write_bytes(b"xyz")
+    assert api.clear_apk_cache() == {"freed_bytes": 1, "left_bytes": 3}
 
 
 def test_clear_apk_cache_is_refused_while_a_job_runs():

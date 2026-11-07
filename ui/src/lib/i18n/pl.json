@@ -613,6 +613,7 @@
     "cache_clear_after_hint": "Kopie zapasowe usuniętych aplikacji zostają.",
     "cache_clear_now": "Wyczyść teraz",
     "cache_cleared": "Usunięto {gb} GB.",
+    "cache_left": "Zostało {gb} GB, których nie dało się usunąć: pliki są otwarte w innym programie albo właśnie się pobierają.",
     "mode_hint": "Ekspercki pokazuje tabelę, konsolę ADB i szczegóły analizy",
     "group_scan": "Po skanie", "group_backups": "Kopie usuwanych aplikacji", "group_support": "Wsparcie", "group_advanced": "Zaawansowane",
     "apk_mode_hint": "Co zrobić po szybkim skanie",

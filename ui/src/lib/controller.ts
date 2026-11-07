@@ -5,7 +5,7 @@ import { EMPTY_TRANSFER_SELECTION, emptyRestore, type AppState, type SettingsCat
 import { ExplorerController } from './explorer/controller';
 import { applyTheme } from './theme';
 import type {
-  ApiError, AppView, CacheUsage, ExportKind, TransferCategory, EtaView, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, TelKind, TelemetrySample, Theme, UploadChoiceView, Verdict,
+  ApiError, AppView, CacheCleared, CacheUsage, ExportKind, TransferCategory, EtaView, DevicesPayload, Lang, Level, Mode, ServiceInfo, Settings, TelKind, TelemetrySample, Theme, UploadChoiceView, Verdict,
 } from './types';
 
 const CONSOLE_LIMIT = 500;
@@ -1368,7 +1368,7 @@ export class Controller {
     return this.call(this.api.apk_cache());
   }
 
-  clearApkCache(): Promise<{ freed_bytes: number } | null> {
+  clearApkCache(): Promise<CacheCleared | null> {
     return this.call(this.api.clear_apk_cache());
   }
 

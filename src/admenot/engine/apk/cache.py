@@ -22,6 +22,7 @@ GB = 1024**3
 RESERVE = 2 * GB  # własne pliki programu: dziennik, zrzuty, PDF, profil Edge przy wydruku
 NO_SPACE = "no_space"  # `ApkReport.error` aplikacji, której nie pobrano z braku miejsca
 UNVERIFIED_MAX_AGE = 3600.0  # młodsze `.unverified-*` może jeszcze czytać trwający skan
+PART_MAX_AGE = 3600.0  # `.part-*` bez zmian dłużej to sierota po zabitym procesie, nie pobranie w toku
 PART = ".part-"  # przedrostek katalogu roboczego pobrania (`fetch.py`)
 UNVERIFIED = ".unverified"  # przedrostek katalogu niezweryfikowanego pobrania (`fetch.py`)
 STAT_TIMEOUT = 30.0
@@ -114,8 +115,20 @@ def has_room(cache_dir: Path, need_bytes: int) -> bool:
     return free_bytes(cache_dir) >= need_bytes + RESERVE
 
 
+def _newest_mtime(path: Path) -> float:
+    """Najnowszy mtime katalogu i plików w nim: `adb pull` dopisuje do pliku, a mtime katalogu stoi."""
+    newest = path.stat().st_mtime
+    for f in path.rglob("*"):
+        try:
+            newest = max(newest, f.stat().st_mtime)
+        except OSError:
+            continue
+    return newest
+
+
 def _entries(cache_dir: Path, now: float) -> list[_Entry]:
-    """Gotowe wpisy i stare `.unverified-*`; nigdy `.part-*` ani świeże `.unverified-*`."""
+    """Gotowe wpisy, stare `.unverified-*` i porzucone `.part-*`; nigdy pobrania w toku
+    (`.part-*` zmienione w ostatniej godzinie) ani świeże `.unverified-*`."""
     root = Path(cache_dir)
     if not root.is_dir():
         return []
@@ -129,9 +142,14 @@ def _entries(cache_dir: Path, now: float) -> list[_Entry]:
             continue
         for entry in children:
             try:
-                if not entry.is_dir() or entry.name.startswith(PART):
+                if not entry.is_dir():
                     continue
-                mtime = entry.stat().st_mtime
+                if entry.name.startswith(PART):
+                    mtime = _newest_mtime(entry)
+                    if now - mtime < PART_MAX_AGE:
+                        continue
+                else:
+                    mtime = entry.stat().st_mtime
                 if entry.name.startswith(UNVERIFIED) and now - mtime < UNVERIFIED_MAX_AGE:
                     continue
                 out.append(_Entry(package.name, entry, _tree_size(entry), mtime))
@@ -141,9 +159,10 @@ def _entries(cache_dir: Path, now: float) -> list[_Entry]:
 
 
 def _remove(entry: _Entry) -> int:
+    """Usuwa wpis i zwraca faktycznie zwolnione bajty (część, gdy plik zajmuje inny proces)."""
     shutil.rmtree(entry.path, ignore_errors=True)
     if entry.path.exists():
-        return 0  # plik zajęty przez inny proces — wpis zostaje
+        return max(0, entry.size - _tree_size(entry.path))  # reszta wpisu zostaje
     try:
         entry.path.parent.rmdir()  # pusty katalog pakietu
     except OSError:
@@ -173,7 +192,7 @@ def prune(cache_dir: Path, limit_bytes: int, *, scan: frozenset[str] = frozenset
         return 0
 
     def group(e: _Entry) -> int:
-        if e.package not in scan:
+        if e.package not in scan or e.path.name.startswith(PART):  # porzucone pobranie: nikt go nie czyta
             return 0
         return 1 if e.package in done and e.package not in flagged else 2
 

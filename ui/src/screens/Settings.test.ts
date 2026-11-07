@@ -191,6 +191,24 @@ test('Naprawa: APK cache bar, limit list, clear after repair and clear now', asy
   expect(await screen.findByText(/Usunięto 3,4 GB/)).toBeTruthy();
 });
 
+test('Naprawa: clear now says how much stayed when some files could not be removed', async () => {
+  const { ctl } = await renderWith(Settings, 'empty');
+  await open('Naprawa');
+  await screen.findByText('3,4 GB z 10 GB');
+  vi.spyOn(ctl, 'clearApkCache').mockResolvedValue({ freed_bytes: 1.7 * 1024 ** 3, left_bytes: 3.5 * 1024 ** 3 });
+  await fireEvent.click(screen.getByRole('button', { name: 'Wyczyść teraz' }));
+  expect(await screen.findByText(/Usunięto 1,7 GB/)).toBeTruthy();
+  expect(screen.getByText(/Zostało 3,5 GB, których nie dało się usunąć/)).toBeTruthy();
+});
+
+test('Naprawa: clear now without leftovers shows only the success notice', async () => {
+  await renderWith(Settings, 'empty');
+  await open('Naprawa');
+  await fireEvent.click(await screen.findByRole('button', { name: 'Wyczyść teraz' }));
+  expect(await screen.findByText(/Usunięto 3,4 GB/)).toBeTruthy();
+  expect(screen.queryByText(/nie dało się usunąć/)).toBeNull();
+});
+
 test('Naprawa: a rejected cache limit shows the message at the row, not the error card, and the list goes back', async () => {
   const { s, bridge } = await renderWith(Settings, 'empty');
   await open('Naprawa');

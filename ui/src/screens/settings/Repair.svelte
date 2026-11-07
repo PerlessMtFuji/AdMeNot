@@ -6,7 +6,7 @@
   import type { Controller } from '../../lib/controller';
   import { i18n, t } from '../../lib/i18n/index.svelte';
   import { formatGb, LEVEL_TONE } from '../../lib/logic';
-  import type { ApkModeDefault, CacheUsage, Level } from '../../lib/types';
+  import type { ApkModeDefault, CacheCleared, CacheUsage, Level } from '../../lib/types';
   import Banner from '../../ui/Banner.svelte';
   import Button from '../../ui/Button.svelte';
   import Progress from '../../ui/Progress.svelte';
@@ -25,7 +25,7 @@
   const STEPS = [1, 2, 3, 5, 10, 15, 20, 30, 50, 75, 100, 150, 200, 300, 500, 1000, 2000];
 
   let cache = $state<CacheUsage | null>(null);
-  let freed = $state<number | null>(null);
+  let cleared = $state<CacheCleared | null>(null);
   let limitBad = $state(false);
   const gb = (b: number) => formatGb(b, i18n.lang);
   const gbWhole = (b: number) => String(Math.round(b / GB));
@@ -52,7 +52,7 @@
 
   async function clearNow(): Promise<void> {
     const r = await ctl.clearApkCache();
-    if (r) { freed = r.freed_bytes; cache = await ctl.loadApkCache(); }
+    if (r) { cleared = r; cache = await ctl.loadApkCache(); }
   }
 
   const pickBackups = async () => (await ctl.pickFolder())?.path ?? null;
@@ -90,9 +90,12 @@
     <Toggle checked={s.settings.apk_cache_clear_after_repair} label={t('settings.cache_clear_after')}
       onchange={async (v) => (await ctl.saveSettings({ apk_cache_clear_after_repair: v })) !== null} />
   </SettingRow>
-  {#if freed !== null}
-    <div class="border-t border-line px-4 py-2.5">
-      <Banner tone="ok" icon="check">{t('settings.cache_cleared', { gb: gb(freed) })}</Banner>
+  {#if cleared !== null}
+    <div class="flex flex-col gap-2 border-t border-line px-4 py-2.5">
+      <Banner tone="ok" icon="check">{t('settings.cache_cleared', { gb: gb(cleared.freed_bytes) })}</Banner>
+      {#if cleared.left_bytes > 0}
+        <Banner tone="info" icon="info">{t('settings.cache_left', { gb: gb(cleared.left_bytes) })}</Banner>
+      {/if}
     </div>
   {/if}
 </SettingGroup>

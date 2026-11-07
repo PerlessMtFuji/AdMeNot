@@ -86,7 +86,7 @@ def test_pending_scan_entries_go_last(tmp_path, disk):
     assert pending.exists() and not safe.exists()
 
 
-def test_prune_never_touches_work_dirs_fresh_unverified_or_busy(tmp_path, disk):
+def test_prune_never_touches_active_work_dirs_fresh_unverified_or_busy(tmp_path, disk):
     part = _entry(tmp_path, "com.a", ".part-x1", 300)
     fresh = _entry(tmp_path, "com.a", ".unverified-y1", 300, age_s=60)
     stale = _entry(tmp_path, "com.a", ".unverified-y2", 300, age_s=2 * 3600)
@@ -124,6 +124,51 @@ def test_locked_entry_is_skipped_and_not_counted(tmp_path, disk, monkeypatch):
     monkeypatch.setattr(C.shutil, "rmtree", rmtree)
     assert C.clear_cache(tmp_path) == 1000
     assert locked.exists() and not other.exists()
+
+
+def _age(path, age_s):
+    """Cofa czas modyfikacji katalogu i wszystkiego w środku o `age_s` s."""
+    t = time.time() - age_s
+    for p in [*Path(path).rglob("*"), Path(path)]:
+        os.utime(p, (t, t))
+
+
+def test_clear_cache_removes_stale_work_dirs_but_not_fresh_ones(tmp_path, disk):
+    stale = _entry(tmp_path, "com.a", ".part-old", 300)
+    _age(stale, 2 * 3600)  # porzucone pobranie: proces zginął w trakcie `adb pull`
+    fresh = _entry(tmp_path, "com.b", ".part-new", 50, age_s=60)
+    assert C.clear_cache(tmp_path) == 300
+    assert not stale.exists() and fresh.exists()
+
+
+def test_work_dir_with_a_fresh_file_inside_is_an_active_download(tmp_path, disk):
+    """`adb pull` dopisuje do jednego pliku: mtime katalogu stoi, liczy się najnowszy plik."""
+    active = _entry(tmp_path, "com.a", ".part-live", 300, age_s=2 * 3600)
+    (active / "base.apk").touch()
+    C.prune(tmp_path, 0)
+    assert C.clear_cache(tmp_path) == 0
+    assert active.exists()
+
+
+def test_prune_takes_stale_work_dirs_first_even_from_this_scan(tmp_path, disk):
+    stale = _entry(tmp_path, "com.mine", ".part-old", 300)
+    _age(stale, 2 * 3600)
+    entry = _entry(tmp_path, "com.mine", "id1", 300, age_s=9999)  # starszy, ale z tego skanu
+    scan = frozenset({"com.mine"})
+    assert C.prune(tmp_path, 300, scan=scan) == 300
+    assert not stale.exists() and entry.exists()
+
+
+def test_partly_removed_entry_reports_the_bytes_actually_freed(tmp_path, disk, monkeypatch):
+    d = _entry(tmp_path, "com.locked", "id1", 1000)
+    (d / "split.apk").write_bytes(b"x" * 400)
+
+    def rmtree(path, ignore_errors=False):
+        (Path(path) / "base.apk").unlink()  # split.apk zostaje: otwarty w innym procesie
+
+    monkeypatch.setattr(C.shutil, "rmtree", rmtree)
+    assert C.clear_cache(tmp_path) == 1000
+    assert C.cache_size(tmp_path) == 400
 
 
 def test_has_room_and_prunable(tmp_path, disk):
