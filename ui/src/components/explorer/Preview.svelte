@@ -3,6 +3,7 @@
   import { closeMorph } from '../../lib/explorer/morph';
   import type { ExplorerController } from '../../lib/explorer/controller';
   import { clock, formatBytes } from '../../lib/explorer/logic';
+  import { NATIVE_IMAGE, PREFETCH_MAX } from '../../lib/explorer/peek';
   import { PhotoPrefetch } from '../../lib/explorer/prefetch';
   import type { ThumbQueue } from '../../lib/explorer/thumbs';
   import { ERROR_KEYS, i18n, t } from '../../lib/i18n/index.svelte';
@@ -22,12 +23,8 @@
   let { ex, thumbs }: { ex: ExplorerController; thumbs: ThumbQueue } = $props();
   const entry = $derived(ex.previewEntry);
   const NEIGHBOURS = 5;
-  /** Co przeglądarka pokaże w <img> (HEIC i RAW — nie). */
-  const NATIVE_IMAGE = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif', 'svg'];
   /** Sąsiednie zdjęcia pobieramy po tej chwili, żeby szybkie strzałki ich nie zamawiały na próżno. */
   const PREFETCH_WAIT_MS = 200;
-  /** Większych nie trzymamy w pamięci na zapas. */
-  const PREFETCH_MAX = 40 * 1024 * 1024;
 
   let info = $state(false);
   let meta = $state<EntryMeta | null>(null);
