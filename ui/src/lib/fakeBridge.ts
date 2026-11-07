@@ -211,6 +211,8 @@ export function createFakeBridge(name: string,
         if (changes.report_pdf_dir && !/^([A-Za-z]:[\\/]|\\\\)/.test(changes.report_pdf_dir)) {
           return { error: { key: 'bad_request', message: 'report_pdf_dir' } };
         }
+        // jak most: pusty folder kopii jest błędem (wartość „domyślny” to null)
+        if (changes.transfers_dir === '') return { error: { key: 'bad_request', message: 'transfers_dir' } };
         settings = { ...settings, ...changes };
         return { ...settings };
       }
@@ -367,6 +369,7 @@ export function createFakeBridge(name: string,
         if (settings.explorer_dest_mode === 'last') settings = { ...settings, explorer_dest: 'D:\\Serwis\\Kowalska' };
         return { path: 'D:\\Serwis\\Kowalska' };
       case 'explorer_clear_recents':
+        settings = { ...settings, explorer_recent_phones: 0 };
         return { phones: 0 };
       case 'explorer_pick_upload':
         return { paths: args[0] === 'folder' ? ['C:\\Users\\serwis\\Desktop\\Faktury_2026']

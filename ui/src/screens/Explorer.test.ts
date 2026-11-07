@@ -562,6 +562,17 @@ describe('Explorer', () => {
       expect(ctl.state.settings.explorer_dest_fixed).toBe('E:\\Pendrive');
     });
 
+    test('changing the destination settings during the session resyncs the open explorer', async () => {
+      const { ctl } = await openExplorer();
+      expect(ctl.explorer.state.dest).toBeNull();
+      await ctl.saveSettings({ explorer_dest_mode: 'fixed', explorer_dest_fixed: 'D:\\Klienci' });
+      expect(ctl.explorer.state.dest).toBe('D:\\Klienci');
+      await ctl.saveSettings({ explorer_dest_fixed: 'E:\\Pendrive' });
+      expect(ctl.explorer.state.dest).toBe('E:\\Pendrive');
+      await ctl.saveSettings({ explorer_dest_mode: 'last' });
+      expect(ctl.explorer.state.dest).toBeNull();
+    });
+
     test('fixed mode: a one-off pick applies to one copy only, the next goes back to the fixed folder', async () => {
       const { bridge, ctl } = await openExplorer();
       ctl.state.settings = { ...ctl.state.settings, explorer_dest_mode: 'fixed', explorer_dest_fixed: 'E:\\Pendrive' };

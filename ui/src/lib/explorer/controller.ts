@@ -1,7 +1,7 @@
 import { type Bridge, isApiError } from '../bridge';
 import { AudioPlayer } from './audio';
 import type { AppState } from '../state.svelte';
-import type { ApiError, ApiErrorBody, EntryView, ExplorerListView, ExplorerOpenView, ExplorerStart, PlaceView, TaskView } from '../types';
+import type { ApiError, ApiErrorBody, EntryView, ExplorerListView, ExplorerOpenView, ExplorerStart, PlaceView, Settings, TaskView } from '../types';
 import { days, defaultView, type ExplorerFilter, type ExplorerView, parentPath, placeAt, ROOT, SORT_START, type SortKey } from './logic';
 import { ExplorerState, type PlayingTrack } from './state.svelte';
 
@@ -50,7 +50,20 @@ export class ExplorerController {
   private player: AudioPlayer | null = null;
   private leaveAnswer: ((ok: boolean) => void) | null = null;  // okno „N zadań zostanie anulowanych”
 
-  constructor(private readonly app: AppState, private readonly bridge: Bridge) {}
+  /** `save` zapisuje ustawienia tą samą drogą co ekran Ustawień (`Controller.saveSettings`), więc oba widoki są zgodne. */
+  constructor(private readonly app: AppState, private readonly bridge: Bridge,
+    private readonly save?: (changes: Partial<Settings>) => Promise<unknown>) {}
+
+  /** Ustawienia „Folder docelowy” zmienione w trakcie sesji: pasek kopiowania bierze nowy folder od razu. */
+  syncDest(): void {
+    if (!this.state.open) return;
+    this.state.dest = this.startDest();
+    this.state.destMissing = false;
+  }
+
+  private saveSetting(changes: Partial<Settings>): Promise<unknown> {
+    return this.save ? this.save(changes) : this.request(() => this.api.save_settings(changes));
+  }
 
   /** Ustawienie „sprawdzaj kopie”: zwykłe „Kopiuj” sprawdza, a menu oferuje kopię bez sprawdzania. */
   get verifyCopies(): boolean {
@@ -283,14 +296,14 @@ export class ExplorerController {
     this.state.view = view;
     this.app.settings = { ...this.app.settings, explorer_view: view };
     // Kolejne szybkie kliknięcia zapisują się w tej samej kolejności co wybory.
-    this.viewWrites = this.viewWrites.then(() => this.request(() => this.api.save_settings({ explorer_view: view })));
+    this.viewWrites = this.viewWrites.then(() => this.saveSetting({ explorer_view: view }));
   }
 
   setPeek(on: boolean): void {
     this.state.peek = on;
     this.app.settings = { ...this.app.settings, explorer_peek: on };
     // Ta sama kolejka co widok: zapisy idą w kolejności kliknięć.
-    this.viewWrites = this.viewWrites.then(() => this.request(() => this.api.save_settings({ explorer_peek: on })));
+    this.viewWrites = this.viewWrites.then(() => this.saveSetting({ explorer_peek: on }));
   }
 
   /** Klik zaznacza od razu; dwuklik przywraca zaznaczenie sprzed pierwszego kliku (otwiera, nie zaznacza).

@@ -25,7 +25,7 @@ export class Controller {
   readonly explorer: ExplorerController;
 
   constructor(readonly state: AppState, readonly bridge: Bridge) {
-    this.explorer = new ExplorerController(state, bridge);
+    this.explorer = new ExplorerController(state, bridge, (changes) => this.saveSettings(changes));
   }
 
   private get api() {
@@ -1239,6 +1239,7 @@ export class Controller {
     if (!r) return null;
     this.applySettings(r);
     this.state.settingsSaved = Date.now();
+    if ('explorer_dest_mode' in changes || 'explorer_dest_fixed' in changes) this.explorer.syncDest();
     if ('lang' in changes) {
       const view = await this.call(this.api.rerender());
       if (view?.scan) this.state.scan = view.scan;
@@ -1369,6 +1370,12 @@ export class Controller {
 
   clearApkCache(): Promise<{ freed_bytes: number } | null> {
     return this.call(this.api.clear_apk_cache());
+  }
+
+  /** „Ostatnio otwierane foldery” → „Wyczyść”: most zapomina foldery wszystkich telefonów (bez potwierdzenia). */
+  async clearExplorerRecents(): Promise<void> {
+    const r = await this.call(this.api.explorer_clear_recents());
+    if (r) this.state.settings = { ...this.state.settings, explorer_recent_phones: r.phones };
   }
 
   setTheme(theme: Theme): Promise<Settings | null> {

@@ -270,3 +270,107 @@ test('Program: adb.exe pill shows source and version, change picks a file, check
   await vi.waitFor(() => expect(s.settings.adb_path).toBeNull());
   expect(bridge.calls).toContainEqual({ method: 'save_settings', args: [{ adb_path: null }] });
 });
+
+test('Przenoszenie: folder is picked and reset to default (null), a bad folder shows the message at the row', async () => {
+  const { s, bridge } = await renderWith(Settings, 'empty');
+  await open('Przenoszenie danych');
+  expect(screen.getByText('%LOCALAPPDATA%\\AdMeNot\\transfers')).toBeTruthy();
+  await fireEvent.click(screen.getByRole('button', { name: 'Zmień…' }));
+  await vi.waitFor(() => expect(s.settings.transfers_dir).toBe('D:\\AdMeNot\\kopie'));
+  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ transfers_dir: 'D:\\AdMeNot\\kopie' }] });
+  await fireEvent.click(screen.getByRole('button', { name: 'Domyślny' }));
+  await vi.waitFor(() => expect(s.settings.transfers_dir).toBeNull());
+  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ transfers_dir: null }] });
+  bridge.failNext('save_settings', 'bad_request', 'transfers_dir');
+  await fireEvent.click(screen.getByRole('button', { name: 'Zmień…' }));
+  expect(await screen.findByText(/Nie można użyć tego folderu/)).toBeTruthy();
+  expect(s.error).toBeNull();
+  expect(s.settings.transfers_dir).toBeNull();
+});
+
+test('Przenoszenie: keep days list, preselect-apps and verify toggles are saved at once', async () => {
+  const { s, bridge } = await renderWith(Settings, 'empty');
+  await open('Przenoszenie danych');
+  const days = screen.getByLabelText('Trzymaj kopie przez') as HTMLSelectElement;
+  expect([...days.options].map((o) => o.textContent)).toEqual(['3 dni', '7 dni', '14 dni', '30 dni']);
+  expect(days.value).toBe('7');
+  await fireEvent.change(days, { target: { value: '30' } });
+  await vi.waitFor(() => expect(s.settings.transfer_keep_days).toBe(30));
+  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ transfer_keep_days: 30 }] });
+  await fireEvent.click(screen.getByRole('switch', { name: 'Zaznaczaj aplikacje do przeniesienia' }));
+  await vi.waitFor(() => expect(s.settings.transfer_apps_default).toBe(false));
+  await fireEvent.click(screen.getByRole('switch', { name: 'Sprawdzaj bajt po bajcie' }));
+  await vi.waitFor(() => expect(s.settings.verify_copies).toBe(true));
+  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ verify_copies: true }] });
+});
+
+test('Eksplorator: view (Automatyczny = null), peek and hidden files are saved', async () => {
+  const { s, bridge } = await renderWith(Settings, 'empty');
+  await open('Eksplorator plików');
+  const group = screen.getByRole('group', { name: 'Widok' });
+  expect(within(group).getByRole('button', { name: 'Automatyczny' }).getAttribute('aria-pressed')).toBe('true');
+  await fireEvent.click(within(group).getByRole('button', { name: 'Siatka' }));
+  await vi.waitFor(() => expect(s.settings.explorer_view).toBe('grid'));
+  await fireEvent.click(within(group).getByRole('button', { name: 'Automatyczny' }));
+  await vi.waitFor(() => expect(s.settings.explorer_view).toBeNull());
+  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ explorer_view: null }] });
+  await fireEvent.click(screen.getByRole('switch', { name: 'Podgląd pliku w dymku po najechaniu' }));
+  await vi.waitFor(() => expect(s.settings.explorer_peek).toBe(false));
+  await fireEvent.click(screen.getByRole('switch', { name: 'Pokazuj ukryte pliki i foldery' }));
+  await vi.waitFor(() => expect(s.settings.explorer_hidden).toBe(true));
+});
+
+test('Eksplorator: Stały without a path opens the picker, cancel keeps the mode, the fixed row follows the mode', async () => {
+  const { s, bridge, container } = await renderWith(Settings, 'empty');
+  await open('Eksplorator plików');
+  const group = screen.getByRole('group', { name: 'Folder docelowy' });
+  expect(container.querySelector('[data-setting-id="explorer_dest_fixed"]')).toBeNull();
+  bridge.answerNext('pick_folder', { path: null });
+  await fireEvent.click(within(group).getByRole('button', { name: 'Stały' }));
+  await tick();
+  await tick();
+  expect(s.settings.explorer_dest_mode).toBe('last');
+  expect(bridge.calls.some((c) => c.method === 'save_settings')).toBe(false);
+  await fireEvent.click(within(group).getByRole('button', { name: 'Stały' }));
+  await vi.waitFor(() => expect(s.settings.explorer_dest_mode).toBe('fixed'));
+  expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ explorer_dest_mode: 'fixed', explorer_dest_fixed: 'D:\\AdMeNot\\kopie' }] });
+  expect(container.querySelector('[data-setting-id="explorer_dest_fixed"]')).not.toBeNull();
+  await fireEvent.click(within(group).getByRole('button', { name: 'Pytaj zawsze' }));
+  await vi.waitFor(() => expect(s.settings.explorer_dest_mode).toBe('ask'));
+  expect(container.querySelector('[data-setting-id="explorer_dest_fixed"]')).toBeNull();
+});
+
+test('Eksplorator: Stały folder is found by search only while the mode is fixed', async () => {
+  const { ctl, container } = await renderWith(Settings, 'empty');
+  await search('stały folder');
+  const visible = () => [...container.querySelectorAll('[data-setting-id="explorer_dest_fixed"]')].filter((e) => !(e as HTMLElement).hidden);
+  expect(visible()).toHaveLength(0);
+  await ctl.saveSettings({ explorer_dest_mode: 'fixed', explorer_dest_fixed: 'D:\\Klienci' });
+  await search('stały folder');
+  expect(visible()).toHaveLength(1);
+});
+
+test('verify_copies is one setting: toggled in Przenoszenie, seen in Eksplorator', async () => {
+  const { s } = await renderWith(Settings, 'empty');
+  await open('Przenoszenie danych');
+  await fireEvent.click(screen.getByRole('switch', { name: 'Sprawdzaj bajt po bajcie' }));
+  await vi.waitFor(() => expect(s.settings.verify_copies).toBe(true));
+  await open('Eksplorator plików');
+  expect(screen.getByRole('switch', { name: 'Sprawdzaj bajt po bajcie' }).getAttribute('aria-checked')).toBe('true');
+});
+
+test('Eksplorator: recent phones use the Polish plural and Wyczyść clears them; at 0 the button is off', async () => {
+  const { s, bridge } = await renderWith(Settings, 'empty');
+  await open('Eksplorator plików');
+  expect(screen.getByText('Nic nie zapamiętano')).toBeTruthy();
+  expect((screen.getByRole('button', { name: 'Wyczyść' }) as HTMLButtonElement).disabled).toBe(true);
+  for (const [n, text] of [[1, 'Pamiętane: 1 telefon'], [2, 'Pamiętane: 2 telefony'], [5, 'Pamiętane: 5 telefonów']] as const) {
+    s.settings = { ...s.settings, explorer_recent_phones: n };
+    await tick();
+    expect(screen.getByText(new RegExp(`^${text} `))).toBeTruthy();
+  }
+  await fireEvent.click(screen.getByRole('button', { name: 'Wyczyść' }));
+  await vi.waitFor(() => expect(s.settings.explorer_recent_phones).toBe(0));
+  expect(bridge.calls.at(-1)).toEqual({ method: 'explorer_clear_recents', args: [] });
+  expect(screen.getByText('Nic nie zapamiętano')).toBeTruthy();
+});
