@@ -371,6 +371,26 @@ describe('PeekBubble', () => {
     expect(full.hasAttribute('src')).toBe(false);
   });
 
+  it('błąd obrazka po zamknięciu dymka (zdjęty `src`) nie rzuca wyjątku', async () => {
+    // Chromium zgłasza `error` na <img>, któremu zdjęto `src`, już po zamknięciu dymka (np. wejście do folderu).
+    await hover(PHOTO);
+    const imgs = [...bubble()!.querySelectorAll('img')];
+    expect(imgs.length).toBeGreaterThan(0);
+    const thrown: unknown[] = [];
+    const catcher = (e: ErrorEvent) => { thrown.push(e.error); e.preventDefault(); };
+    window.addEventListener('error', catcher);
+    try {
+      await fireEvent.mouseDown(window);
+      await settle();
+      expect(bubble()).toBeNull();
+      for (const img of imgs) img.dispatchEvent(new Event('error'));
+      await settle();
+    } finally {
+      window.removeEventListener('error', catcher);
+    }
+    expect(thrown).toEqual([]);
+  });
+
   it('nie otwiera się przy s.peek === false, dla folderu, HEIC ani po dotyku', async () => {
     ex.state.peek = false;
     await hover(PHOTO);

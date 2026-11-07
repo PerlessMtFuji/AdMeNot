@@ -62,7 +62,12 @@
   function cancelLoad(node: HTMLImageElement) {
     return { destroy: () => node.removeAttribute('src') };
   }
+  /** Zdjęty `src` (`cancelLoad`) Chromium zgłasza jako `error` już po zamknięciu dymka; wtedy właściwości dymka
+   *  (`kind`, `entry`) czytają nieistniejący wpis i rzucają — zdarzenia po końcu dymka są pomijane. */
+  let alive = true;
+  $effect(() => () => { alive = false; });
   function thumbFailed(): void {
+    if (!alive) return;
     noCover = true;
     if (kind === 'photo' && !wantFull) onfail();
   }
