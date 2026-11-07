@@ -22,7 +22,12 @@ from admenot.engine.collectors.components import HOME_QUERY
 from admenot.engine.collectors.packages import PM_DISABLED, PM_SYSTEM
 from admenot.engine.collectors.profiles import PM_USERS
 from admenot.engine.collectors.system import DEVICE_POLICY, NOTIF_MANAGER, RESOLVE_HOME
-from admenot.engine.device_checks import BROWSER_QUERY, BROWSER_QUERY_PLAIN
+from admenot.engine.device_checks import (
+    APP_BROWSER_QUERY,
+    APP_BROWSER_QUERY_PLAIN,
+    BROWSER_QUERY,
+    BROWSER_QUERY_PLAIN,
+)
 
 POST = "android.permission.POST_NOTIFICATIONS"
 LISTENERS = "enabled_notification_listeners"
@@ -124,6 +129,7 @@ class FakePhone:
         self.channels: dict[str, dict[str, int]] = {}  # pakiet → {id kanału: importance}
         self.channel_groups: dict[str, list[str]] = {}  # pakiet → id grup kanałów (Chromium: „sites”)
         self.browsers: list[str] = []  # pakiety otwierające dowolny link http
+        self.app_browsers: list[str] = []  # MAIN + CATEGORY_APP_BROWSER: aplikacja deklaruje, że jest przeglądarką
         self.active: list[tuple[str, str, str, str | None]] = []  # (pakiet, kanał, tag, subText)
         self.firefox_perms: dict[str, int] = {}  # origin → capability (1 zezwól, 2 zablokuj)
         self.on_channel_screen: Callable[[FakePhone, str, str], None] | None = None
@@ -202,6 +208,9 @@ class FakePhone:
             return _HOME_HEADER + (self.home or "android/com.android.internal.app.ResolverActivity") + "\n"
         if command in (BROWSER_QUERY, BROWSER_QUERY_PLAIN):
             found = "".join(f"{_HOME_HEADER}  {p}/.Browser\n" for p in self.browsers)
+            return found or "No activities found\n"
+        if command in (APP_BROWSER_QUERY, APP_BROWSER_QUERY_PLAIN):
+            found = "".join(f"{_HOME_HEADER}  {p}/.Main\n" for p in self.app_browsers)
             return found or "No activities found\n"
         if command == HOME_QUERY:
             found = "".join(f"{_HOME_HEADER}  {c}\n" for c in self._home_candidates())

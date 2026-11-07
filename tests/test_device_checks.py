@@ -3,6 +3,8 @@ from fakephone import make_cli_phone
 from admenot.engine.actions.steps import check_step
 from admenot.engine.adb.transport import AdbError
 from admenot.engine.device_checks import (
+    APP_BROWSER_QUERY,
+    APP_BROWSER_QUERY_PLAIN,
     BROWSER_QUERY,
     BROWSER_QUERY_PLAIN,
     fix_steps,
@@ -62,12 +64,37 @@ def test_chromium_browser_without_sites_is_listed_as_checked():
 
 
 def test_browser_read_neither_way_is_unsupported_not_hidden():
-    phone = _phone(browsers=["com.example.odd"])
+    phone = _phone(browsers=["com.example.odd"], app_browsers=["com.example.odd"])
     phone.channels = {"com.example.odd": {"push": 3}}
     check = read_site_notifications(phone, {"com.example.odd": "Odd"})
     (odd,) = check.browsers
     assert (odd.name, odd.mode, odd.read, odd.all_fix) == ("Odd", "unknown", "unsupported", None)
     assert check.state == "review"
+
+
+def test_link_handler_that_is_not_a_browser_is_skipped():
+    """Otwieracz linków albo menedżer plików przechwytuje każdy link http, ale nie jest przeglądarką."""
+    handlers = ["app.traced", "filemanager.files.fileexplorer.android.folder"]
+    phone = _phone(browsers=handlers)
+    phone.channels.update({"app.traced": {"service": 3},
+                           "filemanager.files.fileexplorer.android.folder": {"downloads": 3}})
+    check = read_site_notifications(phone)
+    assert [b.package for b in check.browsers] == [CHROME]
+
+
+def test_named_browser_without_app_browser_category_is_still_unsupported():
+    phone = _phone(browsers=["com.yandex.browser"])
+    phone.channels = {"com.yandex.browser": {"push": 3}}
+    (yandex,) = read_site_notifications(phone).browsers
+    assert (yandex.name, yandex.read) == ("Yandex Browser", "unsupported")
+
+
+def test_without_the_app_browser_list_only_named_browsers_count():
+    phone = _phone(browsers=["com.yandex.browser", "com.example.odd"], app_browsers=["com.example.odd"])
+    phone.channels = {"com.yandex.browser": {"push": 3}, "com.example.odd": {"push": 3}}
+    phone.fail[APP_BROWSER_QUERY] = AdbError("command_failed", "boom")
+    phone.fail[APP_BROWSER_QUERY_PLAIN] = "garbage"
+    assert [b.package for b in read_site_notifications(phone).browsers] == ["com.yandex.browser"]
 
 
 def test_browser_without_site_notifications_is_skipped():
@@ -88,12 +115,14 @@ def test_browser_without_channels_or_unreadable_list_adds_nothing():
 
 
 def test_browser_list_falls_back_to_plain_query_without_query_flags():
-    phone = _phone(browsers=["com.example.odd"])
+    phone = _phone(browsers=["com.example.odd"], app_browsers=["com.example.odd"])
     phone.channels["com.example.odd"] = {"push": 3}
     phone.fail[BROWSER_QUERY] = "Error: Unknown option: --query-flags\n"
+    phone.fail[APP_BROWSER_QUERY] = "Error: Unknown option: --query-flags\n"
     packages = [b.package for b in read_site_notifications(phone).browsers]
     assert packages == [CHROME, "com.example.odd"]
     assert phone.calls.index(BROWSER_QUERY) < phone.calls.index(BROWSER_QUERY_PLAIN)
+    assert phone.calls.index(APP_BROWSER_QUERY) < phone.calls.index(APP_BROWSER_QUERY_PLAIN)
 
 
 def test_unknown_package_with_web_channels_is_per_site_named_by_package_or_label():

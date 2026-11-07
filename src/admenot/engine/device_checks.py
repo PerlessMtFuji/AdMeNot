@@ -48,6 +48,11 @@ CHROME = "com.android.chrome"
 _BROWSER_INTENT = "-a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d http://example.com"
 BROWSER_QUERY = f"cmd package query-activities --brief --query-flags 0x20000 {_BROWSER_INTENT}"
 BROWSER_QUERY_PLAIN = f"cmd package query-activities --brief {_BROWSER_INTENT}"
+# Link http otwiera też otwieracz linków albo menedżer plików. Przeglądarka deklaruje dodatkowo
+# MAIN + CATEGORY_APP_BROWSER (Chrome, Firefox, Samsung Internet, Edge, Opera, Brave, DuckDuckGo, Vivaldi).
+_APP_BROWSER_INTENT = "-a android.intent.action.MAIN -c android.intent.category.APP_BROWSER"
+APP_BROWSER_QUERY = f"cmd package query-activities --brief --query-flags 0x20000 {_APP_BROWSER_INTENT}"
+APP_BROWSER_QUERY_PLAIN = f"cmd package query-activities --brief {_APP_BROWSER_INTENT}"
 _WEB_PREFIX = "web:"
 _CHROMIUM_SITES_GROUP = "sites"  # grupa kanałów witryn Chromium — jest też przy zerze witryn
 _BLOCKED = 0  # NotificationChannel.mImportance: IMPORTANCE_NONE
@@ -228,12 +233,18 @@ def read_site_notifications(adb: AdbTransport, labels: Mapping[str, str | None] 
         if entry is not None:
             browsers.append(entry)
     seen = {b.package for b in browsers}
+    app_browsers: set[str] | None = None  # pytamy dopiero, gdy jest kandydat do „sprawdź ręcznie”
     for package in sorted(_browser_packages(adb) - seen - known.keys() - without_site_notifications()):
         if not dump.channels.get(package):
             continue  # żadnego kanału: przeglądarka nie wysłała jeszcze żadnego powiadomienia
         if _CHROMIUM_SITES_GROUP in dump.groups.get(package, set()):
             browsers.append(BrowserSites(package, _name(package, labels), "per_site", "ok", []))
-        else:
+            continue
+        if app_browsers is None:
+            app_browsers = _query(adb, (APP_BROWSER_QUERY, APP_BROWSER_QUERY_PLAIN))
+        # Bez dowodu, że to przeglądarka (tabela nazw albo CATEGORY_APP_BROWSER), pakiet tylko otwiera
+        # linki — otwieracz linków, menedżer plików — i nie dostaje wiersza „sprawdź ręcznie”.
+        if package in browser_names() or package in app_browsers:
             browsers.append(BrowserSites(package, _name(package, labels), "unknown", "unsupported", []))
     return DeviceCheck(SITE_NOTIFICATIONS, _state(browsers), browsers)
 
@@ -252,14 +263,19 @@ def debugging_appeared(adb: AdbTransport, check: DeviceCheck) -> bool:
         return False
 
 
-def _browser_packages(adb: AdbTransport) -> set[str]:
-    """Pakiety przeglądarek; nieznany format to pusta lista — wtedy zostaje odczyt z samych kanałów."""
-    for command in (BROWSER_QUERY, BROWSER_QUERY_PLAIN):
+def _query(adb: AdbTransport, commands: tuple[str, str]) -> set[str]:
+    """Pakiety z `query-activities` (z MATCH_ALL, potem bez); nieznany format albo błąd to pusty zbiór."""
+    for command in commands:
         try:
             return query_packages(adb.shell(command)) - {"android"}
         except (AdbError, UnrecognizedOutput):
             continue
     return set()
+
+
+def _browser_packages(adb: AdbTransport) -> set[str]:
+    """Pakiety otwierające dowolny link http; pusty zbiór — wtedy zostaje odczyt z samych kanałów."""
+    return _query(adb, (BROWSER_QUERY, BROWSER_QUERY_PLAIN))
 
 
 def read_device_checks(adb: AdbTransport, labels: Mapping[str, str | None] | None = None,

@@ -21,7 +21,8 @@ without_site_notifications:
   - com.mi.globalbrowser  # Mi Przeglądarka
 
 # Nazwy popularnych przeglądarek: kontrola czyta stan przy skanie, zanim znane są nazwy z ekranu telefonu
-# i z analizy APK — bez tej tabeli serwisant widziałby sam pakiet.
+# i z analizy APK — bez tej tabeli serwisant widziałby sam pakiet. Pakiet z tej tabeli liczy się też jako
+# przeglądarka do „sprawdź ręcznie”, gdy nie deklaruje CATEGORY_APP_BROWSER (otwieracze linków są pomijane).
 names:
   com.android.chrome: Chrome
   com.chrome.beta: Chrome Beta
@@ -35,3 +36,16 @@ names:
   com.duckduckgo.mobile.android: DuckDuckGo
   org.mozilla.firefox_beta: Firefox Beta
   org.mozilla.focus: Firefox Focus
+  org.mozilla.fenix: Firefox Nightly
+  com.chrome.dev: Chrome Dev
+  com.chrome.canary: Chrome Canary
+  com.opera.browser.beta: Opera beta
+  com.sec.android.app.sbrowser.beta: Samsung Internet Beta
+  com.ecosia.android: Ecosia
+  com.UCMobile.intl: UC Browser
+  org.torproject.torbrowser: Tor Browser
+  mark.via.gp: Via
+  com.heytap.browser: HeyTap Browser
+  com.vivo.browser: vivo Browser
+  com.huawei.browser: Huawei Browser
+  com.transsion.phoenix: Phoenix Browser
