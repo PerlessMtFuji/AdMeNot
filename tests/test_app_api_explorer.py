@@ -1234,3 +1234,67 @@ def test_retry_bridge_starts_a_new_task_only_for_failed_files(tmp_path):
     bad["on"] = False
     again = api.explorer_retry(task)["task"]
     assert queue.wait_for(again, "done").verified == "hash"
+
+
+def test_listing_shows_hidden_when_enabled(tmp_path):
+    api, _, _, _ = _opened(tmp_path)
+    names_off = {e["name"] for e in api.explorer_list("/sdcard/DCIM/Camera")["entries"]}
+    assert ".hidden.jpg" not in names_off
+    assert "error" not in api.save_settings({"explorer_hidden": True})
+    names_on = {e["name"] for e in api.explorer_list("/sdcard/DCIM/Camera")["entries"]}
+    assert ".hidden.jpg" in names_on
+
+
+def test_copy_fixed_uses_fixed_dest_and_keeps_setting(tmp_path):
+    api, _, _, _ = _opened(tmp_path)
+    a, b, last = _pc_dir(tmp_path, "a"), _pc_dir(tmp_path, "b"), _pc_dir(tmp_path, "last")
+    save_internal({"explorer_dest": str(last)})
+    assert "error" not in api.save_settings({"explorer_dest_mode": "fixed", "explorer_dest_fixed": str(a)})
+    t1 = api.explorer_copy(["/sdcard/Download/faktura.pdf"])
+    assert _wait_task(api, t1["task"], "done")["dest"] == str(a)
+    t2 = api.explorer_copy(["/sdcard/Download/faktura.pdf"], str(b))
+    assert _wait_task(api, t2["task"], "done")["dest"] == str(b)
+    saved = load_settings()
+    assert saved.explorer_dest_fixed == str(a) and saved.explorer_dest == str(last)
+
+
+def test_copy_fixed_missing_raises_no_dest(tmp_path):
+    api, _, _, _ = _opened(tmp_path)
+    assert "error" not in api.save_settings(
+        {"explorer_dest_mode": "fixed", "explorer_dest_fixed": str(tmp_path / "odlaczony")})
+    assert api.explorer_copy(["/sdcard/Download/faktura.pdf"])["error"]["key"] == "explorer_no_dest"
+
+
+def test_copy_ask_requires_dest(tmp_path):
+    api, _, _, _ = _opened(tmp_path)
+    last = _pc_dir(tmp_path, "last")
+    save_internal({"explorer_dest": str(last)})
+    assert "error" not in api.save_settings({"explorer_dest_mode": "ask"})
+    assert api.explorer_copy(["/sdcard/Download/faktura.pdf"])["error"]["key"] == "explorer_no_dest"
+
+
+@pytest.mark.parametrize("mode", ["fixed", "ask"])
+def test_pick_dest_saved_only_in_last_mode(tmp_path, mode):
+    api, _, _, _ = _opened(tmp_path)
+    pc, last = _pc_dir(tmp_path), _pc_dir(tmp_path, "last")
+    save_internal({"explorer_dest": str(last)})
+    api._attach(pick_folder=lambda: str(pc), close=lambda: None)
+    assert "error" not in api.save_settings({"explorer_dest_mode": mode})
+    assert api.explorer_pick_dest() == {"path": str(pc)}
+    assert load_settings().explorer_dest == str(last)
+    api.save_settings({"explorer_dest_mode": "last"})
+    assert api.explorer_pick_dest() == {"path": str(pc)}
+    assert load_settings().explorer_dest == str(pc)
+
+
+def test_clear_recents(tmp_path):
+    api, _, host, _ = _opened(tmp_path, other=True)
+    (_storage_of(host, OTHER).root / "sdcard" / "Music").mkdir(parents=True)
+    api.explorer_list("/sdcard/Download")
+    api.explorer_close()
+    assert api.explorer_open(OTHER).get("error") is None
+    assert "error" not in api.explorer_list("/sdcard/Music")
+    assert api.get_settings()["explorer_recent_phones"] == 2
+    assert api.explorer_clear_recents() == {"phones": 0}
+    assert api.get_settings()["explorer_recent_phones"] == 0
+    assert load_settings().explorer_recents == {}

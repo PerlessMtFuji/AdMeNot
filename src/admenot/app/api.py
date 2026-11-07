@@ -815,6 +815,7 @@ class Api(ExplorerMixin):
         # telefonu w `explorer_open`
         view = {k: v for k, v in asdict(self._settings).items() if k != "explorer_recents"}
         return {**view, "lang": self._lang,
+                "explorer_recent_phones": len(self._settings.explorer_recents),
                 "welcome_current": welcome.WELCOME_VERSION,
                 "telemetry_delete_pending": telemetry.delete_pending(),
                 "donate_reminders": not self._settings.donate_off}

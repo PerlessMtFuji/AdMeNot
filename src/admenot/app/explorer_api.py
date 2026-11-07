@@ -757,7 +757,8 @@ class ExplorerMixin:
         apps = self._explorer_apps(sess)
         locked = False
         try:
-            result = list_dir(sess.adb, path, sdk=sess.device.sdk, apps=apps)
+            result = list_dir(sess.adb, path, sdk=sess.device.sdk, apps=apps,
+                             include_hidden=self._settings.explorer_hidden)
             entries, skipped = result.entries, result.skipped
         except ListError as exc:
             if exc.kind != "denied":
@@ -935,15 +936,17 @@ class ExplorerMixin:
         if exclude is not None and not (isinstance(exclude, list) and all(isinstance(p, str) for p in exclude)):
             raise AppError("bad_request", "exclude")
         remote = [self._explorer_path(p, file=True) for p in paths]
-        if dest is None:
-            dest = self._settings.explorer_dest
+        mode = self._settings.explorer_dest_mode
+        if dest is None:  # tryb „ask” bez folderu → UI zapyta; „fixed” z niedostępnym folderem też
+            dest = {"last": self._settings.explorer_dest, "fixed": self._settings.explorer_dest_fixed}.get(mode)
         elif not isinstance(dest, str):
             raise AppError("bad_request", "dest")
         if not dest or not os.path.isabs(dest) or not os.path.isdir(dest):  # np. odłączony pendrive
             raise AppError("explorer_no_dest")
         with self._explorer_errors(sess):
             plan = plan_to_pc(sess.adb, remote, Path(dest), exclude=frozenset(exclude or ()))
-        self._explorer_save_dest(dest)
+        if mode != "fixed":  # w trybie „fixed” inny folder działa tylko dla tej jednej operacji
+            self._explorer_save_dest(dest)
         return self._explorer_start(sess, plan, verify_hash)
 
     @_bridge
@@ -964,11 +967,17 @@ class ExplorerMixin:
 
     @_bridge
     def explorer_pick_dest(self) -> dict[str, Any]:
-        """Okno wyboru folderu docelowego kopii; wybrany zostaje zapamiętany (`explorer_dest`)."""
+        """Okno wyboru folderu docelowego kopii; wybrany zostaje zapamiętany (`explorer_dest`) tylko w trybie „last”."""
         path = self._pick_folder_fn() if self._pick_folder_fn else None
-        if path:
+        if path and self._settings.explorer_dest_mode == "last":
             self._explorer_save_dest(path)
         return {"path": path}
+
+    @_bridge
+    def explorer_clear_recents(self) -> dict[str, Any]:
+        """Czyści „Ostatnio” wszystkich telefonów (bez potwierdzenia)."""
+        self._settings = save_internal({"explorer_recents": {}})
+        return {"phones": 0}
 
     @_bridge
     def explorer_pick_upload(self, kind: str) -> dict[str, Any]:
