@@ -36,7 +36,7 @@ describe('drawFirstPage', () => {
     await drawFirstPage('http://x/a.pdf', canvas, 400, new AbortController().signal);
     await drawFirstPage('http://x/b.pdf', canvas, 400, new AbortController().signal);
     const [first, second] = lib.state.options;
-    expect(first).toMatchObject({ url: 'http://x/a.pdf', disableAutoFetch: true, disableStream: true });
+    expect(first).toMatchObject({ url: 'http://x/a.pdf', disableAutoFetch: true, disableStream: true, rangeChunkSize: 8 * 1024 * 1024 });
     expect(first.worker).toBeTruthy();
     expect(second.worker).toBe(first.worker);
     expect(lib.state.created).toBe(1);

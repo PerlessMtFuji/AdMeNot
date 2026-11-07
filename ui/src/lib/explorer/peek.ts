@@ -26,13 +26,14 @@ export function peekKind(e: EntryView): PeekKind | null {
   return e.type === 'text' ? 'text' : null;
 }
 
-/** Wymiary dymka (ze stopką); wartości startowe do strojenia. */
+/** Wymiary dymka (ze stopką). PDF: cała strona A4 ze stopką mieści się w najmniejszym oknie (663 px wysokości). */
 export function peekSize(kind: PeekKind): { w: number; h: number } {
   switch (kind) {
     case 'photo':
     case 'video':
       return { w: 440, h: 330 };
     case 'pdf':
+      return { w: 424, h: 640 };
     case 'text':
       return { w: 440, h: 460 };
     case 'audio':

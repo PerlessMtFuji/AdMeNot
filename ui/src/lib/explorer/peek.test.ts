@@ -120,5 +120,6 @@ describe('peekKind', () => {
     expect(peekSize('photo')).toEqual({ w: 440, h: 330 });
     expect(peekSize('audio')).toEqual({ w: 320, h: 210 });
     expect(peekSize('text')).toEqual({ w: 440, h: 460 });
+    expect(peekSize('pdf')).toEqual({ w: 424, h: 640 });
   });
 });

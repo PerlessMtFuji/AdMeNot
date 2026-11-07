@@ -3,6 +3,9 @@ import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 /** Największy obraz strony: przy dużej gęstości pikseli ekranu oznaczałoby setki MB na stronę (jak w `PdfPage`). */
 const MAX_PIXELS = 16_000_000;
+/** Kawałek odczytu dymka. Każdy zakres to osobny strumień z telefonu, a 64 KB pdf.js to dziesiątki kolejnych odczytów:
+ *  plik do 16 MB (2 kawałki) czyta się w całości, jednym strumieniem, większy nadal zakresami. */
+const PEEK_CHUNK = 8 * 1024 * 1024;
 
 /** Biblioteka PDF z ustawionym workerem; ładowana dopiero przy pierwszym PDF-ie. */
 export async function pdfLib(): Promise<typeof import('pdfjs-dist')> {
@@ -32,7 +35,7 @@ export async function drawFirstPage(url: string, canvas: HTMLCanvasElement, widt
   const lib = await pdfLib();
   signal.throwIfAborted();
   if (!worker || worker.destroyed) worker = lib.PDFWorker.create({});
-  const task = lib.getDocument({ url, worker, disableAutoFetch: true, disableStream: true, ...pdfAssets() });
+  const task = lib.getDocument({ url, worker, disableAutoFetch: true, disableStream: true, rangeChunkSize: PEEK_CHUNK, ...pdfAssets() });
   let destroyed = false;
   const destroy = () => {
     if (destroyed) return;
