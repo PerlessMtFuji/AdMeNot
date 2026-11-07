@@ -102,8 +102,12 @@ export function createFakeBridge(name: string,
     apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false, select_level: 'silence', retention_days: 60,
     check_updates: true, dismissed_update: null, last_run_version: null,
     welcome_version: options.welcome ? null : 1, welcome_current: 1, telemetry: false, telemetry_packages: false,
-    telemetry_id: null, telemetry_delete_pending: false, donate_reminders: true, apk_mode_default: 'full' };
-  let service: ServiceInfo = { name: null, address: null, phone: null, logo: null };
+    telemetry_id: null, telemetry_delete_pending: false, donate_reminders: true, apk_mode_default: 'full',
+    transfers_dir: null, transfer_keep_days: 7, transfer_apps_default: true, verify_copies: false,
+    explorer_hidden: false, explorer_dest_mode: 'last', explorer_dest_fixed: null, report_open: true,
+    explorer_recent_phones: 0 };
+  let service: ServiceInfo = { name: null, address: null, phone: null, logo: null, email: null, nip: null,
+    website: null, technician: null, footer: null };
   let lastScan: ScanView | null = null;
   let mirror: { serial: string | null; state: string } = { serial: null, state: 'stopped' };
   let update: UpdateView = { available: null, dismissed: false, retired: null, updated_to: null, updated_notes: null, installable: true };

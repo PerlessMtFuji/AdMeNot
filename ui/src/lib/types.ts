@@ -38,6 +38,16 @@ export interface Settings {
   explorer_dest?: string | null;
   explorer_view?: 'list' | 'grid' | null;
   explorer_peek?: boolean;
+  transfers_dir: string | null;
+  transfer_keep_days: number;
+  transfer_apps_default: boolean;
+  verify_copies: boolean;
+  explorer_hidden: boolean;
+  explorer_dest_mode: 'last' | 'fixed' | 'ask';
+  explorer_dest_fixed: string | null;
+  report_open: boolean;
+  /** Ile telefonów ma zapamiętane „Ostatnio” w eksploratorze (wypełnia most). */
+  explorer_recent_phones: number;
 }
 
 export interface TelemetrySample {
@@ -394,6 +404,11 @@ export interface ServiceInfo {
   address: string | null;
   phone: string | null;
   logo: string | null;
+  email: string | null;
+  nip: string | null;
+  website: string | null;
+  technician: string | null;
+  footer: string | null;
 }
 
 export interface ReportResult {

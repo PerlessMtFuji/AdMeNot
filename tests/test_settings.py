@@ -4,6 +4,7 @@ import pytest
 
 from admenot.engine import settings as S
 from admenot.engine.paths import backups_dir, reports_dir, settings_path
+from admenot.engine.paths import data_dir as data_dir_path
 from admenot.engine.settings import (
     MAX_LOGO_BYTES,
     LogoError,
@@ -300,3 +301,58 @@ def test_apk_mode_default_roundtrip_and_validation(tmp_path):
         save_settings({"apk_mode_default": "fast"}, path)
     path.write_text('{"apk_mode_default": 3}', "utf-8")
     assert load_settings(path).apk_mode_default == "ask"  # zła wartość w pliku = domyślna
+
+
+def test_new_keys_defaults(tmp_path):
+    s = load_settings(tmp_path / "none.json")
+    assert s.transfer_keep_days == 7
+    assert s.transfer_apps_default is True
+    assert s.verify_copies is False
+    assert s.explorer_hidden is False
+    assert s.explorer_dest_mode == "last"
+    assert s.explorer_dest_fixed is None
+    assert s.report_open is True
+    assert s.transfers_dir is None
+    assert s.transfer_roots == []
+
+
+@pytest.mark.parametrize("key,value,ok", [
+    ("transfer_keep_days", 3, True), ("transfer_keep_days", 7, True),
+    ("transfer_keep_days", 14, True), ("transfer_keep_days", 30, True),
+    ("transfer_keep_days", 5, False), ("transfer_keep_days", 0, False), ("transfer_keep_days", True, False),
+    ("explorer_dest_mode", "ask", True), ("explorer_dest_mode", "other", False),
+    ("explorer_dest_fixed", "relative/x", False),
+    ("report_open", "yes", False), ("report_open", False, True),
+    ("verify_copies", 1, False), ("explorer_hidden", True, True), ("transfer_apps_default", None, False),
+])
+def test_new_keys_validation(key, value, ok):
+    if ok:
+        assert getattr(save_settings({key: value}), key) == value
+    else:
+        with pytest.raises(ValueError):
+            save_settings({key: value})
+
+
+def test_explorer_dest_fixed_and_transfers_dir_paths(data_dir):
+    fixed = str(data_dir / "pendrive")
+    assert save_settings({"explorer_dest_fixed": fixed}).explorer_dest_fixed == fixed
+    assert save_settings({"explorer_dest_fixed": None}).explorer_dest_fixed is None
+    kopie = str(data_dir / "kopie")
+    assert save_settings({"transfers_dir": kopie}).transfers_dir == kopie
+    for bad in ("wzgledna/kopie", str(data_dir_path() / "transfers")):
+        with pytest.raises(ValueError):
+            save_settings({"transfers_dir": bad})
+
+
+def test_service_new_fields_roundtrip():
+    info = ServiceInfo(name="S", email="a@b.pl", nip="123", website="x.pl", technician="Jan", footer="L1\nL2")
+    save_service(info)
+    got = load_service()
+    assert (got.email, got.nip, got.website, got.technician) == ("a@b.pl", "123", "x.pl", "Jan")
+    assert got.footer == "L1\nL2"
+
+
+def test_service_footer_too_long():
+    save_service(ServiceInfo(footer="x" * 500))
+    with pytest.raises(ValueError):
+        save_service(ServiceInfo(footer="x" * 501))

@@ -72,7 +72,10 @@ export class AppState {
     apk_cache_limit_gb: 10, apk_cache_clear_after_repair: false, select_level: 'silence', retention_days: 60,
     check_updates: true, dismissed_update: null, last_run_version: null,
     welcome_version: 1, welcome_current: 1, telemetry: false, telemetry_packages: false, telemetry_id: null,
-    telemetry_delete_pending: false, donate_reminders: true, apk_mode_default: 'ask' });
+    telemetry_delete_pending: false, donate_reminders: true, apk_mode_default: 'ask',
+    transfers_dir: null, transfer_keep_days: 7, transfer_apps_default: true, verify_copies: false,
+    explorer_hidden: false, explorer_dest_mode: 'last', explorer_dest_fixed: null, report_open: true,
+    explorer_recent_phones: 0 });
   settingsLoaded = $state(false);  // ekran powitalny dopiero po odczycie ustawień
   devices = $state<DeviceEntry[]>([]);
   devicesError = $state<string | null>(null);

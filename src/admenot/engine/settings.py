@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 from admenot.engine.oplock import try_lock, unlock
-from admenot.engine.paths import reports_dir, settings_path
+from admenot.engine.paths import data_dir, reports_dir, settings_path
 
 LANGS = ("pl", "en")
 MODES = ("simple", "expert")
@@ -34,15 +34,21 @@ SELECT_LEVELS = ("silence", "disable", "remove")  # poziomy akcji (actions/plann
 APK_MODES = ("ask", "full", "manual")  # co po szybkim skanie: pytać, pełna analiza APK, tryb ręczny
 RETENTION_DAYS = (30, 60, 90, 180, 365)  # okres przechowywania zleceń do wyboru; None = nie usuwaj
 DEFAULT_RETENTION_DAYS = 60  # RODO: domyślnie ograniczone przechowywanie danych klientów
+TRANSFER_KEEP_DAYS = (3, 7, 14, 30)  # jak długo trzymać kopie przeniesionych danych
+DEST_MODES = ("last", "fixed", "ask")  # folder docelowy kopii z eksploratora: ostatni, stały, pytaj
+FOOTER_MAX = 500  # znaków w stopce protokołu
+TRANSFER_ROOTS_MAX = 20
 KEYS = ("lang", "mode", "adb_path", "backups_dir", "report_pdf_dir", "theme", "mirror_auto", "explorer_view", "explorer_peek",
         "apk_cache_limit_gb", "apk_cache_clear_after_repair", "select_level",
         "check_updates", "dismissed_update", "last_run_version", "retention_days",
-        "apk_mode_default")
+        "apk_mode_default", "transfers_dir", "transfer_keep_days", "transfer_apps_default", "verify_copies",
+        "explorer_hidden", "explorer_dest_mode", "explorer_dest_fixed", "report_open")
 # Klucze zmieniane tylko przez dedykowane funkcje (ostrzeżenie, zgody telemetrii), nigdy z ekranu
 # ustawień: UI nie może podstawić własnego ID instalacji ani „zaakceptować” ostrzeżenia bokiem.
 INTERNAL_KEYS = ("welcome_version", "welcome_at", "telemetry", "telemetry_packages",
                  "telemetry_id", "telemetry_at", "telemetry_start_day",
-                 "donate_count", "donate_shown_at", "donate_off", "explorer_dest", "explorer_recents")
+                 "donate_count", "donate_shown_at", "donate_off", "explorer_dest", "explorer_recents",
+                 "transfer_roots")
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 LOGO_TYPES = {
@@ -105,6 +111,16 @@ class Settings:
     # pierwszy). Stary klucz `explorer_recent` (jedna lista dla wszystkich telefonów) jest pomijany przy
     # odczycie — nazwy folderów poprzedniego klienta nie trafią do „Ostatnio” innego telefonu.
     explorer_recents: dict[str, list[str]] = field(default_factory=dict)
+    transfers_dir: str | None = None  # None = katalog transfers w danych programu
+    # wszystkie foldery, w których kiedykolwiek leżały kopie (po zmianie `transfers_dir` stare dalej widać)
+    transfer_roots: list[str] = field(default_factory=list)
+    transfer_keep_days: int = 7
+    transfer_apps_default: bool = True
+    verify_copies: bool = False
+    explorer_hidden: bool = False
+    explorer_dest_mode: str = "last"
+    explorer_dest_fixed: str | None = None
+    report_open: bool = True
 
 
 @dataclass(frozen=True)
@@ -113,6 +129,11 @@ class ServiceInfo:
     address: str | None = None
     phone: str | None = None
     logo: Path | None = None
+    email: str | None = None
+    nip: str | None = None
+    website: str | None = None
+    technician: str | None = None
+    footer: str | None = None
 
 
 class LogoError(ValueError):
@@ -236,6 +257,18 @@ def archive_dir_ok(value: str) -> bool:
     return not same
 
 
+def transfers_dir_ok(value: str) -> bool:
+    """Folder kopii: ścieżka bezwzględna i nie wewnątrz danych programu (tam porządkowanie
+    danych mogłoby pomylić kopie z plikami programu)."""
+    path = Path(value)
+    if not path.is_absolute():
+        return False
+    try:
+        return not path.resolve().is_relative_to(data_dir().resolve())
+    except OSError:  # niedostępny dysk: nie blokujemy zapisu
+        return True
+
+
 def _recent_ok(value: Any) -> bool:
     return (isinstance(value, list) and len(value) <= EXPLORER_RECENT_MAX
             and all(isinstance(p, str) and (p == "/sdcard" or p.startswith("/sdcard/")) and "\n" not in p
@@ -243,6 +276,19 @@ def _recent_ok(value: Any) -> bool:
 
 
 def _valid(key: str, value: Any) -> bool:
+    if key == "transfer_roots":
+        return (isinstance(value, list) and len(value) <= TRANSFER_ROOTS_MAX
+                and all(isinstance(p, str) and p.strip() and Path(p).is_absolute() for p in value))
+    if key == "transfer_keep_days":
+        return type(value) is int and value in TRANSFER_KEEP_DAYS
+    if key == "explorer_dest_mode":
+        return value in DEST_MODES
+    if key in ("transfer_apps_default", "verify_copies", "explorer_hidden", "report_open"):
+        return isinstance(value, bool)
+    if key == "transfers_dir" and isinstance(value, str) and value.strip():
+        return transfers_dir_ok(value.strip())
+    if key == "explorer_dest_fixed" and isinstance(value, str) and value.strip():
+        return os.path.isabs(value.strip())
     if key == "explorer_view":
         return value is None or value in ("list", "grid")
     if key == "explorer_recents":
@@ -329,12 +375,16 @@ def load_service(path: Path | None = None) -> ServiceInfo:
         return ServiceInfo()
     logo = _text(raw, "logo")
     return ServiceInfo(_text(raw, "name"), _text(raw, "address"), _text(raw, "phone"),
-                       Path(logo) if logo else None)
+                       Path(logo) if logo else None, _text(raw, "email"), _text(raw, "nip"),
+                       _text(raw, "website"), _text(raw, "technician"), _text(raw, "footer"))
 
 
 def save_service(info: ServiceInfo, path: Path | None = None) -> None:
+    if info.footer is not None and len(info.footer) > FOOTER_MAX:
+        raise ValueError("footer")
     service = {"name": info.name, "address": info.address, "phone": info.phone,
-               "logo": str(info.logo) if info.logo else None}
+               "logo": str(info.logo) if info.logo else None, "email": info.email, "nip": info.nip,
+               "website": info.website, "technician": info.technician, "footer": info.footer}
     _save(path or settings_path(), lambda data: data.update(service=service))  # KEYS zostają
 
 

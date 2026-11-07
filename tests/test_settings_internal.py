@@ -132,3 +132,11 @@ def test_donate_keys_default_and_validate():
                 {"donate_off": 1}):
         with pytest.raises(ValueError):
             save_internal(bad)
+
+
+def test_transfer_roots_internal_only(tmp_path):
+    with pytest.raises(ValueError):
+        save_settings({"transfer_roots": []})
+    assert save_internal({"transfer_roots": [str(tmp_path)]}).transfer_roots == [str(tmp_path)]
+    with pytest.raises(ValueError):
+        save_internal({"transfer_roots": ["relative/path"]})
