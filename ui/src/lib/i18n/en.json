@@ -619,7 +619,7 @@
     "cache_usage": "{size} GB of {limit} GB", "gb": "{n} GB",
     "group_transfer_copies": "Copies on this computer", "group_transfer_default": "Default selection",
     "transfers_dir": "Data copies folder", "transfers_dir_hint": "New copies go here. Existing copies stay where they are.",
-    "transfers_default": "%LOCALAPPDATA%\\AdMeNot\\transfers", "transfers_dir_bad": "This folder cannot be used. Choose an existing folder you can write to.",
+    "transfers_default": "%LOCALAPPDATA%\\AdMeNot\\transfers", "transfers_dir_bad": "This folder cannot be used. Choose a folder outside the program's data folder.",
     "transfer_keep": "Keep copies for", "transfer_keep_hint": "They are deleted automatically afterwards. In History you can extend a single copy.",
     "days": "{n} days",
     "transfer_apps": "Preselect apps to transfer", "transfer_apps_hint": "Suspicious apps are never preselected",
@@ -732,12 +732,13 @@
     "button": "Report PDF",
     "busy": "Creating the report…",
     "opened": "Opened the report: {path}",
+    "saved": "Saved the report: {path}",
     "not_opened": "Saved the report: {path} — could not open it (no program for this file). Open it manually.",
-    "pdf_no_browser": "Microsoft Edge, which creates the PDF, was not found. Opened the HTML report — print it to PDF: {html}",
-    "pdf_timeout": "Creating the PDF took too long. Opened the HTML report: {html}",
-    "pdf_failed": "Could not create the PDF. Opened the HTML report: {html}",
-    "pdf_locked": "File {pdf} is open in another program — close it and try again. Opened the HTML report: {html}",
-    "pdf_folder": "Can't save to the folder {dir} — check the PDF report folder in Settings. Opened the HTML report: {html}"
+    "pdf_no_browser": "Microsoft Edge, which creates the PDF, was not found. Saved the HTML report — print it to PDF: {html}",
+    "pdf_timeout": "Creating the PDF took too long. Saved the HTML report: {html}",
+    "pdf_failed": "Could not create the PDF. Saved the HTML report: {html}",
+    "pdf_locked": "File {pdf} is open in another program — close it and try again. Saved the HTML report: {html}",
+    "pdf_folder": "Can't save to the folder {dir} — check the PDF report folder in Settings. Saved the HTML report: {html}"
   },
   "transfer": {
     "stage": {

@@ -95,8 +95,9 @@ def run_gui() -> int:
                                        background_color="#eef2f6", **WINDOW)
         holder["window"] = window
 
-        def pick_folder() -> str | None:
-            chosen = window.create_file_dialog(webview.FileDialog.FOLDER)
+        def pick_folder(start: str | None = None) -> str | None:
+            """`start` — folder, w którym okno się otwiera (eksplorator podpowiada ostatni folder kopii)."""
+            chosen = window.create_file_dialog(webview.FileDialog.FOLDER, directory=start or "")
             return chosen[0] if chosen else None
 
         def pick_file() -> str | None:

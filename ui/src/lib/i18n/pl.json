@@ -619,7 +619,7 @@
     "cache_usage": "{size} GB z {limit} GB", "gb": "{n} GB",
     "group_transfer_copies": "Kopie na komputerze", "group_transfer_default": "Domyślny wybór",
     "transfers_dir": "Folder kopii danych", "transfers_dir_hint": "Nowe kopie trafią tutaj. Bieżące kopie zostają tam, gdzie są.",
-    "transfers_default": "%LOCALAPPDATA%\\AdMeNot\\transfers", "transfers_dir_bad": "Nie można użyć tego folderu. Wybierz istniejący folder, do którego można zapisywać.",
+    "transfers_default": "%LOCALAPPDATA%\\AdMeNot\\transfers", "transfers_dir_bad": "Nie można użyć tego folderu. Wybierz folder poza katalogiem danych programu.",
     "transfer_keep": "Trzymaj kopie przez", "transfer_keep_hint": "Później usuwamy je automatycznie. W Historii można przedłużyć pojedynczą kopię.",
     "days": "{n} dni",
     "transfer_apps": "Zaznaczaj aplikacje do przeniesienia", "transfer_apps_hint": "Podejrzane aplikacje nigdy nie są zaznaczone",
@@ -732,12 +732,13 @@
     "button": "Protokół PDF",
     "busy": "Tworzę protokół…",
     "opened": "Otwarto protokół: {path}",
+    "saved": "Zapisano protokół: {path}",
     "not_opened": "Zapisano protokół: {path} — nie udało się go otworzyć (brak programu do tego pliku). Otwórz go ręcznie.",
-    "pdf_no_browser": "Nie znaleziono przeglądarki Microsoft Edge, która tworzy PDF. Otwarto protokół HTML — wydrukuj go do PDF: {html}",
-    "pdf_timeout": "Tworzenie PDF trwało zbyt długo. Otwarto protokół HTML: {html}",
-    "pdf_failed": "Nie udało się utworzyć PDF. Otwarto protokół HTML: {html}",
-    "pdf_locked": "Plik {pdf} jest otwarty w innym programie — zamknij go i spróbuj ponownie. Otwarto protokół HTML: {html}",
-    "pdf_folder": "Nie da się zapisać w folderze {dir} — sprawdź folder protokołów w Ustawieniach. Otwarto protokół HTML: {html}"
+    "pdf_no_browser": "Nie znaleziono przeglądarki Microsoft Edge, która tworzy PDF. Zapisano protokół HTML — wydrukuj go do PDF: {html}",
+    "pdf_timeout": "Tworzenie PDF trwało zbyt długo. Zapisano protokół HTML: {html}",
+    "pdf_failed": "Nie udało się utworzyć PDF. Zapisano protokół HTML: {html}",
+    "pdf_locked": "Plik {pdf} jest otwarty w innym programie — zamknij go i spróbuj ponownie. Zapisano protokół HTML: {html}",
+    "pdf_folder": "Nie da się zapisać w folderze {dir} — sprawdź folder protokołów w Ustawieniach. Zapisano protokół HTML: {html}"
   },
   "transfer": {
     "stage": {

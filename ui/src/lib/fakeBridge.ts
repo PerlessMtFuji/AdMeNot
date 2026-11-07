@@ -336,7 +336,8 @@ export function createFakeBridge(name: string,
         const stem = String(args[0]).replaceAll('/', '-');
         const dir = 'C:\\Users\\serwis\\AppData\\Local\\AdMeNot\\reports';
         return { order: args[0], html: `${dir}\\${stem}.html`, pdf: `${dir}\\${stem}.pdf`,
-                 error: null, opened: `${dir}\\${stem}.pdf` };
+                 error: null, opened: settings.report_open ? `${dir}\\${stem}.pdf` : null,
+                 open_skipped: !settings.report_open };
       }
       case 'who_is_showing':
         return { resumed: null, overlays: [], errors: [] };

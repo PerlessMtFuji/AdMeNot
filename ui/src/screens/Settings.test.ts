@@ -283,7 +283,7 @@ test('Przenoszenie: folder is picked and reset to default (null), a bad folder s
   expect(bridge.calls.at(-1)).toEqual({ method: 'save_settings', args: [{ transfers_dir: null }] });
   bridge.failNext('save_settings', 'bad_request', 'transfers_dir');
   await fireEvent.click(screen.getByRole('button', { name: 'Zmień…' }));
-  expect(await screen.findByText(/Nie można użyć tego folderu/)).toBeTruthy();
+  expect(await screen.findByText(/Nie można użyć tego folderu\. Wybierz folder poza katalogiem danych programu\./)).toBeTruthy();
   expect(s.error).toBeNull();
   expect(s.settings.transfers_dir).toBeNull();
 });
@@ -373,6 +373,18 @@ test('Eksplorator: recent phones use the Polish plural and Wyczyść clears them
   await vi.waitFor(() => expect(s.settings.explorer_recent_phones).toBe(0));
   expect(bridge.calls.at(-1)).toEqual({ method: 'explorer_clear_recents', args: [] });
   expect(screen.getByText('Nic nie zapamiętano')).toBeTruthy();
+});
+
+test('Eksplorator: folders remembered while browsing (after start) show up when the category opens', async () => {
+  const { ctl, s, bridge } = await setupCtl('empty');
+  expect(s.settings.explorer_recent_phones).toBe(0);
+  // most zapisał „Ostatnio” przy `explorer_list`, UI nic o tym nie wie
+  bridge.answerNext('get_settings', { ...s.settings, explorer_recent_phones: 2, theme: 'dark' });
+  render(Settings, { context: new Map([['ctl', ctl]]) });
+  await open('Eksplorator plików');
+  expect(await screen.findByText(/^Pamiętane dla 2 telefonów /)).toBeTruthy();
+  expect((screen.getByRole('button', { name: 'Wyczyść' }) as HTMLButtonElement).disabled).toBe(false);
+  expect(s.settings.theme).toBe('system');  // odświeżamy tylko licznik, nie resztę ustawień
 });
 
 const saves = (bridge: { calls: { method: string; args: unknown[] }[] }) =>
@@ -552,7 +564,7 @@ test('Prywatność: Skopiuj copies the ID; a refused clipboard raises no unhandl
   vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
   await fireEvent.click(screen.getByRole('button', { name: 'Skopiuj' }));
   expect(writeText).toHaveBeenCalledWith(PRIVACY_ID);
-  await screen.findByText('Skopiowano');
+  expect((await screen.findByText('Skopiowano')).getAttribute('role')).toBe('status');
   const seen = vi.fn();
   window.addEventListener('unhandledrejection', seen);
   vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText: () => Promise.reject(new Error('denied')) } });

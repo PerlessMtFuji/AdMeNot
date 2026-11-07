@@ -32,7 +32,12 @@ def transfers_dir() -> Path:
     Kopie z poprzednich folderów zna `transfer.store.copy_roots()`."""
     from admenot.engine.settings import load_settings  # settings importuje paths
 
-    custom = (load_settings().transfers_dir or "").strip()
+    return transfers_dir_for(load_settings().transfers_dir)
+
+
+def transfers_dir_for(value: str | None) -> Path:
+    """Folder kopii dla wartości ustawienia `transfers_dir` (`None`/pusty = domyślny w danych programu)."""
+    custom = (value or "").strip()
     return Path(custom) if custom else data_dir() / "transfers"
 
 

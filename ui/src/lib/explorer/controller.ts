@@ -725,10 +725,12 @@ export class ExplorerController {
     const started = await this.start('to_pc', () => (exclude.length
       ? this.api.explorer_copy(paths, dest, verify, exclude) : this.api.explorer_copy(paths, dest, verify)), ['explorer_no_dest']);
     if (started === null && this.noDest) {
-      // stały folder niedostępny: baner i wybór innego folderu na tę jedną kopię (ustawienie zostaje)
+      // Folderu nie ma (np. odłączony pendrive): baner i wybór innego. Stały — na tę jedną kopię (ustawienie
+      // zostaje); ostatni — komunikat `explorer_no_dest`; „pytaj” bez komunikatu (pytanie jest oczekiwane).
       this.noDest = false;
-      const st = this.app.settings;
-      this.state.destMissing = st.explorer_dest_mode === 'fixed';
+      const mode = this.app.settings.explorer_dest_mode;
+      this.state.destMissing = mode === 'fixed';
+      if (mode === 'last') this.state.error = { key: 'explorer_no_dest', message: '' };
       if (!(await this.pickDest())) return false;
       return this.copy({ ...job, dest: this.state.dest });
     }

@@ -109,6 +109,7 @@ from admenot.engine.paths import (
     logs_dir,
     screenshot_files,
     transfers_dir,
+    transfers_dir_for,
 )
 from admenot.engine.phones.provider import PhoneMatch, PhoneProvider
 from admenot.engine.report.files import UnknownOrder, write_report
@@ -426,7 +427,8 @@ class Api(ExplorerMixin):
         self._eta: Eta | None = None  # szacunek pokazany przy wyborze trybu (telemetria)
         self._to_manual: str | None = None  # zadanie APK przerwane „Przerwij i szukaj ręcznie”
         self._match: PhoneMatch | None = None
-        self._pick_folder_fn: Callable[[], str | None] | None = None
+        # okno wyboru folderu; opcjonalny argument: folder, w którym okno się otwiera
+        self._pick_folder_fn: Callable[..., str | None] | None = None
         self._close_fn: Callable[[], None] | None = None
         self._quitting = False
         self._closing_window = False  # krzyżyk czeka już na koniec kopii albo kolejki eksploratora
@@ -476,8 +478,8 @@ class Api(ExplorerMixin):
         self._explorer_setup(explorer_media, explorer_temp, explorer_clipboard)
         self._clean_screenshots()
         self._purge_old_data()
-        # Zegar dobowy: okno bywa otwarte dniami, a kopie po 7 dniach mają zniknąć. Testy
-        # (`sync_jobs`) go nie uruchamiają — każdy `Api` zostawiałby wątek do końca procesu.
+        # Zegar dobowy: okno bywa otwarte dniami, a kopie po terminie (`transfer_keep_days`) mają
+        # zniknąć. Testy (`sync_jobs`) go nie uruchamiają — każdy `Api` zostawiałby wątek do końca procesu.
         if transfer_purge_s and not sync_jobs:
             threading.Thread(target=self._purge_loop, args=(transfer_purge_s,), daemon=True,
                              name="admenot-transfer-purge").start()
@@ -882,12 +884,11 @@ class Api(ExplorerMixin):
         if folder is not None and not (isinstance(folder, str) and folder.strip() and transfers_dir_ok(folder.strip())):
             raise AppError("bad_request", "transfers_dir")  # UI pokazuje to przy wierszu
         with settings_transaction():  # stary folder kopii i zapis bez przeplotu z tworzeniem kopii
-            old_root = transfers_dir() if "transfers_dir" in changes else None
+            if "transfers_dir" in changes:
+                # Najpierw zapamiętujemy stary folder (kopie zostają tam i dalej są w Historii,
+                # `store.copy_roots`), dopiero potem zapisujemy nowy: błąd zapisu nie gubi starego folderu.
+                store.remember_root(transfers_dir(), current=transfers_dir_for(folder))
             self._settings = save_settings(dict(changes))
-            if old_root is not None:
-                # kopie ze starego folderu zostają tam i dalej są w Historii (`store.copy_roots`)
-                store.remember_root(old_root)
-                self._settings = load_settings()
         if "lang" in changes:
             self._lang = effective_lang(self._settings)
         if "adb_path" in changes:
@@ -2303,7 +2304,9 @@ class Api(ExplorerMixin):
             self._report_lock.release()
         target = files.pdf or files.html
         opened: str | None = None
-        if load_settings().report_open:
+        # „Otwieraj protokół po utworzeniu” wyłączone: UI pokazuje samą ścieżkę, nie błąd otwarcia
+        open_skipped = not load_settings().report_open
+        if not open_skipped:
             try:
                 self._open_file(target)
                 opened = str(target)
@@ -2312,7 +2315,7 @@ class Api(ExplorerMixin):
         return {"order": number, "html": str(files.html),
                 "pdf": str(files.pdf) if files.pdf else None,
                 "pdf_target": str(files.pdf_target) if files.pdf_target else None,
-                "error": files.pdf_error, "opened": opened}
+                "error": files.pdf_error, "opened": opened, "open_skipped": open_skipped}
 
     @_api
     def service(self) -> dict[str, Any]:
@@ -2390,7 +2393,7 @@ class Api(ExplorerMixin):
     def pick_folder(self) -> dict[str, Any]:
         return {"path": self._pick_folder_fn() if self._pick_folder_fn else None}
 
-    def _attach(self, pick_folder: Callable[[], str | None], close: Callable[[], None],
+    def _attach(self, pick_folder: Callable[..., str | None], close: Callable[[], None],
                 pick_file: Callable[[], str | None] | None = None,
                 pick_files: Callable[[], list[str]] | None = None,
                 pick_adb: Callable[[], str | None] | None = None) -> None:

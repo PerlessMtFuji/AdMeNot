@@ -967,8 +967,11 @@ class ExplorerMixin:
 
     @_bridge
     def explorer_pick_dest(self) -> dict[str, Any]:
-        """Okno wyboru folderu docelowego kopii; wybrany zostaje zapamiętany (`explorer_dest`) tylko w trybie „last”."""
-        path = self._pick_folder_fn() if self._pick_folder_fn else None
+        """Okno wyboru folderu docelowego kopii, otwarte w ostatnim folderze (gdy jest na komputerze);
+        wybrany zostaje zapamiętany (`explorer_dest`) tylko w trybie „last”."""
+        last = self._settings.explorer_dest
+        start = last if last and Path(last).is_dir() else None
+        path = self._pick_folder_fn(start) if self._pick_folder_fn else None
         if path and self._settings.explorer_dest_mode == "last":
             self._explorer_save_dest(path)
         return {"path": path}

@@ -44,7 +44,7 @@ def test_report_writes_pdf_and_opens_it(edge, tmp_path):
     stem = number.replace("/", "-")
     assert r == {"order": number, "html": str(reports / f"{stem}.html"),
                  "pdf": str(reports / f"{stem}.pdf"), "pdf_target": str(reports / f"{stem}.pdf"),
-                 "error": None, "opened": str(reports / f"{stem}.pdf")}
+                 "error": None, "opened": str(reports / f"{stem}.pdf"), "open_skipped": False}
     assert opened == [reports / f"{stem}.pdf"] and len(edge) == 1
     assert "Anna" in (reports / f"{stem}.html").read_text("utf-8")
 
@@ -104,7 +104,7 @@ def test_report_is_saved_even_when_windows_cannot_open_it(edge, tmp_path):
     api.start_scan(SERIAL, "Anna")
     api.execute(WLIVE, [])
     r = api.report(rec.of("exec:order")[0]["order"])
-    assert r["opened"] is None and r["error"] is None
+    assert r["opened"] is None and r["error"] is None and r["open_skipped"] is False
     assert r["pdf"] and Path(r["pdf"]).is_file()
 
 
@@ -169,6 +169,7 @@ def test_report_not_opened_when_disabled(edge):
     api.save_settings({"report_open": False})
     r = api.report(number)
     assert r["opened"] is None and opened == [] and r["pdf"]
+    assert r["open_skipped"] is True  # UI: zwykła ścieżka, nie „nie udało się otworzyć”
 
 
 def test_logo_that_disappeared_does_not_block_other_changes(tmp_path):

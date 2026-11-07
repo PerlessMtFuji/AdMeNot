@@ -12,7 +12,6 @@ przedłużalne i usuwane po swoim terminie (termin leży w `meta.json` każdej k
 
 from __future__ import annotations
 
-import contextlib
 import json
 import os
 import re
@@ -224,15 +223,27 @@ def copy_roots() -> list[Path]:
 
 
 def _root_dirs(root: Path) -> list[CopyDir]:
-    """Katalogi o kształcie kopii w jednym folderze kopii."""
+    """Katalogi o kształcie kopii w jednym folderze kopii — tylko te, które naprawdę w nim leżą (jak
+    w `resolve`): katalog prowadzący przez dowiązanie lub junction gdzie indziej pomijamy, żeby
+    sprzątanie nie usunęło niczego spoza znanych folderów."""
     found: list[CopyDir] = []
     try:
+        real_root = root.resolve()
         devices = [d for d in root.iterdir() if d.is_dir()]
     except OSError:
         return []
     for device in devices:
-        with contextlib.suppress(OSError):
-            found.extend(CopyDir(c) for c in device.iterdir() if _STAMP.fullmatch(c.name) and c.is_dir())
+        try:
+            stamps = [c for c in device.iterdir() if _STAMP.fullmatch(c.name) and c.is_dir()]
+        except OSError:
+            continue
+        for c in stamps:
+            try:
+                real = c.resolve()
+            except OSError:
+                continue
+            if real.parent.parent == real_root and real.parent.name == device.name and real.name == c.name:
+                found.append(CopyDir(c))
     return found
 
 
@@ -309,12 +320,14 @@ def forget_empty_roots() -> None:
             save_internal({"transfer_roots": keep})
 
 
-def remember_root(root: Path) -> None:
-    """Po zmianie folderu kopii: dopisuje poprzedni folder `root` do `Settings.transfer_roots`, gdy
-    mogą w nim leżeć kopie (`_may_hold_copies`). Najpierw zapomina foldery bez kopii; przy pełnej
-    liście (`TRANSFER_ROOTS_MAX`) wypada najdawniej zapamiętany."""
+def remember_root(root: Path, current: Path | None = None) -> None:
+    """Przy zmianie folderu kopii: dopisuje poprzedni folder `root` do `Settings.transfer_roots`, gdy
+    mogą w nim leżeć kopie (`_may_hold_copies`). `current` — nowy folder kopii (domyślnie bieżący
+    `transfers_dir()`); most woła to przed zapisem nowego folderu, żeby błąd nie zgubił starego.
+    Najpierw zapomina foldery bez kopii; przy pełnej liście (`TRANSFER_ROOTS_MAX`) wypada najdawniej
+    zapamiętany."""
     with settings_transaction():
-        if _path_key(root) == _path_key(transfers_dir()) or not _may_hold_copies(root):
+        if _path_key(root) == _path_key(current or transfers_dir()) or not _may_hold_copies(root):
             return
         forget_empty_roots()
         roots = load_settings().transfer_roots

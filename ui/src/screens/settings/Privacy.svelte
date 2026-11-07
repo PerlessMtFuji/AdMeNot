@@ -48,7 +48,7 @@
     <SettingRow id="telemetry_id" label={t('privacy.id')} hint={t('privacy.id_hint')}>
       <code class="mono text-xs">{s.settings.telemetry_id}</code>
       <Button size="sm" variant="ghost" onclick={copyId}>{t('privacy.copy')}</Button>
-      {#if idCopied}<span class="text-xs text-mut">{t('privacy.copied')}</span>{/if}
+      {#if idCopied}<span role="status" class="text-xs text-mut">{t('privacy.copied')}</span>{/if}
     </SettingRow>
   {/if}
   {#if s.settings.telemetry_delete_pending}

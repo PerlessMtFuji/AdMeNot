@@ -18,11 +18,14 @@
     <Icon name="file-text" />{busy ? t('report.busy') : t('report.button')}
   </Button>
   {#if last && !busy}
-    {#if last.opened === null}
-      <span class="text-xs text-warn">{t('report.not_opened', { path: last.pdf ?? last.html })}</span>
-    {:else if last.error}
+    <!-- Błąd PDF najpierw (powód protokołu HTML); otwieranie wyłączone w ustawieniach to nie błąd. -->
+    {#if last.error}
       <span class="text-xs text-warn">{t(`report.pdf_${last.error}`, { pdf: last.pdf_target ?? last.html.replace(/\.html$/, '.pdf'),
         dir: (last.pdf_target ?? '').replace(/[\\/][^\\/]*$/, ''), html: last.html })}</span>
+    {:else if last.open_skipped}
+      <span class="mono text-xs text-soft">{t('report.saved', { path: last.pdf ?? last.html })}</span>
+    {:else if last.opened === null}
+      <span class="text-xs text-warn">{t('report.not_opened', { path: last.pdf ?? last.html })}</span>
     {:else}
       <span class="mono flex items-center gap-1 text-xs text-ok"><Icon name="check" size={13} />{t('report.opened', { path: last.pdf ?? last.html })}</span>
     {/if}

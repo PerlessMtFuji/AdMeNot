@@ -562,6 +562,30 @@ describe('Explorer', () => {
       expect(ctl.state.settings.explorer_dest_fixed).toBe('E:\\Pendrive');
     });
 
+    test('last mode with an unplugged last folder says why before opening the picker', async () => {
+      const { bridge, ctl } = await openExplorer();
+      ctl.state.settings = { ...ctl.state.settings, explorer_dest_mode: 'last', explorer_dest: 'E:\\Pendrive' };
+      ctl.explorer.state.dest = 'E:\\Pendrive';
+      bridge.failNext('explorer_copy', 'explorer_no_dest');
+      const bar = await select();
+      await fireEvent.click(within(bar).getByRole('button', { name: 'Kopiuj' }));
+      await vi.waitFor(() => expect(copies(bridge)).toHaveLength(2));
+      expect(bridge.calls.some((c) => c.method === 'explorer_pick_dest')).toBe(true);
+      expect(screen.getByText(/Folderu docelowego nie ma na komputerze/)).toBeTruthy();
+      expect(screen.queryByText(/Stały folder jest niedostępny/)).toBeNull();
+    });
+
+    test('ask mode stays silent when the picked folder is gone (asking is expected)', async () => {
+      const { bridge, ctl } = await openExplorer();
+      ctl.state.settings = { ...ctl.state.settings, explorer_dest_mode: 'ask' };
+      bridge.failNext('explorer_copy', 'explorer_no_dest');
+      const bar = await select();
+      await fireEvent.click(within(bar).getByRole('button', { name: 'Kopiuj' }));
+      await vi.waitFor(() => expect(copies(bridge)).toHaveLength(2));
+      expect(screen.queryByText(/Folderu docelowego nie ma na komputerze/)).toBeNull();
+      expect(ctl.explorer.state.error).toBeNull();
+    });
+
     test('changing the destination settings during the session resyncs the open explorer', async () => {
       const { ctl } = await openExplorer();
       expect(ctl.explorer.state.dest).toBeNull();

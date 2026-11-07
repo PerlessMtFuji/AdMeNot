@@ -603,7 +603,7 @@ def test_copy_uses_saved_dest(tmp_path):
     api, rec, _, _ = _opened(tmp_path)
     assert api.explorer_copy(["/sdcard/Download/faktura.pdf"])["error"]["key"] == "explorer_no_dest"
     pc = _pc_dir(tmp_path)
-    api._attach(pick_folder=lambda: str(pc), close=lambda: None)
+    api._attach(pick_folder=lambda start=None: str(pc), close=lambda: None)
     assert api.explorer_pick_dest() == {"path": str(pc)}
     assert load_settings().explorer_dest == str(pc)
     started = api.explorer_copy(["/sdcard/Download/faktura.pdf", "/sdcard/DCIM/Camera"])
@@ -1278,13 +1278,34 @@ def test_pick_dest_saved_only_in_last_mode(tmp_path, mode):
     api, _, _, _ = _opened(tmp_path)
     pc, last = _pc_dir(tmp_path), _pc_dir(tmp_path, "last")
     save_internal({"explorer_dest": str(last)})
-    api._attach(pick_folder=lambda: str(pc), close=lambda: None)
+    api._attach(pick_folder=lambda start=None: str(pc), close=lambda: None)
     assert "error" not in api.save_settings({"explorer_dest_mode": mode})
     assert api.explorer_pick_dest() == {"path": str(pc)}
     assert load_settings().explorer_dest == str(last)
     api.save_settings({"explorer_dest_mode": "last"})
     assert api.explorer_pick_dest() == {"path": str(pc)}
     assert load_settings().explorer_dest == str(pc)
+
+
+def test_pick_dest_starts_in_the_last_folder(tmp_path):
+    api, _, _, _ = _opened(tmp_path)
+    pc, last = _pc_dir(tmp_path), _pc_dir(tmp_path, "last")
+    starts = []
+
+    def pick(start=None):
+        starts.append(start)
+        return str(pc)
+
+    api._attach(pick_folder=pick, close=lambda: None)
+    assert "error" not in api.save_settings({"explorer_dest_mode": "ask"})
+    assert api.explorer_pick_dest() == {"path": str(pc)}  # nic nie zapamiętano: bez podpowiedzi
+    save_internal({"explorer_dest": str(last)})
+    api.save_settings({})
+    api.explorer_pick_dest()
+    save_internal({"explorer_dest": str(tmp_path / "odlaczony")})  # nie ma go na komputerze
+    api.save_settings({})
+    api.explorer_pick_dest()
+    assert starts == [None, str(last), None]
 
 
 def test_clear_recents(tmp_path):

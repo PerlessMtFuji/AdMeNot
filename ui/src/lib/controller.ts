@@ -1373,6 +1373,14 @@ export class Controller {
   }
 
   /** „Ostatnio otwierane foldery” → „Wyczyść”: most zapomina foldery wszystkich telefonów (bez potwierdzenia). */
+  /** Liczba telefonów z „Ostatnio” eksploratora: most zapisuje ją przy przeglądaniu, nie wysyłając
+   *  ustawień, więc Ustawienia pytają o nią przy otwarciu kategorii (reszta ustawień bez zmian). */
+  async loadExplorerRecents(): Promise<void> {
+    // Błąd odczytu nie dostaje karty błędu: zostaje poprzednia liczba.
+    const r = await this.api.get_settings().catch(() => null);
+    if (r && !isApiError(r)) this.state.settings = { ...this.state.settings, explorer_recent_phones: r.explorer_recent_phones };
+  }
+
   async clearExplorerRecents(): Promise<void> {
     const r = await this.call(this.api.explorer_clear_recents());
     if (r) this.state.settings = { ...this.state.settings, explorer_recent_phones: r.phones };

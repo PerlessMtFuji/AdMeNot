@@ -418,7 +418,9 @@ export interface ReportResult {
   /** Gdzie miał trafić PDF (folder z ustawień albo domyślny), także po błędzie; starsze mosty go nie wysyłają. */
   pdf_target?: string | null;
   error: 'no_browser' | 'timeout' | 'failed' | 'locked' | 'folder' | null;
-  opened: string | null; // null: zapisany, ale Windows nie ma programu, który go otworzy
+  opened: string | null; // null: zapisany, ale nieotwarty (brak programu albo `open_skipped`)
+  /** Otwieranie wyłączone w ustawieniach („Otwieraj protokół po utworzeniu”): to nie błąd. */
+  open_skipped?: boolean;
 }
 
 export type MirrorState = 'starting' | 'running' | 'stopped' | 'failed';

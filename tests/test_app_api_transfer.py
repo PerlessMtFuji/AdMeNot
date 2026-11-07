@@ -1410,6 +1410,21 @@ def test_changing_transfers_dir_remembers_old_root(tmp_path):
     assert (error["key"], error["message"]) == ("bad_request", "transfers_dir")
 
 
+def test_failing_to_remember_old_root_keeps_the_old_folder(tmp_path, monkeypatch):
+    from admenot.engine.paths import transfers_dir
+    copy = store.create_copy(SERIAL, _device(), None, NOW)
+    old_root = transfers_dir()
+    api, _ = _api(_phone(tmp_path))
+
+    def locked(changes):
+        raise OSError("settings.json zablokowany")
+
+    monkeypatch.setattr(store, "save_internal", locked)
+    assert "error" in api.save_settings({"transfers_dir": str(tmp_path / "nowy")})
+    assert transfers_dir() == old_root  # folder kopii się nie zmienił, więc kopia nie zniknęła z Historii
+    assert [c["id"] for c in api.transfers()["copies"]] == [copy.read_meta().id]
+
+
 def test_changing_transfers_dir_remembers_unplugged_old_root(tmp_path):
     from admenot.engine.settings import load_settings
     api, _ = _api(_phone(tmp_path))

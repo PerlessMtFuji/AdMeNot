@@ -493,3 +493,30 @@ def test_remember_root_skips_empty_or_never_created_root(tmp_path):
     store.remember_root(empty)
     store.remember_root(tmp_path / "nigdy")  # rodzic dostępny, folderu brak
     assert load_settings().transfer_roots == []
+
+
+def _junction(link, target) -> None:
+    import subprocess
+    done = subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(target)],
+                          capture_output=True, check=False)
+    if done.returncode != 0 or not link.is_dir():
+        pytest.skip("nie da się utworzyć dowiązania (junction)")
+
+
+@pytest.mark.parametrize("level", ["device", "stamp"])
+def test_purge_never_deletes_through_a_junction(tmp_path, level):
+    expired = _copy(now=NOW - timedelta(days=8))
+    elsewhere = tmp_path / "gdzie_indziej"
+    elsewhere.mkdir()
+    device = expired.path.parent
+    if level == "device":  # <folder kopii>\X -> C:\gdzie_indziej\<telefon>
+        moved = device.rename(elsewhere / device.name)
+        _junction(transfers_dir() / "X", moved)
+        target = moved / expired.path.name
+    else:  # <folder kopii>\<telefon>\<znacznik> -> C:\gdzie_indziej\<znacznik>
+        target = expired.path.rename(elsewhere / expired.path.name)
+        _junction(expired.path, target)
+    assert (target / "meta.json").is_file()
+    assert store.purge_expired(NOW, lambda serial: False, lambda copy_id: False) == []
+    assert (target / "meta.json").is_file() and (target / "files").is_dir()
+    assert store.list_copies() == []

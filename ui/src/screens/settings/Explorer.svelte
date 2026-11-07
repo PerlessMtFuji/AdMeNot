@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getContext } from 'svelte';
+  import { getContext, onMount } from 'svelte';
   import PathPicker from '../../components/settings/PathPicker.svelte';
   import SettingGroup from '../../components/settings/SettingGroup.svelte';
   import SettingRow from '../../components/settings/SettingRow.svelte';
@@ -23,6 +23,8 @@
 
   const view = $derived<ViewChoice>(s.settings.explorer_view ?? 'auto');
   const phones = $derived(s.settings.explorer_recent_phones);
+
+  onMount(() => { void ctl.loadExplorerRecents(); }); // „Ostatnio” zapisane w eksploratorze po starcie
 
   const saveView = (v: ViewChoice) => ctl.saveSettings({ explorer_view: v === 'auto' ? null : v });
 
