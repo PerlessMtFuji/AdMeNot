@@ -1,7 +1,7 @@
 <script lang="ts">
   import { tick, untrack } from 'svelte';
   import type { ExplorerController } from '../../lib/explorer/controller';
-  import { formatBytes, type SortKey, shortDate } from '../../lib/explorer/logic';
+  import { folderSummary, formatBytes, type SortKey, shortDate } from '../../lib/explorer/logic';
   import { FALLBACK, rowRange, type Viewport, viewport } from '../../lib/explorer/virtual';
   import { i18n, t } from '../../lib/i18n/index.svelte';
   import { enter, stagger } from '../../lib/motion';
@@ -141,6 +141,7 @@
       {#each rendered as i (items[i].path)}
         {@const e = items[i]}
         {@const sel = s.selected.has(e.path)}
+        {@const dir = e.kind === 'dir' && !e.locked ? folderSummary(s.dirStats[e.path], i18n.lang) : undefined}
         <div role="option" aria-selected={sel} data-path={e.path} tabindex={tabPath === e.path ? 0 : -1}
           in:rowIn={{ i, on: fresh }}
           onclick={(ev) => ex.clickSelect(e.path, ev.detail, { ctrl: ev.ctrlKey || ev.metaKey, shift: ev.shiftKey })}
@@ -155,12 +156,20 @@
             <FileIcon kind={e.kind} type={e.type} ext={e.ext} locked={e.locked} size={26} />
             <div class="min-w-0">
               <div class="truncate text-sm font-semibold {sel ? 'text-accent' : 'text-ink'}">{e.label ?? e.name}</div>
-              {#if e.label}<div class="mono truncate text-2xs text-soft">{e.name}</div>{/if}
+              {#if e.label || (e.kind === 'dir' && !e.locked)}
+                <div class="truncate text-2xs text-soft" data-folder-files={e.kind === 'dir' ? '' : undefined} title={dir?.hint || undefined}>
+                  {#if e.label}<span class="mono">{e.name}</span>{#if e.kind === 'dir'} · {/if}{/if}
+                  {#if e.kind === 'dir'}{dir ? dir.files : t('explorer.folder_stats.counting')}{/if}
+                </div>
+              {/if}
             </div>
             {#if e.locked}<span class="flex-none text-2xs font-semibold text-soft">{t('explorer.locked_row')}</span>{/if}
           </div>
-          <div class="text-right text-xs text-mut tabular-nums">
-            {e.kind === 'dir' ? t('explorer.list.folder') : formatBytes(e.size, i18n.lang)}
+          <div class="text-right text-xs text-mut tabular-nums" title={dir?.hint || undefined}>
+            {#if e.kind !== 'dir'}{formatBytes(e.size, i18n.lang)}
+            {:else if e.locked}{t('explorer.list.folder')}
+            {:else if dir}{dir.size}
+            {:else}<span class="text-soft" aria-label={t('explorer.folder_stats.counting')}>…</span>{/if}
           </div>
           <div class="text-right text-xs text-mut tabular-nums">{shortDate(e.mtime, now)}</div>
         </div>

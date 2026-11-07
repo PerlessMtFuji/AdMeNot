@@ -105,6 +105,30 @@ test('spreadsheet: a recorded CSV and a two-sheet workbook render a scrollable g
   expect(errors).toEqual([]);
 });
 
+test('folder counts and sizes fit in list rows and grid tiles', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto('/?scenario=explorer');
+  await page.getByRole('button', { name: 'Pliki', exact: true }).click();
+  await page.evaluate(async () => {
+    const ex = (window as any).__admenot.ctl.explorer;
+    ex.setView('list');
+    await ex.go('/sdcard');
+  });
+  const list = page.getByRole('listbox', { name: 'Pliki w folderze' });
+  await expect(list.locator('[data-path="/sdcard/DCIM"]')).toContainText('40 plików');
+  await expect(list.locator('[data-path="/sdcard/DCIM"]')).toContainText('27 KB');
+  await page.screenshot({ path: 'test-results/folders-list.png' });
+  await page.evaluate(() => (window as any).__admenot.ctl.explorer.setView('grid'));
+  const stats = page.locator('[data-path="/sdcard/Movies"] [data-folder-stats]');
+  await expect(stats).toHaveText('2 pliki · 9,8 KB');
+  // tekst mieści się w kaflu (obcięty wielokropkiem, nie wystaje)
+  const fits = await stats.evaluate((el) => el.getBoundingClientRect().right <= el.closest('[data-path]')!.getBoundingClientRect().right + 0.5);
+  expect(fits).toBe(true);
+  await page.screenshot({ path: 'test-results/folders-grid.png' });
+  expect(errors).toEqual([]);
+});
+
 async function openPdf(page: import('@playwright/test').Page) {
   await page.route('http://127.0.0.1:4173/test-search.pdf', route => route.fulfill({
     body: readFileSync(new URL('./fixtures/search.pdf', import.meta.url)),

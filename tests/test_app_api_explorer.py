@@ -643,6 +643,65 @@ def test_copy_problems_returned_before_start(tmp_path, monkeypatch):
     api.explorer_close()
 
 
+def _folder_events(rec) -> dict:
+    out: dict = {}
+    for e in rec.of("explorer:folders"):
+        assert e["serial"] == SERIAL
+        out.update(e["folders"])
+    return out
+
+
+def test_listing_counts_subfolders_once_and_skips_locked(tmp_path):
+    api, rec, host, _ = _opened(tmp_path)
+    _storage_of(host).deny_in_tree = True  # jak Android 11+: `Android/data` w środku drzewa bez dostępu
+    shown = api.explorer_list("/sdcard/Android")
+    assert shown["folders"] == {}  # nic jeszcze nie policzone: liczby dochodzą zdarzeniami
+    folders = _folder_events(rec)
+    assert folders == {"/sdcard/Android/media": {"files": 1, "bytes": 1, "partial": False, "approx": False}}
+    # `Android/data` z kłódką: bez liczenia
+
+    api.explorer_list("/sdcard")
+    every = _folder_events(rec)
+    assert every["/sdcard/DCIM"] == {"files": 2, "bytes": len(FILES["DCIM/Camera/IMG_Ąę 1.jpg"]) + 1,
+                                     "partial": False, "approx": False}  # ukryty plik też, jak przy kopii
+    assert every["/sdcard/Android"]["partial"] is True and every["/sdcard/Android"]["files"] == 1
+    calls = len(_storage_of(host).commands)
+    again = api.explorer_list("/sdcard")
+    assert again["folders"] == {p: v for p, v in every.items() if p.count("/") == 2}  # dzieci /sdcard z pamięci
+    assert not [c for c in _storage_of(host).commands[calls:] if c.startswith("du ")]  # z pamięci sesji
+
+
+def test_old_toybox_sizes_are_approximate(tmp_path):
+    api, rec, host, _ = _opened(tmp_path)
+    _storage_of(host).du_without_b = True
+    api.explorer_list("/sdcard/Download")
+    api.explorer_list("/sdcard")
+    assert _folder_events(rec)["/sdcard/Music"] == {"files": 1, "bytes": 1024, "partial": False, "approx": True}
+
+
+def test_new_text_and_upload_recount_the_folder_and_its_parents(tmp_path):
+    api, rec, _, _ = _opened(tmp_path)
+    api.explorer_list("/sdcard")
+    before = _folder_events(rec)["/sdcard/Download"]
+    rec.events.clear()
+    assert "error" not in api.explorer_new_text("/sdcard/Download", "notatka2", "abc")
+    events = [e["folders"] for e in rec.of("explorer:folders")]
+    assert events[0] == {"/sdcard/Download": None}  # kafelek wraca do „liczę…”
+    after = _folder_events(rec)["/sdcard/Download"]
+    assert after["files"] == before["files"] + 1 and after["bytes"] == before["bytes"] + 3
+
+    api.explorer_list("/sdcard/Download")  # oglądany folder: jego podfoldery
+    rec.events.clear()
+    local = _pc_dir(tmp_path, "z komputera")
+    (local / "a.txt").write_bytes(b"12345")
+    started = api.explorer_upload([str(local / "a.txt")], "/sdcard/Download")
+    _wait_task(api, started["task"], "done")
+    forgotten = {p for e in rec.of("explorer:folders") for p, v in e["folders"].items() if v is None}
+    assert forgotten == {"/sdcard/Download"}  # nad nim tylko /sdcard, którego nikt nie liczy
+    # kafelka Download teraz nie widać: policzy się od nowa przy powrocie do /sdcard
+    assert "/sdcard/Download" not in api._explorer.folders
+
+
 def test_upload_task_events(tmp_path):
     api, rec, host, _ = _opened(tmp_path)
     local = _pc_dir(tmp_path, "z komputera")

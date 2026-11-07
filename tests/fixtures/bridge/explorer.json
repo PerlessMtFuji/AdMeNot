@@ -1079,7 +1079,8 @@
      }
     ],
     "skipped": 0,
-    "locked": false
+    "locked": false,
+    "folders": {}
    },
    "events": [
     [
@@ -1240,7 +1241,8 @@
      }
     ],
     "skipped": 0,
-    "locked": false
+    "locked": false,
+    "folders": {}
    },
    "events": [
     [
@@ -1615,7 +1617,8 @@
      }
     ],
     "skipped": 0,
-    "locked": false
+    "locked": false,
+    "folders": {}
    },
    "events": [
     [
@@ -1667,7 +1670,8 @@
     ],
     "entries": [],
     "skipped": 0,
-    "locked": true
+    "locked": true,
+    "folders": {}
    },
    "events": [
     [
@@ -1765,9 +1769,22 @@
      }
     ],
     "skipped": 0,
-    "locked": false
+    "locked": false,
+    "folders": {}
    },
    "events": [
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "du -sb /sdcard/Android/ 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "1\t/sdcard/Android/\n",
+      "tag": null
+     }
+    ],
     [
      "adb:command",
      {
@@ -1778,6 +1795,184 @@
       "duration": 0.0,
       "output": "41f9|4096|1790413200|/sdcard/Android\n41f9|4096|1790413200|/sdcard/DCIM\n41f9|4096|1790413200|/sdcard/Download\n41f9|4096|1790413200|/sdcard/Movies\n41f9|4096|1790413200|/sdcard/Music\n",
       "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "find /sdcard/Android/ -type f 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "/sdcard/Android/data/com.example/cache.bin\n",
+      "tag": null
+     }
+    ],
+    [
+     "explorer:folders",
+     {
+      "serial": "R58T00TEST",
+      "folders": {
+       "/sdcard/Android": {
+        "files": 1,
+        "bytes": 1,
+        "partial": false,
+        "approx": false
+       }
+      }
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "du -sb /sdcard/DCIM/ 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "27202\t/sdcard/DCIM/\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "find /sdcard/DCIM/ -type f 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "/sdcard/DCIM/Camera/IMG_20260924_0028.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0029.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0030.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0031.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0032.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0033.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0034.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0035.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0036.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0037.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0038.jpg\n/sdcard/DCIM/Camera/IMG_20260924_0039.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0014.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0015.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0016.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0017.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0018.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0019.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0020.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0021.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0022.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0023.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0024.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0025.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0026.jpg\n/sdcard/DCIM/Camera/IMG_20260925_0027.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0000.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0001.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0002.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0003.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0004.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0005.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0006.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0007.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0008.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0009.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0010.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0011.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0012.jpg\n/sdcard/DCIM/Camera/IMG_20260926_0013.jpg\n",
+      "tag": null
+     }
+    ],
+    [
+     "explorer:folders",
+     {
+      "serial": "R58T00TEST",
+      "folders": {
+       "/sdcard/DCIM": {
+        "files": 40,
+        "bytes": 27202,
+        "partial": false,
+        "approx": false
+       }
+      }
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "du -sb /sdcard/Download/ 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "126\t/sdcard/Download/\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "find /sdcard/Download/ -type f 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "/sdcard/Download/aplikacja.apk\n/sdcard/Download/faktura.pdf\n/sdcard/Download/Lista zakupów.txt\n/sdcard/Download/notatka.txt\n/sdcard/Download/umowa.docx\n/sdcard/Download/zestawienie.csv\n",
+      "tag": null
+     }
+    ],
+    [
+     "explorer:folders",
+     {
+      "serial": "R58T00TEST",
+      "folders": {
+       "/sdcard/Download": {
+        "files": 6,
+        "bytes": 126,
+        "partial": false,
+        "approx": false
+       }
+      }
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "du -sb /sdcard/Movies/ 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "10024\t/sdcard/Movies/\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "find /sdcard/Movies/ -type f 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "/sdcard/Movies/film 1.mp4\n/sdcard/Movies/film 2.mp4\n",
+      "tag": null
+     }
+    ],
+    [
+     "explorer:folders",
+     {
+      "serial": "R58T00TEST",
+      "folders": {
+       "/sdcard/Movies": {
+        "files": 2,
+        "bytes": 10024,
+        "partial": false,
+        "approx": false
+       }
+      }
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "du -sb /sdcard/Music/ 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "6009\t/sdcard/Music/\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "find /sdcard/Music/ -type f 2>&1 || true",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "/sdcard/Music/utwór 1.mp3\n/sdcard/Music/utwór 2.mp3\n/sdcard/Music/utwór 3.mp3\n",
+      "tag": null
+     }
+    ],
+    [
+     "explorer:folders",
+     {
+      "serial": "R58T00TEST",
+      "folders": {
+       "/sdcard/Music": {
+        "files": 3,
+        "bytes": 6009,
+        "partial": false,
+        "approx": false
+       }
+      }
      }
     ]
    ]

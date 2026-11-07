@@ -45,6 +45,8 @@ class Recorder:
     "find '/sdcard/' -mindepth 1 -maxdepth 1 -exec stat -c '%f|%s|%Y|%n' {} +",
     "find '/sdcard/DCIM/' -mindepth 1 -maxdepth 1 -exec stat -c '%f|%s|%Y|%n' {} +",
     "stat -c '%f|%s|%Y|%n' '/sdcard/a b' 2>&1 || true",
+    "du -sb '/sdcard/Download/' 2>&1 || true",
+    "du -sk '/sdcard/Zdjęcia klienta/' 2>&1 || true",
     "find '/sdcard/Download/' -type f -exec stat -c '%s|%n' {} + 2>&1 || true",
     "find /sdcard/ -type f -exec stat -c '%s|%n' {} + 2>&1 || true",
     "find '/sdcard/Download/' -type f 2>&1 || true",
@@ -79,6 +81,12 @@ def test_allows_writes_under_sdcard(cmd):
 
 @pytest.mark.parametrize("cmd", [
     "rm '/sdcard/Download/.admenot-0123456789ab.part'",
+    "du -sb '/data/data/' 2>&1 || true",
+    "du -sb '/sdcard/../data/' 2>&1 || true",
+    "du -sb '/sdcard/a' '/sdcard/b' 2>&1 || true",
+    "du -sbL '/sdcard/a/' 2>&1 || true",
+    "du -s -b '/sdcard/a/' 2>&1 || true",
+    "du -sb /sdcard/a/;reboot 2>&1 || true",
     "rm -f '/sdcard/a.jpg'",
     "rm -rf '/sdcard/Download'",
     f"rm -f '{TMP}' '/sdcard/Download/.admenot-aaaaaaaaaaaa.part'",

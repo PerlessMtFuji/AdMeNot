@@ -158,6 +158,8 @@ class FakeStoragePhone:
         self.accounts: list[tuple[str, str]] = []
         # eksplorator plików
         self.deny_list_prefixes: set[str] = set()  # listowanie (`find`, `ls`) pod takim prefiksem -> Permission denied
+        self.du_without_b = False  # `du -sb` jak w starym toyboxie: nieznana opcja
+        self.deny_in_tree = False  # `find -type f` i `du` nad zablokowanym folderem: błąd w wyniku, bez jego plików
         self.listing_extra: dict[str, list[tuple[str, int, int]]] = {}  # folder -> (nazwa, rozmiar, mtime) tylko w listingu
         self.scanned: list[str] = []  # ścieżki z `content call … scan_file`
 
@@ -228,6 +230,8 @@ class FakeStoragePhone:
                     return self._find(argv[1:])
                 except AdbError as exc:
                     return exc.message.encode("utf-8")
+            if argv[0] == "du":  # rozmiar folderu dla kafelka; odmowa jako linia wyniku, kod 0
+                return self._du(argv[1:])
             assert argv[0] == "stat", argv
             return self._stat(argv[1:], tolerant=True)
         if command.endswith(CONTENT_TAIL):  # `content query … 2>&1`: błąd providera na stdout
@@ -343,10 +347,31 @@ class FakeStoragePhone:
             raise AdbError("command_failed", f"find: '{remote}': No such file or directory")
         prefix = remote.rstrip("/")
         out = [f"{prefix}/{p.relative_to(base).as_posix()}" for p in sorted(base.rglob("*")) if p.is_file()]
+        # podfolder bez dostępu w środku drzewa: jego pliki znikają, a `find` dopisuje błąd (jak toybox)
+        hidden = sorted(d for d in self.deny_list_prefixes if self.deny_in_tree and d.startswith(prefix + "/"))
+        out = [f for f in out if not any(f.startswith(d + "/") for d in hidden)]
+        out += [f"find: '{d}': Permission denied" for d in hidden if self.local(d).is_dir()]
         for folder, extra in self.listing_extra.items():
             if (folder + "/").startswith(prefix + "/"):
                 out += [f"{folder}/{name}" for name, _, _ in extra]
         return ("\n".join(out) + "\n").encode("utf-8") if out else b""
+
+    def _du(self, args: list[str]) -> bytes:
+        """`du -sb|-sk '<folder>/'`: suma rozmiarów plików (bez samych folderów); `du_without_b` — stary toybox."""
+        flag, remote = args
+        if flag == "-sb" and self.du_without_b:
+            return b"du: Unknown option 'b' (see \"du --help\")\n"
+        if any(remote.startswith(p) for p in self.deny_list_prefixes):
+            return f"du: {remote}: Permission denied\n".encode()
+        base = self.local(remote)
+        if not base.is_dir():
+            return f"du: {remote}: No such file or directory\n".encode()
+        hidden = [d for d in self.deny_list_prefixes
+                  if self.deny_in_tree and d.startswith(remote.rstrip("/") + "/") and self.local(d).is_dir()]
+        total = sum(f.stat().st_size for f in base.rglob("*")
+                    if f.is_file() and not any(f.is_relative_to(self.local(d)) for d in hidden))
+        errors = "".join(f"du: {d}: Permission denied\n" for d in hidden)
+        return f"{errors}{total if flag == '-sb' else -(-total // 1024)}\t{remote}\n".encode()
 
     def _ls(self, args: list[str]) -> bytes:
         assert args[:1] == ["-1"] and len(args) == 2 or len(args) == 1, args
@@ -813,7 +838,7 @@ def _render(rows: list[dict[str, str | None]], cols: list[str] | None) -> str:
                    for i, r in enumerate(rows))
 
 
-_STORAGE_TOOLS = {"find", "stat", "ls", "df", "content", "sha256sum", "mkdir", "head", "tail", "dd", "mv"}
+_STORAGE_TOOLS = {"find", "du", "stat", "ls", "df", "content", "sha256sum", "mkdir", "head", "tail", "dd", "mv"}
 _TEL_HEADS = (["am", "instrument"], ["dumpsys", "role"], ["dumpsys", "account"], ["rm", "-rf"],
               ["cmd", "role", "add-role-holder"], ["cmd", "role", "remove-role-holder"])
 _TEL_INTENTS = (f"{helper.PACKAGE}/.RoleActivity", "android.settings.MANAGE_DEFAULT_APPS_SETTINGS")

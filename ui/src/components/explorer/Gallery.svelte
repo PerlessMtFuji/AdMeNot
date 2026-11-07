@@ -1,14 +1,14 @@
 <script lang="ts">
   import { tick, untrack } from 'svelte';
   import type { ExplorerController } from '../../lib/explorer/controller';
-  import { days } from '../../lib/explorer/logic';
+  import { days, folderSummary } from '../../lib/explorer/logic';
   import { openMorph } from '../../lib/explorer/morph';
   import { SPARE, type ThumbQueue } from '../../lib/explorer/thumbs';
   import {
     FALLBACK, GRID, type GroupIn, gridLayout, inView, locate, neighbour, type Rect, tileRect, tilesInRect, type Viewport,
     viewport, visibleSlices,
   } from '../../lib/explorer/virtual';
-  import { t, tp } from '../../lib/i18n/index.svelte';
+  import { i18n, t, tp } from '../../lib/i18n/index.svelte';
   import { reducedMotion } from '../../lib/motion';
   import type { EntryView } from '../../lib/types';
   import Icon from '../../ui/Icon.svelte';
@@ -331,7 +331,8 @@
         onmouseenter={() => (s.hover = e.path)} onmouseleave={() => { if (s.hover === e.path) s.hover = null; }}>
         <div class="h-full w-full {s.fresh.has(e.path) ? '[animation:pop-in_.35s]' : ''}">
           <Thumb entry={e} thumb={url ? thumbs.get(url) : null} noThumb={!url || thumbs.failed(url)} selected={sel}
-            cascadeAt={cascadeAt(e.path)} onbroken={() => { if (url) thumbs.broken(url); }} />
+            cascadeAt={cascadeAt(e.path)} onbroken={() => { if (url) thumbs.broken(url); }}
+            folder={e.kind === 'dir' && !e.locked ? folderSummary(s.dirStats[e.path], i18n.lang) : undefined} />
         </div>
       </div>
     {/each}

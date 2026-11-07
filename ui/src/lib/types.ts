@@ -520,7 +520,14 @@ export interface ExplorerListView {
   skipped: number;
   /** Cały folder bez dostępu (kłódka zamiast błędu). */
   locked: boolean;
+  /** Liczby podfolderów policzone już w tej sesji; resztę przynosi `explorer:folders`. */
+  folders?: Record<string, FolderStatsView>;
 }
+
+/** Liczba plików i rozmiar folderu razem z podfolderami (także ukrytymi plikami — jak kopia folderu).
+ *  `partial` — część podfolderów bez dostępu; `approx` — rozmiar z bloków dysku (starszy Android).
+ *  `failed` — nie udało się policzyć (np. limit czasu). */
+export type FolderStatsView = { files: number; bytes: number; partial: boolean; approx: boolean } | { failed: true };
 
 export type TaskStatus = 'queued' | 'running' | 'paused' | 'waiting' | 'done' | 'cancelled' | 'failed';
 
@@ -1023,6 +1030,8 @@ export interface EventMap {
   'explorer:closed': { serial: string; reason: 'other_phone' | 'switched' };
   /** Pamięć telefonu po zadaniu wgrywania (poziom „cieczy” w Miejscach rośnie na żywo). */
   'explorer:storage': StorageView;
+  /** Liczby folderów z liczenia w tle; `null` — folder do policzenia od nowa (coś do niego wgrano). */
+  'explorer:folders': { serial: string; folders: Record<string, FolderStatsView | null> };
   'explorer:task': { task: TaskView };
   /** Pliki upuszczone z Eksploratora Windows (liczba plików i bajty z folderami). */
   'explorer:drop': { paths: string[]; count: number; bytes: number };

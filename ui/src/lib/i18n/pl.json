@@ -108,6 +108,11 @@
     "upload_here": "Wgraj tutaj",
     "list": { "label": "Pliki w folderze", "name": "Nazwa", "size": "Rozmiar", "date": "Data", "folder": "folder" },
     "locked_row": "Bez dostępu",
+    "folder_stats": {
+      "counting": "liczę…", "empty": "pusty", "failed": "nie udało się policzyć",
+      "partial": "Część podfolderów jest bez dostępu — liczby obejmują resztę.",
+      "approx": "Rozmiar przybliżony: ten Android podaje tylko zajęte miejsce na dysku."
+    },
     "locked": { "title": "Android nie pozwala zajrzeć do tego folderu", "text": "Telefon nie udostępnia go przez kabel — zwykle to dane aplikacji, które Android chroni przed innymi programami." },
     "empty": { "folder": "Ten folder jest pusty", "folder_text": "Wgraj tu pliki z komputera — przeciągnij je na okno albo użyj „Wgraj tutaj”.", "filter": "Nic tu nie pasuje do filtra ani wyszukiwania", "filter_text": "Zmień filtr typu albo wyczyść pole wyszukiwania." },
     "storage": {

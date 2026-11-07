@@ -1,6 +1,6 @@
 // Logika eksploratora plików bez stanu: typy plików, sortowanie, filtr, grupowanie po dniach.
-import { i18n, t } from '../i18n/index.svelte';
-import type { EntryView, FileKind, PlaceView } from '../types';
+import { i18n, t, tp } from '../i18n/index.svelte';
+import type { EntryView, FolderStatsView, FileKind, PlaceView } from '../types';
 
 export const ROOT = '/sdcard';
 
@@ -72,14 +72,21 @@ function cached<T extends Intl.DateTimeFormat | Intl.NumberFormat | Intl.Collato
 const dateFormat = (locale: string, options: Intl.DateTimeFormatOptions) =>
   cached(`d:${locale}:${JSON.stringify(options)}`, () => new Intl.DateTimeFormat(locale, options));
 
-/** Sortowanie: foldery zawsze na górze. Rozmiar folderu nic nie mówi: foldery przy sortowaniu po
- *  rozmiarze idą po nazwie. `lang` — język porównywania nazw. */
-export function sortEntries(entries: readonly EntryView[], sort: SortSpec, lang: string = i18n.lang): EntryView[] {
+/** Sortowanie: foldery zawsze na górze. Po rozmiarze foldery idą według policzonej zawartości (`dirs`); jeszcze
+ *  niepoliczone — na końcu folderów, po nazwie. `lang` — język porównywania nazw. */
+export function sortEntries(entries: readonly EntryView[], sort: SortSpec, lang: string = i18n.lang,
+  dirs?: Readonly<Record<string, FolderStatsView>>): EntryView[] {
   const cmp = cached(`c:${lang}`, () => new Intl.Collator(lang, { numeric: true, sensitivity: 'base' }));
   const byName = (a: EntryView, b: EntryView) => cmp.compare(a.label ?? a.name, b.label ?? b.name);
   // Kolumna sortowania w wybranym kierunku; równe wartości (i foldery przy rozmiarze) zawsze A→Z.
   const key = (a: EntryView, b: EntryView): number => {
     if (sort.key === 'name') return byName(a, b) * sort.dir;
+    if (sort.key === 'size' && a.kind === 'dir') {
+      const sa = folderBytes(dirs?.[a.path]);
+      const sb = folderBytes(dirs?.[b.path]);
+      if (sa === null || sb === null) return sa === sb ? byName(a, b) : sa === null ? 1 : -1;
+      return (sa - sb) * sort.dir || byName(a, b);
+    }
     const primary = sort.key === 'date' ? a.mtime - b.mtime : a.kind === 'file' ? a.size - b.size : 0;
     return primary * sort.dir || byName(a, b);
   };
@@ -178,4 +185,19 @@ export function clock(seconds: number): string {
   const mm = String(Math.floor((s % 3600) / 60));
   const ss = String(s % 60).padStart(2, '0');
   return h ? `${h}:${mm.padStart(2, '0')}:${ss}` : `${mm}:${ss}`;
+}
+
+const folderBytes = (s: FolderStatsView | undefined): number | null => (s && 'bytes' in s ? s.bytes : null);
+
+/** Opis folderu w kafelku i na liście: liczba plików i rozmiar; `≥` — część podfolderów bez dostępu, `≈` — rozmiar
+ *  przybliżony; `hint` — wyjaśnienie znaku w dymku `title`. `null` — jeszcze liczymy. */
+export function folderSummary(s: FolderStatsView | undefined, lang: string = i18n.lang):
+  { files: string; size: string; hint: string } | null {
+  if (!s) return null;
+  if (!('bytes' in s)) return { files: t('explorer.folder_stats.failed'), size: '—', hint: t('explorer.folder_stats.failed') };
+  if (s.files === 0 && !s.partial) return { files: t('explorer.folder_stats.empty'), size: formatBytes(s.bytes, lang), hint: '' };
+  const at = s.partial ? '≥ ' : '';
+  const hint = [s.partial ? t('explorer.folder_stats.partial') : '', s.approx ? t('explorer.folder_stats.approx') : '']
+    .filter(Boolean).join(' ');
+  return { files: at + tp('explorer.gallery.files', s.files), size: at + (s.approx ? '≈ ' : '') + formatBytes(s.bytes, lang), hint };
 }

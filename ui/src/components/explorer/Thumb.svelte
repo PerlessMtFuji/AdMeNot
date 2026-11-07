@@ -5,6 +5,7 @@
   import { reducedMotion } from '../../lib/motion';
   import type { EntryView } from '../../lib/types';
   import Icon from '../../ui/Icon.svelte';
+  import { t } from '../../lib/i18n/index.svelte';
   import FileIcon, { mediaGradient } from './FileIcon.svelte';
 
   type Props = {
@@ -17,8 +18,10 @@
     cascadeAt: number | null;
     /** Obrazu nie da się zdekodować — kafel przechodzi na ikonę typu. */
     onbroken: () => void;
+    /** Folder: liczba plików i rozmiar (null — jeszcze liczymy, undefined — nie dotyczy, np. kłódka). */
+    folder?: { files: string; size: string; hint: string } | null;
   };
-  let { entry, thumb, noThumb, selected, cascadeAt, onbroken }: Props = $props();
+  let { entry, thumb, noThumb, selected, cascadeAt, onbroken, folder }: Props = $props();
 
   // Miniatura już w pamięci przy pojawieniu się kafla (przewinięcie z powrotem) — bez efektu, od razu.
   const cachedAtMount = untrack(() => thumb !== null);
@@ -41,6 +44,11 @@
     <div class="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-2 pt-1">
       <FileIcon kind={entry.kind} type={entry.type} ext={entry.ext} locked={entry.locked} size={40} />
       <span class="w-full truncate text-center text-2xs font-semibold text-ink">{entry.label ?? entry.name}</span>
+      {#if folder !== undefined}
+        <span data-folder-stats class="w-full truncate text-center text-[10.5px] text-mut tabular-nums" title={folder?.hint || undefined}>
+          {folder ? (folder.size === '—' ? folder.files : `${folder.files} · ${folder.size}`) : t('explorer.folder_stats.counting')}
+        </span>
+      {/if}
     </div>
   {/if}
   {#if (entry.type === 'video' || entry.type === 'audio') && !noThumb}

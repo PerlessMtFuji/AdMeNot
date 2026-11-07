@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { i18n } from '../i18n/index.svelte';
 import type { EntryView } from '../types';
-import { days, defaultView, fileType, formatBytes, parentPath, visible } from './logic';
+import { days, defaultView, fileType, folderSummary, formatBytes, parentPath, sortEntries, visible } from './logic';
 
 const at = (iso: string) => Math.floor(new Date(iso).getTime() / 1000);
 
@@ -109,5 +109,35 @@ describe('helpers', () => {
     expect(formatBytes(1536, 'pl')).toBe('1,5 KB');
     expect(formatBytes(310 * 1024, 'pl')).toBe('310 KB');
     expect(formatBytes(6.1 * 1024 ** 3, 'en')).toBe('6.1 GB');
+  });
+});
+
+describe('folder sizes', () => {
+  const dir = (name: string): EntryView => ({ name, path: `/sdcard/${name}`, kind: 'dir', size: 4096, mtime: 0, label: null,
+    locked: false, type: 'other', ext: '', thumb: null, url: null });
+  const file = (name: string, size: number): EntryView => ({ ...dir(name), kind: 'file', size, ext: 'jpg', type: 'image' });
+  const stats = (files: number, bytes: number, partial = false, approx = false) => ({ files, bytes, partial, approx });
+
+  test('sorting by size orders folders by their content; uncounted ones go last', () => {
+    const entries = [dir('Mały'), dir('Nieznany'), file('a.jpg', 5), dir('Duży'), dir('Błąd')];
+    const dirs = { '/sdcard/Mały': stats(1, 10), '/sdcard/Duży': stats(9, 9000), '/sdcard/Błąd': { failed: true as const } };
+    const names = (key: 'size', dir: 1 | -1) => sortEntries(entries, { key, dir }, 'pl', dirs).map((e) => e.name);
+    expect(names('size', -1)).toEqual(['Duży', 'Mały', 'Błąd', 'Nieznany', 'a.jpg']);
+    expect(names('size', 1)).toEqual(['Mały', 'Duży', 'Błąd', 'Nieznany', 'a.jpg']);
+    expect(sortEntries(entries, { key: 'size', dir: -1 }, 'pl').map((e) => e.name).slice(0, 4))
+      .toEqual(['Błąd', 'Duży', 'Mały', 'Nieznany']);  // bez liczb: po nazwie, jak dotąd
+  });
+
+  test('summary: files and size, partial and approximate marks, empty and failed', () => {
+    i18n.lang = 'pl';
+    expect(folderSummary(undefined)).toBeNull();
+    expect(folderSummary(stats(1213, 23 * 1024 * 1024))).toEqual({ files: '1213 plików', size: formatBytes(23 * 1024 * 1024, 'pl'), hint: '' });
+    const partial = folderSummary(stats(2, 2048, true, true))!;
+    expect(partial.files).toBe('≥ 2 pliki');
+    expect(partial.size).toBe(`≥ ≈ ${formatBytes(2048, 'pl')}`);
+    expect(partial.hint).toContain('bez dostępu');
+    expect(partial.hint).toContain('przybliżony');
+    expect(folderSummary(stats(0, 0))!.files).toBe('pusty');
+    expect(folderSummary({ failed: true })).toEqual({ files: 'nie udało się policzyć', size: '—', hint: 'nie udało się policzyć' });
   });
 });

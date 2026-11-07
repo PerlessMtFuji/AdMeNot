@@ -22,6 +22,32 @@ const row = (name: string) => rows().find((r) => r.textContent?.includes(name))!
 const selected = () => rows().filter((r) => r.getAttribute('aria-selected') === 'true').length;
 
 describe('Explorer', () => {
+  test('folders show file counts and sizes as they arrive; sorting by size uses them', async () => {
+    const { ctl, bridge } = await openExplorer();
+    const ex = ctl.explorer;
+    ex.setView('list');
+    await fireEvent.click(screen.getByRole('button', { name: /Cała pamięć/ }));
+    await vi.waitFor(() => expect(row('DCIM').textContent).toContain('40 plików'));
+    expect(row('DCIM').textContent).toContain('27 KB');
+    expect(row('Music').textContent).toContain('3 pliki');
+
+    bridge.emit('explorer:folders', { serial: ex.state.serial!, folders: { '/sdcard/DCIM': null } });
+    await vi.waitFor(() => expect(row('DCIM').textContent).toContain('liczę…'));
+    bridge.emit('explorer:folders', { serial: 'INNY', folders: { '/sdcard/Music': { failed: true } } });
+    await tick();
+    expect(row('Music').textContent).toContain('3 pliki');  // zdarzenie innego telefonu pominięte
+
+    ex.state.sort = { key: 'size', dir: -1 };
+    await tick();
+    const folders = () => rows().filter((r) => r.querySelector('[data-folder-files]')).map((r) => r.dataset.path!.split('/').pop());
+    expect(folders()).toEqual(['Movies', 'Music', 'Download', 'Android', 'DCIM']);  // DCIM liczy się od nowa: na końcu
+
+    ex.setView('grid');
+    await tick();
+    const tile = document.querySelector('[data-path="/sdcard/Movies"] [data-folder-stats]');
+    expect(tile?.textContent).toContain('2 pliki');
+  });
+
   test('explicit view choice survives folders and closing the explorer', async () => {
     const { ctl, bridge } = await openExplorer();
     const ex = ctl.explorer;

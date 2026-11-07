@@ -108,6 +108,11 @@
     "upload_here": "Upload here",
     "list": { "label": "Files in folder", "name": "Name", "size": "Size", "date": "Date", "folder": "folder" },
     "locked_row": "No access",
+    "folder_stats": {
+      "counting": "counting…", "empty": "empty", "failed": "could not count",
+      "partial": "Some subfolders are not accessible — the numbers cover the rest.",
+      "approx": "Approximate size: this Android only reports the space used on disk."
+    },
     "locked": { "title": "Android does not allow looking into this folder", "text": "The phone does not share it over the cable — usually it is app data that Android protects from other programs." },
     "empty": { "folder": "This folder is empty", "folder_text": "Upload files from your computer — drag them onto the window or use “Upload here”.", "filter": "Nothing here matches the filter or search", "filter_text": "Change the type filter or clear the search box." },
     "storage": {
