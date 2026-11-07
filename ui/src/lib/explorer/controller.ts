@@ -247,7 +247,8 @@ export class ExplorerController {
     } else {
       s.selected.clear();
       Object.assign(s, { anchor: null, query: '', preview: null,
-        view: this.app.settings.explorer_view ?? defaultView(placeAt(s.places, r.path)?.key ?? null) });
+        view: this.app.settings.explorer_view ?? defaultView(placeAt(s.places, r.path)?.key ?? null),
+        peek: this.app.settings.explorer_peek ?? true });
     }
     if (!r.locked && r.path !== ROOT) s.recent = [r.path, ...s.recent.filter((p) => p !== r.path)].slice(0, RECENT_MAX);
   }
@@ -266,6 +267,13 @@ export class ExplorerController {
     this.app.settings = { ...this.app.settings, explorer_view: view };
     // Kolejne szybkie kliknięcia zapisują się w tej samej kolejności co wybory.
     this.viewWrites = this.viewWrites.then(() => this.request(() => this.api.save_settings({ explorer_view: view })));
+  }
+
+  setPeek(on: boolean): void {
+    this.state.peek = on;
+    this.app.settings = { ...this.app.settings, explorer_peek: on };
+    // Ta sama kolejka co widok: zapisy idą w kolejności kliknięć.
+    this.viewWrites = this.viewWrites.then(() => this.request(() => this.api.save_settings({ explorer_peek: on })));
   }
 
   /** Klik zaznacza od razu; dwuklik przywraca zaznaczenie sprzed pierwszego kliku (otwiera, nie zaznacza).

@@ -36,6 +36,22 @@ describe('Explorer', () => {
     expect(ex.state.view).toBe('list');
   });
 
+  test('zapamiętuje wyłącznik dymka', async () => {
+    const { ctl, bridge } = await openExplorer();
+    const ex = ctl.explorer;
+    const btn = () => screen.getByRole('button', { name: /Podgląd w dymku/ });
+    expect(btn().getAttribute('aria-pressed')).toBe('true');
+    expect(btn().getAttribute('aria-label')).toBe('Podgląd w dymku włączony');
+    await fireEvent.click(btn());
+    expect(ex.state.peek).toBe(false);
+    expect(btn().getAttribute('aria-pressed')).toBe('false');
+    expect(btn().getAttribute('aria-label')).toBe('Podgląd w dymku wyłączony');
+    await vi.waitFor(() => expect(bridge.calls.some(c => c.method === 'save_settings' && (c.args[0] as any).explorer_peek === false)).toBe(true));
+    await ex.close();
+    await ex.open(SERIAL);
+    expect(ex.state.peek).toBe(false);
+  });
+
   test('"Show" in the current folder selects and reveals what arrived', async () => {
     const { ctl } = await openExplorer();
     const ex = ctl.explorer;

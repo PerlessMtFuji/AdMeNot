@@ -28,6 +28,8 @@ export class ExplorerState {
   /** Trwa odczyt folderu (`explorer_list`). */
   loading = $state(false);
   view = $state<ExplorerView>('list');
+  /** Podgląd pliku w dymku po najechaniu (ustawienie `explorer_peek`). */
+  peek = $state(true);
   sort = $state<SortSpec>({ key: 'date', dir: -1 });
   filter = $state<ExplorerFilter>('all');
   query = $state('');

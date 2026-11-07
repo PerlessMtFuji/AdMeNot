@@ -53,6 +53,7 @@ describe('dictionaries', () => {
         .map((p) => `explorer.place.${p}`),
       ...FILTERS.map((f) => `explorer.filter.${f}`),
       ...['grid', 'list'].map((v) => `explorer.view.${v}`),
+      ...['on', 'off'].map((v) => `explorer.peek.${v}`),
       ...['name', 'size', 'date'].map((c) => `explorer.list.${c}`),
       ...['busy', 'other_phone', 'switched'].map((n) => `explorer.notice.${n}`),
     ];

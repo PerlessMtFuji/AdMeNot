@@ -37,6 +37,7 @@ export interface Settings {
   /** Eksplorator: ostatni folder docelowy kopii na komputerze (zapisuje most). */
   explorer_dest?: string | null;
   explorer_view?: 'list' | 'grid' | null;
+  explorer_peek?: boolean;
 }
 
 export interface TelemetrySample {

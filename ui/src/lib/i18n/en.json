@@ -100,6 +100,7 @@
     "summary": { "one": "{count} file · {size}", "few": "{count} files · {size}", "many": "{count} files · {size}", "other": "{count} files · {size}" },
     "folders": { "one": "{count} folder", "few": "{count} folders", "many": "{count} folders", "other": "{count} folders" },
     "view": { "label": "View", "grid": "Grid", "list": "List" },
+    "peek": { "on": "Hover preview on", "off": "Hover preview off" },
     "search": "Search in {folder}…",
     "search_label": "Search this folder",
     "filter": { "label": "Show", "all": "Everything", "image": "Photos", "video": "Videos", "doc": "Documents", "apk": "APK" },

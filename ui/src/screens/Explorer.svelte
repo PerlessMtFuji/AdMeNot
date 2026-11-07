@@ -188,6 +188,11 @@
         </button>
       {/each}
     </div>
+    <button type="button" aria-pressed={s.peek} aria-label={t(`explorer.peek.${s.peek ? 'on' : 'off'}`)}
+      title={t(`explorer.peek.${s.peek ? 'on' : 'off'}`)} onclick={() => ex.setPeek(!s.peek)}
+      class="{TOGGLE} flex-none {s.peek ? 'card text-ink' : 'text-mut hover:text-ink'}">
+      <Icon name="eye" size={16} />
+    </button>
   </header>
 
   <div class="flex items-center gap-2.5">

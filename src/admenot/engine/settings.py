@@ -34,7 +34,7 @@ SELECT_LEVELS = ("silence", "disable", "remove")  # poziomy akcji (actions/plann
 APK_MODES = ("ask", "full", "manual")  # co po szybkim skanie: pytać, pełna analiza APK, tryb ręczny
 RETENTION_DAYS = (30, 60, 90, 180, 365)  # okres przechowywania zleceń do wyboru; None = nie usuwaj
 DEFAULT_RETENTION_DAYS = 60  # RODO: domyślnie ograniczone przechowywanie danych klientów
-KEYS = ("lang", "mode", "adb_path", "backups_dir", "report_pdf_dir", "theme", "mirror_auto", "explorer_view",
+KEYS = ("lang", "mode", "adb_path", "backups_dir", "report_pdf_dir", "theme", "mirror_auto", "explorer_view", "explorer_peek",
         "apk_cache_limit_gb", "apk_cache_clear_after_repair", "select_level",
         "check_updates", "dismissed_update", "last_run_version", "retention_days",
         "apk_mode_default")
@@ -100,6 +100,7 @@ class Settings:
     donate_off: bool = False  # „Już wspieram, nie pokazuj więcej”
     explorer_dest: str | None = None  # eksplorator: ostatni folder docelowy na komputerze
     explorer_view: str | None = None  # None: domyślny dla miejsca, potem jawny wybór użytkownika
+    explorer_peek: bool = True  # eksplorator: podgląd pliku w dymku po najechaniu
     # eksplorator: numer seryjny telefonu → jego ostatnie foldery (kolejność: najdawniej używany telefon
     # pierwszy). Stary klucz `explorer_recent` (jedna lista dla wszystkich telefonów) jest pomijany przy
     # odczycie — nazwy folderów poprzedniego klienta nie trafią do „Ostatnio” innego telefonu.
@@ -259,7 +260,7 @@ def _valid(key: str, value: Any) -> bool:
         return value is None or (isinstance(value, int) and not isinstance(value, bool) and value >= 1)
     if key == "telemetry_id":
         return value is None or (isinstance(value, str) and UUID_RE.match(value) is not None)
-    if key in ("mirror_auto", "apk_cache_clear_after_repair", "check_updates"):
+    if key in ("mirror_auto", "apk_cache_clear_after_repair", "check_updates", "explorer_peek"):
         return isinstance(value, bool)
     if key == "apk_cache_limit_gb":
         # bool to podklasa int — True nie może znaczyć „1 GB"
