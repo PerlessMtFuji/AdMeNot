@@ -73,6 +73,8 @@ td li.gap { color: var(--warn); }
 .recs li { margin-bottom: 3px; }
 .sign { display: flex; justify-content: space-between; align-items: flex-end; gap: 10mm; margin-top: 10mm; break-inside: avoid; }
 .sign div { width: 70mm; text-align: center; font-size: 8.5pt; color: var(--mut); }
+.sign div .tech { display: block; margin-bottom: 2mm; font-size: 9pt; color: var(--ink); }
+.svc-footer { margin: 4mm 0 0; font-size: 8pt; line-height: 1.35; color: var(--mut); text-align: center; }
 .sign span { display: block; margin-bottom: 3px; border-top: 1px solid var(--ink); }
 footer { text-align: left; font-size: 7.5pt; color: var(--soft); }
 .shots { break-before: page; }

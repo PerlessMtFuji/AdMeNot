@@ -222,6 +222,30 @@ def test_service_header_with_and_without_logo(tmp_path):
     assert 'class="logo"' not in html
 
 
+def test_header_shows_contact_lines():
+    info = ServiceInfo(name="Serwis", email="biuro@serwis.pl", website="serwis.pl", nip="123")
+    html = render_html(make_protocol(), info, GENERATED)
+    assert "biuro@serwis.pl" in html and "serwis.pl" in html and "NIP 123" in html
+    assert "VAT ID 123" in render_html(make_protocol(lang="en"), info, GENERATED)
+    empty = render_html(make_protocol(), ServiceInfo(name="Serwis"), GENERATED)
+    assert "NIP" not in empty
+
+
+def test_technician_above_signature():
+    html = render_html(make_protocol(), ServiceInfo(technician="Jan Kowalski"), GENERATED)
+    sign = html[html.index('class="sign"'):]
+    assert sign.index("Jan Kowalski") < sign.index(TEXTS["pl"]["signature_service"])
+    assert "Jan Kowalski" not in render_html(make_protocol(), ServiceInfo(), GENERATED)
+
+
+def test_footer_keeps_newlines_and_escapes_html():
+    html = render_html(make_protocol(), ServiceInfo(footer="A\n<b>B</b>"), GENERATED)
+    assert "A<br>" in html and "&lt;b&gt;B&lt;/b&gt;" in html and "<b>B</b>" not in html
+    closing = html[html.index('class="closing"'):]
+    assert "A<br>" in closing
+    assert 'class="svc-footer"' not in render_html(make_protocol(), ServiceInfo(), GENERATED)
+
+
 def test_data_uri(tmp_path):
     svg = tmp_path / "a.SVG"
     svg.write_text("<svg/>", "utf-8")

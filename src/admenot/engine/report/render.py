@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from jinja2 import Environment, PackageLoader, StrictUndefined
+from markupsafe import Markup, escape
 
 from admenot.engine.apk.analyze import safe_icon
 from admenot.engine.phones.provider import SILHOUETTE
@@ -143,6 +144,13 @@ def _phone(check: PhoneCheck, t: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _footer(text: str | None) -> Markup | None:
+    """Stopka serwisu: tekst escapowany, łamania wierszy zachowane jako <br>."""
+    if not text or not text.strip():
+        return None
+    return Markup("<br>").join(escape(line) for line in text.splitlines())
+
+
 def render_html(protocol: Protocol, service: ServiceInfo, generated_at: datetime) -> str:
     lang = protocol.lang
     t = TEXTS[lang]
@@ -150,6 +158,7 @@ def render_html(protocol: Protocol, service: ServiceInfo, generated_at: datetime
         p=protocol,
         t=t,
         service=service,
+        footer=_footer(service.footer),
         rows=[_row(r, t, lang) for r in protocol.rows if not _compact(r)],
         watch=[_row(r, t, lang) for r in protocol.rows if _compact(r)],
         photo=data_uri(SILHOUETTE),

@@ -134,12 +134,13 @@ def test_report_during_apk_analysis_does_not_stop_it(edge):
 
 def test_service_round_trip_and_logo(tmp_path):
     api, _ = make_api(make_cli_phone())
-    assert api.service() == {"name": None, "address": None, "phone": None, "logo": None}
+    empty = dict.fromkeys(("name", "address", "phone", "logo", "email", "nip", "website",
+                           "technician", "footer"))
+    assert api.service() == empty
     logo = tmp_path / "logo.png"
     logo.write_bytes(b"\x89PNG....")
     r = api.save_service({"name": " Serwis Ząb ", "phone": "600 000 000", "logo": str(logo)})
-    assert r == {"name": "Serwis Ząb", "address": None, "phone": "600 000 000",
-                 "logo": str(logo.resolve())}
+    assert r == {**empty, "name": "Serwis Ząb", "phone": "600 000 000", "logo": str(logo.resolve())}
     assert load_service() == ServiceInfo("Serwis Ząb", None, "600 000 000", logo.resolve())
     assert api.save_service({"logo": None, "phone": ""})["logo"] is None
     assert load_service() == ServiceInfo("Serwis Ząb")
@@ -148,6 +149,26 @@ def test_service_round_trip_and_logo(tmp_path):
     assert api.save_service({"logo": str(tmp_path / "x.gif")})["error"]["key"] == "logo_type"
     assert api.save_service({"colour": "red"})["error"]["key"] == "bad_request"
     assert load_service() == ServiceInfo("Serwis Ząb")
+
+
+def test_save_service_new_fields():
+    api, _ = make_api(make_cli_phone())
+    r = api.save_service({"email": " a@b.pl ", "nip": " 123 ", "website": "b.pl",
+                          "technician": "Jan", "footer": " Linia 1\nLinia 2 \n"})
+    assert (r["email"], r["nip"], r["website"], r["technician"], r["footer"]) == (
+        "a@b.pl", "123", "b.pl", "Jan", "Linia 1\nLinia 2")
+    assert api.save_service({"nip": ""})["nip"] is None  # pojedyncza zmiana zostawia resztę
+    assert load_service().email == "a@b.pl" and load_service().footer == "Linia 1\nLinia 2"
+    err = api.save_service({"footer": "x" * 501})["error"]
+    assert err["key"] == "bad_request" and err["message"] == "footer"
+    assert load_service().footer == "Linia 1\nLinia 2"
+
+
+def test_report_not_opened_when_disabled(edge):
+    api, _, number, opened = _executed()
+    api.save_settings({"report_open": False})
+    r = api.report(number)
+    assert r["opened"] is None and opened == [] and r["pdf"]
 
 
 def test_logo_that_disappeared_does_not_block_other_changes(tmp_path):

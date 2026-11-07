@@ -2175,7 +2175,12 @@
     "name": null,
     "address": null,
     "phone": null,
-    "logo": null
+    "logo": null,
+    "email": null,
+    "nip": null,
+    "website": null,
+    "technician": null,
+    "footer": null
    },
    "events": []
   },
@@ -2192,7 +2197,12 @@
     "name": "Serwis Ząb",
     "address": "ul. Długa 1",
     "phone": "600 000 000",
-    "logo": null
+    "logo": null,
+    "email": null,
+    "nip": null,
+    "website": null,
+    "technician": null,
+    "footer": null
    },
    "events": []
   },

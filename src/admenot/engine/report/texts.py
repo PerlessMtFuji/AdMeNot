@@ -101,6 +101,7 @@ TEXTS: dict[str, dict[str, Any]] = {
             "general": "Instaluj aplikacje tylko ze Sklepu Play. Nie pozwalaj nieznanym "
                        "aplikacjom wyświetlać się nad innymi aplikacjami ani wysyłać powiadomień.",
         },
+        "nip": "NIP",
         "signature_service": "Podpis serwisanta",
         "generated": "Wygenerowano {date} programem AdMeNot",
         "date_format": "%d.%m.%Y",
@@ -198,6 +199,7 @@ TEXTS: dict[str, dict[str, Any]] = {
             "general": "Install apps only from the Play Store. Do not let unknown apps "
                        "display over other apps or send notifications.",
         },
+        "nip": "VAT ID",
         "signature_service": "Technician signature",
         "generated": "Generated {date} by AdMeNot",
         "date_format": "%Y-%m-%d",

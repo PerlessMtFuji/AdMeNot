@@ -18,6 +18,9 @@
       {% if service.name %}<b>{{ service.name }}</b>{% endif %}
       {% if service.address %}<span>{{ service.address }}</span>{% endif %}
       {% if service.phone %}<span>{{ service.phone }}</span>{% endif %}
+      {% if service.email %}<span>{{ service.email }}</span>{% endif %}
+      {% if service.website %}<span>{{ service.website }}</span>{% endif %}
+      {% if service.nip %}<span>{{ t.nip }} {{ service.nip }}</span>{% endif %}
     </div>
   </div>
   <div class="title">
@@ -119,8 +122,11 @@
 
 <div class="sign">
   <footer>{{ generated }}</footer>
-  <div><span></span>{{ t.signature_service }}</div>
+  <div>{% if service.technician %}<b class="tech">{{ service.technician }}</b>{% endif %}<span></span>{{ t.signature_service }}</div>
 </div>
+{% if footer %}
+<p class="svc-footer">{{ footer }}</p>
+{% endif %}
 </section>
 {% if shots %}
 {# Załącznik na osobnej stronie: protokół zostaje jednostronicowy (ustalenie z próby Planu 6). #}

@@ -116,6 +116,7 @@ from admenot.engine.report.render import data_uri
 from admenot.engine.screenshot import delete_shots, take_screenshot
 from admenot.engine.session import ScanReport, analyze_apks, apply_phone_labels, run_scan
 from admenot.engine.settings import (
+    FOOTER_MAX,
     LogoError,
     ServiceInfo,
     SettingsTooNew,
@@ -254,12 +255,15 @@ def _startfile(path: Path) -> None:
     os.startfile(path)  # type: ignore[attr-defined]  # tylko Windows
 
 
-SERVICE_KEYS = ("name", "address", "phone", "logo")
+SERVICE_TEXT_KEYS = ("name", "address", "phone", "email", "nip", "website", "technician")
+SERVICE_KEYS = (*SERVICE_TEXT_KEYS, "logo", "footer")
 
 
 def _service_view(info: ServiceInfo) -> dict[str, Any]:
     return {"name": info.name, "address": info.address, "phone": info.phone,
-            "logo": str(info.logo) if info.logo else None}
+            "logo": str(info.logo) if info.logo else None, "email": info.email,
+            "nip": info.nip, "website": info.website, "technician": info.technician,
+            "footer": info.footer}
 
 
 def _fixes(value: Any) -> tuple[str, ...]:
@@ -2296,11 +2300,13 @@ class Api(ExplorerMixin):
         finally:
             self._report_lock.release()
         target = files.pdf or files.html
-        try:
-            self._open_file(target)
-            opened: str | None = str(target)
-        except OSError:  # brak programu do PDF/HTML: plik jest zapisany, UI poda jego ścieżkę
-            opened = None
+        opened: str | None = None
+        if load_settings().report_open:
+            try:
+                self._open_file(target)
+                opened = str(target)
+            except OSError:  # brak programu do PDF/HTML: plik jest zapisany, UI poda jego ścieżkę
+                pass
         return {"order": number, "html": str(files.html),
                 "pdf": str(files.pdf) if files.pdf else None,
                 "pdf_target": str(files.pdf_target) if files.pdf_target else None,
@@ -2318,10 +2324,13 @@ class Api(ExplorerMixin):
             raise AppError("bad_request", ", ".join(unknown))
         info = load_service()
         values: dict[str, Any] = {}
-        for key in ("name", "address", "phone"):
+        for key in (*SERVICE_TEXT_KEYS, "footer"):
             if key in changes:
                 value = changes[key]
                 values[key] = (value.strip() or None) if isinstance(value, str) else None
+        footer = values.get("footer")
+        if footer is not None and len(footer) > FOOTER_MAX:
+            raise AppError("bad_request", "footer")
         if "logo" in changes:
             raw = changes["logo"]
             if not (isinstance(raw, str) and raw.strip()):
