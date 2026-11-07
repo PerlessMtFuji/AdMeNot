@@ -364,7 +364,7 @@ test('Eksplorator: recent phones use the Polish plural and Wyczyść clears them
   await open('Eksplorator plików');
   expect(screen.getByText('Nic nie zapamiętano')).toBeTruthy();
   expect((screen.getByRole('button', { name: 'Wyczyść' }) as HTMLButtonElement).disabled).toBe(true);
-  for (const [n, text] of [[1, 'Pamiętane: 1 telefon'], [2, 'Pamiętane: 2 telefony'], [5, 'Pamiętane: 5 telefonów']] as const) {
+  for (const [n, text] of [[1, 'Pamiętane dla 1 telefonu'], [2, 'Pamiętane dla 2 telefonów'], [5, 'Pamiętane dla 5 telefonów'], [22, 'Pamiętane dla 22 telefonów']] as const) {
     s.settings = { ...s.settings, explorer_recent_phones: n };
     await tick();
     expect(screen.getByText(new RegExp(`^${text} `))).toBeTruthy();

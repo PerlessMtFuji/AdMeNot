@@ -64,8 +64,9 @@ test('report scenario: PDF error falls back to HTML, service details saved', asy
   await report.click();
   await expect(page.getByText(/otwarty w innym programie/)).toBeVisible();
   await page.getByRole('button', { name: 'Ustawienia' }).click();
+  await page.getByRole('button', { name: /Serwis i protokoły/ }).click();
   await page.getByLabel('Nazwa serwisu').fill('Serwis Ząb');
-  await page.getByRole('button', { name: 'Zapisz dane serwisu' }).click();
+  await page.getByLabel('Nazwa serwisu').blur();
   await expect(page.getByText(/Zapisano/)).toBeVisible();
 });
 
