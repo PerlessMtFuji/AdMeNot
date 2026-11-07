@@ -24,12 +24,22 @@
   /** Kaskada wyostrzania: odstęp między kolejnymi kaflami i najdalszy kafel z własnym opóźnieniem. */
   const STEP_MS = 25;
   const STEP_MAX = 12;
+  const MEMO_TILES = 2000;
+  /** Miniatury pobierane na zapas (kafle): w kierunku przewijania i za plecami. */
+  const AHEAD = 120;
+  const BEHIND = 40;
+  /** Priorytet zapasu: po kaflach w DOM. */
+  const SPARE = 200_000;
+  /** Skok o pół okna i więcej: kafle zaraz znikną, więc z pobieraniem czekamy, aż przewijanie zwolni. */
+  const FLING_WAIT_MS = 60;
   const DIRS = '/dirs';
   const FILES = '/files';
 
   let box: HTMLElement;
   let content: HTMLElement;
-  let vp = $state<Viewport>({ top: 0, ...FALLBACK });
+  let vp = $state.raw<Viewport>({ top: 0, ...FALLBACK });
+  /** Osobno od `vp`: przewijanie nie może przeliczać układu wszystkich plików. */
+  const width = $derived(vp.width);
   let focusPath = $state<string | null>(null);
   let lasso = $state<Rect | null>(null);
 
@@ -41,10 +51,12 @@
     return [...(dirs.length ? [{ key: DIRS, label: t('explorer.gallery.folders'), items: dirs }] : []),
       ...(byDay ? days(files, now) : files.length ? [{ key: FILES, label: t('explorer.gallery.all_files'), items: files }] : [])];
   });
-  const layout = $derived(gridLayout(groups, Math.max(1, vp.width - 2 * PAD)));
+  const layout = $derived(gridLayout(groups, Math.max(1, width - 2 * PAD)));
   const order = $derived(layout.order.map((e) => e.path));
   const index = $derived(new Map(order.map((p, i) => [p, i])));
   const slices = $derived(visibleSlices(layout, vp));
+  // Sekcje jako stałe obiekty: przewinięcie nie przelicza zaznaczenia i koloru każdego nagłówka.
+  const shownSections = $derived(slices.map((x) => x.section));
   const seen = $derived(inView(layout, vp));
   // Dokładnie jeden kafel w kolejności Tab: ostatnio aktywny, kotwica albo pierwszy widoczny.
   const tabPath = $derived([focusPath, s.anchor].find((p) => p !== null && index.has(p)) ?? order[0] ?? null);
@@ -52,10 +64,21 @@
   const source = (e: EntryView) => e.thumb ?? (e.type === 'video' ? e.url : null);
 
   interface Tile { e: EntryView; rect: Rect; i: number }
+  // Te same obiekty kafli między klatkami: Svelte nie dotyka kafla, który tylko został na ekranie.
+  let tileMemo = new Map<number, Tile>();
+  let tileLayout: typeof layout | null = null;
   const tiles = $derived.by((): Tile[] => {
+    if (tileLayout !== layout || tileMemo.size > MEMO_TILES) {
+      tileLayout = layout;
+      tileMemo = new Map();
+    }
     const out: Tile[] = [];
-    const add = (section: (typeof layout.sections)[number], i: number) =>
-      out.push({ e: section.items[i], rect: tileRect(layout, section, i), i: section.first + i });
+    const add = (section: (typeof layout.sections)[number], i: number) => {
+      const at = section.first + i;
+      let tile = tileMemo.get(at);
+      if (!tile) tileMemo.set(at, tile = { e: section.items[i], rect: tileRect(layout, section, i), i: at });
+      out.push(tile);
+    };
     for (const { section, from, to } of slices) for (let i = from; i < to; i++) add(section, i);
     // kafel z fokusem / w kolejności Tab zostaje w DOM, nawet gdy przewinięty poza okno
     for (const p of new Set([tabPath, focusPath])) {
@@ -96,20 +119,50 @@
     return performance.now() > at + 500 ? null : at;  // po kaskadzie (przewinięcie i powrót) — już bez niej
   }
 
-  // Kolejka miniatur: widoczne pierwsze (w kolejności na ekranie), zapas ± 2 wiersze potem; reszta anulowana.
+  // Kolejka miniatur: widoczne pierwsze (w kolejności na ekranie), potem reszta kafli w DOM, potem zapas spoza DOM
+  // (bez klatek filmów: każda to dekoder i strumień); reszta anulowana.
+  let lastTop = 0;
+  let planTimer: ReturnType<typeof setTimeout> | undefined;
   $effect(() => {
     const wanted: [string, number][] = [];
     const visible = new Set(seen.map((e) => e.path));
+    let first = Infinity;
+    let last = -1;
     for (const { e, i } of tiles) {
       const url = source(e);
       if (url) wanted.push([url, visible.has(e.path) ? i : 100_000 + i]);
+      if (visible.has(e.path)) {
+        first = Math.min(first, i);
+        last = Math.max(last, i);
+      }
+    }
+    const { top, height } = vp;
+    const down = top >= lastTop;
+    const fling = Math.abs(top - lastTop) > height / 2;
+    lastTop = top;
+    if (last >= 0) {
+      const all = layout.order;
+      const after = down ? AHEAD : BEHIND;
+      const before = down ? BEHIND : AHEAD;
+      for (let k = last + 1; k <= Math.min(all.length - 1, last + after); k++) {
+        const url = all[k].thumb;
+        if (url) wanted.push([url, SPARE + k - last]);
+      }
+      for (let k = first - 1; k >= Math.max(0, first - before); k--) {
+        const url = all[k].thumb;
+        if (url) wanted.push([url, SPARE + first - k]);
+      }
     }
     untrack(() => {
-      thumbs.cancelAllExcept(new Set(wanted.map(([url]) => url)));
-      for (const [url, priority] of wanted) thumbs.want(url, priority);
+      clearTimeout(planTimer);
+      if (fling) planTimer = setTimeout(() => thumbs.plan(wanted), FLING_WAIT_MS);
+      else thumbs.plan(wanted);
     });
   });
-  $effect(() => () => thumbs.cancelAllExcept(new Set()));
+  $effect(() => () => {
+    clearTimeout(planTimer);
+    thumbs.cancelAllExcept(new Set());
+  });
 
   /** Kolor dominujący dnia: pierwsza znana miniatura z początku dnia. */
   function dayColor(group: GroupIn): string | null {
@@ -240,7 +293,7 @@
   onfocusin={(ev) => { const p = (ev.target as HTMLElement).dataset?.path; if (p) focusPath = p; }}
   class="relative min-h-0 flex-1 overflow-y-auto overscroll-contain outline-none select-none">
   <div bind:this={content} class="relative" style:height="calc({layout.height + PAD}px + var(--dock-h, 0px))" style:margin="0 {PAD}px">
-    {#each slices as { section } (section.key)}
+    {#each shownSections as section (section.key)}
       {@const all = daySelected(section)}
       {@const plain = section.key === DIRS || section.key === FILES}
       {@const color = plain ? null : dayColor(section)}
@@ -272,7 +325,7 @@
       {@const sel = s.selected.has(e.path)}
       {@const url = source(e)}
       <div role="option" aria-selected={sel} aria-label={e.label ?? e.name} data-path={e.path} tabindex={tabPath === e.path ? 0 : -1}
-        class="group absolute top-0 left-0 rounded-[12px] outline-offset-2"
+        class="group absolute top-0 left-0 rounded-[12px] outline-offset-2 [contain:size_layout_style]"
         style:transform="translate({rect.x}px, {rect.y}px)" style:width="{rect.w}px" style:height="{rect.h}px"
         onclick={(ev) => onclick(ev, e)}
         ondblclick={(ev) => { if (!(ev.target instanceof Element && ev.target.closest('[data-check]'))) open(e); }}

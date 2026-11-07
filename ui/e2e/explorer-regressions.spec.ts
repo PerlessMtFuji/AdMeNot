@@ -40,7 +40,7 @@ test('PDF renders, searches all pages, highlights matches and handles page/zoom 
     const ex = (window as any).__admenot.ctl.explorer;
     const entry = { ...ex.state.entries[0], path: '/sdcard/search.pdf', name: 'search.pdf', kind: 'file',
       type: 'doc', ext: 'pdf', url: 'http://127.0.0.1:4173/test-search.pdf', thumb: null };
-    ex.state.entries.push(entry);
+    ex.state.entries = [...ex.state.entries, entry];
     ex.openPreview(entry.path);
   });
   const dialog = page.getByRole('dialog');
@@ -73,7 +73,7 @@ async function openPdf(page: import('@playwright/test').Page) {
     const ex = (window as any).__admenot.ctl.explorer;
     const entry = { ...ex.state.entries[0], path: '/sdcard/search.pdf', name: 'search.pdf', kind: 'file',
       type: 'doc', ext: 'pdf', url: 'http://127.0.0.1:4173/test-search.pdf', thumb: null };
-    ex.state.entries.push(entry);
+    ex.state.entries = [...ex.state.entries, entry];
     ex.openPreview(entry.path);
   });
   const dialog = page.getByRole('dialog');
@@ -177,7 +177,7 @@ test('portrait video fits above controls and reports decoded dimensions without 
     stream.getTracks().forEach((track) => track.stop());
     const entry = { ...ctl.explorer.state.entries[0], path: '/sdcard/portrait.mp4', name: 'portrait.mp4',
       type: 'video', ext: 'mp4', url, thumb: null };
-    ctl.explorer.state.entries.push(entry);
+    ctl.explorer.state.entries = [...ctl.explorer.state.entries, entry];
     bridge.answerNext('explorer_meta', { meta: { size: entry.size, mtime: entry.mtime, path: entry.path } });
     ctl.explorer.openPreview(entry.path);
   });
@@ -208,7 +208,7 @@ for (const scan of ['scan-ccitt', 'scan-jpx']) {
       const ex = (window as any).__admenot.ctl.explorer;
       const entry = { ...ex.state.entries[0], path: `/sdcard/${scan}.pdf`, name: `${scan}.pdf`, kind: 'file',
         type: 'doc', ext: 'pdf', url: `http://127.0.0.1:4173/${scan}.pdf`, thumb: null };
-      ex.state.entries.push(entry);
+      ex.state.entries = [...ex.state.entries, entry];
       ex.openPreview(entry.path);
     }, scan);
     await expect.poll(() => page.evaluate(() => {
@@ -280,7 +280,7 @@ test('an idle photo preview does no work every frame', async ({ page }) => {
     const ex = (window as any).__admenot.ctl.explorer;
     const entry = { ...ex.state.entries[0], path: '/sdcard/idle.png', name: 'idle.png', kind: 'file', type: 'image', ext: 'png',
       url: 'http://127.0.0.1:4173/idle.png', thumb: 'http://127.0.0.1:4173/idle.png' };
-    ex.state.entries.push(entry);
+    ex.state.entries = [...ex.state.entries, entry];
     ex.openPreview(entry.path);
   });
   await expect(page.getByRole('dialog').locator('.glow')).toHaveCount(1);  // poświata jest, tylko nie pracuje bez przerwy
@@ -302,8 +302,8 @@ test('closing a zoomed photo takes no snapshot of it', async ({ page }) => {
     (window as any).__transitions = 0;
     document.startViewTransition = ((cb: () => void) => { (window as any).__transitions++; return start(cb); }) as typeof document.startViewTransition;
     const ex = (window as any).__admenot.ctl.explorer;
-    ex.state.entries.push({ ...ex.state.entries[0], path: '/sdcard/zoom.png', name: 'zoom.png', kind: 'file', type: 'image', ext: 'png',
-      url: 'http://127.0.0.1:4173/zoom.png', thumb: 'http://127.0.0.1:4173/zoom.png' });
+    ex.state.entries = [...ex.state.entries, { ...ex.state.entries[0], path: '/sdcard/zoom.png', name: 'zoom.png', kind: 'file', type: 'image', ext: 'png',
+      url: 'http://127.0.0.1:4173/zoom.png', thumb: 'http://127.0.0.1:4173/zoom.png' }];
   });
   const open = () => page.evaluate(() => (window as any).__admenot.ctl.explorer.openPreview('/sdcard/zoom.png'));
   const transitions = () => page.evaluate(() => (window as any).__transitions);

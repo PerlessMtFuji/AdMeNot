@@ -153,7 +153,7 @@ describe('Preview', () => {
   test('PDF opens the isolated reader instead of unsupported-file view', async () => {
     const { ex } = await openExplorer();
     const pdf = entry('dokument.pdf', 'doc', 'pdf');
-    ex.state.entries.push(pdf);
+    ex.state.entries = [...ex.state.entries, pdf];
     ex.openPreview(pdf.path);
     await tick();
     expect(within(dialog()).getByRole('searchbox', { name: 'Szukaj w treści' })).toBeTruthy();

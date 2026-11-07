@@ -39,7 +39,7 @@ export class ThumbQueue {
   private readonly exhausted = new Set<string>();
   private readonly attempts = new Map<string, number>();
   private readonly waiting = new Map<string, ReturnType<typeof setTimeout>>();
-  private readonly priority = new Map<string, number>();
+  private priority = new Map<string, number>();
   private readonly pending = new Map<string, number>();
   private readonly running = new Map<string, AbortController>();
   private keep = new Set<string>();
@@ -75,6 +75,23 @@ export class ThumbQueue {
       if (urls.has(url)) continue;
       ctl.abort();
       this.running.delete(url);
+    }
+    this.pump();
+  }
+
+  /** Cały plan pobierania naraz (galeria, po każdym przewinięciu): `wanted` zastępuje kolejkę razem z priorytetami,
+   *  więc kafel, który wyjechał z okna, nie wyprzedza nowych; reszta jest anulowana. */
+  plan(wanted: readonly (readonly [string, number])[]): void {
+    this.priority = new Map(wanted);
+    this.keep = new Set(this.priority.keys());
+    for (const [url, ctl] of [...this.running]) {
+      if (this.keep.has(url)) continue;
+      ctl.abort();
+      this.running.delete(url);
+    }
+    this.pending.clear();
+    for (const [url, priority] of this.priority) {
+      if (!this.cache.has(url) && !this.bad.has(url) && !this.running.has(url) && !this.waiting.has(url)) this.pending.set(url, priority);
     }
     this.pump();
   }

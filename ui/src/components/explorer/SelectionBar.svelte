@@ -11,7 +11,14 @@
   /** Pasek zaznaczenia: sprężyście wjeżdża z dołu; „Kopiuj” do zapamiętanego folderu na komputerze. */
   let { ex }: { ex: ExplorerController } = $props();
   const s = $derived(ex.state);
-  const size = $derived(s.entries.reduce((sum, e) => (e.kind === 'file' && s.selected.has(e.path) ? sum + e.size : sum), 0));
+  const size = $derived.by(() => {
+    let sum = 0;
+    for (const path of s.selected) {
+      const e = s.byPath.get(path);
+      if (e?.kind === 'file') sum += e.size;
+    }
+    return sum;
+  });
   const destName = $derived(s.dest ? (s.dest.split(/[\\/]/).filter(Boolean).pop() ?? s.dest) : '');
   const spring = (t: number) => 1 - Math.cos(t * Math.PI * 4.5) * Math.exp(-t * 6);
 </script>

@@ -8,7 +8,12 @@
 
   /** Zdjęcie w podglądzie: rozmyta poświata z tego samego obrazu, kółko = zoom do kursora, przeciąganie =
    *  przesuwanie, ⟳ obrót. Do czasu pobrania pliku widać miniaturę. */
-  let { entry, onfail }: { entry: EntryView; onfail: () => void } = $props();
+  type Props = { entry: EntryView;
+    /** Miniatura (adres `blob:` z pamięci galerii albo adres serwera). */
+    thumb: string | null;
+    /** Zdjęcie: pobrane na zapas albo adres serwera. */
+    full: string | null; onfail: () => void };
+  let { entry, thumb, full, onfail }: Props = $props();
 
   const MAX_ZOOM = 8;
   const STEP = 1.25;
@@ -36,7 +41,7 @@
     return Math.min(1, box.w / (c * natural.h), box.h / (c * natural.w));
   });
   const transform = $derived(`translate(${x}px, ${y}px) rotate(${turn * 90}deg) scale(${zoom * fit})`);
-  const src = $derived(entry.thumb ?? entry.url ?? '');
+  const src = $derived(thumb ?? full ?? '');
 
   function measure(e: Event): void {
     const img = e.currentTarget as HTMLImageElement;
@@ -88,10 +93,10 @@
   role="presentation" onwheel={wheel} onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={up}>
   <div data-morph="photo" data-zoomed={zoom > 1 ? '' : undefined} class="absolute inset-0 {dragging ? '' : 'transition-transform duration-150 ease-out motion-reduce:transition-none'}"
     style:transform={transform}>
-    <img src={entry.thumb ?? ''} alt="" draggable="false" class="absolute inset-0 h-full w-full object-contain select-none"
+    <img src={thumb ?? ''} alt="" draggable="false" class="absolute inset-0 h-full w-full object-contain select-none"
       onload={measure} />
-    {#if entry.url}
-      <img src={entry.url} alt={entry.label ?? entry.name} draggable="false" onload={(e) => { loaded = true; measure(e); }} onerror={onfail}
+    {#if full}
+      <img src={full} alt={entry.label ?? entry.name} draggable="false" decoding="async" onload={(e) => { loaded = true; measure(e); }} onerror={onfail}
         class="absolute inset-0 h-full w-full object-contain select-none transition-opacity duration-300 {loaded ? 'opacity-100' : 'opacity-0'}" />
     {/if}
   </div>

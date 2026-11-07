@@ -19,7 +19,7 @@
   const ROW_H = 46;
   const PAD_Y = 6;
   let box: HTMLElement;
-  let vp = $state<Viewport>({ top: 0, ...FALLBACK });
+  let vp = $state.raw<Viewport>({ top: 0, ...FALLBACK });
   let focusPath = $state<string | null>(null);
 
   const index = $derived(new Map(items.map((e, i) => [e.path, i])));
@@ -148,7 +148,7 @@
           onkeydown={(ev) => onkey(ev, e, i)}
           onmouseenter={() => (s.hover = e.path)} onmouseleave={() => { if (s.hover === e.path) s.hover = null; }}
           style:top="{PAD_Y + i * ROW_H}px" style:height="{ROW_H}px"
-          class="group {COLS} absolute inset-x-0 cursor-default rounded-xl px-3 select-none transition-colors duration-150
+          class="group {COLS} absolute inset-x-0 cursor-default rounded-xl px-3 select-none transition-colors duration-150 [contain:layout_style]
             {sel ? 'bg-accent-soft shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--color-accent)_35%,transparent)]'
               : 'hover:bg-neutral-soft'}">
           <div class="flex min-w-0 items-center gap-3">

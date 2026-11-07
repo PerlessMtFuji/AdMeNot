@@ -1,6 +1,7 @@
 import { SvelteSet } from 'svelte/reactivity';
 import type { ApiErrorBody, CrumbView, EntryView, ExplorerProblem, PhoneCard, PlaceView, StorageView, TaskView } from '../types';
-import { type ExplorerFilter, type ExplorerView, ROOT, type SortSpec } from './logic';
+import { i18n } from '../i18n/index.svelte';
+import { type ExplorerFilter, type ExplorerView, filterEntries, ROOT, sortEntries, type SortSpec } from './logic';
 
 /** Komunikat na „Połącz” po nieudanym otwarciu albo zamknięciu eksploratora przez most. */
 export type ExplorerNotice = 'busy' | 'other_phone' | 'switched';
@@ -19,7 +20,8 @@ export class ExplorerState {
   recent = $state<string[]>([]);
   path = $state(ROOT);
   crumbs = $state<CrumbView[]>([]);
-  entries = $state<EntryView[]>([]);
+  /** Raw: lista jest podmieniana w całości, a głębokie proxy na tysiącach wpisów kosztowało setki ms na klawisz. */
+  entries = $state.raw<EntryView[]>([]);
   /** Cały bieżący folder bez dostępu (kłódka zamiast listy). */
   locked = $state(false);
   skipped = $state(0);
@@ -29,6 +31,12 @@ export class ExplorerState {
   sort = $state<SortSpec>({ key: 'date', dir: -1 });
   filter = $state<ExplorerFilter>('all');
   query = $state('');
+  /** Wpisy po sortowaniu: liczone tylko przy zmianie folderu, sortowania albo języka, nie przy każdym klawiszu. */
+  sorted = $derived(sortEntries(this.entries, this.sort, i18n.lang));
+  /** Wpisy w kolejności na ekranie (sortowanie, filtr typu, szukanie). */
+  items = $derived(filterEntries(this.sorted, this.filter, this.query));
+  /** Wpis po ścieżce. */
+  byPath = $derived(new Map(this.entries.map((e) => [e.path, e])));
   selected = new SvelteSet<string>();
   /** Pierwszy klik mógł być początkiem dwukliku: pasek zaznaczenia jeszcze czeka. */
   barHeld = $state(false);

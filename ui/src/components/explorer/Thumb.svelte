@@ -35,7 +35,7 @@
   style:background={noThumb ? undefined : tint}
   style:box-shadow={selected ? `0 0 0 2.5px var(--color-accent), 0 0 24px -2px ${glow}` : undefined}>
   {#if thumb && !noThumb}
-    <img src={thumb.src} alt="" draggable="false" onerror={onbroken} class="absolute inset-0 h-full w-full object-cover {animate ? 'sharpen' : ''}"
+    <img src={thumb.src} alt="" draggable="false" decoding="async" onerror={onbroken} class="absolute inset-0 h-full w-full object-cover {animate ? 'sharpen' : ''}"
       style:animation-delay={animate ? `${delay}ms` : undefined} />
   {:else if noThumb}
     <div class="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-2 pt-1">
@@ -45,7 +45,8 @@
   {/if}
   {#if (entry.type === 'video' || entry.type === 'audio') && !noThumb}
     <span class="absolute inset-0 grid place-items-center text-white">
-      <span class="grid h-9 w-9 place-items-center rounded-full bg-black/35 shadow-[inset_0_0_0_1px_rgb(255_255_255/.35)] backdrop-blur-sm">
+      <!-- Bez `backdrop-filter`: rozmycie pod każdą plakietką to osobna warstwa i 40% kosztu klatki przy przewijaniu filmów. -->
+      <span class="grid h-9 w-9 place-items-center rounded-full bg-black/45 shadow-[inset_0_0_0_1px_rgb(255_255_255/.35)]">
         <Icon name={entry.type === 'audio' ? 'music' : 'play'} size={16} strokeWidth={2.6}
           class={entry.type === 'audio' ? '' : 'translate-x-px fill-current'} />
       </span>
@@ -62,5 +63,6 @@
   transition-[transform,opacity] duration-200 ease-[cubic-bezier(.2,1.6,.4,1)]
   {selected ? 'scale-100 bg-accent text-white opacity-100 shadow-[0_0_0_2px_var(--color-surface)]'
     : 'scale-90 bg-black/20 text-transparent opacity-0 shadow-[inset_0_0_0_1.5px_rgb(255_255_255/.9)] group-hover:opacity-100'}">
-  <Icon name="check" size={12} strokeWidth={3.2} />
+  <!-- Niezaznaczony kafel ma ptaszek przezroczysty: ikona powstaje dopiero po zaznaczeniu. -->
+  {#if selected}<Icon name="check" size={12} strokeWidth={3.2} />{/if}
 </span>

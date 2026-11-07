@@ -29,9 +29,19 @@
   const s = ex.state;
   const known: readonly string[] = ERROR_KEYS;
   const items = $derived(ex.items);
-  const files = $derived(s.entries.filter((e) => e.kind === 'file'));
-  const folders = $derived(s.entries.length - files.length);
-  const bytes = $derived(files.reduce((sum, e) => sum + e.size, 0));
+  const totals = $derived.by(() => {
+    let files = 0;
+    let bytes = 0;
+    for (const e of s.entries) {
+      if (e.kind !== 'file') continue;
+      files += 1;
+      bytes += e.size;
+    }
+    return { files, bytes };
+  });
+  const files = $derived(totals.files);
+  const folders = $derived(s.entries.length - files);
+  const bytes = $derived(totals.bytes);
   const folderName = $derived(s.crumbs.at(-1)?.label ?? '');
   const errorText = $derived(s.error ? t(`error.${known.includes(s.error.key) ? s.error.key : 'internal'}`) : '');
   const TOGGLE = 'grid h-8 w-9 place-items-center rounded-[9px] transition duration-150';
@@ -120,7 +130,7 @@
     const path = s.hover ?? focused;
     if (!path || (!s.hover && el?.closest('button, a'))) return;
     e.preventDefault();
-    const entry = s.entries.find((x) => x.path === path);
+    const entry = s.byPath.get(path);
     if (entry?.kind === 'file') list?.openPath(path);
     else if (entry) ex.select(path, { ctrl: true });
   }
@@ -161,9 +171,9 @@
   <header class="flex min-w-0 items-center gap-3">
     <Crumbs crumbs={s.crumbs} ongo={(p) => ex.go(p)} />
     {#key s.path}
-      {#if files.length || folders}
+      {#if files || folders}
         <span in:enter={{ y: 4 }} class="flex-none rounded-full bg-accent-soft px-2.5 py-0.5 text-2xs font-bold text-accent tabular-nums">
-          {files.length ? tp('explorer.summary', files.length, { size: formatBytes(bytes, i18n.lang) }) : tp('explorer.folders', folders)}
+          {files ? tp('explorer.summary', files, { size: formatBytes(bytes, i18n.lang) }) : tp('explorer.folders', folders)}
         </span>
       {/if}
     {/key}

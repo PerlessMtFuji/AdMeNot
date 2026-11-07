@@ -3,10 +3,11 @@
   import { closeMorph } from '../../lib/explorer/morph';
   import type { ExplorerController } from '../../lib/explorer/controller';
   import { clock, formatBytes } from '../../lib/explorer/logic';
+  import { PhotoPrefetch } from '../../lib/explorer/prefetch';
   import type { ThumbQueue } from '../../lib/explorer/thumbs';
   import { ERROR_KEYS, i18n, t } from '../../lib/i18n/index.svelte';
   import { DUR, ms } from '../../lib/motion';
-  import type { EntryMeta } from '../../lib/types';
+  import type { EntryMeta, EntryView } from '../../lib/types';
   import Banner from '../../ui/Banner.svelte';
   import Button from '../../ui/Button.svelte';
   import Icon from '../../ui/Icon.svelte';
@@ -23,6 +24,10 @@
   const NEIGHBOURS = 5;
   /** Co przeglądarka pokaże w <img> (HEIC i RAW — nie). */
   const NATIVE_IMAGE = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif', 'svg'];
+  /** Sąsiednie zdjęcia pobieramy po tej chwili, żeby szybkie strzałki ich nie zamawiały na próżno. */
+  const PREFETCH_WAIT_MS = 200;
+  /** Większych nie trzymamy w pamięci na zapas. */
+  const PREFETCH_MAX = 40 * 1024 * 1024;
 
   let info = $state(false);
   let meta = $state<EntryMeta | null>(null);
@@ -68,6 +73,21 @@
   const files = $derived(ex.items.filter((e) => e.kind === 'file'));
   const at = $derived(files.findIndex((e) => e.path === entry?.path));
   const strip = $derived(entry?.type === 'image' ? files.slice(Math.max(0, at - NEIGHBOURS), at + NEIGHBOURS + 1) : []);
+  /** Miniatura z pamięci galerii, a gdy jej tam nie ma — z serwera. */
+  const thumbSrc = (url: string | null) => (url ? thumbs.get(url)?.src ?? url : null);
+
+  const photos = new PhotoPrefetch();
+  $effect(() => () => photos.clear());
+  const isPhoto = (e: EntryView | undefined): e is EntryView & { url: string } =>
+    !!e?.url && e.type === 'image' && e.size <= PREFETCH_MAX && NATIVE_IMAGE.includes(e.ext.toLowerCase());
+  const photoUrl = $derived(entry?.url ? photos.get(entry.url) ?? entry.url : null);
+  $effect(() => {
+    if (at < 0) return;
+    const current = isPhoto(files[at]) ? [files[at].url!] : [];
+    const near = [files[at + 1], files[at - 1]].filter(isPhoto).map((e) => e.url);
+    const timer = setTimeout(() => photos.keep(current, near), PREFETCH_WAIT_MS);
+    return () => clearTimeout(timer);
+  });
 
   const facts = $derived.by(() => {
     if (!entry) return [];
@@ -164,7 +184,7 @@
         {#key entry.path}
           <div class="absolute inset-0" in:fade={{ duration: ms(DUR.enter) }}>
             {#if view === 'photo'}
-              <PhotoView {entry} onfail={() => (broken = entry.path)} />
+              <PhotoView {entry} thumb={thumbSrc(entry.thumb)} full={photoUrl} onfail={() => (broken = entry.path)} />
             {:else if view === 'media'}
               <MediaView bind:this={media} {ex} {entry} meta={displayMeta} {thumbs} onmetadata={(m) => (decoded = m)} onfail={() => (broken = entry.path)} />
             {:else if view === 'text'}
@@ -196,7 +216,7 @@
             aria-current={n.path === entry.path ? 'true' : undefined}
             class="h-12 w-12 flex-none overflow-hidden rounded-[10px] transition duration-150 ease-out
               {n.path === entry.path ? 'scale-100 opacity-100 ring-2 ring-accent' : 'scale-90 opacity-60 hover:opacity-100'}">
-            {#if n.thumb}<img src={n.thumb} alt="" draggable="false" class="h-full w-full object-cover" />
+            {#if n.thumb}<img src={thumbSrc(n.thumb)} alt="" draggable="false" decoding="async" class="h-full w-full object-cover" />
             {:else}<span class="grid h-full w-full place-items-center bg-white/10"><Icon name="image" size={18} /></span>{/if}
           </button>
         {/each}

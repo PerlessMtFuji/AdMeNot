@@ -2,7 +2,7 @@ import { type Bridge, isApiError } from '../bridge';
 import { AudioPlayer } from './audio';
 import type { AppState } from '../state.svelte';
 import type { ApiError, ApiErrorBody, EntryView, ExplorerListView, ExplorerOpenView, ExplorerStart, PlaceView, TaskView } from '../types';
-import { days, defaultView, type ExplorerFilter, type ExplorerView, parentPath, placeAt, ROOT, SORT_START, type SortKey, visible } from './logic';
+import { days, defaultView, type ExplorerFilter, type ExplorerView, parentPath, placeAt, ROOT, SORT_START, type SortKey } from './logic';
 import { ExplorerState, type PlayingTrack } from './state.svelte';
 
 /** Jak `EXPLORER_RECENT_MAX` w ustawieniach mostu. */
@@ -14,6 +14,15 @@ const FRESH_MS = 700;
 const DOUBLE_CLICK_MS = 500;
 const FOLDER_MEMORY = 40;
 const ACTIVE: ReadonlySet<TaskView['status']> = new Set(['queued', 'running', 'paused', 'waiting']);
+
+/** Ta sama zawartość folderu (adresy mediów wynikają ze ścieżki i są stałe w sesji). */
+function sameEntries(a: readonly EntryView[], b: readonly EntryView[]): boolean {
+  return a === b || (a.length === b.length && a.every((e, i) => {
+    const o = b[i];
+    return e.path === o.path && e.size === o.size && e.mtime === o.mtime && e.kind === o.kind && e.label === o.label
+      && e.locked === o.locked;
+  }));
+}
 
 export interface SelectMods {
   ctrl?: boolean;
@@ -47,8 +56,7 @@ export class ExplorerController {
 
   /** Wpisy bieżącego folderu w kolejności na ekranie (sortowanie, filtr typu, szukanie). */
   get items(): EntryView[] {
-    const s = this.state;
-    return visible(s.entries, s.filter, s.query, s.sort);
+    return this.state.items;
   }
 
   subscribe(): void {
@@ -221,14 +229,16 @@ export class ExplorerController {
   /** Lista na ekran; `same` — ten sam folder odświeżony (zaznaczenie i podgląd zostają). */
   private showList(r: ExplorerListView, same: boolean): void {
     const s = this.state;
-    if (same) {
+    // Odświeżenie bez zmian to częsty przypadek (powrót do folderu): ten sam widok, nic się nie przelicza.
+    const unchanged = same && sameEntries(s.entries, r.entries);
+    if (same && !unchanged) {
       const old = new Set(s.entries.map((e) => e.path));
       this.markFresh(r.entries.filter((e) => !old.has(e.path)).map((e) => e.path));
-    } else {
+    } else if (!same) {
       this.markFresh([]);
     }
-    Object.assign(s, { error: null, path: r.path, crumbs: r.crumbs, entries: r.entries, locked: r.locked,
-      skipped: r.skipped });
+    Object.assign(s, { error: null, path: r.path, crumbs: r.crumbs, entries: unchanged ? s.entries : r.entries,
+      locked: r.locked, skipped: r.skipped });
     if (same) {
       const present = new Set(r.entries.map((e) => e.path));
       if (s.preview !== null && !present.has(s.preview)) s.preview = null;  // plik zniknął przy odświeżeniu
@@ -345,8 +355,11 @@ export class ExplorerController {
   /** Zaznaczanie prostokątem; `additive` (Ctrl) — dopisuje do dotychczasowego. */
   selectRect(paths: string[], additive: boolean): void {
     const sel = this.state.selected;
-    if (!additive) sel.clear();
-    for (const p of paths) sel.add(p);
+    if (!additive) {
+      const keep = new Set(paths);
+      for (const p of [...sel]) if (!keep.has(p)) sel.delete(p);
+    }
+    for (const p of paths) if (!sel.has(p)) sel.add(p);
   }
 
   selectAll(): void {
@@ -374,11 +387,11 @@ export class ExplorerController {
   /** Plik w oknie podglądu (wpis bieżącego folderu) albo undefined. */
   get previewEntry(): EntryView | undefined {
     const path = this.state.preview;
-    return path === null ? undefined : this.state.entries.find((e) => e.path === path);
+    return path === null ? undefined : this.state.byPath.get(path);
   }
 
   openPreview(path: string): void {
-    if (!this.state.entries.some((e) => e.path === path && e.kind === 'file')) return;
+    if (this.state.byPath.get(path)?.kind !== 'file') return;
     this.state.preview = path;
     this.state.error = null;  // baner w podglądzie mówi tylko o jego własnych działaniach
   }
@@ -700,6 +713,7 @@ export class ExplorerController {
 
   /** Zaznaczone, a niewidoczne po zmianie filtra lub szukania, nie mogą trafić do kopii. */
   private keepVisibleSelection(): void {
+    if (!this.state.selected.size) return;
     const shown = new Set(this.items.map((e) => e.path));
     for (const p of [...this.state.selected]) if (!shown.has(p)) this.state.selected.delete(p);
   }

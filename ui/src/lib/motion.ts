@@ -8,9 +8,17 @@ export const DUR = { micro: 140, enter: 300, screen: 300, success: 500, count: 4
 const STAGGER = 40;
 const STAGGER_MAX = 10;
 
+// Jedno zapytanie na okno (`matches` jest żywe): `matchMedia` w każdym kaflu galerii kosztował przy przewijaniu.
+let query: MediaQueryList | undefined;
+let queryFrom: typeof window.matchMedia | undefined;
+
 export function reducedMotion(): boolean {
-  return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+  if (queryFrom !== window.matchMedia) {
+    queryFrom = window.matchMedia;
+    query = window.matchMedia('(prefers-reduced-motion: reduce)');
+  }
+  return !!query?.matches;
 }
 
 export function ms(value: number): number {

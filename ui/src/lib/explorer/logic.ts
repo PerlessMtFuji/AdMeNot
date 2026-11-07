@@ -62,15 +62,20 @@ export function parentPath(path: string): string | null {
   return path.slice(0, path.lastIndexOf('/'));
 }
 
-const collator = () => new Intl.Collator(i18n.lang, { numeric: true, sensitivity: 'base' });
+// Formatery Intl tworzy się długo (dziesiątki µs), a lista i nagłówki dni wołają je przy każdym wierszu.
+const formatters = new Map<string, Intl.DateTimeFormat | Intl.NumberFormat | Intl.Collator>();
+function cached<T extends Intl.DateTimeFormat | Intl.NumberFormat | Intl.Collator>(key: string, make: () => T): T {
+  let value = formatters.get(key);
+  if (!value) formatters.set(key, value = make());
+  return value as T;
+}
+const dateFormat = (locale: string, options: Intl.DateTimeFormatOptions) =>
+  cached(`d:${locale}:${JSON.stringify(options)}`, () => new Intl.DateTimeFormat(locale, options));
 
-/** Wpisy do pokazania: foldery zawsze na górze (filtr typu dotyczy plików — foldery zostają do
- *  nawigacji), szukanie po nazwie i ludzkiej nazwie folderu. Rozmiar folderu nic nie mówi: foldery
- *  przy sortowaniu po rozmiarze idą po nazwie. */
-export function visible(entries: EntryView[], filter: ExplorerFilter, query: string, sort: SortSpec): EntryView[] {
-  const q = query.trim().toLocaleLowerCase();
-  const kinds = filter === 'all' ? null : FILTER_KINDS[filter];
-  const cmp = collator();
+/** Sortowanie: foldery zawsze na górze. Rozmiar folderu nic nie mówi: foldery przy sortowaniu po
+ *  rozmiarze idą po nazwie. `lang` — język porównywania nazw. */
+export function sortEntries(entries: readonly EntryView[], sort: SortSpec, lang: string = i18n.lang): EntryView[] {
+  const cmp = cached(`c:${lang}`, () => new Intl.Collator(lang, { numeric: true, sensitivity: 'base' }));
   const byName = (a: EntryView, b: EntryView) => cmp.compare(a.label ?? a.name, b.label ?? b.name);
   // Kolumna sortowania w wybranym kierunku; równe wartości (i foldery przy rozmiarze) zawsze A→Z.
   const key = (a: EntryView, b: EntryView): number => {
@@ -78,10 +83,32 @@ export function visible(entries: EntryView[], filter: ExplorerFilter, query: str
     const primary = sort.key === 'date' ? a.mtime - b.mtime : a.kind === 'file' ? a.size - b.size : 0;
     return primary * sort.dir || byName(a, b);
   };
-  return entries
-    .filter((e) => (!kinds || e.kind === 'dir' || kinds.includes(e.type))
-      && (!q || e.name.toLocaleLowerCase().includes(q) || !!e.label?.toLocaleLowerCase().includes(q)))
-    .sort((a, b) => (a.kind === b.kind ? key(a, b) : a.kind === 'dir' ? -1 : 1));
+  return [...entries].sort((a, b) => (a.kind === b.kind ? key(a, b) : a.kind === 'dir' ? -1 : 1));
+}
+
+/** Nazwy małymi literami: wpis się nie zmienia, a szukanie przechodzi po wszystkich przy każdym klawiszu. */
+const lowered = new WeakMap<EntryView, string>();
+function searchable(e: EntryView): string {
+  let text = lowered.get(e);
+  if (text === undefined) {
+    text = `${e.name.toLocaleLowerCase()}\n${e.label?.toLocaleLowerCase() ?? ''}`;
+    lowered.set(e, text);
+  }
+  return text;
+}
+
+/** Filtr typu dotyczy plików (foldery zostają do nawigacji); szukanie po nazwie i ludzkiej nazwie folderu.
+ *  Bez filtra i szukania — ta sama tablica. */
+export function filterEntries(entries: EntryView[], filter: ExplorerFilter, query: string): EntryView[] {
+  const q = query.trim().toLocaleLowerCase();
+  const kinds = filter === 'all' ? null : FILTER_KINDS[filter];
+  if (!kinds && !q) return entries;
+  return entries.filter((e) => (!kinds || e.kind === 'dir' || kinds.includes(e.type)) && (!q || searchable(e).includes(q)));
+}
+
+/** Wpisy do pokazania: `sortEntries` i `filterEntries` razem. */
+export function visible(entries: EntryView[], filter: ExplorerFilter, query: string, sort: SortSpec): EntryView[] {
+  return filterEntries(sortEntries(entries, sort), filter, query);
 }
 
 function localDay(d: Date): string {
@@ -93,8 +120,8 @@ function localDay(d: Date): string {
 export function dayLabel(date: Date, now: Date): string {
   const locale = i18n.lang === 'pl' ? 'pl-PL' : 'en-GB';
   const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  const long = date.toLocaleDateString(locale, { day: 'numeric', month: 'long',
-    ...(date.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) });
+  const long = dateFormat(locale, { day: 'numeric', month: 'long',
+    ...(date.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) }).format(date);
   if (localDay(date) === localDay(now)) return t('explorer.day.today', { date: long });
   if (localDay(date) === localDay(yesterday)) return t('explorer.day.yesterday');
   return long;
@@ -120,12 +147,12 @@ export function days(entries: EntryView[], now: Date): DayGroup[] {
 export function shortDate(mtime: number, now: Date): string {
   const locale = i18n.lang === 'pl' ? 'pl-PL' : 'en-GB';
   const date = new Date(mtime * 1000);
-  const time = date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+  const time = () => dateFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(date);
   const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-  if (localDay(date) === localDay(now)) return t('explorer.date.today', { time });
-  if (localDay(date) === localDay(yesterday)) return t('explorer.date.yesterday', { time });
-  return date.toLocaleDateString(locale, { day: 'numeric', month: 'short',
-    ...(date.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) });
+  if (localDay(date) === localDay(now)) return t('explorer.date.today', { time: time() });
+  if (localDay(date) === localDay(yesterday)) return t('explorer.date.yesterday', { time: time() });
+  return dateFormat(locale, { day: 'numeric', month: 'short',
+    ...(date.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) }).format(date);
 }
 
 const UNITS = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -139,8 +166,8 @@ export function formatBytes(bytes: number, lang: string): string {
     unit += 1;
   }
   const digits = unit > 0 && value < 10 ? 1 : 0;
-  const number = new Intl.NumberFormat(lang === 'pl' ? 'pl-PL' : 'en-US',
-    { maximumFractionDigits: digits }).format(value);
+  const locale = lang === 'pl' ? 'pl-PL' : 'en-US';
+  const number = cached(`n:${locale}:${digits}`, () => new Intl.NumberFormat(locale, { maximumFractionDigits: digits })).format(value);
   return `${number} ${UNITS[unit]}`;
 }
 
