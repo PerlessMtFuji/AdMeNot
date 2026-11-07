@@ -20,9 +20,14 @@
   let pending = $state<{ levels: Record<string, Level>; level: Level | null } | null>(null);
   let action = $state('');
 
-  $effect(() => {
+  // Stan pola zapisujemy wprost do DOM: atrybut `checked={…}` Svelte pomija, gdy zapamiętana wartość
+  // się nie zmieniła, a kliknięcie zmienia pole poza Svelte — nagłówek rozjeżdżał się z wierszami.
+  function sync() {
+    box.checked = check === 'all';
     box.indeterminate = check === 'some';
-  });
+  }
+
+  $effect(sync);
 
   const names = $derived(pending ? apps.filter((a) => pending!.levels[a.package]) : []);
   const systemCount = $derived(names.filter((a) => a.is_system).length);
@@ -33,15 +38,17 @@
     else ctl.setLevels(levels);
   }
 
-  function toggleAll(e: Event) {
-    e.preventDefault(); // stan pola wynika z wyboru, nie z kliknięcia
+  function toggleAll() {
+    // Bez `preventDefault`: Chromium przywracałby stan pola już po zapisie Svelte. Kliknięcie przełącza
+    // pole, a `sync` od razu ustawia stan wynikający z wyboru (przy dialogu: stan sprzed kliknięcia).
     if (check === 'all') {
       ctl.setLevels(Object.fromEntries(apps.map((a) => [a.package, null])));
-      return;
+    } else {
+      // potwierdzamy tylko nowe zmiany: aplikacje już zaznaczone zachowują swój wybór
+      const levels = ctl.groupSelectLevels(apps);
+      ask(Object.fromEntries(Object.entries(levels).filter(([p, l]) => s.selection[p] !== l)), null);
     }
-    // potwierdzamy tylko nowe zmiany: aplikacje już zaznaczone zachowują swój wybór
-    const levels = ctl.groupSelectLevels(apps);
-    ask(Object.fromEntries(Object.entries(levels).filter(([p, l]) => s.selection[p] !== l)), null);
+    sync();
   }
 
   function pick(e: Event) {
@@ -59,8 +66,8 @@
 
 <div class="flex items-center gap-3 font-semibold tracking-normal normal-case">
   <label class="flex cursor-pointer items-center gap-2 hover:text-ink">
-    <input type="checkbox" bind:this={box} class="h-4 w-4 accent-[var(--color-accent)]" checked={check === 'all'}
-      disabled={!actionable || s.orderRunning} aria-label={t('bulk.select_all_in', { group })} onclick={toggleAll} />
+    <input type="checkbox" bind:this={box} class="h-4 w-4 accent-[var(--color-accent)]"
+      disabled={!actionable || s.orderRunning} aria-label={t('bulk.select_all_in', { group })} onchange={toggleAll} />
     {t('bulk.select_all')}
   </label>
   <select aria-label={t('bulk.action_in', { group })} value={action} disabled={check === 'none' || s.orderRunning} onchange={pick}

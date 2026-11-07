@@ -513,6 +513,28 @@ describe('Results: APK analysis in progress and bulk group actions', () => {
     expect(s.selection).toEqual({});
   });
 
+  test('select all header follows the rows even after the browser left the box out of step', async () => {
+    const { s, ctl } = await scanned();
+    // „Do sprawdzenia” z kilkoma aplikacjami, żeby przejść przez stan „część zaznaczona”.
+    s.scan = { ...s.scan!, apps: s.scan!.apps.map((a) => (a.verdict === 'safe' ? { ...a, verdict: 'review' as const } : a)) };
+    ctl.setGroupOpen('review', true);
+    s.selection = {};
+    await tick();
+    const region = screen.getByRole('region', { name: 'Do sprawdzenia' });
+    const all = within(region).getByRole('checkbox', { name: t('bulk.select_all_in', { group: 'Do sprawdzenia' }) }) as HTMLInputElement;
+    const one = s.scan.apps.find((a) => a.verdict === 'review')!.package;
+    expect(all.checked).toBe(false);
+    all.checked = true; // Chromium przywraca stan pola po kliknięciu, już po zapisie Svelte
+    s.selection = { [one]: 'silence' };
+    await tick();
+    expect(all.checked).toBe(false);
+    expect(all.indeterminate).toBe(true);
+    s.selection = {};
+    await tick();
+    expect(all.checked).toBe(false);
+    expect(all.indeterminate).toBe(false);
+  });
+
   test('bulk action: silence applies at once, remove asks and warns about data', async () => {
     const { s, ctl } = await scanned();
     ctl.setGroupOpen('review', true);
