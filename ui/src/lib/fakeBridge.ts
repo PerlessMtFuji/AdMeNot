@@ -326,6 +326,8 @@ export function createFakeBridge(name: string,
       case 'save_service':
         service = { ...service, ...(args[0] as Partial<ServiceInfo>) };
         return { ...service };
+      case 'pick_adb':
+        return { path: 'C:\\pt\\adb.exe' };
       case 'pick_logo':
         return { path: 'D:\\AdMeNot\\logo.png' };
       case 'report': {

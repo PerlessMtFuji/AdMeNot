@@ -929,6 +929,7 @@ export interface Api {
   service(): R<ServiceInfo>;
   save_service(changes: Partial<ServiceInfo>): R<ServiceInfo>;
   pick_logo(): R<{ path: string | null }>;
+  pick_adb(): R<{ path: string | null }>;
   update_state(): R<UpdateView>;
   dismiss_update(version: string): R<UpdateView>;
   install_update(): R<{ job_id: string } | { opened: boolean }>;

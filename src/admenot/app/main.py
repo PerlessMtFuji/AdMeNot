@@ -105,6 +105,11 @@ def run_gui() -> int:
                 file_types=("Logo (*.png;*.jpg;*.jpeg;*.webp;*.svg)",))
             return chosen[0] if chosen else None
 
+        def pick_adb() -> str | None:
+            chosen = window.create_file_dialog(
+                webview.FileDialog.OPEN, file_types=("adb (adb.exe)",))
+            return chosen[0] if chosen else None
+
         def pick_files() -> list[str]:
             """Eksplorator plików: „Wgraj tutaj” — wiele plików naraz."""
             chosen = window.create_file_dialog(webview.FileDialog.OPEN, allow_multiple=True)
@@ -127,7 +132,8 @@ def run_gui() -> int:
             document.events.dragover += DOMEventHandler(lambda _event: None, True, False, debounce=500)
             document.events.drop += DOMEventHandler(on_drop, True, False)
 
-        api._attach(pick_folder=pick_folder, close=window.destroy, pick_file=pick_file, pick_files=pick_files)
+        api._attach(pick_folder=pick_folder, close=window.destroy, pick_file=pick_file, pick_files=pick_files,
+                     pick_adb=pick_adb)
         window.events.loaded += bind_drop
         api._start_updates()
         api._start_telemetry()

@@ -438,6 +438,7 @@ class Api(ExplorerMixin):
         self._incident_active = False
         self._incident_lock = threading.Lock()
         self._pick_file_fn: Callable[[], str | None] | None = None
+        self._pick_adb_fn: Callable[[], str | None] | None = None
         self._open_order: dict[str, int] = {}  # telefon → zlecenie, do którego idą nowe zrzuty
         self._identities: dict[str, tuple[str | None, str | None, str | None, str | None]] = {}  # → (nazwa, IMEI, obrazek, Android)
         self._pending: dict[str, list[int]] = {}  # telefon → zrzuty czekające na zlecenie
@@ -2351,6 +2352,10 @@ class Api(ExplorerMixin):
     def pick_logo(self) -> dict[str, Any]:
         return {"path": self._pick_file_fn() if self._pick_file_fn else None}
 
+    @_api
+    def pick_adb(self) -> dict[str, Any]:
+        return {"path": self._pick_adb_fn() if self._pick_adb_fn else None}
+
     # --- konsola, adb, okno --------------------------------------------------------------------
 
     @_api
@@ -2387,10 +2392,12 @@ class Api(ExplorerMixin):
 
     def _attach(self, pick_folder: Callable[[], str | None], close: Callable[[], None],
                 pick_file: Callable[[], str | None] | None = None,
-                pick_files: Callable[[], list[str]] | None = None) -> None:
+                pick_files: Callable[[], list[str]] | None = None,
+                pick_adb: Callable[[], str | None] | None = None) -> None:
         self._pick_folder_fn = pick_folder
         self._close_fn = close
         self._pick_file_fn = pick_file
+        self._pick_adb_fn = pick_adb
         self._pick_files_fn = pick_files  # eksplorator: „Wgraj tutaj” (wiele plików)
 
     def _transfer_job(self) -> Job | None:

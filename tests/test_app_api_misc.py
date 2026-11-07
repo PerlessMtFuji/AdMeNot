@@ -186,3 +186,10 @@ def test_quit_during_a_long_step_closes_after_it_instead_of_cutting_it(monkeypat
             break
         threading.Event().wait(0.02)
     assert closed == [True]
+
+
+def test_pick_adb_returns_path():
+    api, _ = make_api(make_cli_phone())
+    assert api.pick_adb() == {"path": None}
+    api._attach(pick_folder=lambda: None, close=lambda: None, pick_adb=lambda: "C:\pt\adb.exe")
+    assert api.pick_adb() == {"path": "C:\pt\adb.exe"}

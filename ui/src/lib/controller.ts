@@ -1416,6 +1416,10 @@ export class Controller {
     return r;
   }
 
+  pickAdb() {
+    return this.call(this.api.pick_adb());
+  }
+
   pickLogo() {
     return this.call(this.api.pick_logo());
   }
