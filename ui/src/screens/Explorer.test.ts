@@ -527,6 +527,68 @@ describe('Explorer', () => {
     expect(ctl.explorer.state.tasks).toHaveLength(2);
   });
 
+  describe('defaults from settings', () => {
+    const select = async () => {
+      await fireEvent.click(rows()[0]);
+      return screen.findByRole('region', { name: 'Zaznaczenie' });
+    };
+    const copies = (bridge: { calls: { method: string; args: unknown[] }[] }) =>
+      bridge.calls.filter((c) => c.method === 'explorer_copy');
+
+    test('ask mode picks the folder on every copy, even with a remembered one', async () => {
+      const { bridge, ctl } = await openExplorer();
+      ctl.state.settings = { ...ctl.state.settings, explorer_dest_mode: 'ask', explorer_dest: 'D:\\Stary' };
+      ctl.explorer.state.dest = 'D:\\Stary';
+      const bar = await select();
+      await fireEvent.click(within(bar).getByRole('button', { name: 'Kopiuj' }));
+      await vi.waitFor(() => expect(copies(bridge)).toHaveLength(1));
+      expect(bridge.calls.filter((c) => c.method === 'explorer_pick_dest')).toHaveLength(1);
+      expect(copies(bridge)[0].args[1]).toBe('D:\\Serwis\\Kowalska');
+    });
+
+    test('fixed mode with a missing folder opens the picker and shows the notice', async () => {
+      const { bridge, ctl } = await openExplorer();
+      ctl.state.settings = { ...ctl.state.settings, explorer_dest_mode: 'fixed', explorer_dest_fixed: 'E:\\Pendrive' };
+      ctl.explorer.state.dest = 'E:\\Pendrive';
+      bridge.failNext('explorer_copy', 'explorer_no_dest');
+      const bar = await select();
+      await fireEvent.click(within(bar).getByRole('button', { name: 'Kopiuj' }));
+      await vi.waitFor(() => expect(copies(bridge)).toHaveLength(2));
+      expect(copies(bridge)[0].args[1]).toBeNull();
+      expect(bridge.calls.some((c) => c.method === 'explorer_pick_dest')).toBe(true);
+      expect(copies(bridge)[1].args[1]).toBe('D:\\Serwis\\Kowalska');
+      expect(screen.getByText(/Stały folder jest niedostępny/)).toBeTruthy();
+      expect(ctl.explorer.state.error).toBeNull();
+      expect(ctl.state.settings.explorer_dest_fixed).toBe('E:\\Pendrive');
+    });
+
+    test('verify on: plain copy verifies and the menu offers copying without verification', async () => {
+      const { bridge, ctl } = await openExplorer();
+      ctl.state.settings = { ...ctl.state.settings, verify_copies: true };
+      ctl.explorer.state.dest = 'D:\\X';
+      const bar = await select();
+      await fireEvent.click(within(bar).getByRole('button', { name: 'Kopiuj' }));
+      await vi.waitFor(() => expect(copies(bridge)).toHaveLength(1));
+      expect(copies(bridge)[0].args[2]).toBe(true);
+      await fireEvent.click(rows()[1]);
+      const bar2 = await screen.findByRole('region', { name: 'Zaznaczenie' });
+      await fireEvent.click(within(bar2).getByRole('button', { name: 'Więcej' }));
+      expect(screen.queryByRole('menuitem', { name: /Sprawdź co do bajtu/ })).toBeNull();
+      await fireEvent.click(screen.getByRole('menuitem', { name: /Kopiuj bez sprawdzania/ }));
+      await vi.waitFor(() => expect(copies(bridge)).toHaveLength(2));
+      expect(copies(bridge)[1].args[2]).toBe(false);
+    });
+
+    test('verify off: the menu keeps the byte-by-byte item', async () => {
+      const { ctl } = await openExplorer();
+      ctl.explorer.state.dest = 'D:\\X';
+      const bar = await select();
+      await fireEvent.click(within(bar).getByRole('button', { name: 'Więcej' }));
+      expect(screen.getByRole('menuitem', { name: /Sprawdź co do bajtu/ })).toBeTruthy();
+      expect(screen.queryByRole('menuitem', { name: /Kopiuj bez sprawdzania/ })).toBeNull();
+    });
+  });
+
   test('Ctrl+V uploads the Windows clipboard to the current folder; not inside the search box', async () => {
     const { bridge } = await openExplorer();
     await fireEvent.keyDown(screen.getByRole('searchbox'), { key: 'v', ctrlKey: true });

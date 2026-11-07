@@ -225,6 +225,8 @@
       "more": "More",
       "verify": "Verify byte for byte",
       "verify_sub": "copy and compare every file's checksum — slower",
+      "copy_no_verify": "Copy without verifying",
+      "copy_no_verify_sub": "faster — skips comparing the files' checksums",
       "clear": "Unselect"
     },
     "task": {
@@ -296,6 +298,7 @@
       "preparing": "Preparing the upload to {folder}…",
       "free": "free space: {size}"
     },
+    "dest_missing": "The fixed folder is unavailable (e.g. a removed USB drive) — pick another one for this copy.",
     "clipboard_empty": "There are no files on the clipboard — copy them in Windows Explorer (Ctrl+C) and come back with Ctrl+V."
   },
   "usb": {

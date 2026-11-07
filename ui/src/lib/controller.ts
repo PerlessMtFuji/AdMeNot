@@ -714,7 +714,7 @@ export class Controller {
       if (s.phase !== 'transfer_choose') return; // serwisant już wyszedł z przenoszenia
       const prev = s.transfer.inventory; // jest tylko po „Sprawdź ponownie” (`startTransfer` czyści stan)
       s.transfer.selection = prev ? rescanSelection(s.transfer.selection, prev, d.inventory)
-        : resumeSelection(d.inventory, d.resumable?.selection);
+        : resumeSelection(d.inventory, d.resumable?.selection, s.settings.transfer_apps_default);
       s.transfer.inventory = d.inventory;
       s.transfer.resumable = d.resumable;
       s.phase = 'transfer_choose';
@@ -738,7 +738,7 @@ export class Controller {
       this.replanChoice = null;
       const tel = d.tel ?? null;
       Object.assign(s.transfer.restore, { plan: d.plan, copy: d.copy, tel,
-        choice: kept ? keptUploadChoice(d.plan, kept, tel) : defaultUploadChoice(d.plan, tel),
+        choice: kept ? keptUploadChoice(d.plan, kept, tel) : defaultUploadChoice(d.plan, tel, s.settings.verify_copies),
         resumable: d.resumable, sameRecent: d.same_phone_recent });
     });
     on('transfer:restore_progress', (d) => {

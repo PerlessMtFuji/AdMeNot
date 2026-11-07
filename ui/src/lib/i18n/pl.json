@@ -225,6 +225,8 @@
       "more": "Więcej",
       "verify": "Sprawdź co do bajtu",
       "verify_sub": "kopia z porównaniem sumy kontrolnej każdego pliku — wolniej",
+      "copy_no_verify": "Kopiuj bez sprawdzania",
+      "copy_no_verify_sub": "szybciej — bez porównania sum kontrolnych plików",
       "clear": "Odznacz"
     },
     "task": {
@@ -296,6 +298,7 @@
       "preparing": "Przygotowuję wgrywanie do {folder}…",
       "free": "wolne miejsce: {size}"
     },
+    "dest_missing": "Stały folder jest niedostępny (np. odłączony pendrive) — wybierz inny na tę kopię.",
     "clipboard_empty": "W schowku nie ma plików — skopiuj je w Eksploratorze Windows (Ctrl+C) i wróć tu z Ctrl+V."
   },
   "usb": {

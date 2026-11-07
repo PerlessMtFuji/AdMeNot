@@ -20,6 +20,7 @@
     return sum;
   });
   const destName = $derived(s.dest ? (s.dest.split(/[\\/]/).filter(Boolean).pop() ?? s.dest) : '');
+  const verifyOn = $derived(ex.verifyCopies);
   const spring = (t: number) => 1 - Math.cos(t * Math.PI * 4.5) * Math.exp(-t * 6);
 </script>
 
@@ -40,8 +41,9 @@
       <Icon name="download" size={15} />{t('explorer.selection.copy')}
     </Button>
     <Menu up label={t('explorer.selection.more')} title={t('explorer.selection.more')} menuLabel={t('explorer.selection.more')}
-      class="btn-secondary h-[34px] w-[34px] rounded-[10px] text-ink" items={[
-        { id: 'verify', label: t('explorer.selection.verify'), sub: t('explorer.selection.verify_sub'), onselect: () => void ex.copySelected(true) },
+      class="btn-secondary h-[34px] w-[34px] rounded-[10px] text-ink" items={[verifyOn
+        ? { id: 'no-verify', label: t('explorer.selection.copy_no_verify'), sub: t('explorer.selection.copy_no_verify_sub'), onselect: () => void ex.copySelected(false) }
+        : { id: 'verify', label: t('explorer.selection.verify'), sub: t('explorer.selection.verify_sub'), onselect: () => void ex.copySelected(true) },
       ]}>
       <span aria-hidden="true">⋯</span>
     </Menu>

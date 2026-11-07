@@ -590,14 +590,14 @@ export function keptExport(prev: ExportChoice, prevInv: InventoryView, inv: Inve
 
 /** Wszystko, co telefon dał odczytać, poza innymi folderami i aplikacjami odznaczonymi przez silnik (podejrzane).
  *  Kategoria, której telefon nie dał odczytać, a jest dla niej plik eksportu — z najnowszego pliku (SMS bez MMS). */
-export function defaultTransferSelection(inv: InventoryView): TransferSelection {
+export function defaultTransferSelection(inv: InventoryView, appsOn = true): TransferSelection {
   const exports = exportDefaults(inv);
   return {
     contacts: readable(inv.contacts) || !!exports.contacts, sms: readable(inv.sms) || !!exports.sms,
     mms: readable(inv.mms) && !exports.sms, calls: readable(inv.calls) || !!exports.calls,
     categories: TRANSFER_CATEGORIES.filter((c) => (inv.categories[c]?.files ?? 0) > 0),
     others: [],
-    apps: inv.apps.filter((a) => a.default_on).map((a) => a.package),
+    apps: appsOn ? inv.apps.filter((a) => a.default_on).map((a) => a.package) : [],
     exports,
   };
 }
@@ -605,8 +605,8 @@ export function defaultTransferSelection(inv: InventoryView): TransferSelection 
 /** Wybór przerwanej kopii (wznowienie dokłada do niej i nadpisuje jej wybór), zawężony do tego, co telefon
  *  ma teraz; kopia bez zapisanego wyboru — wybór domyślny. Zapisany plik eksportu zostaje, jeśli nadal jest
  *  na liście, inaczej najnowszy. */
-export function resumeSelection(inv: InventoryView, stored: StoredSelection | undefined): TransferSelection {
-  if (!stored || !Object.keys(stored).length) return defaultTransferSelection(inv);
+export function resumeSelection(inv: InventoryView, stored: StoredSelection | undefined, appsOn = true): TransferSelection {
+  if (!stored || !Object.keys(stored).length) return defaultTransferSelection(inv, appsOn);
   const others = new Set(inv.others.map((o) => o.name));
   const apps = new Set(inv.apps.map((a) => a.package));
   const exports: ExportChoice = {};
@@ -764,12 +764,12 @@ export function telWrite(tel: TelPlanView | null, kind: TelKind): number | null 
 
 /** Wszystkie grupy z plikami i wszystkie inne foldery kopii (każdy był w niej wybrany); podejrzane APK odznaczone;
  *  każda kategoria telefonii, w której jest co wgrać. */
-export function defaultUploadChoice(plan: RestorePlanView, tel: TelPlanView | null = null): UploadChoiceView {
+export function defaultUploadChoice(plan: RestorePlanView, tel: TelPlanView | null = null, verify = false): UploadChoiceView {
   return {
     groups: [...UPLOAD_GROUPS.filter((g) => (plan.groups[g]?.files ?? 0) > 0),
       ...plan.others.filter((o) => o.files > 0).map((o) => otherGroup(o.name))],
     apks_on: [],
-    verify_hash: false,
+    verify_hash: verify,
     tel: TEL_KINDS.filter((k) => (telWrite(tel, k) ?? 0) > 0),
   };
 }

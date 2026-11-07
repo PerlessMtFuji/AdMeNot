@@ -350,14 +350,22 @@ export function createFakeBridge(name: string,
       // Kopia i wgrywanie nie mają nagrania (kolejka w tle): zadanie w kolejce, postęp wstrzykują testy (`emit`).
       case 'explorer_copy':
       case 'explorer_upload': {
-        const task = fakeTask(method === 'explorer_copy' ? 'to_pc' : 'to_phone',
-          String(args[1] ?? settings.explorer_dest ?? ''));
+        let dest = args[1] as string | null | undefined;
+        if (method === 'explorer_copy' && dest == null) {
+          // jak most: „ostatni” — zapamiętany folder, „stały” — stały folder, „pytaj” — brak domyślnego
+          const mode = settings.explorer_dest_mode;
+          dest = mode === 'last' ? settings.explorer_dest : mode === 'fixed' ? settings.explorer_dest_fixed : null;
+          if (!dest) return { error: { key: 'explorer_no_dest', message: '' } };
+        }
+        const task = fakeTask(method === 'explorer_copy' ? 'to_pc' : 'to_phone', String(dest ?? settings.explorer_dest ?? ''));
         tasks.push(task);
         return { task: task.id };
       }
       case 'explorer_pick_dest':
-        settings = { ...settings, explorer_dest: 'D:\\Serwis\\Kowalska' };
+        if (settings.explorer_dest_mode === 'last') settings = { ...settings, explorer_dest: 'D:\\Serwis\\Kowalska' };
         return { path: 'D:\\Serwis\\Kowalska' };
+      case 'explorer_clear_recents':
+        return { phones: 0 };
       case 'explorer_pick_upload':
         return { paths: args[0] === 'folder' ? ['C:\\Users\\serwis\\Desktop\\Faktury_2026']
           : ['C:\\Users\\serwis\\Desktop\\zdjecie.jpg', 'C:\\Users\\serwis\\Desktop\\umowa.pdf'] };

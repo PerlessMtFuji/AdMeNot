@@ -972,6 +972,7 @@ export interface Api {
   explorer_upload(paths: string[], remoteDir: string, verifyHash: boolean): R<ExplorerStart>;
   explorer_retry(taskId: string): R<{ task: string | null }>;
   explorer_pick_dest(): R<{ path: string | null }>;
+  explorer_clear_recents(): R<{ phones: number }>;
   explorer_pick_upload(kind: 'files' | 'folder'): R<{ paths: string[] }>;
   explorer_clipboard(): R<{ paths: string[] }>;
   explorer_tasks(): R<{ tasks: TaskView[] }>;

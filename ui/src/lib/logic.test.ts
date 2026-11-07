@@ -628,6 +628,11 @@ describe('data transfer', () => {
     });
   });
 
+  test('apps default off leaves the app list empty; on keeps the engine defaults', () => {
+    expect(defaultTransferSelection(inv(), false).apps).toEqual([]);
+    expect(defaultTransferSelection(inv(), true).apps).toEqual(['a.ok']);
+  });
+
   test('unreadable or empty phone data starts unticked', () => {
     const sel = defaultTransferSelection(inv({ sms: null, mms: 0, contacts: null }));
     expect([sel.contacts, sel.sms, sel.mms, sel.calls]).toEqual([false, false, false, true]);
@@ -844,6 +849,11 @@ describe('uploading a copy to the new phone', () => {
       others: [...recorded.plan.others, { name: '', files: 2, bytes: 5, exists: 0, rename: 0 }] };
     expect(defaultUploadChoice(plan)).toEqual({ groups: ['photos', 'downloads', 'other:Music', 'other:'], apks_on: [],
       verify_hash: false, tel: [] });
+  });
+
+  test('default choice starts with the verify setting', () => {
+    expect(defaultUploadChoice(recorded.plan, null, true).verify_hash).toBe(true);
+    expect(defaultUploadChoice(recorded.plan).verify_hash).toBe(false);
   });
 
   test('default choice ticks every telephony category with something to write; SMS counts MMS too', () => {

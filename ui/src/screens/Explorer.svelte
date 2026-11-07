@@ -269,6 +269,12 @@
           {#snippet actions()}<Button size="sm" variant="ghost" onclick={() => (s.error = null)}>{t('common.close')}</Button>{/snippet}
         </Banner>
       {/if}
+      {#if s.destMissing}
+        <Banner tone="warn" icon="triangle-alert">
+          {t('explorer.dest_missing')}
+          {#snippet actions()}<Button size="sm" variant="ghost" onclick={() => (s.destMissing = false)}>{t('common.close')}</Button>{/snippet}
+        </Banner>
+      {/if}
       {#if s.clipboardEmpty}
         <Banner tone="info" icon="info">
           {t('explorer.clipboard_empty')}

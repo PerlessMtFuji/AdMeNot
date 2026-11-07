@@ -81,6 +81,8 @@ export class ExplorerState {
   drop = $state<DropInfo | null>(null);
   /** Trwa planowanie kopii lub wgrania (przyciski nie startują drugiego zadania). */
   starting = $state(false);
+  /** Stały folder docelowy jest niedostępny (np. odłączony pendrive) — baner, kopia pyta o inny folder. */
+  destMissing = $state(false);
   /** Wpisy, które pojawiły się przy ostatnim odświeżeniu folderu (wskakują, `pop-in`). */
   fresh = new SvelteSet<string>();
   /** Ctrl+V bez plików w schowku Windows — podpowiedź do zamknięcia. */

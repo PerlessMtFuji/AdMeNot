@@ -40,7 +40,9 @@ export class ExplorerController {
   private holdTimer: ReturnType<typeof setTimeout> | undefined;
   private lastClick: { path: string; selected: string[]; anchor: string | null } | null = null;
   /** Ostatnia kopia: „Kopiuj bez tych plików” powtarza ją z dodatkowymi wyłączeniami. */
-  private lastCopy: { paths: string[]; dest: string; verify: boolean; exclude: string[]; clear: boolean } | null = null;
+  /** Błąd `explorer_no_dest` ostatniego planu kopii (zamiast banera — kopia pyta o folder). */
+  private noDest = false;
+  private lastCopy: { paths: string[]; dest: string | null; verify: boolean; exclude: string[]; clear: boolean } | null = null;
   private viewWrites: Promise<unknown> = Promise.resolve();
   private dismissedTasks = new Set<string>();
   /** Odwiedzone foldery: wejście pokazuje je od razu, a świeża lista dochodzi w tle. */
@@ -49,6 +51,11 @@ export class ExplorerController {
   private leaveAnswer: ((ok: boolean) => void) | null = null;  // okno „N zadań zostanie anulowanych”
 
   constructor(private readonly app: AppState, private readonly bridge: Bridge) {}
+
+  /** Ustawienie „sprawdzaj kopie”: zwykłe „Kopiuj” sprawdza, a menu oferuje kopię bez sprawdzania. */
+  get verifyCopies(): boolean {
+    return this.app.settings.verify_copies;
+  }
 
   private get api() {
     return this.bridge.api;
@@ -129,7 +136,7 @@ export class ExplorerController {
     this.reset();
     Object.assign(s, {
       open: true, serial, device: r.device, places: this.earlyPlaces ?? r.places, media: r.media,
-      leftovers: r.leftovers, dest: app.settings.explorer_dest ?? null, recent: [...(r.recent ?? [])],
+      leftovers: r.leftovers, dest: this.startDest(), recent: [...(r.recent ?? [])],
     });
     this.earlyPlaces = null;
     app.screen = 'explorer';
@@ -461,8 +468,27 @@ export class ExplorerController {
     const s = this.state;
     const path = s.preview;
     if (path === null || s.starting) return false;
-    if (!s.dest && !(await this.pickDest())) return false;
-    return this.copy({ paths: [path], dest: s.dest!, verify: false, exclude: [], clear: false });
+    const dest = await this.destForCopy();
+    if (dest === undefined) return false;
+    return this.copy({ paths: [path], dest, verify: this.app.settings.verify_copies, exclude: [], clear: false });
+  }
+
+  /** Folder docelowy na starcie sesji: w trybie „stały” — stały folder, inaczej ostatnio użyty. */
+  private startDest(): string | null {
+    const st = this.app.settings;
+    return (st.explorer_dest_mode === 'fixed' ? st.explorer_dest_fixed : st.explorer_dest) ?? null;
+  }
+
+  /** Folder dla kopii wg trybu z ustawień. Null — most sam weźmie stały folder (i zgłosi, gdy go nie ma);
+   *  undefined — serwisant zrezygnował z wyboru. */
+  private async destForCopy(): Promise<string | null | undefined> {
+    const s = this.state;
+    const st = this.app.settings;
+    if (st.explorer_dest_mode === 'ask' || !s.dest) {
+      if (!(await this.pickDest())) return undefined;
+      return s.dest;
+    }
+    return st.explorer_dest_mode === 'fixed' && s.dest === st.explorer_dest_fixed ? null : s.dest;
   }
 
   private track(e: EntryView): PlayingTrack {
@@ -541,18 +567,23 @@ export class ExplorerController {
     const r = await this.request(() => this.api.explorer_pick_dest());
     if (!r?.path) return false;
     this.state.dest = r.path;
-    this.app.settings = { ...this.app.settings, explorer_dest: r.path };
+    // most zapamiętuje wybór tylko w trybie „ostatni”; w innych to jednorazowy folder tej sesji
+    if (this.app.settings.explorer_dest_mode === 'last') {
+      this.app.settings = { ...this.app.settings, explorer_dest: r.path };
+    }
     return true;
   }
 
-  /** „Kopiuj” z paska zaznaczenia (`verifyHash` — „Sprawdź co do bajtu”). Bez zapamiętanego folderu
-   *  najpierw pyta o folder. Zaznaczenie znika, gdy zadanie trafi do kolejki. */
-  async copySelected(verifyHash = false): Promise<void> {
+  /** „Kopiuj” z paska zaznaczenia (`verifyHash` — nadpisuje ustawienie „sprawdzaj kopie”; bez argumentu
+   *  decyduje ustawienie). Tryb „pytaj” albo brak folderu — najpierw okno wyboru folderu. Zaznaczenie znika,
+   *  gdy zadanie trafi do kolejki. */
+  async copySelected(verifyHash?: boolean): Promise<void> {
     const s = this.state;
     const paths = [...s.selected];
     if (!paths.length || s.starting) return;
-    if (!s.dest && !(await this.pickDest())) return;
-    await this.copy({ paths, dest: s.dest!, verify: verifyHash, exclude: [], clear: true });
+    const dest = await this.destForCopy();
+    if (dest === undefined) return;
+    await this.copy({ paths, dest, verify: verifyHash ?? this.app.settings.verify_copies, exclude: [], clear: true });
   }
 
   /** Wgranie plików i folderów z komputera do bieżącego folderu telefonu. */
@@ -676,19 +707,30 @@ export class ExplorerController {
   private async copy(job: NonNullable<typeof this.lastCopy>): Promise<boolean> {
     this.lastCopy = job;
     const { paths, dest, verify, exclude } = job;
+    this.noDest = false;
     const started = await this.start('to_pc', () => (exclude.length
-      ? this.api.explorer_copy(paths, dest, verify, exclude) : this.api.explorer_copy(paths, dest, verify)));
+      ? this.api.explorer_copy(paths, dest, verify, exclude) : this.api.explorer_copy(paths, dest, verify)), ['explorer_no_dest']);
+    if (started === null && this.noDest) {
+      // stały folder niedostępny: baner i wybór innego folderu na tę jedną kopię (ustawienie zostaje)
+      this.noDest = false;
+      const st = this.app.settings;
+      this.state.destMissing = st.explorer_dest_mode === 'fixed';
+      if (!(await this.pickDest())) return false;
+      return this.copy({ ...job, dest: this.state.dest });
+    }
+    if (started !== null && job.dest === null) this.state.destMissing = false;  // stały folder znów działa
     if (started !== null && job.clear) this.clear();
     return started !== null;
   }
 
-  /** Plan zadania w moście: problemy → okno (nic nie startuje), zadanie → pasek zadań. Id zadania albo null. */
-  private async start(kind: TaskView['kind'], call: () => Promise<ExplorerStart | ApiError>): Promise<string | null> {
+  /** Plan zadania w moście: problemy → okno (nic nie startuje), zadanie → pasek zadań. Id zadania albo null.
+   *  `quiet` — klucze błędów, które nie idą do banera (wywołujący sam o nich mówi). */
+  private async start(kind: TaskView['kind'], call: () => Promise<ExplorerStart | ApiError>, quiet: string[] = []): Promise<string | null> {
     const s = this.state;
     s.starting = true;
     let r: ExplorerStart | null;
     try {
-      r = await this.request(call);
+      r = await this.request(call, true, quiet);
     } finally {
       s.starting = false;
     }
@@ -711,7 +753,7 @@ export class ExplorerController {
 
   /** Wywołanie mostu z błędem w banerze nad listą (sesja zamknięta → powrót na „Połącz”); `banner = false` —
    *  błąd tylko zwraca null, a okno wywołujące (podgląd) mówi o nim samo. */
-  private async request<T extends object>(call: () => Promise<T | ApiError>, banner = true): Promise<T | null> {
+  private async request<T extends object>(call: () => Promise<T | ApiError>, banner = true, quiet: string[] = []): Promise<T | null> {
     let r: T | ApiError;
     try {
       r = await call();
@@ -719,6 +761,10 @@ export class ExplorerController {
       r = { error: { key: 'internal', message: String(e) } };
     }
     if (!isApiError(r)) return r;
+    if (quiet.includes(r.error.key)) {
+      this.noDest = r.error.key === 'explorer_no_dest';
+      return null;
+    }
     if (r.error.key === 'explorer_not_open') {
       this.leave();
       this.app.error = r.error;
@@ -772,7 +818,7 @@ export class ExplorerController {
     s.selected.clear();
     this.markFresh([]);
     Object.assign(s, {
-      dirStats: {}, storage: null, problems: null, drop: null, starting: false, clipboardEmpty: false, barHeld: false, hover: null, reveal: null,
+      dirStats: {}, storage: null, problems: null, drop: null, starting: false, destMissing: false, clipboardEmpty: false, barHeld: false, hover: null, reveal: null,
       open: false, serial: null, device: null, places: [], recent: [], path: ROOT, crumbs: [], entries: [],
       locked: false, skipped: 0, loading: false, view: 'list', filter: 'all', query: '', anchor: null, tasks: [],
       offline: false, preview: null, playing: null, queue: [], playError: false, dest: null, leftovers: 0, media: '', error: null,
