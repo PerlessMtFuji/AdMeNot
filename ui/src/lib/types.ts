@@ -667,6 +667,8 @@ export interface CopyView {
   counts: Record<string, number>;
   /** Notatka serwisanta (`set_transfer_note`); starsze mosty jej nie wysyłają. */
   note?: string | null;
+  /** Numer ZS zlecenia przeniesienia (null: kopia bez zlecenia); starsze mosty go nie wysyłają. */
+  order?: string | null;
   /** Wybór zapisany w kopii (pusty, gdy kopia jeszcze nie ruszyła); wznowienie zaczyna od niego. */
   selection?: StoredSelection;
   /** Wgrywania tej kopii na nowe telefony, najnowsze pierwsze; starsze mosty ich nie wysyłają. */

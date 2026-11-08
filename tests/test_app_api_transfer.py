@@ -1447,3 +1447,64 @@ def test_bridge_uses_transfer_keep_days(tmp_path):
     copy = store.create_copy(SERIAL, _device(), None, NOW)
     view = api.extend_transfer(copy.read_meta().id)["copy"]
     assert view["expires"] == (NOW + timedelta(days=37)).isoformat(timespec="seconds")
+
+
+# --- zlecenie ZS dla kopii (Etap 4–5, zadanie 3) --------------------------------------------------
+
+def _transfer_orders():
+    from admenot.engine.journal.db import Journal
+    from admenot.engine.paths import journal_path
+    with Journal(journal_path()) as journal:
+        return journal.transfer_orders()
+
+
+def test_backup_done_opens_order(tmp_path):
+    api, rec, _ = _inventoried(tmp_path)
+    api.start_backup(SELECTION)
+    done = rec.of("transfer:done")[0]
+    found = _transfer_orders()
+    assert len(found) == 1
+    order, record = found[0]
+    assert order.kind == "transfer" and order.client_name == "Anna K."
+    assert done["copy"]["order"] == order.number
+    assert record.copy_id == done["copy"]["id"]
+
+
+def test_stopped_backup_opens_no_order(tmp_path):
+    api, rec, release = _held_backup(tmp_path)
+    job_id = api._jobs.current().id
+    api.stop(job_id)
+    release.set()
+    assert rec.wait_for("transfer:done")["result"]["status"] == "stopped"
+    assert api._jobs.wait(5)
+    assert _transfer_orders() == []
+
+
+def test_delete_copy_marks_journal(tmp_path):
+    api, rec, _ = _inventoried(tmp_path)
+    api.start_backup(SELECTION)
+    copy_id = rec.of("transfer:done")[0]["copy"]["id"]
+    assert api.delete_transfer(copy_id) == {"deleted": copy_id}
+    (order, record), = _transfer_orders()
+    assert record.copy_deleted_at == NOW and order.status == "expired"
+
+
+def test_extend_updates_journal_expiry(tmp_path):
+    api, rec, _ = _inventoried(tmp_path)
+    api.start_backup(SELECTION)
+    copy_id = rec.of("transfer:done")[0]["copy"]["id"]
+    view = api.extend_transfer(copy_id)["copy"]
+    (_, record), = _transfer_orders()
+    assert record.copy_expires.isoformat(timespec="seconds") == view["expires"]
+
+
+def test_purge_marks_journal(tmp_path):
+    api, rec, _ = _inventoried(tmp_path)
+    api.start_backup(SELECTION)
+    copy_id = rec.of("transfer:done")[0]["copy"]["id"]
+    meta = store.resolve(copy_id).read_meta()
+    meta.expires = NOW - timedelta(days=1)
+    store.resolve(copy_id).write_meta(meta)
+    api._purge_transfers()
+    (_, record), = _transfer_orders()
+    assert record.copy_deleted_at == NOW

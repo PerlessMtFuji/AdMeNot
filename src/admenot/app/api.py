@@ -147,6 +147,7 @@ from admenot.engine.texts import (
     screenshot_caption,
 )
 from admenot.engine.tools import resolve_adb
+from admenot.engine.transfer import orders as transfer_orders
 from admenot.engine.transfer import store
 from admenot.engine.transfer.backup import (
     BackupError,
@@ -468,6 +469,7 @@ class Api(ExplorerMixin):
         # wgrywanie.
         self._restore: tuple[DeviceInfo, store.CopyDir, RestorePlan, TelPlan] | None = None
         self._restore_copy_id: str | None = None  # kopia czytana przez plan albo wgrywanie
+        self._restore_order: str | None = None  # numer ZS zlecenia wgrywania w toku
         # Prośba o stuknięcie na telefonie (`transfer:tap`): „sms_role_grant” | „sms_role_restore” | None.
         self._tap_request: str | None = None
         self._skip_tap = threading.Event()  # „Pomiń” przy nadaniu roli SMS (`skip_tap`)
@@ -546,8 +548,21 @@ class Api(ExplorerMixin):
     def _purge_transfers(self) -> None:
         """Kopie danych po terminie (z `meta.json` każdej kopii) we wszystkich folderach kopii."""
         try:
-            store.purge_expired(self._now(), self._transfer_busy, self._copy_busy)
+            removed = store.purge_expired(self._now(), self._transfer_busy, self._copy_busy)
+            self._journal_copies_deleted(removed)
         except Exception as exc:  # noqa: BLE001 — sprzątanie nie może zablokować okna
+            log_exception(exc)
+
+    def _journal_copies_deleted(self, copy_ids: list[str]) -> None:
+        """Zlecenia usuniętych kopii dostają datę usunięcia. Kopia jest już usunięta, więc błąd
+        dziennika nie może jej „odusunąć” ani zepsuć odpowiedzi: tylko lokalny log."""
+        if not copy_ids:
+            return
+        try:
+            with self._journal() as journal:
+                for copy_id in copy_ids:
+                    journal.mark_copy_deleted(copy_id, self._now())
+        except Exception as exc:  # noqa: BLE001
             log_exception(exc)
 
     def _purge_loop(self, every: float) -> None:
@@ -1904,7 +1919,9 @@ class Api(ExplorerMixin):
         result = run_backup(adb, puller, device, copy, inventory, chosen, on_progress=progress,
                             should_stop=job.should_stop, wait_device=wait_device, now=self._now(),
                             keep_days=keep_days)
-
+        if result.status in ("complete", "incomplete"):  # zatrzymana kopia nie ma jeszcze zlecenia
+            with self._journal() as journal:
+                transfer_orders.open_for_copy(journal, copy, self._now())
         return result, copy
 
     def _transfer_events(self, job: Job, raw: AdbTransport, event: str,
@@ -2043,6 +2060,10 @@ class Api(ExplorerMixin):
             tel_error: str | None = None
             try:
                 with _transfer_errors("restore"), device_lock(journal_path(), serial):
+                    if copy.meta_path.is_file():  # kopii usuniętej w międzyczasie silnik odmówi sam
+                        with self._journal() as journal:  # zlecenie tej kopii dla tego telefonu, przed plikami
+                            self._restore_order = transfer_orders.order_for_target(
+                                journal, copy, device, self._now()).number
                     if chosen.tel:
                         self._note_tel_pending(copy, serial, tel_plan, chosen.tel)
                     result = self._run_restore(job, adb, raw, device, copy, plan, chosen)
@@ -2057,6 +2078,7 @@ class Api(ExplorerMixin):
                     view = self._copy_view(copy.read_meta())  # kopia zniknęła → błąd kopii
             finally:
                 self._restore_copy_id = None
+                self._restore_order = None
                 with self._cleanup_lock:
                     self._cleaned.discard(serial)  # nieudane przywrócenie telefonu: sprzątanie zaraz po zadaniu
                     self._cleanup_tries.pop(serial, None)  # nowe zmiany telefonu: od nowa pełne ponowienia
@@ -2136,6 +2158,11 @@ class Api(ExplorerMixin):
             meta = store.extend(copy_id, self._settings.transfer_keep_days)
         except OSError:  # meta.json zablokowany przez inny program; ścieżka nie idzie do raportu
             raise AppError("transfer_in_use") from None
+        try:
+            with self._journal() as journal:  # termin kopii zapisany też w zleceniu
+                journal.set_copy_expires(meta.id, meta.expires)
+        except Exception as exc:  # noqa: BLE001 — termin w pliku kopii już przedłużony
+            log_exception(exc)
         return {"copy": self._copy_view(meta)}
 
     @_api
@@ -2164,6 +2191,7 @@ class Api(ExplorerMixin):
             store.delete(copy_id)  # zmiany nowego telefonu zostają w zapisie telefonu poza kopią
         except OSError:  # plik kopii otwarty w innym programie; ścieżka nie idzie do raportu
             raise AppError("transfer_in_use") from None
+        self._journal_copies_deleted([copy_id])
         return {"deleted": copy_id}
 
     # --- aktualizacje ---------------------------------------------------------------------------

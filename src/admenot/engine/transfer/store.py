@@ -63,6 +63,7 @@ class CopyMeta:
     selection: dict[str, Any] = field(default_factory=dict)
     counts: dict[str, int] = field(default_factory=dict)
     bytes: int = 0
+    order: str | None = None  # numer ZS zlecenia przeniesienia (dziennik); None: kopia bez zlecenia
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -70,7 +71,7 @@ class CopyMeta:
             "model": self.model, "android": self.android, "imei": self.imei, "client": self.client,
             "created": self.created.isoformat(), "expires": self.expires.isoformat(),
             "status": self.status, "selection": self.selection, "counts": self.counts,
-            "bytes": self.bytes,
+            "bytes": self.bytes, "order": self.order,
         }
 
     @classmethod
@@ -84,7 +85,7 @@ class CopyMeta:
             client=data.get("client"), created=datetime.fromisoformat(data["created"]),
             expires=datetime.fromisoformat(data["expires"]), status=status,
             selection=dict(data.get("selection") or {}), counts=dict(data.get("counts") or {}),
-            bytes=int(data.get("bytes") or 0),
+            bytes=int(data.get("bytes") or 0), order=data.get("order") or None,
         )
 
 
@@ -144,7 +145,8 @@ class CopyDir:
 
     def write_verdicts(self, entries: list[AppEntry]) -> None:
         """Werdykty aplikacji starego telefonu (także pominiętych); atomowo jak `write_meta`."""
-        data = [{"package": e.package, "version_code": e.version_code, "verdict": e.verdict} for e in entries]
+        data = [{"package": e.package, "version_code": e.version_code, "verdict": e.verdict,
+                 "label": e.label} for e in entries]
         tmp = self.verdicts_path.with_name(VERDICTS + ".tmp")
         tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
         os.replace(tmp, self.verdicts_path)
@@ -160,6 +162,18 @@ class CopyDir:
             return result
         except (OSError, ValueError, KeyError, TypeError):
             return None
+
+    def read_app_labels(self) -> dict[str, str]:
+        """Pakiet -> nazwa aplikacji ze starego telefonu; brak nazwy (albo kopia sprzed zmiany) → brak klucza."""
+        return _read_app_labels(self.verdicts_path)
+
+
+def _read_app_labels(path: Path) -> dict[str, str]:
+    try:
+        return {str(i["package"]): str(i["label"]) for i in json.loads(path.read_text(encoding="utf-8"))
+                if i.get("label")}
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return {}
 
 
 def create_copy(serial: str, device: DeviceInfo, client: str | None, now: datetime,
