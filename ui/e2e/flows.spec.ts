@@ -230,6 +230,7 @@ test('phone state: a site fix on an app from the plan runs as one row with the a
   await page.goto('/?scenario=adware&checks=app_browser');
   await page.getByRole('button', { name: 'Skanuj' }).click();
   await expect(page.getByText(/Analiza plików aplikacji/)).toBeHidden({ timeout: 15_000 });
+  await page.getByRole('tab', { name: /^Telefon/ }).click();  // sprawdzenia telefonu mają własną zakładkę
   await page.getByRole('switch', { name: 'Wycisz tanie-bilety.example' }).check();
   await page.getByRole('button', { name: /Podsumowanie/ }).click();
   await page.getByRole('button', { name: /^Wykonaj/ }).click();
