@@ -799,6 +799,8 @@ export interface UploadChoiceView {
   verify_hash: boolean;
   /** Telefonia do wgrania (`sms` obejmuje MMS); brak = bez telefonii. */
   tel: TelKind[];
+  /** Pakiety aplikacji z planu aplikacji do zainstalowania; brak = bez aplikacji. */
+  apps: string[];
 }
 
 // --- przenoszenie danych: kontakty, wiadomości i połączenia (present.tel_plan_view / tel_result_view)

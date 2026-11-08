@@ -33,7 +33,7 @@ async function show(phase: 'transfer_restore' | 'transfer_restored' = 'transfer_
 describe('TransferRestore', () => {
   test('stages follow the chosen data; telephony progress shows its own count', async () => {
     const { s, bridge } = await show();
-    s.transfer.restore.choice = { groups: ['photos'], apks_on: [], verify_hash: false, tel: ['contacts', 'sms', 'calls'] };
+    s.transfer.restore.choice = { groups: ['photos'], apks_on: [], verify_hash: false, tel: ['contacts', 'sms', 'calls'], apps: [] };
     bridge.emit('transfer:tel_progress', { kind: 'sms', done: 40, total: 200, path: 'companion' });
     await tick();
     const stages = screen.getByRole('list', { name: 'Etapy wgrywania' });
@@ -45,7 +45,7 @@ describe('TransferRestore', () => {
 
   test('safety backup of the new phone gets its own stage label and no counter', async () => {
     const { s, bridge } = await show();
-    s.transfer.restore.choice = { groups: ['photos'], apks_on: [], verify_hash: false, tel: ['contacts', 'sms'] };
+    s.transfer.restore.choice = { groups: ['photos'], apks_on: [], verify_hash: false, tel: ['contacts', 'sms'], apps: [] };
     bridge.emit('transfer:tel_progress', { kind: 'safety', done: 0, total: 0, path: 'none' });
     await tick();
     expect(screen.getByText('Etap: Kopia bezpieczeństwa nowego telefonu')).toBeTruthy();

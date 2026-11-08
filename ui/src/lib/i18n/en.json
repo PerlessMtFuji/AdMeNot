@@ -993,7 +993,7 @@
       "planning": "Checking the new phone…",
       "planning_sub": "Reading the free space and which files are already there. Nothing is uploaded yet.",
       "title": "What to upload to the new phone?",
-      "sub": "Copy of {phone} ({details}). Nothing is overwritten — a different file with the same name is saved beside it as “(z kopii)”.",
+      "sub": "Copy of {phone} ({details}). I will not overwrite or delete anything.",
       "same_title": "This is the phone the copy was made from",
       "same_text": "The copy is less than 24 hours old, so these files are most likely already on this phone. Upload anyway?",
       "same_no": "No",
@@ -1027,8 +1027,6 @@
       },
       "exists": "already on the phone: {count}",
       "rename": "saved beside: {count}",
-      "section_files": "Files",
-      "section_apks": "APK files",
       "apks_note": "App installers from the copy, assessed on this computer. Harmful ones are never uploaded.",
       "apk": {
         "clean": "checked",
@@ -1037,12 +1035,6 @@
         "malicious": "skipped as harmful",
         "unknown": "can't be assessed"
       },
-      "later_title": "Later in the program",
-      "later": {
-        "apps": "Apps",
-        "whatsapp": "Restoring WhatsApp chats"
-      },
-      "section_tel": "Contacts and messages",
       "tel": {
         "contacts": "Contacts",
         "sms": "SMS and MMS",
@@ -1060,7 +1052,7 @@
           "many": "skipped {count} contacts from messaging apps",
           "other": "skipped {count} contacts from messaging apps"
         },
-        "duplicates": "The phone already has contacts — duplicates are possible",
+        "duplicates": "the phone already has contacts — duplicates are possible",
         "done_ok": "Contacts and messages uploaded",
         "done_warn": "Contacts and messages uploaded, but not everything worked",
         "done_warn_text": "Details in the table below.",
@@ -1120,7 +1112,34 @@
         "failed": "The phone did not return to its settings",
         "failed_text": "On the phone open Settings → Apps → Default apps → SMS app and choose {app}. Then uninstall AdMeNot Helper (Settings → Apps)."
       },
-      "next_version": "in a later version",
+      "apk_malicious": {
+        "one": "{count} harmful APK — skipped",
+        "few": "{count} harmful APKs — skipped",
+        "many": "{count} harmful APKs — skipped",
+        "other": "{count} harmful APKs — skipped"
+      },
+      "apk_suspicious": {
+        "one": "{count} suspicious APK — unticked",
+        "few": "{count} suspicious APKs — unticked",
+        "many": "{count} suspicious APKs — unticked",
+        "other": "{count} suspicious APKs — unticked"
+      },
+      "apps_count": "{n} of {m}",
+      "apps_note": "without data — each one needs signing in again",
+      "xiaomi_label": "Xiaomi blocks installation · how to enable?",
+      "xiaomi_how": "How to enable: Settings → Additional settings → Developer options → “Install via USB” (Xiaomi may ask you to sign in to a Mi account). I will check by myself once you do. Without it I upload the rest and skip the apps.",
+      "apps_skip": "I will not install: {list}",
+      "apps_skip_more": "… and {count} more",
+      "apps_skip_item": "{name} — {reason}",
+      "apps_reason": {
+        "installed": "already there",
+        "too_old": "too old for Android {version}",
+        "too_old_unknown": "too old for this Android",
+        "too_new": "needs a newer Android",
+        "no_abi": "no version for this processor",
+        "incomplete": "incomplete copy"
+      },
+      "safety": "Before uploading I will make a safety backup of the new phone.",
       "panel": "Space on the new phone",
       "space_label": "Used space and files to upload",
       "to_upload": "To upload",

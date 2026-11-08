@@ -215,8 +215,10 @@ test('upload a copy: the new phone is offered the copy, the plan shows APK label
   await expect(page.getByText(/Wgrać kopię z samsung SM-A145R \(Anna K\./)).toBeVisible();
   await page.getByRole('button', { name: 'Wgraj', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Co wgrać na nowy telefon?' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('1 APK szkodliwy — pominę')).toBeVisible();
+  await expect(page.getByText('1 APK podejrzany — odznaczony')).toBeVisible();
+  await page.getByRole('button', { name: /^Pobrane i dokumenty: Pokaż/ }).click();  // lista APK jest zwinięta
   await expect(page.getByText('pominięty jako szkodliwy')).toBeVisible();
-  await expect(page.getByText('podejrzany — odznaczony')).toBeVisible();
   await page.getByRole('complementary', { name: 'Miejsce na nowym telefonie' }).getByRole('button', { name: /^Wgraj/ }).click();
   await expect(page.getByText('Pliki wgrane', { exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('pominięto 1 plik oceniony jako szkodliwy')).toBeVisible();

@@ -7,7 +7,7 @@
   let { title, children, empty, missingKey = 'transfer.row.missing' }: { title: string; children: Snippet; empty?: string; missingKey?: string } = $props();
 </script>
 
-<section class="card overflow-hidden rounded-2xl border border-line shadow-sm" aria-label={title}>
+<section class="card shrink-0 overflow-hidden rounded-2xl border border-line shadow-sm" aria-label={title}>
   <h3 class="px-4 pt-2.5 pb-0.5 text-xs font-bold tracking-wider text-soft uppercase">{title}</h3>
   <div class="flex flex-col divide-y divide-line">
     {@render children()}

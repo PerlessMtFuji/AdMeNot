@@ -1,7 +1,7 @@
 import { SvelteSet } from 'svelte/reactivity';
 import { actedLevels, type ActedLog, type OpenGroups, type Phase } from './logic';
 import type {
-  ApiErrorBody, ApkEstimate, BackupResultView, CopyView, InventoryView, RestorePlanView, RestoreProgressView, RestoreResultView, TapRequest, TelPlanView, TelProgressView, TelResultView, TransferProgress, TransferSelection, UploadChoiceView, ApkQuestion, Category, ConsoleEntry, DeviceEntry, EtaView, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
+  ApiErrorBody, ApkEstimate, AppsPlanView, BackupResultView, CopyView, InventoryView, RestorePlanView, RestoreProgressView, RestoreResultView, TapRequest, TelPlanView, TelProgressView, TelResultView, TransferProgress, TransferSelection, UploadChoiceView, ApkQuestion, Category, ConsoleEntry, DeviceEntry, EtaView, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
   PlanView, Question, ReportResult, ScanView, Settings, ShareState, ShotsView, ShotView, StepEvent, UndoDone, UndoSite, UpdateView, UserWait, Verdict, WhoView,
 } from './types';
 
@@ -17,7 +17,7 @@ export const EMPTY_TRANSFER_SELECTION: TransferSelection = {
 };
 
 export const emptyRestore = (): RestoreState => ({ plan: null, copy: null,
-  choice: { groups: [], apks_on: [], verify_hash: false, tel: [] }, progress: null, result: null, sameRecent: false,
+  choice: { groups: [], apks_on: [], verify_hash: false, tel: [], apps: [] }, apps: null, progress: null, result: null, sameRecent: false,
   resumable: false, tel: null, telProgress: null, telResult: null, telError: null, tap: null, tapPackage: null });
 
 /** Wgrywanie kopii na nowy telefon: plan z mostu, wybór serwisanta, postęp i wynik. */
@@ -26,6 +26,8 @@ export interface RestoreState {
   /** Wgrywana kopia (zanim przyjdzie plan — z listy kopii). */
   copy: CopyView | null;
   choice: UploadChoiceView;
+  /** Aplikacje z kopii (null — plan jeszcze nie przyszedł albo most bez aplikacji). */
+  apps: AppsPlanView | null;
   progress: RestoreProgressView | null;
   result: RestoreResultView | null;
   /** Ten sam telefon co w kopii i kopia młodsza niż 24 h — ostrzeżenie, domyślnie „Nie”. */

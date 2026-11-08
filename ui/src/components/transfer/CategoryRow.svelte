@@ -43,7 +43,8 @@
 </script>
 
 <div data-tone={tone}>
-  <div class="flex items-center gap-3 px-4 py-2.5 {tone ? TINT[tone] : ''}">
+  <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 {tone ? TINT[tone] : ''}">
+    <div class="flex min-w-[15rem] flex-1 items-center gap-3">
     {#if hasBox}
       <input type="checkbox" class="h-[17px] w-[17px] flex-none accent-accent" checked={checked ?? false} {disabled}
         aria-label={name} onchange={() => ontoggle?.()} />
@@ -55,6 +56,9 @@
       <span class="font-bold [overflow-wrap:anywhere] text-ink">{name}</span>{#if count}<span class="ml-1 font-semibold text-soft">{count}</span>{/if}
       {#if sub}<span class="block text-[12.5px] leading-snug text-mut">{sub}</span>{/if}
     </span>
+    </div>
+    {#if pills || fold || size || result}
+    <div class="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-1.5">
     {#if pills}<span class="flex flex-none flex-wrap items-center justify-end gap-1.5">{@render pills()}</span>{/if}
     {#if fold}
       <button type="button" class="flex-none cursor-pointer text-[13px] font-semibold whitespace-nowrap text-accent hover:underline"
@@ -64,6 +68,8 @@
     {#if size}<span class="mono flex-none text-[12.5px] whitespace-nowrap text-mut">{size}</span>{/if}
     {#if result}
       <span class="flex-none font-bold whitespace-nowrap tabular-nums {result.tone === 'ok' ? 'text-ok' : 'text-warn'}">{result.text}</span>
+    {/if}
+    </div>
     {/if}
   </div>
   {#if fold}

@@ -1443,7 +1443,7 @@ describe('data transfer — uploading a copy', () => {
     expect(s.transfer.restore.sameRecent).toBe(false);
     expect(s.transfer.restore.resumable).toBe(false);
     expect(s.transfer.restore.choice).toEqual({ groups: ['photos', 'downloads', 'whatsapp', 'other:Music'], apks_on: [],
-      verify_hash: false, tel: ['contacts', 'sms', 'calls'] });
+      verify_hash: false, tel: ['contacts', 'sms', 'calls'], apps: ['com.whatsapp'] });
     expect(s.transfer.restore.tel?.contacts?.write).toBe(2);
     await vi.waitFor(() => expect(s.job).toBeNull());
   });
@@ -1475,7 +1475,7 @@ describe('data transfer — uploading a copy', () => {
     expect(s.phase).toBe('transfer_restore');
     expect(bridge.calls.find((c) => c.method === 'start_restore')?.args[0]).toEqual({
       groups: ['photos', 'videos', 'downloads', 'whatsapp', 'other:Music'], apks_on: [], verify_hash: false,
-      tel: ['contacts', 'sms', 'calls'] });
+      tel: ['contacts', 'sms', 'calls'], apps: ['com.whatsapp'] });
     await vi.waitFor(() => expect(s.phase).toBe('transfer_restored'));
     expect(s.transfer.restore.result?.files_renamed).toBe(1);
     expect(s.transfer.restore.progress?.stage).toBe('scan');

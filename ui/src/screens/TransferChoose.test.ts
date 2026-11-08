@@ -195,7 +195,7 @@ const XIAOMI = { serial: 'R58T00TEST', manufacturer: 'Xiaomi', brand: 'Redmi' } 
     await tick();
     return env;
   }
-  const meta = (name: RegExp) => screen.getByRole('checkbox', { name }).parentElement!.textContent!;
+  const meta = (name: RegExp) => screen.getByRole('checkbox', { name }).parentElement!.parentElement!.textContent!;  // wiersz: lewa część + etykiety
   const openFold = (row: string) => fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${row}: `) }));
 
   test('unreadable export data: a short label, no instructions and no re-check button until clicked', async () => {

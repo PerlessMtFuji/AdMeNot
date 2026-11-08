@@ -1,6 +1,6 @@
 import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
-import { actedAfter, changedVerdicts, defaultSelection, defaultUploadChoice, keptUploadChoice, otherGroup, TEL_KINDS, telWrite, resumableCopy, UPLOAD_GROUPS, resumeSelection, rescanSelection, TRANSFER_CATEGORIES, transferNeed, transferTotals, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
+import { actedAfter, changedVerdicts, defaultApps, installableApps, defaultSelection, defaultUploadChoice, keptUploadChoice, otherGroup, TEL_KINDS, telWrite, resumableCopy, UPLOAD_GROUPS, resumeSelection, rescanSelection, TRANSFER_CATEGORIES, transferNeed, transferTotals, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
 import { EMPTY_TRANSFER_SELECTION, emptyRestore, type AppState, type RepairTab, type SettingsCategory } from './state.svelte';
 import { ExplorerController } from './explorer/controller';
 import { applyTheme } from './theme';
@@ -772,8 +772,9 @@ export class Controller {
       const kept = this.replanChoice;
       this.replanChoice = null;
       const tel = d.tel ?? null;
-      Object.assign(s.transfer.restore, { plan: d.plan, copy: d.copy, tel,
-        choice: kept ? keptUploadChoice(d.plan, kept, tel) : defaultUploadChoice(d.plan, tel, s.settings.verify_copies),
+      const apps = d.apps ?? null;  // starsze nagrania mostu nie mają aplikacji
+      Object.assign(s.transfer.restore, { plan: d.plan, copy: d.copy, tel, apps,
+        choice: kept ? keptUploadChoice(d.plan, kept, tel, apps) : defaultUploadChoice(d.plan, tel, s.settings.verify_copies, apps),
         resumable: d.resumable, sameRecent: d.same_phone_recent });
     });
     on('transfer:restore_progress', (d) => {
@@ -1024,6 +1025,34 @@ export class Controller {
     r.choice = { ...r.choice, apks_on: on.includes(remote) ? on.filter((x) => x !== remote) : [...on, remote] };
   }
 
+  /** Aplikacja z kopii; tej z powodem pominięcia (`skip`) nie da się zaznaczyć. */
+  toggleRestoreApp(pkg: string): void {
+    const r = this.state.transfer.restore;
+    if (!installableApps(r.apps).some((a) => a.package === pkg)) return;
+    const on = r.choice.apps;
+    r.choice = { ...r.choice, apps: on.includes(pkg) ? on.filter((p) => p !== pkg) : [...on, pkg] };
+  }
+
+  /** Wiersz „Aplikacje”: odznacza wszystkie albo wraca do domyślnych (gdy żadna nie jest domyślna — wszystkie do wgrania). */
+  toggleRestoreApps(): void {
+    const r = this.state.transfer.restore;
+    const all = installableApps(r.apps).map((a) => a.package);
+    const defaults = defaultApps(r.apps);
+    r.choice = { ...r.choice, apps: r.choice.apps.length ? [] : (defaults.length ? defaults : all) };
+  }
+
+  /** Automatyczne sprawdzanie blokady instalacji przez USB (Xiaomi): tani odczyt bez zadania; gdy blokady już nie
+   *  ma, etykieta znika z planu. Nieznany wynik (`null`) nie zmienia niczego. */
+  async checkInstall(): Promise<void> {
+    const s = this.state;
+    if (s.phase !== 'transfer_restore_plan' || !s.transfer.restore.apps?.block || s.job) return;
+    const res = await this.call(this.api.install_check());
+    const apps = s.transfer.restore.apps;
+    if (res && res.blocked === false && s.phase === 'transfer_restore_plan' && apps?.block) {
+      s.transfer.restore.apps = { ...apps, block: null };
+    }
+  }
+
   /** Wiersz telefonii (kontakty, SMS z MMS, połączenia); bez rekordów do wgrania nie da się go zaznaczyć. */
   toggleTel(kind: TelKind): void {
     const r = this.state.transfer.restore;
@@ -1055,7 +1084,7 @@ export class Controller {
     const choice = s.transfer.restore.choice;
     s.error = null;
     const r = await this.call(this.api.start_restore({ groups: [...choice.groups], apks_on: [...choice.apks_on],
-      verify_hash: choice.verify_hash, tel: [...choice.tel] }));
+      verify_hash: choice.verify_hash, tel: [...choice.tel], apps: [...choice.apps] }));
     if (!r) return;
     Object.assign(s.transfer.restore, { progress: null, result: null, telProgress: null, telResult: null, telError: null,
       tap: null });

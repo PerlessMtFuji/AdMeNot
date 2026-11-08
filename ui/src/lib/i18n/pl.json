@@ -993,7 +993,7 @@
       "planning": "Sprawdzam nowy telefon…",
       "planning_sub": "Liczę wolne miejsce i sprawdzam, które pliki już na nim są. Jeszcze niczego nie wgrywam.",
       "title": "Co wgrać na nowy telefon?",
-      "sub": "Kopia z {phone} ({details}). Niczego nie nadpiszę — inny plik o tej samej nazwie zapiszę obok jako „(z kopii)”.",
+      "sub": "Kopia z {phone} ({details}). Niczego nie nadpiszę ani nie usunę.",
       "same_title": "To ten sam telefon, z którego jest kopia",
       "same_text": "Kopia ma mniej niż 24 godziny, więc te pliki najpewniej już są na tym telefonie. Wgrać mimo to?",
       "same_no": "Nie",
@@ -1027,8 +1027,6 @@
       },
       "exists": "już na telefonie: {count}",
       "rename": "zapisane obok: {count}",
-      "section_files": "Pliki",
-      "section_apks": "Pliki APK",
       "apks_note": "Instalatory aplikacji z kopii, ocenione na komputerze. Szkodliwych nie wgrywam.",
       "apk": {
         "clean": "sprawdzony",
@@ -1037,12 +1035,6 @@
         "malicious": "pominięty jako szkodliwy",
         "unknown": "nie do oceny"
       },
-      "later_title": "Później w programie",
-      "later": {
-        "apps": "Aplikacje",
-        "whatsapp": "Przywracanie czatów WhatsApp"
-      },
-      "section_tel": "Kontakty i wiadomości",
       "tel": {
         "contacts": "Kontakty",
         "sms": "SMS i MMS",
@@ -1060,7 +1052,7 @@
           "many": "pominięto {count} kontaktów z komunikatorów",
           "other": "pominięto {count} kontaktu z komunikatorów"
         },
-        "duplicates": "Na telefonie są już kontakty — możliwe duplikaty",
+        "duplicates": "na telefonie są już kontakty — możliwe duplikaty",
         "done_ok": "Kontakty i wiadomości wgrane",
         "done_warn": "Kontakty i wiadomości wgrane, ale nie wszystko się udało",
         "done_warn_text": "Szczegóły w tabeli poniżej.",
@@ -1120,7 +1112,34 @@
         "failed": "Telefon nie wrócił do swoich ustawień",
         "failed_text": "Na telefonie otwórz Ustawienia → Aplikacje → Aplikacje domyślne → Aplikacja SMS i wybierz {app}. Potem odinstaluj AdMeNot Helper (Ustawienia → Aplikacje)."
       },
-      "next_version": "w kolejnej wersji",
+      "apk_malicious": {
+        "one": "{count} APK szkodliwy — pominę",
+        "few": "{count} APK szkodliwe — pominę",
+        "many": "{count} APK szkodliwych — pominę",
+        "other": "{count} APK szkodliwego — pominę"
+      },
+      "apk_suspicious": {
+        "one": "{count} APK podejrzany — odznaczony",
+        "few": "{count} APK podejrzane — odznaczone",
+        "many": "{count} APK podejrzanych — odznaczonych",
+        "other": "{count} APK podejrzanego — odznaczonego"
+      },
+      "apps_count": "{n} z {m}",
+      "apps_note": "bez danych — w każdej trzeba się zalogować ponownie",
+      "xiaomi_label": "Xiaomi blokuje instalację · jak włączyć?",
+      "xiaomi_how": "Jak włączyć: Ustawienia → Dodatkowe ustawienia → Opcje programisty → „Instaluj przez USB” (Xiaomi może poprosić o zalogowanie do konta Mi). Sprawdzę sam, gdy to zrobisz. Bez tego wgram resztę, a aplikacje pominę.",
+      "apps_skip": "Nie zainstaluję: {list}",
+      "apps_skip_more": "… i {count} innych",
+      "apps_skip_item": "{name} — {reason}",
+      "apps_reason": {
+        "installed": "już jest",
+        "too_old": "za stara dla Androida {version}",
+        "too_old_unknown": "za stara dla tego Androida",
+        "too_new": "wymaga nowszego Androida",
+        "no_abi": "brak wersji dla tego procesora",
+        "incomplete": "niepełna kopia"
+      },
+      "safety": "Przed wgraniem zrobię kopię bezpieczeństwa nowego telefonu.",
       "panel": "Miejsce na nowym telefonie",
       "space_label": "Zajęte miejsce i pliki do wgrania",
       "to_upload": "Do wgrania",

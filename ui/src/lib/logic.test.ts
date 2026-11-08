@@ -11,6 +11,8 @@ import {
   splitNotices,
   defaultUploadChoice,
   keptUploadChoice,
+  defaultApps,
+  restoreEtaMin,
   restoreOffer,
   restoreOutcome,
   restoreResumable,
@@ -864,7 +866,7 @@ describe('uploading a copy to the new phone', () => {
     const plan: RestorePlanView = { ...recorded.plan, groups,
       others: [...recorded.plan.others, { name: '', files: 2, bytes: 5, exists: 0, rename: 0 }] };
     expect(defaultUploadChoice(plan)).toEqual({ groups: ['photos', 'downloads', 'other:Music', 'other:'], apks_on: [],
-      verify_hash: false, tel: [] });
+      verify_hash: false, tel: [], apps: [] });
   });
 
   test('default choice starts with the verify setting', () => {
@@ -899,9 +901,28 @@ describe('uploading a copy to the new phone', () => {
     const plan = recorded.plan;
     expect(keptUploadChoice(plan, { groups: ['photos', 'other:Music', 'other:Gone', 'videos'],
       apks_on: ['/sdcard/Download/gra.apk', '/sdcard/Download/szybki-cleaner.apk', '/sdcard/x.apk'], verify_hash: true,
-      tel: ['contacts', 'calls'] }, { ...recorded.tel, calls: null }))
+      tel: ['contacts', 'calls'], apps: ['a.ok', 'a.gone', 'a.skipped'] }, { ...recorded.tel, calls: null },
+      { block: null, bytes: 1, items: [{ package: 'a.ok', name: 'A', bytes: 1, verdict: 'safe', default_on: true, skip: null },
+        { package: 'a.skipped', name: 'B', bytes: 1, verdict: 'safe', default_on: true, skip: 'installed' }] }))
       .toEqual({ groups: ['photos', 'other:Music', 'videos'], apks_on: ['/sdcard/Download/gra.apk'], verify_hash: true,
-        tel: ['contacts'] });
+        tel: ['contacts'], apps: ['a.ok'] });
+  });
+
+  test('apps: default on without skipped and suspicious; only the chosen installable apps count toward the need', () => {
+    const item = (package_: string, over = {}) => ({ package: package_, name: package_, bytes: 100, verdict: 'safe' as const,
+      default_on: true, skip: null, ...over });
+    const apps = { block: null, bytes: 200, items: [item('a'), item('b', { verdict: 'suspicious', default_on: false }),
+      item('c', { skip: 'installed' }), item('d')] };
+    expect(defaultApps(apps)).toEqual(['a', 'd']);
+    expect(defaultApps(null)).toEqual([]);
+    const plan: RestorePlanView = { groups: {}, others: [], apks: [], space: { free: 1000, total: 2000 }, reserve: 0, missing: 0 };
+    const choice = { groups: [], apks_on: [], verify_hash: false, tel: [], apps: ['a', 'b', 'c'] };
+    // „c” jest pominięta (już jest), więc nie liczy się do miejsca nawet w wyborze
+    expect(uploadNeed(plan, choice, apps).need).toBe(200);
+    expect(uploadNeed(plan, choice).need).toBe(0);
+    expect(restoreEtaMin(25 * 1024 ** 2 * 120, 0)).toBe(2);
+    expect(restoreEtaMin(0, 30)).toBe(4);
+    expect(restoreEtaMin(0, 0)).toBe(1);
   });
 
   test('upload need mirrors RestorePlan.need: group totals already hold default APKs, suspicious only when ticked', () => {
@@ -913,7 +934,7 @@ describe('uploading a copy to the new phone', () => {
       .toBe(5000 + 504 + 800 + 400 + 902);
     // podejrzany zaznaczony w odznaczonej grupie nie liczy się
     expect(uploadNeed(plan, { ...all, groups: ['photos'], apks_on: ['/sdcard/Download/gra.apk'] }).need).toBe(5000);
-    expect(uploadNeed(plan, { groups: [], apks_on: [], verify_hash: false, tel: [] }).need).toBe(0);
+    expect(uploadNeed(plan, { groups: [], apks_on: [], verify_hash: false, tel: [], apps: [] }).need).toBe(0);
   });
 
   test('upload need: clean APK bytes are not counted twice, a ticked one already on the phone adds nothing', () => {
@@ -922,15 +943,15 @@ describe('uploading a copy to the new phone', () => {
     const plan: RestorePlanView = { groups: { downloads: { files: 3, bytes: 100, exists: 2, rename: 0 } }, others: [],
       apks: [apk('a.apk', 'clean', true), apk('b.apk', 'suspicious', false, 'exists'), apk('c.apk', 'unknown', true, 'exists')],
       space: { free: 10_000, total: null }, reserve: 1_000, missing: 0 };
-    expect(uploadNeed(plan, { groups: ['downloads'], apks_on: ['b.apk'], verify_hash: false, tel: [] }).need).toBe(100);
+    expect(uploadNeed(plan, { groups: ['downloads'], apks_on: ['b.apk'], verify_hash: false, tel: [], apps: [] }).need).toBe(100);
   });
 
   test('fits keeps the reserve free and reports what is missing', () => {
     const plan: RestorePlanView = { groups: { photos: { files: 1, bytes: 9_000, exists: 0, rename: 0 },
       videos: { files: 1, bytes: 3_000, exists: 0, rename: 0 } }, others: [], apks: [],
       space: { free: 10_000, total: 20_000 }, reserve: 1_000, missing: 0 };
-    expect(uploadNeed(plan, { groups: ['photos'], apks_on: [], verify_hash: false, tel: [] })).toEqual({ need: 9_000, fits: true, missing: 0 });
-    expect(uploadNeed(plan, { groups: ['photos', 'videos'], apks_on: [], verify_hash: false, tel: [] }))
+    expect(uploadNeed(plan, { groups: ['photos'], apks_on: [], verify_hash: false, tel: [], apps: [] })).toEqual({ need: 9_000, fits: true, missing: 0 });
+    expect(uploadNeed(plan, { groups: ['photos', 'videos'], apks_on: [], verify_hash: false, tel: [], apps: [] }))
       .toEqual({ need: 12_000, fits: false, missing: 3_000 });
   });
 
