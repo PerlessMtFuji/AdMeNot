@@ -46,3 +46,39 @@ test('expert table keeps the app name and the action readable', async ({ page })
   expect(inside(await box(action), main)).toBe(true);
   expect(inside(await box(page.getByRole('button', { name: 'Skanuj ponownie' })), main)).toBe(true);
 });
+
+test('the analysis progress line stays on one row', async ({ page }) => {
+  await scan(page);
+  // Stan „analiza w toku” z najdłuższą zawartością: licznik, szacunek czasu, dymek i przycisk przerwania.
+  await page.waitForFunction(() => (window as any).__admenot !== undefined);
+  await page.evaluate(() => {
+    const { ctl } = (window as any).__admenot;
+    const s = ctl.state;
+    s.job = { id: 'e2e-apk', kind: 'apk' };
+    s.apkScope = 'all';
+    s.apk = { done: 123, total: 456, running: true, changed: [], eta: 4980 };
+    s.apkEstimate = { to_fetch_bytes: 3_500_000_000, total_bytes: 4_000_000_000, apps: 456, unknown: 3, cached: 12,
+      largest_bytes: 200_000_000, limit_bytes: 10_000_000_000, effective_bytes: 10_000_000_000, free_bytes: 50_000_000_000,
+      eta_s: 4980, eta_kind: 'measured', eta_min_s: 4980, eta_max_s: 4980 };
+  });
+  const line = page.locator('main').getByText('Analiza plików aplikacji').locator('xpath=..');
+  await expect(line).toBeVisible();
+  const stop = page.getByRole('button', { name: 'Przerwij — przejrzę ręcznie' });
+  await expect(stop).toBeVisible();
+  const main = await box(page.locator('main'));
+  const lineBox = await box(line);
+  const kids = line.locator(':scope > *');
+  const n = await kids.count();
+  expect(n).toBeGreaterThanOrEqual(4);
+  const tops: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const b = await box(kids.nth(i));
+    tops.push(b.y + b.height / 2);
+  }
+  // Wszystkie elementy linii leżą w jednym rzędzie (środki w granicach kilku pikseli) i nie wystają z okna.
+  expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(4);
+  expect(lineBox.height).toBeLessThanOrEqual(40);
+  const stopBox = await box(stop);
+  // Uwaga: przy tej najdłuższej zawartości przycisk wystaje ok. 30 px poza linię (patrz raport zadania 7), ale nie poza okno.
+  expect(stopBox.x + stopBox.width).toBeLessThanOrEqual(1008);
+});
