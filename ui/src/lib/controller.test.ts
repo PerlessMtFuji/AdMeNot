@@ -1349,6 +1349,20 @@ describe('data transfer — export files', () => {
     expect(sent.exports).toEqual({ sms: SMS });
   });
 
+  test('checkExports is a cheap read without a job: merges the parts and keeps the choices', async () => {
+    const { ctl, s, bridge } = await chosen();
+    ctl.chooseExport('contacts', OLDER);
+    ctl.toggleTransfer('downloads');
+    const before = s.transfer.selection;
+    await ctl.checkExports();
+    expect(bridge.calls.at(-1)?.method).toBe('transfer_exports_check');
+    expect(bridge.calls.some((c) => c.method === 'transfer_rescan')).toBe(false);
+    expect(s.job).toBeNull();
+    expect(s.transfer.inventory?.exports.contacts?.length).toBeGreaterThan(0);
+    expect(s.transfer.inventory?.apps.length).toBeGreaterThan(0);  // reszta inwentarza zostaje
+    expect(s.transfer.selection).toEqual(before);
+  });
+
   test('rescan asks the bridge, keeps an older picked file and the other choices', async () => {
     const { ctl, s, bridge } = await chosen();
     ctl.chooseExport('contacts', OLDER);

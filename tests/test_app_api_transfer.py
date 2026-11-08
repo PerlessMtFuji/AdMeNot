@@ -1849,3 +1849,29 @@ def test_apps_left_makes_restore_resumable(tmp_path):
     assert apps_left({"apps_left": 2, "choice": {"apps": ["a"]}}) == 2
     assert apps_left({"apps_left": 2, "choice": {"apps": []}}) == 0
     assert apps_left({"choice": {"apps": ["a"]}}) == 0
+
+
+def test_transfer_exports_check_without_inventory_is_refused(tmp_path):
+    api, _ = _api(_phone(tmp_path))
+    assert api.transfer_exports_check()["error"]["key"] == "transfer_no_inventory"
+
+
+def test_transfer_exports_check_is_cheap_read_only_and_updates_inventory(tmp_path):
+    api, rec, phone, *_ = _denied(tmp_path)
+    _put(phone, "Pobrane/jeszcze-nowsze.vcf", VCF_NEW, MTIME + 50)
+    before = len(rec.of("transfer:inventory"))
+    start = len(phone.storage.commands)
+    result = api.transfer_exports_check()
+    assert set(result) == {"contacts", "sms", "mms", "mms_bytes", "calls", "denied", "exports"}
+    assert result["denied"] == ["contacts", "sms"]
+    assert [e["name"] for e in result["exports"]["contacts"]][0] == "jeszcze-nowsze.vcf"
+    assert len(result["exports"]["contacts"]) == 3
+    # bez zadania i bez nowego zdarzenia inwentarza; bieżący inwentarz (dla start_backup) jest odświeżony
+    assert len(rec.of("transfer:inventory")) == before
+    assert api._transfer[1].exports["contacts"][0].remote.endswith("jeszcze-nowsze.vcf")
+    assert api._transfer[1].files  # pliki z poprzedniego skanu zostają
+    session = phone.storage.commands[start:]
+    # tylko odczyt: żadnego skanu całej pamięci (stat całego /sdcard bez filtra rozszerzeń), zapisu ani usuwania
+    assert not any(c.split()[0] in {"rm", "mv", "cp", "touch", "mkdir", "am", "pm", "settings"} for c in session)
+    finds = [c for c in session if c.startswith("find")]
+    assert finds and all("-iname" in c for c in finds)

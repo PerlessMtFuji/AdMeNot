@@ -305,9 +305,11 @@ class FakeStoragePhone:
             maxdepth = int(expr[1])
             j = 2
         match_name: str | None = None
-        while j < len(expr) and expr[j] in ("-path", "-name"):
-            if expr[j] == "-name" and expr[j + 2] == "-type":  # filtr nazwy, bez -prune
-                match_name = expr[j + 1]
+        match_ci = False
+        while j < len(expr) and expr[j] in ("-path", "-name", "-iname"):
+            if expr[j] in ("-name", "-iname") and expr[j + 2] == "-type":  # filtr nazwy, bez -prune
+                match_name = expr[j + 1].lower() if expr[j] == "-iname" else expr[j + 1]
+                match_ci = expr[j] == "-iname"
                 j += 2
                 break
             (prune_paths if expr[j] == "-path" else prune_names).add(expr[j + 1])
@@ -339,7 +341,7 @@ class FakeStoragePhone:
                 dirnames[:] = [d for d in dirnames
                                if d not in prune_names and f"{rdir}/{d}" not in prune_paths]
                 for name in filenames:
-                    if name in prune_names or (match_name and not fnmatch.fnmatchcase(name, match_name)):
+                    if name in prune_names or (match_name and not fnmatch.fnmatchcase(name.lower() if match_ci else name, match_name)):
                         continue
                     st = os.stat(os.path.join(dirpath, name))
                     out.append(f"{st.st_size}|{int(st.st_mtime)}|{rdir}/{name}")

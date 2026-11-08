@@ -595,6 +595,9 @@ export interface InventoryApp {
 /** Rodzaj pliku eksportu: wizytówki .vcf, SMS Backup & Restore (`<smses>`, `<calls>`). */
 export type ExportKind = 'contacts' | 'sms' | 'calls';
 
+/** Część inwentarza z `transfer_exports_check`. */
+export type ExportsCheck = Pick<InventoryView, 'contacts' | 'sms' | 'mms' | 'mms_bytes' | 'calls' | 'denied' | 'exports'>;
+
 /** Plik eksportu znaleziony na telefonie (z `present.inventory_view`). `mtime`: czas lokalny ISO, sekundy
  *  (null — telefon podał czas spoza zakresu dat, np. ujemny);
  *  `count`: null, gdy plik jest większy niż odczytany nagłówek (liczba będzie znana po pobraniu). */
@@ -1015,6 +1018,8 @@ export interface Api {
   transfer_whatsapp(): R<{ whatsapp_backup: string | null }>;
   /** Ponowny odczyt telefonu (np. po eksporcie kontaktów do pliku) — wynik jak `transfer_inventory`. */
   transfer_rescan(): R<{ job_id: string }>;
+  /** Tani odczyt pod automatyczne sprawdzanie (bez zadania): liczby z providerów i pliki eksportu. */
+  transfer_exports_check(): R<ExportsCheck>;
   start_backup(selection: TransferSelection): R<{ job_id: string }>;
   transfers(): R<{ orders: TransferOrderView[]; copies: CopyView[] }>;
   /** Czy telefon z ostatniego planu wciąż blokuje instalację przez USB (Xiaomi); null — nieznane. */

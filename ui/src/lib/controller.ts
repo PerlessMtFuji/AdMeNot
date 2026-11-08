@@ -880,6 +880,19 @@ export class Controller {
     if (r) this.setJob(r.job_id, 'transfer_scan');
   }
 
+  /** Automatyczne sprawdzanie pod otwartą instrukcją eksportu: tani odczyt (bez zadania), wynik wchodzi do
+   *  bieżącego inwentarza, a wybór serwisanta zostaje (`rescanSelection`). */
+  async checkExports(): Promise<void> {
+    const s = this.state;
+    if (s.phase !== 'transfer_choose' || !s.transfer.inventory || s.job) return;
+    const r = await this.call(this.api.transfer_exports_check());
+    const prev = s.transfer.inventory;
+    if (!r || !prev || s.phase !== 'transfer_choose') return;
+    const next = { ...prev, ...r };
+    s.transfer.selection = rescanSelection(s.transfer.selection, prev, next);
+    s.transfer.inventory = next;
+  }
+
   /** „Sprawdź ponownie”: serwisant właśnie zrobił kopię czatów WhatsApp na telefonie. */
   async recheckWhatsapp(): Promise<void> {
     const r = await this.call(this.api.transfer_whatsapp());

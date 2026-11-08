@@ -348,9 +348,9 @@ def refresh_inventory(
     return _build(adb, previous.apps, previous.skipped_apps, should_stop)
 
 
-def _build(
-    adb: AdbTransport, apps: list[AppEntry], skipped: list[AppEntry], should_stop: Callable[[], bool]
-) -> Inventory:
+def _read_counts(adb: AdbTransport, should_stop: Callable[[], bool]
+                 ) -> tuple[dict[str, int | None], set[str], int | None, int]:
+    """Liczby z providerów (kontakty, SMS, połączenia), kategorie z odmową oraz statystyki MMS."""
     counts: dict[str, int | None] = {}
     denied: set[str] = set()
     for key, uri in (("contacts", "content://com.android.contacts/contacts"),
@@ -366,6 +366,44 @@ def _build(
         mms, mms_bytes = mms_stats(adb)
     except ContentQueryError:
         pass
+    return counts, denied, mms, mms_bytes
+
+
+def refresh_exports(adb: AdbTransport, previous: Inventory, should_stop: Callable[[], bool]) -> Inventory:
+    """Tani odczyt pod automatyczne sprawdzanie: tylko liczby z providerów i pliki eksportu.
+
+    Bez skanu całej pamięci: kandydatów (`*.vcf`, `*.xml`) szuka jeden `find` na rozszerzenie.
+    Reszta inwentarza (pliki, foldery, aplikacje, WhatsApp, miejsce) zostaje z `previous`."""
+    counts, denied, mms, mms_bytes = _read_counts(adb, should_stop)
+    missing = {k for k in EXPORT_KINDS if counts[k] is None}
+    exports: dict[str, list[ExportFile]] = {}
+    if missing:
+        candidates: list[RemoteFile] = []
+        for ext in ("vcf", "xml"):
+            _check(should_stop)
+            parts = ["find", "-H", q(REMOTE_BASE), "-path", q(f"{REMOTE_BASE}/Android"), "-prune", "-o"]
+            for name in JUNK_DIRS:
+                parts += ["-name", q(name), "-prune", "-o"]
+            parts += ["-iname", q(f"*.{ext}"), "-type", "f", "-exec", "stat", "-c", q("%s|%Y|%n"), "{}", "+"]
+            try:
+                out = adb.shell(" ".join(parts), timeout=120)
+            except AdbError as exc:
+                if exc.kind in _PROPAGATE_KINDS:
+                    raise
+                continue
+            for line in out.split(chr(10)):
+                bits = line.split("|", 2)
+                if len(bits) == 3 and bits[0].isdigit() and bits[1].lstrip("-").isdigit() and "�" not in bits[2]:
+                    candidates.append(RemoteFile(bits[2].replace("//", "/"), int(bits[0]), int(bits[1]), ""))
+        exports = find_exports(adb, candidates, missing, should_stop)
+    return replace(previous, contacts=counts["contacts"], sms=counts["sms"], mms=mms, mms_bytes=mms_bytes,
+                   calls=counts["calls"], denied=frozenset(denied), exports=exports)
+
+
+def _build(
+    adb: AdbTransport, apps: list[AppEntry], skipped: list[AppEntry], should_stop: Callable[[], bool]
+) -> Inventory:
+    counts, denied, mms, mms_bytes = _read_counts(adb, should_stop)
     files, others, unreadable = scan_files(adb, should_stop)
     _check(should_stop)
     wa = whatsapp_backup_time(adb)

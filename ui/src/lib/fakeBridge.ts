@@ -198,6 +198,14 @@ export function createFakeBridge(name: string,
         return {};
       case 'transfer_whatsapp':
         return { whatsapp_backup: '2026-09-26T14:29:00' };
+      case 'transfer_exports_check': {
+        // Bez nagrania: te same liczby i pliki eksportu co w `transfer:inventory`.
+        const events = data.calls.find((c) => c.method === 'transfer_inventory')?.events ?? [];
+        const inv = (events.find(([event]) => event === 'transfer:inventory')?.[1] as { inventory?: Record<string, unknown> } | undefined)?.inventory;
+        if (!inv) return { error: { key: 'transfer_no_inventory', message: '' } };
+        const { contacts, sms, mms, mms_bytes, calls, denied, exports } = inv;
+        return { contacts, sms, mms, mms_bytes, calls, denied, exports };
+      }
       case 'transfer_rescan': {
         // Scenariusz bez nagranego ponownego skanu: ten sam odczyt co `transfer_inventory`.
         const events = data.calls.find((c) => c.method === 'transfer_inventory')?.events ?? [];

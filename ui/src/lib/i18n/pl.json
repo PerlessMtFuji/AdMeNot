@@ -813,13 +813,6 @@
         "many": "{count} z pliku eksportu",
         "other": "{count} z pliku eksportu"
       },
-      "what": {
-        "contacts": "kontaktów",
-        "sms": "wiadomości",
-        "calls": "historii połączeń",
-        "and": " i ",
-        "sep": ", "
-      },
       "items": {
         "contacts": {
           "one": "{count} kontakt",
@@ -877,12 +870,6 @@
       "few": "{count} wiadomości",
       "many": "{count} wiadomości",
       "other": "{count} wiadomości"
-    },
-    "folders": {
-      "one": "{count} folder",
-      "few": "{count} foldery",
-      "many": "{count} folderów",
-      "other": "{count} folderu"
     },
     "categories": {
       "one": "{count} kategoria",

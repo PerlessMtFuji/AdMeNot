@@ -146,7 +146,7 @@ test('an old WhatsApp chat backup is a short label; the instructions open only o
 
   describe('automatic re-check', () => {
     afterEach(() => { vi.useRealTimers(); });
-    const rescans = (b: { calls: { method: string }[] }) => b.calls.filter((c) => c.method === 'transfer_rescan').length;
+    const rescans = (b: { calls: { method: string }[] }) => b.calls.filter((c) => c.method === 'transfer_exports_check').length;
     const waChecks = (b: { calls: { method: string }[] }) => b.calls.filter((c) => c.method === 'transfer_whatsapp').length;
 
     test('with the WhatsApp fold open the bridge is asked every RECHECK_MS; with it closed, never', async () => {
@@ -159,14 +159,17 @@ test('an old WhatsApp chat backup is a short label; the instructions open only o
       expect(waChecks(bridge)).toBeGreaterThan(0);
     });
 
-    test('with an export fold open the phone is re-read after RECHECK_MS; with it closed, never', async () => {
+    test('with an export fold open the cheap exports check runs after RECHECK_MS; with it closed, never', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
-      const { bridge } = await show({ contacts: null, denied: ['contacts'] });
+      const { bridge, s } = await show({ contacts: null, denied: ['contacts'] });
       await vi.advanceTimersByTimeAsync(RECHECK_MS * 2 + 100);
       expect(rescans(bridge)).toBe(0);
       await fireEvent.click(screen.getByRole('button', { name: /^Kontakty: jak skopiować\?/ }));
       await vi.advanceTimersByTimeAsync(RECHECK_MS + 100);
       expect(rescans(bridge)).toBeGreaterThan(0);
+      // tani odczyt: ani pełny skan, ani zadanie (przyciski „Rozpocznij kopię” nie migają)
+      expect(bridge.calls.some((c) => c.method === 'transfer_rescan')).toBe(false);
+      expect(s.job).toBeNull();
     });
 
     test('no re-check while another phone read is in progress', async () => {

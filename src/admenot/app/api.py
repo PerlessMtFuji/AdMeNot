@@ -176,6 +176,7 @@ from admenot.engine.transfer.inventory import (
     FILE_CATEGORIES,
     Inventory,
     build_inventory,
+    refresh_exports,
     refresh_inventory,
     whatsapp_backup_time,
 )
@@ -1923,6 +1924,17 @@ class Api(ExplorerMixin):
         when = whatsapp_backup_time(ReadOnlyAdb(self._session(device.serial)))
         inventory.whatsapp_backup = when
         return {"whatsapp_backup": when.isoformat(timespec="seconds") if when else None}
+
+    @_api
+    def transfer_exports_check(self) -> dict[str, Any]:
+        """Tani ponowny odczyt pod automatyczne sprawdzanie na ekranie wyboru (bez zadania i bez skanu pamięci):
+        liczby z providerów i pliki eksportu. Wynik trafia też do bieżącego inwentarza, z którego
+        `start_backup` waliduje wybór. Zwraca tylko te części widoku inwentarza."""
+        device, previous, name = self._transfer_state()
+        inventory = refresh_exports(ReadOnlyAdb(self._session(device.serial)), previous, lambda: False)
+        self._transfer = (device, inventory, name)
+        view = inventory_view(inventory, self._lang)
+        return {key: view[key] for key in ("contacts", "sms", "mms", "mms_bytes", "calls", "denied", "exports")}
 
     @_api
     def start_backup(self, selection: dict[str, Any]) -> dict[str, Any]:

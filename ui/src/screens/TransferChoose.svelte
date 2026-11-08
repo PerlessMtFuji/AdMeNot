@@ -58,7 +58,6 @@
   }
   const problems = $derived(inv ? EXPORT_KINDS.filter((k) => (k === 'sms' ? inv.sms === null || inv.mms === null : inv[k] === null)) : []);
   const deniedKinds = $derived(problems.filter((k) => inv?.denied?.includes(k)));
-  const rescanning = $derived(s.job?.kind === 'transfer_scan');
   // Czas pliku spoza zakresu dat (most daje null): bez daty zamiast „Invalid Date”.
   const fileDate = (iso: string | null) => iso === null ? '' : new Date(iso).toLocaleString(i18n.lang === 'pl' ? 'pl-PL' : 'en-GB',
     { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -68,18 +67,20 @@
   const setOpen = (key: string) => (open: boolean) => { opened[key] = open; };
   const exportOpen = $derived(problems.some((k) => opened[k]));
 
+  const positive = (n: number | null | undefined) => n !== null && n !== undefined && n > 0;
+
   const messageRows = $derived.by((): Row[] => {
     if (!inv) return [];
     const messages = inv.sms === null && inv.mms === null ? null : (inv.sms ?? 0) + (inv.mms ?? 0);
     const rows: Row[] = [
       { key: 'contacts', icon: Users, name: t('transfer.row.contacts'), count: inv.contacts === null ? fileMeta('contacts') || undefined : num(inv.contacts),
-        checked: sel.contacts, disabled: !(inv.contacts && inv.contacts > 0) && !files('contacts').length, kind: 'contacts' },
+        checked: sel.contacts, disabled: !positive(inv.contacts) && !files('contacts').length, kind: 'contacts' },
       { key: 'sms', icon: MessageSquare, name: t('transfer.row.sms'),
         count: messages === null ? fileMeta('sms') || undefined : count(messages, 'transfer.messages'),
-        size: (inv.mms ?? 0) > 0 && inv.mms_bytes ? size(inv.mms_bytes) : undefined, checked: sel.sms || sel.mms,
-        disabled: !(inv.sms && inv.sms > 0) && !(inv.mms && inv.mms > 0) && !files('sms').length, kind: 'sms' },
+        size: positive(inv.mms) && inv.mms_bytes ? size(inv.mms_bytes) : undefined, checked: sel.sms || sel.mms,
+        disabled: !positive(inv.sms) && !positive(inv.mms) && !files('sms').length, kind: 'sms' },
       { key: 'calls', icon: PhoneIcon, name: t('transfer.row.calls'), count: inv.calls === null ? fileMeta('calls') || undefined : num(inv.calls),
-        checked: sel.calls, disabled: !(inv.calls && inv.calls > 0) && !files('calls').length, kind: 'calls' },
+        checked: sel.calls, disabled: !positive(inv.calls) && !files('calls').length, kind: 'calls' },
     ];
     return rows;
   });
@@ -107,10 +108,10 @@
   const waOld = $derived(!!inv && inv.categories.whatsapp.files > 0 && whatsappStale(inv.whatsapp_backup, new Date()));
 
   // Zamiast przycisków „Sprawdź ponownie”: gdy rozwinięcie z instrukcją jest otwarte, program sam co RECHECK_MS pyta
-  // telefon. Eksport to ponowny odczyt telefonu (`transfer_rescan`, zadanie w tle), WhatsApp — tani odczyt kopii czatów.
-  // Nic nie idzie naraz: `recheck` czeka na koniec poprzedniego, a odczyt telefonu wstrzymuje oba sprawdzenia.
+  // telefon. Eksport to tani odczyt (`transfer_exports_check`: liczby z providerów i pliki eksportu, bez zadania), WhatsApp — odczyt kopii czatów.
+  // Nic nie idzie naraz: `recheck` czeka na koniec poprzedniego, a trwające zadanie na telefonie wstrzymuje oba sprawdzenia.
   $effect(() => {
-    const stopExport = recheck(() => ctl.rescanTransfer(), () => exportOpen && s.job === null);
+    const stopExport = recheck(() => ctl.checkExports(), () => exportOpen && s.job === null);
     const stopWa = recheck(() => ctl.recheckWhatsapp(), () => !!opened.whatsapp && waOld && s.job === null);
     return () => { stopExport(); stopWa(); };
   });
@@ -221,7 +222,7 @@
 </div>
 
 {#snippet autoCheck(text: string)}
-  <p class="mt-1 flex items-center gap-1.5 text-xs text-soft">{#if rescanning}<Spinner />{/if}{text}</p>
+  <p class="mt-1 flex items-center gap-1.5 text-xs text-soft">{text}</p>
 {/snippet}
 
 <!-- Rozwinięcie wiersza z problemem odczytu: lista plików eksportu (jeśli są) i instrukcja eksportu. -->
