@@ -27,7 +27,7 @@ import time
 from collections import Counter, deque
 from collections.abc import Callable
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
@@ -48,6 +48,7 @@ from .puller import PullResult
 from .pusher import Pusher
 from .restore_plan import (
     MTIME_TOLERANCE,
+    UPLOAD_GROUPS,
     Action,
     PlanFile,
     RestorePlan,
@@ -84,16 +85,17 @@ class UploadChoice:
     apks_on: frozenset[str]  # `remote` podejrzanych APK zaznaczonych przez serwisanta
     verify_hash: bool = False
     tel: frozenset[str] = frozenset()  # ⊆ TEL_KINDS; `sms` obejmuje MMS (silnik telefonii: `sms` + `mms`)
+    apps: frozenset[str] = frozenset()  # pakiety aplikacji z `apps/` kopii do zainstalowania (etap aplikacji)
 
     def to_json(self) -> dict[str, Any]:
         return {"groups": sorted(self.groups), "apks_on": sorted(self.apks_on), "verify_hash": self.verify_hash,
-                "tel": sorted(self.tel)}
+                "tel": sorted(self.tel), "apps": sorted(self.apps)}
 
     @classmethod
     def from_json(cls, data: dict[str, Any]) -> UploadChoice:
-        """Stan sprzed Etapu 3 nie ma klucza `tel` (wgrywanie samych plików)."""
+        """Stan sprzed Etapu 3 nie ma klucza `tel`, sprzed Etapu 4 — `apps`."""
         return cls(frozenset(data["groups"]), frozenset(data["apks_on"]), bool(data.get("verify_hash", False)),
-                   frozenset(data.get("tel") or ()))
+                   frozenset(data.get("tel") or ()), frozenset(data.get("apps") or ()))
 
 
 TEL_KINDS = frozenset({"contacts", "sms", "calls"})  # wybór telefonii na ekranie wgrywania
@@ -127,6 +129,9 @@ class RestoreResult:
     # skończone: Android 10+ `done`/`failed`, starszy `restart`; przerwane: `skipped` (skanuje wznowienie)
     media_scan: MediaScan
     files_missing: int = 0  # pliki wybranych grup, których nie ma na PC (`plan.missing_in`)
+    # per grupa (`photos`, `videos`, `downloads`, `whatsapp`, `others`): done / exists / skipped / failed
+    # (`failed` = błąd + odmowa dostępu); `skipped` = odznaczona grupa albo pominięty APK
+    groups: dict[str, dict[str, int]] = field(default_factory=dict)
 
 
 class RestoreError(Exception):
@@ -548,6 +553,14 @@ class _Restore:
         cnt = Counter(r.status for r in rows)
         skipped = Counter(r.error for r in rows if r.status == "skipped")
         done = [r for r in rows if r.status == "done"]
+        groups = {g: {"done": 0, "exists": 0, "skipped": 0, "failed": 0}
+                  for g in (*UPLOAD_GROUPS, "others")}
+        for r in rows:
+            key = {"done": "done", "exists": "exists", "skipped": "skipped", "error": "failed",
+                   "denied": "failed"}.get(r.status)
+            bucket = groups.get("others" if r.grp.startswith("other:") else r.grp)
+            if key and bucket is not None:
+                bucket[key] += 1
         return RestoreResult(
             status=status, target_serial=self.device.serial, files_done=len(done),
             files_exists=cnt["exists"], files_renamed=sum(1 for r in done if r.target != r.remote),
@@ -555,7 +568,7 @@ class _Restore:
             apk_skipped=skipped["apk_malicious"], apk_suspicious_skipped=skipped["apk_suspicious"],
             bytes=sum(r.size for r in done), seconds=round(time.monotonic() - t0),
             hashed=self.choice.verify_hash and self.hash_ok, media_scan=media_scan,
-            files_missing=self.plan.missing_in(self.choice.groups))
+            files_missing=self.plan.missing_in(self.choice.groups), groups=groups)
 
 
 def _mark(state: RestoreState, status: str) -> None:

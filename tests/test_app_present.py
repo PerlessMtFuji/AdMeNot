@@ -528,3 +528,30 @@ def test_inventory_view_export_mtime_out_of_range_is_none(stamp):
     inv = Inventory(None, 5, 0, 0, 7, [], {}, [], [], None, None, 0,
                     exports={"sms": [ExportFile("/sdcard/sms.xml", 10, stamp, "sms", 1)]})
     assert inventory_view(inv, "pl")["exports"]["sms"][0]["mtime"] is None
+
+
+def test_apps_plan_and_result_views():
+    from admenot.app.present import apps_plan_view, apps_result_view
+    from admenot.engine.transfer.apps import AppCandidate, AppsPlan, AppsResult
+
+    plan = AppsPlan([AppCandidate("a", "Alfa", 3, 100, "clean", True, None, ()),
+                     AppCandidate("b", "Beta", 4, 50, "suspicious", False, "installed", ())], "xiaomi")
+    assert apps_plan_view(plan) == {
+        "items": [{"package": "a", "name": "Alfa", "bytes": 100, "verdict": "clean", "default_on": True,
+                   "skip": None},
+                  {"package": "b", "name": "Beta", "bytes": 50, "verdict": "suspicious", "default_on": False,
+                   "skip": "installed"}],
+        "block": "xiaomi", "bytes": 100}
+    res = AppsResult(1, 1, 0, {}, {}, {}, False, False,
+                     [{"package": "a", "label": "Alfa", "status": "installed", "reason": None}], True)
+    assert apps_result_view(res)["installed"] == 1
+
+
+def test_result_notes_counts_failures_only():
+    from admenot.app.present import result_notes
+
+    assert result_notes(None) == 0
+    result = {"files": {"groups": {"photos": {"failed": 3}, "videos": {"failed": 0}}},
+              "tel": {"kinds": {"sms": {"failed": 1}, "calls": {"failed": 0}}},
+              "apps": {"failed": {"no_space": 1, "failed": 1}, "skipped": {"installed": 4}}}
+    assert result_notes(result) == 1 + 1 + 2

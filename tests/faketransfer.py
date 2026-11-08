@@ -923,6 +923,9 @@ def _telephony_cmd(argv: list[str]) -> bool:
     return argv[0] == "pm" and argv[1:2] in (["list"], ["uninstall"], ["grant"]) and helper.PACKAGE in argv
 
 
+_APP_PROPS = ("ro.product.cpu.abilist", "persist.security.adbinstall")  # odczyty planu aplikacji
+
+
 class TransferPhone:
     """Telefon do testów mostu kopii: skan aplikacji z `FakePhone` (pakiety, ustawienia), pamięć,
     providery, APK i `pull` z `FakeStoragePhone`. Jest też `Puller` (puller_factory → ta atrapa).
@@ -948,6 +951,10 @@ class TransferPhone:
             return argv[2] in self.storage.apps
         if argv[:2] == ["rm", "-f"]:  # eksplorator: nasz plik tymczasowy pod `/sdcard/`
             return True
+        if argv[:3] == ["pm", "list", "packages"] and len(argv) in (3, 4):  # instalacja aplikacji z kopii
+            return True
+        if len(argv) == 2 and argv[0] == "getprop" and (argv[1] in self.storage.props or argv[1] in _APP_PROPS):
+            return True
         return (bool(argv) and argv[0] in _STORAGE_TOOLS) or _telephony_cmd(argv)
 
     def shell(self, command: str, timeout: float = 20.0) -> str:
@@ -956,7 +963,7 @@ class TransferPhone:
         return self.cli.shell(command, timeout)
 
     def run(self, args: list[str], timeout: float = 20.0) -> str:
-        if args == ["get-state"] or args[:2] == ["install", "-g"]:
+        if args == ["get-state"] or args[:2] == ["install", "-g"] or args[:1] in (["install"], ["install-multiple"]):
             return self.storage.run(args, timeout)
         if len(args) == 3 and args[:2] == ["shell", "-T"] and self._storage_cmd(args[2]):
             return self.storage.run(args, timeout)

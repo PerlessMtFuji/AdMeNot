@@ -1180,6 +1180,42 @@
    "method": "transfers",
    "args": [],
    "result": {
+    "orders": [
+     {
+      "number": "ZS/2026/0926/01",
+      "client": "Anna K.",
+      "created_at": "2026-09-26T14:30:00",
+      "source": {
+       "name": "samsung SM-A145R",
+       "imei": null
+      },
+      "target": null,
+      "state": "copy_ready",
+      "notes": 0,
+      "copy": {
+       "id": "R58T00TEST-90fae0b8e3f0/20260926-143000",
+       "days_left": 7,
+       "deleted_at": null
+      },
+      "whatsapp_restored": false,
+      "counts": {
+       "apps": 1,
+       "apps_failed": 0,
+       "apps_skipped": 0,
+       "calls": 1,
+       "contacts": 2,
+       "files": 7,
+       "files_downloads": 3,
+       "files_failed": 0,
+       "files_others": 1,
+       "files_photos": 2,
+       "files_skipped": 0,
+       "files_whatsapp": 1,
+       "sms": 2,
+       "unreadable": 0
+      }
+     }
+    ],
     "copies": [
      {
       "id": "R58T00TEST-90fae0b8e3f0/20260926-143000",
@@ -1442,6 +1478,30 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58W20NEW01",
+      "command": "getprop ro.product.cpu.abilist",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
+      "command": "pm list packages",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58W20NEW01",
       "command": "stat -c '%s|%Y|%n' '/sdcard/DCIM/Camera/IMG_0001 (z kopii).jpg' '/sdcard/DCIM/Camera/IMG_0001 (z kopii 2).jpg' '/sdcard/DCIM/Camera/IMG_0001 (z kopii 3).jpg' '/sdcard/DCIM/Camera/IMG_0001 (z kopii 4).jpg' '/sdcard/DCIM/Camera/IMG_0001 (z kopii 5).jpg' 2>&1 || true",
       "status": "ok",
       "duration": 0.0,
@@ -1552,6 +1612,21 @@
         "calls": false
        }
       },
+      "apps": {
+       "items": [
+        {
+         "package": "com.whatsapp",
+         "name": "com.whatsapp",
+         "bytes": 11,
+         "verdict": "safe",
+         "default_on": true,
+         "skip": null
+        }
+       ],
+       "block": null,
+       "bytes": 11
+      },
+      "order": "ZS/2026/0926/01",
       "copy": {
        "id": "R58T00TEST-90fae0b8e3f0/20260926-143000",
        "serial": "R58T00TEST",
@@ -1878,7 +1953,39 @@
        "seconds": 0,
        "hashed": false,
        "media_scan": "done",
-       "files_missing": 0
+       "files_missing": 0,
+       "groups": {
+        "photos": {
+         "done": 2,
+         "exists": 0,
+         "skipped": 0,
+         "failed": 0
+        },
+        "videos": {
+         "done": 0,
+         "exists": 0,
+         "skipped": 0,
+         "failed": 0
+        },
+        "downloads": {
+         "done": 1,
+         "exists": 0,
+         "skipped": 2,
+         "failed": 0
+        },
+        "whatsapp": {
+         "done": 1,
+         "exists": 0,
+         "skipped": 0,
+         "failed": 0
+        },
+        "others": {
+         "done": 1,
+         "exists": 0,
+         "skipped": 0,
+         "failed": 0
+        }
+       }
       },
       "copy": {
        "id": "R58T00TEST-90fae0b8e3f0/20260926-143000",
@@ -1939,7 +2046,13 @@
        ]
       },
       "tel": null,
-      "tel_error": null
+      "tel_error": null,
+      "apps": null,
+      "order": "ZS/2026/0926/01",
+      "whatsapp": {
+       "files": true,
+       "app": "missing"
+      }
      }
     ],
     [
@@ -1955,6 +2068,45 @@
    "method": "transfers",
    "args": [],
    "result": {
+    "orders": [
+     {
+      "number": "ZS/2026/0926/01",
+      "client": "Anna K.",
+      "created_at": "2026-09-26T14:30:00",
+      "source": {
+       "name": "samsung SM-A145R",
+       "imei": null
+      },
+      "target": {
+       "name": "samsung SM-A546B",
+       "imei": null
+      },
+      "state": "restored",
+      "notes": 0,
+      "copy": {
+       "id": "R58T00TEST-90fae0b8e3f0/20260926-143000",
+       "days_left": 7,
+       "deleted_at": null
+      },
+      "whatsapp_restored": false,
+      "counts": {
+       "apps": 1,
+       "apps_failed": 0,
+       "apps_skipped": 0,
+       "calls": 1,
+       "contacts": 2,
+       "files": 7,
+       "files_downloads": 3,
+       "files_failed": 0,
+       "files_others": 1,
+       "files_photos": 2,
+       "files_skipped": 0,
+       "files_whatsapp": 1,
+       "sms": 2,
+       "unreadable": 0
+      }
+     }
+    ],
     "copies": [
      {
       "id": "R58T00TEST-90fae0b8e3f0/20260926-143000",

@@ -514,7 +514,9 @@ def _new_phone(tmp_path: Path, files: dict[str, bytes] | None = None) -> Transfe
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
         os.utime(path, (MTIME, MTIME))
-    return TransferPhone(make_cli_phone(), FakeStoragePhone(root, serial=NEW))
+    storage = FakeStoragePhone(root, serial=NEW)
+    storage.props["ro.product.cpu.abilist"] = "arm64-v8a,armeabi-v7a"
+    return TransferPhone(make_cli_phone(), storage)
 
 
 def _copied(tmp_path, extra: dict[str, bytes] | None = None, **kw):
@@ -539,6 +541,7 @@ def _copied(tmp_path, extra: dict[str, bytes] | None = None, **kw):
 def _planned(api, rec, copy_id: str, serial: str = NEW) -> dict:
     assert "job_id" in api.restore_plan(copy_id, serial)
     assert api._jobs.wait(5)
+    assert not rec.of("job:error"), rec.of("job:error")
     return rec.of("transfer:restore_plan")[-1]
 
 
@@ -1521,3 +1524,232 @@ def test_backup_survives_journal_failure_when_opening_order(tmp_path, monkeypatc
     api.start_backup(SELECTION)
     done = rec.of("transfer:done")[0]
     assert done["result"]["status"] == "complete" and done["copy"]["order"] is None
+
+
+# --- Etap 4: aplikacje w wgrywaniu i wynik w dzienniku ---------------------------------------------
+
+APPS_CHOICE = {**CHOICE, "apps": ["com.whatsapp"]}
+
+
+def _add_app(copy_id: str, package: str, label: str, verdict: str, version: int = 5) -> None:
+    import hashlib
+
+    from admenot.engine.actions.backup import COMPLETE
+
+    copy = store.CopyDir(store.transfers_dir() / copy_id)
+    d = copy.apps_dir / package / str(version)
+    d.mkdir(parents=True)
+    data = package.encode()
+    (d / "base.apk").write_bytes(data)
+    (d / COMPLETE).write_text(json.dumps({"package": package, "version_code": version,
+                                          "files": {"base.apk": hashlib.sha256(data).hexdigest()}}),
+                              encoding="utf-8")
+    rows = json.loads(copy.verdicts_path.read_text(encoding="utf-8")) if copy.verdicts_path.is_file() else []
+    rows.append({"package": package, "version_code": version, "verdict": verdict, "label": label})
+    copy.verdicts_path.write_text(json.dumps(rows), encoding="utf-8")
+
+
+def _order(api, number: str):
+    with api._journal() as journal:
+        order = journal.order_by_number(number)
+        return order, journal.transfer(order.id)
+
+
+def test_restore_plan_lists_apps_with_skip(tmp_path):
+    api, rec, host, copy_id = _copied(tmp_path)
+    _add_app(copy_id, "com.bad", "Zły", "suspicious")
+    host.phone(NEW).storage.installed.add("com.whatsapp")
+    event = _planned(api, rec, copy_id)
+    items = {i["package"]: i for i in event["apps"]["items"]}
+    assert items["com.whatsapp"]["skip"] == "installed"
+    assert items["com.bad"]["default_on"] is False and items["com.bad"]["skip"] is None
+    assert items["com.bad"]["name"] == "Zły" and items["com.bad"]["verdict"] == "suspicious"
+    assert event["apps"]["block"] is None
+    assert event["apps"]["bytes"] == items["com.bad"]["bytes"] > 0  # tylko instalowalne
+    assert event["order"] is not None and event["order"].startswith("ZS/")
+
+
+def test_restore_runs_apps_last_and_saves_result(tmp_path, no_tap_wait):
+    api, rec, host, copy_id = _tel_copied(tmp_path)
+    _planned(api, rec, copy_id)
+    assert "job_id" in api.start_restore({**TEL_CHOICE, "apps": ["com.whatsapp"]})
+    names = [n for n in rec.names() if n in ("transfer:restore_progress", "transfer:tel_progress",
+                                             "transfer:apps_progress")]
+    assert names.index("transfer:restore_progress") < names.index("transfer:tel_progress") \
+        < names.index("transfer:apps_progress")
+    done = rec.of("transfer:restore_done")[0]
+    assert done["apps"]["installed"] == 1 and done["order"].startswith("ZS/")
+    assert done["whatsapp"] is None  # grupa WhatsApp nie miała plików w kopii
+    assert "com.whatsapp" in host.phone(NEW).storage.installed
+    order, record = _order(api, done["order"])
+    assert record.result["apps"]["installed"] == 1 and record.result["files"]["status"] == "complete"
+    assert record.result["tel"]["status"] == "complete" and record.result["status"] == "done"
+    assert record.result["finished_at"] and order.status == "done"
+    assert record.target_serial == NEW
+
+
+def test_restore_without_apps_has_null_apps(tmp_path):
+    api, rec, _host, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+    api.start_restore(CHOICE)
+    done = rec.of("transfer:restore_done")[0]
+    assert done["apps"] is None
+    assert done["whatsapp"] is None
+    _, record = _order(api, done["order"])
+    assert record.result["apps"] is None
+
+
+def test_result_saved_after_files_when_tel_crashes(tmp_path, no_tap_wait, monkeypatch):
+    api, rec, _host, copy_id = _tel_copied(tmp_path)
+    _planned(api, rec, copy_id)
+
+    def boom(*a, **kw):
+        raise RuntimeError("tel down")
+
+    monkeypatch.setattr(type(api), "_run_tel", boom)
+    api.start_restore({**TEL_CHOICE, "apps": ["com.whatsapp"]})
+    done = rec.of("transfer:restore_done")[0]
+    assert done["tel_error"] == "transfer_failed"
+    order, record = _order(api, done["order"])
+    assert record.result["files"]["files_done"] == 5 and record.result["tel_error"] == "transfer_failed"
+    assert record.result["apps"]["installed"] == 1  # aplikacje nie zależą od telefonii
+    assert order.status == "failed" and record.result["status"] == "failed"
+
+
+def test_files_saved_when_job_raises_after_files(tmp_path, monkeypatch):
+    api, rec, _host, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+
+    def boom(*a, **kw):
+        raise RuntimeError("apps down")
+
+    monkeypatch.setattr("admenot.app.api.run_install", boom)
+    api.start_restore(APPS_CHOICE)
+    assert not rec.of("transfer:restore_done")
+    with api._journal() as journal:
+        ((order, record),) = journal.transfer_orders()[:1]
+    assert record.result["files"]["files_done"] == 5 and order.status == "failed"
+    assert record.result["status"] == "failed"
+
+
+def _xiaomi_copied(tmp_path, monkeypatch):
+    from admenot.engine.transfer import apps as A
+
+    monkeypatch.setattr(A, "_XIAOMI", A._XIAOMI | {"samsung", "oppo"})
+    api, rec, host, copy_id = _copied(tmp_path)
+    new = host.phone(NEW).storage
+    new.props["persist.security.adbinstall"] = "0"
+    return api, rec, host, copy_id, new
+
+
+def test_install_remaining_after_unblock(tmp_path, monkeypatch):
+    api, rec, _host, copy_id, new = _xiaomi_copied(tmp_path, monkeypatch)
+    event = _planned(api, rec, copy_id)
+    assert event["apps"]["block"] == "xiaomi"
+    assert api.install_check() == {"blocked": True}
+    api.start_restore(APPS_CHOICE)
+    done = rec.of("transfer:restore_done")[0]
+    assert done["apps"]["blocked"] is True and done["apps"]["skipped"] == {"user_restricted": 1}
+    number = done["order"]
+    new.props["persist.security.adbinstall"] = "1"
+    assert api.install_check() == {"blocked": False}
+    assert "job_id" in api.install_remaining_apps(number)
+    again = rec.of("transfer:apps_done")[-1]
+    assert again["order"] == number and again["apps"]["installed"] == 1
+    _, record = _order(api, number)
+    assert record.result["apps"]["installed"] == 1 and record.result["files"]["status"] == "complete"
+    assert "com.whatsapp" in new.installed
+
+
+def test_install_remaining_needs_phone(tmp_path, monkeypatch):
+    api, rec, host, copy_id, _new = _xiaomi_copied(tmp_path, monkeypatch)
+    _planned(api, rec, copy_id)
+    api.start_restore(APPS_CHOICE)
+    number = rec.of("transfer:restore_done")[0]["order"]
+    host.connected.discard(NEW)
+    assert api.install_remaining_apps(number)["error"]["key"] == "transfer_no_phone"
+    assert api.install_remaining_apps("ZS/none")["error"]["key"] == "bad_request"
+
+
+def test_install_check_reads_prop_only(tmp_path, monkeypatch):
+    api, rec, _host, copy_id, _new = _xiaomi_copied(tmp_path, monkeypatch)
+    _planned(api, rec, copy_id)
+    seen = len(rec.of("adb:command"))
+    api.install_check()
+    fresh = rec.of("adb:command")[seen:]
+    assert fresh and all("getprop persist.security.adbinstall" in c["command"] for c in fresh)
+
+
+def test_install_check_without_plan(tmp_path):
+    api, _rec = _api(_phone(tmp_path))
+    assert api.install_check() == {"blocked": None}
+
+
+def test_set_whatsapp_restored_roundtrip(tmp_path):
+    api, rec, _host, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+    api.start_restore(CHOICE)
+    number = rec.of("transfer:restore_done")[0]["order"]
+    assert api.set_whatsapp_restored(number, True) == {"order": number, "whatsapp_restored": True}
+    assert _order(api, number)[1].whatsapp_restored is True
+    assert api.set_whatsapp_restored(number, False)["whatsapp_restored"] is False
+    assert api.set_whatsapp_restored(number, "yes")["error"]["key"] == "bad_request"
+    assert api.set_whatsapp_restored("ZS/none", True)["error"]["key"] == "bad_request"
+
+
+def test_transfers_lists_orders_and_running_copies(tmp_path):
+    api, rec, _host, copy_id = _copied(tmp_path)
+    (waiting,) = api.transfers()["orders"]
+    assert waiting["state"] == "copy_ready" and waiting["target"] is None
+    assert waiting["copy"]["id"] == copy_id and waiting["client"] == "Anna K."
+    _planned(api, rec, copy_id)
+    api.start_restore(CHOICE)
+    (done,) = api.transfers()["orders"]
+    assert done["state"] == "restored" and done["notes"] == 0 and done["target"] is not None
+    assert done["whatsapp_restored"] is False and done["counts"]
+    # kopia przerwana: bez zlecenia, trafia do `copies`
+    store.create_copy("OLD2", _device(), "Jan", NOW)
+    listed = api.transfers()
+    assert len(listed["orders"]) == 1
+    assert any(c["status"] == "in_progress" for c in listed["copies"])
+    assert copy_id in {c["id"] for c in listed["copies"]}  # stary kształt zostaje do przejścia UI
+
+
+def test_transfer_order_view_states(tmp_path):
+    from admenot.app.present import transfer_order_view
+
+    api, rec, _host, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+    api.start_restore(CHOICE)
+    with api._journal() as journal:
+        ((order, record),) = journal.transfer_orders()
+        journal.save_transfer_result(order.id, {**record.result, "apps": {"failed": {"no_space": 2}}})
+        record = journal.transfer(order.id)
+        view = transfer_order_view(order, record, None, NOW)
+        assert (view["state"], view["notes"]) == ("restored_notes", 2)
+        journal.set_order_status(order.id, "failed")
+        assert transfer_order_view(journal.order(order.id), record, None, NOW)["state"] == "failed"
+        journal.set_order_status(order.id, "expired")
+        assert transfer_order_view(journal.order(order.id), record, None, NOW)["state"] == "expired"
+
+
+def test_whatsapp_view_rules(tmp_path):
+    from admenot.app.api import _whatsapp_view
+    from admenot.engine.transfer.apps import AppCandidate, AppsPlan, AppsResult
+    from admenot.engine.transfer.restore import RestoreResult, UploadChoice
+
+    copy = store.create_copy("OLD", _device(), None, NOW)
+    base = RestoreResult("complete", NEW, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, False, "done",
+                         groups={"whatsapp": {"done": 1, "exists": 0, "skipped": 0, "failed": 0}})
+    chosen = UploadChoice(frozenset({"whatsapp"}), frozenset())
+
+    def apps(status):
+        return AppsResult(1, 0, 0, {}, {}, {}, False, False,
+                          [{"package": "com.whatsapp", "label": "WhatsApp", "status": status, "reason": None}], True)
+
+    assert _whatsapp_view(chosen, base, None, None, copy, NEW) == {"files": True, "app": "missing"}
+    assert _whatsapp_view(chosen, base, apps("installed"), None, copy, NEW) == {"files": True, "app": "installed"}
+    assert _whatsapp_view(chosen, base, apps("exists"), None, copy, NEW) == {"files": True, "app": "pre_installed"}
+    plan = AppsPlan([AppCandidate("com.whatsapp", "WhatsApp", 1, 1, "clean", True, "installed", ())], None)
+    assert _whatsapp_view(chosen, base, None, plan, copy, NEW) == {"files": True, "app": "pre_installed"}
+    assert _whatsapp_view(UploadChoice(frozenset({"photos"}), frozenset()), base, None, None, copy, NEW) is None

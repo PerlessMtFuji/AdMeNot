@@ -24,7 +24,7 @@ from admenot.engine.device.info import DeviceInfo
 from admenot.engine.device_checks import DeviceCheck, fix_steps
 from admenot.engine.evidence import ladders
 from admenot.engine.facts import AppFacts
-from admenot.engine.journal.db import Action, Journal, Order
+from admenot.engine.journal.db import Action, Journal, Order, TransferRecord
 from admenot.engine.paths import transfers_dir
 from admenot.engine.phones.provider import SILHOUETTE, PhoneMatch
 from admenot.engine.report.model import device_block
@@ -49,6 +49,7 @@ from admenot.engine.texts import (
     verdict_label,
     warning_text,
 )
+from admenot.engine.transfer.apps import AppsPlan, AppsResult
 from admenot.engine.transfer.backup import BackupResult
 from admenot.engine.transfer.inventory import FILE_CATEGORIES, Inventory
 from admenot.engine.transfer.restore import RestoreResult
@@ -571,3 +572,71 @@ def tel_result_view(r: TelResult) -> dict[str, Any]:
             "cleanup": {**asdict(r.cleanup), "ok": r.cleanup.ok},
             "synced_accounts": _accounts(r.synced_accounts), "seconds": r.seconds, "stopped": r.stopped,
             "status": r.status}
+
+
+def apps_plan_view(plan: AppsPlan) -> dict[str, Any]:
+    """Aplikacje z kopii na ekranie wgrywania. `name` = etykieta ze starego telefonu (albo pakiet);
+    `skip` = powód, dla którego aplikacji nie da się zainstalować (`installed`, `too_old`, …) albo `None`.
+    `bytes` = suma rozmiarów wszystkich instalowalnych pozycji (`skip` pusty) — UI dolicza do „Do wgrania”
+    tylko zaznaczone. `block`: `xiaomi`, gdy telefon blokuje instalację przez USB."""
+    return {"items": [{"package": c.package, "name": c.label, "bytes": c.bytes, "verdict": c.verdict,
+                       "default_on": c.default_on, "skip": c.skip} for c in plan.apps],
+            "block": plan.block,
+            "bytes": sum(c.bytes for c in plan.apps if c.skip is None)}
+
+
+def apps_result_view(r: AppsResult) -> dict[str, Any]:
+    """Wynik instalacji: liczby, kody błędów (`INSTALL_FAILED_…`), wiersze `{package, label, status,
+    reason}` (etykiety tylko do UI) i flagi `blocked` / `stopped` / `play_installer`."""
+    return asdict(r)
+
+
+def result_notes(result: dict[str, Any] | None) -> int:
+    """Liczba uwag do wyniku wgrywania: aplikacje z błędem + grupy plików z błędami + kategorie telefonii
+    z błędami + błąd całej telefonii. Pominięcia (np. aplikacja już jest) uwagą nie są."""
+    if not result:
+        return 0
+    notes = 0
+    files = result.get("files") or {}
+    notes += sum(1 for g in (files.get("groups") or {}).values() if g.get("failed"))
+    tel = result.get("tel") or {}
+    notes += sum(1 for k in (tel.get("kinds") or {}).values() if k.get("failed"))
+    notes += 1 if result.get("tel_error") else 0
+    apps = result.get("apps") or {}
+    notes += sum((apps.get("failed") or {}).values())
+    return notes
+
+
+def transfer_order_view(order: Order, rec: TransferRecord, meta: CopyMeta | None,
+                        now: datetime) -> dict[str, Any]:
+    """Zlecenie ZS przeniesienia danych w Historii. `state`: `expired`/`failed` ze statusu zlecenia;
+    bez telefonu docelowego albo z wgrywaniem w toku — `copy_ready`; po wgraniu `restored` albo
+    `restored_notes` (`notes` > 0, patrz `result_notes`). `copy`: kopia, która jeszcze jest (dni do
+    usunięcia) albo `deleted_at` po jej usunięciu; `None` — brak kopii i brak daty."""
+    notes = result_notes(rec.result)
+    if order.status == "expired":
+        state = "expired"
+    elif order.status == "failed":
+        state = "failed"
+    elif rec.target_serial is None or rec.result is None or rec.result.get("status") != "done":
+        state = "copy_ready"
+    else:
+        state = "restored_notes" if notes else "restored"
+    copy: dict[str, Any] | None = None
+    if meta is not None:
+        left = (meta.expires - now).total_seconds()
+        copy = {"id": meta.id, "days_left": max(0, math.ceil(left / 86_400)), "deleted_at": None}
+    elif rec.copy_deleted_at is not None:
+        copy = {"id": rec.copy_id, "days_left": 0, "deleted_at": rec.copy_deleted_at.isoformat(timespec="seconds")}
+
+    def phone(d: dict[str, Any] | None) -> dict[str, Any] | None:
+        if not d:
+            return None
+        name = d.get("market_name") or " ".join(x for x in (d.get("manufacturer"), d.get("model")) if x)
+        return {"name": name or None, "imei": d.get("imei")}
+
+    return {"number": order.number, "client": order.client_name,
+            "created_at": order.created_at.isoformat(timespec="seconds"),
+            "source": phone(rec.source) or {"name": None, "imei": None}, "target": phone(rec.target),
+            "state": state, "notes": notes, "copy": copy, "whatsapp_restored": rec.whatsapp_restored,
+            "counts": dict(rec.source.get("counts") or {})}
