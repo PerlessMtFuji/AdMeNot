@@ -112,3 +112,31 @@ def test_source_snapshot_has_no_paths(tmp_path):
     assert snapshot["imei"] == "356938035643809" and snapshot["serial"] == "SRC"
     assert snapshot["selection_groups"] == ["contacts_messages", "files", "apps"]
     assert (snapshot["manufacturer"], snapshot["model"], snapshot["android"]) == ("samsung", "SM-A145R", "14")
+
+
+def test_open_for_copy_refreshes_source_and_expiry(journal):
+    from datetime import timedelta
+    copy = _copy()
+    first = orders.open_for_copy(journal, copy, NOW)
+    a = orders.order_for_target(journal, copy, _device("A"), NOW)
+    b = orders.order_for_target(journal, copy, _device("B"), NOW)
+    meta = copy.read_meta()
+    meta.counts = {"contacts": 500}
+    meta.expires = meta.expires + timedelta(days=7)
+    copy.write_meta(meta)
+    again = orders.open_for_copy(journal, copy, NOW)
+    assert again.number == first.number
+    for order in (a, b):
+        record = journal.transfer(order.id)
+        assert record.source["counts"] == {"contacts": 500} and record.copy_expires == meta.expires
+
+
+def test_open_for_copy_reuses_order_when_meta_lost_it(journal):
+    copy = _copy()
+    first = orders.open_for_copy(journal, copy, NOW)
+    meta = copy.read_meta()
+    meta.order = None
+    copy.write_meta(meta)
+    assert orders.open_for_copy(journal, copy, NOW).number == first.number
+    assert copy.read_meta().order == first.number
+    assert len(journal.transfers_for_copy(meta.id)) == 1

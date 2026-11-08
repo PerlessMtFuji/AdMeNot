@@ -1920,8 +1920,11 @@ class Api(ExplorerMixin):
                             should_stop=job.should_stop, wait_device=wait_device, now=self._now(),
                             keep_days=keep_days)
         if result.status in ("complete", "incomplete"):  # zatrzymana kopia nie ma jeszcze zlecenia
-            with self._journal() as journal:
-                transfer_orders.open_for_copy(journal, copy, self._now())
+            try:
+                with self._journal() as journal:
+                    transfer_orders.open_for_copy(journal, copy, self._now())
+            except Exception as exc:  # noqa: BLE001 — dobra kopia nie staje się błędem zadania; order=None
+                log_exception(exc)
         return result, copy
 
     def _transfer_events(self, job: Job, raw: AdbTransport, event: str,

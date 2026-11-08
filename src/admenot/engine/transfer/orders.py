@@ -40,15 +40,23 @@ def _copy_id(copy: CopyDir) -> str:
 
 
 def open_for_copy(journal: Journal, copy: CopyDir, now: datetime) -> Order:
-    """Zlecenie tej kopii: istniejące (numer w `meta.order` znany dziennikowi) albo nowe."""
+    """Zlecenie tej kopii: istniejące albo nowe. Istniejące (także gdy `meta.order` zginęło po
+    nieudanym zapisie) dostaje świeżą migawkę źródła i termin — wznowiona kopia kończy się ponownie."""
     meta = copy.read_meta()
-    if meta.order:
-        found = journal.order_by_number(meta.order)
-        if found is not None:
-            return found
+    copy_id = _copy_id(copy)
+    existing = journal.transfers_for_copy(copy_id)
+    if existing:
+        chosen = next((o for o in existing if o.number == meta.order), None) or next(
+            (o for o in existing if journal.transfer(o.id).target_serial is None), existing[0])
+        journal.set_transfer_source(copy_id, source_snapshot(meta))
+        journal.set_copy_expires(copy_id, meta.expires)
+        if meta.order != chosen.number:
+            meta.order = chosen.number
+            copy.write_meta(meta)
+        return chosen
     identity = {k: v for k, v in (("imei", meta.imei), ("model", meta.model or None)) if v}
     order = journal.create_transfer_order(
-        meta.serial, meta.model, meta.client, identity or None, copy_id=_copy_id(copy),
+        meta.serial, meta.model, meta.client, identity or None, copy_id=copy_id,
         source=source_snapshot(meta), received_at=meta.created, copy_expires=meta.expires)
     meta.order = order.number
     copy.write_meta(meta)

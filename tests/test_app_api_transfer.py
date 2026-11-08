@@ -1508,3 +1508,16 @@ def test_purge_marks_journal(tmp_path):
     api._purge_transfers()
     (_, record), = _transfer_orders()
     assert record.copy_deleted_at == NOW
+
+
+def test_backup_survives_journal_failure_when_opening_order(tmp_path, monkeypatch):
+    from admenot.engine.transfer import orders as orders_mod
+
+    def boom(*a, **k):
+        raise RuntimeError("journal down")
+
+    monkeypatch.setattr(orders_mod, "open_for_copy", boom)
+    api, rec, _ = _inventoried(tmp_path)
+    api.start_backup(SELECTION)
+    done = rec.of("transfer:done")[0]
+    assert done["result"]["status"] == "complete" and done["copy"]["order"] is None

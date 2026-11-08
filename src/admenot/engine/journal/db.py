@@ -391,6 +391,12 @@ class Journal:
             self._db.execute("UPDATE transfers SET copy_deleted_at = ? WHERE copy_id = ?",
                              (when.isoformat(timespec="seconds"), copy_id))
 
+    def set_transfer_source(self, copy_id: str, source: dict[str, Any]) -> None:
+        """Odświeża migawkę źródła we wszystkich zleceniach kopii (wznowiona kopia kończy się ponownie)."""
+        with self._db:
+            self._db.execute("UPDATE transfers SET source_json = ? WHERE copy_id = ?",
+                             (_dump(source), copy_id))
+
     def set_copy_expires(self, copy_id: str, expires: datetime) -> None:
         with self._db:
             self._db.execute("UPDATE transfers SET copy_expires = ? WHERE copy_id = ?",
