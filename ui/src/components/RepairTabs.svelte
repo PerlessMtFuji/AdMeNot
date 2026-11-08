@@ -14,6 +14,8 @@
   // Strzałki przełączają zakładki (roving tabindex); zdarzenie nie może dotrzeć do klawiatury tabeli eksperta.
   function onkey(e: KeyboardEvent, tab: RepairTab) {
     if (!e.key.startsWith('Arrow')) return;
+    // Alt/Ctrl/Meta + strzałka (np. Alt+← = wstecz w przeglądarce): nic nie robimy, niech obsłuży to przeglądarka/system.
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
     e.stopPropagation();
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     e.preventDefault();

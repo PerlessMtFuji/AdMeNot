@@ -69,3 +69,33 @@ test('arrow keydowns never bubble to the expert table handler', () => {
   document.body.removeEventListener('keydown', seen);
   expect(seen).not.toHaveBeenCalled();
 });
+
+test('ArrowRight moves focus to the other tab', async () => {
+  // Rodzic zmienia value po onchange — tu wystarczy fokus ustawiony przez komponent.
+  mount({ value: 'apps' });
+  const apps = screen.getByRole('tab', { name: /Aplikacje/ });
+  apps.focus();
+  await fireEvent.keyDown(apps, { key: 'ArrowRight' });
+  expect(document.activeElement).toBe(screen.getByRole('tab', { name: /Telefon/ }));
+});
+
+test('arrows with Alt, Ctrl or Meta are left to the browser', async () => {
+  const onchange = mount({ value: 'apps' });
+  const apps = screen.getByRole('tab', { name: /Aplikacje/ });
+  for (const mod of ['altKey', 'ctrlKey', 'metaKey']) {
+    const ev = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true, [mod]: true });
+    apps.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+  }
+  expect(onchange).not.toHaveBeenCalled();
+});
+
+test('modified arrows still bubble (component does not stop them)', () => {
+  mount();
+  const seen = vi.fn();
+  document.body.addEventListener('keydown', seen);
+  screen.getByRole('tab', { name: /Aplikacje/ }).dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'ArrowLeft', altKey: true, bubbles: true, cancelable: true }));
+  document.body.removeEventListener('keydown', seen);
+  expect(seen).toHaveBeenCalledTimes(1);
+});
