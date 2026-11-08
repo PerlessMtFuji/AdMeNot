@@ -718,7 +718,8 @@ export interface AppsPlanItem {
   /** Etykieta ze starego telefonu (albo nazwa pakietu). */
   name: string;
   bytes: number;
-  verdict: Verdict;
+  /** `unknown`: kopia bez werdyktów. */
+  verdict: Verdict | 'unknown';
   default_on: boolean;
   skip: AppSkip | null;
 }
@@ -1117,7 +1118,7 @@ export interface EventMap {
   'transfer:cleanup_done': { ok: boolean; serial: string };
   /** `tel`: null dla samych plików albo po błędzie telefonii (`tel_error` — klucz błędu). */
   'transfer:restore_done': { result: RestoreResultView; copy: CopyView; tel?: TelResultView | null; tel_error?: string | null;
-    apps: AppsResultView | null; apps_error?: string | null; order: string; whatsapp: WhatsappView | null };
+    apps: AppsResultView | null; apps_error?: string | null; order: string | null; whatsapp: WhatsappView | null };
   /** Eksplorator: liczby plików Miejsc liczone w tle (po każdym miejscu cała lista). */
   'explorer:places': { places: PlaceView[] };
   /** Telefon eksploratora zniknął z listy — most czeka na niego (kolejka stoi). */

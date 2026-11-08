@@ -49,7 +49,7 @@
       <Glyph size={16} strokeWidth={2} aria-hidden="true" />
     </span>
     <span class="min-w-0 flex-1">
-      <span class="font-bold text-ink">{name}</span>{#if count}<span class="ml-1 font-semibold text-soft">{count}</span>{/if}
+      <span class="font-bold [overflow-wrap:anywhere] text-ink">{name}</span>{#if count}<span class="ml-1 font-semibold text-soft">{count}</span>{/if}
       {#if sub}<span class="block text-[12.5px] leading-snug text-mut">{sub}</span>{/if}
     </span>
     {#if pills}<span class="flex flex-none flex-wrap items-center justify-end gap-1.5">{@render pills()}</span>{/if}
@@ -63,9 +63,9 @@
       <span class="flex-none font-bold whitespace-nowrap tabular-nums {result.tone === 'ok' ? 'text-ok' : 'text-warn'}">{result.text}</span>
     {/if}
   </div>
-  {#if fold && open}
-    <div id={foldId} class="pr-4 pt-1 pb-3 text-[13px] {hasBox ? 'pl-[75px]' : 'pl-[58px]'} text-mut">
-      {@render fold()}
+  {#if fold}
+    <div id={foldId} hidden={!open} class="pr-4 pt-1 pb-3 text-[13px] {hasBox ? 'pl-[75px]' : 'pl-[58px]'} text-mut">
+      {#if open}{@render fold()}{/if}
     </div>
   {/if}
 </div>
