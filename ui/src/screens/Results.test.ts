@@ -22,7 +22,7 @@ const appRows = () => within(screen.getByRole('group', { name: 'Tabela aplikacji
 const tab = (name: 'Aplikacje' | 'Telefon') => screen.getByRole('tab', { name: new RegExp(`^${name}`) });
 const openPhone = () => fireEvent.click(tab('Telefon'));
 // Dymek linii analizy: zdanie uspokajające i szacunek pobierania (spec §3 p.2) — czytany z nazwy ikony.
-const apkHint = () => screen.getByRole('img', { name: /Na razie bez oznak|Analiza pobierze|Pliki wszystkich/ }).getAttribute('aria-label') ?? '';
+const apkHint = () => screen.getByRole('button', { name: /Na razie bez oznak|Analiza pobierze|Pliki wszystkich/ }).getAttribute('aria-label') ?? '';
 
 describe('Results', () => {
   test('header shows the phone thumbnail next to the device name, in both modes', async () => {
