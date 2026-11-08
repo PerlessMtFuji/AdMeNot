@@ -73,6 +73,7 @@ for (const theme of ['light', 'dark'] as const) {
 
     test('results: phone state with site notification fixes', async ({ page }) => {
       await scan(page, 'adware', '&checks=populated');
+      await page.getByRole('tab', { name: /^Telefon/ }).click();
       await page.getByRole('switch', { name: 'Wycisz tanie-bilety.example' }).check();
       await expect(page.getByRole('complementary', { name: 'Plan naprawy' }).getByText('tanie-bilety.example')).toBeVisible();
       await expect(page).toHaveScreenshot(`results-phone-state-${theme}.png`);
