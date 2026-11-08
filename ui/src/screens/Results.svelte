@@ -8,6 +8,7 @@
   import AppCard from '../components/AppCard.svelte';
   import EvidencePanel from '../components/EvidencePanel.svelte';
   import ExpertTable from '../components/ExpertTable.svelte';
+  import EmptyVerdicts from '../components/EmptyVerdicts.svelte';
   import DeviceChecks from '../components/DeviceChecks.svelte';
   import DiagnosticsPanel from '../components/DiagnosticsPanel.svelte';
   import InterruptedBanner from '../components/InterruptedBanner.svelte';
@@ -21,7 +22,7 @@
   import StepTimeline from '../components/StepTimeline.svelte';
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
-  import { facetCounts, flaggedApps, focusedApp, groupOpen, isManual, modeUndecided, notices, phoneBadge, shownChecks, splitNotices,
+  import { emptyDangerVerdicts, facetCounts, flaggedApps, focusedApp, groupOpen, isManual, modeUndecided, notices, phoneBadge, shownChecks, splitNotices,
     verdictGroups, visibleApps } from '../lib/logic';
   import { DUR, enter, ms, stagger } from '../lib/motion';
   import type { Mode, Verdict } from '../lib/types';
@@ -208,10 +209,11 @@
           </div>
         {/if}
         {#if expert}
-          <ExpertTable groups={expertGroups} {focused} {facets} {searching} {navRows} />
+          <ExpertTable groups={expertGroups} {focused} {facets} {searching} {navRows} emptyDanger={emptyDangerVerdicts(apps)} />
         {:else if flagged.length > 0 && !verdictsHidden}
+          <EmptyVerdicts verdicts={emptyDangerVerdicts(apps)} />
           {#each simpleGroups.filter((g) => g.verdict !== 'safe') as g (g.verdict)}
-            {#if g.apps.length || DANGER.includes(g.verdict)}
+            {#if g.apps.length}
               <VerdictSection verdict={g.verdict} count={g.apps.length} open={isOpen(g.verdict)} apps={g.apps}
                 collapsible={g.apps.length > 0 && !DANGER.includes(g.verdict)}
                 ontoggle={() => ctl.setGroupOpen(g.verdict, !isOpen(g.verdict))}>

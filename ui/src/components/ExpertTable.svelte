@@ -6,14 +6,15 @@
   import type { AppView, Category, Level, Verdict } from '../lib/types';
   import Icon from '../ui/Icon.svelte';
   import AppIcon from './AppIcon.svelte';
+  import EmptyVerdicts from './EmptyVerdicts.svelte';
   import FiltersMenu from './FiltersMenu.svelte';
   import ReasonTiles from './ReasonTiles.svelte';
   import VerdictSection from './VerdictSection.svelte';
 
   type Facets = { categories: { value: Category; count: number }[]; sources: { value: string; count: number }[]; nonPlay: number };
   type Group = { verdict: Verdict; apps: AppView[] };
-  let { groups, focused, facets, searching, navRows }:
-    { groups: Group[]; focused: string | null; facets: Facets; searching: boolean; navRows: AppView[] } = $props();
+  let { groups, focused, facets, searching, navRows, emptyDanger }:
+    { groups: Group[]; focused: string | null; facets: Facets; searching: boolean; navRows: AppView[]; emptyDanger: Verdict[] } = $props();
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
   const SCORE = { malicious: 'text-bad', suspicious: 'text-warn', review: 'text-neutral', safe: 'text-ok' };
@@ -22,9 +23,10 @@
   // Groźne sekcje są zawsze otwarte; reszta według zapisu lub (przy wyszukiwaniu) sama się rozwija.
   const DANGER: Verdict[] = ['malicious', 'suspicious'];
   const isOpen = (v: Verdict) => groupOpen(v, s.settings.mode, s.openGroups, searching);
-  // Puste linie „Szkodliwe 0 — nic nie znaleziono” tylko gdy coś jest oznaczone; na czystym telefonie zostaje samo „Bez uwag”.
+  // Puste groźne kategorie zwijają się do jednego wiersza (EmptyVerdicts), tylko gdy coś jest oznaczone i nic nie szukamy;
+  // na czystym telefonie zostaje samo „Bez uwag”.
   const anyFlagged = $derived(groups.some((g) => g.verdict !== 'safe' && g.apps.length > 0));
-  const shown = $derived(groups.filter((g) => g.apps.length > 0 || (!searching && anyFlagged && DANGER.includes(g.verdict))));
+  const shown = $derived(groups.filter((g) => g.apps.length > 0));
   const firstWithRows = $derived(shown.find((g) => g.apps.length > 0 && isOpen(g.verdict))?.verdict ?? null);
   const total = $derived(s.scan!.counts.total);
   const filtered = $derived(s.categoryFilter.length > 0 || s.sourceFilter !== null);
@@ -68,6 +70,7 @@
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
 <div role="group" aria-label={t('expert.table')} tabindex="0" onkeydown={keydown} bind:this={table} class="@container flex flex-col gap-4 outline-none">
+  {#if !searching && anyFlagged}<EmptyVerdicts verdicts={emptyDanger} />{/if}
   {#each shown as g (g.verdict)}
     <VerdictSection verdict={g.verdict} count={g.apps.length} open={isOpen(g.verdict)} apps={g.apps}
       collapsible={!searching && g.apps.length > 0 && !DANGER.includes(g.verdict)}

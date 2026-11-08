@@ -64,7 +64,9 @@ describe('Results', () => {
     const { s, ctl } = await scanned();
     const review = s.scan!.apps.filter((a) => a.verdict === 'review');
     expect(screen.getByRole('region', { name: 'Szkodliwe' })).toBeTruthy();
-    expect(within(screen.getByRole('region', { name: 'Podejrzane' })).getByText(/nic nie znaleziono/)).toBeTruthy();
+    // Pusta kategoria nie ma już własnego regionu — tylko wiersz „Podejrzane 0 — nic nie znaleziono”.
+    expect(screen.queryByRole('region', { name: 'Podejrzane' })).toBeNull();
+    expect(screen.getByTestId('empty-verdicts').textContent).toMatch(/Podejrzane.*nic nie znaleziono/);
     const toggle = screen.getByRole('button', { name: /^Do sprawdzenia/ });
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
     expect(screen.queryByRole('article', { name: review[0].name })).toBeNull();
@@ -75,6 +77,52 @@ describe('Results', () => {
     await ctl.setMode('simple');
     await tick();
     expect(screen.queryByRole('article', { name: review[0].name })).toBeNull();
+  });
+
+  // Telefon bez szkodliwych i podejrzanych, z aplikacjami do sprawdzenia (werdykty podmienione w skanie).
+  async function onlyReview() {
+    const env = await scanned();
+    env.s.scan = { ...env.s.scan!, apps: env.s.scan!.apps.map((a) => (a.verdict === 'malicious' || a.verdict === 'suspicious' ? { ...a, verdict: 'review' as const } : a)) };
+    await tick();
+    return env;
+  }
+
+  test('simple mode: no malicious and no suspicious fold into one line', async () => {
+    await onlyReview();
+    expect(screen.queryByRole('region', { name: 'Szkodliwe' })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Podejrzane' })).toBeNull();
+    const line = screen.getByTestId('empty-verdicts');
+    expect(line.textContent).toMatch(/Szkodliwe/);
+    expect(line.textContent).toMatch(/Podejrzane/);
+    expect(line.textContent).toMatch(/nic nie znaleziono/);
+  });
+
+  test('simple mode: one suspicious app keeps its section, the line lists only malicious', async () => {
+    const { s } = await onlyReview();
+    const first = s.scan!.apps.find((a) => a.verdict === 'review')!.package;
+    s.scan = { ...s.scan!, apps: s.scan!.apps.map((a) => (a.package === first ? { ...a, verdict: 'suspicious' as const } : a)) };
+    await tick();
+    expect(screen.getByRole('region', { name: 'Podejrzane' })).toBeTruthy();
+    const line = screen.getByTestId('empty-verdicts');
+    expect(line.textContent).toMatch(/Szkodliwe/);
+    expect(line.textContent).not.toMatch(/Podejrzane/);
+  });
+
+  test('expert mode: the line sits above the table; searching to nothing does not show “nothing found”', async () => {
+    const { ctl, s } = await onlyReview();
+    await ctl.setMode('expert');
+    await tick();
+    const table = screen.getByRole('group', { name: 'Tabela aplikacji' });
+    expect(screen.queryByRole('region', { name: 'Szkodliwe' })).toBeNull();
+    expect(within(table).getByTestId('empty-verdicts').textContent).toMatch(/Szkodliwe.*Podejrzane.*nic nie znaleziono/);
+    // Wiersz nad grupą „Do sprawdzenia”.
+    const line = within(table).getByTestId('empty-verdicts');
+    const review = within(table).getByRole('region', { name: 'Do sprawdzenia' });
+    expect(line.compareDocumentPosition(review) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    s.query = 'zzzz-brak-takiej-aplikacji';
+    await tick();
+    expect(screen.queryByTestId('empty-verdicts')).toBeNull();
+    expect(screen.queryByText(/nic nie znaleziono/)).toBeNull();
   });
 
   test('clean phone, simple: the clean state, no empty danger lines, folded “no issues”', async () => {
