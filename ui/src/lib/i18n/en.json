@@ -65,6 +65,7 @@
     "apps": { "one": "{count} app", "few": "{count} apps", "many": "{count} apps", "other": "{count} apps" },
     "plan": "Repair plan", "empty": "Select the apps or sites you want to fix."
   },
+  "repair_tabs": { "label": "Repair step view", "apps": "Apps", "phone": "Phone", "phone_ok": "All good", "phone_unknown": "Not everything could be read" },
   "rail": { "label": "Menu", "new_order": "New order", "back_to_order": "Back to the order" },
   "header": { "find_source": "Find the ad source", "find_source_recording": "Find the ad source — recording in progress", "simple": "Simple", "expert": "Expert", "history": "History", "settings": "Settings" },
   "stage": { "label": "Stages", "connect": "Connection", "read": "Reading", "analyze": "Analysis", "fix": "Repair", "report": "Report" },

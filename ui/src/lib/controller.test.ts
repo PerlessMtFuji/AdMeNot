@@ -507,6 +507,27 @@ describe('repair screen view state', () => {
   });
 });
 
+describe('repair tab state', () => {
+  test('starts on apps, is set by setRepairTab, reset by a (re)scan and by returning to Połącz', async () => {
+    const { ctl, s } = await setupCtl('adware');
+    expect(s.repairTab).toBe('apps');
+    await ctl.startScan();
+    await vi.waitFor(() => expect(s.job).toBeNull());
+    ctl.setRepairTab('phone');
+    expect(s.repairTab).toBe('phone');
+    // Przejście do Protokołu i z powrotem nie zmienia zakładki.
+    s.phase = 'done';
+    s.phase = 'results';
+    expect(s.repairTab).toBe('phone');
+    await ctl.startScan();
+    await vi.waitFor(() => expect(s.repairTab).toBe('apps'));
+    await vi.waitFor(() => expect(s.job).toBeNull());
+    ctl.setRepairTab('phone');
+    ctl.newScan();
+    expect(s.repairTab).toBe('apps');
+  });
+});
+
 describe('error reports', () => {
   test('init loads startup reports', async () => {
     const { ctl, s, bridge } = setup('empty');

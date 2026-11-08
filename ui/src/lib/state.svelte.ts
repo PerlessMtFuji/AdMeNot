@@ -5,6 +5,8 @@ import type {
   PlanView, Question, ReportResult, ScanView, Settings, ShareState, ShotsView, ShotView, StepEvent, UndoDone, UndoSite, UpdateView, UserWait, Verdict, WhoView,
 } from './types';
 
+/** Zakładka kroku Naprawa: lista aplikacji albo stan telefonu. */
+export type RepairTab = 'apps' | 'phone';
 export type Screen = 'main' | 'history' | 'settings' | 'explorer';
 /** Kategorie ekranu Ustawienia w kolejności kolumny (spec ustawień §4). */
 export type SettingsCategory = 'general' | 'repair' | 'transfer' | 'explorer' | 'service' | 'privacy' | 'program';
@@ -120,6 +122,8 @@ export class AppState {
   focused = $state<string | null>(null);
   /** Rozwinięte/zwinięte grupy werdyktu na ekranie Naprawa; puste = domyślne trybu (logic.groupOpen). */
   openGroups = $state<OpenGroups>({});
+  /** Aktywna zakładka kroku Naprawa; żyje do nowego skanu / powrotu do Połącz (zmiana kroku jej nie rusza). */
+  repairTab = $state<RepairTab>('apps');
   /** Prawy panel pokazuje „Znajdź źródło reklamy" zamiast planu / szczegółów. */
   diagnostics = $state(false);
   who = $state<WhoView | null>(null); // wynik „Kto to wyświetla?” — żyje do nowego skanu

@@ -1,7 +1,7 @@
 import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
 import { actedAfter, changedVerdicts, defaultSelection, defaultUploadChoice, keptUploadChoice, otherGroup, TEL_KINDS, telWrite, resumableCopy, UPLOAD_GROUPS, resumeSelection, rescanSelection, TRANSFER_CATEGORIES, transferNeed, transferTotals, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
-import { EMPTY_TRANSFER_SELECTION, emptyRestore, type AppState, type SettingsCategory } from './state.svelte';
+import { EMPTY_TRANSFER_SELECTION, emptyRestore, type AppState, type RepairTab, type SettingsCategory } from './state.svelte';
 import { ExplorerController } from './explorer/controller';
 import { applyTheme } from './theme';
 import type {
@@ -128,6 +128,7 @@ export class Controller {
       s.fixes.clear();
       s.expanded = [];
       s.openGroups = {};
+      s.repairTab = 'apps';
       s.diagnostics = false;
       s.who = null;
       s.apk = { done: 0, total: 0, running: true, changed: [], eta: null };
@@ -440,7 +441,7 @@ export class Controller {
       phase: 'connect', screen: 'main', device: null, scan: null, result: null, order: null,
       plan: null, selection: {}, actedLog: {}, undoTarget: null, steps: [], disconnectedOrder: null, reports: {},
       categoryFilter: [], sourceFilter: null, lastShot: null, lastShotSerial: null, shotCount: 0,
-      openGroups: {}, diagnostics: false, who: null,
+      openGroups: {}, repairTab: 'apps', diagnostics: false, who: null,
       // Nowa sprawa: nazwisko poprzedniego klienta nie może trafić do protokołu następnego telefonu
       // (audyt 2026-10-11, PRIV-04), a odblokowane pakiety chronione — do jego planu (QA-01).
       client: '', unlocked: [],
@@ -578,6 +579,10 @@ export class Controller {
 
   setGroupOpen(verdict: Verdict, open: boolean): void {
     this.state.openGroups = { ...this.state.openGroups, [verdict]: open };
+  }
+
+  setRepairTab(tab: RepairTab): void {
+    this.state.repairTab = tab;
   }
 
   openDiagnostics(): void {
