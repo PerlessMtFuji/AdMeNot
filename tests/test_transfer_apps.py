@@ -337,3 +337,102 @@ def test_adb_error_kinds_for_phone_offline(env):
     env.phone.online = False
     with pytest.raises(AdbError):
         env.adb.run(["get-state"])
+
+
+def _installs(env, package):
+    return [c for c in env.phone.host_commands if Path(c[-1]).parent.parent.name == package]
+
+
+def test_pending_from_previous_process_and_present_is_installed_without_install(env):
+    env.add("com.a.one", "Alpha")
+    env.add("com.b.two", "Beta")
+    plan = env.plan()
+    env.state.app_attempt("com.a.one")  # polecenie poszło w poprzednim procesie
+    env.state.app_attempt("com.b.two")
+    env.phone.installed.update({"com.a.one", "com.b.two"})  # stare okno zgody dokończyło instalację
+    res = env.run(plan)
+    assert res.installed == 2 and res.failed == {} and env.phone.host_commands == []
+    # to samo, gdy plan zbudowano jeszcze przed instalacją (pakiet pojawia się dopiero przy sprawdzeniu)
+    env.state.db.execute("DELETE FROM apps")
+    env.state.app_attempt("com.a.one")
+    env.phone.installed.clear()
+    plan = env.plan()
+    env.phone.installed.add("com.a.one")
+    res = env.run(plan, packages={"com.a.one"})
+    assert res.installed == 1 and env.phone.host_commands == []
+
+
+@pytest.mark.parametrize("failure", ["Failure [INSTALL_FAILED_ALREADY_EXISTS: x]",
+                                     "Failure [INSTALL_FAILED_ABORTED: User rejected permissions]"])
+def test_failure_but_package_landed_is_installed(env, failure):
+    env.add("com.a.one", "Alpha")
+    env.phone.install_fail["com.a.one"] = failure
+    env.phone.install_fail_lands.add("com.a.one")
+    res = env.run(env.plan())
+    assert res.installed == 1 and res.failed == {}
+    assert len(env.phone.host_commands) == 1
+
+
+def test_installer_word_in_package_name_does_not_drop_installer(env):
+    env.add("com.my.installer", "Alpha")
+    env.add("com.b.two", "Beta")
+    env.phone.install_fail["com.my.installer"] = "Failure [INSTALL_FAILED_ABORTED: User rejected permissions]"
+    res = env.run(env.plan())
+    assert res.failed == {"no_consent": 1} and res.installed == 1
+    assert all("-i" in c for c in env.phone.host_commands)
+    assert len(_installs(env, "com.my.installer")) == 1
+    assert res.play_installer is True
+
+
+def test_installer_rejected_requires_security_exception_about_installer():
+    files = (Path("/x/apps/com.a.b/1/base.apk"),)
+    msg = "java.lang.SecurityException: Caller is not allowed to set the installer package"
+    assert A.installer_rejected(msg, files, "com.a.b")
+    assert not A.installer_rejected("Failure [INSTALL_FAILED_ABORTED]: SecurityException installer", files, "com.a.b")
+    assert not A.installer_rejected("package installer: failed to install /x/apps/com.a.b/1/base.apk", files,
+                                    "com.a.b")
+    assert not A.installer_rejected("SecurityException: foo /x/apps/com.a.b/1/base.apk", files, "com.a.b")
+
+
+def test_no_consent_row_rechecked_on_resume(env):
+    env.add("com.a.one", "Alpha")
+    env.phone.install_timeout.add("com.a.one")
+    plan = env.plan()
+    res = env.run(plan)
+    assert res.failed == {"no_consent": 1}
+    env.phone.installed.add("com.a.one")  # zgoda przyszła później
+    env.phone.host_commands.clear()
+    res = env.run(plan)
+    assert res.installed == 1 and res.failed == {} and env.phone.host_commands == []
+
+
+def test_pending_under_block_checks_presence_first(env):
+    env.add("com.a.one", "Alpha")
+    env.add("com.b.two", "Beta")
+    env.phone.props["persist.security.adbinstall"] = "0"
+    plan = env.plan(_device(manufacturer="Xiaomi"))
+    env.state.app_attempt("com.a.one")
+    env.phone.installed.add("com.a.one")
+    plan = A.AppsPlan(plan.apps, plan.block)
+    res = env.run(plan)
+    by = {r["package"]: (r["status"], r["reason"]) for r in res.rows}
+    assert by == {"com.a.one": ("installed", None), "com.b.two": ("skipped", "user_restricted")}
+
+
+def test_adb_error_while_alive_fails_one_app_and_continues(env):
+    env.add("com.a.one", "Alpha")
+    env.add("com.b.two", "Beta")
+    plan = env.plan()
+
+    def boom(command: str) -> None:
+        if command == "pm list packages com.a.one":
+            raise AdbError("command_failed", "boom")
+
+    env.phone.on_shell = boom
+    res = env.run(plan)
+    assert res.failed == {"failed": 1} and res.installed == 1
+    assert [r["status"] for r in res.rows] == ["failed", "installed"]
+
+
+def test_adb_text_with_timeout_is_not_no_consent():
+    assert A.classify_install("adb: connection timeout while installing") == ("failed", None)

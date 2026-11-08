@@ -609,3 +609,17 @@ def test_app_install_guard(tmp_path):
     with pytest.raises(UnsafeCommand):
         adb.shell("pm uninstall com.a.b")
     assert len(rec.calls) == len(ok) + 1
+
+
+def test_app_install_guard_rejects_relative_paths(tmp_path, monkeypatch):
+    from admenot.engine.transfer.guard import AppInstallAdb
+
+    root = tmp_path / "apps"
+    (root / "com.a.b" / "1").mkdir(parents=True)
+    (root / "com.a.b" / "1" / "base.apk").write_bytes(b"x")
+    monkeypatch.chdir(tmp_path)
+    adb = AppInstallAdb(Recorder(), root)
+    with pytest.raises(UnsafeCommand):
+        adb.run(["install", "apps/com.a.b/1/base.apk"])
+    with pytest.raises(UnsafeCommand):
+        adb.run(["install-multiple", str(root / "com.a.b" / "1" / "base.apk"), "apps/com.a.b/1/base.apk"])

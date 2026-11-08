@@ -28,6 +28,7 @@ from admenot.engine.device.info import DeviceInfo
 
 from .backup import MAX_DISCONNECTS
 from .guard import APP_INSTALLER, AppInstallAdb
+from .restore_state import RestoreState
 from .store import CopyDir
 
 # Instalator zapisany w pakiecie (decyzja ze spike'u na OPPO, spec §5.2): aplikacje dostają aktualizacje
@@ -44,14 +45,15 @@ _XIAOMI = {"xiaomi", "redmi", "poco"}
 _ABI_SPLIT = re.compile(r"split_config\.([a-z0-9_]+)\.apk")
 _ABIS = {"arm64_v8a", "armeabi_v7a", "armeabi", "x86", "x86_64", "mips", "mips64", "riscv64"}
 _CODE = re.compile(r"INSTALL_(?:PARSE_)?FAILED_[A-Z0-9_]+")
-_INSTALLER_REJECTED = re.compile(r"security ?exception|installer", re.IGNORECASE)
+_SECURITY = re.compile(r"security ?exception", re.IGNORECASE)
+_INSTALLER_WORD = re.compile(r"installer", re.IGNORECASE)
 _TOO_OLD_TARGET = 23  # Android 14+ odrzuca targetSdk poniżej 23
 _TOO_OLD_ANDROID = 34
 
 _CLASSIFY: tuple[tuple[re.Pattern[str], AppError], ...] = tuple(
     (re.compile(p, re.IGNORECASE), e) for p, e in (
         (r"INSTALL_FAILED_USER_RESTRICTED", "user_restricted"),
-        (r"INSTALL_FAILED_ABORTED|cancell?ed[ _]by[ _]user|timed out|timeout", "no_consent"),
+        (r"INSTALL_FAILED_ABORTED|cancell?ed[ _]by[ _]user", "no_consent"),
         (r"INSTALL_FAILED_DEPRECATED_SDK_VERSION|INSTALL_FAILED_OLDER_SDK", "too_old"),
         (r"INSTALL_FAILED_NO_MATCHING_ABIS", "no_abi"),
         (r"INSTALL_FAILED_INSUFFICIENT_STORAGE", "no_space"),
@@ -142,11 +144,24 @@ def xiaomi_install_blocked(adb: AppInstallAdb) -> bool | None:
     return {"0": True, "1": False}.get(value)
 
 
+def installer_rejected(output: str, c_files: tuple[Path, ...], package: str) -> bool:
+    """Telefon odrzucił `-i`: SecurityException o instalatorze, bez kodu `INSTALL_FAILED_…`. Lokalne ścieżki
+    plików i nazwa pakietu (mogą zawierać słowo „installer”) są przed sprawdzeniem wycinane z wyjścia."""
+    if _CODE.search(output):
+        return False
+    text = output
+    for f in c_files:
+        for variant in (str(f), f.as_posix(), str(f.parent), f.parent.as_posix()):
+            text = text.replace(variant, "")
+    text = text.replace(package, "")
+    return bool(_SECURITY.search(text) and _INSTALLER_WORD.search(text))
+
+
 def _listed(out: str) -> set[str]:
     return {line[len("package:"):].strip() for line in out.splitlines() if line.startswith("package:")}
 
 
-def _best_version(pkg_dir: Path, package: str) -> tuple[int | None, Path] | None:
+def _best_version(pkg_dir: Path, package: str) -> tuple[int, Path] | None:
     """Najwyższa kompletna wersja `apps/<pakiet>/<versionCode>/`."""
     best: tuple[int, Path] | None = None
     for d in pkg_dir.iterdir():
@@ -209,7 +224,7 @@ class _TooManyDisconnects(Exception):
 
 
 class _Installer:
-    def __init__(self, adb: AppInstallAdb, plan: AppsPlan, packages: frozenset[str], state: Any,
+    def __init__(self, adb: AppInstallAdb, plan: AppsPlan, packages: frozenset[str], state: RestoreState,
                  on_progress: Callable[[AppsProgress], None], should_stop: Callable[[], bool],
                  wait_device: Callable[[], None], only_blocked: bool) -> None:
         self.adb, self.plan, self.state = adb, plan, state
@@ -289,12 +304,15 @@ class _Installer:
                     self._set(c.package, "failed", "failed")
                 return False
             error, code = classify_install(out)
-            if self.installer and error != "user_restricted" and _INSTALLER_REJECTED.search(out):
+            if self.installer and installer_rejected(out, c.files, c.package):
                 self.installer = None  # telefon nie przyjmuje `-i`: ta aplikacja jeszcze raz, reszta też bez
                 continue
             if error == "user_restricted":
                 self._set(c.package, "skipped", error, code)
                 return True
+            if self._present(c.package):  # wcześniejsza sesja instalacji (stare okno zgody) mogła ją dokończyć
+                self._set(c.package, "installed")
+                return False
             if error == "failed" and code is None:
                 unknown += 1
                 if unknown < APP_ATTEMPTS:
@@ -304,11 +322,26 @@ class _Installer:
 
     # ---- przebieg ----------------------------------------------------------------------------
     def run(self) -> AppsResult:
-        if self.state.get_meta("apps_pre_installed") is None:
-            before = self._call(lambda: _listed(self.adb.shell("pm list packages")))
-            self.state.set_meta("apps_pre_installed", sorted(before))
-        prior = self.state.apps_status()
         todo: list[tuple[AppCandidate, bool]] = []  # (aplikacja, czy instalacja już była wysłana)
+        try:
+            self._prepare(todo)
+            self._process(todo, len(todo), 0)
+        except _TooManyDisconnects:
+            self.stopped = True
+            for c, _ in todo:
+                if self.state.apps_status().get(c.package, ("",))[0] == "pending":
+                    self._set(c.package, "failed", "disconnected")
+        return self._result()
+
+    def _prepare(self, todo: list[tuple[AppCandidate, bool]]) -> None:
+        if self.state.get_meta("apps_pre_installed") is None:
+            try:
+                before = self._call(lambda: _listed(self.adb.shell("pm list packages")))
+            except AdbError:
+                before = None  # lista tylko do ramki WhatsApp; zapiszemy przy następnym przebiegu
+            if before is not None:
+                self.state.set_meta("apps_pre_installed", sorted(before))
+        prior = self.state.apps_status()
         for c in self.chosen:
             old = prior.get(c.package)
             if self.only_blocked:
@@ -319,15 +352,27 @@ class _Installer:
                 todo.append((c, False))
             elif old[0] == "pending" or old[:2] == ("failed", "disconnected"):
                 todo.append((c, True))
-        total, done = len(todo), 0
-        try:
-            self._process(todo, total, done)
-        except _TooManyDisconnects:
-            self.stopped = True
-            for c, _ in todo:
-                if self.state.apps_status().get(c.package, ("",))[0] == "pending":
-                    self._set(c.package, "failed", "disconnected")
-        return self._result()
+            elif old[:2] == ("failed", "no_consent"):
+                # zgoda mogła przyjść po limicie czasu albo w starym oknie: pakiet jest -> zainstalowany
+                try:
+                    if self._present(c.package):
+                        self._set(c.package, "installed")
+                except AdbError:
+                    pass
+
+    def _one(self, c: AppCandidate, attempted: bool) -> None:
+        if (self.blocked or self.plan.block == "xiaomi") and c.skip is None:
+            if attempted and self._present(c.package):  # instalacja sprzed rozłączenia weszła
+                self._set(c.package, "installed")
+                return
+            self.blocked = True
+            self._set(c.package, "skipped", "user_restricted")
+        elif c.skip == "installed":
+            self._set(c.package, "installed" if attempted else "exists")
+        elif c.skip is not None:
+            self._set(c.package, "skipped", c.skip)
+        elif self._install(c, attempted):
+            self.blocked = True
 
     def _process(self, todo: list[tuple[AppCandidate, bool]], total: int, done: int) -> None:
         for c, attempted in todo:
@@ -335,15 +380,10 @@ class _Installer:
                 self.stopped = True
                 return
             self.on_progress(AppsProgress("apps", done, total, c.label))
-            if (self.blocked or self.plan.block == "xiaomi") and c.skip is None:
-                self.blocked = True
-                self._set(c.package, "skipped", "user_restricted")
-            elif c.skip == "installed":
-                self._set(c.package, "installed" if attempted else "exists")
-            elif c.skip is not None:
-                self._set(c.package, "skipped", c.skip)
-            elif self._install(c, attempted):
-                self.blocked = True
+            try:
+                self._one(c, attempted)
+            except AdbError:  # polecenie nie przeszło, a telefon jest podłączony: ta jedna aplikacja, reszta dalej
+                self._set(c.package, "failed", "failed")
             done += 1
         self.on_progress(AppsProgress("apps", done, total, ""))
 
@@ -373,7 +413,7 @@ class _Installer:
 
 
 def run_install(adb: AppInstallAdb, device: DeviceInfo, copy: CopyDir, plan: AppsPlan,
-                packages: frozenset[str], state: Any, *, on_progress: Callable[[AppsProgress], None],
+                packages: frozenset[str], state: RestoreState, *, on_progress: Callable[[AppsProgress], None],
                 should_stop: Callable[[], bool], wait_device: Callable[[], None],
                 only_blocked: bool = False) -> AppsResult:
     """Instaluje wybrane `packages` z `plan` (alfabetycznie po etykiecie); wynik z końcowego stanu aplikacji."""

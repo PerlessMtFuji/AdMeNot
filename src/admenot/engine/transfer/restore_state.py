@@ -157,10 +157,6 @@ class RestoreState:
         `skipped` | `failed`. `pending` = instalacja wysłana, wynik nieznany (rozłączenie)."""
         return {p: (st, rs, cd) for p, st, rs, cd in self.db.execute("SELECT package, status, reason, code FROM apps")}
 
-    def app_attempts(self, package: str) -> int:
-        row = self.db.execute("SELECT attempts FROM apps WHERE package=?", (package,)).fetchone()
-        return row[0] if row else 0
-
     def app_set(self, package: str, status: str, reason: str | None = None, code: str | None = None) -> None:
         """Status aplikacji, z commitem; liczba prób zostaje."""
         self.db.execute(

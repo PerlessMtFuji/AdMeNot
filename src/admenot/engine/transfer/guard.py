@@ -309,7 +309,8 @@ class AppInstallAdb:
         for name in rest:
             path = Path(name)
             try:
-                inside = path.suffix == ".apk" and path.is_file() and path.resolve().is_relative_to(root)
+                inside = (path.is_absolute() and path.suffix == ".apk" and path.is_file()
+                          and path.resolve().is_relative_to(root))
             except OSError:
                 inside = False
             if not inside:

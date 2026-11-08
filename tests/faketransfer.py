@@ -162,6 +162,7 @@ class FakeStoragePhone:
         self.install_fail: dict[str, str] = {}  # pakiet -> wyjście błędu `adb install` (kod 1)
         self.install_timeout: set[str] = set()  # pakiety, dla których instalacja czeka na zgodę do limitu
         self.disconnect_after_install: set[str] = set()  # pakiet wchodzi, a telefon się odłącza (raz)
+        self.install_fail_lands: set[str] = set()  # `install_fail`, a pakiet i tak wchodzi (stara sesja zgody)
         self.installer_rejected = False  # `-i <sklep>` kończy się `Security exception`
         # eksplorator plików
         self.deny_list_prefixes: set[str] = set()  # listowanie (`find`, `ls`) pod takim prefiksem -> Permission denied
@@ -634,6 +635,8 @@ class FakeStoragePhone:
         if package in self.install_timeout:
             raise AdbError("timeout", f"adb {args[0]} timed out")
         if package in self.install_fail:
+            if package in self.install_fail_lands:
+                self.installed.add(package)
             raise AdbError("command_failed", f"Performing Streamed Install\nadb: failed to install "
                                              f"{files[0]}: {self.install_fail[package]}")
         if self.install_blocked:
