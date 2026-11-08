@@ -626,6 +626,8 @@ def settle_finished(copy: CopyDir, serial: str, plan: RestorePlan, tel_plan: Tel
         return False
     state = RestoreState(restore_state_path(copy, serial))
     try:
+        if state.get_meta("apps_left"):  # aplikacje wybrane, a bez wyniku: wznowienie ma jeszcze pracę
+            return False
         saved = state.get_meta("choice")
         try:
             choice = UploadChoice.from_json(saved) if isinstance(saved, dict) else None

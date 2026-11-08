@@ -2048,6 +2048,7 @@
       "tel": null,
       "tel_error": null,
       "apps": null,
+      "apps_error": null,
       "order": "ZS/2026/0926/01",
       "whatsapp": {
        "files": true,

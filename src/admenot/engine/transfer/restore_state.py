@@ -323,9 +323,19 @@ def _summary(path: Path) -> RestoreSummary | None:
     return RestoreSummary(serial, status, updated if isinstance(updated, str) else None,
                           # `complete` z `tel_left`: pliki skończone, a wybranej telefonii jeszcze nie
                           # było (program zamknięty między etapami; most zapisuje `tel_left` przed plikami)
-                          (status != "complete" and left > 0) or _tel_left(meta) > 0,
+                          (status != "complete" and left > 0) or _tel_left(meta) > 0 or apps_left(meta) > 0,
                           changes_pending(meta.get("device_changes")),
                           meta["imei"] if isinstance(meta.get("imei"), str) else None)
+
+
+def apps_left(meta: dict[str, Any]) -> int:
+    """Aplikacje wybrane do instalacji, a jeszcze nierozstrzygnięte (meta `apps_left`: most ustawia je przed
+    plikami, a po etapie aplikacji na liczbę bez wyniku). Stan bez aplikacji w wyborze ich nie liczy."""
+    left = meta.get("apps_left")
+    choice = meta.get("choice")
+    if not isinstance(left, int) or (isinstance(choice, dict) and not choice.get("apps")):
+        return 0
+    return left
 
 
 def _tel_left(meta: dict[str, Any]) -> int:

@@ -608,15 +608,17 @@ def result_notes(result: dict[str, Any] | None) -> int:
 
 
 def transfer_order_view(order: Order, rec: TransferRecord, meta: CopyMeta | None,
-                        now: datetime) -> dict[str, Any]:
+                        now: datetime, running: bool = False) -> dict[str, Any]:
     """Zlecenie ZS przeniesienia danych w Historii. `state`: `expired`/`failed` ze statusu zlecenia;
     bez telefonu docelowego albo z wgrywaniem w toku — `copy_ready`; po wgraniu `restored` albo
-    `restored_notes` (`notes` > 0, patrz `result_notes`). `copy`: kopia, która jeszcze jest (dni do
+    `restored_notes` (`notes` > 0, patrz `result_notes`). Zlecenie `running` z celem i zapisanym wynikiem,
+    którego wgrywanie nie trwa (`running` — zadanie dla tego zlecenia), to przerwane (program zamknięty): `failed`. `copy`: kopia, która jeszcze jest (dni do
     usunięcia) albo `deleted_at` po jej usunięciu; `None` — brak kopii i brak daty."""
     notes = result_notes(rec.result)
     if order.status == "expired":
         state = "expired"
-    elif order.status == "failed":
+    elif order.status == "failed" or (order.status == "running" and rec.target_serial is not None
+                                      and rec.result is not None and not running):
         state = "failed"
     elif rec.target_serial is None or rec.result is None or rec.result.get("status") != "done":
         state = "copy_ready"

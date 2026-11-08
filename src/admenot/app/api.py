@@ -2125,6 +2125,7 @@ class Api(ExplorerMixin):
             tel: TelResult | None = None
             apps: AppsResult | None = None
             tel_error: str | None = None
+            apps_error: str | None = None
             order_id: int | None = None
             order_number: str | None = None
             saved: dict[str, Any] = {}
@@ -2153,9 +2154,11 @@ class Api(ExplorerMixin):
                         for stage in ("files", "tel", "apps"):
                             saved.setdefault(stage, None)
                         save(status="running", started_at=self._now().isoformat(timespec="seconds"),
-                             finished_at=None, tel_error=None)
+                             finished_at=None, tel_error=None, apps_error=None)
                     if chosen.tel:
                         self._note_tel_pending(copy, serial, tel_plan, chosen.tel)
+                    if chosen.apps:
+                        self._set_apps_left(copy, serial, chosen.apps)
                     result = self._run_restore(job, adb, raw, device, copy, plan, chosen)
                     save(files=restore_result_view(result))
                     if chosen.tel and result.status != "stopped":  # zatrzymane pliki: telefonia czeka
@@ -2169,16 +2172,23 @@ class Api(ExplorerMixin):
                         save(tel=tel_result_view(tel) if tel is not None else None, tel_error=tel_error)
                     if (chosen.apps and apps_plan is not None and result.status != "stopped"
                             and not (tel is not None and tel.stopped)):  # zatrzymane: aplikacje czekają
-                        with _transfer_errors("restore_apps"):
-                            apps = self._run_apps(job, adb, raw, device, copy, apps_plan, chosen.apps)
-                        save(apps=apps_result_view(apps))
+                        try:
+                            with _transfer_errors("restore_apps"):
+                                apps = self._run_apps(job, adb, raw, device, copy, apps_plan, chosen.apps)
+                        except Stopped:
+                            raise
+                        except Exception as exc:  # noqa: BLE001 — pliki i telefonia już są: ich wynik idzie dalej
+                            apps_error = error_payload(exc)["key"]
+                        save(apps=apps_result_view(apps) if apps is not None else None, apps_error=apps_error)
+                        self._set_apps_left(copy, serial, chosen.apps)
                     view = self._copy_view(copy.read_meta())  # kopia zniknęła → błąd kopii
                     finished = True
             finally:
                 self._restore_copy_id = None
                 self._restore_order = None
-                stopped = (result is not None and result.status == "stopped")                     or (tel is not None and tel.stopped) or (apps is not None and apps.stopped)
-                ok = finished and tel_error is None and not stopped
+                stopped = ((result is not None and result.status == "stopped")
+                           or (tel is not None and tel.stopped) or (apps is not None and apps.stopped))
+                ok = finished and tel_error is None and apps_error is None and not stopped
                 if order_id is not None:
                     save(status="done" if ok else "failed",
                          finished_at=self._now().isoformat(timespec="seconds"))
@@ -2190,11 +2200,16 @@ class Api(ExplorerMixin):
                 with self._cleanup_lock:
                     self._cleaned.discard(serial)  # nieudane przywrócenie telefonu: sprzątanie zaraz po zadaniu
                     self._cleanup_tries.pop(serial, None)  # nowe zmiany telefonu: od nowa pełne ponowienia
+            try:
+                whatsapp = _whatsapp_view(chosen, result, apps, apps_plan, copy, serial)
+            except Exception as exc:  # noqa: BLE001 — ramka WhatsApp nie może zgubić zdarzenia końca
+                log_exception(exc)
+                whatsapp = None
             self._emit("transfer:restore_done", {
                 "result": restore_result_view(result), "copy": view,
                 "tel": tel_result_view(tel) if tel is not None else None, "tel_error": tel_error,
-                "apps": apps_result_view(apps) if apps is not None else None,
-                "order": order_number, "whatsapp": _whatsapp_view(chosen, result, apps, apps_plan, copy, serial)})
+                "apps": apps_result_view(apps) if apps is not None else None, "apps_error": apps_error,
+                "order": order_number, "whatsapp": whatsapp})
             failed = tel_error is not None
             telemetry.record("transfer_restore", lambda _packages: transfer_restore_event(
                 device, result, chosen, STREAMS, tel, tel_failed=failed))
@@ -2213,6 +2228,20 @@ class Api(ExplorerMixin):
         state = RestoreState(restore_state_path(copy, serial))
         try:
             state.set_meta("tel_left", left)
+        finally:
+            state.close()
+
+    def _set_apps_left(self, copy: store.CopyDir, serial: str, packages: frozenset[str]) -> None:
+        """Meta `apps_left` stanu wgrywania: wybrane aplikacje bez rozstrzygnięcia (brak wiersza, `pending`
+        albo `failed/disconnected`). Przed plikami to cały wybór, po etapie aplikacji — reszta do wznowienia."""
+        if not copy.files_dir.is_dir():
+            return
+        state = RestoreState(restore_state_path(copy, serial))
+        try:
+            status = state.apps_status()
+            state.set_meta("apps_left", sum(
+                1 for p in packages
+                if p not in status or status[p][0] == "pending" or status[p][:2] == ("failed", "disconnected")))
         finally:
             state.close()
 
@@ -2275,6 +2304,17 @@ class Api(ExplorerMixin):
                 raise ValueError
         except (OSError, ValueError, KeyError, TypeError):  # kopia usunięta: nie ma z czego instalować
             raise AppError("transfer_copy_missing") from None
+        path = restore_state_path(copy, serial)
+        if path.is_file():
+            probe = RestoreState(path)
+            try:
+                has_apps = bool(probe.apps_status())
+            finally:
+                probe.close()
+        else:
+            has_apps = False
+        if not has_apps:  # zlecenie bez wybranych aplikacji: nie ma czego dokończyć (i nie nadpisujemy wyniku)
+            raise AppError("bad_request", "order")
         self._require_cleaned(serial)
         self._abandon_apk()
         adb = self._session(serial)
@@ -2285,6 +2325,7 @@ class Api(ExplorerMixin):
             try:
                 with _transfer_errors("restore_apps"), device_lock(journal_path(), serial):
                     device = read_device_info(adb)
+                    crash.note_device(device.serial, device.manufacturer, device.model, device.android_release)
                     apps_plan = build_apps_plan(AppInstallAdb(adb, copy.apps_dir), copy, device)
                     state = RestoreState(restore_state_path(copy, serial))
                     try:
@@ -2360,7 +2401,9 @@ class Api(ExplorerMixin):
         except Exception as exc:  # noqa: BLE001 — dziennik nie zasłania listy kopii
             log_exception(exc)
             pairs = []
-        return {"orders": [transfer_order_view(o, r, by_id.get(r.copy_id), now) for o, r in pairs],
+        running = self._restore_order
+        return {"orders": [transfer_order_view(o, r, by_id.get(r.copy_id), now, o.number == running)
+                           for o, r in pairs],
                 "copies": [self._copy_view(m, now, restoring) for m in metas]}
 
     @_api
