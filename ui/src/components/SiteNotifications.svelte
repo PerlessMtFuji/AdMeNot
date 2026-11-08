@@ -1,5 +1,6 @@
 <script lang="ts">
   import { getContext } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
   import { initial, siteRows } from '../lib/logic';
@@ -17,7 +18,6 @@
   // zrobienia, z powiadomieniem na ekranie na górze (to je klient widzi i ich zwykle dotyczy skarga). Przeglądarka
   // ze wspólnym kanałem (Samsung Internet, Firefox bez debugowania) to jeden wiersz: jej witryny z ekranu,
   // „Wycisz wszystkie” i podpowiedź — zamiast trzech osobnych wierszy tej samej przeglądarki.
-  // Przeglądarka, której powiadomień nie umiemy odczytać (`unsupported`): wiersz z instrukcją zamiast cichego pominięcia.
   const rows = $derived(siteRows(check));
   const { todo, done, shared: sharedRows, unsupported, unreadable, rdpOff } = $derived(rows);
   const allFix = $derived(check.browsers.filter((b) => b.all_fix));
@@ -25,10 +25,13 @@
   const fixable = $derived(todo.filter((r) => r.site.fix).length + allFix.length);
   const picked = $derived([...todo.map((r) => r.site.fix), ...allFix.map((b) => b.all_fix)].filter((f) => f && s.fixes.has(f)).length);
   const ok = $derived(check.state === 'ok');
+  // Brak wierszy do pokazania (stopka może mieć jeszcze „już wyłączone”): zdanie zamiast pustej listy.
+  const empty = $derived(!todo.length && !sharedRows.length && !unsupported.length);
 
-  // Zwinięta, gdy wszystko w porządku; ręczne rozwinięcie albo zwinięcie przesłania ten domyślny stan.
-  let chosen = $state<boolean | null>(null);
-  const open = $derived(chosen ?? !ok);
+  // Przeglądarka, której powiadomień nie umiemy odczytać (`unsupported`): wiersz z nazwą i pigułką, a instrukcja
+  // zamiast cichego pominięcia chowa się pod „jak sprawdzić” (stan per pakiet).
+  const howOpen = new SvelteSet<string>();
+  const toggleHow = (pkg: string) => (howOpen.has(pkg) ? howOpen.delete(pkg) : howOpen.add(pkg));
   // Origin i identyfikator poprawki tylko dla eksperta, w dymku — nie w treści wiersza.
   const detail = (site: CheckSite) => (expert ? [site.origin, site.fix].filter(Boolean).join(' · ') : undefined);
 </script>
@@ -41,29 +44,26 @@
   </label>
 {/snippet}
 
-<div class="card rounded-2xl {open ? 'p-4' : 'px-4 py-3'}">
-  <button type="button" class="flex w-full items-start gap-3 text-left" aria-expanded={open} onclick={() => (chosen = !open)}>
+<div class="card rounded-2xl p-4">
+  <div class="flex items-start gap-3">
     {#if ok}
       <span class="grid h-6 w-6 flex-none place-items-center rounded-full bg-ok-soft text-ok"><Icon name="check" size={14} strokeWidth={3} /></span>
     {:else}
       <span class="grid h-6 w-6 flex-none place-items-center rounded-full bg-warn-soft text-warn"><Icon name="bell-ring" size={14} /></span>
     {/if}
-    <span class="flex min-w-0 flex-1 flex-col gap-0.5">
-      <span class="flex flex-wrap items-center gap-2">
-        <b>{t(`checks.${check.id}`)}</b>
+    <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+      <div class="flex flex-wrap items-center gap-2">
+        <h3 class="font-bold">{t(`checks.${check.id}`)}</h3>
         {#if fixable}<Pill tone="warn">{tp('checks.to_fix', fixable)}</Pill>{:else}<Pill tone={ok ? 'ok' : 'warn'}>{check.state_label}</Pill>{/if}
         {#if picked}<Pill tone="accent">{tp('checks.picked', picked)}</Pill>{/if}
-        {#if !open}
-          <span class="flex items-center gap-1">{#each check.browsers as b (b.package)}<BrowserIcon pkg={b.package} name={b.name} size="sm" />{/each}</span>
-          {#if ok}<span class="text-sm text-soft">{t('checks.ok_sub')}</span>{/if}
-        {/if}
-      </span>
-      {#if open}<span class="text-sm text-mut">{t('checks.intro')}</span>{/if}
-    </span>
-    <Icon name="chevron-down" size={16} class="mt-1 flex-none text-soft transition-transform duration-150 {open ? 'rotate-180' : ''}" />
-  </button>
+      </div>
+      <span class="text-sm text-mut">{t('checks.intro')}</span>
+    </div>
+  </div>
 
-  {#if open}
+  {#if empty}
+    {#if ok || !done.length}<p class="mt-3 border-t border-line pt-2.5 text-sm text-mut">{ok ? t('checks.ok_sub') : t('checks.none')}</p>{/if}
+  {:else}
     <ul class="mt-3 flex flex-col border-t border-line">
       {#each todo as { site, browser } (browser.package + site.origin)}
         <li class="flex items-center gap-3 border-b border-line py-2.5">
@@ -96,39 +96,40 @@
         </li>
       {/each}
       {#each unsupported as b (b.package)}
-        <li class="flex items-center gap-3 border-b border-line py-2.5">
-          <BrowserIcon pkg={b.package} name={b.name} />
-          <span class="flex min-w-0 flex-1 flex-col">
-            <b class="truncate" title={expert ? b.package : undefined}>{b.name}</b>
-            <span class="text-sm text-soft">{t('checks.unsupported', { browser: b.name })}</span>
-          </span>
-          <Pill tone="neutral">{t('checks.unsupported_pill')}</Pill>
+        {@const how = howOpen.has(b.package)}
+        <li class="border-b border-line py-2.5">
+          <div class="flex items-center gap-3">
+            <BrowserIcon pkg={b.package} name={b.name} />
+            <span class="flex min-w-0 flex-1 flex-col">
+              <b class="truncate" title={expert ? b.package : undefined}>{b.name}</b>
+            </span>
+            <Pill tone="neutral">{t('checks.unsupported_pill')}</Pill>
+            <button type="button" class="flex-none text-sm font-semibold text-accent hover:underline" aria-expanded={how}
+              onclick={() => toggleHow(b.package)}>{how ? t('checks.howto_hide') : t('checks.howto')}</button>
+          </div>
+          {#if how}<p class="mt-1.5 pl-10 text-sm text-soft">{t('checks.unsupported', { browser: b.name })}</p>{/if}
         </li>
       {/each}
     </ul>
-
-    {#if !todo.length && !sharedRows.length && !unsupported.length && !done.length}
-      <p class="pt-2.5 text-sm text-mut">{t('checks.none')}</p>
-    {/if}
-    {#if done.length || unreadable.length || rdpOff.length}
-      <div class="flex flex-wrap items-center gap-x-5 gap-y-1.5 pt-2.5 text-sm text-soft">
-        {#if done.length}
-          <span class="flex flex-wrap items-center gap-1.5">
-            <Icon name="check" size={14} strokeWidth={3} class="text-ok" />{t('checks.done')}
-            {#each done as { site, browser }, i (browser.package + site.origin)}
-              <span class="flex items-center gap-1" title={detail(site)}><BrowserIcon pkg={browser.package} name={browser.name} size="sm" />{site.host}{i < done.length - 1 ? ',' : ''}</span>
-            {/each}
-          </span>
-        {/if}
-        {#if unreadable.length}
-          <span class="flex items-center gap-1.5">{t('checks.unreadable')}
-            {#each unreadable as b (b.package)}<BrowserIcon pkg={b.package} name={b.name} size="sm" />{b.name}{/each}</span>
-        {/if}
-        {#each rdpOff as b (b.package)}
-          <span class="ml-auto flex items-center gap-1.5"><Icon name="triangle-alert" size={14} class="text-warn" />{t('checks.rdp_off')}</span>
-        {/each}
-      </div>
-    {/if}
+  {/if}
+  {#if done.length || unreadable.length || rdpOff.length}
+    <div class="flex flex-wrap items-center gap-x-5 gap-y-1.5 pt-2.5 text-sm text-soft">
+      {#if done.length}
+        <span class="flex flex-wrap items-center gap-1.5">
+          <Icon name="check" size={14} strokeWidth={3} class="text-ok" />{t('checks.done')}
+          {#each done as { site, browser }, i (browser.package + site.origin)}
+            <span class="flex items-center gap-1" title={detail(site)}><BrowserIcon pkg={browser.package} name={browser.name} size="sm" />{site.host}{i < done.length - 1 ? ',' : ''}</span>
+          {/each}
+        </span>
+      {/if}
+      {#if unreadable.length}
+        <span class="flex items-center gap-1.5">{t('checks.unreadable')}
+          {#each unreadable as b (b.package)}<BrowserIcon pkg={b.package} name={b.name} size="sm" />{b.name}{/each}</span>
+      {/if}
+      {#each rdpOff as b (b.package)}
+        <span class="ml-auto flex items-center gap-1.5"><Icon name="triangle-alert" size={14} class="text-warn" />{t('checks.rdp_off')}</span>
+      {/each}
+    </div>
   {/if}
 </div>
 

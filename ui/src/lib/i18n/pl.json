@@ -48,6 +48,8 @@
     "rdp_off": "Na koniec wyłącz w Firefoxie „Zdalne debugowanie przez USB”",
     "unsupported": "Program nie umie sprawdzić powiadomień tej przeglądarki. Sprawdź na telefonie: Ustawienia → Aplikacje → {browser} → Powiadomienia.",
     "unsupported_pill": "sprawdź ręcznie",
+    "howto": "jak sprawdzić",
+    "howto_hide": "ukryj",
     "rdp": "Bez debugowania widać tylko strony z powiadomieniem na ekranie. Żeby zobaczyć i wyciszać każdą osobno, włącz na telefonie: Firefox → Ustawienia → Zdalne debugowanie przez USB. Odczytam je sam, gdy tylko to zrobisz."
   },
   "choice": { "silence": "Wycisz", "disable": "Wyłącz", "remove": "Usuń", "fix": "Ustawienia witryn" },

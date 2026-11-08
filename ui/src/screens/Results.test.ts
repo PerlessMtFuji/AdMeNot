@@ -744,14 +744,14 @@ describe('Results: “Aplikacje” and “Telefon” tabs', () => {
     const apps = screen.getByRole('tabpanel');
     expect(apps.id).toBe('repair-panel-apps');
     expect(apps.getAttribute('aria-labelledby')).toBe('repair-tab-apps');
-    expect(screen.queryByRole('button', { name: /Powiadomienia z witryn/ })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Powiadomienia z witryn' })).toBeNull();
     expect(within(apps).getByRole('region', { name: 'Szkodliwe' })).toBeTruthy();
     await openPhone();
     expect(s.repairTab).toBe('phone');
     const phone = screen.getByRole('tabpanel');
     expect(phone.id).toBe('repair-panel-phone');
     expect(phone.getAttribute('aria-labelledby')).toBe('repair-tab-phone');
-    expect(within(phone).getByRole('button', { name: /Powiadomienia z witryn/ })).toBeTruthy();
+    expect(within(phone).getByRole('heading', { name: 'Powiadomienia z witryn' })).toBeTruthy();
     expect(screen.queryByRole('region', { name: 'Szkodliwe' })).toBeNull();
     expect(screen.queryByRole('article')).toBeNull();
   });
@@ -805,7 +805,7 @@ describe('Results: “Aplikacje” and “Telefon” tabs', () => {
     await fireEvent.click(link);
     expect(s.repairTab).toBe('phone');
     expect(tab('Telefon').getAttribute('aria-selected')).toBe('true');
-    expect(screen.getByRole('button', { name: /Powiadomienia z witryn/ })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Powiadomienia z witryn' })).toBeTruthy();
   });
 
   test('clean apps, phone unreadable: the “not everything could be read” link', async () => {

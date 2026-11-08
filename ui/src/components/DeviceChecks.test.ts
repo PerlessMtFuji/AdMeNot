@@ -21,24 +21,23 @@ async function mounted(checks: DeviceCheck[]) {
 }
 
 describe('DeviceChecks', () => {
-  test('stays folded while every check is ok, and opens on demand', async () => {
+  test('the card is always open: a static h3 header, no collapse button; ok shows the ok_sub sentence', async () => {
     await mounted([check([{ ...CHROME, sites: [CHROME.sites[2]] }], 'ok')]);
-    const toggle = screen.getByRole('button', { name: /Powiadomienia z witryn/ });
-    expect(toggle.getAttribute('aria-expanded')).toBe('false');
-    expect(toggle.textContent).toContain('żadna strona nie może wysyłać powiadomień');
-    expect(screen.queryByText('sklep.example')).toBeNull();
-    await fireEvent.click(toggle);
-    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    const head = screen.getByRole('heading', { level: 3, name: 'Powiadomienia z witryn' });
+    expect(screen.queryByRole('button', { name: /Powiadomienia z witryn/ })).toBeNull();
+    expect(head.closest('[aria-expanded]')).toBeNull();
+    expect(head.parentElement!.textContent).toContain('W porządku');
+    expect(screen.getByText('żadna strona nie może wysyłać powiadomień')).toBeTruthy();
     expect(screen.getByText(/Już wyłączone/)).toBeTruthy();
     expect(screen.getByText('sklep.example')).toBeTruthy();
   });
 
-  test('is open when something needs a look; nothing is ticked up front', async () => {
+  test('with something to do: intro sentence and counter pill in the header; nothing is ticked up front', async () => {
     const { s } = await mounted([CHECKS_SAMPLE]);
-    const toggle = screen.getByRole('button', { name: /Powiadomienia z witryn/ });
-    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    const head = screen.getByRole('heading', { level: 3, name: 'Powiadomienia z witryn' });
     // Dwie witryny Chrome z poprawką i „wszystkie witryny” Samsung Internet.
-    expect(toggle.textContent).toContain('3 do wyciszenia');
+    expect(head.parentElement!.textContent).toContain('3 do wyciszenia');
+    expect(screen.getByText(/Strony, którym ktoś pozwolił/)).toBeTruthy();
     for (const box of screen.getAllByRole('switch')) expect((box as HTMLInputElement).checked).toBe(false);
     expect(s.fixes.size).toBe(0);
   });
@@ -68,7 +67,7 @@ describe('DeviceChecks', () => {
     const box = screen.getByRole('switch', { name: 'Wycisz tanie-bilety.example' });
     await fireEvent.click(box);
     expect([...s.fixes]).toEqual([CHROME.sites[0].fix]);
-    expect(screen.getByRole('button', { name: /Powiadomienia z witryn/ }).textContent).toContain('1 zaznaczona');
+    expect(screen.getByRole('heading', { name: 'Powiadomienia z witryn' }).parentElement!.textContent).toContain('1 zaznaczona');
     await fireEvent.click(box);
     expect(s.fixes.size).toBe(0);
   });
@@ -114,14 +113,22 @@ describe('DeviceChecks', () => {
     expect(screen.getByText('Na koniec wyłącz w Firefoxie „Zdalne debugowanie przez USB”')).toBeTruthy();
   });
 
-  test('a browser the program cannot read gets a row with manual steps, not silence', async () => {
+  test('a browser the program cannot read: name and pill, the steps fold under “jak sprawdzić”', async () => {
     const odd: CheckBrowser = { package: 'com.example.odd', name: 'Odd', mode: 'unknown', read: 'unsupported', rdp_hint: false,
       block_action: false, all_fix: null, all_fix_label: null, sites: [] };
     await mounted([check([odd])]);
     const row = screen.getByText('Odd').closest('li')!;
-    expect(row.textContent).toContain('Ustawienia → Aplikacje → Odd → Powiadomienia');
     expect(row.textContent).toContain('sprawdź ręcznie');
     expect(within(row).queryByRole('switch')).toBeNull();
+    expect(screen.queryByText(/Ustawienia → Aplikacje → Odd → Powiadomienia/)).toBeNull();
+    const how = within(row).getByRole('button', { name: 'jak sprawdzić' });
+    expect(how.getAttribute('aria-expanded')).toBe('false');
+    await fireEvent.click(how);
+    expect(how.getAttribute('aria-expanded')).toBe('true');
+    expect(how.textContent).toContain('ukryj');
+    expect(row.textContent).toContain('Ustawienia → Aplikacje → Odd → Powiadomienia');
+    await fireEvent.click(how);
+    expect(screen.queryByText(/Ustawienia → Aplikacje → Odd → Powiadomienia/)).toBeNull();
   });
 
   test('known browsers show a built-in icon, unknown ones an initial', async () => {
