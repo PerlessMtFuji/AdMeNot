@@ -321,3 +321,37 @@ def test_fake_helper_mms_addrs_and_threads(tmp_path):
     assert w.write("sms", [("s2", _sms_rec(2))], lambda: None).ok == {"s2"}
     rows = tel.content_query(ro, "content://sms", ["_id", "thread_id"])
     assert rows[-1]["thread_id"] == "0"
+
+
+def test_fake_install_arbitrary_apks_pm_list_and_getprop(tmp_path):
+    from admenot.engine.adb.transport import AdbError
+
+    phone = _phone(tmp_path)
+    apk = tmp_path / "apps" / "com.x.y" / "3" / "base.apk"
+    apk.parent.mkdir(parents=True)
+    apk.write_bytes(b"x")
+    phone.props["persist.security.adbinstall"] = "0"
+    assert phone.shell("getprop persist.security.adbinstall").strip() == "0"
+    assert phone.shell("getprop nothing.here").strip() == ""
+    assert phone.shell("pm list packages") == ""
+    assert "Success" in phone.run(["install", "-i", "com.android.vending", str(apk)])
+    assert phone.shell("pm list packages com.x.y") == "package:com.x.y\n"
+    assert phone.shell("pm list packages") == "package:com.x.y\n"
+    with pytest.raises(AdbError, match="INSTALL_FAILED_ALREADY_EXISTS"):
+        phone.run(["install", str(apk)])
+    phone.installed.clear()
+    phone.install_timeout.add("com.x.y")
+    with pytest.raises(AdbError) as exc:
+        phone.run(["install", str(apk)])
+    assert exc.value.kind == "timeout"
+    phone.install_timeout.clear()
+    phone.disconnect_after_install.add("com.x.y")
+    with pytest.raises(AdbError) as exc:
+        phone.run(["install-multiple", str(apk)])
+    assert exc.value.kind == "offline" and "com.x.y" in phone.installed and not phone.online
+    phone.reconnect()
+    phone.installed.clear()
+    phone.installer_rejected = True
+    with pytest.raises(AdbError, match="SecurityException"):
+        phone.run(["install", "-i", "com.android.vending", str(apk)])
+    assert "Success" in phone.run(["install", str(apk)])

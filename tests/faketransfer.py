@@ -157,6 +157,12 @@ class FakeStoragePhone:
         self.install_blocked = False
         self.host_commands: list[list[str]] = []  # polecenia hosta (`install`)
         self.accounts: list[tuple[str, str]] = []
+        # instalacja aplikacji z kopii (Etap 4)
+        self.props: dict[str, str] = {}  # `getprop <nazwa>`; brak = pusta linia
+        self.install_fail: dict[str, str] = {}  # pakiet -> wyjście błędu `adb install` (kod 1)
+        self.install_timeout: set[str] = set()  # pakiety, dla których instalacja czeka na zgodę do limitu
+        self.disconnect_after_install: set[str] = set()  # pakiet wchodzi, a telefon się odłącza (raz)
+        self.installer_rejected = False  # `-i <sklep>` kończy się `Security exception`
         # eksplorator plików
         self.deny_list_prefixes: set[str] = set()  # listowanie (`find`, `ls`) pod takim prefiksem -> Permission denied
         self.du_without_b = False  # `du -sb` jak w starym toyboxie: nieznana opcja
@@ -208,6 +214,8 @@ class FakeStoragePhone:
             return self._pull_apk(args[1], Path(args[2]))
         if len(args) == 3 and args[:2] == ["install", "-g"]:
             return self._install(args)
+        if args and args[0] in ("install", "install-multiple"):
+            return self._install_apps(args)
         raise AdbError("command_failed", f"fake: unsupported {args}")
 
     def run_bytes(self, args: list[str], timeout: float = 20.0) -> bytes:
@@ -577,8 +585,11 @@ class FakeStoragePhone:
             return (f"User UserInfo{{0:Właściciel:c13}}:\n  Accounts: {len(lines)}\n" + "".join(lines)
                     + "\n  Active Sessions: 0\n").encode()
         if head == ["pm", "list"]:
-            assert argv[2] == "packages" and len(argv) == 4, argv
-            return "".join(f"package:{p}\n" for p in sorted(self.installed) if p.startswith(argv[3])).encode()
+            assert argv[2] == "packages" and len(argv) in (3, 4), argv
+            prefix = argv[3] if len(argv) == 4 else ""
+            return "".join(f"package:{p}\n" for p in sorted(self.installed) if p.startswith(prefix)).encode()
+        if argv[0] == "getprop" and len(argv) == 2:
+            return f"{self.props.get(argv[1], '')}\n".encode()
         if head == ["pm", "uninstall"]:
             return self._uninstall(argv[2])
         if head == ["pm", "grant"]:
@@ -601,6 +612,42 @@ class FakeStoragePhone:
                                              f"[INSTALL_FAILED_ALREADY_EXISTS: Attempt to re-install "
                                              f"{helper.PACKAGE} without first uninstalling.]")
         self.installed.add(helper.PACKAGE)  # `Android/data/<pakiet>` nie istnieje do pierwszego `mkdir -p`
+        return "Performing Streamed Install\nSuccess\n"
+
+    def _install_apps(self, args: list[str]) -> str:
+        """`install`/`install-multiple` plików z kopii (`…/apps/<pakiet>/<wersja>/*.apk`): pakiet to nazwa
+        katalogu dwa poziomy nad plikiem. Zgoda/odmowa/limit/rozłączenie wg haków `install_*`."""
+        if not self.online:
+            raise AdbError("offline", "device offline")
+        self.host_commands.append(list(args))
+        rest = args[1:]
+        with_installer = rest[:1] == ["-i"]
+        if with_installer:
+            rest = rest[2:]
+        files = [Path(f) for f in rest]
+        assert files and all(f.is_file() for f in files), args
+        package = files[0].parent.parent.name
+        if with_installer and self.installer_rejected:
+            raise AdbError("command_failed", "Performing Streamed Install\nException occurred while executing "
+                                             "'install':\njava.lang.SecurityException: Caller is not allowed "
+                                             "to set the installer package")
+        if package in self.install_timeout:
+            raise AdbError("timeout", f"adb {args[0]} timed out")
+        if package in self.install_fail:
+            raise AdbError("command_failed", f"Performing Streamed Install\nadb: failed to install "
+                                             f"{files[0]}: {self.install_fail[package]}")
+        if self.install_blocked:
+            raise AdbError("command_failed", f"Performing Streamed Install\nadb: failed to install {files[0]}: "
+                                             "Failure [INSTALL_FAILED_USER_RESTRICTED: Install canceled by user]")
+        if package in self.installed:
+            raise AdbError("command_failed", f"adb: failed to install {files[0]}: Failure "
+                                             f"[INSTALL_FAILED_ALREADY_EXISTS: Attempt to re-install {package} "
+                                             "without first uninstalling.]")
+        self.installed.add(package)
+        if package in self.disconnect_after_install:
+            self.disconnect_after_install.discard(package)
+            self.online = False
+            raise AdbError("offline", "device offline")
         return "Performing Streamed Install\nSuccess\n"
 
     def _uninstall(self, package: str) -> bytes:

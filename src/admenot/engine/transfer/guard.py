@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 import shlex
 from collections.abc import Callable
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 
 from admenot.engine.adb.transport import AdbTransport
 
@@ -262,6 +262,78 @@ class AppendOnlyAdb:
         if cmd is None:
             raise UnsafeCommand(f"Polecenie hosta spoza allowlisty: {' '.join(args)[:120]}")
         assert_append_only(cmd)
+        return self.inner.run_bytes(args, timeout=timeout)
+
+
+APP_INSTALLER = "com.android.vending"
+_APP_INSTALLER_OPT = ["-i", APP_INSTALLER]
+_PM_LIST = "pm list packages"
+
+
+def _assert_app_shell(cmd: str) -> None:
+    """Odczyty `AppendOnlyAdb` + `pm list packages` (bez argumentów albo z jedną nazwą pakietu)."""
+    if cmd == _PM_LIST:
+        return
+    if cmd.startswith(_PM_LIST + " ") and _PACKAGE.fullmatch(cmd[len(_PM_LIST) + 1:]):
+        return
+    assert_append_only(cmd)
+
+
+class AppInstallAdb:
+    """`AppendOnlyAdb` + instalacja aplikacji z kopii: wyłącznie `install`/`install-multiple` (opcjonalnie
+    `-i com.android.vending`) z istniejącymi plikami `.apk` leżącymi pod `apps_root` oraz `pm list packages`.
+    Nigdy `-r`, `-d`, `-g`, odinstalowanie ani plik spoza kopii."""
+
+    def __init__(self, inner: AdbTransport, apps_root: Path) -> None:
+        self.inner = inner
+        self.apps_root = apps_root
+
+    @property
+    def serial(self) -> str | None:
+        return self.inner.serial
+
+    def with_serial(self, serial: str) -> AppInstallAdb:
+        return AppInstallAdb(self.inner.with_serial(serial), self.apps_root)
+
+    def shell(self, command: str, timeout: float = 20.0) -> str:
+        _assert_app_shell(command)
+        return self.inner.shell(command, timeout=timeout)
+
+    def _check_install(self, args: list[str]) -> None:
+        rest = args[1:]
+        if rest[:2] == _APP_INSTALLER_OPT:
+            rest = rest[2:]
+        if not rest or (args[0] == "install" and len(rest) != 1):
+            raise UnsafeCommand(f"Niepoprawna instalacja: {' '.join(args)[:120]}")
+        root = self.apps_root.resolve()
+        for name in rest:
+            path = Path(name)
+            try:
+                inside = path.suffix == ".apk" and path.is_file() and path.resolve().is_relative_to(root)
+            except OSError:
+                inside = False
+            if not inside:
+                raise UnsafeCommand(f"Instalacja dozwolona tylko z plików .apk kopii: {name[:120]}")
+
+    def _check_run(self, args: list[str]) -> None:
+        cmd = _shell_T_command(args)
+        if cmd is not None:
+            _assert_app_shell(cmd)
+        elif args == ["get-state"]:
+            return
+        elif args and args[0] in ("install", "install-multiple"):
+            self._check_install(args)
+        else:
+            raise UnsafeCommand(f"Polecenie hosta spoza allowlisty: {' '.join(args)[:120]}")
+
+    def run(self, args: list[str], timeout: float = 20.0) -> str:
+        self._check_run(args)
+        return self.inner.run(args, timeout=timeout)
+
+    def run_bytes(self, args: list[str], timeout: float = 20.0) -> bytes:
+        if _shell_T_command(args) is None:
+            raise UnsafeCommand(f"Polecenie hosta spoza allowlisty: {' '.join(args)[:120]}")
+        self._check_run(args)
         return self.inner.run_bytes(args, timeout=timeout)
 
 
