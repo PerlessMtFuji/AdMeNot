@@ -391,6 +391,23 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     expect(screen.queryByText(t('summary.select_level_disable'))).toBeNull();
   });
 
+  test('plan panel: the Android 12 note appears once, only when some entry is Silence on sdk < 33', async () => {
+    const { s } = await scanned('adware');
+    const panel = screen.getByRole('complementary', { name: 'Plan naprawy' });
+    const note = t('notice.short.notifications_manual');
+    const [a, b] = s.scan!.apps.filter((x) => x.verdict !== 'safe');
+    s.device = { ...s.device!, sdk: 31 };
+    s.selection = { [a.package]: 'disable' };
+    await tick();
+    expect(within(panel).queryByText(note)).toBeNull(); // brak „Wycisz” w planie
+    s.selection = { [a.package]: 'silence', [b.package]: 'silence' };
+    await tick();
+    expect(within(panel).getAllByText(note)).toHaveLength(1);
+    s.device = { ...s.device!, sdk: 34 };
+    await tick();
+    expect(within(panel).queryByText(note)).toBeNull();
+  });
+
   test('a failed undo of one app is explained on the results list', async () => {
     const { s } = await scanned('clean');
     const app = s.scan!.apps[0];

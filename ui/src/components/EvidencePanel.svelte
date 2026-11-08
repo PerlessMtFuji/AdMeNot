@@ -3,7 +3,7 @@
   import { CATEGORY_ICON, categoryKey } from '../lib/categories';
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
-  import { evidenceGroups, initial, planEntries, topReasons, VERDICT_TONE } from '../lib/logic';
+  import { evidenceGroups, initial, notificationsManual, planEntries, topReasons, VERDICT_TONE } from '../lib/logic';
   import type { AppView, Level } from '../lib/types';
   import Segmented from '../ui/Segmented.svelte';
   import Button from '../ui/Button.svelte';
@@ -76,6 +76,10 @@
           onclick={() => ctl.undoApp(app.package)}><Icon name="undo-2" size={14} />{t('history.undo_changes')}</Button></div>
     {:else}
       <Segmented stretch size="sm" label={t('evidence.what_to_do')} value={level} options={LEVELS_ACT} onchange={pick} />
+      <!-- Android ≤12: „Wycisz” nie wyłączy powiadomień z komputera — krótka notka tam, gdzie się to wybiera. -->
+      {#if level === 'silence' && notificationsManual(ctl?.state.device?.sdk)}
+        <p class="flex items-start gap-1.5 text-xs text-mut"><Icon name="info" size={14} class="mt-px flex-none" />{t('notice.short.notifications_manual')}</p>
+      {/if}
     {/if}
   {/if}
 

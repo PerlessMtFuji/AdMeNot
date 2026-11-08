@@ -146,3 +146,22 @@ test('deep analysis button for every app, also without findings; disabled withou
   await fireEvent.click(button);
   expect(bridge.calls.some((c) => c.method === 'deep_analyze' && c.args[0] === 'com.quiet.app')).toBe(true);
 });
+
+test('evidence: Android 12 note shows only when Silence is chosen on sdk < 33', async () => {
+  const NOTE = 'Android 12: powiadomienia wyłączysz tylko na telefonie.';
+  const { s } = await renderWith(EvidencePanel, 'empty', { app: flaggedApp });
+  const what = screen.getByRole('group', { name: 'Co zrobić' });
+  const setSdk = (sdk: number) => { s.device = { ...(s.device as object), sdk } as never; };
+  setSdk(31);
+  await tick();
+  expect(screen.queryByText(NOTE)).toBeNull(); // nic niewybrane
+  await fireEvent.click(within(what).getByRole('button', { name: 'Wycisz' }));
+  expect(screen.getByText(NOTE)).toBeTruthy();
+  await fireEvent.click(within(what).getByRole('button', { name: 'Wyłącz' }));
+  expect(screen.queryByText(NOTE)).toBeNull();
+  await fireEvent.click(within(what).getByRole('button', { name: 'Wycisz' }));
+  expect(screen.getByText(NOTE)).toBeTruthy();
+  setSdk(34);
+  await tick();
+  expect(screen.queryByText(NOTE)).toBeNull();
+});

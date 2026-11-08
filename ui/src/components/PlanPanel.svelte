@@ -3,7 +3,7 @@
   import { flip } from 'svelte/animate';
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
-  import { groupOpen, isManual, LEVEL_TONE, modeUndecided, planEntries } from '../lib/logic';
+  import { groupOpen, isManual, LEVEL_TONE, modeUndecided, notificationsManual, planEntries } from '../lib/logic';
   import { DUR, enter, ms } from '../lib/motion';
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
@@ -51,6 +51,10 @@
 {/if}
 <span class="lbl">{t('panel.plan')}</span>
 {#if count === 0}<p class="text-mut">{t('panel.empty')}</p>{/if}
+<!-- Android ≤12: jedna notka nad listą, gdy w planie jest „Wycisz” (powiadomienia tylko ręcznie na telefonie). -->
+{#if notificationsManual(s.device?.sdk) && entries.some((e) => e.level === 'silence')}
+  <p class="flex items-start gap-1.5 text-xs text-mut"><Icon name="info" size={14} class="mt-px flex-none" />{t('notice.short.notifications_manual')}</p>
+{/if}
 <ul class="well well-list flex flex-col overflow-hidden empty:hidden">
   {#each entries as e (e.package)}
     <li animate:flip={{ duration: ms(DUR.flip) }} transition:enter
