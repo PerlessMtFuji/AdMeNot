@@ -88,6 +88,9 @@ export class Controller {
     this.state.settingsLoaded = true;
   }
 
+  /** Telefony gotowe (`state: device`) w poprzedniej liście — do wykrycia „pojawił się nowy”. */
+  private readySerials = new Set<string>();
+
   private onDevices(d: DevicesPayload): void {
     const s = this.state;
     s.devices = d.devices;
@@ -107,6 +110,21 @@ export class Controller {
       this.autoMirrored.add(picked.serial);  // raz na uruchomienie: zamknięte okno nie wraca samo
       void this.mirrorStart(picked.serial, picked.model?.replaceAll('_', ' ') ?? picked.serial);
     }
+    const before = this.readySerials;
+    this.readySerials = new Set(ready.map((e) => e.serial));
+    this.offerRestoreToNewPhone(ready.map((e) => e.serial).filter((x) => !before.has(x)));
+  }
+
+  /** Po gotowej kopii („Kopia gotowa”) podłączony nowy telefon (inny niż źródło kopii) od razu dostaje plan wgrywania.
+   *  Raz na pojawienie się telefonu; ten sam stary telefon albo kilka telefonów naraz — nic (wybór zostaje na ekranie Połącz). */
+  private offerRestoreToNewPhone(fresh: string[]): void {
+    const s = this.state;
+    const copy = s.transfer.copy;
+    if (fresh.length === 0 || s.phase !== 'transfer_done' || !copy || copy.status === 'in_progress' || s.transfer.result?.status === 'stopped') return;
+    const others = s.devices.filter((e) => e.state === 'device' && e.serial !== copy.serial);
+    if (others.length !== 1 || !fresh.includes(others[0].serial)) return;
+    this.selectDevice(others[0].serial);
+    void this.planRestore(copy.id);
   }
 
   private subscribe(): void {

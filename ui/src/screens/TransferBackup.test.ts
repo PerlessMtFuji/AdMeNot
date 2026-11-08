@@ -41,7 +41,7 @@ describe('TransferBackup', () => {
     expect(screen.getByText(/3 z 10 plików/)).toBeTruthy();
     expect(screen.queryByText(/aplikacji/)).toBeNull();
     expect(screen.getByText('DCIM/Camera/a.jpg')).toBeTruthy();
-    expect(screen.getByText(/Pliki/)).toBeTruthy();
+    expect(screen.getByText('Etap: Pliki')).toBeTruthy();
   });
 
   test('with apps selected, all files copied is not the end: apps are counted and the bar is not full', async () => {
@@ -147,5 +147,61 @@ describe('TransferBackup', () => {
     await tick();
     expect(screen.queryByText(/Telefon odłączony/)).toBeNull();
   });
-});
 
+  test('progress: one current stage in the middle, the stage list with done / current / pending on the right', async () => {
+    const { s, bridge } = await show();
+    s.transfer.selection = { ...s.transfer.selection, contacts: true, categories: ['media'], apps: ['com.a'] };
+    bridge.emit('transfer:progress', { stage: 'files', done_files: 3, total_files: 10, done_bytes: 30, total_bytes: 100, current: 'a.jpg' });
+    await tick();
+    const list = screen.getByRole('list', { name: 'Etapy kopii' });
+    const items = Array.from(list.querySelectorAll('li'));
+    expect(items.map((li) => li.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
+      'gotowe Kontakty, wiadomości i połączenia', 'Pliki', 'Aplikacje', 'Sprawdzanie kopii']);
+    expect(items[1].getAttribute('aria-current')).toBe('step');
+    expect(items[0].getAttribute('aria-current')).toBeNull();
+  });
+
+  test('done: result and numbers in one line, no table of numbers', async () => {
+    const { s, container } = await show('transfer_done');
+    s.transfer.result = result();
+    s.transfer.copy = COPY;
+    await tick();
+    expect(container.querySelector('dl, table')).toBeNull();
+    const line = screen.getByTestId('copy-numbers');
+    expect(Array.from(line.querySelectorAll('li')).map((li) => li.textContent)).toEqual(['Kontakty 2', 'SMS 2', 'Połączenia 1', 'Pliki 5', 'Aplikacje 1']);
+    expect(screen.getByText(/1 MB w 3 s\./)).toBeTruthy();
+  });
+
+  test('done: the main card says to connect the new phone, the note is a small link', async () => {
+    const { s } = await show('transfer_done');
+    s.transfer.result = result();
+    s.transfer.copy = COPY;
+    await tick();
+    expect(screen.getByText('Podłącz nowy telefon')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Dodaj notatkę do kopii' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Zakończ — wgram później' })).toBeTruthy();
+  });
+
+  test('done: no new phone card for a stopped copy', async () => {
+    const { s } = await show('transfer_done');
+    s.transfer.result = result({ status: 'stopped' });
+    s.transfer.copy = { ...COPY, status: 'in_progress' };
+    await tick();
+    expect(screen.queryByText('Podłącz nowy telefon')).toBeNull();
+  });
+
+  test('done: the side panel has the IMEI, the order number with the client and the deletion date', async () => {
+    const { s } = await show('transfer_done');
+    s.devices = [{ serial: 'R58T00TEST', state: 'device', model: 'SM_A145R', name: null, imei: '356938035643809' }];
+    s.serial = 'R58T00TEST';
+    s.transfer.result = result();
+    s.transfer.copy = { ...COPY, order: 'ZS/2026/1108/01' };
+    await tick();
+    const panel = screen.getByRole('complementary', { name: 'Przedmiot zlecenia' });
+    expect(panel.textContent).toContain('IMEI 356938035643809');
+    expect(panel.textContent).not.toContain('R58T00TEST');
+    expect(panel.textContent).toContain('ZS/2026/1108/01');
+    expect(panel.textContent).toContain('Anna K.');
+    expect(panel.textContent).toMatch(/Kopia zostanie usunięta z komputera .*2026/);
+  });
+});

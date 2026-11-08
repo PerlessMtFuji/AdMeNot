@@ -1763,3 +1763,63 @@ describe('data transfer — resuming', () => {
     expect(s.phase).toBe('transfer_choose');
   });
 });
+
+describe('data transfer — after a copy', () => {
+  const OLD = 'R58T00TEST';
+  const NEW = 'R58W20NEW01';
+  const dev = (serial: string) => ({ serial, state: 'device' as const, model: 'M', name: null, imei: null });
+  const copy = { id: `${OLD}-90fae0b8e3f0/20261108-100000`, serial: OLD, model: 'SM-A145R', manufacturer: 'samsung', client: 'Anna K.',
+    created: '2026-11-08T10:00:00', expires: '2026-11-15T10:00:00', days_left: 7, status: 'complete' as 'complete' | 'in_progress', bytes: 10, counts: {} };
+  const result = { status: 'complete' as const, copy_id: copy.id, files_done: 1, files_failed: 0, apps_done: 0, apps_failed: 0, bytes: 10,
+    seconds: 3, telephony: {} };
+  const restorePlans = (bridge: { calls: { method: string; args: unknown[] }[] }) => bridge.calls.filter((c) => c.method === 'restore_plan');
+
+  async function finished(copyOver: Partial<typeof copy> = {}) {
+    const env = setup('transfer');
+    await env.ctl.init();
+    env.bridge.emit('devices', { devices: [dev(OLD)], error: null });
+    env.ctl.selectDevice(OLD);
+    env.bridge.emit('transfer:done', { result, copy: { ...copy, ...copyOver } });
+    expect(env.s.phase).toBe('transfer_done');
+    return env;
+  }
+
+  test('auto plans restore when another phone connects after a copy', async () => {
+    const { s, bridge } = await finished();
+    bridge.emit('devices', { devices: [dev(OLD), dev(NEW)], error: null });
+    await vi.waitFor(() => expect(restorePlans(bridge)).toHaveLength(1));
+    expect(restorePlans(bridge)[0].args).toEqual([copy.id, NEW]);
+    expect(s.serial).toBe(NEW);
+    expect(s.phase).toBe('transfer_restore_plan');
+  });
+
+  test('does nothing when the same phone reconnects', async () => {
+    const { s, bridge } = await finished();
+    bridge.emit('devices', { devices: [], error: null });
+    bridge.emit('devices', { devices: [dev(OLD)], error: null });
+    await flush();
+    expect(restorePlans(bridge)).toHaveLength(0);
+    expect(s.phase).toBe('transfer_done');
+  });
+
+  test('does nothing when two new phones appear at once, or when the copy was stopped', async () => {
+    const a = await finished();
+    a.bridge.emit('devices', { devices: [dev(OLD), dev(NEW), dev('OTHER')], error: null });
+    await flush();
+    expect(restorePlans(a.bridge)).toHaveLength(0);
+    const b = await finished({ status: 'in_progress' });
+    b.bridge.emit('devices', { devices: [dev(OLD), dev(NEW)], error: null });
+    await flush();
+    expect(restorePlans(b.bridge)).toHaveLength(0);
+  });
+
+  test('plans once per appearance, not on every device refresh', async () => {
+    const { s, bridge } = await finished();
+    bridge.emit('devices', { devices: [dev(NEW)], error: null });
+    await vi.waitFor(() => expect(restorePlans(bridge)).toHaveLength(1));
+    s.phase = 'transfer_done';
+    bridge.emit('devices', { devices: [dev(NEW)], error: null });
+    await flush();
+    expect(restorePlans(bridge)).toHaveLength(1);
+  });
+});
