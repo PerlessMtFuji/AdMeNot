@@ -31,7 +31,7 @@ export const PLURAL_KEYS = ['results.title', 'results.safe', 'expert.days', 'pan
   'exec.apps', 'exec.steps', 'history.did.remove', 'history.did.disable', 'history.did.silence',
   'shot.count', 'apk_cache.estimate', 'checks.to_check', 'checks.picked', 'history.sites_restored',
   'undo.done_collapsed', 'transfer.apps_skipped', 'transfer.apps_suspicious', 'transfer.files', 'transfer.messages',
-  'transfer.categories', 'transfer.progress_files', 'transfer.expires', 'transfer.days_left',
+  'transfer.categories', 'transfer.progress_files', 'transfer.expires', 'transfer.hist.notes', 'transfer.hist.left',
   'transfer.unreadable_files', 'transfer.restore.missing', 'transfer.restore.apk_skipped', 'transfer.restore.tel.synced',
   'transfer.restore.tel.messenger', 'transfer.restore.issue.files', 'transfer.restore.issue.apps', 'explorer.summary', 'explorer.folders', 'explorer.skipped', 'explorer.leftovers',
   'explorer.selection.count', 'explorer.preview.lines', 'explorer.task.copied', 'explorer.task.uploaded', 'explorer.task.failed_pc',

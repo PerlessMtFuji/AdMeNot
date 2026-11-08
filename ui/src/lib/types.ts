@@ -778,6 +778,8 @@ export interface TransferOrderView {
   /** Kopia, która jeszcze jest (dni do usunięcia) albo `deleted_at` po jej usunięciu; null — brak kopii i daty. */
   copy: { id: string; days_left: number; deleted_at: string | null } | null;
   whatsapp_restored: boolean;
+  /** Aplikacje pominięte z powodu blokady instalacji przez USB (Xiaomi) — da się je doinstalować po odblokowaniu. */
+  apps_blocked: boolean;
   counts: Record<string, number>;
 }
 

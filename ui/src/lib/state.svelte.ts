@@ -1,12 +1,14 @@
 import { SvelteSet } from 'svelte/reactivity';
 import { actedLevels, type ActedLog, type OpenGroups, type Phase } from './logic';
 import type {
-  ApiErrorBody, ApkEstimate, AppsPlanView, AppsProgressView, AppsResultView, WhatsappView, BackupResultView, CopyView, InventoryView, RestorePlanView, RestoreProgressView, RestoreResultView, TapRequest, TelPlanView, TelProgressView, TelResultView, TransferProgress, TransferSelection, UploadChoiceView, ApkQuestion, Category, ConsoleEntry, DeviceEntry, EtaView, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
+  ApiErrorBody, ApkEstimate, AppsPlanView, AppsProgressView, AppsResultView, WhatsappView, BackupResultView, CopyView, InventoryView, RestorePlanView, RestoreProgressView, RestoreResultView, TapRequest, TelPlanView, TelProgressView, TelResultView, TransferOrderView, TransferProgress, TransferSelection, UploadChoiceView, ApkQuestion, Category, ConsoleEntry, DeviceEntry, EtaView, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
   PlanView, Question, ReportResult, ScanView, Settings, ShareState, ShotsView, ShotView, StepEvent, UndoDone, UndoSite, UpdateView, UserWait, Verdict, WhoView,
 } from './types';
 
 /** Zakładka kroku Naprawa: lista aplikacji albo stan telefonu. */
 export type RepairTab = 'apps' | 'phone';
+/** Zakładki Historii: naprawy telefonu / przeniesienia danych (zlecenia ZS wszystkich telefonów). */
+export type HistoryTab = 'orders' | 'transfers';
 export type Screen = 'main' | 'history' | 'settings' | 'explorer';
 /** Kategorie ekranu Ustawienia w kolejności kolumny (spec ustawień §4). */
 export type SettingsCategory = 'general' | 'repair' | 'transfer' | 'explorer' | 'service' | 'privacy' | 'program';
@@ -86,6 +88,12 @@ export interface TransferState {
   /** Kopia z `transfer:done` (ile dni do usunięcia). */
   copy: CopyView | null;
   copies: CopyView[];
+  /** Zlecenia ZS przeniesień (Historia → Przeniesienia), najnowsze pierwsze. */
+  orders: TransferOrderView[];
+  /** Zlecenie, któremu Historia doinstalowuje aplikacje (zadanie `restore_apps` trwa). */
+  appsBusy: string | null;
+  /** Krótka uwaga w wierszu zlecenia po nieudanym doinstalowaniu (klucz błędu) — bez banera. */
+  appsNotes: Record<string, string>;
   restore: RestoreState;
   cleanup: CleanupState;
 }
@@ -178,8 +186,8 @@ export class AppState {
   }
   disconnectedOrder = $state<string | null>(null);
   history = $state<HistoryView | null>(null);
-  /** Zakładka Historii: naprawy wybranego telefonu albo kopie danych wszystkich telefonów. */
-  historyTab = $state<'orders' | 'copies'>('orders');
+  /** Zakładka Historii: naprawy wybranego telefonu albo przeniesienia danych wszystkich telefonów. */
+  historyTab = $state<HistoryTab>('orders');
   undoSteps = $state<StepEvent[]>([]);
   undoResult = $state<UndoDone | null>(null);
   /** Kolejka witryn bieżącego cofania (`undo:sites`); null — cofanie nie ma ekranów witryn. */
@@ -219,7 +227,7 @@ export class AppState {
   crashError = $state<ApiErrorBody | null>(null);
   fatalCrash = $state<string | null>(null);
   transfer = $state<TransferState>({ inventory: null, resumable: null, selection: { ...EMPTY_TRANSFER_SELECTION },
-    progress: null, waiting: false, result: null, copy: null, copies: [], restore: emptyRestore(),
+    progress: null, waiting: false, result: null, copy: null, copies: [], orders: [], appsBusy: null, appsNotes: {}, restore: emptyRestore(),
     cleanup: { serial: null, running: false, ok: null } });
 
   get orderRunning(): boolean {

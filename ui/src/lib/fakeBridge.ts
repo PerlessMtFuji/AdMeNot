@@ -1,7 +1,7 @@
 // Atrapa mostu: odtwarza scenariusze nagrane z prawdziwego Api (scripts/record_bridge_fixtures.py).
 import type { Bridge } from './bridge';
 import { live } from './fakeBridgeLive';
-import type { Api, ApiError, EntryView, ExplorerListView, CopyView, CrashSummary, DeviceCheck, EventMap, EventName, Lang, PlanView, ScanView, ServiceInfo, Settings, ShotView, TaskView, TelemetrySample, UpdateView } from './types';
+import type { Api, ApiError, EntryView, ExplorerListView, CopyView, CrashSummary, DeviceCheck, EventMap, EventName, Lang, PlanView, ScanView, ServiceInfo, Settings, ShotView, TaskView, TelemetrySample, TransferOrderView, UpdateView } from './types';
 // Wynik `telemetry_events.sample()` z Pythona (Task 7 planu kroku H) — ten sam kształt co prawdziwe zdarzenia.
 import SAMPLE from './telemetrySample.json';
 
@@ -36,6 +36,7 @@ export type FakeBridge = Bridge & {
   failNext(method: string, key: string, message?: string): void;  // następne wywołanie `method` zwraca błąd `key`
   answerNext(method: string, result: unknown): void;  // następne wywołanie `method` zwraca `result` (np. problemy planu)
   setChecks(checks: DeviceCheck[]): void;  // co zwróci następny `recheck_site_notifications` (i kolejne skany)
+  setOrders(orders: TransferOrderView[]): void;  // zlecenia ZS przeniesień (`transfers` bez nagrania w scenariuszu)
   setCopies(copies: CopyView[]): void;  // kopie danych na komputerze (`transfers` bez nagrania w scenariuszu)
   calls: { method: string; args: unknown[] }[];
   emit<K extends EventName>(name: K, detail: EventMap[K]): void;
@@ -119,6 +120,7 @@ export function createFakeBridge(name: string,
   let checks: DeviceCheck[] | null = options.checks ? structuredClone(options.checks) : null;
   let checksChanged = false; // odpytywanie w tle (`whenDebugging`) dostaje odczyt tylko po zmianie
   let copies: CopyView[] = [];
+  let orders: TransferOrderView[] = [];
   let planCode = 'K7F3'; // kod ostatniego podglądu planu: udostępnienie liczy ten sam plan
   let taskSeq = 0;
   const tasks: TaskView[] = [];
@@ -166,12 +168,13 @@ export function createFakeBridge(name: string,
   const fallback = (method: string, args: unknown[]): unknown => {
     switch (method) {
       case 'transfers':
-        return { orders: [], copies: structuredClone(copies) };
+        return { orders: structuredClone(orders), copies: structuredClone(copies) };
       case 'install_check':
         return { blocked: false };
       case 'install_remaining_apps':
         return { job_id: 'job-apps' };
       case 'set_whatsapp_restored':
+        for (const o of orders) if (o.number === args[0]) o.whatsapp_restored = args[1] === true;
         return { order: String(args[0]), whatsapp_restored: args[1] === true };
       case 'extend_transfer': {
         const copy = copies.find((c) => c.id === args[0]);
@@ -183,6 +186,7 @@ export function createFakeBridge(name: string,
         const p = (n: number) => String(n).padStart(2, '0');
         const expires = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
         Object.assign(copy, { expires, days_left: copy.days_left + days });
+        for (const o of orders) if (o.copy?.id === copy.id) o.copy.days_left = copy.days_left;
         return { copy: structuredClone(copy) };
       }
       case 'set_transfer_note': {
@@ -193,6 +197,7 @@ export function createFakeBridge(name: string,
       }
       case 'delete_transfer':
         copies = copies.filter((c) => c.id !== args[0]);
+        for (const o of orders) if (o.copy?.id === args[0]) o.copy = { id: String(args[0]), days_left: 0, deleted_at: '2026-11-09T10:00:00' };
         return { deleted: String(args[0]) };
       case 'skip_tap':
         return {};
@@ -571,6 +576,7 @@ export function createFakeBridge(name: string,
     failNext: (method, key, message = '') => { failures.set(method, { key, message }); },
     answerNext: (method, result) => { answers.set(method, result); },
     setChecks: (next) => { checks = structuredClone(next); checksChanged = true; },
+    setOrders: (next) => { orders = structuredClone(next); },
     setCopies: (next) => { copies = structuredClone(next); },
     dispose,
   };

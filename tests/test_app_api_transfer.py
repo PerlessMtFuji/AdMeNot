@@ -1749,6 +1749,11 @@ def test_transfer_order_view_states(tmp_path):
         record = journal.transfer(order.id)
         view = transfer_order_view(order, record, None, NOW)
         assert (view["state"], view["notes"]) == ("restored_notes", 2)
+        assert view["apps_blocked"] is False
+        blocked = {**record.result, "apps": {"blocked": True, "failed": {}}}
+        journal.save_transfer_result(order.id, blocked)
+        assert transfer_order_view(order, journal.transfer(order.id), None, NOW)["apps_blocked"] is True
+        journal.save_transfer_result(order.id, {**record.result, "apps": {"failed": {"no_space": 2}}})
         journal.set_order_status(order.id, "failed")
         assert transfer_order_view(journal.order(order.id), record, None, NOW)["state"] == "failed"
         journal.set_order_status(order.id, "expired")

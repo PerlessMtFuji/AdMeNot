@@ -518,7 +518,7 @@
   "history": {
     "manual": "tryb ręczny",
     "title": "Historia zleceń", "phone": "Telefon",
-    "tabs": "Widok historii", "tab_orders": "Naprawy", "tab_copies": "Kopie danych ({n})", "empty": "Brak zleceń dla tego telefonu.", "none": "Brak zapisanych zleceń.",
+    "tabs": "Widok historii", "tab_orders": "Naprawy", "tab_transfers": "Przeniesienia ({n})", "empty": "Brak zleceń dla tego telefonu.", "none": "Brak zapisanych zleceń.",
     "restore": "Przywróć", "undo_all": "Cofnij całe zlecenie", "resume": "Dokończ",
     "delete": "Usuń zlecenie", "delete_title": "Usunąć zlecenie {number}?", "delete_text": "Znikną kroki, zrzuty ekranu, protokół i kopie APK tego zlecenia. Zmian na telefonie nie będzie już można cofnąć w AdMeNot.", "delete_pdf_kept": "PDF protokołu w folderze {dir} zostaje — usuń go sam, jeśli trzeba.", "delete_confirm": "Usuń",
     "admin_note": "Cofnięcie nie przywraca uprawnień administratora urządzenia.", "undo_errors": "Nie wszystko udało się cofnąć:",
@@ -954,30 +954,52 @@
       "other": "Kopia zostanie usunięta z komputera za {count} dnia — zmienisz to w Historii."
     },
     "finish": "Zakończ",
-    "copies_title": "Kopie danych na komputerze",
-    "copies_sub": "Ze wszystkich telefonów. Każda kopia znika po {days} dniach, chyba że ją przedłużysz.",
+    "hist": {
+      "title": "Przeniesienia danych",
+      "sub": "Zlecenia ze wszystkich telefonów. Kopia znika z komputera po czasie z Ustawień, chyba że ją przedłużysz — protokół zostaje.",
+      "old_phone": "stary telefon",
+      "new_phone": "nowy telefon",
+      "old_label": "Stary telefon",
+      "new_label": "Nowy telefon",
+      "imei": "IMEI {imei}",
+      "state": { "copy_ready": "kopia gotowa", "restored": "wgrano", "failed": "nie wgrano", "expired": "kopia wygasła",
+        "interrupted": "przerwane", "incomplete": "kopia niepełna" },
+      "notes": {
+        "one": "wgrano · {count} uwaga",
+        "few": "wgrano · {count} uwagi",
+        "many": "wgrano · {count} uwag",
+        "other": "wgrano · {count} uwagi"
+      },
+      "left": {
+        "one": "kopia jeszcze {count} dzień",
+        "few": "kopia jeszcze {count} dni",
+        "many": "kopia jeszcze {count} dni",
+        "other": "kopia jeszcze {count} dnia"
+      },
+      "deleted": "kopia usunięta {date}",
+      "interrupted": "kopia przerwana — wznów przy podłączeniu",
+      "apps_waiting": "aplikacje czekają na odblokowanie instalacji",
+      "installing": "doinstalowuję aplikacje…",
+      "apps_note": { "transfer_no_phone": "telefon nie jest podłączony", "transfer_copy_missing": "kopii już nie ma na komputerze",
+        "other": "nie udało się doinstalować aplikacji" },
+      "details": "Pokaż szczegóły",
+      "hide": "Ukryj szczegóły",
+      "empty_counts": "Brak zapisanych liczb.",
+      "report": "Protokół",
+      "to_phone": "Wgraj na podłączony",
+      "more": "Więcej działań — {name}",
+      "menu": { "extend": "Przedłuż", "delete": "Usuń kopię", "note": "Notatka", "whatsapp": "Czaty WhatsApp przywrócone",
+        "reinstall": "Doinstaluj aplikacje", "report": "Protokół" }
+    },
     "note": { "label": "Notatka serwisanta", "add": "Dodaj notatkę", "add_to_copy": "Dodaj notatkę do kopii", "edit": "Edytuj", "placeholder": "Np. czego klient potrzebuje, co sprawdzić przy wgrywaniu…" },
     "contents": {
       "contacts": "Kontakty", "sms": "SMS", "mms": "MMS", "calls": "Połączenia", "files": "Pliki",
       "files_photos": "Zdjęcia", "files_videos": "Filmy", "files_downloads": "Pobrane",
       "files_whatsapp": "WhatsApp", "files_others": "Inne foldery", "apps": "Aplikacje"
     },
-    "days_left": {
-      "one": "został {count} dzień",
-      "few": "zostały {count} dni",
-      "many": "zostało {count} dni",
-      "other": "zostało {count} dnia"
-    },
-    "extend": "Przedłuż",
-    "delete": "Usuń teraz",
     "delete_title": "Usunąć kopię {name}?",
     "delete_text": "Dane klienta z tej kopii znikną z komputera. Tego nie da się cofnąć.",
     "delete_confirm": "Usuń",
-    "status": {
-      "in_progress": "niedokończona",
-      "incomplete": "niepełna",
-      "complete": "pełna"
-    },
     "restore": {
       "offer_title": "Wgrać kopię z {phone} ({details})?",
       "offer_text": "Pliki z kopii trafią na ten telefon. Niczego na nim nie nadpiszę.",

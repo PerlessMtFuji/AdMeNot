@@ -61,8 +61,11 @@
   import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
   import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
   import Wrench from '@lucide/svelte/icons/wrench';
+  import Ellipsis from '@lucide/svelte/icons/ellipsis';
+  import StickyNote from '@lucide/svelte/icons/sticky-note';
 
   export const ICONS = {
+    ellipsis: Ellipsis, 'sticky-note': StickyNote,
     megaphone: Megaphone, 'bell-ring': BellRing, lock: Lock, 'lock-open': LockOpen, eye: Eye,
     'venetian-mask': VenetianMask, clock: Clock, download: Download, zap: Zap, check: Check, x: X,
     'triangle-alert': TriangleAlert, info: Info, 'undo-2': Undo2, 'trash-2': Trash2, 'rotate-ccw': RotateCcw, 'arrow-left': ArrowLeft,

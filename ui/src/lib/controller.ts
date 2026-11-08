@@ -1,7 +1,7 @@
 import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
 import { actedAfter, changedVerdicts, defaultApps, installableApps, defaultSelection, defaultUploadChoice, keptUploadChoice, otherGroup, TEL_KINDS, telWrite, resumableCopy, UPLOAD_GROUPS, resumeSelection, rescanSelection, TRANSFER_CATEGORIES, transferNeed, transferTotals, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
-import { EMPTY_TRANSFER_SELECTION, emptyRestore, type AppState, type RepairTab, type SettingsCategory } from './state.svelte';
+import { EMPTY_TRANSFER_SELECTION, emptyRestore, type AppState, type HistoryTab, type RepairTab, type SettingsCategory } from './state.svelte';
 import { ExplorerController } from './explorer/controller';
 import { applyTheme } from './theme';
 import type {
@@ -320,6 +320,7 @@ export class Controller {
         return;
       }
       if (d.kind === 'restore_apps') { // dokończenie aplikacji w tle: powód w wierszu „Aplikacje”, nie karta błędu
+        if (s.transfer.appsBusy) s.transfer.appsNotes = { ...s.transfer.appsNotes, [s.transfer.appsBusy]: d.key };
         const r = s.transfer.restore;
         const transient = REINSTALL_TRANSIENT.includes(d.key);
         Object.assign(r, { appsError: d.key, appsProgress: null, reinstallDone: !transient, reinstallGaveUp: !transient });
@@ -384,6 +385,10 @@ export class Controller {
       this.ended.add(d.job_id);
       if (d.kind === 'update') s.updateProgress = null;
       if (d.kind === 'phone_cleanup') s.transfer.cleanup = { ...s.transfer.cleanup, running: false };
+      if (d.kind === 'restore_apps' && s.transfer.appsBusy) {  // doinstalowanie z Historii skończone: nowy wynik w wierszu
+        s.transfer.appsBusy = null;
+        void this.loadTransfers();
+      }
       if (s.job?.id === d.job_id) s.job = null;
       if (d.kind === 'transfer_scan') this.continueResume();
     });
@@ -1168,12 +1173,51 @@ export class Controller {
 
   async loadTransfers(): Promise<void> {
     const r = await this.call(this.api.transfers());
-    if (r) this.state.transfer.copies = r.copies;
+    if (!r) return;
+    this.state.transfer.copies = r.copies;
+    this.state.transfer.orders = r.orders ?? [];
   }
 
   async extendTransfer(id: string): Promise<void> {
     const r = await this.call(this.api.extend_transfer(id));
-    if (r) this.state.transfer.copies = this.state.transfer.copies.map((c) => (c.id === id ? r.copy : c));
+    if (!r) return;
+    this.state.transfer.copies = this.state.transfer.copies.map((c) => (c.id === id ? r.copy : c));
+    this.state.transfer.orders = this.state.transfer.orders.map((o) => (o.copy?.id === id && !o.copy.deleted_at
+      ? { ...o, copy: { ...o.copy, days_left: r.copy.days_left } } : o));
+  }
+
+  /** „Czaty WhatsApp przywrócone” z menu wiersza w Historii: zapis w zleceniu (trafia do protokołu). */
+  private historyWhatsappSeq = 0;
+  async setOrderWhatsapp(number: string, on: boolean): Promise<void> {
+    const apply = (value: boolean) => {
+      this.state.transfer.orders = this.state.transfer.orders.map((o) => (o.number === number ? { ...o, whatsapp_restored: value } : o));
+    };
+    const before = this.state.transfer.orders.find((o) => o.number === number)?.whatsapp_restored ?? false;
+    const seq = ++this.historyWhatsappSeq;
+    apply(on);
+    const res = await this.call(this.api.set_whatsapp_restored(number, on));
+    if (seq !== this.historyWhatsappSeq) return;  // późniejsze kliknięcie rozstrzyga o polu
+    apply(res ? res.whatsapp_restored : before);
+  }
+
+  /** „Doinstaluj aplikacje” z menu wiersza w Historii: tylko aplikacje pominięte z powodu blokady, na telefonie celu.
+   *  Cicho: odmowa to krótka uwaga w wierszu (`transfer.appsNotes`), nie baner; wynik odświeża listę (`job:end`). */
+  async reinstallFromHistory(number: string): Promise<void> {
+    const tr = this.state.transfer;
+    if (this.state.job) return;
+    tr.appsNotes = Object.fromEntries(Object.entries(tr.appsNotes).filter(([k]) => k !== number));
+    let res;
+    try {
+      res = await this.api.install_remaining_apps(number);
+    } catch {
+      res = null;
+    }
+    if (!res || isApiError(res)) {
+      tr.appsNotes = { ...tr.appsNotes, [number]: res ? res.error.key : 'internal' };
+      return;
+    }
+    tr.appsBusy = number;
+    this.setJob(res.job_id, 'restore_apps');
   }
 
   /** Zapis notatki do kopii; `true` po udanym zapisie (pole edycji się zamyka). */
@@ -1188,7 +1232,9 @@ export class Controller {
 
   async deleteTransfer(id: string): Promise<void> {
     const r = await this.call(this.api.delete_transfer(id));
-    if (r) this.state.transfer.copies = this.state.transfer.copies.filter((c) => c.id !== id);
+    if (!r) return;
+    this.state.transfer.copies = this.state.transfer.copies.filter((c) => c.id !== id);
+    await this.loadTransfers();  // wiersz zlecenia zostaje („kopia usunięta DD.MM”), znika tylko kopia bez zlecenia
   }
 
   // --- aktualizacje ------------------------------------------------------------------------------
@@ -1331,7 +1377,7 @@ export class Controller {
 
   // --- historia, ustawienia, konsola -------------------------------------------------------------
 
-  async openHistory(serial: string | null = null, tab: 'orders' | 'copies' = 'orders'): Promise<void> {
+  async openHistory(serial: string | null = null, tab: HistoryTab = 'orders'): Promise<void> {
     const s = this.state;
     s.screen = 'history';
     s.historyTab = tab;

@@ -360,32 +360,50 @@ test('undo banner lists restored sites with open buttons', async () => {
   expect(screen.queryByText(/strona musi zapisać telefon od nowa/)).toBeNull();
 });
 
-test('data copies of all phones sit on their own tab, without the phone panel of the repair history', async () => {
+const TRANSFER = { number: 'ZS/2026/1025/02', client: 'Anna K.', created_at: '2026-10-25T14:20:00',
+  source: { name: 'Samsung A52', imei: '351111111111111' }, target: { name: 'OPPO A54', imei: '862222222222222' },
+  state: 'restored' as const, notes: 0, copy: { id: 'OLD/1', days_left: 6, deleted_at: null }, whatsapp_restored: false,
+  apps_blocked: false, counts: { contacts: 5 } };
+
+test('transfers of all phones sit on their own tab, without the phone panel of the repair history', async () => {
   const env = await setupCtl('adware');
-  env.bridge.setCopies([{ id: 'OLD/20261031-173908', serial: 'OLD', model: '22101316G', manufacturer: 'Xiaomi', client: null,
-    created: '2026-10-31T17:39:08', expires: '2026-11-07T17:39:08', days_left: 6, status: 'complete', bytes: 10,
-    counts: {}, restores: [] }]);
+  env.bridge.setOrders([TRANSFER]);
   render(App, { props: { ctl: env.ctl } });
   await env.ctl.openHistory();
+  await vi.waitFor(() => expect(env.s.transfer.orders).toHaveLength(1));
   await tick();
   const tabs = screen.getByRole('group', { name: 'Widok historii' });
   expect(within(tabs).getByRole('button', { name: 'Naprawy' }).getAttribute('aria-pressed')).toBe('true');
-  expect(screen.queryByRole('article', { name: 'Xiaomi 22101316G' })).toBeNull();
+  expect(screen.queryByRole('article', { name: /Samsung A52/ })).toBeNull();
   expect(screen.getByRole('complementary', { name: 'Telefon' })).toBeTruthy();
-  await fireEvent.click(within(tabs).getByRole('button', { name: 'Kopie danych (1)' }));
-  expect(screen.getByRole('article', { name: 'Xiaomi 22101316G' })).toBeTruthy();
-  expect(screen.getByText(/Ze wszystkich telefonów/)).toBeTruthy();
+  await fireEvent.click(within(tabs).getByRole('button', { name: 'Przeniesienia (1)' }));
+  expect(screen.getByRole('article', { name: /Samsung A52 → OPPO A54/ })).toBeTruthy();
   expect(screen.queryByRole('complementary', { name: 'Telefon' })).toBeNull();
-  // „Wgraj kopię” i „Inna kopia” z ekranu Połącz otwierają od razu zakładkę kopii
+  // „Wgraj kopię” i „Inna kopia” z ekranu Połącz otwierają od razu zakładkę przeniesień
   await fireEvent.click(within(tabs).getByRole('button', { name: 'Naprawy' }));
   env.s.screen = 'main';
-  await env.ctl.openHistory(null, 'copies');
+  await env.ctl.openHistory(null, 'transfers');
   await tick();
-  expect(screen.getByRole('article', { name: 'Xiaomi 22101316G' })).toBeTruthy();
+  expect(screen.getByRole('article', { name: /Samsung A52 → OPPO A54/ })).toBeTruthy();
 });
 
-test('without data copies the history has no tabs', async () => {
+test('the transfers tab counts orders and copies without an order, and the repair tab shows no transfers', async () => {
+  const env = await setupCtl('adware');
+  env.bridge.setOrders([TRANSFER]);
+  env.bridge.setCopies([{ id: 'OLD/7', serial: 'S7', model: 'Moto G54', manufacturer: 'motorola', client: null,
+    created: '2026-10-20T12:00:00', expires: '2026-10-27T12:00:00', days_left: 2, status: 'in_progress', bytes: 1, counts: {},
+    order: null, restores: [] }]);
+  render(App, { props: { ctl: env.ctl } });
+  await env.ctl.openHistory();
+  await vi.waitFor(() => expect(env.s.transfer.orders).toHaveLength(1));
+  await tick();
+  const tabs = screen.getByRole('group', { name: 'Widok historii' });
+  expect(within(tabs).getByRole('button', { name: 'Przeniesienia (2)' })).toBeTruthy();
+  expect(screen.queryByText(TRANSFER.number)).toBeNull();  // zakładka „Naprawy” bez przeniesień
+});
+
+test('without transfers the history has no tabs', async () => {
   const { s } = await openHistory();
-  expect(s.transfer.copies).toEqual([]);
+  expect(s.transfer.orders).toEqual([]);
   expect(screen.queryByRole('group', { name: 'Widok historii' })).toBeNull();
 });

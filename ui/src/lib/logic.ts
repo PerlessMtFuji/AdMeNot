@@ -1,5 +1,5 @@
 import { CATEGORY_ORDER } from './categories';
-import type { CheckBrowser, CheckSite, AppView, BackupResultView, Category, CopyView, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferProgress, TransferSelection, InventoryView, ExportFileView, ExportKind, StoredSelection, RestorePlanView, RestoreResultView, AppsPlanView, AppsPlanItem, TelKind, TelPlanView, TelResultView, UndoSite, UploadChoiceView, UploadGroup, UpdateView, UserWait, Verdict } from './types';
+import type { CheckBrowser, CheckSite, AppView, BackupResultView, Category, CopyView, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferOrderView, TransferProgress, TransferSelection, InventoryView, ExportFileView, ExportKind, StoredSelection, RestorePlanView, RestoreResultView, AppsPlanView, AppsPlanItem, TelKind, TelPlanView, TelResultView, UndoSite, UploadChoiceView, UploadGroup, UpdateView, UserWait, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done'
   | 'transfer_choose' | 'transfer_backup' | 'transfer_done'
@@ -773,6 +773,42 @@ export function backupOutcome(r: BackupResultView, unreadable = 0): 'ok' | 'warn
  *  w mostku. `copies` przychodzą najnowsze pierwsze. */
 export function resumableCopy(copies: CopyView[], serial: string | null): CopyView | null {
   return (serial && copies.find((c) => c.status === 'in_progress' && c.serial === serial)) || null;
+}
+
+/** Wiersz Historii → Przeniesienia: zlecenie ZS albo kopia bez zlecenia (w toku / przerwana / starsza, sprzed zleceń). */
+export interface TransferRow {
+  key: string;
+  /** Numer ZS; null — kopia bez zlecenia. */
+  number: string | null;
+  client: string | null;
+  at: string;
+  source: { name: string | null; imei: string | null };
+  target: { name: string | null; imei: string | null } | null;
+  state: TransferOrderView['state'] | 'interrupted' | 'incomplete';
+  notes: number;
+  /** Kopia, która jest albo była (dni do usunięcia / data usunięcia); null — brak kopii i daty. */
+  copy: TransferOrderView['copy'];
+  /** Widok kopii na dysku (notatka, przedłużanie, wznawianie); null — kopii już nie ma. */
+  disk: CopyView | null;
+  whatsappRestored: boolean;
+  appsBlocked: boolean;
+  counts: Record<string, number>;
+}
+
+/** Zlecenia przeniesień i kopie bez zlecenia (`order` pusty) w jednej liście, najnowsze pierwsze. Kopia ze zleceniem
+ *  jest już jego wierszem, więc osobnego nie dostaje. */
+export function transferRows(orders: TransferOrderView[], copies: CopyView[]): TransferRow[] {
+  const byId = new Map(copies.map((c) => [c.id, c]));
+  const fromOrders = orders.map((o): TransferRow => ({ key: o.number, number: o.number, client: o.client, at: o.created_at,
+    source: o.source, target: o.target, state: o.state, notes: o.notes, copy: o.copy,
+    disk: o.copy && !o.copy.deleted_at ? byId.get(o.copy.id) ?? null : null,
+    whatsappRestored: o.whatsapp_restored, appsBlocked: !!o.apps_blocked, counts: o.counts }));
+  const fromCopies = copies.filter((c) => !c.order).map((c): TransferRow => ({ key: c.id, number: null, client: c.client, at: c.created,
+    source: { name: `${c.manufacturer} ${c.model}`.trim() || null, imei: null }, target: null,
+    state: c.status === 'in_progress' ? 'interrupted' : c.status === 'incomplete' ? 'incomplete' : 'copy_ready',
+    notes: 0, copy: { id: c.id, days_left: c.days_left, deleted_at: null }, disk: c,
+    whatsappRestored: false, appsBlocked: false, counts: c.counts }));
+  return [...fromOrders, ...fromCopies].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
 }
 
 /** Ile miejsca potrzeba jeszcze na kopię: przy wznowieniu tylko reszta (skopiowane już leży na dysku,

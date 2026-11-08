@@ -518,7 +518,7 @@
   "history": {
     "manual": "by hand",
     "title": "Order history", "phone": "Phone",
-    "tabs": "History view", "tab_orders": "Repairs", "tab_copies": "Data copies ({n})", "empty": "No orders for this phone.", "none": "No saved orders.",
+    "tabs": "History view", "tab_orders": "Repairs", "tab_transfers": "Transfers ({n})", "empty": "No orders for this phone.", "none": "No saved orders.",
     "restore": "Restore", "undo_all": "Undo the whole order", "resume": "Finish",
     "delete": "Delete order", "delete_title": "Delete order {number}?", "delete_text": "Its steps, screenshots, report and APK copies will be removed. Changes on the phone can no longer be undone in AdMeNot.", "delete_pdf_kept": "The PDF report in {dir} stays — delete it yourself if needed.", "delete_confirm": "Delete",
     "admin_note": "Undo does not restore device admin rights.", "undo_errors": "Not everything could be undone:",
@@ -954,30 +954,52 @@
       "other": "The copy is deleted from this computer in {count} days — change that in History."
     },
     "finish": "Finish",
-    "copies_title": "Data copies on this computer",
-    "copies_sub": "From all phones. Each copy is deleted after {days} days unless you extend it.",
+    "hist": {
+      "title": "Data transfers",
+      "sub": "Orders from all phones. A copy is removed from this computer after the time set in Settings unless you extend it — the report stays.",
+      "old_phone": "old phone",
+      "new_phone": "new phone",
+      "old_label": "Old phone",
+      "new_label": "New phone",
+      "imei": "IMEI {imei}",
+      "state": { "copy_ready": "copy ready", "restored": "uploaded", "failed": "not uploaded", "expired": "copy expired",
+        "interrupted": "interrupted", "incomplete": "incomplete copy" },
+      "notes": {
+        "one": "uploaded · {count} note",
+        "few": "uploaded · {count} notes",
+        "many": "uploaded · {count} notes",
+        "other": "uploaded · {count} notes"
+      },
+      "left": {
+        "one": "copy kept {count} more day",
+        "few": "copy kept {count} more days",
+        "many": "copy kept {count} more days",
+        "other": "copy kept {count} more days"
+      },
+      "deleted": "copy deleted {date}",
+      "interrupted": "copy interrupted — resume when the phone is connected",
+      "apps_waiting": "apps are waiting for installation to be unblocked",
+      "installing": "installing the remaining apps…",
+      "apps_note": { "transfer_no_phone": "the phone is not connected", "transfer_copy_missing": "the copy is no longer on this computer",
+        "other": "could not install the apps" },
+      "details": "Show details",
+      "hide": "Hide details",
+      "empty_counts": "No counts saved.",
+      "report": "Report",
+      "to_phone": "Upload to connected phone",
+      "more": "More actions — {name}",
+      "menu": { "extend": "Extend", "delete": "Delete copy", "note": "Note", "whatsapp": "WhatsApp chats restored",
+        "reinstall": "Install remaining apps", "report": "Report" }
+    },
     "note": { "label": "Technician's note", "add": "Add a note", "add_to_copy": "Add a note to the copy", "edit": "Edit", "placeholder": "E.g. what the customer needs, what to check when restoring…" },
     "contents": {
       "contacts": "Contacts", "sms": "SMS", "mms": "MMS", "calls": "Calls", "files": "Files",
       "files_photos": "Photos", "files_videos": "Videos", "files_downloads": "Downloads",
       "files_whatsapp": "WhatsApp", "files_others": "Other folders", "apps": "Apps"
     },
-    "days_left": {
-      "one": "{count} day left",
-      "few": "{count} days left",
-      "many": "{count} days left",
-      "other": "{count} days left"
-    },
-    "extend": "Extend",
-    "delete": "Delete now",
     "delete_title": "Delete the copy {name}?",
     "delete_text": "The customer's data in this copy is removed from this computer. This can't be undone.",
     "delete_confirm": "Delete",
-    "status": {
-      "in_progress": "unfinished",
-      "incomplete": "incomplete",
-      "complete": "complete"
-    },
     "restore": {
       "offer_title": "Upload the copy of {phone} ({details})?",
       "offer_text": "Files from the copy go to this phone. Nothing on it is overwritten.",

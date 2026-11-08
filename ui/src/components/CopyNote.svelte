@@ -18,7 +18,8 @@
   let saving = $state(false);
   let area = $state<HTMLTextAreaElement | null>(null);
 
-  async function edit(): Promise<void> {
+  /** Otwiera pole edycji (menu wiersza Historii: „Notatka”). */
+  export async function edit(): Promise<void> {
     draft = copy.note ?? '';
     editing = true;
     await tick();

@@ -45,9 +45,9 @@
   const filesReason = $derived(!s.serial ? t('explorer.files_reason.pick') : s.job ? t('explorer.files_reason.busy')
     : cleaning ? t('explorer.files_reason.cleanup') : null);
 
-  /** „Inna kopia” i „Wgraj kopię”: lista kopii (z „Wgraj na podłączony telefon”) to zakładka Historii. */
+  /** „Inna kopia” i „Wgraj kopię”: lista przeniesień (z „Wgraj na podłączony”) to zakładka Historii. */
   async function otherCopy(): Promise<void> {
-    await ctl.openHistory(null, 'copies');
+    await ctl.openHistory(null, 'transfers');
   }
 
   // Za każdym powrotem na ten ekran: kopia mogła się w międzyczasie skończyć albo przerwać.

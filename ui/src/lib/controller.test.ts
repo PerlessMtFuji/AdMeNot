@@ -1276,6 +1276,43 @@ describe('data transfer', () => {
     expect(s.transfer.copies).toEqual([]);
   });
 
+  test('transfer orders: loaded with the copies, the copy stays in its row after deleting, WhatsApp saves optimistically', async () => {
+    const { ctl, s, bridge } = setup('empty');
+    await ctl.init();
+    const order = { number: 'ZS/1', client: null, created_at: '2026-10-25T10:00:00', source: { name: 'A', imei: null },
+      target: { name: 'B', imei: null }, state: 'restored' as const, notes: 0, copy: { id: 'S/1', days_left: 7, deleted_at: null },
+      whatsapp_restored: false, apps_blocked: false, counts: {} };
+    bridge.setOrders([order]);
+    bridge.setCopies([{ id: 'S/1', serial: 'S', model: 'M', manufacturer: 'm', client: null, created: '2026-10-25T10:00:00',
+      expires: '2026-11-01T10:00:00', days_left: 7, status: 'complete', bytes: 10, counts: {}, order: 'ZS/1' }]);
+    await ctl.loadTransfers();
+    expect(s.transfer.orders.map((o) => o.number)).toEqual(['ZS/1']);
+    await ctl.extendTransfer('S/1');
+    expect(s.transfer.orders[0].copy?.days_left).toBe(14);
+    const pending = ctl.setOrderWhatsapp('ZS/1', true);
+    expect(s.transfer.orders[0].whatsapp_restored).toBe(true);
+    await pending;
+    expect(bridge.calls.at(-1)).toEqual({ method: 'set_whatsapp_restored', args: ['ZS/1', true] });
+    bridge.failNext('set_whatsapp_restored', 'unknown_order', 'ZS/1');
+    await ctl.setOrderWhatsapp('ZS/1', false);
+    expect(s.transfer.orders[0].whatsapp_restored).toBe(true);  // odmowa cofa pole
+    await ctl.deleteTransfer('S/1');
+    expect(s.transfer.orders[0].copy).toMatchObject({ id: 'S/1', deleted_at: expect.any(String) });
+  });
+
+  test('reinstall from the history: a refusal is a note on the order (no banner); success marks the order busy', async () => {
+    const { ctl, s, bridge } = setup('empty');
+    await ctl.init();
+    bridge.failNext('install_remaining_apps', 'transfer_no_phone', 'X');
+    await ctl.reinstallFromHistory('ZS/1');
+    expect(s.error).toBeNull();
+    expect(s.transfer.appsNotes).toEqual({ 'ZS/1': 'transfer_no_phone' });
+    await ctl.reinstallFromHistory('ZS/1');
+    expect(s.transfer.appsNotes).toEqual({});
+    expect(s.transfer.appsBusy).toBe('ZS/1');
+    expect(s.job?.kind).toBe('restore_apps');
+  });
+
   test('a refused delete (copy in use) keeps the copy and shows the error', async () => {
     const { ctl, s, bridge } = setup('transfer');
     await ctl.init();
