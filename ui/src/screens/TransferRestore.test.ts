@@ -495,15 +495,22 @@ describe('TransferRestore result', () => {
       expect(calls(bridge, 'install_remaining_apps')).toBe(2);
     });
 
-    test('apps_done that is still blocked re-arms the next unblock', async () => {
+    test('apps_done still blocked: runs again only after a fresh blocked → unblocked transition', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       const { bridge, s } = await finished(result(), { apps: BLOCKED });
-      await vi.advanceTimersByTimeAsync(RECHECK_MS + 100);
+      await vi.advanceTimersByTimeAsync(RECHECK_MS + 100);  // „odblokowane” → pierwsze dokończenie
+      expect(calls(bridge, 'install_remaining_apps')).toBe(1);
       bridge.emit('transfer:apps_done', { order: ORDER, apps: BLOCKED });
       bridge.emit('job:end', { job_id: 'job-apps', kind: 'restore_apps' } as never);
       s.job = null;
       await tick();
+      await vi.advanceTimersByTimeAsync(RECHECK_MS * 4);  // telefon dalej mówi „odblokowane”: czekamy
+      expect(calls(bridge, 'install_remaining_apps')).toBe(1);
+      expect(screen.getByRole('button', { name: /Xiaomi blokuje instalację/ })).toBeTruthy();
+      bridge.answerNext('install_check', { blocked: true });
       await vi.advanceTimersByTimeAsync(RECHECK_MS + 100);
+      expect(calls(bridge, 'install_remaining_apps')).toBe(1);
+      await vi.advanceTimersByTimeAsync(RECHECK_MS + 100);  // znów „odblokowane”
       expect(calls(bridge, 'install_remaining_apps')).toBe(2);
     });
 

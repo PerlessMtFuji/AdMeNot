@@ -819,12 +819,12 @@ export class Controller {
       const r = s.transfer.restore;
       if (r.order !== d.order) return;
       // nadal zablokowane: kolejne odblokowanie uruchomi dokończenie jeszcze raz
-      Object.assign(r, { appsResult: d.apps, appsProgress: null, appsError: null, reinstallGaveUp: false, reinstallDone: !d.apps.blocked });
+      Object.assign(r, { appsResult: d.apps, appsProgress: null, appsError: null, reinstallGaveUp: false, reinstallDone: !d.apps.blocked, awaitBlock: d.apps.blocked });
     });
     on('transfer:restore_done', (d) => {
       Object.assign(s.transfer.restore, { result: d.result, copy: d.copy, telResult: d.tel ?? null,
         telError: d.tel_error ?? null, tap: null, appsResult: d.apps ?? null, appsError: d.apps_error ?? null, reinstallGaveUp: false,
-        appsProgress: null, order: d.order ?? null, whatsapp: d.whatsapp ?? null, whatsappRestored: false, reinstallDone: false });
+        appsProgress: null, order: d.order ?? null, whatsapp: d.whatsapp ?? null, whatsappRestored: false, reinstallDone: false, awaitBlock: false });
       s.transfer.copies = s.transfer.copies.map((c) => (c.id === d.copy.id ? d.copy : c));
       s.transfer.waiting = false;
       s.stopping = false;
@@ -1087,7 +1087,9 @@ export class Controller {
     if (!s.devices.some((e) => e.serial === target && e.state === 'device')) return;
     try {
       const check = await this.api.install_check();
-      if (isApiError(check) || check.blocked !== false) return;
+      if (isApiError(check)) return;
+      if (check.blocked === true) r.awaitBlock = false;  // zobaczyliśmy blokadę: następne „odblokowane” to nowe przejście
+      if (check.blocked !== false || r.awaitBlock) return;
       if (r.reinstallDone || s.phase !== 'transfer_restored' || s.job) return;
       r.reinstallDone = true;
       const res = await this.api.install_remaining_apps(order);
@@ -1149,7 +1151,7 @@ export class Controller {
     if (!r) return;
     Object.assign(s.transfer.restore, { progress: null, result: null, telProgress: null, telResult: null, telError: null,
       tap: null, appsProgress: null, appsResult: null, appsError: null, order: null, whatsapp: null, whatsappRestored: false,
-      reinstallDone: false, reinstallGaveUp: false });
+      reinstallDone: false, reinstallGaveUp: false, awaitBlock: false });
     s.transfer.waiting = false;
     s.stopping = false;
     s.phase = 'transfer_restore';
