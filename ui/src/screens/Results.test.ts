@@ -1,13 +1,15 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { flushSync, tick } from 'svelte';
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import App from '../App.svelte';
 import { CHECKS_SAMPLE } from '../lib/fakeBridge';
+import type { CheckBrowser, DeviceCheck } from '../lib/types';
 import { t, tp } from '../lib/i18n/index.svelte';
 import { setupCtl } from '../test-utils';
+import Results from './Results.svelte';
 
-async function scanned(scenario = 'adware') {
-  const env = await setupCtl(scenario);
+async function scanned(scenario = 'adware', checks?: DeviceCheck[]) {
+  const env = await setupCtl(scenario, checks ? { checks } : {});
   render(App, { props: { ctl: env.ctl } });
   await env.ctl.startScan();
   await vi.waitFor(() => expect(env.s.job).toBeNull());
@@ -17,6 +19,10 @@ async function scanned(scenario = 'adware') {
 
 // Tylko wiersze tabeli aplikacji — panel szczegółów ma własną tabelę (możliwości aplikacji).
 const appRows = () => within(screen.getByRole('group', { name: 'Tabela aplikacji' })).getAllByRole('row');
+const tab = (name: 'Aplikacje' | 'Telefon') => screen.getByRole('tab', { name: new RegExp(`^${name}`) });
+const openPhone = () => fireEvent.click(tab('Telefon'));
+// Dymek linii analizy: zdanie uspokajające i szacunek pobierania (spec §3 p.2) — czytany z nazwy ikony.
+const apkHint = () => screen.getByRole('img', { name: /Na razie bez oznak|Analiza pobierze|Pliki wszystkich/ }).getAttribute('aria-label') ?? '';
 
 describe('Results', () => {
   test('header shows the phone thumbnail next to the device name, in both modes', async () => {
@@ -318,7 +324,8 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     expect(screen.getByText(t('summary.profiles_unknown'))).toBeTruthy();
     s.scan = { ...s.scan!, profiles: { others: [], known: true } };
     await tick();
-    expect(notesLine().textContent).not.toContain(t('notice.short.profiles_unknown')); // zostaje tylko „stan telefonu nie odczytany”
+    // „Stan telefonu nie odczytany” należy do zakładki „Telefon”, więc linia uwag aplikacji znika.
+    expect(screen.queryByRole('region', { name: 'Uwagi do skanu' })?.textContent ?? '').not.toContain(t('notice.short.profiles_unknown'));
     expect(screen.queryByText(t('summary.profiles_unknown'))).toBeNull();
   });
 
@@ -365,8 +372,8 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     s.apk = { ...s.apk, running: true };
     bridge.emit('apk:estimate', { to_fetch_bytes: 7.2 * GB, total_bytes: 7.2 * GB, apps: 142, unknown: 3, cached: 0,
       largest_bytes: 3 * GB, limit_bytes: 10 * GB, effective_bytes: 2 * GB, free_bytes: 4 * GB, eta_s: null, eta_kind: null, eta_min_s: null, eta_max_s: null, scope: 'all' });
-    expect(await screen.findByText(/Analiza pobierze ok. 7,2 GB \(142 aplikacje\)/)).toBeTruthy();
-    expect(screen.getByText(/Na dysku jest miejsce na 2,0 GB/)).toBeTruthy();
+    await vi.waitFor(() => expect(apkHint()).toMatch(/Analiza pobierze ok. 7,2 GB \(142 aplikacje\)/));
+    expect(apkHint()).toMatch(/Na dysku jest miejsce na 2,0 GB/);
     expect(tp('apk_cache.estimate', 5, { size: '1,0 GB' })).toBe('Analiza pobierze ok. 1,0 GB (5 aplikacji)');
     bridge.emit('apk:question', { job_id: 'job-9', kind: 'no_space', to_fetch_bytes: 7.2 * GB, total_bytes: 7.2 * GB,
       apps: 142, unknown: 0, cached: 0, largest_bytes: 3 * GB, limit_bytes: 10 * GB, effective_bytes: 2 * GB, free_bytes: 4 * GB,
@@ -385,11 +392,11 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
       effective_bytes: 10 * GB, free_bytes: 50 * GB, eta_s: null, eta_kind: null, eta_min_s: null, eta_max_s: null };
     s.apk = { ...s.apk, running: true };
     bridge.emit('apk:estimate', { ...base, to_fetch_bytes: 0, apps: 89, cached: 89, scope: 'all' });
-    expect(await screen.findByText(
-      'Pliki wszystkich aplikacji do analizy (89) są już na komputerze — nic nie trzeba pobierać.')).toBeTruthy();
+    await vi.waitFor(() => expect(apkHint()).toBe(
+      'Pliki wszystkich aplikacji do analizy (89) są już na komputerze — nic nie trzeba pobierać.'));
     bridge.emit('apk:estimate', { ...base, to_fetch_bytes: 30 * 1024 ** 2, apps: 89, cached: 87, scope: 'all' });
-    expect(await screen.findByText(
-      'Analiza pobierze ok. 30 MB (2 z 89 aplikacji, pozostałe są już na komputerze).')).toBeTruthy();
+    await vi.waitFor(() => expect(apkHint()).toBe(
+      'Analiza pobierze ok. 30 MB (2 z 89 aplikacji, pozostałe są już na komputerze).'));
   });
 
   test('find the ad source: header button swaps the side panel, back and the plan close it', async () => {
@@ -487,7 +494,7 @@ describe('Results: APK analysis in progress and bulk group actions', () => {
     await tick();
     expect(screen.queryByRole('heading', { name: t('results.clean_title') })).toBeNull();
     expect(screen.getByRole('heading', { name: t('results.apk_title') })).toBeTruthy();
-    expect(screen.getByText(t('results.apk_sub'))).toBeTruthy();
+    expect(apkHint()).toBe(t('results.apk_sub'));
     expect(screen.getByRole('progressbar', { name: t('summary.apk_running', { done: 5, total: 140 }) })).toBeTruthy();
     s.apk = { ...s.apk, running: false };
     await tick();
@@ -615,7 +622,7 @@ describe('Results: manual mode (tryb ręczny)', () => {
       expect((within(panel()).getByRole('button', { name: t('actions.fix', { count: 0 }) }) as HTMLButtonElement).disabled).toBe(true);
     };
     hidden();
-    expect(screen.getByText(t('results.apk_sub'))).toBeTruthy();
+    expect(apkHint()).toBe(t('results.apk_sub'));
     // Nawet wymuszone zaznaczenie nie trafia do panelu, dopóki tryb nie jest wybrany.
     s.selection = { [flagged[0].package]: 'disable' };
     await tick();
@@ -677,15 +684,18 @@ describe('Results: phone state', () => {
     return env;
   }
 
-  test('the section sits above the app list', async () => {
+  test('the section lives in the “Telefon” tab, not above the app list', async () => {
     await scannedWithChecks();
-    const section = screen.getByRole('region', { name: 'Stan telefonu' });
-    const firstGroup = screen.getByRole('region', { name: 'Szkodliwe' });
-    expect(section.compareDocumentPosition(firstGroup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Stan telefonu' })).toBeNull();
+    expect(screen.getByRole('region', { name: 'Szkodliwe' })).toBeTruthy();
+    await openPhone();
+    expect(screen.getByRole('region', { name: 'Stan telefonu' })).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Szkodliwe' })).toBeNull();
   });
 
   test('an unreadable phone state is a notice, not an empty or “all clear” section', async () => {
     await scanned();
+    await openPhone();
     expect(screen.queryByRole('region', { name: 'Stan telefonu' })).toBeNull();
     await fireEvent.click(within(screen.getByRole('region', { name: 'Uwagi do skanu' })).getByRole('button', { name: 'Więcej' }));
     expect(screen.getByText(/Nie dało się odczytać stanu telefonu/)).toBeTruthy();
@@ -695,6 +705,7 @@ describe('Results: phone state', () => {
     const { s, bridge } = await scannedWithChecks();
     const panel = screen.getByRole('complementary', { name: 'Plan naprawy' });
     const before = Object.keys(s.selection).length;
+    await openPhone();
     await fireEvent.click(screen.getByRole('switch', { name: 'Wycisz tanie-bilety.example' }));
     expect(within(panel).getByText('tanie-bilety.example')).toBeTruthy();
     await fireEvent.click(within(panel).getByRole('button', { name: `Podsumowanie (${before + 1})` }));
@@ -712,7 +723,212 @@ describe('Results: phone state', () => {
     await tick();
     const panel = screen.getByRole('complementary', { name: 'Plan naprawy' });
     expect((within(panel).getByRole('button', { name: 'Podsumowanie (0)' }) as HTMLButtonElement).disabled).toBe(true);
+    await openPhone();
     await fireEvent.click(screen.getByRole('switch', { name: 'Wycisz wiadomosci.example' }));
     expect((within(panel).getByRole('button', { name: 'Podsumowanie (1)' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+describe('Results: “Aplikacje” and “Telefon” tabs', () => {
+  const CHROME = CHECKS_SAMPLE.browsers[0];
+  const check = (browsers: CheckBrowser[]): DeviceCheck =>
+    ({ id: 'site_notifications', state: 'review', state_label: 'Do sprawdzenia', browsers });
+  const snap = (v: unknown) => JSON.parse(JSON.stringify(v));
+  const unreadable = t('notice.short.checks_unreadable');
+
+  test('after a scan: the tab bar, apps first; the site card only after switching to “Telefon”', async () => {
+    const { s } = await scanned('adware', [CHECKS_SAMPLE]);
+    expect(screen.getByRole('tablist', { name: t('repair_tabs.label') })).toBeTruthy();
+    expect(tab('Aplikacje').getAttribute('aria-selected')).toBe('true');
+    expect(tab('Telefon').getAttribute('aria-selected')).toBe('false');
+    const apps = screen.getByRole('tabpanel');
+    expect(apps.id).toBe('repair-panel-apps');
+    expect(apps.getAttribute('aria-labelledby')).toBe('repair-tab-apps');
+    expect(screen.queryByRole('button', { name: /Powiadomienia z witryn/ })).toBeNull();
+    expect(within(apps).getByRole('region', { name: 'Szkodliwe' })).toBeTruthy();
+    await openPhone();
+    expect(s.repairTab).toBe('phone');
+    const phone = screen.getByRole('tabpanel');
+    expect(phone.id).toBe('repair-panel-phone');
+    expect(phone.getAttribute('aria-labelledby')).toBe('repair-tab-phone');
+    expect(within(phone).getByRole('button', { name: /Powiadomienia z witryn/ })).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Szkodliwe' })).toBeNull();
+    expect(screen.queryByRole('article')).toBeNull();
+  });
+
+  test('expert table (and its arrow keys) only on “Aplikacje”', async () => {
+    const { ctl } = await scanned();
+    await ctl.setMode('expert');
+    await tick();
+    expect(screen.getByRole('group', { name: 'Tabela aplikacji' })).toBeTruthy();
+    await openPhone();
+    expect(screen.queryByRole('group', { name: 'Tabela aplikacji' })).toBeNull();
+  });
+
+  test('the apps badge counts flagged apps', async () => {
+    const { s } = await scanned();
+    const flagged = s.scan!.apps.filter((a) => a.verdict !== 'safe').length;
+    expect(tab('Aplikacje').textContent).toContain(String(flagged));
+  });
+
+  test('“phone state unreadable” is a phone notice, not an apps notice', async () => {
+    await scanned(); // nagrany skan: stan telefonu „nie udało się odczytać”
+    expect(screen.queryByRole('region', { name: 'Uwagi do skanu' })?.textContent ?? '').not.toContain(unreadable);
+    await openPhone();
+    expect(screen.getByRole('region', { name: 'Uwagi do skanu' }).textContent).toContain(unreadable);
+  });
+
+  test('the tab bar is there in manual mode, without an apps badge', async () => {
+    const { s, bridge } = await scanned('clean');
+    bridge.emit('apk:manual', { scan: { ...snap(s.scan), apk_mode: 'manual', on_demand: [] } });
+    await tick();
+    const panel = screen.getByRole('tabpanel');
+    expect(within(panel).getByRole('searchbox', { name: t('manual.search') })).toBeTruthy();
+    expect(screen.getByRole('tablist', { name: t('repair_tabs.label') })).toBeTruthy();
+    expect(tab('Aplikacje').textContent?.trim()).toBe('Aplikacje');
+  });
+
+  test('the tab bar is there while the analysis mode is being chosen; the choice is in “Aplikacje”', async () => {
+    const { s, bridge } = await scanned();
+    s.job = { id: 'j1', kind: 'apk' };
+    bridge.emit('apk:question', { job_id: 'j1', kind: 'mode', apps: 12, eta_s: 90, eta_kind: 'measured', eta_min_s: 90, eta_max_s: 90 });
+    await tick();
+    expect(screen.getByRole('tablist', { name: t('repair_tabs.label') })).toBeTruthy();
+    expect(tab('Aplikacje').textContent?.trim()).toBe('Aplikacje');
+    expect(within(screen.getByRole('tabpanel')).getByRole('button', { name: new RegExp(t('apk_mode.full')) })).toBeTruthy();
+  });
+
+  test('clean apps, things to do on the phone: same title, a link under the illustration switches tabs', async () => {
+    const { s } = await scanned('clean', [check([CHROME])]);
+    expect(screen.getByRole('heading', { name: t('results.clean_title') })).toBeTruthy();
+    const link = screen.getByRole('button', { name: 'W zakładce Telefon: 2 rzeczy do sprawdzenia' });
+    await fireEvent.click(link);
+    expect(s.repairTab).toBe('phone');
+    expect(tab('Telefon').getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('button', { name: /Powiadomienia z witryn/ })).toBeTruthy();
+  });
+
+  test('clean apps, phone unreadable: the “not everything could be read” link', async () => {
+    const { s } = await scanned('clean');
+    await fireEvent.click(screen.getByRole('button', { name: 'W zakładce Telefon: nie wszystko udało się odczytać' }));
+    expect(s.repairTab).toBe('phone');
+  });
+
+  test('clean apps, phone all fine: no link under the illustration', async () => {
+    await scanned('clean', [{ ...check([{ ...CHROME, sites: [CHROME.sites[2]] }]), state: 'ok' }]);
+    expect(screen.getByRole('heading', { name: t('results.clean_title') })).toBeTruthy();
+    expect(within(tab('Telefon')).getByRole('img', { name: t('repair_tabs.phone_ok') })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^W zakładce Telefon/ })).toBeNull();
+  });
+
+  test('a scan without phone checks: “Telefon” has a tick and says there is nothing to check', async () => {
+    await scanned('clean', []);
+    expect(within(tab('Telefon')).getByRole('img', { name: t('repair_tabs.phone_ok') })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^W zakładce Telefon/ })).toBeNull();
+    await openPhone();
+    expect(screen.getByText('Nic do sprawdzenia na tym telefonie.')).toBeTruthy();
+  });
+
+  test('the phone tab with checks to show has no “nothing to check” line', async () => {
+    await scanned('adware', [CHECKS_SAMPLE]);
+    await openPhone();
+    expect(screen.queryByText('Nic do sprawdzenia na tym telefonie.')).toBeNull();
+  });
+});
+
+describe('Results: Firefox re-reads in the background, whichever tab is open', () => {
+  const FIREFOX = CHECKS_SAMPLE.browsers[2];
+  const SAMSUNG = CHECKS_SAMPLE.browsers[1];
+  const check = (browsers: CheckBrowser[]): DeviceCheck =>
+    ({ id: 'site_notifications', state: 'review', state_label: 'Do sprawdzenia', browsers });
+  const rechecks = (env: { bridge: { calls: { method: string }[] } }) =>
+    env.bridge.calls.filter((c) => c.method === 'recheck_site_notifications').length;
+  const site = (host: string) => ({ host, origin: `https://${host}`, blocked: false, active: false,
+    fix: `site_perm:org.mozilla.firefox:https://${host}`, fix_label: `Blokada powiadomień: ${host} (Firefox)` });
+
+  afterEach(() => vi.useRealTimers());
+
+  async function resultsWith(checks: DeviceCheck[]) {
+    const env = await setupCtl('adware', { checks });
+    await env.ctl.startScan();
+    await vi.waitFor(() => expect(env.s.job).toBeNull());
+    vi.useFakeTimers();
+    const view = render(Results, { context: new Map([['ctl', env.ctl]]) });
+    await tick();
+    return { ...env, view };
+  }
+
+  test('on “Aplikacje”: every 5 s a cheap re-read; once sites show up the tab count grows and polling ends', async () => {
+    const env = await resultsWith([check([FIREFOX])]);
+    expect(env.s.repairTab).toBe('apps');
+    expect(tab('Telefon').textContent).toContain('1');
+    expect(rechecks(env)).toBe(0);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(rechecks(env)).toBe(1);
+    // w tle tylko tani odczyt gniazda debugowania
+    expect(env.bridge.calls.filter((c) => c.method === 'recheck_site_notifications').at(-1)?.args).toEqual([true]);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(rechecks(env)).toBe(3);
+    // Serwisant włączył debugowanie: następny odczyt oddaje witryny i polling się kończy.
+    env.bridge.setChecks([check([{ ...FIREFOX, mode: 'rdp', read: 'ok', rdp_hint: false,
+      sites: [site('push.example'), site('promo.example')] }])]);
+    await vi.advanceTimersByTimeAsync(5000);
+    await tick();
+    expect(env.s.scan!.device_checks[0].browsers[0].rdp_hint).toBe(false);
+    expect(tab('Telefon').textContent).toContain('2');
+    const after = rechecks(env);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(rechecks(env)).toBe(after);
+    env.view.unmount();
+  });
+
+  test('the “Telefon” tab shows the instruction and no retry button', async () => {
+    const env = await resultsWith([check([FIREFOX])]);
+    await fireEvent.click(tab('Telefon'));
+    expect(screen.getByText(/Zdalne debugowanie przez USB/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Spróbuj|Ponów|Sprawdź ponownie/ })).toBeNull();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(rechecks(env)).toBe(1);
+    env.view.unmount();
+  });
+
+  test('polling stops when the repair screen leaves', async () => {
+    const env = await resultsWith([check([FIREFOX])]);
+    await vi.advanceTimersByTimeAsync(5000);
+    env.view.unmount();
+    const before = rechecks(env);
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(rechecks(env)).toBe(before);
+  });
+
+  test('no re-read while the plan or the client page is open: the fixes stay as previewed', async () => {
+    const env = await resultsWith([check([FIREFOX, SAMSUNG])]);
+    env.ctl.toggleFix(SAMSUNG.all_fix!);
+    // Firefox dostał zdalne debugowanie, a Samsung Internet nie oferuje już poprawki: odczyt zmieniłby plan.
+    env.bridge.setChecks([check([{ ...FIREFOX, read: 'ok', rdp_hint: false }])]);
+    env.s.plan = { apps: [], runnable: 1, code: 'K7F3' };
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(rechecks(env)).toBe(0);
+    env.s.plan = null;
+    env.s.share = { id: 'ui-1', code: 'K7F3', status: 'ready', url: 'https://x', mode: 'server', expires: null,
+      upgraded: false, reason: null, offline: false };
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(rechecks(env)).toBe(0);
+    expect([...env.s.fixes]).toEqual([SAMSUNG.all_fix]);
+    env.s.share = null;
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(rechecks(env)).toBe(1);
+    expect(env.s.fixes.size).toBe(0);
+    env.view.unmount();
+  });
+
+  test('a failed re-read stays silent: no error card, the next one is tried', async () => {
+    const env = await resultsWith([check([FIREFOX])]);
+    env.bridge.failNext('recheck_site_notifications', 'busy');
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(env.s.error).toBeNull();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(rechecks(env)).toBe(2);
+    env.view.unmount();
   });
 });

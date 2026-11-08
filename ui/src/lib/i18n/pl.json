@@ -65,7 +65,10 @@
     "apps": { "one": "{count} aplikacja", "few": "{count} aplikacje", "many": "{count} aplikacji", "other": "{count} aplikacji" },
     "plan": "Plan naprawy", "empty": "Zaznacz aplikacje albo witryny, które chcesz naprawić."
   },
-  "repair_tabs": { "label": "Widok kroku Naprawa", "apps": "Aplikacje", "phone": "Telefon", "phone_ok": "Wszystko w porządku", "phone_unknown": "Nie wszystko udało się odczytać" },
+  "repair_tabs": { "label": "Widok kroku Naprawa", "apps": "Aplikacje", "phone": "Telefon", "phone_ok": "Wszystko w porządku", "phone_unknown": "Nie wszystko udało się odczytać",
+    "phone_todo": { "one": "W zakładce Telefon: {count} rzecz do sprawdzenia", "few": "W zakładce Telefon: {count} rzeczy do sprawdzenia", "many": "W zakładce Telefon: {count} rzeczy do sprawdzenia", "other": "W zakładce Telefon: {count} rzeczy do sprawdzenia" },
+    "phone_unknown_link": "W zakładce Telefon: nie wszystko udało się odczytać",
+    "phone_empty": "Nic do sprawdzenia na tym telefonie." },
   "rail": { "label": "Menu", "new_order": "Nowe zlecenie", "back_to_order": "Wróć do zlecenia" },
   "header": { "find_source": "Znajdź źródło reklamy", "find_source_recording": "Znajdź źródło reklamy — trwa nagrywanie", "simple": "Prosty", "expert": "Ekspert", "history": "Historia", "settings": "Ustawienia" },
   "stage": { "label": "Etapy", "connect": "Połączenie", "read": "Odczyt", "analyze": "Analiza", "fix": "Naprawa", "report": "Protokół" },

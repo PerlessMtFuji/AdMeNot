@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { CHECKS_SAMPLE } from '../lib/fakeBridge';
 import type { CheckBrowser, DeviceCheck } from '../lib/types';
 import { renderWith, setupCtl } from '../test-utils';
@@ -19,18 +19,6 @@ async function mounted(checks: DeviceCheck[]) {
   await tick();
   return env;
 }
-
-async function scannedWith(checks: DeviceCheck[]) {
-  const env = await setupCtl('adware', { checks });
-  await env.ctl.startScan();
-  await vi.waitFor(() => expect(env.s.job).toBeNull());
-  return env;
-}
-
-const rechecks = (env: { bridge: { calls: { method: string }[] } }) =>
-  env.bridge.calls.filter((c) => c.method === 'recheck_site_notifications').length;
-
-afterEach(() => vi.useRealTimers());
 
 describe('DeviceChecks', () => {
   test('stays folded while every check is ok, and opens on demand', async () => {
@@ -157,79 +145,19 @@ describe('DeviceChecks', () => {
     expect(screen.queryByText(CHROME.sites[0].fix!)).toBeNull();
   });
 
-  test('Firefox without remote debugging: instruction, then quiet background re-reads until it is on', async () => {
-    const env = await scannedWith([check([FIREFOX])]);
+  test('the section itself does not re-read Firefox: that is the repair screen’s job (spec §8a.5)', async () => {
+    const env = await setupCtl('adware', { checks: [check([FIREFOX])] });
+    await env.ctl.startScan();
+    await vi.waitFor(() => expect(env.s.job).toBeNull());
     vi.useFakeTimers();
-    const view = render(DeviceChecks, { context: new Map([['ctl', env.ctl]]) });
-    await tick();
-    expect(screen.getByText(/Zdalne debugowanie przez USB/)).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /Spróbuj|Ponów|Sprawdź ponownie/ })).toBeNull();
-    expect(rechecks(env)).toBe(0);
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(rechecks(env)).toBe(1);
-    // w tle tylko tani odczyt gniazda debugowania
-    expect(env.bridge.calls.filter((c) => c.method === 'recheck_site_notifications').at(-1)?.args).toEqual([true]);
-    await vi.advanceTimersByTimeAsync(10_000);
-    expect(rechecks(env)).toBe(3);
-    // Serwisant włączył debugowanie: następny odczyt oddaje witryny i polling się kończy.
-    const site = { host: 'push.example', origin: 'https://push.example', blocked: false, active: false,
-      fix: 'site_perm:org.mozilla.firefox:https://push.example', fix_label: 'Blokada powiadomień: push.example (Firefox)' };
-    env.bridge.setChecks([check([{ ...FIREFOX, mode: 'rdp', read: 'ok', rdp_hint: false, sites: [site] }])]);
-    await vi.advanceTimersByTimeAsync(5000);
-    await tick();
-    expect(env.s.scan!.device_checks[0].browsers[0].rdp_hint).toBe(false);
-    expect(screen.getByText('push.example')).toBeTruthy();
-    const after = rechecks(env);
-    await vi.advanceTimersByTimeAsync(30_000);
-    expect(rechecks(env)).toBe(after);
-    expect(screen.queryByText(/Bez debugowania widać/)).toBeNull();
-    view.unmount();
-  });
-
-  test('polling stops when the section leaves the screen', async () => {
-    const env = await scannedWith([check([FIREFOX])]);
-    vi.useFakeTimers();
-    const view = render(DeviceChecks, { context: new Map([['ctl', env.ctl]]) });
-    await tick();
-    await vi.advanceTimersByTimeAsync(5000);
-    view.unmount();
-    const before = rechecks(env);
-    await vi.advanceTimersByTimeAsync(20_000);
-    expect(rechecks(env)).toBe(before);
-  });
-
-  test('no re-read while the plan or the client page is open: the fixes stay as previewed', async () => {
-    const env = await scannedWith([check([FIREFOX, SAMSUNG])]);
-    env.ctl.toggleFix(SAMSUNG.all_fix!);
-    vi.useFakeTimers();
-    const view = render(DeviceChecks, { context: new Map([['ctl', env.ctl]]) });
-    // Firefox dostał zdalne debugowanie, a Samsung Internet nie oferuje już poprawki: odczyt zmieniłby plan.
-    env.bridge.setChecks([check([{ ...FIREFOX, read: 'ok', rdp_hint: false }])]);
-    env.s.plan = { apps: [], runnable: 1, code: 'K7F3' };
-    await vi.advanceTimersByTimeAsync(15_000);
-    expect(rechecks(env)).toBe(0);
-    env.s.plan = null;
-    env.s.share = { id: 'ui-1', code: 'K7F3', status: 'ready', url: 'https://x', mode: 'server', expires: null,
-      upgraded: false, reason: null, offline: false };
-    await vi.advanceTimersByTimeAsync(15_000);
-    expect(rechecks(env)).toBe(0);
-    expect([...env.s.fixes]).toEqual([SAMSUNG.all_fix]);
-    env.s.share = null;
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(rechecks(env)).toBe(1);
-    expect(env.s.fixes.size).toBe(0);
-    view.unmount();
-  });
-
-  test('a failed re-read stays silent: no error card, the next one is tried', async () => {
-    const env = await scannedWith([check([FIREFOX])]);
-    vi.useFakeTimers();
-    const view = render(DeviceChecks, { context: new Map([['ctl', env.ctl]]) });
-    env.bridge.failNext('recheck_site_notifications', 'busy');
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(env.s.error).toBeNull();
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(rechecks(env)).toBe(2);
-    view.unmount();
+    try {
+      render(DeviceChecks, { context: new Map([['ctl', env.ctl]]) });
+      await tick();
+      expect(screen.getByText(/Zdalne debugowanie przez USB/)).toBeTruthy();
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(env.bridge.calls.filter((c) => c.method === 'recheck_site_notifications')).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

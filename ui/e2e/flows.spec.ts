@@ -186,6 +186,7 @@ test('phone state: tick a site, see it in the plan, Firefox waits for remote deb
   await expect(page.getByRole('heading', { name: 'Połączono' })).toBeVisible();
   await page.getByRole('button', { name: 'Skanuj' }).click();
   await expect(page.getByText(/Analiza plików aplikacji/)).toBeHidden({ timeout: 15_000 });
+  await page.getByRole('tab', { name: /^Telefon/ }).click();  // sprawdzenia telefonu mają własną zakładkę
   await expect(page.getByRole('region', { name: 'Stan telefonu' })).toBeVisible();
   await expect(page.getByText(/Zdalne debugowanie przez USB/)).toBeVisible();
   const site = page.getByRole('switch', { name: 'Wycisz tanie-bilety.example' });
@@ -200,7 +201,8 @@ test('phone state: tick a site, see it in the plan, Firefox waits for remote deb
 test('phone state in English', async ({ page }) => {
   await page.goto('/?scenario=adware&checks=populated&lang=en');
   await page.getByRole('button', { name: 'Scan' }).click();
-  await expect(page.getByRole('region', { name: 'Phone state' })).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('tab', { name: /^Phone/ }).click({ timeout: 15_000 });
+  await expect(page.getByRole('region', { name: 'Phone state' })).toBeVisible();
   await expect(page.getByRole('switch', { name: 'All sites in Samsung Internet' })).toBeVisible();
 });
 

@@ -2,14 +2,16 @@
   import { getContext } from 'svelte';
   import type { Controller } from '../lib/controller';
   import { formatEta } from '../lib/eta';
-  import { i18n, t } from '../lib/i18n/index.svelte';
+  import { i18n, t, tp } from '../lib/i18n/index.svelte';
+  import { formatGb, formatSize } from '../lib/logic';
   import Button from '../ui/Button.svelte';
-  import Card from '../ui/Card.svelte';
+  import Icon from '../ui/Icon.svelte';
   import Progress from '../ui/Progress.svelte';
-  import ApkEstimate from './ApkEstimate.svelte';
+  import Tooltip from '../ui/Tooltip.svelte';
 
-  // Analiza APK w tle: karta z paskiem nad stanem telefonu i listą aplikacji — to ona teraz „się dzieje”.
+  // Analiza APK w tle: jedna cienka linia nad zakładkami (spec układu Naprawy §3 p.2) — to ona teraz „się dzieje”.
   // calm: nic jeszcze nie oznaczono — wtedy uspokajające zdanie zamiast przedwczesnego „czysto”.
+  // Zdanie i szacunek pobierania nie mieszczą się w linii przy oknie 1200 px, więc idą do dymka przy ikonie.
   let { calm = false }: { calm?: boolean } = $props();
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
@@ -18,23 +20,34 @@
   const remaining = $derived(s.apk.eta === null ? null
     : formatEta({ eta_s: s.apk.eta, eta_kind: 'measured', eta_min_s: s.apk.eta, eta_max_s: s.apk.eta }, i18n.lang));
   const canStop = $derived(s.canStopToManual);
+  // Ile analiza pobierze z telefonu i czy zmieści się na dysku (zdarzenie apk:estimate).
+  const estimate = $derived.by(() => {
+    const e = s.apkEstimate;
+    if (!s.apk.running || !e) return '';
+    const size = formatSize(e.to_fetch_bytes, i18n.lang);
+    const base = e.cached && e.cached === e.apps ? t('apk_cache.all_cached', { count: e.apps })
+      : e.cached ? t('apk_cache.estimate_part', { size, fetch: e.apps - e.cached, count: e.apps })
+      : tp('apk_cache.estimate', e.apps, { size });
+    const unknown = e.unknown ? ` ${t('apk_cache.unknown', { count: e.unknown })}` : '';
+    const over = e.to_fetch_bytes > e.effective_bytes ? ` ${t('apk_cache.over', { gb: formatGb(e.effective_bytes, i18n.lang) })}` : '';
+    return `${base}${unknown}.${over}`;
+  });
+  const hint = $derived([calm ? t('results.apk_sub') : '', estimate].filter(Boolean).join(' '));
 </script>
 
-<Card class="px-4 py-3.5">
-  <div class="flex items-center gap-3.5">
-    <span class="spin flex-none"></span>
-    <div class="flex min-w-0 flex-1 flex-col gap-1.5">
-      <div class="flex items-baseline gap-2.5">
-        <b class="text-ink">{t('results.apk_card')}</b>
-        {#if s.apk.total}<span class="text-sm text-mut">{t('results.apk_count', { done: s.apk.done, total: s.apk.total })}</span>{/if}
-        {#if remaining}<span class="ml-auto text-sm whitespace-nowrap text-soft">{remaining}</span>{/if}
-      </div>
-      <Progress {value} {label} />
-      <div class="text-sm text-soft">
-        {#if calm}<p>{t('results.apk_sub')}</p>{/if}
-        <ApkEstimate class="text-xs" />
-      </div>
-    </div>
-    {#if canStop}<Button size="sm" variant="ghost" onclick={() => ctl.stopToManual()}>{t('apk_mode.stop_to_manual')}</Button>{/if}
-  </div>
-</Card>
+<div class="flex min-w-0 items-center gap-3 text-sm whitespace-nowrap text-mut">
+  <span class="spin flex-none"></span>
+  <b class="flex-none text-ink">{t('results.apk_card')}</b>
+  {#if s.apk.total}<span class="flex-none tabular-nums">{t('results.apk_count', { done: s.apk.done, total: s.apk.total })}</span>{/if}
+  {#if remaining}<span class="flex-none text-soft" aria-hidden="true">·</span><span class="flex-none text-soft">{remaining}</span>{/if}
+  {#if hint}
+    <Tooltip text={hint} class="flex-none whitespace-normal">
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <span role="img" tabindex="0" aria-label={hint} class="grid rounded-full text-soft outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]">
+        <Icon name="info" size={15} />
+      </span>
+    </Tooltip>
+  {/if}
+  <div class="min-w-12 flex-1"><Progress {value} {label} /></div>
+  {#if canStop}<Button size="sm" variant="ghost" class="flex-none" onclick={() => ctl.stopToManual()}>{t('apk_mode.stop_to_manual')}</Button>{/if}
+</div>

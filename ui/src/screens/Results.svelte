@@ -16,11 +16,13 @@
   import PhoneThumb from '../components/PhoneThumb.svelte';
   import PlanConfirm from '../components/PlanConfirm.svelte';
   import PlanPanel from '../components/PlanPanel.svelte';
+  import RepairTabs from '../components/RepairTabs.svelte';
   import VerdictSection from '../components/VerdictSection.svelte';
   import StepTimeline from '../components/StepTimeline.svelte';
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
-  import { facetCounts, flaggedApps, focusedApp, groupOpen, isManual, modeUndecided, notices, verdictGroups, visibleApps } from '../lib/logic';
+  import { facetCounts, flaggedApps, focusedApp, groupOpen, isManual, modeUndecided, notices, phoneBadge, shownChecks, splitNotices,
+    verdictGroups, visibleApps } from '../lib/logic';
   import { DUR, enter, ms, stagger } from '../lib/motion';
   import type { Mode, Verdict } from '../lib/types';
   import Banner from '../ui/Banner.svelte';
@@ -56,6 +58,10 @@
   const withGaps = $derived(apps.filter((a) => a.gaps.length > 0).length);
   const noteItems = $derived(notices({ scan: s.scan, sdk: s.device?.sdk, selectLevel: s.settings.select_level,
     missing, withGaps }));
+  // Zakładki kroku (spec układu Naprawy §4): uwagi o stanie telefonu idą do „Telefon”, reszta zostaje przy aplikacjach.
+  const notes = $derived(splitNotices(noteItems));
+  const phone = $derived(phoneBadge(s.scan?.device_checks));
+  const checks = $derived(shownChecks(s.scan));
   // Błędy kolektorów (dawny tooltip kafelka) — tylko dla eksperta, pod pełnym komunikatem o niepełnej ocenie.
   const noteDetails = $derived(expert ? { incomplete: (s.scan?.collectors.failed ?? [])
     .map((c) => t('expert.collector_failed', { name: c.name, error: c.error ?? '' })) } : {});
@@ -85,6 +91,19 @@
   const mirrorLabel = $derived(!s.mirror.available ? t('mirror.missing') : mirrorState === 'starting' ? t('mirror.header_starting')
     : mirrorOn ? t('mirror.header_off') : t('mirror.header_on'));
   const findLabel = $derived(t(s.incident.recording ? 'header.find_source_recording' : 'header.find_source'));
+
+  // Odczyt Firefoxa przez zdalne debugowanie pojawia się, gdy serwisant je włączy na telefonie: bez przycisku
+  // ponowienia program sam sprawdza co kilka sekund, dopóki ekran Naprawa jest otwarty i podpowiedź jest prawdziwa
+  // — na każdej zakładce, żeby licznik „Telefon” rósł też, gdy serwisant stoi na „Aplikacje” (spec §8a.5).
+  // Tanio: telefon czyta tylko gniazdo debugowania, pełny odczyt witryn dopiero po jego pojawieniu się.
+  const RECHECK_MS = 5000;
+  const waitingForRdp = $derived(checks.some((c) => c.browsers.some((b) => b.rdp_hint)));
+
+  $effect(() => {
+    if (!waitingForRdp) return;
+    const id = setInterval(() => void ctl.recheckSiteNotifications(true), RECHECK_MS);
+    return () => clearInterval(id);
+  });
 </script>
 
 <div class="flex min-h-0 min-w-0 flex-1">
@@ -143,56 +162,80 @@
         <ul class="list-disc pl-5 text-sm">{#each s.undoResult.errors as e (e)}<li>{e}</li>{/each}</ul>
       </Banner>
     {/if}
-    <NoticeLine items={noteItems} details={noteDetails} />
-    <DeviceChecks />
-
-    {#if choosing}
-      <ApkModeChoice />
-    {:else if manual}
-      <ManualList />
-    {:else if undecided || (flagged.length === 0 && s.apk.running)}
-      <!-- W toku i nic jeszcze nie oznaczono: zamiast przedwczesnego „czysto” sama karta postępu u góry. -->
-    {:else if flagged.length === 0}
-      <div class="grid place-items-center gap-2 py-10 text-center" in:enter>
-        {#if anyIncomplete}
-          <span class="grid h-20 w-20 place-items-center rounded-full bg-warn-strong text-white shadow-[0_0_0_12px_var(--color-warn-soft),0_0_40px_-4px_var(--color-warn-strong)] [animation:pop-in_.6s]">
-            <Icon name="info" size={38} strokeWidth={3} />
-          </span>
-        {:else}
-          <span class="grid h-20 w-20 place-items-center rounded-full bg-ok text-white shadow-[0_0_0_12px_var(--color-ok-soft),0_0_40px_-4px_var(--color-ok)] [animation:pop-in_.6s]">
-            <Icon name="check" size={38} strokeWidth={3} />
-          </span>
-        {/if}
-        <p class="mt-3 text-mut">{t('results.clean_sub', { count: s.scan?.counts.total ?? 0 })}</p>
-      </div>
+    {#if s.scan}
+      <RepairTabs value={s.repairTab} onchange={(tab) => ctl.setRepairTab(tab)}
+        appsCount={verdictsHidden || flagged.length === 0 ? null : flagged.length} {phone} />
     {/if}
-    {#if expert}
-      <ExpertTable groups={expertGroups} {focused} {facets} {searching} {navRows} />
-    {:else if flagged.length > 0 && !verdictsHidden}
-      {#each simpleGroups.filter((g) => g.verdict !== 'safe') as g (g.verdict)}
-        {#if g.apps.length || DANGER.includes(g.verdict)}
-          <VerdictSection verdict={g.verdict} count={g.apps.length} open={isOpen(g.verdict)} apps={g.apps}
-            collapsible={g.apps.length > 0 && !DANGER.includes(g.verdict)}
-            ontoggle={() => ctl.setGroupOpen(g.verdict, !isOpen(g.verdict))}>
-            {#each g.apps as app, i (app.package)}
-              <div animate:flip={{ duration: ms(DUR.flip) }} in:enter={{ delay: stagger(i) }}>
-                <AppCard {app} level={s.selection[app.package] ?? null} done={s.acted[app.package] ?? null} busy={s.orderRunning}
-                  onundo={() => ctl.undoApp(app.package)} flash={s.apk.changed.includes(app.package)}
-                  onlevel={(level) => ctl.setLevel(app.package, level)} ontoggle={() => ctl.toggle(app)} />
-              </div>
+
+    {#if s.repairTab === 'phone'}
+      <div role="tabpanel" id="repair-panel-phone" aria-labelledby="repair-tab-phone" class="flex flex-col gap-4">
+        <NoticeLine items={notes.phone} />
+        <DeviceChecks />
+        {#if !checks.length && !notes.phone.length}
+          <p class="py-6 text-center text-mut">{t('repair_tabs.phone_empty')}</p>
+        {/if}
+      </div>
+    {:else}
+      <div role="tabpanel" id="repair-panel-apps" aria-labelledby="repair-tab-apps" class="flex flex-col gap-4">
+        <NoticeLine items={notes.apps} details={noteDetails} />
+
+        {#if choosing}
+          <ApkModeChoice />
+        {:else if manual}
+          <ManualList />
+        {:else if undecided || (flagged.length === 0 && s.apk.running)}
+          <!-- W toku i nic jeszcze nie oznaczono: zamiast przedwczesnego „czysto” sama linia postępu u góry. -->
+        {:else if flagged.length === 0}
+          <div class="grid place-items-center gap-2 py-10 text-center" in:enter>
+            {#if anyIncomplete}
+              <span class="grid h-20 w-20 place-items-center rounded-full bg-warn-strong text-white shadow-[0_0_0_12px_var(--color-warn-soft),0_0_40px_-4px_var(--color-warn-strong)] [animation:pop-in_.6s]">
+                <Icon name="info" size={38} strokeWidth={3} />
+              </span>
+            {:else}
+              <span class="grid h-20 w-20 place-items-center rounded-full bg-ok text-white shadow-[0_0_0_12px_var(--color-ok-soft),0_0_40px_-4px_var(--color-ok)] [animation:pop-in_.6s]">
+                <Icon name="check" size={38} strokeWidth={3} />
+              </span>
+            {/if}
+            <p class="mt-3 text-mut">{t('results.clean_sub', { count: s.scan?.counts.total ?? 0 })}</p>
+            <!-- Aplikacje czyste, a w „Telefon” jest coś do zrobienia (spec §8a.8): tytuł zostaje, odnośnik prowadzi dalej. -->
+            {#if phone.kind !== 'ok'}
+              <button type="button" class="mt-1 inline-flex items-center gap-1 rounded-md text-sm font-semibold text-accent outline-none hover:underline focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
+                onclick={() => ctl.setRepairTab('phone')}>
+                {phone.kind === 'count' ? tp('repair_tabs.phone_todo', phone.count) : t('repair_tabs.phone_unknown_link')}
+                <Icon name="chevron-right" size={16} />
+              </button>
+            {/if}
+          </div>
+        {/if}
+        {#if expert}
+          <ExpertTable groups={expertGroups} {focused} {facets} {searching} {navRows} />
+        {:else if flagged.length > 0 && !verdictsHidden}
+          {#each simpleGroups.filter((g) => g.verdict !== 'safe') as g (g.verdict)}
+            {#if g.apps.length || DANGER.includes(g.verdict)}
+              <VerdictSection verdict={g.verdict} count={g.apps.length} open={isOpen(g.verdict)} apps={g.apps}
+                collapsible={g.apps.length > 0 && !DANGER.includes(g.verdict)}
+                ontoggle={() => ctl.setGroupOpen(g.verdict, !isOpen(g.verdict))}>
+                {#each g.apps as app, i (app.package)}
+                  <div animate:flip={{ duration: ms(DUR.flip) }} in:enter={{ delay: stagger(i) }}>
+                    <AppCard {app} level={s.selection[app.package] ?? null} done={s.acted[app.package] ?? null} busy={s.orderRunning}
+                      onundo={() => ctl.undoApp(app.package)} flash={s.apk.changed.includes(app.package)}
+                      onlevel={(level) => ctl.setLevel(app.package, level)} ontoggle={() => ctl.toggle(app)} />
+                  </div>
+                {/each}
+              </VerdictSection>
+            {/if}
+          {/each}
+        {/if}
+        {#if !expert && !verdictsHidden && safeGroup.apps.length}
+          <VerdictSection verdict="safe" count={safeGroup.apps.length} open={isOpen('safe')} collapsible
+            ontoggle={() => ctl.setGroupOpen('safe', !isOpen('safe'))}>
+            {#each safeGroup.apps as app (app.package)}
+              <AppCard {app} level={s.selection[app.package] ?? null} done={s.acted[app.package] ?? null} busy={s.orderRunning}
+                onundo={() => ctl.undoApp(app.package)} onlevel={(level) => ctl.setLevel(app.package, level)} ontoggle={() => ctl.toggle(app)} />
             {/each}
           </VerdictSection>
         {/if}
-      {/each}
-    {/if}
-    {#if !expert && !verdictsHidden && safeGroup.apps.length}
-      <VerdictSection verdict="safe" count={safeGroup.apps.length} open={isOpen('safe')} collapsible
-        ontoggle={() => ctl.setGroupOpen('safe', !isOpen('safe'))}>
-        {#each safeGroup.apps as app (app.package)}
-          <AppCard {app} level={s.selection[app.package] ?? null} done={s.acted[app.package] ?? null} busy={s.orderRunning}
-            onundo={() => ctl.undoApp(app.package)} onlevel={(level) => ctl.setLevel(app.package, level)} ontoggle={() => ctl.toggle(app)} />
-        {/each}
-      </VerdictSection>
+      </div>
     {/if}
   </main>
   <SidePanel width={expert ? 344 : undefined} label={s.plan ? t('panel.plan') : s.diagnostics ? t('diag.title') : expert ? t('evidence.title') : t('panel.plan')}>
