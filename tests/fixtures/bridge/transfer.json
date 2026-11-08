@@ -512,6 +512,42 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
+      "command": "find -H '/data/app/~~x9==/com.whatsapp-q==' -maxdepth 1 -name '*.apk' -type f -exec stat -c '%s|%Y|%n' {} +",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "find: /data/app/~~x9==/com.whatsapp-q==: No such file or directory",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "find -H '/data/app/~~y7==/com.wlive.forecast-z==' '/data/app/~~x9==/com.whatsapp-q==' -maxdepth 1 -name '*.apk' -type f -exec stat -c '%s|%Y|%n' {} +",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "find: /data/app/~~y7==/com.wlive.forecast-z==: No such file or directory",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "find -H '/data/app/~~y7==/com.wlive.forecast-z==' -maxdepth 1 -name '*.apk' -type f -exec stat -c '%s|%Y|%n' {} +",
+      "status": "error:command_failed",
+      "duration": 0.0,
+      "output": "find: /data/app/~~y7==/com.wlive.forecast-z==: No such file or directory",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
       "command": "find -H /sdcard -maxdepth 1 -type f -exec stat -c '%s|%Y|%n' {} +",
       "status": "ok",
       "duration": 0.0,

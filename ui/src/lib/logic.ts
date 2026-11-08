@@ -707,7 +707,7 @@ export function isXiaomi(device: { manufacturer?: string; brand?: string } | nul
 export const MMS_FACTOR = 2.4;
 
 /** Rozmiar zaznaczonych danych, liczba zaznaczonych wierszy ekranu (SMS i MMS to jeden) i czas w minutach.
- *  Aplikacje liczą się tylko z rozmiarem z inwentarza — dziś go nie ma (`bytes: null`), więc ich nie wliczamy. */
+ *  Aplikacje liczą się rozmiarem APK z inwentarza; aplikacja bez odczytanego rozmiaru (`bytes: null`) liczy się jako 0. */
 export function transferTotals(inv: InventoryView, sel: TransferSelection): { bytes: number; categories: number; etaMin: number } {
   const others = new Set(sel.others);
   const apps = new Set(sel.apps);

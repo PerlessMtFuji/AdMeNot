@@ -651,6 +651,18 @@ describe('data transfer', () => {
     expect(transferTotals(data, more)).toEqual({ bytes: 5000 + 800 + 410, categories: 5, etaMin: 1 });
   });
 
+  test('ticked apps add their APK size; an app without a size counts as zero', () => {
+    const data = inv({ apps: [
+      { package: 'a.ok', label: 'A', verdict: 'safe', default_on: true, bytes: 700 },
+      { package: 'b.sus', label: 'B', verdict: 'suspicious', default_on: false, bytes: 90 },
+      { package: 'c.nosize', label: 'C', verdict: 'safe', default_on: true, bytes: null },
+    ] });
+    const none = { ...defaultTransferSelection(data), apps: [] };
+    const base = transferTotals(data, none).bytes;
+    expect(transferTotals(data, { ...none, apps: ['a.ok', 'c.nosize'] }).bytes).toBe(base + 700);
+    expect(transferTotals(data, { ...none, apps: ['a.ok', 'b.sus'] }).bytes).toBe(base + 790);
+  });
+
   test('ETA assumes 25 MB/s and never drops below a minute', () => {
     const big = inv({ categories: { media: { files: 1, bytes: 25 * 1024 ** 2 * 60 * 10 }, downloads: { files: 0, bytes: 0 },
       whatsapp: { files: 0, bytes: 0 } } });

@@ -11,6 +11,7 @@ from admenot.engine.scoring import AppResult
 from admenot.engine.session import ScanReport
 from admenot.engine.transfer.guard import ReadOnlyAdb
 from admenot.engine.transfer.inventory import (
+    app_sizes,
     build_inventory,
     classify_apps,
     refresh_inventory,
@@ -98,6 +99,56 @@ def test_classify_apps():
     assert [(a.package, a.default_on) for a in apps] == [("sus", False), ("ok", True)]
     assert [a.package for a in skipped] == ["bad"]
     assert apps[1].label == "OK" and apps[1].version_code == 7
+
+
+def _app(package: str, apk_path: str | None):
+    from admenot.engine.transfer.inventory import AppEntry
+    return AppEntry(package, package, 1, "safe", True, apk_path=apk_path)
+
+
+def test_app_sizes_sum_base_and_splits(tmp_path):
+    """Rozmiar aplikacji = base.apk + wszystkie splity z jej katalogu (jak `pm path`)."""
+    phone, adb = _ro(tmp_path)
+    root = tmp_path / "phone"
+    _put(root, "app/a-1/base.apk", b"a" * 100)
+    _put(root, "app/a-1/split_config.pl.apk", b"a" * 20)
+    _put(root, "app/a-1/lib/x.so", b"a" * 999)  # nie APK, głębiej — nie liczymy
+    _put(root, "app/b-1/base.apk", b"b" * 7)
+    apps = [_app("a", "/sdcard/app/a-1/base.apk"), _app("b", "/sdcard/app/b-1/base.apk"),
+            _app("nopath", None)]
+    assert app_sizes(adb, apps, lambda: False) == {"a": 120, "b": 7}
+    assert len(phone.commands) == 1  # jedno `find` na wszystkie aplikacje
+
+
+def test_app_sizes_shared_dir_uses_exact_path(tmp_path):
+    """Stary układ: kilka APK w jednym katalogu — liczymy tylko jawną ścieżkę pakietu."""
+    _phone, adb = _ro(tmp_path)
+    root = tmp_path / "phone"
+    _put(root, "legacy/a.apk", b"a" * 5)
+    _put(root, "legacy/b.apk", b"b" * 9)
+    apps = [_app("a", "/sdcard/legacy/a.apk"), _app("b", "/sdcard/legacy/b.apk")]
+    sizes = app_sizes(adb, apps, lambda: False)
+    assert sizes == {"a": 5, "b": 9}
+
+
+def test_app_sizes_failed_dir_does_not_lose_others(tmp_path):
+    """Błąd `find` (kod ≠ 0) gubi cały wynik — wtedy katalogi po kolei, a nieczytelny bez rozmiaru."""
+    _phone, adb = _ro(tmp_path)
+    _put(tmp_path / "phone", "app/a-1/base.apk", b"a" * 3)
+    apps = [_app("a", "/sdcard/app/a-1/base.apk"), _app("gone", "/sdcard/app/gone-1/base.apk")]
+    assert app_sizes(adb, apps, lambda: False) == {"a": 3}
+
+
+def test_build_inventory_fills_app_sizes(tmp_path):
+    phone = FakeStoragePhone(tmp_path / "phone")
+    install_telephony(tmp_path / "phone")
+    _put(tmp_path / "phone", "app/ok-1/base.apk", b"o" * 42)
+    r = _result("ok", "safe")
+    r.facts.apk_path = "/sdcard/app/ok-1/base.apk"
+    inv = build_inventory(ReadOnlyAdb(phone), _report(r, _result("nopath", "safe")), lambda: False)
+    assert [(a.package, a.size) for a in inv.apps] == [("ok", 42), ("nopath", None)]
+    again = refresh_inventory(ReadOnlyAdb(phone), inv, lambda: False)
+    assert [a.size for a in again.apps] == [42, None]
 
 
 def test_build_inventory_unavailable_sms(tmp_path):

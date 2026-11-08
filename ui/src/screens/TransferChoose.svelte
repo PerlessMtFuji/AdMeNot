@@ -90,6 +90,9 @@
       bytes: c.bytes, checked: sel.categories.includes(key), disabled: c.files === 0 };
   }
   const othersBytes = $derived(inv?.others.reduce((n, o) => n + o.bytes, 0) ?? 0);
+  // Rozmiar zaznaczonych aplikacji; pusto, gdy telefon nie dał odczytać żadnego rozmiaru APK.
+  const appsBytes = $derived(inv?.apps.some((a) => a.bytes !== null)
+    ? inv.apps.filter((a) => sel.apps.includes(a.package)).reduce((n, a) => n + (a.bytes ?? 0), 0) : null);
   const suspicious = $derived(inv?.apps.filter((a) => a.verdict === 'suspicious').length ?? 0);
   const waOld = $derived(!!inv && inv.categories.whatsapp.files > 0 && whatsappStale(inv.whatsapp_backup, new Date()));
   let waChecking = $state(false);
@@ -162,7 +165,7 @@
 
       <span class="lbl mt-2">{t('transfer.group.apps')}</span>
       {@render row({ key: 'apps', icon: LayoutGrid, title: t('transfer.row.apps'), meta: num(inv.apps.length),
-        note: t('transfer.row.apps_note'), bytes: null, checked: sel.apps.length > 0, disabled: inv.apps.length === 0 }, apps)}
+        note: t('transfer.row.apps_note'), bytes: appsBytes, checked: sel.apps.length > 0, disabled: inv.apps.length === 0 }, apps)}
     {/if}
   </main>
 
@@ -295,6 +298,7 @@
             <span class="truncate">{a.label}</span>
             {#if a.label !== a.package}<span class="mono truncate text-2xs text-soft">{a.package}</span>{/if}
             {#if a.verdict === 'suspicious'}<Pill tone="warn">{t('transfer.suspicious')}</Pill>{/if}
+            {#if a.bytes !== null}<span class="mono ml-auto flex-none text-2xs text-soft">{size(a.bytes)}</span>{/if}
           </label>
         </li>
       {/each}

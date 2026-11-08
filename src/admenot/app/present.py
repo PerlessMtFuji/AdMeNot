@@ -450,7 +450,7 @@ def _iso_mtime(mtime: int) -> str | None:
 
 def inventory_view(inv: Inventory, lang: str) -> dict[str, Any]:
     """Ekran wyboru kopii. Folder `""` w `others` to luźne pliki w głównym folderze — nazwę
-    pokazuje UI. `bytes` aplikacji nie znamy przed kopią (None). `lang`: jak w innych widokach;
+    pokazuje UI. `bytes` aplikacji = base + splity APK; None, gdy nie udało się odczytać. `lang`: jak w innych widokach;
     nazwy aplikacji pochodzą z telefonu, więc tu nic nie tłumaczymy."""
     del lang
     categories = {c: {"files": 0, "bytes": 0} for c in FILE_CATEGORIES}
@@ -464,7 +464,7 @@ def inventory_view(inv: Inventory, lang: str) -> dict[str, Any]:
         "others": [{"name": name, "files": n, "bytes": size}
                    for name, (n, size) in sorted(inv.others.items())],
         "apps": [{"package": a.package, "label": a.label, "verdict": a.verdict,
-                  "default_on": a.default_on, "bytes": None} for a in inv.apps],
+                  "default_on": a.default_on, "bytes": a.size} for a in inv.apps],
         "skipped_apps": [{"package": a.package, "label": a.label} for a in inv.skipped_apps],
         "whatsapp_backup": (inv.whatsapp_backup.isoformat(timespec="seconds")
                             if inv.whatsapp_backup else None),

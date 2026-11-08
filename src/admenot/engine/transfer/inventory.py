@@ -9,8 +9,9 @@ a korzeń, który mimo to zawodzi, liczymy do „nieczytelnych”.
 from __future__ import annotations
 
 import posixpath
+from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 
 from admenot.engine.adb.transport import AdbError, AdbTransport
@@ -72,6 +73,8 @@ class AppEntry:
     version_code: int | None
     verdict: str
     default_on: bool
+    apk_path: str | None = None  # base.apk z `pm` (skan); katalog obok trzyma splity
+    size: int | None = None  # bajty base + splity; None = nie udało się odczytać
 
 
 @dataclass
@@ -244,7 +247,69 @@ def classify_apps(report: ScanReport) -> tuple[list[AppEntry], list[AppEntry]]:
 def _entry(r: AppResult) -> AppEntry:
     f = r.facts
     return AppEntry(f.package, f.label or f.package, f.version_code, r.verdict,
-                    default_on=r.verdict != "suspicious")
+                    default_on=r.verdict != "suspicious", apk_path=f.apk_path)
+
+
+APK_FIND_CHARS = 12_000  # paczka korzeni na jedno `find` (linia poleceń Windows: 32 767 znaków)
+
+
+def _apk_roots(apps: list[AppEntry]) -> dict[str, str]:
+    """Korzeń `find` -> pakiet: katalog `base.apk` (base + splity), gdy należy do jednej aplikacji;
+    inaczej (stary układ `/data/app/<pakiet>-1.apk`, wspólny katalog) tylko jawna ścieżka APK."""
+    parents = Counter(posixpath.dirname(a.apk_path) for a in apps if a.apk_path)
+    roots: dict[str, str] = {}
+    for a in apps:
+        if not a.apk_path:
+            continue
+        parent = posixpath.dirname(a.apk_path)
+        if posixpath.basename(a.apk_path) == "base.apk" and parents[parent] == 1:
+            roots[parent] = a.package
+        else:
+            roots[a.apk_path] = a.package
+    return roots
+
+
+def _find_apks(adb: AdbTransport, roots: list[str]) -> str:
+    return adb.shell("find -H " + " ".join(q(r) for r in roots) + " -maxdepth 1 -name " + q("*.apk")
+                     + " -type f -exec stat -c " + q("%s|%Y|%n") + " {} +", timeout=120)
+
+
+def app_sizes(adb: AdbTransport, apps: list[AppEntry], should_stop: Callable[[], bool]) -> dict[str, int]:
+    """Rozmiar APK (base + splity) aplikacji do kopii, w bajtach; bez wpisu = nie odczytano.
+
+    Jedno `find` na paczkę katalogów; po błędzie (kod ≠ 0 gubi cały wynik) katalogi po kolei."""
+    roots = _apk_roots(apps)
+    batches: list[list[str]] = []
+    for root in roots:
+        if not batches or sum(len(r) + 3 for r in batches[-1]) + len(root) + 3 > APK_FIND_CHARS:
+            batches.append([])
+        batches[-1].append(root)
+    outputs: list[str] = []
+    for batch in batches:
+        _check(should_stop)
+        try:
+            outputs.append(_find_apks(adb, batch))
+            continue
+        except AdbError as exc:
+            if exc.kind in _PROPAGATE_KINDS:
+                raise
+        for root in batch if len(batch) > 1 else ():
+            _check(should_stop)
+            try:
+                outputs.append(_find_apks(adb, [root]))
+            except AdbError as exc:
+                if exc.kind in _PROPAGATE_KINDS:
+                    raise
+    sizes: dict[str, int] = {}
+    for line in "\n".join(outputs).split("\n"):
+        bits = line.strip().split("|", 2)
+        if len(bits) != 3 or not bits[0].isdigit():
+            continue
+        path = bits[2]
+        package = roots.get(path) or roots.get(posixpath.dirname(path))
+        if package:
+            sizes[package] = sizes.get(package, 0) + int(bits[0])
+    return sizes
 
 
 def _count(fn: Callable[[], int]) -> tuple[int | None, bool]:
@@ -270,6 +335,8 @@ def _storage(adb: AdbTransport) -> tuple[int, int] | None:
 
 def build_inventory(adb: AdbTransport, report: ScanReport, should_stop: Callable[[], bool]) -> Inventory:
     apps, skipped = classify_apps(report)
+    sizes = app_sizes(adb, apps, should_stop)
+    apps = [replace(a, size=sizes.get(a.package)) for a in apps]
     return _build(adb, apps, skipped, should_stop)
 
 

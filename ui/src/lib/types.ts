@@ -589,7 +589,7 @@ export interface InventoryApp {
   label: string;
   verdict: Verdict;
   default_on: boolean;
-  bytes: number | null; // nieznany przed kopią
+  bytes: number | null; // base + splity APK; null = telefon nie dał odczytać
 }
 
 /** Rodzaj pliku eksportu: wizytówki .vcf, SMS Backup & Restore (`<smses>`, `<calls>`). */

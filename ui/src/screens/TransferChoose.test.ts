@@ -46,6 +46,19 @@ describe('TransferChoose', () => {
     expect((screen.getByRole('checkbox', { name: /Zdjęcia i filmy/ }) as HTMLInputElement).checked).toBe(false);
   });
 
+  test('ticking an app adds its APK size to the apps row and the total', async () => {
+    await show({ apps: [
+      { package: 'pl.bank', label: 'Bank', verdict: 'safe', default_on: true, bytes: 80 * MB },
+      { package: 'com.sus.app', label: 'Latarka Pro', verdict: 'suspicious', default_on: false, bytes: 15 * MB },
+    ] });
+    const card = screen.getByRole('checkbox', { name: /^Aplikacje/ }).closest('.card') as HTMLElement;
+    expect(within(card).getByText('80 MB')).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'Pokaż listę' }));
+    expect(within(card).getByText('15 MB')).toBeTruthy();  // rozmiar przy aplikacji na liście
+    await fireEvent.click(screen.getByRole('checkbox', { name: /Latarka Pro/ }));
+    expect(within(card).getByText('95 MB')).toBeTruthy();  // suma panelu: test transferTotals w logic.test
+  });
+
   test('suspicious apps are listed but unticked, harmful ones skipped', async () => {
     await show();
     expect(screen.getByText('1 podejrzana — odznaczona')).toBeTruthy();

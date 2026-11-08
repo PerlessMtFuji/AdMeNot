@@ -90,6 +90,7 @@ from admenot.engine.transfer.telplan import CONTACTS_URI, DATA_URI, RAW_URI
 _MMS_PREFIX = "content://mms/part/"
 DEFAULT_FREE_KB = 70_000_000
 APK_DIR = "/data/app/~~fake==/{package}-1"
+TRANSFER_APK_MTIME = 1_700_000_000
 TEL_URIS = {"content://sms": "sms", "content://mms": "mms", "content://call_log/calls": "calls",
             CONTACTS_URI: "contacts", RAW_URI: "raw_contacts", DATA_URI: "data"}
 CONVERSATIONS_URI = "content://mms-sms/conversations?simple=true"
@@ -305,7 +306,20 @@ class FakeStoragePhone:
         assert expr[j:j + 6] == ["-type", "f", "-exec", "stat", "-c", "%s|%Y|%n"], expr[j:]
         out: list[str] = []
         for remote in roots:
+            if not remote.startswith("/sdcard"):  # katalog aplikacji: APK z `self.apps`, reszta nie istnieje
+                apks = next(((APK_DIR.format(package=p), f) for p, f in self.apps.items()
+                             if remote == APK_DIR.format(package=p)), None)
+                if apks is None:
+                    raise AdbError("command_failed", f"find: {remote}: No such file or directory")
+                out += [f"{len(data)}|{TRANSFER_APK_MTIME}|{apks[0]}/{name}" for name, data in apks[1].items()
+                        if not match_name or fnmatch.fnmatchcase(name, match_name)]
+                continue
             base = self.local(remote)
+            if base.is_file():  # plik jako korzeń: `find` wypisuje go sam (stary układ APK)
+                if not match_name or fnmatch.fnmatchcase(base.name, match_name):
+                    st = base.stat()
+                    out.append(f"{st.st_size}|{int(st.st_mtime)}|{remote}")
+                continue
             if not base.is_dir():
                 raise AdbError("command_failed", f"find: {remote}: No such file or directory")
             for dirpath, dirnames, filenames in os.walk(base):
