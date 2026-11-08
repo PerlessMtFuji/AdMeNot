@@ -1172,6 +1172,8 @@
         },
         "blocked": "apps are waiting for Xiaomi to allow install via USB",
         "installing": "installing the skipped apps",
+        "files_incomplete": "not all files were uploaded",
+        "safety": "the backup of the new phone failed",
         "apps_error": "the apps could not be installed"
       },
       "res": {
@@ -1196,6 +1198,10 @@
           "import": "file to import",
           "failed": "failed: {count}",
           "error": "error",
+          "gallery": "gallery restart",
+          "incomplete": "incomplete",
+          "safety": "failed",
+          "check": "check in Messages",
           "installing": "installing",
           "blocked": "waiting for Xiaomi",
           "stopped": "stopped"

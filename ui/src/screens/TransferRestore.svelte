@@ -82,7 +82,9 @@
   const telState = $derived(tel ? telOutcome(tel) : null);
   const outcome = $derived(done ? restoreOutcome(done) : null);
   const apps = $derived(done ? r.appsResult : null);
-  const appsError = $derived(done && !apps ? r.appsError : null);
+  const appsError = $derived(done ? r.appsError : null);
+  // Dokończenie nie ma szans (błąd trwały): bez etykiety i obietnicy „sprawdzę sam”.
+  const gaveUp = $derived(r.reinstallGaveUp);
   const telError = $derived(done && !tel ? r.telError : null);
   // Dokończenie aplikacji po odblokowaniu Xiaomi (zadanie `restore_apps`): wiersz pokazuje postęp, nie etykietę blokady.
   const reinstalling = $derived(s.job?.kind === 'restore_apps');
@@ -100,7 +102,7 @@
 
   type StageMark = { key: Stage; tone: 'ok' | 'warn'; note?: string };
   type TelRow = { kind: 'contacts' | 'sms' | 'calls'; icon: Glyph; name: string; sub?: string; result: { text: string; tone: Tone };
-    importPill: boolean; instructions: string[]; details: string[]; mark: StageMark };
+    importPill: boolean; visible: boolean; instructions: string[]; details: string[]; mark: StageMark };
   const TEL_ICONS: Record<TelRow['kind'], Glyph> = { contacts: Users, sms: MessageSquare, calls: Phone };
   const telRows = $derived.by((): TelRow[] => {
     if (!tel) return [];
@@ -122,17 +124,19 @@
       if (k.skipped_messenger > 0) details.push(tp('transfer.restore.tel.messenger', k.skipped_messenger, { count: num(k.skipped_messenger) }));
       if (details.length && k.path !== 'none') details.push(t('transfer.restore.res.path', { path: t(`transfer.restore.tel.path.${k.path}`) }));
       const bad = k.failed > 0 || toImport;
-      return [{ kind, icon: TEL_ICONS[kind], name: t(`transfer.restore.tel.${kind}`), sub, result, importPill: toImport && k.failed === 0,
+      return [{ kind, icon: TEL_ICONS[kind], name: t(`transfer.restore.tel.${kind}`), sub, result, importPill: toImport && k.failed === 0, visible: k.visible_warning,
         instructions: manual.map((m) => (m.kind === 'contacts' ? t('transfer.restore.tel.todo_contacts', { name: m.name })
           : t('transfer.restore.tel.todo_file', { name: m.name }))),
         details: details.length === 0 || (k.existed === 0 && k.skipped_synced === 0 && k.skipped_messenger === 0) ? [] : details,
-        mark: { key: stageOf(kind), tone: bad ? 'warn' : 'ok',
+        mark: { key: stageOf(kind), tone: bad || k.visible_warning ? 'warn' : 'ok',
           note: k.failed > 0 ? t('transfer.restore.res.stage_note.failed', { count: num(k.failed) })
-            : toImport ? t('transfer.restore.res.stage_note.import') : undefined } }];
+            : toImport ? t('transfer.restore.res.stage_note.import') : k.visible_warning ? t('transfer.restore.res.stage_note.check') : undefined } }];
     });
   });
   const telErrorText = $derived(telError ? errorText(telError) : null);
-  const telFailed = $derived(tel ? telRows.some((row) => row.result.tone === 'warn' && !row.importPill) || tel.stopped : false);
+  const telFailed = $derived(tel ? telRows.some((row) => row.result.tone === 'warn' && !row.importPill) || tel.stopped
+    || (tel.status === 'incomplete' && !telRows.some((row) => row.result.tone === 'warn')) : false);
+  const safetyFailed = $derived(tel ? Object.keys(tel.safety).length > 0 && !Object.values(tel.safety).every(Boolean) : false);
   const importKinds = $derived(telRows.filter((row) => row.instructions.length || row.importPill)
     .map((row) => t(`transfer.restore.res.import_kind.${row.kind}`)));
 
@@ -140,6 +144,7 @@
   const GROUP_NAME = (g: string) => t(`transfer.restore.group.${g.startsWith('other') ? 'others' : g}`);
   const filesPresent = $derived(done ? done.files_done + done.files_exists : 0);
   const filesBad = $derived(done ? done.files_denied + done.files_failed + done.files_missing : 0);
+  const filesIncomplete = $derived(done ? done.status === 'incomplete' && filesBad === 0 : false);
   const filesRow = $derived.by(() => {
     if (!done) return null;
     const result = outcome === 'stopped' ? { text: num(filesPresent), tone: 'warn' as const }
@@ -181,9 +186,9 @@
       if (reinstalling) {
         return { result: { text: ap ? ofText(ap.done, ap.total) : '…', tone: 'mut' as Tone }, sub: t('transfer.restore.res.apps_running') };
       }
-      const bad = problemRows.length + blockedRows.length > 0 || apps.stopped;
+      const bad = problemRows.length + blockedRows.length > 0 || apps.stopped || !!appsError;
       return { result: bad ? { text: ofText(got, apps.selected), tone: 'warn' as Tone } : { text: `✓ ${num(got)}`, tone: 'ok' as Tone },
-        sub: appsLine || undefined };
+        sub: [appsLine, appsError ? errorText(appsError) : ''].filter(Boolean).join(' · ') || undefined };
     }
     if (appsError) return { result: { text: t('transfer.restore.res.not_written'), tone: 'bad' as Tone }, sub: errorText(appsError) };
     return null;
@@ -192,7 +197,7 @@
     if (!appsRow) return null;
     if (appsError) return { key: 'apps', tone: 'warn', note: t('transfer.restore.res.stage_note.error') };
     if (problemRows.length) return { key: 'apps', tone: 'warn', note: t('transfer.restore.res.stage_note.failed', { count: num(problemRows.length) }) };
-    if (blockedRows.length) return { key: 'apps', tone: 'warn', note: t(`transfer.restore.res.stage_note.${reinstalling ? 'installing' : 'blocked'}`) };
+    if (blockedRows.length && !gaveUp) return { key: 'apps', tone: 'warn', note: t(`transfer.restore.res.stage_note.${reinstalling ? 'installing' : 'blocked'}`) };
     return { key: 'apps', tone: 'ok' };
   });
   const appList = $derived((apps?.rows ?? []).map((x) => ({ ...x,
@@ -210,10 +215,12 @@
     if (!done) return [];
     const list: StageMark[] = [];
     if (showFiles && filesRow) {
-      list.push({ key: 'files', tone: filesRow.result.tone === 'ok' ? 'ok' : 'warn',
-        note: outcome === 'stopped' ? t('transfer.restore.res.stage_note.stopped') : filesBad > 0 ? t('transfer.restore.res.stage_note.failed', { count: num(filesBad) }) : undefined });
+      const gallery = done?.media_scan === 'restart' || done?.media_scan === 'failed';
+      list.push({ key: 'files', tone: filesRow.result.tone === 'ok' && !gallery && !filesIncomplete ? 'ok' : 'warn',
+        note: outcome === 'stopped' ? t('transfer.restore.res.stage_note.stopped') : filesBad > 0 ? t('transfer.restore.res.stage_note.failed', { count: num(filesBad) })
+          : gallery ? t('transfer.restore.res.stage_note.gallery') : filesIncomplete ? t('transfer.restore.res.stage_note.incomplete') : undefined });
     }
-    if (tel && Object.keys(tel.safety).length) list.push({ key: 'safety', tone: Object.values(tel.safety).every(Boolean) ? 'ok' : 'warn' });
+    if (tel && Object.keys(tel.safety).length) list.push({ key: 'safety', tone: safetyFailed ? 'warn' : 'ok', note: safetyFailed ? t('transfer.restore.res.stage_note.safety') : undefined });
     list.push(...telRows.map((row) => row.mark));
     if (telError) list.push({ key: 'messages', tone: 'warn', note: t('transfer.restore.res.stage_note.error') });
     if (appsMark) list.push(appsMark);
@@ -225,12 +232,16 @@
     if (!done) return [];
     const list: string[] = [];
     if (filesBad > 0) list.push(tp('transfer.restore.issue.files', filesBad, { count: num(filesBad) }));
+    if (filesIncomplete) list.push(t('transfer.restore.issue.files_incomplete'));
     if (done.media_scan === 'failed') list.push(t('transfer.restore.issue.scan'));
+    if (done.media_scan === 'restart') list.push(t('transfer.restore.restart'));
     if (telError) list.push(t('transfer.restore.issue.tel_error'));
     if (telFailed) list.push(t('transfer.restore.issue.tel_failed'));
+    if (telRows.some((row) => row.visible)) list.push(t('transfer.restore.tel.visible'));
+    if (safetyFailed) list.push(t('transfer.restore.issue.safety'));
     if (importKinds.length) list.push(t('transfer.restore.issue.import', { list: importKinds.join(', ') }));
     if (problemRows.length) list.push(tp('transfer.restore.issue.apps', problemRows.length, { count: num(problemRows.length) }));
-    if (blockedRows.length) list.push(t(`transfer.restore.issue.${reinstalling ? 'installing' : 'blocked'}`));
+    if (blockedRows.length && !gaveUp) list.push(t(`transfer.restore.issue.${reinstalling ? 'installing' : 'blocked'}`));
     if (appsError) list.push(t('transfer.restore.issue.apps_error'));
     return list;
   });
@@ -367,11 +378,11 @@
         {/if}
         {#if appsRow}
           <CategoryRow icon={LayoutGrid} name={t('transfer.row.apps')} sub={appsRow.sub} result={appsRow.result}
-            tone={apps?.blocked && !reinstalling ? 'block' : null}
+            tone={apps?.blocked && !reinstalling && !gaveUp ? 'block' : null}
             fold={appList.length ? appsFold : undefined} foldText={t('transfer.restore.res.list')} foldLabel={t('transfer.row.apps')}
             foldOpen={appsOpen} onfold={(open) => (appsOpen = open)}>
             {#snippet pills()}
-              {#if apps?.blocked && !reinstalling}
+              {#if apps?.blocked && !reinstalling && !gaveUp}
                 <button type="button" aria-expanded={howOpen} aria-controls="xiaomi-how" onclick={toggleHow}
                   class="inline-flex cursor-pointer items-center rounded-full bg-warn-soft px-2.5 py-0.5 text-xs font-bold whitespace-nowrap text-warn ring-1 ring-current/15 ring-inset hover:underline">
                   {t('transfer.restore.xiaomi_label')}
@@ -478,7 +489,7 @@
 <!-- Aplikacje: cała lista; instrukcja Xiaomi tylko po kliknięciu etykiety -->
 {#snippet appsFold()}
   <div class="flex flex-col gap-2.5">
-    {#if apps?.blocked && howOpen && !reinstalling}
+    {#if apps?.blocked && howOpen && !reinstalling && !gaveUp}
       <p id="xiaomi-how" class="rounded-xl border border-warn/30 bg-warn-soft px-3 py-2 text-warn">{t('transfer.restore.xiaomi_how_done')}</p>
     {/if}
     <ul class="grid max-h-72 grid-cols-2 gap-x-6 gap-y-1.5 overflow-auto pr-1">

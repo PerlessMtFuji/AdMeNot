@@ -233,10 +233,28 @@ describe('TransferRestore result', () => {
     expect(screen.getByText(/nie udało się wgrać: 2/)).toBeTruthy();
   });
 
-  test('Android below 10: still green, the restart request sits in the Files row', async () => {
+  test('Android below 10: the restart request sits in the Files row and turns the result yellow, in the panel too', async () => {
     await finished(result({ media_scan: 'restart' }), { tel: null });
-    expect(screen.getByText('Wszystko wgrane')).toBeTruthy();
+    expect(screen.queryByText('Wszystko wgrane')).toBeNull();
+    expect(screen.getByText('Prawie wszystko gotowe')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toMatch(/Uruchom ponownie telefon, żeby galeria zobaczyła pliki/);
     expect(rowOf('Pliki').textContent).toMatch(/uruchom ponownie telefon, żeby galeria zobaczyła pliki/);
+    const panel = screen.getByRole('complementary', { name: 'Przedmiot zlecenia' });
+    expect(within(panel).getByRole('list', { name: 'Etapy wgrywania' }).textContent).toMatch(/restart galerii/);
+  });
+
+  test('never green when something needs attention: Messages check, incomplete status, failed safety backup', async () => {
+    await finished(result({ status: 'incomplete' }), { tel: tel({ kinds: { contacts: kind(), sms: kind({ visible_warning: true }) },
+      safety: { contacts: true, sms: false } }) });
+    expect(screen.queryByText('Wszystko wgrane')).toBeNull();
+    const hero = screen.getByRole('status').textContent ?? '';
+    expect(hero).toMatch(/nie wszystkie pliki zostały wgrane/i);
+    expect(hero).toMatch(/sprawdź w aplikacji Wiadomości/);
+    expect(hero).toMatch(/kopia bezpieczeństwa nowego telefonu się nie udała/);
+    const panel = screen.getByRole('complementary', { name: 'Przedmiot zlecenia' });
+    const text = within(panel).getByRole('list', { name: 'Etapy wgrywania' }).textContent ?? '';
+    expect(text).toMatch(/Kopia bezpieczeństwa nowego telefonu — nieudana/);
+    expect(text).toMatch(/Wiadomości — sprawdź w Wiadomościach/);
   });
 
   test('a failed gallery scan is a yellow remark, not the generic failure', async () => {
@@ -422,6 +440,79 @@ describe('TransferRestore result', () => {
       expect(rowOf('Aplikacje').textContent).toMatch(/✓ 3/);
       expect(screen.getByText('Wszystko wgrane')).toBeTruthy();
       expect(screen.queryByRole('button', { name: /Xiaomi blokuje instalację/ })).toBeNull();
+    });
+
+    const err = (kindName: string, key: string) => ({ job_id: 'job-apps', kind: kindName, key, message: '' });
+
+    test('a transient job error is not a global error: a note in the row, the promise stays and the next unblock retries', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const { bridge, s } = await finished(result(), { apps: BLOCKED });
+      await vi.advanceTimersByTimeAsync(RECHECK_MS + 100);
+      expect(calls(bridge, 'install_remaining_apps')).toBe(1);
+      bridge.emit('job:error', err('restore_apps', 'disconnected') as never);
+      bridge.emit('job:end', { job_id: 'job-apps', kind: 'restore_apps' } as never);
+      await tick();
+      expect(s.error).toBeNull();
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(rowOf('Aplikacje').textContent).toMatch(/Telefon został odłączony/);
+      expect(screen.getByRole('button', { name: /Xiaomi blokuje instalację/ })).toBeTruthy();
+      await vi.advanceTimersByTimeAsync(RECHECK_MS + 100);
+      expect(calls(bridge, 'install_remaining_apps')).toBe(2);
+    });
+
+    test('a permanent job error drops the promise, shows the reason and never retries', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const { bridge, s } = await finished(result(), { apps: BLOCKED });
+      await vi.advanceTimersByTimeAsync(RECHECK_MS + 100);
+      bridge.emit('job:error', err('restore_apps', 'transfer_failed') as never);
+      bridge.emit('job:end', { job_id: 'job-apps', kind: 'restore_apps' } as never);
+      await tick();
+      expect(s.error).toBeNull();
+      expect(screen.queryByRole('button', { name: /Xiaomi blokuje instalację/ })).toBeNull();
+      expect(rowOf('Aplikacje').textContent).toMatch(/Wgrywanie nie powiodło się/);
+      await vi.advanceTimersByTimeAsync(RECHECK_MS * 4);
+      expect(calls(bridge, 'install_remaining_apps')).toBe(1);
+    });
+
+    test('install_remaining_apps refused for good (copy deleted): reason in the row, no promise, no retry', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const { bridge, s } = await finished(result(), { apps: BLOCKED });
+      bridge.failNext('install_remaining_apps', 'transfer_copy_missing');
+      await vi.advanceTimersByTimeAsync(RECHECK_MS + 100);
+      await vi.advanceTimersByTimeAsync(RECHECK_MS * 3);
+      expect(calls(bridge, 'install_remaining_apps')).toBe(1);
+      expect(s.error).toBeNull();
+      expect(screen.queryByRole('button', { name: /Xiaomi blokuje instalację/ })).toBeNull();
+      expect(rowOf('Aplikacje').textContent).toMatch(/Tej kopii nie ma już na komputerze/);
+    });
+
+    test.each(['busy', 'transfer_no_phone'])('install_remaining_apps refused with %s is tried again', async (key) => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const { bridge } = await finished(result(), { apps: BLOCKED });
+      bridge.failNext('install_remaining_apps', key);
+      await vi.advanceTimersByTimeAsync(RECHECK_MS + 100);
+      await vi.advanceTimersByTimeAsync(RECHECK_MS + 100);
+      expect(calls(bridge, 'install_remaining_apps')).toBe(2);
+    });
+
+    test('apps_done that is still blocked re-arms the next unblock', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const { bridge, s } = await finished(result(), { apps: BLOCKED });
+      await vi.advanceTimersByTimeAsync(RECHECK_MS + 100);
+      bridge.emit('transfer:apps_done', { order: ORDER, apps: BLOCKED });
+      bridge.emit('job:end', { job_id: 'job-apps', kind: 'restore_apps' } as never);
+      s.job = null;
+      await tick();
+      await vi.advanceTimersByTimeAsync(RECHECK_MS + 100);
+      expect(calls(bridge, 'install_remaining_apps')).toBe(2);
+    });
+
+    test('the checks stop when the screen is closed', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const { bridge, unmount } = await finished(result(), { apps: BLOCKED });
+      unmount();
+      await vi.advanceTimersByTimeAsync(RECHECK_MS * 3);
+      expect(calls(bridge, 'install_check')).toBe(0);
     });
 
     test('a different order in apps_done changes nothing', async () => {

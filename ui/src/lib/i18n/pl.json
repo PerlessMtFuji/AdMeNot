@@ -1172,6 +1172,8 @@
         },
         "blocked": "aplikacje czekają, aż Xiaomi pozwoli na instalację przez USB",
         "installing": "trwa instalacja pominiętych aplikacji",
+        "files_incomplete": "nie wszystkie pliki zostały wgrane",
+        "safety": "kopia bezpieczeństwa nowego telefonu się nie udała",
         "apps_error": "nie udało się zainstalować aplikacji"
       },
       "res": {
@@ -1196,6 +1198,10 @@
           "import": "plik do importu",
           "failed": "nieudane: {count}",
           "error": "błąd",
+          "gallery": "restart galerii",
+          "incomplete": "niepełne",
+          "safety": "nieudana",
+          "check": "sprawdź w Wiadomościach",
           "installing": "instaluję",
           "blocked": "czeka na Xiaomi",
           "stopped": "przerwane"

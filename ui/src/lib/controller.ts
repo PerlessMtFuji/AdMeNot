@@ -11,6 +11,10 @@ import type {
 const CONSOLE_LIMIT = 500;
 const FLASH_MS = 2000;  // czas animacji `.flash` z app.css
 
+/** Błędy dokończenia aplikacji, po których warto spróbować przy następnym odblokowaniu (kabel, zajęty telefon). */
+const REINSTALL_TRANSIENT = ['disconnected', 'offline', 'timeout', 'adb_error', 'busy', 'device_busy', 'transfer_no_phone',
+  'transfer_too_many_disconnects'];
+
 export class Controller {
   private ended = new Set<string>();
   private knownLoaded = false;
@@ -313,6 +317,12 @@ export class Controller {
       }
       if (d.kind === 'phone_cleanup') { // czerwony baner sprzątania mówi, co zrobić ręcznie; most ponawia w tle
         s.transfer.cleanup = { ...s.transfer.cleanup, running: false, ok: false };
+        return;
+      }
+      if (d.kind === 'restore_apps') { // dokończenie aplikacji w tle: powód w wierszu „Aplikacje”, nie karta błędu
+        const r = s.transfer.restore;
+        const transient = REINSTALL_TRANSIENT.includes(d.key);
+        Object.assign(r, { appsError: d.key, appsProgress: null, reinstallDone: !transient, reinstallGaveUp: !transient });
         return;
       }
       if (d.kind === 'update') { // błędy aktualizacji pokazuje okno instalacji, nie karta błędu
@@ -808,11 +818,12 @@ export class Controller {
     on('transfer:apps_done', (d) => {
       const r = s.transfer.restore;
       if (r.order !== d.order) return;
-      Object.assign(r, { appsResult: d.apps, appsProgress: null, appsError: null });
+      // nadal zablokowane: kolejne odblokowanie uruchomi dokończenie jeszcze raz
+      Object.assign(r, { appsResult: d.apps, appsProgress: null, appsError: null, reinstallGaveUp: false, reinstallDone: !d.apps.blocked });
     });
     on('transfer:restore_done', (d) => {
       Object.assign(s.transfer.restore, { result: d.result, copy: d.copy, telResult: d.tel ?? null,
-        telError: d.tel_error ?? null, tap: null, appsResult: d.apps ?? null, appsError: d.apps_error ?? null,
+        telError: d.tel_error ?? null, tap: null, appsResult: d.apps ?? null, appsError: d.apps_error ?? null, reinstallGaveUp: false,
         appsProgress: null, order: d.order ?? null, whatsapp: d.whatsapp ?? null, whatsappRestored: false, reinstallDone: false });
       s.transfer.copies = s.transfer.copies.map((c) => (c.id === d.copy.id ? d.copy : c));
       s.transfer.waiting = false;
@@ -1080,20 +1091,26 @@ export class Controller {
       if (r.reinstallDone || s.phase !== 'transfer_restored' || s.job) return;
       r.reinstallDone = true;
       const res = await this.api.install_remaining_apps(order);
-      if (!isApiError(res)) this.setJob(res.job_id, 'restore_apps');
-      else if (res.error.key === 'transfer_no_phone' || res.error.key === 'busy') r.reinstallDone = false;
+      if (!isApiError(res)) {
+        r.appsError = null;
+        this.setJob(res.job_id, 'restore_apps');
+      } else if (REINSTALL_TRANSIENT.includes(res.error.key)) r.reinstallDone = false;
+      else Object.assign(r, { appsError: res.error.key, reinstallGaveUp: true });  // np. kopia usunięta: bez obietnicy, powód w wierszu
     } catch {
       // następna próba za RECHECK_MS (jeśli zadanie jeszcze nie ruszyło)
     }
   }
 
   /** Pole „Czaty przywrócone” na ekranie wyniku: zapis w zleceniu (trafia do protokołu). */
+  private whatsappSeq = 0;
   async setWhatsappRestored(on: boolean): Promise<void> {
     const r = this.state.transfer.restore;
     if (!r.order) return;
     const before = r.whatsappRestored;
+    const seq = ++this.whatsappSeq;
     r.whatsappRestored = on;
     const res = await this.call(this.api.set_whatsapp_restored(r.order, on));
+    if (seq !== this.whatsappSeq) return;  // późniejsze kliknięcie rozstrzyga o polu
     r.whatsappRestored = res ? res.whatsapp_restored : before;
   }
 
@@ -1132,7 +1149,7 @@ export class Controller {
     if (!r) return;
     Object.assign(s.transfer.restore, { progress: null, result: null, telProgress: null, telResult: null, telError: null,
       tap: null, appsProgress: null, appsResult: null, appsError: null, order: null, whatsapp: null, whatsappRestored: false,
-      reinstallDone: false });
+      reinstallDone: false, reinstallGaveUp: false });
     s.transfer.waiting = false;
     s.stopping = false;
     s.phase = 'transfer_restore';

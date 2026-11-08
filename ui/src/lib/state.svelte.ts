@@ -19,7 +19,7 @@ export const EMPTY_TRANSFER_SELECTION: TransferSelection = {
 export const emptyRestore = (): RestoreState => ({ plan: null, copy: null,
   choice: { groups: [], apks_on: [], verify_hash: false, tel: [], apps: [] }, apps: null, progress: null, result: null, sameRecent: false,
   resumable: false, tel: null, telProgress: null, telResult: null, telError: null, tap: null, tapPackage: null,
-  appsProgress: null, appsResult: null, appsError: null, order: null, whatsapp: null, whatsappRestored: false, reinstallDone: false });
+  appsProgress: null, appsResult: null, appsError: null, order: null, whatsapp: null, whatsappRestored: false, reinstallDone: false, reinstallGaveUp: false });
 
 /** Wgrywanie kopii na nowy telefon: plan z mostu, wybór serwisanta, postęp i wynik. */
 export interface RestoreState {
@@ -59,6 +59,8 @@ export interface RestoreState {
   whatsappRestored: boolean;
   /** Dokończenie aplikacji po odblokowaniu Xiaomi już uruchomiono (raz na wynik). */
   reinstallDone: boolean;
+  /** Dokończenie aplikacji nie może się udać (błąd trwały): bez obietnicy „sprawdzę sam”, powód w wierszu. */
+  reinstallGaveUp: boolean;
 }
 
 /** Przywracanie ustawień telefonu po przerwanym wgrywaniu (`phone_cleanup`): `ok` — wynik ostatniej próby. */
