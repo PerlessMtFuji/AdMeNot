@@ -68,12 +68,30 @@ CREATE TABLE IF NOT EXISTS order_seq (
 );
 """
 
+_V4_TRANSFERS = """
+ALTER TABLE orders ADD COLUMN kind TEXT NOT NULL DEFAULT 'repair';
+CREATE TABLE IF NOT EXISTS transfers (
+    order_id INTEGER PRIMARY KEY REFERENCES orders(id),
+    copy_id TEXT NOT NULL,
+    source_json TEXT NOT NULL,
+    received_at TEXT NOT NULL,
+    target_serial TEXT,
+    target_json TEXT,
+    result_json TEXT,
+    whatsapp_restored INTEGER NOT NULL DEFAULT 0,
+    copy_expires TEXT,
+    copy_deleted_at TEXT
+);
+CREATE INDEX IF NOT EXISTS transfers_by_copy ON transfers(copy_id);
+"""
+
 # v1 to schemat sprzed wersjonowania — `IF NOT EXISTS` przyjmuje też bazy z user_version = 0.
 # v2: tożsamość telefonu w zleceniu (android_id, IMEI, model) — przegląd 2026-10-11.
 # v3: licznik numerów zleceń dnia — numer usuniętego zlecenia nie wraca (protokół mógł trafić do klienta).
-MIGRATIONS: tuple[str, ...] = (_SCHEMA_V1, _V2_IDENTITY, _V3_ORDER_SEQ)
+# v4: rodzaj zlecenia (naprawa / przeniesienie danych) i tabela przeniesień.
+MIGRATIONS: tuple[str, ...] = (_SCHEMA_V1, _V2_IDENTITY, _V3_ORDER_SEQ, _V4_TRANSFERS)
 
-ORDER_STATUSES = frozenset({"running", "done", "failed", "undone", "partially_undone"})
+ORDER_STATUSES = frozenset({"running", "done", "failed", "undone", "partially_undone", "expired"})
 ACTION_STATUSES = frozenset({"pending", "done", "failed", "undone"})
 
 MAX_REPORT_SCREENSHOTS = 8  # protokół pokazuje najwyżej tyle zrzutów (Plan 6b §5.3)
@@ -103,6 +121,21 @@ class Order:
     created_at: datetime
     status: str
     device_identity: dict[str, Any] | None = None
+    kind: str = "repair"
+
+
+@dataclass(frozen=True)
+class TransferRecord:
+    order_id: int
+    copy_id: str
+    source: dict[str, Any]
+    received_at: datetime
+    target_serial: str | None
+    target: dict[str, Any] | None
+    result: dict[str, Any] | None
+    whatsapp_restored: bool
+    copy_expires: datetime | None
+    copy_deleted_at: datetime | None
 
 
 @dataclass(frozen=True)
@@ -168,7 +201,19 @@ def _migrate(db: sqlite3.Connection, path: Path | str, migrations: Sequence[str]
 def _order(row: sqlite3.Row) -> Order:
     return Order(row["id"], row["number"], row["device_serial"], row["device_model"],
                  row["client_name"], datetime.fromisoformat(row["created_at"]), row["status"],
-                 _load(row["device_identity"]))
+                 _load(row["device_identity"]), row["kind"])
+
+
+def _opt_dt(text: str | None) -> datetime | None:
+    return None if text is None else datetime.fromisoformat(text)
+
+
+def _transfer_record(row: sqlite3.Row) -> TransferRecord:
+    return TransferRecord(
+        row["order_id"], row["copy_id"], _load(row["source_json"]) or {},
+        datetime.fromisoformat(row["received_at"]), row["target_serial"], _load(row["target_json"]),
+        _load(row["result_json"]), bool(row["whatsapp_restored"]), _opt_dt(row["copy_expires"]),
+        _opt_dt(row["copy_deleted_at"]))
 
 
 def _action(row: sqlite3.Row) -> Action:
@@ -215,6 +260,11 @@ class Journal:
 
     def create_order(self, serial: str, model: str | None, client_name: str | None = None,
                      identity: dict[str, Any] | None = None) -> Order:
+        return self._insert_order(serial, model, client_name, identity, "repair")
+
+    def _insert_order(self, serial: str, model: str | None, client_name: str | None,
+                      identity: dict[str, Any] | None, kind: str,
+                      extra: Callable[[int], None] | None = None) -> Order:
         now = self._now()
         prefix = f"ZS/{now:%Y}/{now:%m%d}/"
         with self._db:
@@ -230,9 +280,11 @@ class Journal:
                 " ON CONFLICT(prefix) DO UPDATE SET last = excluded.last", (prefix, last + 1))
             cur = self._db.execute(
                 "INSERT INTO orders (number, device_serial, device_model, client_name, created_at, status,"
-                " device_identity) VALUES (?, ?, ?, ?, ?, 'running', ?)",
+                " device_identity, kind) VALUES (?, ?, ?, ?, ?, 'running', ?, ?)",
                 (f"{prefix}{last + 1:02d}", serial, model, client_name or None,
-                 now.isoformat(timespec="seconds"), _dump(identity)))
+                 now.isoformat(timespec="seconds"), _dump(identity), kind))
+            if extra is not None:
+                extra(cur.lastrowid)
         return self.order(cur.lastrowid)
 
     def order(self, order_id: int) -> Order:
@@ -247,18 +299,20 @@ class Journal:
 
     def orders_for(self, serial: str) -> list[Order]:
         rows = self._db.execute(
-            "SELECT * FROM orders WHERE device_serial = ? ORDER BY id DESC", (serial,))
+            "SELECT * FROM orders WHERE device_serial = ? AND kind = 'repair' ORDER BY id DESC", (serial,))
         return [_order(r) for r in rows]
 
     def interrupted_orders(self, serial: str) -> list[Order]:
         rows = self._db.execute(
             "SELECT DISTINCT o.* FROM orders o JOIN actions a ON a.order_id = o.id"
-            " WHERE o.device_serial = ? AND a.status = 'pending' ORDER BY o.id DESC", (serial,))
+            " WHERE o.device_serial = ? AND o.kind = 'repair' AND a.status = 'pending'"
+            " ORDER BY o.id DESC", (serial,))
         return [_order(r) for r in rows]
 
     def recent_serials(self, limit: int = 20) -> list[str]:
         rows = self._db.execute(
-            "SELECT device_serial FROM orders GROUP BY device_serial ORDER BY MAX(id) DESC LIMIT ?",
+            "SELECT device_serial FROM orders WHERE kind = 'repair' GROUP BY device_serial"
+            " ORDER BY MAX(id) DESC LIMIT ?",
             (limit,))
         return [r[0] for r in rows]
 
@@ -277,8 +331,70 @@ class Journal:
         """Wiersze zlecenia; pliki (zrzuty, protokół, kopie APK) usuwa `engine.retention`."""
         with self._db:
             for table, column in (("actions", "order_id"), ("order_scans", "order_id"),
-                                  ("screenshots", "order_id"), ("orders", "id")):
+                                  ("screenshots", "order_id"), ("transfers", "order_id"),
+                                  ("orders", "id")):
                 self._db.execute(f"DELETE FROM {table} WHERE {column} = ?", (order_id,))  # stałe nazwy
+
+    # --- przeniesienia danych ----------------------------------------------------------------
+
+    def create_transfer_order(self, serial: str, model: str | None, client_name: str | None,
+                              identity: dict[str, Any] | None, *, copy_id: str, source: dict[str, Any],
+                              received_at: datetime, copy_expires: datetime) -> Order:
+        def add_transfer(order_id: int) -> None:
+            self._db.execute(
+                "INSERT INTO transfers (order_id, copy_id, source_json, received_at, copy_expires)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (order_id, copy_id, _dump(source), received_at.isoformat(timespec="seconds"),
+                 copy_expires.isoformat(timespec="seconds")))
+
+        return self._insert_order(serial, model, client_name, identity, "transfer", add_transfer)
+
+    def transfer(self, order_id: int) -> TransferRecord:
+        row = self._db.execute("SELECT * FROM transfers WHERE order_id = ?", (order_id,)).fetchone()
+        if row is None:
+            raise KeyError(order_id)
+        return _transfer_record(row)
+
+    def transfers_for_copy(self, copy_id: str) -> list[Order]:
+        rows = self._db.execute(
+            "SELECT o.* FROM orders o JOIN transfers t ON t.order_id = o.id"
+            " WHERE t.copy_id = ? ORDER BY o.id", (copy_id,))
+        return [_order(r) for r in rows]
+
+    def transfer_orders(self) -> list[tuple[Order, TransferRecord]]:
+        rows = self._db.execute(
+            "SELECT o.*, t.* FROM orders o JOIN transfers t ON t.order_id = o.id ORDER BY o.id DESC"
+        ).fetchall()
+        return [(_order(r), _transfer_record(r)) for r in rows]
+
+    def set_transfer_target(self, order_id: int, serial: str, target: dict[str, Any]) -> None:
+        with self._db:
+            self._db.execute("UPDATE transfers SET target_serial = ?, target_json = ? WHERE order_id = ?",
+                             (serial, _dump(target), order_id))
+
+    def save_transfer_result(self, order_id: int, result: dict[str, Any]) -> None:
+        with self._db:
+            self._db.execute("UPDATE transfers SET result_json = ? WHERE order_id = ?",
+                             (_dump(result), order_id))
+
+    def set_whatsapp_restored(self, order_id: int, on: bool) -> None:
+        with self._db:
+            self._db.execute("UPDATE transfers SET whatsapp_restored = ? WHERE order_id = ?",
+                             (int(on), order_id))
+
+    def mark_copy_deleted(self, copy_id: str, when: datetime) -> None:
+        """Kopia przeniesienia usunięta: zlecenia bez celu (nic nie wgrano) przechodzą w „expired”."""
+        with self._db:
+            self._db.execute(
+                "UPDATE orders SET status = 'expired' WHERE id IN (SELECT order_id FROM transfers"
+                " WHERE copy_id = ? AND target_serial IS NULL)", (copy_id,))
+            self._db.execute("UPDATE transfers SET copy_deleted_at = ? WHERE copy_id = ?",
+                             (when.isoformat(timespec="seconds"), copy_id))
+
+    def set_copy_expires(self, copy_id: str, expires: datetime) -> None:
+        with self._db:
+            self._db.execute("UPDATE transfers SET copy_expires = ? WHERE copy_id = ?",
+                             (expires.isoformat(timespec="seconds"), copy_id))
 
     def backup_dirs(self, exclude: int | None = None) -> set[str]:
         """Katalogi kopii APK, do których odwołują się kroki zleceń (poza `exclude`)."""
