@@ -72,13 +72,15 @@ test('the analysis progress line stays on one row', async ({ page }) => {
   expect(n).toBeGreaterThanOrEqual(4);
   const tops: number[] = [];
   for (let i = 0; i < n; i++) {
-    const b = await box(kids.nth(i));
+    const b = await kids.nth(i).boundingBox();
+    if (!b) continue;  // ukryty element (szacunek czasu przy wąskim oknie)
     tops.push(b.y + b.height / 2);
   }
   // Wszystkie elementy linii leżą w jednym rzędzie (środki w granicach kilku pikseli) i nie wystają z okna.
   expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(4);
   expect(lineBox.height).toBeLessThanOrEqual(40);
+  await expect(line.getByText('123 z 456')).toBeVisible();
   const stopBox = await box(stop);
-  // Uwaga: przy tej najdłuższej zawartości przycisk wystaje ok. 30 px poza linię (patrz raport zadania 7), ale nie poza okno.
-  expect(stopBox.x + stopBox.width).toBeLessThanOrEqual(1008);
+  expect(inside(stopBox, main), JSON.stringify({ stopBox, main, lineBox })).toBe(true);
+  expect(inside(stopBox, lineBox), JSON.stringify({ stopBox, lineBox })).toBe(true);
 });

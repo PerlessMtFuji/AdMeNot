@@ -32,14 +32,15 @@
     const over = e.to_fetch_bytes > e.effective_bytes ? ` ${t('apk_cache.over', { gb: formatGb(e.effective_bytes, i18n.lang) })}` : '';
     return `${base}${unknown}.${over}`;
   });
-  const hint = $derived([calm ? t('results.apk_sub') : '', estimate].filter(Boolean).join(' '));
+  // Szacunek czasu w linii znika przy wąskim oknie (max-[1200px]) — wtedy jest w dymku.
+  const hint = $derived([calm ? t('results.apk_sub') : '', estimate, remaining ?? ''].filter(Boolean).join(' '));
 </script>
 
 <div class="flex min-w-0 items-center gap-3 text-sm whitespace-nowrap text-mut">
   <span class="spin flex-none"></span>
   <b class="flex-none text-ink">{t('results.apk_card')}</b>
   {#if s.apk.total}<span class="flex-none tabular-nums">{t('results.apk_count', { done: s.apk.done, total: s.apk.total })}</span>{/if}
-  {#if remaining}<span class="flex-none text-soft" aria-hidden="true">·</span><span class="flex-none text-soft">{remaining}</span>{/if}
+  {#if remaining}<span class="flex-none text-soft max-[1200px]:hidden" aria-hidden="true">·</span><span class="flex-none text-soft max-[1200px]:hidden">{remaining}</span>{/if}
   {#if hint}
     <Tooltip text={hint} class="flex-none whitespace-normal">
       <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -48,6 +49,6 @@
       </span>
     </Tooltip>
   {/if}
-  <div class="min-w-12 flex-1"><Progress {value} {label} /></div>
+  <div class="min-w-0 flex-1 basis-12"><Progress {value} {label} /></div>
   {#if canStop}<Button size="sm" variant="ghost" class="flex-none" onclick={() => ctl.stopToManual()}>{t('apk_mode.stop_to_manual')}</Button>{/if}
 </div>
