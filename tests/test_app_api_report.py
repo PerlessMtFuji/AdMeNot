@@ -5,6 +5,7 @@ from apphelpers import SlowApk, make_api
 from conftest import SERIAL
 from fakephone import make_cli_phone
 
+from admenot.engine.journal.db import Journal
 from admenot.engine.report.pdf import PdfError
 from admenot.engine.settings import ServiceInfo, load_service
 
@@ -190,3 +191,23 @@ def test_pick_logo_without_a_window():
     assert api.pick_logo() == {"path": None}
     api._attach(pick_folder=lambda: None, close=lambda: None, pick_file=lambda: "C:\\logo.png")
     assert api.pick_logo() == {"path": "C:\\logo.png"}
+
+
+def test_report_for_transfer_order(edge, tmp_path):
+    from datetime import datetime
+
+    from admenot.engine.paths import journal_path
+
+    api, _ = make_api(make_cli_phone())
+    with Journal(journal_path()) as j:
+        order = j.create_transfer_order(
+            "SRC", "SM-A525F", "Marta", None, copy_id="SRC/c1",
+            source={"manufacturer": "samsung", "model": "SM-A525F", "counts": {"contacts": 3},
+                    "selection_groups": ["contacts_messages"]},
+            received_at=datetime(2026, 11, 1, 10, 0), copy_expires=datetime(2026, 11, 15, 10, 0))
+    r = api.report(order.number)
+    reports = tmp_path / "data" / "AdMeNot" / "reports"
+    stem = order.number.replace("/", "-")
+    assert r["pdf"] == str(reports / f"{stem}.pdf") and r["error"] is None and len(edge) == 1
+    html = (reports / f"{stem}.html").read_text("utf-8")
+    assert "Protokół przeniesienia danych" in html and "Marta" in html

@@ -15,6 +15,8 @@ from admenot.engine.paths import journal_path, reports_dir
 from admenot.engine.report.model import build_protocol
 from admenot.engine.report.pdf import PdfError, html_to_pdf
 from admenot.engine.report.render import render_html
+from admenot.engine.report.transfer_model import build_transfer_protocol
+from admenot.engine.report.transfer_render import render_transfer_html
 from admenot.engine.settings import load_service, load_settings
 
 
@@ -40,8 +42,12 @@ def write_report(number: str, lang: str, *, out: Path | None = None, pdf: bool =
         order = journal.order_by_number(number)
         if order is None:
             raise UnknownOrder(number)
-        protocol = build_protocol(journal, order.id, lang)
-    html = render_html(protocol, load_service(), now())
+        if order.kind == "transfer":
+            moment = now()
+            html = render_transfer_html(build_transfer_protocol(journal, order.id, lang, moment),
+                                        load_service(), moment)
+        else:
+            html = render_html(build_protocol(journal, order.id, lang), load_service(), now())
     stem = report_stem(order.number)
     if out:
         html_path, target = out.with_suffix(".html"), out.with_suffix(".pdf")
