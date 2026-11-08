@@ -77,7 +77,7 @@
     {:else}
       <Segmented stretch size="sm" label={t('evidence.what_to_do')} value={level} options={LEVELS_ACT} onchange={pick} />
       <!-- Android ≤12: „Wycisz” nie wyłączy powiadomień z komputera — krótka notka tam, gdzie się to wybiera. -->
-      {#if level === 'silence' && notificationsManual(ctl?.state.device?.sdk)}
+      {#if level === 'silence' && notificationsManual(ctl.state.device?.sdk)}
         <p class="flex items-start gap-1.5 text-xs text-mut"><Icon name="info" size={14} class="mt-px flex-none" />{t('notice.short.notifications_manual')}</p>
       {/if}
     {/if}

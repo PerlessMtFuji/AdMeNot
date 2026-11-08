@@ -21,7 +21,8 @@
     : formatEta({ eta_s: s.apk.eta, eta_kind: 'measured', eta_min_s: s.apk.eta, eta_max_s: s.apk.eta }, i18n.lang));
   const canStop = $derived(s.canStopToManual);
   // Szacunek przekracza miejsce na dysku — ikona dymka dostaje ton ostrzegawczy.
-  const over = $derived(!!s.apkEstimate && s.apk.running && s.apkEstimate.to_fetch_bytes > s.apkEstimate.effective_bytes);
+  const exceeds = $derived(!!s.apkEstimate && s.apkEstimate.to_fetch_bytes > s.apkEstimate.effective_bytes);
+  const over = $derived(exceeds && s.apk.running);
   // Ile analiza pobierze z telefonu i czy zmieści się na dysku (zdarzenie apk:estimate).
   const estimate = $derived.by(() => {
     const e = s.apkEstimate;
@@ -31,7 +32,7 @@
       : e.cached ? t('apk_cache.estimate_part', { size, fetch: e.apps - e.cached, count: e.apps })
       : tp('apk_cache.estimate', e.apps, { size });
     const unknown = e.unknown ? ` ${t('apk_cache.unknown', { count: e.unknown })}` : '';
-    const overText = e.to_fetch_bytes > e.effective_bytes ? ` ${t('apk_cache.over', { gb: formatGb(e.effective_bytes, i18n.lang) })}` : '';
+    const overText = exceeds ? ` ${t('apk_cache.over', { gb: formatGb(e.effective_bytes, i18n.lang) })}` : '';
     return `${base}${unknown}.${overText}`;
   });
   // Szacunek czasu w linii znika przy wąskim oknie (max-[1200px]) — wtedy jest w dymku.

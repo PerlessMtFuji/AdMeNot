@@ -26,6 +26,8 @@ describe('DeviceChecks', () => {
     await mounted([check([{ ...CHROME, sites: [CHROME.sites[2]] }], 'ok')]);
     const head = screen.getByRole('heading', { level: 2, name: 'Powiadomienia z witryn' });
     expect(screen.queryByRole('button', { name: /Powiadomienia z witryn/ })).toBeNull();
+    // Cały wiersz nagłówka karty (ikona, tytuł, pigułki) nie zawiera nic zwijanego.
+    expect(head.parentElement!.parentElement!.parentElement!.querySelector('[aria-expanded]')).toBeNull();
     expect(head.closest('[aria-expanded]')).toBeNull();
     expect(head.parentElement!.textContent).toContain('W porządku');
     expect(screen.getByText('żadna strona nie może wysyłać powiadomień')).toBeTruthy();

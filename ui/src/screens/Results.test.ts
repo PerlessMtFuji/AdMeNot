@@ -21,6 +21,12 @@ async function scanned(scenario = 'adware', checks?: DeviceCheck[]) {
 const appRows = () => within(screen.getByRole('group', { name: 'Tabela aplikacji' })).getAllByRole('row');
 const tab = (name: 'Aplikacje' | 'Telefon') => screen.getByRole('tab', { name: new RegExp(`^${name}`) });
 const openPhone = () => fireEvent.click(tab('Telefon'));
+// Karta „Powiadomienia z witryn” z podanymi przeglądarkami — wspólna dla bloków „Telefon” i odczytu Firefoksa.
+const check = (browsers: CheckBrowser[]): DeviceCheck =>
+  ({ id: 'site_notifications', state: 'review', state_label: 'Do sprawdzenia', browsers });
+// Ile razy ekran ponowił odczyt powiadomień z witryn (wywołania mostka).
+const rechecks = (env: { bridge: { calls: { method: string }[] } }) =>
+  env.bridge.calls.filter((c) => c.method === 'recheck_site_notifications').length;
 // Dymek linii analizy: zdanie uspokajające i szacunek pobierania (spec §3 p.2) — czytany z nazwy ikony.
 const apkHint = () => screen.getByRole('button', { name: /Na razie bez oznak|Analiza pobierze|Pliki wszystkich/ }).getAttribute('aria-label') ?? '';
 
@@ -123,6 +129,22 @@ describe('Results', () => {
     await tick();
     expect(screen.queryByTestId('empty-verdicts')).toBeNull();
     expect(screen.queryByText(/nic nie znaleziono/)).toBeNull();
+  });
+
+  test('expert mode: an active category or source filter hides the “nothing found” line too', async () => {
+    const { ctl, s } = await onlyReview();
+    await ctl.setMode('expert');
+    await tick();
+    expect(screen.getByTestId('empty-verdicts')).toBeTruthy();
+    s.categoryFilter = ['ads'];
+    await tick();
+    expect(screen.queryByTestId('empty-verdicts')).toBeNull();
+    s.categoryFilter = [];
+    await tick();
+    expect(screen.getByTestId('empty-verdicts')).toBeTruthy();
+    s.sourceFilter = 'Chrome';
+    await tick();
+    expect(screen.queryByTestId('empty-verdicts')).toBeNull();
   });
 
   test('clean phone, simple: the clean state, no empty danger lines, folded “no issues”', async () => {
@@ -395,7 +417,9 @@ describe('Results: missing data is never a plain "all clear" (final review I2/M2
     const { s } = await scanned('adware');
     const panel = screen.getByRole('complementary', { name: 'Plan naprawy' });
     const note = t('notice.short.notifications_manual');
-    const [a, b] = s.scan!.apps.filter((x) => x.verdict !== 'safe');
+    const flagged = s.scan!.apps.filter((x) => x.verdict !== 'safe');
+    expect(flagged.length).toBeGreaterThanOrEqual(2); // test potrzebuje dwóch oznaczonych aplikacji
+    const [a, b] = flagged;
     s.device = { ...s.device!, sdk: 31 };
     s.selection = { [a.package]: 'disable' };
     await tick();
@@ -796,8 +820,6 @@ describe('Results: phone state', () => {
 
 describe('Results: “Aplikacje” and “Telefon” tabs', () => {
   const CHROME = CHECKS_SAMPLE.browsers[0];
-  const check = (browsers: CheckBrowser[]): DeviceCheck =>
-    ({ id: 'site_notifications', state: 'review', state_label: 'Do sprawdzenia', browsers });
   const snap = (v: unknown) => JSON.parse(JSON.stringify(v));
   const unreadable = t('notice.short.checks_unreadable');
 
@@ -818,6 +840,7 @@ describe('Results: “Aplikacje” and “Telefon” tabs', () => {
     expect(phone.getAttribute('aria-labelledby')).toBe('repair-tab-phone');
     expect(within(phone).getByRole('heading', { name: 'Powiadomienia z witryn' })).toBeTruthy();
     expect(screen.queryByRole('region', { name: 'Szkodliwe' })).toBeNull();
+    // Karta aplikacji (AppCard) ma rolę `article`, więc na „Telefonie” nie może być żadnej.
     expect(screen.queryByRole('article')).toBeNull();
   });
 
@@ -906,10 +929,6 @@ describe('Results: “Aplikacje” and “Telefon” tabs', () => {
 describe('Results: Firefox re-reads in the background, whichever tab is open', () => {
   const FIREFOX = CHECKS_SAMPLE.browsers[2];
   const SAMSUNG = CHECKS_SAMPLE.browsers[1];
-  const check = (browsers: CheckBrowser[]): DeviceCheck =>
-    ({ id: 'site_notifications', state: 'review', state_label: 'Do sprawdzenia', browsers });
-  const rechecks = (env: { bridge: { calls: { method: string }[] } }) =>
-    env.bridge.calls.filter((c) => c.method === 'recheck_site_notifications').length;
   const site = (host: string) => ({ host, origin: `https://${host}`, blocked: false, active: false,
     fix: `site_perm:org.mozilla.firefox:https://${host}`, fix_label: `Blokada powiadomień: ${host} (Firefox)` });
 

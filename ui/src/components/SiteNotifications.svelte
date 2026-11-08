@@ -10,6 +10,8 @@
   import BrowserIcon from './BrowserIcon.svelte';
 
   let { check }: { check: DeviceCheck } = $props();
+  // Wcięcie rozwiniętych objaśnień pod wierszem — równo z tekstem po ikonie (jedno miejsce przy zmianie rozmiaru ikony).
+  const INDENT = 'pl-10';
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
   const expert = $derived(s.settings.mode === 'expert');
@@ -90,7 +92,7 @@
             {#if hint}{@render more(key, site.host, t('checks.details'))}{/if}
             {#if site.fix}{@render toggle(site.fix, t('checks.silence_site', { host: site.host }), site.fix_label)}{/if}
           </div>
-          {#if hint && howOpen.has(key)}<p class="mt-1.5 pl-10 text-sm text-soft">{t('checks.active_no_fix')}</p>{/if}
+          {#if hint && howOpen.has(key)}<p class="mt-1.5 {INDENT} text-sm text-soft">{t('checks.active_no_fix')}</p>{/if}
         </li>
       {/each}
       {#each sharedRows as b (b.package)}
@@ -113,7 +115,7 @@
             {#if b.all_fix}{@render toggle(b.all_fix, t('checks.all', { browser: b.name }), b.all_fix_label, t('checks.silence_all'))}{/if}
           </div>
           {#if open}
-            <div class="mt-1.5 flex flex-col gap-1 pl-10 text-sm text-soft">
+            <div class="mt-1.5 flex flex-col gap-1 {INDENT} text-sm text-soft">
               <span>{b.rdp_hint ? t('checks.rdp') : t('checks.all_sub')}</span>
               {#if live.length && b.block_action}<span>{t('checks.active_no_fix')}</span>{/if}
             </div>
@@ -131,7 +133,7 @@
             <Pill tone="neutral">{t('checks.unsupported_pill')}</Pill>
             {@render more(b.package, b.name, t('checks.howto'))}
           </div>
-          {#if how}<p class="mt-1.5 pl-10 text-sm text-soft">{t('checks.unsupported', { browser: b.name })}</p>{/if}
+          {#if how}<p class="mt-1.5 {INDENT} text-sm text-soft">{t('checks.unsupported', { browser: b.name })}</p>{/if}
         </li>
       {/each}
     </ul>
