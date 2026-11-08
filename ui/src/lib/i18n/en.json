@@ -785,7 +785,10 @@
       "others": "Other folders",
       "root": "Files in the main folder",
       "apps": "Apps",
-      "apps_note": "Only the apps, without their data and sign-ins."
+      "apps_note": "Only the apps, without their data and sign-ins.",
+      "show": "Show ▾",
+      "hide": "Hide ▴",
+      "missing": "Not in the copy: {what}"
     },
     "export": {
       "title_denied": "The phone did not allow reading {what}.",

@@ -166,7 +166,13 @@ export function createFakeBridge(name: string,
   const fallback = (method: string, args: unknown[]): unknown => {
     switch (method) {
       case 'transfers':
-        return { copies: structuredClone(copies) };
+        return { orders: [], copies: structuredClone(copies) };
+      case 'install_check':
+        return { blocked: false };
+      case 'install_remaining_apps':
+        return { job_id: 'job-apps' };
+      case 'set_whatsapp_restored':
+        return { order: String(args[0]), whatsapp_restored: args[1] === true };
       case 'extend_transfer': {
         const copy = copies.find((c) => c.id === args[0]);
         if (!copy) return { error: { key: 'bad_request', message: 'copy_id' } };

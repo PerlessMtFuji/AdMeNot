@@ -1518,7 +1518,8 @@ describe('data transfer — uploading a copy', () => {
     const done = { status: 'complete', target_serial: NEW, files_done: 1, files_exists: 0, files_renamed: 0, files_denied: 0,
       files_failed: 0, files_unselected: 0, apk_skipped: 0, apk_suspicious_skipped: 0, bytes: 1, seconds: 1, hashed: false,
       media_scan: 'done', files_missing: 0 } as const;
-    bridge.emit('transfer:restore_done', { result: done, copy: JSON.parse(JSON.stringify(s.transfer.restore.copy)), tel: null, tel_error: 'disconnected' });
+    bridge.emit('transfer:restore_done', { result: done, copy: JSON.parse(JSON.stringify(s.transfer.restore.copy)), tel: null, tel_error: 'disconnected',
+      apps: null, order: 'ZS/2026/0926/01', whatsapp: null });
     expect(s.phase).toBe('transfer_restored');
     expect(s.transfer.restore.result?.files_done).toBe(1);
     expect(s.transfer.restore.telError).toBe('disconnected');

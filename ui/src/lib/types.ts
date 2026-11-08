@@ -710,6 +710,70 @@ export interface RestoreApk {
   default_on: boolean;
 }
 
+/** Powód, dla którego aplikacji z kopii nie da się zainstalować (`apps_plan_view.items[].skip`). */
+export type AppSkip = 'installed' | 'too_old' | 'too_new' | 'no_abi' | 'incomplete';
+
+export interface AppsPlanItem {
+  package: string;
+  /** Etykieta ze starego telefonu (albo nazwa pakietu). */
+  name: string;
+  bytes: number;
+  verdict: Verdict;
+  default_on: boolean;
+  skip: AppSkip | null;
+}
+
+/** Aplikacje z kopii na ekranie wgrywania. `bytes`: suma instalowalnych pozycji (`skip` pusty);
+ *  `block`: `xiaomi` — telefon blokuje instalację przez USB. */
+export interface AppsPlanView {
+  items: AppsPlanItem[];
+  block: 'xiaomi' | null;
+  bytes: number;
+}
+
+export interface AppsResultRow {
+  package: string;
+  /** Etykieta tylko do UI. */
+  label: string;
+  status: 'pending' | 'installed' | 'exists' | 'skipped' | 'failed';
+  reason: string | null;
+}
+
+/** Wynik instalacji aplikacji (`apps_result_view`). `failed`/`skipped`/`codes`: liczby według powodu / kodu `INSTALL_FAILED_…`. */
+export interface AppsResultView {
+  selected: number;
+  installed: number;
+  exists: number;
+  skipped: Record<string, number>;
+  failed: Record<string, number>;
+  codes: Record<string, number>;
+  blocked: boolean;
+  stopped: boolean;
+  rows: AppsResultRow[];
+  play_installer: boolean;
+}
+
+/** Ramka WhatsApp w wyniku wgrywania: `app` — czy aplikacja jest na telefonie. */
+export interface WhatsappView {
+  files: boolean;
+  app: 'installed' | 'pre_installed' | 'missing';
+}
+
+/** Zlecenie ZS przeniesienia danych w Historii (`transfer_order_view`). */
+export interface TransferOrderView {
+  number: string;
+  client: string | null;
+  created_at: string;
+  source: { name: string | null; imei: string | null };
+  target: { name: string | null; imei: string | null } | null;
+  state: 'copy_ready' | 'restored' | 'restored_notes' | 'failed' | 'expired';
+  notes: number;
+  /** Kopia, która jeszcze jest (dni do usunięcia) albo `deleted_at` po jej usunięciu; null — brak kopii i daty. */
+  copy: { id: string; days_left: number; deleted_at: string | null } | null;
+  whatsapp_restored: boolean;
+  counts: Record<string, number>;
+}
+
 export interface RestorePlanView {
   /** Grupa bez plików może nie przyjść. */
   groups: Partial<Record<UploadGroup, UploadTotals>>;
@@ -951,7 +1015,13 @@ export interface Api {
   /** Ponowny odczyt telefonu (np. po eksporcie kontaktów do pliku) — wynik jak `transfer_inventory`. */
   transfer_rescan(): R<{ job_id: string }>;
   start_backup(selection: TransferSelection): R<{ job_id: string }>;
-  transfers(): R<{ copies: CopyView[] }>;
+  transfers(): R<{ orders: TransferOrderView[]; copies: CopyView[] }>;
+  /** Czy telefon z ostatniego planu wciąż blokuje instalację przez USB (Xiaomi); null — nieznane. */
+  install_check(): R<{ blocked: boolean | null }>;
+  /** Dokończenie instalacji aplikacji pominiętych z powodu blokady (po odblokowaniu telefonu). */
+  install_remaining_apps(order: string): R<{ job_id: string }>;
+  /** Serwisant potwierdza (albo cofa), że WhatsApp przywrócono z kopii na telefonie klienta. */
+  set_whatsapp_restored(order: string, on: boolean): R<{ order: string; whatsapp_restored: boolean }>;
   extend_transfer(copyId: string): R<{ copy: CopyView }>;
   /** Pusta albo null usuwa notatkę; za długa (>2000 znaków): `bad_request`. */
   set_transfer_note(copyId: string, note: string | null): R<{ copy: CopyView }>;
@@ -1032,10 +1102,13 @@ export interface EventMap {
   /** Kopia założona albo wznowiona — zaraz po starcie, przed pierwszym `transfer:progress`. */
   'transfer:copy': { copy: CopyView };
   'transfer:done': { result: BackupResultView; copy: CopyView };
-  'transfer:restore_plan': { plan: RestorePlanView; tel: TelPlanView | null; copy: CopyView; resumable: boolean;
-    same_phone_recent: boolean };
+  'transfer:restore_plan': { plan: RestorePlanView; tel: TelPlanView | null; apps: AppsPlanView; order: string | null;
+    copy: CopyView; resumable: boolean; same_phone_recent: boolean };
   'transfer:restore_progress': RestoreProgressView;
   'transfer:tel_progress': TelProgressView;
+  'transfer:apps_progress': { stage: 'apps'; done: number; total: number; current: string };
+  /** Koniec dokończenia instalacji (`install_remaining_apps`): wynik zastępuje `apps` w zleceniu. */
+  'transfer:apps_done': { order: string; apps: AppsResultView };
   /** `request` null: prośba załatwiona. `package`: poprzednia domyślna aplikacja SMS (null — nieznana). */
   'transfer:tap': { request: TapRequest | null; package: string | null };
   /** Start przywracania ustawień telefonu `serial` po przerwanym wgrywaniu (także ponowienia w tle). */
@@ -1043,7 +1116,8 @@ export interface EventMap {
   /** Koniec przywracania ustawień telefonu; nieudane most ponawia w tle (najwyżej 3 próby na podłączenie). */
   'transfer:cleanup_done': { ok: boolean; serial: string };
   /** `tel`: null dla samych plików albo po błędzie telefonii (`tel_error` — klucz błędu). */
-  'transfer:restore_done': { result: RestoreResultView; copy: CopyView; tel?: TelResultView | null; tel_error?: string | null };
+  'transfer:restore_done': { result: RestoreResultView; copy: CopyView; tel?: TelResultView | null; tel_error?: string | null;
+    apps: AppsResultView | null; apps_error?: string | null; order: string; whatsapp: WhatsappView | null };
   /** Eksplorator: liczby plików Miejsc liczone w tle (po każdym miejscu cała lista). */
   'explorer:places': { places: PlaceView[] };
   /** Telefon eksploratora zniknął z listy — most czeka na niego (kolejka stoi). */

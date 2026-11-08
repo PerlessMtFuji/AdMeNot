@@ -785,7 +785,10 @@
       "others": "Inne foldery",
       "root": "Pliki w folderze głównym",
       "apps": "Aplikacje",
-      "apps_note": "Same aplikacje, bez ich danych i logowań."
+      "apps_note": "Same aplikacje, bez ich danych i logowań.",
+      "show": "Pokaż ▾",
+      "hide": "Zwiń ▴",
+      "missing": "Brak w kopii: {what}"
     },
     "export": {
       "title_denied": "Telefon nie pozwolił odczytać {what}.",
