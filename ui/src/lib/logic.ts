@@ -1,5 +1,5 @@
 import { CATEGORY_ORDER } from './categories';
-import type { AppView, BackupResultView, Category, CopyView, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferProgress, TransferSelection, InventoryView, ExportFileView, ExportKind, StoredSelection, RestorePlanView, RestoreResultView, TelKind, TelPlanView, TelResultView, UndoSite, UploadChoiceView, UploadGroup, UpdateView, UserWait, Verdict } from './types';
+import type { CheckBrowser, CheckSite, AppView, BackupResultView, Category, CopyView, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferProgress, TransferSelection, InventoryView, ExportFileView, ExportKind, StoredSelection, RestorePlanView, RestoreResultView, TelKind, TelPlanView, TelResultView, UndoSite, UploadChoiceView, UploadGroup, UpdateView, UserWait, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done'
   | 'transfer_choose' | 'transfer_backup' | 'transfer_done'
@@ -452,6 +452,23 @@ export type NoticeKey = 'low_data' | 'incomplete' | 'profiles' | 'profiles_unkno
   | 'select_level_disable' | 'checks_unreadable';
 export interface Notice { key: NoticeKey; tone: 'warn' | 'info'; params: Record<string, string | number> }
 
+/** Uwagi, które należą do zakładki „Telefon”, a nie „Aplikacje”. */
+export const PHONE_NOTICES: NoticeKey[] = ['checks_unreadable'];
+
+/** Dzieli uwagi na te dla zakładki „Aplikacje” i „Telefon”, zachowując kolejność. */
+export function splitNotices(items: Notice[]): { apps: Notice[]; phone: Notice[] } {
+  return {
+    apps: items.filter((n) => !PHONE_NOTICES.includes(n.key)),
+    phone: items.filter((n) => PHONE_NOTICES.includes(n.key)),
+  };
+}
+
+/** Kategorie zagrożeń (szkodliwe, podejrzane), w których nie ma żadnej aplikacji — do pustych nagłówków. */
+export function emptyDangerVerdicts(apps: AppView[]): Verdict[] {
+  const present = new Set(apps.map((a) => a.verdict));
+  return (['malicious', 'suspicious'] as const).filter((v) => !present.has(v));
+}
+
 /** Komunikaty informacyjne nad listą: najpierw ostrzeżenia, potem informacje (spec §3). */
 export function notices(input: { scan: ScanView | null; sdk: number | undefined; selectLevel: Level;
   missing: string[]; withGaps: number }): Notice[] {
@@ -547,6 +564,44 @@ export function offeredFixes(checks: DeviceCheck[]): string[] {
 /** Kontrole do pokazania w sekcji: nieodczytane (`unrecognized`) idą do linii uwag, nie do sekcji. */
 export function shownChecks(scan: ScanView | null): DeviceCheck[] {
   return (scan?.device_checks ?? []).filter((c) => c.state !== 'unrecognized');
+}
+
+export interface SiteRow { site: CheckSite; browser: CheckBrowser }
+export interface SiteRows {
+  todo: SiteRow[]; shared: CheckBrowser[]; unsupported: CheckBrowser[];
+  done: SiteRow[]; unreadable: CheckBrowser[]; rdpOff: CheckBrowser[];
+}
+
+/** Wiersze kontroli witryn: jedna rzecz do zrobienia na wiersz; przeglądarka ze wspólnym kanałem to jeden wiersz. */
+export function siteRows(check: DeviceCheck): SiteRows {
+  const isShared = (b: CheckBrowser) => b.mode === 'shared';
+  const onScreen = (b: CheckBrowser) => b.sites.filter((x) => x.active && !x.blocked);
+  const todo = check.browsers.filter((b) => !isShared(b))
+    .flatMap((browser) => browser.sites.filter((x) => !x.blocked).map((site) => ({ site, browser })))
+    .sort((a, b) => Number(b.site.active) - Number(a.site.active));
+  const done = check.browsers.flatMap((browser) => browser.sites.filter((x) => x.blocked).map((site) => ({ site, browser })));
+  return {
+    todo, done,
+    shared: check.browsers.filter((b) => isShared(b) && (b.all_fix || b.rdp_hint || onScreen(b).length)),
+    unsupported: check.browsers.filter((b) => b.read === 'unsupported'),
+    unreadable: check.browsers.filter((b) => b.read === 'unrecognized'),
+    rdpOff: check.browsers.filter((b) => b.mode === 'rdp'),
+  };
+}
+
+export type PhoneBadge = { kind: 'count'; count: number } | { kind: 'unknown' } | { kind: 'ok' };
+
+/** Licznik zakładki „Telefon”: wiersze do zrobienia; bez wierszy — „nieznane”, gdy czegoś nie dało się odczytać. */
+export function phoneBadge(checks: DeviceCheck[] | null | undefined): PhoneBadge {
+  const all = checks ?? [];
+  const count = all.filter((c) => c.state !== 'unrecognized').reduce((n, c) => {
+    const r = siteRows(c);
+    return n + r.todo.length + r.shared.length + r.unsupported.length;
+  }, 0);
+  if (count) return { kind: 'count', count };
+  const unknown = all.some((c) => c.state === 'unrecognized'
+    || c.browsers.some((b) => b.read === 'unrecognized' || b.mode === 'rdp'));
+  return unknown ? { kind: 'unknown' } : { kind: 'ok' };
 }
 
 // --- przenoszenie danych ---------------------------------------------------------------------

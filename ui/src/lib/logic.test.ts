@@ -940,3 +940,98 @@ describe('uploading a copy to the new phone', () => {
     expect(restoreOutcome(r({ status: 'stopped', media_scan: 'skipped' }))).toBe('stopped');
   });
 });
+
+// --- wiersze sprawdzeń, licznik zakładki „Telefon”, podział uwag ---------------------------------
+
+import { emptyDangerVerdicts, phoneBadge, siteRows, splitNotices } from './logic';
+import type { Notice } from './logic';
+import type { CheckBrowser, CheckSite, DeviceCheck } from './types';
+
+const mkSite = (host: string, o: Partial<CheckSite> = {}): CheckSite =>
+  ({ host, origin: `https://${host}`, blocked: false, active: false, fix: `fix-${host}`, fix_label: null, ...o });
+const mkBrowser = (pkg: string, o: Partial<CheckBrowser> = {}): CheckBrowser =>
+  ({ package: pkg, name: pkg, mode: 'per_site', read: 'ok', rdp_hint: false, block_action: false,
+    all_fix: null, all_fix_label: null, sites: [], ...o });
+const mkCheck = (browsers: CheckBrowser[], state: DeviceCheck['state'] = 'review'): DeviceCheck =>
+  ({ id: 'site_notifications', state, state_label: '', browsers });
+
+describe('siteRows', () => {
+  test('todo: niezablokowane witryny przeglądarek nie-shared, aktywne pierwsze', () => {
+    const b = mkBrowser('a', { sites: [mkSite('x.pl'), mkSite('y.pl', { active: true }), mkSite('z.pl', { blocked: true })] });
+    const sh = mkBrowser('s', { mode: 'shared', sites: [mkSite('w.pl')] });
+    const r = siteRows(mkCheck([b, sh]));
+    expect(r.todo.map((x) => x.site.host)).toEqual(['y.pl', 'x.pl']);
+    expect(r.todo[0].browser).toBe(b);
+  });
+  test('shared: all_fix, rdp_hint albo aktywna niezablokowana witryna', () => {
+    const a = mkBrowser('a', { mode: 'shared', all_fix: 'f' });
+    const b = mkBrowser('b', { mode: 'shared', rdp_hint: true });
+    const c = mkBrowser('c', { mode: 'shared', sites: [mkSite('x.pl', { active: true })] });
+    const d = mkBrowser('d', { mode: 'shared', sites: [mkSite('y.pl'), mkSite('z.pl', { active: true, blocked: true })] });
+    const e = mkBrowser('e', { sites: [mkSite('q.pl', { active: true })], all_fix: 'g' });
+    expect(siteRows(mkCheck([a, b, c, d, e])).shared).toEqual([a, b, c]);
+  });
+  test('unsupported, unreadable, rdpOff i done', () => {
+    const u = mkBrowser('u', { read: 'unsupported' });
+    const n = mkBrowser('n', { read: 'unrecognized' });
+    const r = mkBrowser('r', { mode: 'rdp', sites: [mkSite('b.pl', { blocked: true })] });
+    const s = mkBrowser('s', { mode: 'shared', sites: [mkSite('c.pl', { blocked: true })] });
+    const rows = siteRows(mkCheck([u, n, r, s]));
+    expect(rows.unsupported).toEqual([u]);
+    expect(rows.unreadable).toEqual([n]);
+    expect(rows.rdpOff).toEqual([r]);
+    expect(rows.done.map((x) => x.site.host)).toEqual(['b.pl', 'c.pl']);
+  });
+});
+
+describe('phoneBadge', () => {
+  test('brak kontroli to ok', () => {
+    expect(phoneBadge(undefined)).toEqual({ kind: 'ok' });
+    expect(phoneBadge(null)).toEqual({ kind: 'ok' });
+    expect(phoneBadge([])).toEqual({ kind: 'ok' });
+  });
+  test('witryna do zrobienia i przeglądarka nieobsługiwana liczą się po 1', () => {
+    const c = mkCheck([mkBrowser('a', { sites: [mkSite('x.pl')] }), mkBrowser('u', { read: 'unsupported' })]);
+    expect(phoneBadge([c])).toEqual({ kind: 'count', count: 2 });
+  });
+  test('przeglądarka shared z kilkoma aktywnymi witrynami to 1', () => {
+    const sites = [1, 2, 3].map((i) => mkSite(`s${i}.pl`, { active: true }));
+    expect(phoneBadge([mkCheck([mkBrowser('s', { mode: 'shared', sites })])])).toEqual({ kind: 'count', count: 1 });
+  });
+  test('bez wierszy: nierozpoznana kontrola, rdp albo nieczytelna przeglądarka to unknown', () => {
+    expect(phoneBadge([mkCheck([], 'unrecognized')])).toEqual({ kind: 'unknown' });
+    expect(phoneBadge([mkCheck([mkBrowser('r', { mode: 'rdp' })])])).toEqual({ kind: 'unknown' });
+    expect(phoneBadge([mkCheck([mkBrowser('n', { read: 'unrecognized' })])])).toEqual({ kind: 'unknown' });
+  });
+  test('liczba wygrywa z nierozpoznaną kontrolą', () => {
+    const rows = mkCheck([mkBrowser('a', { sites: [mkSite('x.pl')] })]);
+    expect(phoneBadge([rows, mkCheck([], 'unrecognized')])).toEqual({ kind: 'count', count: 1 });
+  });
+  test('wszystkie witryny zablokowane to ok', () => {
+    const c = mkCheck([mkBrowser('a', { sites: [mkSite('x.pl', { blocked: true })] })], 'ok');
+    expect(phoneBadge([c])).toEqual({ kind: 'ok' });
+  });
+  test('nierozpoznana kontrola nie wchodzi do count, nawet z witrynami', () => {
+    const bad = mkCheck([mkBrowser('a', { sites: [mkSite('x.pl')] })], 'unrecognized');
+    expect(phoneBadge([bad])).toEqual({ kind: 'unknown' });
+    expect(phoneBadge([bad, mkCheck([mkBrowser('b', { sites: [mkSite('y.pl')] })])])).toEqual({ kind: 'count', count: 1 });
+  });
+});
+
+describe('splitNotices', () => {
+  test('checks_unreadable do phone, reszta do apps, kolejność zachowana', () => {
+    const n = (key: Notice['key']): Notice => ({ key, tone: 'info', params: {} });
+    const r = splitNotices([n('low_data'), n('checks_unreadable'), n('profiles')]);
+    expect(r.phone.map((x) => x.key)).toEqual(['checks_unreadable']);
+    expect(r.apps.map((x) => x.key)).toEqual(['low_data', 'profiles']);
+  });
+});
+
+describe('emptyDangerVerdicts', () => {
+  const app = (verdict: AppView['verdict']) => ({ verdict }) as AppView;
+  test('puste kategorie szkodliwych i podejrzanych', () => {
+    expect(emptyDangerVerdicts([app('safe')])).toEqual(['malicious', 'suspicious']);
+    expect(emptyDangerVerdicts([app('suspicious')])).toEqual(['malicious']);
+    expect(emptyDangerVerdicts([app('suspicious'), app('malicious')])).toEqual([]);
+  });
+});

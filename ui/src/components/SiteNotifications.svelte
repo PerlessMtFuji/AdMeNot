@@ -2,7 +2,7 @@
   import { getContext } from 'svelte';
   import type { Controller } from '../lib/controller';
   import { t, tp } from '../lib/i18n/index.svelte';
-  import { initial } from '../lib/logic';
+  import { initial, siteRows } from '../lib/logic';
   import type { CheckBrowser, CheckSite, DeviceCheck } from '../lib/types';
   import Icon from '../ui/Icon.svelte';
   import Pill from '../ui/Pill.svelte';
@@ -17,18 +17,11 @@
   // zrobienia, z powiadomieniem na ekranie na górze (to je klient widzi i ich zwykle dotyczy skarga). Przeglądarka
   // ze wspólnym kanałem (Samsung Internet, Firefox bez debugowania) to jeden wiersz: jej witryny z ekranu,
   // „Wycisz wszystkie” i podpowiedź — zamiast trzech osobnych wierszy tej samej przeglądarki.
-  const shared = (b: CheckBrowser) => b.mode === 'shared';
-  const todo = $derived(check.browsers.filter((b) => !shared(b))
-    .flatMap((browser) => browser.sites.filter((x) => !x.blocked).map((site) => ({ site, browser })))
-    .sort((a, b) => Number(b.site.active) - Number(a.site.active)));
-  const done = $derived(check.browsers.flatMap((browser) => browser.sites.filter((x) => x.blocked).map((site) => ({ site, browser }))));
+  // Przeglądarka, której powiadomień nie umiemy odczytać (`unsupported`): wiersz z instrukcją zamiast cichego pominięcia.
+  const rows = $derived(siteRows(check));
+  const { todo, done, shared: sharedRows, unsupported, unreadable, rdpOff } = $derived(rows);
   const allFix = $derived(check.browsers.filter((b) => b.all_fix));
   const onScreen = (b: CheckBrowser) => b.sites.filter((x) => x.active && !x.blocked);
-  const sharedRows = $derived(check.browsers.filter((b) => shared(b) && (b.all_fix || b.rdp_hint || onScreen(b).length)));
-  // Przeglądarka, której powiadomień nie umiemy odczytać: wiersz z instrukcją zamiast cichego pominięcia.
-  const unsupported = $derived(check.browsers.filter((b) => b.read === 'unsupported'));
-  const rdpOff = $derived(check.browsers.filter((b) => b.mode === 'rdp'));
-  const unreadable = $derived(check.browsers.filter((b) => b.read === 'unrecognized'));
   const fixable = $derived(todo.filter((r) => r.site.fix).length + allFix.length);
   const picked = $derived([...todo.map((r) => r.site.fix), ...allFix.map((b) => b.all_fix)].filter((f) => f && s.fixes.has(f)).length);
   const ok = $derived(check.state === 'ok');
