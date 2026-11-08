@@ -792,6 +792,9 @@ export interface TransferRow {
   disk: CopyView | null;
   whatsappRestored: boolean;
   appsBlocked: boolean;
+  /** Numery seryjne tylko do dopasowania z podłączonym telefonem (gdy brak IMEI); nigdy do wyświetlania. */
+  sourceSerial: string | null;
+  targetSerial: string | null;
   counts: Record<string, number>;
 }
 
@@ -802,12 +805,13 @@ export function transferRows(orders: TransferOrderView[], copies: CopyView[]): T
   const fromOrders = orders.map((o): TransferRow => ({ key: o.number, number: o.number, client: o.client, at: o.created_at,
     source: o.source, target: o.target, state: o.state, notes: o.notes, copy: o.copy,
     disk: o.copy && !o.copy.deleted_at ? byId.get(o.copy.id) ?? null : null,
-    whatsappRestored: o.whatsapp_restored, appsBlocked: !!o.apps_blocked, counts: o.counts }));
+    whatsappRestored: o.whatsapp_restored, appsBlocked: !!o.apps_blocked, targetSerial: o.target_serial ?? null,
+    sourceSerial: o.copy && !o.copy.deleted_at ? byId.get(o.copy.id)?.serial ?? null : null, counts: o.counts }));
   const fromCopies = copies.filter((c) => !c.order).map((c): TransferRow => ({ key: c.id, number: null, client: c.client, at: c.created,
     source: { name: `${c.manufacturer} ${c.model}`.trim() || null, imei: null }, target: null,
     state: c.status === 'in_progress' ? 'interrupted' : c.status === 'incomplete' ? 'incomplete' : 'copy_ready',
     notes: 0, copy: { id: c.id, days_left: c.days_left, deleted_at: null }, disk: c,
-    whatsappRestored: false, appsBlocked: false, counts: c.counts }));
+    whatsappRestored: false, appsBlocked: false, sourceSerial: c.serial, targetSerial: null, counts: c.counts }));
   return [...fromOrders, ...fromCopies].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
 }
 

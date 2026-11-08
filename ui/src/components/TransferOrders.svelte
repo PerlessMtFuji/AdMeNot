@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { getContext, tick } from 'svelte';
+  import { getContext, onMount, tick } from 'svelte';
   import type { Controller } from '../lib/controller';
   import { i18n, t, tp } from '../lib/i18n/index.svelte';
   import { transferRows, type TransferRow } from '../lib/logic';
   import { enter, stagger } from '../lib/motion';
+  import { recheck } from '../lib/recheck';
   import Button from '../ui/Button.svelte';
   import Dialog from '../ui/Dialog.svelte';
   import Icon from '../ui/Icon.svelte';
@@ -30,17 +31,23 @@
   const online = $derived(s.devices.filter((d) => d.state === 'device'));
   const selected = $derived(s.serial ? online.find((d) => d.serial === s.serial) ?? null : null);
   const phoneReady = $derived(selected !== null && s.job === null);
-  // „Wgraj na podłączony”: tylko inny telefon niż ten, z którego jest kopia (po IMEI; bez IMEI nie ma jak porównać).
-  const canUpload = (r: TransferRow) => !!r.disk && (r.state === 'copy_ready' || r.state === 'incomplete') && phoneReady
-    && !(selected?.imei && selected.imei === r.source.imei);
-  const targetConnected = (r: TransferRow) => !!r.target?.imei && online.some((d) => d.imei === r.target?.imei);
+  // Ten sam telefon: po IMEI, a gdy go brakuje (kopia bez zlecenia, telefon jeszcze bez IMEI) po numerze seryjnym.
+  const same = (d: { serial: string; imei?: string | null }, imei: string | null | undefined, serial: string | null) =>
+    (!!d.imei && !!imei && d.imei === imei) || (!!serial && d.serial === serial);
+  // „Wgraj na podłączony”: kopia, która jest, i telefon inny niż ten, z którego ją zrobiono (nigdy na źródło).
+  const uploadable = (r: TransferRow) => !!r.disk && r.disk.status !== 'in_progress' && phoneReady && !r.copy?.deleted_at
+    && !same(selected!, r.source.imei, r.sourceSerial);
+  const canUpload = (r: TransferRow) => (r.state === 'copy_ready' || r.state === 'incomplete') && uploadable(r);
+  // Wgrane zlecenie: ta sama kopia na drugi telefon (nowe zlecenie) — w menu, bo na wierzchu zostaje Protokół.
+  const menuUpload = (r: TransferRow) => !canUpload(r) && uploadable(r) && r.state !== 'interrupted';
+  const targetConnected = (r: TransferRow) => !!r.target && online.some((d) => same(d, r.target?.imei, r.targetSerial));
   const restored = (r: TransferRow) => r.state === 'restored' || r.state === 'restored_notes';
   const hasCopy = (r: TransferRow) => !!r.disk && !r.copy?.deleted_at;
   const topReport = (r: TransferRow) => !!r.number && restored(r);
   const showWhatsapp = (r: TransferRow) => !!r.number && restored(r) && ((r.counts.files_whatsapp ?? 0) > 0 || r.whatsappRestored);
   const showReinstall = (r: TransferRow) => !!r.number && r.appsBlocked && targetConnected(r);
   const menuReport = (r: TransferRow) => !!r.number && !topReport(r);
-  const hasMenu = (r: TransferRow) => hasCopy(r) || showWhatsapp(r) || showReinstall(r) || menuReport(r);
+  const hasMenu = (r: TransferRow) => hasCopy(r) || menuUpload(r) || showWhatsapp(r) || showReinstall(r) || menuReport(r);
 
   const phone = (p: { name: string | null } | null, fallback: string) => p?.name || fallback;
   const label = (r: TransferRow) => `${phone(r.source, t('transfer.hist.old_phone'))} → ${phone(r.target, t('transfer.hist.new_phone'))}${r.number ? `, ${r.number}` : ''}`;
@@ -75,21 +82,56 @@
   }
 
   async function editNote(r: TransferRow): Promise<void> {
-    menuFor = null;
+    closeMenu(false);
     expanded = { ...expanded, [r.key]: true };
     await tick();
     await noteRefs[r.key]?.edit();
   }
 
-  function pick(action: () => unknown): void {
+  // Menu: fokus wchodzi do niego po otwarciu, strzałki chodzą po pozycjach, Escape i wybór oddają fokus przyciskowi ⋯.
+  const wrapper = (key: string) => document.querySelector<HTMLElement>(`[data-menu-root="${CSS.escape(key)}"]`);
+  const items = (key: string) => [...(wrapper(key)?.querySelectorAll<HTMLElement>('[role^="menuitem"]:not(:disabled)') ?? [])];
+
+  async function toggleMenu(r: TransferRow): Promise<void> {
+    if (menuFor === r.key) { closeMenu(true); return; }
+    menuFor = r.key;
+    await tick();
+    items(r.key)[0]?.focus();
+  }
+
+  function closeMenu(refocus: boolean): void {
+    const key = menuFor;
     menuFor = null;
+    if (refocus && key) wrapper(key)?.querySelector<HTMLElement>('button')?.focus();
+  }
+
+  function menuKey(e: KeyboardEvent, r: TransferRow): void {
+    const list = items(r.key);
+    const at = list.indexOf(document.activeElement as HTMLElement);
+    const go = (i: number) => { e.preventDefault(); list[(i + list.length) % list.length]?.focus(); };
+    if (e.key === 'ArrowDown') go(at + 1);
+    else if (e.key === 'ArrowUp') go(at < 0 ? -1 : at - 1);
+    else if (e.key === 'Home') go(0);
+    else if (e.key === 'End') go(-1);
+    else if (e.key === 'Tab') closeMenu(false);
+  }
+
+  function pick(action: () => unknown): void {
+    closeMenu(true);
     void action();
   }
+
+  // Blokada Xiaomi: dopóki zakładka jest na ekranie, program sam sprawdza telefon celu i gdy blokady już nie ma,
+  // doinstaluje pominięte aplikacje (cicho: bez błędu na ekran).
+  const reinstallable = () => rows.filter((r) => !!r.number && r.appsBlocked && targetConnected(r));
+  onMount(() => recheck(async () => {
+    for (const r of reinstallable()) await ctl.reinstallWhenUnblockedFromHistory(r.number!);
+  }, () => s.job === null && reinstallable().length > 0));
 </script>
 
 <!-- Klik poza menu zamyka je; własny przycisk ⋯ i menu mają `data-menu`. -->
-<svelte:window onkeydown={(e) => { if (menuFor && e.key === 'Escape') menuFor = null; }}
-  onclick={(e) => { if (menuFor && !e.composedPath().some((n) => n instanceof HTMLElement && n.dataset.menu === menuFor)) menuFor = null; }} />
+<svelte:window onkeydown={(e) => { if (menuFor && e.key === 'Escape') closeMenu(true); }}
+  onclick={(e) => { if (menuFor && !e.composedPath().some((n) => n instanceof HTMLElement && n.dataset.menuRoot === menuFor)) closeMenu(false); }} />
 
 {#if rows.length}
   <section id="transfer-orders" aria-label={t('transfer.hist.title')} class="flex scroll-mt-4 flex-col gap-3">
@@ -141,15 +183,21 @@
                 </Button>
               {/if}
             </div>
-            <div class="relative h-9 w-9 flex-none" data-menu={r.key}>
+            <div class="relative h-9 w-9 flex-none" data-menu-root={r.key}>
             {#if hasMenu(r)}
-                <Button variant="ghost" size="icon" label={t('transfer.hist.more', { name: label(r) })}
-                  onclick={() => (menuFor = menuFor === r.key ? null : r.key)}>
+                <button type="button" aria-label={t('transfer.hist.more', { name: label(r) })} aria-haspopup="menu" aria-expanded={menuFor === r.key}
+                  class="inline-flex aspect-square h-9 items-center justify-center rounded-xl p-0 text-mut transition duration-150 hover:bg-neutral-soft hover:text-ink"
+                  onclick={() => void toggleMenu(r)}>
                   <Icon name="ellipsis" size={18} />
-                </Button>
+                </button>
                 {#if menuFor === r.key}
-                  <div role="menu" aria-label={t('transfer.hist.more', { name: label(r) })} data-menu={r.key}
+                  <div role="menu" aria-label={t('transfer.hist.more', { name: label(r) })} tabindex="-1" onkeydown={(e) => menuKey(e, r)}
                     class="absolute top-full right-0 z-20 mt-1.5 flex min-w-[230px] flex-col gap-0.5 rounded-2xl card p-1.5 shadow-xl">
+                    {#if menuUpload(r)}
+                      <button type="button" role="menuitem" class="menu-item" onclick={() => pick(() => ctl.planRestore(r.disk!.id))}>
+                        <Icon name="smartphone" size={15} />{t('transfer.hist.to_phone')}
+                      </button>
+                    {/if}
                     {#if hasCopy(r)}
                       <button type="button" role="menuitem" class="menu-item" onclick={() => pick(() => ctl.extendTransfer(r.disk!.id))}>
                         <Icon name="clock" size={15} />{t('transfer.hist.menu.extend')}
@@ -179,7 +227,7 @@
                     {/if}
                     {#if hasCopy(r)}
                       <div class="my-0.5 border-t border-line"></div>
-                      <button type="button" role="menuitem" class="menu-item text-bad" onclick={() => pick(() => (confirming = r))}>
+                      <button type="button" role="menuitem" class="menu-item text-bad" onclick={() => { closeMenu(false); confirming = r; }}>
                         <Icon name="trash-2" size={15} />{t('transfer.hist.menu.delete')}
                       </button>
                     {/if}

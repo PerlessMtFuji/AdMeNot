@@ -2281,9 +2281,20 @@ class Api(ExplorerMixin):
             state.close()
 
     @_api
-    def install_check(self) -> dict[str, Any]:
-        """Czy telefon z ostatniego planu wciąż blokuje instalację przez USB (Xiaomi): jeden odczyt
-        `getprop`, bez zadania. `None` — nieznane (brak planu, telefon odłączony, nietypowa wartość)."""
+    def install_check(self, order: str | None = None) -> dict[str, Any]:
+        """Czy telefon wciąż blokuje instalację przez USB (Xiaomi): jeden odczyt `getprop`, bez zadania.
+        Bez `order` — telefon z ostatniego planu; z `order` (Historia) — telefon celu tego zlecenia, o ile jest
+        podłączony (numer seryjny z dziennika). `None` — nieznane (brak planu, telefon odłączony, nietypowa wartość)."""
+        if order is not None:
+            _found, record = self._transfer_order(order)
+            serial = record.target_serial
+            if serial is None or serial not in {e.serial for e in list_devices(self._host) if e.state == "device"}:
+                return {"blocked": None}
+            try:
+                root = store.copy_dir(record.copy_id).apps_dir
+            except (OSError, ValueError, KeyError, TypeError):  # kopia usunięta: sam odczyt `getprop` jej nie potrzebuje
+                root = Path()
+            return {"blocked": xiaomi_install_blocked(AppInstallAdb(self._session(serial), root))}
         state = self._restore
         if state is None:
             return {"blocked": None}

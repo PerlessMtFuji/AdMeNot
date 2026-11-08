@@ -780,6 +780,8 @@ export interface TransferOrderView {
   whatsapp_restored: boolean;
   /** Aplikacje pominięte z powodu blokady instalacji przez USB (Xiaomi) — da się je doinstalować po odblokowaniu. */
   apps_blocked: boolean;
+  /** Numer seryjny telefonu celu — tylko do dopasowania z podłączonym telefonem, nigdy do wyświetlania. */
+  target_serial?: string | null;
   counts: Record<string, number>;
 }
 
@@ -1030,7 +1032,7 @@ export interface Api {
   start_backup(selection: TransferSelection): R<{ job_id: string }>;
   transfers(): R<{ orders: TransferOrderView[]; copies: CopyView[] }>;
   /** Czy telefon z ostatniego planu wciąż blokuje instalację przez USB (Xiaomi); null — nieznane. */
-  install_check(): R<{ blocked: boolean | null }>;
+  install_check(order?: string): R<{ blocked: boolean | null }>;
   /** Dokończenie instalacji aplikacji pominiętych z powodu blokady (po odblokowaniu telefonu). */
   install_remaining_apps(order: string): R<{ job_id: string }>;
   /** Serwisant potwierdza (albo cofa), że WhatsApp przywrócono z kopii na telefonie klienta. */

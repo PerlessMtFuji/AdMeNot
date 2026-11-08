@@ -1437,6 +1437,7 @@
        "deleted_at": null
       },
       "whatsapp_restored": false,
+      "target_serial": null,
       "apps_blocked": false,
       "counts": {
        "apps": 1,

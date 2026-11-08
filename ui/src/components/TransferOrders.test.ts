@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import { RECHECK_MS } from '../lib/recheck';
 import type { CopyView, TransferOrderView } from '../lib/types';
 import { setupCtl } from '../test-utils';
 import TransferOrders from './TransferOrders.svelte';
@@ -24,6 +25,8 @@ const DELETED: TransferOrderView = { ...RESTORED, number: 'ZS/2026/1012/03', cli
   copy: { id: 'OLD/9', days_left: 0, deleted_at: '2026-10-19T08:00:00' }, counts: {} };
 const INTERRUPTED: CopyView = { ...COPY, id: 'OLD/7', serial: 'SERIALOLD7', model: 'Moto G54', manufacturer: 'motorola', client: 'Piotr S.',
   created: '2026-10-20T12:00:00', status: 'in_progress', order: null };
+
+afterEach(() => { vi.useRealTimers(); });
 
 async function show(orders: TransferOrderView[], copies: CopyView[], connected: { serial: string; imei: string | null } | null = null) {
   const env = await setupCtl('clean');
@@ -208,6 +211,122 @@ describe('TransferOrders', () => {
     await openMenu(RESTORED.number);
     await fireEvent.click(document.body);
     expect(screen.queryByRole('menu')).toBeNull();
+  });
+
+  test('a restored order offers its copy to another connected phone from the menu; the top action stays the report', async () => {
+    const env = await show([RESTORED], [COPY], { serial: 'NEW9', imei: '123456789012345' });
+    const plan = vi.spyOn(env.ctl, 'planRestore').mockResolvedValue();
+    const r = row(RESTORED.number);
+    expect(within(r).getByRole('button', { name: 'Protokół' })).toBeTruthy();
+    expect(within(r).queryByRole('button', { name: 'Wgraj na podłączony' })).toBeNull();
+    await openMenu(RESTORED.number);
+    await fireEvent.click(within(r).getByRole('menuitem', { name: 'Wgraj na podłączony' }));
+    expect(plan).toHaveBeenCalledWith('OLD/1');
+  });
+
+  test('never offered to the source phone itself: by IMEI, and by serial when the IMEI is missing', async () => {
+    const env = await show([RESTORED], [COPY], { serial: 'X', imei: OLD_IMEI });
+    await openMenu(RESTORED.number);
+    expect(within(row(RESTORED.number)).queryByRole('menuitem', { name: 'Wgraj na podłączony' })).toBeNull();
+    env.s.devices = [{ serial: 'SERIALOLD1', state: 'device', model: 'M', name: null, imei: null }];
+    env.s.serial = 'SERIALOLD1';
+    await tick();
+    expect(within(row(RESTORED.number)).queryByRole('menuitem', { name: 'Wgraj na podłączony' })).toBeNull();
+    // kopia bez zlecenia (źródło bez IMEI) — ta sama zasada
+    env.s.transfer.copies = [{ ...COPY, id: 'OLD/8', order: null, status: 'complete' as const }];
+    env.s.transfer.orders = [];
+    await tick();
+    expect(screen.queryByRole('button', { name: 'Wgraj na podłączony' })).toBeNull();
+    env.s.devices = [{ serial: 'ELSE', state: 'device', model: 'M', name: null, imei: null }];
+    env.s.serial = 'ELSE';
+    await tick();
+    expect(screen.getByRole('button', { name: 'Wgraj na podłączony' })).toBeTruthy();
+  });
+
+  test('the target phone is matched by serial when it has no IMEI (serial is never shown)', async () => {
+    await show([{ ...RESTORED, apps_blocked: true, target: { name: 'OPPO A54', imei: null }, target_serial: 'TGT1' }], [COPY],
+      { serial: 'TGT1', imei: null });
+    await openMenu(RESTORED.number);
+    expect(within(row(RESTORED.number)).getByRole('menuitem', { name: 'Doinstaluj aplikacje' })).toBeTruthy();
+    expect(document.body.textContent).not.toContain('TGT1');
+  });
+
+  test('menu focus: opens on the first item, arrows move, Escape and a choice return to the dots button', async () => {
+    await show([RESTORED], [COPY]);
+    const dots = within(row(RESTORED.number)).getByRole('button', { name: /^Więcej działań/ });
+    await fireEvent.click(dots);
+    const items = within(row(RESTORED.number)).getAllByRole('menuitem');
+    await vi.waitFor(() => expect(document.activeElement).toBe(items[0]));
+    const menu = screen.getByRole('menu');
+    await fireEvent.keyDown(menu, { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(items[1]);
+    await fireEvent.keyDown(menu, { key: 'ArrowUp' });
+    await fireEvent.keyDown(menu, { key: 'ArrowUp' });
+    expect(document.activeElement).toBe(items.at(-1));
+    await fireEvent.keyDown(menu, { key: 'Home' });
+    expect(document.activeElement).toBe(items[0]);
+    await fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(document.activeElement).toBe(dots);
+    await fireEvent.click(dots);
+    await fireEvent.click(within(row(RESTORED.number)).getByRole('menuitem', { name: 'Przedłuż' }));
+    expect(document.activeElement).toBe(dots);
+  });
+
+  describe('automatic reinstall of blocked apps', () => {
+    const blocked = { ...RESTORED, apps_blocked: true };
+    async function armed(checks: (boolean | null)[]) {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      const env = await setupCtl('clean');
+      env.bridge.setInstallChecks(checks);
+      env.s.transfer.orders = [blocked];
+      env.s.transfer.copies = [COPY];
+      env.s.devices = [{ serial: 'NEW9', state: 'device', model: 'M', name: null, imei: NEW_IMEI }];
+      const view = render(TransferOrders, { context: new Map([['ctl', env.ctl]]) });
+      await tick();
+      const calls = (m: string) => env.bridge.calls.filter((c) => c.method === m);
+      return { env, view, calls };
+    }
+    const step = async () => { await vi.advanceTimersByTimeAsync(RECHECK_MS + 10); };
+
+    test('checks the order silently and installs once when the block is gone', async () => {
+      const { env, calls } = await armed([true, false]);
+      await step();
+      expect(calls('install_check')[0].args).toEqual([RESTORED.number]);
+      expect(calls('install_remaining_apps')).toHaveLength(0);  // jeszcze zablokowane
+      await step();
+      expect(calls('install_remaining_apps')).toHaveLength(1);
+      expect(calls('install_remaining_apps')[0].args).toEqual([RESTORED.number]);
+      expect(env.s.error).toBeNull();
+    });
+
+    test('not repeated while the reading stays unblocked and the job runs', async () => {
+      const { env, calls } = await armed([false]);
+      await step();
+      expect(calls('install_remaining_apps')).toHaveLength(1);
+      expect(env.s.job?.kind).toBe('restore_apps');
+      await step();
+      await step();
+      expect(calls('install_remaining_apps')).toHaveLength(1);
+    });
+
+    test('an unknown reading does nothing; unmounting stops the checking', async () => {
+      const { view, calls } = await armed([null]);
+      await step();
+      expect(calls('install_check')).toHaveLength(1);
+      expect(calls('install_remaining_apps')).toHaveLength(0);
+      view.unmount();
+      await step();
+      await step();
+      expect(calls('install_check')).toHaveLength(1);
+    });
+
+    test('no checking while the target phone is not connected', async () => {
+      const { env, calls } = await armed([false]);
+      env.s.devices = [];
+      await step();
+      expect(calls('install_check')).toHaveLength(0);
+    });
   });
 
   test('failed and expired orders have their own pills', async () => {

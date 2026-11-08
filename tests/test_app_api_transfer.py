@@ -1702,6 +1702,23 @@ def test_install_check_reads_prop_only(tmp_path, monkeypatch):
     assert fresh and all("getprop persist.security.adbinstall" in c["command"] for c in fresh)
 
 
+def test_install_check_for_an_order_reads_the_target_phone_only(tmp_path, monkeypatch):
+    api, rec, host, copy_id, new = _xiaomi_copied(tmp_path, monkeypatch)
+    _planned(api, rec, copy_id)
+    api.start_restore(APPS_CHOICE)
+    number = rec.of("transfer:restore_done")[0]["order"]
+    api._restore = None  # jak w Historii: żadnego planu wgrywania
+    seen = len(rec.of("adb:command"))
+    assert api.install_check(number) == {"blocked": True}
+    fresh = rec.of("adb:command")[seen:]
+    assert fresh and all("getprop persist.security.adbinstall" in c["command"] for c in fresh)
+    new.props["persist.security.adbinstall"] = "1"
+    assert api.install_check(number) == {"blocked": False}
+    host.connected.discard(NEW)
+    assert api.install_check(number) == {"blocked": None}
+    assert api.install_check("ZS/none")["error"]["key"] == "bad_request"
+
+
 def test_install_check_without_plan(tmp_path):
     api, _rec = _api(_phone(tmp_path))
     assert api.install_check() == {"blocked": None}
@@ -1750,6 +1767,7 @@ def test_transfer_order_view_states(tmp_path):
         view = transfer_order_view(order, record, None, NOW)
         assert (view["state"], view["notes"]) == ("restored_notes", 2)
         assert view["apps_blocked"] is False
+        assert view["target_serial"] == record.target_serial == NEW
         blocked = {**record.result, "apps": {"blocked": True, "failed": {}}}
         journal.save_transfer_result(order.id, blocked)
         assert transfer_order_view(order, journal.transfer(order.id), None, NOW)["apps_blocked"] is True

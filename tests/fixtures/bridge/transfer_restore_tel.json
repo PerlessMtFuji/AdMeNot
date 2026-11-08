@@ -2660,6 +2660,7 @@
        "deleted_at": null
       },
       "whatsapp_restored": false,
+      "target_serial": "R58W20NEW01",
       "apps_blocked": false,
       "counts": {
        "apps": 1,

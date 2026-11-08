@@ -641,5 +641,6 @@ def transfer_order_view(order: Order, rec: TransferRecord, meta: CopyMeta | None
             "created_at": order.created_at.isoformat(timespec="seconds"),
             "source": phone(rec.source) or {"name": None, "imei": None}, "target": phone(rec.target),
             "state": state, "notes": notes, "copy": copy, "whatsapp_restored": rec.whatsapp_restored,
+            "target_serial": rec.target_serial,
             "apps_blocked": bool(((rec.result or {}).get("apps") or {}).get("blocked")),
             "counts": dict(rec.source.get("counts") or {})}

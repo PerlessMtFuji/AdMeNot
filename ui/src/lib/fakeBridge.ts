@@ -36,6 +36,8 @@ export type FakeBridge = Bridge & {
   failNext(method: string, key: string, message?: string): void;  // następne wywołanie `method` zwraca błąd `key`
   answerNext(method: string, result: unknown): void;  // następne wywołanie `method` zwraca `result` (np. problemy planu)
   setChecks(checks: DeviceCheck[]): void;  // co zwróci następny `recheck_site_notifications` (i kolejne skany)
+  /** Kolejne odczyty `install_check` (blokada Xiaomi): ostatnia wartość powtarza się; domyślnie `false` (odblokowane). */
+  setInstallChecks(values: (boolean | null)[]): void;
   setOrders(orders: TransferOrderView[]): void;  // zlecenia ZS przeniesień (`transfers` bez nagrania w scenariuszu)
   setCopies(copies: CopyView[]): void;  // kopie danych na komputerze (`transfers` bez nagrania w scenariuszu)
   calls: { method: string; args: unknown[] }[];
@@ -121,6 +123,7 @@ export function createFakeBridge(name: string,
   let checksChanged = false; // odpytywanie w tle (`whenDebugging`) dostaje odczyt tylko po zmianie
   let copies: CopyView[] = [];
   let orders: TransferOrderView[] = [];
+  let installChecks: (boolean | null)[] = [];
   let planCode = 'K7F3'; // kod ostatniego podglądu planu: udostępnienie liczy ten sam plan
   let taskSeq = 0;
   const tasks: TaskView[] = [];
@@ -170,7 +173,7 @@ export function createFakeBridge(name: string,
       case 'transfers':
         return { orders: structuredClone(orders), copies: structuredClone(copies) };
       case 'install_check':
-        return { blocked: false };
+        return { blocked: installChecks.length > 1 ? installChecks.shift() : (installChecks.length ? installChecks[0] : false) };
       case 'install_remaining_apps':
         return { job_id: 'job-apps' };
       case 'set_whatsapp_restored':
@@ -576,6 +579,7 @@ export function createFakeBridge(name: string,
     failNext: (method, key, message = '') => { failures.set(method, { key, message }); },
     answerNext: (method, result) => { answers.set(method, result); },
     setChecks: (next) => { checks = structuredClone(next); checksChanged = true; },
+    setInstallChecks: (values) => { installChecks = [...values]; },
     setOrders: (next) => { orders = structuredClone(next); },
     setCopies: (next) => { copies = structuredClone(next); },
     dispose,
