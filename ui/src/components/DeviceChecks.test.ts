@@ -121,7 +121,7 @@ describe('DeviceChecks', () => {
     expect(row.textContent).toContain('sprawdź ręcznie');
     expect(within(row).queryByRole('switch')).toBeNull();
     expect(screen.queryByText(/Ustawienia → Aplikacje → Odd → Powiadomienia/)).toBeNull();
-    const how = within(row).getByRole('button', { name: 'jak sprawdzić' });
+    const how = within(row).getByRole('button', { name: 'jak sprawdzić: Odd' });
     expect(how.getAttribute('aria-expanded')).toBe('false');
     await fireEvent.click(how);
     expect(how.getAttribute('aria-expanded')).toBe('true');

@@ -600,7 +600,7 @@ export function phoneBadge(checks: DeviceCheck[] | null | undefined): PhoneBadge
   }, 0);
   if (count) return { kind: 'count', count };
   const unknown = all.some((c) => c.state === 'unrecognized'
-    || c.browsers.some((b) => b.read === 'unrecognized' || b.mode === 'rdp'));
+    || c.browsers.some((b) => b.read === 'unrecognized'));
   return unknown ? { kind: 'unknown' } : { kind: 'ok' };
 }
 

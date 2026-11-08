@@ -1,8 +1,14 @@
 import { describe, expect, test } from 'vitest';
 import fixture from '../../../tests/fixtures/bridge/transfer_restore.json';
-import type { CopyView, InventoryView, RestoreApk, RestorePlanView, RestoreResultView, TelKindResultView, TelPlanView, TelResultView } from './types';
+import { CHECKS_SAMPLE } from './fakeBridge';
+import type { AppView, Category, CheckBrowser, CheckSite, CopyView, DeviceCheck, Finding, Level, PlanApp, PlanView, ScanView, Settings, StepEvent, UpdateView, InventoryView, RestoreApk, RestorePlanView, RestoreResultView, TelKindResultView, TelPlanView, TelResultView } from './types';
+import type { Notice } from './logic';
 import {
   backupOutcome,
+  emptyDangerVerdicts,
+  phoneBadge,
+  siteRows,
+  splitNotices,
   defaultUploadChoice,
   keptUploadChoice,
   restoreOffer,
@@ -76,8 +82,6 @@ import {
 } from './logic';
 
 const MB = 1024 ** 2;
-import { CHECKS_SAMPLE } from './fakeBridge';
-import type { AppView, Category, Level, PlanApp, PlanView, StepEvent, Finding, ScanView, Settings, UpdateView } from './types';
 
 function app(pkg: string, verdict: AppView['verdict'], extra: Partial<AppView> = {}): AppView {
   const level = verdict === 'malicious' ? 'remove' : verdict === 'suspicious' ? 'disable' : null;
@@ -943,9 +947,6 @@ describe('uploading a copy to the new phone', () => {
 
 // --- wiersze sprawdzeń, licznik zakładki „Telefon”, podział uwag ---------------------------------
 
-import { emptyDangerVerdicts, phoneBadge, siteRows, splitNotices } from './logic';
-import type { Notice } from './logic';
-import type { CheckBrowser, CheckSite, DeviceCheck } from './types';
 
 const mkSite = (host: string, o: Partial<CheckSite> = {}): CheckSite =>
   ({ host, origin: `https://${host}`, blocked: false, active: false, fix: `fix-${host}`, fix_label: null, ...o });
@@ -998,10 +999,14 @@ describe('phoneBadge', () => {
     const sites = [1, 2, 3].map((i) => mkSite(`s${i}.pl`, { active: true }));
     expect(phoneBadge([mkCheck([mkBrowser('s', { mode: 'shared', sites })])])).toEqual({ kind: 'count', count: 1 });
   });
-  test('bez wierszy: nierozpoznana kontrola, rdp albo nieczytelna przeglądarka to unknown', () => {
+  test('bez wierszy: nierozpoznana kontrola albo nieczytelna przeglądarka to unknown', () => {
     expect(phoneBadge([mkCheck([], 'unrecognized')])).toEqual({ kind: 'unknown' });
-    expect(phoneBadge([mkCheck([mkBrowser('r', { mode: 'rdp' })])])).toEqual({ kind: 'unknown' });
     expect(phoneBadge([mkCheck([mkBrowser('n', { read: 'unrecognized' })])])).toEqual({ kind: 'unknown' });
+  });
+  test('Firefox odczytany przez debugowanie (rdp): bez wierszy to ok, nie unknown', () => {
+    expect(phoneBadge([mkCheck([mkBrowser('r', { mode: 'rdp' })])])).toEqual({ kind: 'ok' });
+    const blocked = mkBrowser('r', { mode: 'rdp', read: 'ok', sites: [mkSite('a.pl', { blocked: true }), mkSite('b.pl', { blocked: true })] });
+    expect(phoneBadge([mkCheck([blocked])])).toEqual({ kind: 'ok' });
   });
   test('liczba wygrywa z nierozpoznaną kontrolą', () => {
     const rows = mkCheck([mkBrowser('a', { sites: [mkSite('x.pl')] })]);

@@ -104,7 +104,7 @@
               <b class="truncate" title={expert ? b.package : undefined}>{b.name}</b>
             </span>
             <Pill tone="neutral">{t('checks.unsupported_pill')}</Pill>
-            <button type="button" class="flex-none text-sm font-semibold text-accent hover:underline" aria-expanded={how}
+            <button type="button" class="flex-none text-sm font-semibold text-accent hover:underline" aria-expanded={how} aria-label="{how ? t('checks.howto_hide') : t('checks.howto')}: {b.name}"
               onclick={() => toggleHow(b.package)}>{how ? t('checks.howto_hide') : t('checks.howto')}</button>
           </div>
           {#if how}<p class="mt-1.5 pl-10 text-sm text-soft">{t('checks.unsupported', { browser: b.name })}</p>{/if}

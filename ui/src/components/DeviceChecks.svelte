@@ -13,7 +13,7 @@
 </script>
 
 {#if checks.length}
-  <!-- Każda kontrola to własna zwijana karta; sekcja tylko je grupuje. -->
+  <!-- Każda kontrola to własna karta (zawsze rozwinięta); sekcja tylko je grupuje. -->
   <section aria-label={t('checks.title')} class="flex flex-col gap-2.5">
     {#each checks as c (c.id)}
       {#if c.id === 'site_notifications'}<SiteNotifications check={c} />{/if}

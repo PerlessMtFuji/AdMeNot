@@ -49,7 +49,7 @@
     "unsupported": "The program cannot check this browser’s notifications. Check on the phone: Settings → Apps → {browser} → Notifications.",
     "howto": "how to check",
     "howto_hide": "hide",
-    "unsupported_pill":"check manually",
+    "unsupported_pill": "check manually",
     "rdp": "Without debugging only sites with a notification on screen are visible. To see and silence each one, turn this on on the phone: Firefox → Settings → Remote debugging via USB. I will read them as soon as you do."
   },
   "choice": { "silence": "Silence", "disable": "Disable", "remove": "Remove", "fix": "Site settings" },

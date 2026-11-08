@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { getContext } from 'svelte';
+  import { getContext, tick } from 'svelte';
   import { flip } from 'svelte/animate';
   import { fade } from 'svelte/transition';
   import ApkModeChoice from '../components/ApkModeChoice.svelte';
@@ -63,6 +63,12 @@
   const notes = $derived(splitNotices(noteItems));
   const phone = $derived(phoneBadge(s.scan?.device_checks));
   const checks = $derived(shownChecks(s.scan));
+  // Odnośnik „W zakładce Telefon…” znika razem z zakładką Aplikacje — fokus przenosimy na kartę „Telefon”.
+  async function openPhoneTab() {
+    ctl.setRepairTab('phone');
+    await tick();
+    document.getElementById('repair-tab-phone')?.focus();
+  }
   // Błędy kolektorów (dawny tooltip kafelka) — tylko dla eksperta, pod pełnym komunikatem o niepełnej ocenie.
   const noteDetails = $derived(expert ? { incomplete: (s.scan?.collectors.failed ?? [])
     .map((c) => t('expert.collector_failed', { name: c.name, error: c.error ?? '' })) } : {});
@@ -201,7 +207,7 @@
             <!-- Aplikacje czyste, a w „Telefon” jest coś do zrobienia (spec §8a.8): tytuł zostaje, odnośnik prowadzi dalej. -->
             {#if phone.kind !== 'ok'}
               <button type="button" class="mt-1 inline-flex items-center gap-1 rounded-md text-sm font-semibold text-accent outline-none hover:underline focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
-                onclick={() => ctl.setRepairTab('phone')}>
+                onclick={openPhoneTab}>
                 {phone.kind === 'count' ? tp('repair_tabs.phone_todo', phone.count) : t('repair_tabs.phone_unknown_link')}
                 <Icon name="chevron-right" size={16} />
               </button>

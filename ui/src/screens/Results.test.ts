@@ -871,6 +871,8 @@ describe('Results: “Aplikacje” and “Telefon” tabs', () => {
     expect(s.repairTab).toBe('phone');
     expect(tab('Telefon').getAttribute('aria-selected')).toBe('true');
     expect(screen.getByRole('heading', { name: 'Powiadomienia z witryn' })).toBeTruthy();
+    // Odnośnik zniknął z DOM, więc fokus ma trafić na kartę „Telefon”, nie na <body>.
+    await vi.waitFor(() => expect(document.activeElement).toBe(tab('Telefon')));
   });
 
   test('clean apps, phone unreadable: the “not everything could be read” link', async () => {
