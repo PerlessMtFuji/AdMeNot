@@ -81,7 +81,29 @@ describe('CategoryRow custom fold text', () => {
   });
 });
 
+describe('CategoryRow result rows', () => {
+  test('bad and muted result tones', () => {
+    const { unmount } = render(CategoryRow, { ...base, result: { text: 'nie wgrano', tone: 'bad' } });
+    expect(screen.getByText('nie wgrano').className).toContain('text-bad');
+    unmount();
+    render(CategoryRow, { ...base, result: { text: '3 z 9', tone: 'mut' } });
+    expect(screen.getByText('3 z 9').className).toContain('text-mut');
+  });
+
+  test('note stays visible without any toggle', () => {
+    render(CategoryRow, { ...base, note: snippet('Na telefonie: zrób to'), result: { text: '980', tone: 'warn' } });
+    expect(screen.getByText('Na telefonie: zrób to')).toBeTruthy();
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+});
+
 describe('CategoryGroup', () => {
+  test('bare group keeps the title for screen readers only', () => {
+    render(CategoryGroup, { title: 'Wynik', children: snippet('wiersz'), bare: true });
+    expect(screen.getByRole('region', { name: 'Wynik' })).toBeTruthy();
+    expect(screen.getByText('Wynik').className).toContain('sr-only');
+  });
+
   test('missingKey changes the prefix of the empty line', () => {
     render(CategoryGroup, { title: 'Pliki', children: snippet('wiersz'), empty: 'muzyka', missingKey: 'transfer.row.missing_phone' });
     expect(screen.getByText('Brak na telefonie: muzyka')).toBeTruthy();

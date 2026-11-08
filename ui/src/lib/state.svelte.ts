@@ -1,7 +1,7 @@
 import { SvelteSet } from 'svelte/reactivity';
 import { actedLevels, type ActedLog, type OpenGroups, type Phase } from './logic';
 import type {
-  ApiErrorBody, ApkEstimate, AppsPlanView, BackupResultView, CopyView, InventoryView, RestorePlanView, RestoreProgressView, RestoreResultView, TapRequest, TelPlanView, TelProgressView, TelResultView, TransferProgress, TransferSelection, UploadChoiceView, ApkQuestion, Category, ConsoleEntry, DeviceEntry, EtaView, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
+  ApiErrorBody, ApkEstimate, AppsPlanView, AppsProgressView, AppsResultView, WhatsappView, BackupResultView, CopyView, InventoryView, RestorePlanView, RestoreProgressView, RestoreResultView, TapRequest, TelPlanView, TelProgressView, TelResultView, TransferProgress, TransferSelection, UploadChoiceView, ApkQuestion, Category, ConsoleEntry, DeviceEntry, EtaView, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
   PlanView, Question, ReportResult, ScanView, Settings, ShareState, ShotsView, ShotView, StepEvent, UndoDone, UndoSite, UpdateView, UserWait, Verdict, WhoView,
 } from './types';
 
@@ -18,7 +18,8 @@ export const EMPTY_TRANSFER_SELECTION: TransferSelection = {
 
 export const emptyRestore = (): RestoreState => ({ plan: null, copy: null,
   choice: { groups: [], apks_on: [], verify_hash: false, tel: [], apps: [] }, apps: null, progress: null, result: null, sameRecent: false,
-  resumable: false, tel: null, telProgress: null, telResult: null, telError: null, tap: null, tapPackage: null });
+  resumable: false, tel: null, telProgress: null, telResult: null, telError: null, tap: null, tapPackage: null,
+  appsProgress: null, appsResult: null, appsError: null, order: null, whatsapp: null, whatsappRestored: false, reinstallDone: false });
 
 /** Wgrywanie kopii na nowy telefon: plan z mostu, wybór serwisanta, postęp i wynik. */
 export interface RestoreState {
@@ -44,6 +45,20 @@ export interface RestoreState {
   tap: TapRequest | null;
   /** Poprzednia domyślna aplikacja SMS (pakiet), której oddajemy rolę. */
   tapPackage: string | null;
+  /** Postęp etapu „Aplikacje” (także dokończenia po blokadzie Xiaomi). */
+  appsProgress: AppsProgressView | null;
+  /** Wynik instalacji aplikacji (null — bez aplikacji albo błąd `appsError`); `transfer:apps_done` zastępuje go w miejscu. */
+  appsResult: AppsResultView | null;
+  /** Klucz błędu etapu „Aplikacje” (`apps_error`): reszta wyniku zostaje. */
+  appsError: string | null;
+  /** Numer ZS zlecenia przeniesienia (null — most bez zlecenia: bez protokołu). */
+  order: string | null;
+  /** Ramka WhatsApp wyniku (null — WhatsApp nie wybrany albo pliki niewgrane). */
+  whatsapp: WhatsappView | null;
+  /** Pole „Czaty przywrócone” — to, co zapisano w zleceniu. */
+  whatsappRestored: boolean;
+  /** Dokończenie aplikacji po odblokowaniu Xiaomi już uruchomiono (raz na wynik). */
+  reinstallDone: boolean;
 }
 
 /** Przywracanie ustawień telefonu po przerwanym wgrywaniu (`phone_cleanup`): `ok` — wynik ostatniej próby. */

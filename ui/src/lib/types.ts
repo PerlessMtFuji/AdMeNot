@@ -757,6 +757,9 @@ export interface AppsResultView {
   play_installer: boolean;
 }
 
+/** Postęp etapu „Aplikacje” (`transfer:apps_progress`). */
+export interface AppsProgressView { stage: 'apps'; done: number; total: number; current: string }
+
 /** Ramka WhatsApp w wyniku wgrywania: `app` — czy aplikacja jest na telefonie. */
 export interface WhatsappView {
   files: boolean;
@@ -1114,7 +1117,7 @@ export interface EventMap {
     copy: CopyView; resumable: boolean; same_phone_recent: boolean };
   'transfer:restore_progress': RestoreProgressView;
   'transfer:tel_progress': TelProgressView;
-  'transfer:apps_progress': { stage: 'apps'; done: number; total: number; current: string };
+  'transfer:apps_progress': AppsProgressView;
   /** Koniec dokończenia instalacji (`install_remaining_apps`): wynik zastępuje `apps` w zleceniu. */
   'transfer:apps_done': { order: string; apps: AppsResultView };
   /** `request` null: prośba załatwiona. `package`: poprzednia domyślna aplikacja SMS (null — nieznana). */

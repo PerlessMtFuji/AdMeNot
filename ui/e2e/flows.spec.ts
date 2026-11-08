@@ -206,7 +206,7 @@ test('phone state in English', async ({ page }) => {
   await expect(page.getByRole('switch', { name: 'All sites in Samsung Internet' })).toBeVisible();
 });
 
-test('upload a copy: the new phone is offered the copy, the plan shows APK labels, the result is green', async ({ page }) => {
+test('upload a copy: the new phone is offered the copy, the plan shows APK labels, the result is green with the file details folded', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.clock.setFixedTime(new Date('2026-09-26T15:00:00'));  // nagrana kopia jest świeża (< 24 h)
@@ -220,7 +220,9 @@ test('upload a copy: the new phone is offered the copy, the plan shows APK label
   await page.getByRole('button', { name: /^Pobrane i dokumenty: Pokaż/ }).click();  // lista APK jest zwinięta
   await expect(page.getByText('pominięty jako szkodliwy')).toBeVisible();
   await page.getByRole('complementary', { name: 'Miejsce na nowym telefonie' }).getByRole('button', { name: /^Wgraj/ }).click();
-  await expect(page.getByText('Pliki wgrane', { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('heading', { name: 'Dane przeniesione' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Wszystko wgrane')).toBeVisible();
+  await page.getByRole('button', { name: /^Pliki: Szczegóły/ }).click();  // szczegóły plików są zwinięte
   await expect(page.getByText('pominięto 1 plik oceniony jako szkodliwy')).toBeVisible();
   expect(errors).toEqual([]);
 });

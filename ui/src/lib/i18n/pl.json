@@ -1053,19 +1053,6 @@
           "other": "pominięto {count} kontaktu z komunikatorów"
         },
         "duplicates": "na telefonie są już kontakty — możliwe duplikaty",
-        "done_ok": "Kontakty i wiadomości wgrane",
-        "done_warn": "Kontakty i wiadomości wgrane, ale nie wszystko się udało",
-        "done_warn_text": "Szczegóły w tabeli poniżej.",
-        "error_title": "Nie udało się wgrać kontaktów i wiadomości",
-        "col": {
-          "kind": "Kategoria",
-          "written": "Wgrano",
-          "existed": "Już były",
-          "skipped": "Pominięte",
-          "failed": "Błędy",
-          "manual": "Do importu",
-          "path": "Sposób"
-        },
         "kind": {
           "contacts": "Kontakty",
           "sms": "SMS",
@@ -1079,7 +1066,6 @@
           "none": "—"
         },
         "visible": "sprawdź w aplikacji Wiadomości",
-        "todo_title": "Do zrobienia na telefonie",
         "todo_file": "zainstaluj SMS Backup & Restore, Przywróć, wybierz plik {name} z Pobranych",
         "todo_contacts": "otwórz Kontakty → Importuj, wybierz plik {name} z Pobranych"
       },
@@ -1089,7 +1075,8 @@
         "contacts": "Kontakty",
         "messages": "Wiadomości",
         "calls": "Połączenia",
-        "safety": "Kopia bezpieczeństwa nowego telefonu"
+        "safety": "Kopia bezpieczeństwa nowego telefonu",
+        "apps": "Aplikacje"
       },
       "tel_progress": "{done} z {total}",
       "tap": {
@@ -1158,16 +1145,94 @@
       "progress_label": "Postęp wgrywania",
       "starting": "Przygotowuję wgrywanie…",
       "waiting": "Telefon odłączony — podłącz ponownie, wgrywanie będzie kontynuowane",
-      "done_heading": "Wgrywanie na nowy telefon",
-      "done_ok": "Pliki wgrane",
-      "done_warn": "Pliki wgrane, ale nie wszystko się udało",
-      "done_warn_text": "Szczegóły poniżej. Pliki, których nie udało się wgrać, zostają w kopii na komputerze.",
+      "done_heading": "Dane przeniesione",
+      "done_heading_stopped": "Wgrywanie na nowy telefon",
+      "done_all": "Wszystko wgrane",
+      "done_almost": "Prawie wszystko gotowe",
+      "done_took": "{size} w {time}.",
       "done_stopped": "Wgrywanie przerwane",
       "done_stopped_text": "Wgrane pliki zostają na telefonie. Żeby dokończyć, podłącz ten telefon i wybierz „Wznów” przy kopii.",
-      "restart": "Uruchom ponownie telefon, żeby galeria zobaczyła pliki",
-      "restart_text": "Ten Android nie odświeża galerii sam. Pliki są już na telefonie.",
-      "scan_failed": "Pliki wgrane, ale galeria może ich nie widzieć do restartu telefonu",
-      "scan_failed_text": "Telefon nie odświeżył galerii. Pliki są na miejscu — jeśli galeria ich nie pokazuje, uruchom telefon ponownie.",
+      "restart": "uruchom ponownie telefon, żeby galeria zobaczyła pliki",
+      "issue": {
+        "import": "do zaimportowania na telefonie: {list}",
+        "tel_failed": "nie wszystko udało się wgrać w kontaktach i wiadomościach",
+        "tel_error": "nie udało się wgrać kontaktów i wiadomości",
+        "files": {
+          "one": "{count} plik nie został wgrany",
+          "few": "{count} pliki nie zostały wgrane",
+          "many": "{count} plików nie zostało wgranych",
+          "other": "{count} pliku nie zostało wgranych"
+        },
+        "scan": "galeria może nie widzieć plików do restartu telefonu",
+        "apps": {
+          "one": "{count} aplikacja się nie zainstalowała",
+          "few": "{count} aplikacje się nie zainstalowały",
+          "many": "{count} aplikacji się nie zainstalowało",
+          "other": "{count} aplikacji się nie zainstalowało"
+        },
+        "blocked": "aplikacje czekają, aż Xiaomi pozwoli na instalację przez USB",
+        "installing": "trwa instalacja pominiętych aplikacji",
+        "apps_error": "nie udało się zainstalować aplikacji"
+      },
+      "res": {
+        "card": "Wynik wgrywania",
+        "files": "Pliki",
+        "details": "Szczegóły",
+        "list": "Lista",
+        "to_import": "do importu",
+        "import_sub": "telefon nie pozwolił zapisać — przygotowałem plik do importu",
+        "not_written": "nie wgrano",
+        "on_phone": "Na telefonie:",
+        "path": "sposób: {path}",
+        "apps_running": "instaluję aplikacje pominięte przez blokadę Xiaomi…",
+        "import_kind": {
+          "contacts": "kontakty",
+          "sms": "SMS i MMS",
+          "calls": "historia połączeń"
+        },
+        "stages": "Etapy",
+        "stage_warn": "wymaga uwagi",
+        "stage_note": {
+          "import": "plik do importu",
+          "failed": "nieudane: {count}",
+          "error": "błąd",
+          "installing": "instaluję",
+          "blocked": "czeka na Xiaomi",
+          "stopped": "przerwane"
+        },
+        "protocol": "Protokół",
+        "protocol_hint": "PDF do podpisu",
+        "finish_no_report": "Zakończ bez protokołu"
+      },
+      "wa": {
+        "title": "WhatsApp",
+        "optional": "opcjonalnie, z klientem",
+        "installed": "Kopia czatów jest na telefonie. Otwórz WhatsApp, zaloguj numerem klienta i wybierz „Przywróć” (może być potrzebne hasło do kopii).",
+        "missing": "Kopia czatów jest na telefonie. Zainstaluj WhatsApp ze Sklepu Play, zaloguj numerem klienta i wybierz „Przywróć” (może być potrzebne hasło do kopii).",
+        "pre_installed": "WhatsApp był już na telefonie — jeśli był uruchomiony, przywrócenie może wymagać jego ponownej instalacji.",
+        "check": "Czaty przywrócone — wpisz to do protokołu"
+      },
+      "apps_consent": "Jeśli telefon pyta o zgodę — potwierdź",
+      "apps_why": {
+        "user_restricted": "Xiaomi blokuje instalację przez USB",
+        "no_consent": "nie potwierdzono na telefonie",
+        "too_old": "za stara dla tego Androida",
+        "too_new": "wymaga nowszego Androida",
+        "no_abi": "brak wersji dla tego procesora",
+        "no_space": "brak miejsca na telefonie",
+        "version_downgrade": "na telefonie jest nowsza wersja",
+        "conflict": "koliduje z zainstalowaną wersją",
+        "invalid_apk": "uszkodzony instalator",
+        "disconnected": "telefon się rozłączył",
+        "incomplete": "niepełna kopia",
+        "pending": "nie zdążyłem",
+        "failed": "telefon odrzucił instalację"
+      },
+      "apps_state": {
+        "installed": "zainstalowana",
+        "exists": "już była na telefonie"
+      },
+      "xiaomi_how_done": "Jak włączyć: Ustawienia → Dodatkowe ustawienia → Opcje programisty → „Instaluj przez USB” (Xiaomi może poprosić o zalogowanie do konta Mi). Sprawdzę sam, gdy to zrobisz, i doinstaluję pominięte aplikacje.",
       "sum": {
         "done": "Wgrane",
         "exists": "Już były na telefonie",

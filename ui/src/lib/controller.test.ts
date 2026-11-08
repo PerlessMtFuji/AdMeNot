@@ -1495,6 +1495,39 @@ describe('data transfer — uploading a copy', () => {
     expect(s.transfer.restore.choice.tel).toEqual(['contacts', 'sms']);
   });
 
+  test('restore_done carries apps, order and WhatsApp; old recordings without them leave nulls; apps events update in place', async () => {
+    const { ctl, s, bridge } = setup('transfer_restore');
+    await ctl.init();
+    const done = (extra: object) => bridge.emit('transfer:restore_done', { result: { status: 'complete', target_serial: NEW } as never,
+      copy: { id: COPY_ID } as never, ...extra } as never);
+    done({});
+    expect(s.transfer.restore).toMatchObject({ appsResult: null, appsError: null, order: null, whatsapp: null, whatsappRestored: false });
+    const apps = { selected: 1, installed: 0, exists: 0, skipped: { user_restricted: 1 }, failed: {}, codes: {}, blocked: true, stopped: false,
+      rows: [], play_installer: true };
+    done({ apps, order: 'ZS/1', whatsapp: { files: true, app: 'missing' }, apps_error: null });
+    expect(s.transfer.restore).toMatchObject({ appsResult: apps, order: 'ZS/1', whatsapp: { files: true, app: 'missing' } });
+    bridge.emit('transfer:apps_progress', { stage: 'apps', done: 1, total: 2, current: 'x' });
+    expect(s.transfer.restore.appsProgress?.done).toBe(1);
+    bridge.emit('transfer:apps_done', { order: 'ZS/other', apps: { ...apps, blocked: false } });
+    expect(s.transfer.restore.appsResult?.blocked).toBe(true);
+    bridge.emit('transfer:apps_done', { order: 'ZS/1', apps: { ...apps, blocked: false, installed: 1, skipped: {} } });
+    expect(s.transfer.restore.appsResult).toMatchObject({ blocked: false, installed: 1 });
+    expect(s.transfer.restore.appsProgress).toBeNull();
+  });
+
+  test('WhatsApp tick: saved through the bridge, rolled back when the bridge refuses', async () => {
+    const { ctl, s, bridge } = setup('transfer_restore');
+    await ctl.init();
+    s.transfer.restore.order = 'ZS/1';
+    await ctl.setWhatsappRestored(true);
+    expect(bridge.calls.at(-1)).toEqual({ method: 'set_whatsapp_restored', args: ['ZS/1', true] });
+    expect(s.transfer.restore.whatsappRestored).toBe(true);
+    bridge.failNext('set_whatsapp_restored', 'unknown_order', 'ZS/1');
+    await ctl.setWhatsappRestored(false);
+    expect(s.transfer.restore.whatsappRestored).toBe(true);
+    expect(s.error?.key).toBe('unknown_order');
+  });
+
   test('telephony run: progress, the on-phone prompt, skipping it and the result with the files', async () => {
     const env = setup('transfer_restore_tel');
     await env.ctl.init();

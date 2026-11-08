@@ -1053,19 +1053,6 @@
           "other": "skipped {count} contacts from messaging apps"
         },
         "duplicates": "the phone already has contacts — duplicates are possible",
-        "done_ok": "Contacts and messages uploaded",
-        "done_warn": "Contacts and messages uploaded, but not everything worked",
-        "done_warn_text": "Details in the table below.",
-        "error_title": "Could not upload contacts and messages",
-        "col": {
-          "kind": "Category",
-          "written": "Uploaded",
-          "existed": "Already there",
-          "skipped": "Skipped",
-          "failed": "Errors",
-          "manual": "To import",
-          "path": "Method"
-        },
         "kind": {
           "contacts": "Contacts",
           "sms": "SMS",
@@ -1079,7 +1066,6 @@
           "none": "—"
         },
         "visible": "check in the Messages app",
-        "todo_title": "To do on the phone",
         "todo_file": "install SMS Backup & Restore, tap Restore and choose the file {name} from Downloads",
         "todo_contacts": "open Contacts → Import and pick {name} from Downloads"
       },
@@ -1089,7 +1075,8 @@
         "contacts": "Contacts",
         "messages": "Messages",
         "calls": "Calls",
-        "safety": "Backing up the new phone"
+        "safety": "Backing up the new phone",
+        "apps": "Apps"
       },
       "tel_progress": "{done} of {total}",
       "tap": {
@@ -1158,16 +1145,94 @@
       "progress_label": "Upload progress",
       "starting": "Preparing the upload…",
       "waiting": "Phone disconnected — reconnect it and the upload will continue",
-      "done_heading": "Upload to the new phone",
-      "done_ok": "Files uploaded",
-      "done_warn": "Files uploaded, but not everything worked",
-      "done_warn_text": "Details below. Files that couldn't be uploaded stay in the copy on this computer.",
+      "done_heading": "Data transferred",
+      "done_heading_stopped": "Upload to the new phone",
+      "done_all": "Everything uploaded",
+      "done_almost": "Almost everything is done",
+      "done_took": "{size} in {time}.",
       "done_stopped": "Upload stopped",
       "done_stopped_text": "Uploaded files stay on the phone. To finish, connect this phone and choose “Resume” next to the copy.",
-      "restart": "Restart the phone so the gallery sees the files",
-      "restart_text": "This Android version doesn't refresh the gallery by itself. The files are already on the phone.",
-      "scan_failed": "Files uploaded, but the gallery may not see them until the phone restarts",
-      "scan_failed_text": "The phone didn't refresh its gallery. The files are there — if the gallery doesn't show them, restart the phone.",
+      "restart": "restart the phone so the gallery sees the files",
+      "issue": {
+        "import": "to import on the phone: {list}",
+        "tel_failed": "not everything could be uploaded in contacts and messages",
+        "tel_error": "contacts and messages could not be uploaded",
+        "files": {
+          "one": "{count} file was not uploaded",
+          "few": "{count} files were not uploaded",
+          "many": "{count} files were not uploaded",
+          "other": "{count} files were not uploaded"
+        },
+        "scan": "the gallery may not see the files until the phone restarts",
+        "apps": {
+          "one": "{count} app failed to install",
+          "few": "{count} apps failed to install",
+          "many": "{count} apps failed to install",
+          "other": "{count} apps failed to install"
+        },
+        "blocked": "apps are waiting for Xiaomi to allow install via USB",
+        "installing": "installing the skipped apps",
+        "apps_error": "the apps could not be installed"
+      },
+      "res": {
+        "card": "Upload result",
+        "files": "Files",
+        "details": "Details",
+        "list": "List",
+        "to_import": "to import",
+        "import_sub": "the phone would not let me write them — I prepared a file to import",
+        "not_written": "not uploaded",
+        "on_phone": "On the phone:",
+        "path": "method: {path}",
+        "apps_running": "installing the apps skipped because of the Xiaomi block…",
+        "import_kind": {
+          "contacts": "contacts",
+          "sms": "SMS and MMS",
+          "calls": "call history"
+        },
+        "stages": "Stages",
+        "stage_warn": "needs attention",
+        "stage_note": {
+          "import": "file to import",
+          "failed": "failed: {count}",
+          "error": "error",
+          "installing": "installing",
+          "blocked": "waiting for Xiaomi",
+          "stopped": "stopped"
+        },
+        "protocol": "Report",
+        "protocol_hint": "PDF to sign",
+        "finish_no_report": "Finish without a report"
+      },
+      "wa": {
+        "title": "WhatsApp",
+        "optional": "optional, with the customer",
+        "installed": "The chat backup is on the phone. Open WhatsApp, sign in with the customer's number and choose “Restore” (the backup password may be needed).",
+        "missing": "The chat backup is on the phone. Install WhatsApp from Google Play, sign in with the customer's number and choose “Restore” (the backup password may be needed).",
+        "pre_installed": "WhatsApp was already on the phone — if it had been opened, restoring may need it to be reinstalled.",
+        "check": "Chats restored — note it in the report"
+      },
+      "apps_consent": "If the phone asks for permission, confirm it",
+      "apps_why": {
+        "user_restricted": "Xiaomi blocks install via USB",
+        "no_consent": "not confirmed on the phone",
+        "too_old": "too old for this Android",
+        "too_new": "needs a newer Android",
+        "no_abi": "no version for this processor",
+        "no_space": "not enough space on the phone",
+        "version_downgrade": "the phone has a newer version",
+        "conflict": "conflicts with the installed version",
+        "invalid_apk": "damaged installer",
+        "disconnected": "the phone disconnected",
+        "incomplete": "incomplete copy",
+        "pending": "did not get to it",
+        "failed": "the phone rejected the install"
+      },
+      "apps_state": {
+        "installed": "installed",
+        "exists": "already on the phone"
+      },
+      "xiaomi_how_done": "How to enable: Settings → Additional settings → Developer options → “Install via USB” (Xiaomi may ask you to sign in to a Mi account). I will check by myself once you do and install the skipped apps.",
       "sum": {
         "done": "Uploaded",
         "exists": "Already on the phone",

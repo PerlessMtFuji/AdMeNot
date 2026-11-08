@@ -6,7 +6,7 @@
   // „Pokaż ▾” (zwinięte szczegóły), rozmiar albo wynik po prawej. Problem to etykieta w wierszu, a opis
   // „jak …?” siedzi w zwinięciu i otwiera się dopiero po kliknięciu.
   let { icon: Glyph, name, count, size, sub, checked, disabled = false, ontoggle, tone = null, pills, fold, foldLabel, foldText,
-    foldOpen, onfold, result }: {
+    foldOpen, onfold, result, note }: {
     icon: Component<{ size?: number; strokeWidth?: number; 'aria-hidden'?: 'true' }>;
     name: string;
     count?: string;
@@ -24,7 +24,9 @@
     /** Tryb sterowany: stan trzyma rodzic (`onfold`). Bez niego wiersz sam pamięta, zwinięty na starcie. */
     foldOpen?: boolean;
     onfold?: (open: boolean) => void;
-    result?: { text: string; tone: 'ok' | 'warn' };
+    result?: { text: string; tone: 'ok' | 'warn' | 'bad' | 'mut' };
+    /** Treść zawsze widoczna pod wierszem (bez przycisku), np. krok do zrobienia na telefonie, bez którego wynik nie jest kompletny. */
+    note?: Snippet;
   } = $props();
 
   const uid = $props.id();
@@ -33,6 +35,7 @@
   const toggleText = $derived(foldText ? `${foldText} ${open ? '▴' : '▾'}` : open ? t('transfer.row.hide') : t('transfer.row.show'));
   const foldId = `fold-${uid}`;
   const hasBox = $derived(ontoggle !== undefined || checked !== undefined);
+  const RESULT_TONE = { ok: 'text-ok', warn: 'text-warn', bad: 'text-bad', mut: 'text-mut' };
   const TINT = { warn: 'bg-warn-soft/50', block: 'bg-gradient-to-r from-warn-soft to-transparent to-70%' };
 
   function toggleFold() {
@@ -67,11 +70,14 @@
     {/if}
     {#if size}<span class="mono flex-none text-[12.5px] whitespace-nowrap text-mut">{size}</span>{/if}
     {#if result}
-      <span class="flex-none font-bold whitespace-nowrap tabular-nums {result.tone === 'ok' ? 'text-ok' : 'text-warn'}">{result.text}</span>
+      <span class="flex-none font-bold whitespace-nowrap tabular-nums {RESULT_TONE[result.tone]}">{result.text}</span>
     {/if}
     </div>
     {/if}
   </div>
+  {#if note}
+    <div class="pr-4 pb-3 text-[13px] text-mut {hasBox ? 'pl-[75px]' : 'pl-[58px]'}">{@render note()}</div>
+  {/if}
   {#if fold}
     <div id={foldId} hidden={!open} class="pr-4 pt-1 pb-3 text-[13px] {hasBox ? 'pl-[75px]' : 'pl-[58px]'} text-mut">
       {#if open}{@render fold()}{/if}

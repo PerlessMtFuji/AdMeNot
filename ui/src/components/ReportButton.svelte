@@ -5,8 +5,9 @@
   import Button from '../ui/Button.svelte';
   import Icon from '../ui/Icon.svelte';
 
-  type Props = { order: string; variant?: 'secondary' | 'ghost'; size?: 'sm' | 'md' | 'lg' };
-  let { order, variant = 'secondary', size = 'md' }: Props = $props();
+  // `label` + `hint`: główny przycisk w dwóch liniach („Protokół” / „PDF do podpisu”), bez ikony.
+  type Props = { order: string; variant?: 'primary' | 'secondary' | 'ghost'; size?: 'sm' | 'md' | 'lg'; label?: string; hint?: string };
+  let { order, variant = 'secondary', size = 'md', label, hint }: Props = $props();
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
   const busy = $derived(s.reportBusy === order);
@@ -14,8 +15,13 @@
 </script>
 
 <div class="flex flex-col gap-1">
-  <Button {variant} {size} disabled={s.reportBusy !== null} onclick={() => ctl.report(order)}>
-    <Icon name="file-text" />{busy ? t('report.busy') : t('report.button')}
+  <Button {variant} {size} class={hint ? 'flex-col !gap-0' : ''} disabled={s.reportBusy !== null} onclick={() => ctl.report(order)}>
+    {#if hint}
+      {busy ? t('report.busy') : (label ?? t('report.button'))}
+      <small class="text-xs font-semibold opacity-85">{hint}</small>
+    {:else}
+      <Icon name="file-text" />{busy ? t('report.busy') : (label ?? t('report.button'))}
+    {/if}
   </Button>
   {#if last && !busy}
     <!-- Błąd PDF najpierw (powód protokołu HTML); otwieranie wyłączone w ustawieniach to nie błąd. -->
