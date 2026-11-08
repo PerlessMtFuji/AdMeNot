@@ -79,7 +79,7 @@
 </div>
 
 {% if copy_line %}<p class="priv">{{ copy_line }}</p>{% endif %}
-<div class="sign"><div>{% if service.technician %}<b class="tech">{{ service.technician }}</b>{% endif %}<span></span>{{ t.signature_service }}</div><div><span></span>{{ t.signature_client }}</div></div>
+<div class="sign"><div><b class="tech">{{ service.technician or "" }}</b><span></span>{{ t.signature_service }}</div><div><b class="tech"></b><span></span>{{ t.signature_client }}</div></div>
 {% if footer %}<p class="svc-footer">{{ footer }}</p>{% endif %}
 <p class="foot">{{ generated }}</p>
 </body>

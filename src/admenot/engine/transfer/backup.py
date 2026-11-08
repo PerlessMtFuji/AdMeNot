@@ -667,6 +667,7 @@ class _Backup:
                   "files_skipped": cnt.get("skipped", 0), "apps": result.apps_done,
                   "apps_failed": result.apps_failed,
                   "apps_skipped": sum(1 for a in apps.values() if a.get("status") == "skipped"),
+                  "apps_malicious": len(self.inventory.skipped_apps),  # złośliwe: nigdy nie trafiają do kopii
                   "unreadable": self.inventory.unreadable,
                   **{k: v.count for k, v in tel.items()}}
         # Skopiowane pliki według grupy wgrywania (Historia: „Zdjęcia 1 530 · Filmy 40 …”);

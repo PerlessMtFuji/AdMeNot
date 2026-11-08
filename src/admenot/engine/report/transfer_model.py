@@ -109,15 +109,18 @@ def _file_tile(t: dict[str, Any], key: str, groups: tuple[str, ...], counts: dic
     per = [(files.get("groups") or {}).get(g) or {} for g in groups]
     done = sum(g.get("done", 0) + g.get("exists", 0) for g in per)
     failed = sum(g.get("failed", 0) for g in per)
-    bad_apk = (files.get("apk_skipped", 0) + files.get("apk_suspicious_skipped", 0)) if key == "downloads" else 0
+    mal = files.get("apk_skipped", 0) if key == "downloads" else 0
+    sus = files.get("apk_suspicious_skipped", 0) if key == "downloads" else 0
     count = _of(t, done, total)
     st = t["state"]
     gap = total - done
-    if done == 0 and not bad_apk and not failed:
+    if done == 0 and not mal and not sus and not failed:
         return _missing(t, key, total)
     if gap > 0:
-        if bad_apk and gap <= bad_apk:
-            return Tile(key, count, st["malicious"].format(n=bad_apk), "warn")
+        if not failed and mal and gap <= mal:
+            return Tile(key, count, st["malicious"].format(n=mal), "warn")
+        if not failed and not mal and sus and gap <= sus:
+            return Tile(key, count, st["suspicious"].format(n=sus), "warn")
         return Tile(key, count, (st["failed"] if failed else st["remaining"]).format(n=failed or gap), "warn")
     if key == "whatsapp":
         return Tile(key, count, st["wa_restored"] if whatsapp_restored else st["wa_pending"], "ok")
@@ -175,7 +178,7 @@ def _headline(t: dict[str, Any], tone: Tone, has_result: bool, app_problems: int
     if tone == "bad":
         return h["bad_partial"] if has_result else h["bad_none"]
     if tone == "ok":
-        return h["ok"]
+        return h["done"]
     parts = [h["warn_data"] if data_warn else h["done"]]
     if apps_missing:
         parts.append(t["not_restored_apps"])
@@ -195,9 +198,10 @@ def build_transfer_protocol(journal: Journal, order_id: int, lang: str, now: dat
     tiles = _tiles(t, rec.source, result, rec.whatsapp_restored)
     installed, total, named, more, problems, apps_missing = _apps(t, rec.source, result)
 
-    finished = order.status == "done" and result is not None and result.get("status") == "done"
+    finished = (order.status == "done" and result is not None and result.get("status") == "done"
+                and not result.get("tel_error") and not result.get("apps_error"))
     data_warn = any(x.tone != "ok" for x in tiles)
-    if not finished:
+    if not finished or any(x.tone == "bad" for x in tiles):
         tone: Tone = "bad"
     else:
         tone = "warn" if data_warn or apps_missing or problems else "ok"
@@ -218,7 +222,7 @@ def build_transfer_protocol(journal: Journal, order_id: int, lang: str, now: dat
         target=_device(rec.target, rec.target_serial) if rec.target else None,
         tone=tone, headline=headline, tiles=tiles, apps_installed=installed, apps_total=total,
         apps_named=named, apps_more=more, apps_problems=problems,
-        apps_malicious_skipped=0,  # dziennik nie zapisuje liczby szkodliwych aplikacji wyłączonych z kopii
+        apps_malicious_skipped=int((rec.source.get("counts") or {}).get("apps_malicious", 0)),
         whatsapp=whatsapp,
         copy_until=None if rec.copy_deleted_at or rec.copy_expires is None else rec.copy_expires.date(),
         copy_deleted=rec.copy_deleted_at.date() if rec.copy_deleted_at else None)

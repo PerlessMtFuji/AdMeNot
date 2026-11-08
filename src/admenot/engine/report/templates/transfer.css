@@ -72,6 +72,6 @@ h2 { margin: 14px 0 6px; font-size: 8.5pt; letter-spacing: .11em; text-transform
 .sign { display: grid; grid-template-columns: 1fr 1fr; align-items: end; gap: 18mm; margin-top: 14mm; break-inside: avoid; }
 .sign div { text-align: center; font-size: 8.5pt; color: var(--mut); }
 .sign span { display: block; margin-bottom: 3px; border-top: 1px solid var(--ink); }
-.tech { display: block; margin-bottom: 2mm; font-size: 9pt; color: var(--ink); }
+.tech { display: block; height: 5mm; margin-bottom: 1mm; font-size: 9pt; color: var(--ink); }
 .svc-footer { margin: 4mm 0 0; font-size: 8pt; line-height: 1.35; color: var(--mut); text-align: center; }
 .foot { margin: 6mm 0 0; font-size: 7.5pt; color: var(--soft); }

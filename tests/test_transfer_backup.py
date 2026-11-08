@@ -997,3 +997,13 @@ def test_pull_chunks_measure_paths_like_the_windows_command_line():
     assert len(chunks) > 1
     for chunk in chunks:
         assert sum(backup_mod._host_len(r.remote) + 3 for r in chunk) <= backup_mod.CMD_MAX_CHARS
+
+
+def test_backup_counts_malicious_apps_excluded_from_copy(tmp_path):
+    phone = _phone(tmp_path)
+    inv = _inventory(phone, [AppEntry("com.safe.app", "Safe", 3, "safe", True)])
+    inv.skipped_apps.append(AppEntry("com.bad.app", "Bad", None, "malicious", False))
+    inv.skipped_apps.append(AppEntry("com.bad2.app", "Bad2", None, "malicious", False))
+    copy = _copy()
+    _run(phone, copy, inv, _sel(categories=frozenset()))
+    assert copy.read_meta().counts["apps_malicious"] == 2

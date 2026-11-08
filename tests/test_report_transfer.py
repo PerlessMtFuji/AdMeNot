@@ -204,3 +204,60 @@ def test_issued_date_is_now(journal):
     order = _order(journal, _result())
     p = build_transfer_protocol(journal, order.id, "pl", NOW + timedelta(days=1))
     assert p.issued == NOW + timedelta(days=1) and p.received == datetime(2026, 11, 1, 10, 0)
+
+
+def test_malicious_apps_line_shown_only_when_counted(journal):
+    src = {**SOURCE, "counts": {**SOURCE["counts"], "apps_malicious": 3}}
+    p = build_transfer_protocol(journal, _order(journal, _result(), source=src).id, "pl", NOW)
+    assert p.apps_malicious_skipped == 3
+    html = _html(p)
+    assert "Pominięto 3 aplikacji ocenionych jako szkodliwe" in html and "usunięto" not in html.lower()
+    zero = build_transfer_protocol(journal, _order(journal, _result()).id, "pl", NOW)
+    assert zero.apps_malicious_skipped == 0 and "szkodliwe" not in _html(zero)
+
+
+def test_suspicious_skips_are_not_called_harmful(journal):
+    result = _result()
+    result["files"]["groups"]["downloads"]["done"] = 311
+    result["files"]["apk_suspicious_skipped"] = 1
+    tile = next(t for t in build_transfer_protocol(journal, _order(journal, result).id, "pl", NOW).tiles
+                if t.key == "downloads")
+    assert "podejrzane" in tile.state and "szkodliwe" not in tile.state
+
+
+def test_malicious_wording_not_used_when_files_failed(journal):
+    result = _result()
+    result["files"]["groups"]["downloads"] = {"done": 310, "exists": 0, "skipped": 0, "failed": 1}
+    result["files"]["apk_skipped"] = 1
+    tile = next(t for t in build_transfer_protocol(journal, _order(journal, result).id, "pl", NOW).tiles
+                if t.key == "downloads")
+    assert "szkodliwe" not in tile.state
+
+
+def test_ok_headline_makes_no_overclaim(journal):
+    p = build_transfer_protocol(journal, _order(journal, _result()).id, "pl", NOW)
+    assert p.headline == "Dane przeniesione."
+
+
+def test_done_order_with_missing_stage_is_bad(journal):
+    result = _result(tel=None)
+    p = build_transfer_protocol(journal, _order(journal, result).id, "pl", NOW)
+    assert p.tone == "bad" and p.headline.startswith("Wgrywanie przerwane")
+
+
+@pytest.mark.parametrize("field", ["tel_error", "apps_error"])
+def test_stage_error_is_bad(journal, field):
+    result = _result(status="failed", **{field: "restore_failed"})
+    p = build_transfer_protocol(journal, _order(journal, result, status="failed").id, "pl", NOW)
+    assert p.tone == "bad"
+    done = _order(journal, _result(**{field: "x"}))  # nawet zapisany jako done: błąd etapu = bad
+    assert build_transfer_protocol(journal, done.id, "pl", NOW).tone == "bad"
+
+
+def test_unselected_category_has_no_tile(journal):
+    src = {**SOURCE, "selection_groups": ["contacts_messages"]}
+    p = build_transfer_protocol(journal, _order(journal, _result(), source=src).id, "pl", NOW)
+    assert [t.key for t in p.tiles] == ["contacts", "sms", "calls"]
+    src2 = {**SOURCE, "counts": {k: v for k, v in SOURCE["counts"].items() if k != "calls"}}
+    p2 = build_transfer_protocol(journal, _order(journal, _result(), source=src2).id, "pl", NOW)
+    assert "calls" not in [t.key for t in p2.tiles]

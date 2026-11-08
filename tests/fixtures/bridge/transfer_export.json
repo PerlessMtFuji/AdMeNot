@@ -1359,6 +1359,7 @@
         "apps": 1,
         "apps_failed": 0,
         "apps_skipped": 0,
+        "apps_malicious": 1,
         "unreadable": 0,
         "contacts": 3,
         "sms": 2,
@@ -1439,6 +1440,7 @@
       "counts": {
        "apps": 1,
        "apps_failed": 0,
+       "apps_malicious": 1,
        "apps_skipped": 0,
        "contacts": 3,
        "files": 5,
@@ -1472,6 +1474,7 @@
        "apps": 1,
        "apps_failed": 0,
        "apps_skipped": 0,
+       "apps_malicious": 1,
        "unreadable": 0,
        "contacts": 3,
        "sms": 2,
