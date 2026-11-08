@@ -952,7 +952,7 @@ describe('Results: Firefox re-reads in the background, whichever tab is open', (
   test('the “Telefon” tab shows the instruction and no retry button', async () => {
     const env = await resultsWith([check([FIREFOX])]);
     await fireEvent.click(tab('Telefon'));
-    expect(screen.getByText(/Zdalne debugowanie przez USB/)).toBeTruthy();
+    expect(screen.getByText(/zdalne debugowanie/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Spróbuj|Ponów|Sprawdź ponownie/ })).toBeNull();
     await vi.advanceTimersByTimeAsync(5000);
     expect(rechecks(env)).toBe(1);

@@ -188,7 +188,7 @@ test('phone state: tick a site, see it in the plan, Firefox waits for remote deb
   await expect(page.getByText(/Analiza plików aplikacji/)).toBeHidden({ timeout: 15_000 });
   await page.getByRole('tab', { name: /^Telefon/ }).click();  // sprawdzenia telefonu mają własną zakładkę
   await expect(page.getByRole('region', { name: 'Stan telefonu' })).toBeVisible();
-  await expect(page.getByText(/Zdalne debugowanie przez USB/)).toBeVisible();
+  await expect(page.getByText(/zdalne debugowanie/)).toBeVisible();
   const site = page.getByRole('switch', { name: 'Wycisz tanie-bilety.example' });
   await expect(site).not.toBeChecked();
   await site.check();

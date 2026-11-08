@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { describe, expect, test, vi } from 'vitest';
 import { CHECKS_SAMPLE } from '../lib/fakeBridge';
+import { phoneBadge } from '../lib/logic';
 import type { CheckBrowser, DeviceCheck } from '../lib/types';
 import { renderWith, setupCtl } from '../test-utils';
 import DeviceChecks from './DeviceChecks.svelte';
@@ -21,9 +22,9 @@ async function mounted(checks: DeviceCheck[]) {
 }
 
 describe('DeviceChecks', () => {
-  test('the card is always open: a static h3 header, no collapse button; ok shows the ok_sub sentence', async () => {
+  test('the card is always open: a static h2 header, no collapse button; ok shows the ok_sub sentence', async () => {
     await mounted([check([{ ...CHROME, sites: [CHROME.sites[2]] }], 'ok')]);
-    const head = screen.getByRole('heading', { level: 3, name: 'Powiadomienia z witryn' });
+    const head = screen.getByRole('heading', { level: 2, name: 'Powiadomienia z witryn' });
     expect(screen.queryByRole('button', { name: /Powiadomienia z witryn/ })).toBeNull();
     expect(head.closest('[aria-expanded]')).toBeNull();
     expect(head.parentElement!.textContent).toContain('W porządku');
@@ -34,9 +35,9 @@ describe('DeviceChecks', () => {
 
   test('with something to do: intro sentence and counter pill in the header; nothing is ticked up front', async () => {
     const { s } = await mounted([CHECKS_SAMPLE]);
-    const head = screen.getByRole('heading', { level: 3, name: 'Powiadomienia z witryn' });
-    // Dwie witryny Chrome z poprawką i „wszystkie witryny” Samsung Internet.
-    expect(head.parentElement!.textContent).toContain('3 do wyciszenia');
+    const head = screen.getByRole('heading', { level: 2, name: 'Powiadomienia z witryn' });
+    // Dwie witryny Chrome, Samsung Internet i Firefox bez debugowania — tyle co w liczniku zakładki.
+    expect(head.parentElement!.textContent).toContain('4 do sprawdzenia');
     expect(screen.getByText(/Strony, którym ktoś pozwolił/)).toBeTruthy();
     for (const box of screen.getAllByRole('switch')) expect((box as HTMLInputElement).checked).toBe(false);
     expect(s.fixes.size).toBe(0);
@@ -80,7 +81,8 @@ describe('DeviceChecks', () => {
     expect(within(row).getByText('Samsung Internet')).toBeTruthy();
     expect(row.textContent).toContain('Teraz na ekranie:');
     expect(within(row).getByText('reklamy.example')).toBeTruthy();
-    expect(within(row).getByText(/dotknij „Blokuj”/)).toBeTruthy();
+    expect(within(row).queryByText(/dotknij „Blokuj”/)).toBeNull();
+    expect(within(row).queryByText(/nie pokazuje listy stron/)).toBeNull();
     const all = within(row).getByRole('switch', { name: 'Wszystkie witryny w Samsung Internet' });
     expect(row.textContent).toContain('Wycisz wszystkie');
     await fireEvent.click(all);
@@ -93,7 +95,7 @@ describe('DeviceChecks', () => {
     const rows = screen.getAllByRole('listitem');
     expect(rows).toHaveLength(1);
     expect(rows[0].textContent).toContain('push.example');
-    expect(rows[0].textContent).toContain('Zdalne debugowanie przez USB');
+    expect(rows[0].textContent).toContain('Włącz w Firefoksie zdalne debugowanie');
     expect(within(rows[0]).getAllByRole('switch')).toHaveLength(1);
   });
 
@@ -101,6 +103,7 @@ describe('DeviceChecks', () => {
     const site = { host: 'push.example', origin: 'https://push.example', blocked: false, active: true, fix: null, fix_label: null };
     await mounted([check([{ ...FIREFOX, mode: 'shared', read: 'partial', rdp_hint: true, sites: [site] }])]);
     expect(screen.getByText('push.example')).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: 'szczegóły: Firefox' }));
     expect(screen.getByText(/Zdalne debugowanie przez USB/)).toBeTruthy();
     expect(screen.queryByText(/Blokuj/)).toBeNull();
     expect(screen.queryByText(/Na koniec wyłącz/)).toBeNull();
@@ -129,6 +132,57 @@ describe('DeviceChecks', () => {
     expect(row.textContent).toContain('Ustawienia → Aplikacje → Odd → Powiadomienia');
     await fireEvent.click(how);
     expect(screen.queryByText(/Ustawienia → Aplikacje → Odd → Powiadomienia/)).toBeNull();
+  });
+
+  test('a site row hides the “Blokuj” instruction under “szczegóły: host”', async () => {
+    const site = { host: 'push.example', origin: 'https://push.example', blocked: false, active: true, fix: null, fix_label: null };
+    await mounted([check([{ ...SAMSUNG, all_fix: null, all_fix_label: null, mode: 'per_site', sites: [site] }])]);
+    expect(screen.queryByText(/dotknij „Blokuj”/)).toBeNull();
+    const btn = screen.getByRole('button', { name: 'szczegóły: push.example' });
+    expect(btn.getAttribute('aria-expanded')).toBe('false');
+    await fireEvent.click(btn);
+    expect(btn.getAttribute('aria-expanded')).toBe('true');
+    expect(btn.textContent).toContain('ukryj');
+    expect(screen.getByText(/dotknij „Blokuj”/)).toBeTruthy();
+    await fireEvent.click(btn);
+    expect(screen.queryByText(/dotknij „Blokuj”/)).toBeNull();
+  });
+
+  test('Samsung Internet: only name, on-screen sites and “silence all” up front; the rest under “szczegóły”', async () => {
+    await mounted([check([SAMSUNG])]);
+    const row = screen.getAllByRole('listitem')[0];
+    expect(row.textContent).toContain('Teraz na ekranie:');
+    expect(row.textContent).toContain('Wycisz wszystkie');
+    expect(screen.queryByText(/nie pokazuje listy stron/)).toBeNull();
+    await fireEvent.click(screen.getByRole('button', { name: 'szczegóły: Samsung Internet' }));
+    expect(screen.getByText(/nie pokazuje listy stron/)).toBeTruthy();
+    expect(screen.getByText(/dotknij „Blokuj”/)).toBeTruthy();
+  });
+
+  test('Firefox with the debugging hint: one short call to action and a spinner; the full path under “szczegóły”', async () => {
+    const { container } = await mounted([check([FIREFOX])]);
+    expect(screen.getByText('Włącz w Firefoksie zdalne debugowanie, żeby wyciszać każdą stronę osobno.')).toBeTruthy();
+    expect(container.querySelector('.spin')).not.toBeNull();
+    expect(screen.queryByText(/Zdalne debugowanie przez USB/)).toBeNull();
+    await fireEvent.click(screen.getByRole('button', { name: 'szczegóły: Firefox' }));
+    expect(screen.getByText(/Zdalne debugowanie przez USB/)).toBeTruthy();
+  });
+
+  test('the header pill counts rows like the tab badge', async () => {
+    const odd: CheckBrowser = { package: 'com.example.odd', name: 'Odd', mode: 'unknown', read: 'unsupported', rdp_hint: false,
+      block_action: false, all_fix: null, all_fix_label: null, sites: [] };
+    const c = check([{ ...CHROME, sites: [CHROME.sites[0], CHROME.sites[1]] }, SAMSUNG, odd]);
+    await mounted([c]);
+    const head = screen.getByRole('heading', { level: 2, name: 'Powiadomienia z witryn' });
+    expect(head.parentElement!.textContent).toContain('4 do sprawdzenia');
+    expect(phoneBadge([c])).toEqual({ kind: 'count', count: 4 });
+  });
+
+  test('an empty list with only already-silenced sites still draws the footer separator', async () => {
+    await mounted([check([{ ...CHROME, sites: [CHROME.sites[2]] }])]);
+    const footer = screen.getByText(/Już wyłączone/).closest('div')!;
+    expect(footer.className).toContain('mt-3');
+    expect(footer.className).toContain('border-t');
   });
 
   test('known browsers show a built-in icon, unknown ones an initial', async () => {
@@ -160,7 +214,7 @@ describe('DeviceChecks', () => {
     try {
       render(DeviceChecks, { context: new Map([['ctl', env.ctl]]) });
       await tick();
-      expect(screen.getByText(/Zdalne debugowanie przez USB/)).toBeTruthy();
+      expect(screen.getByText(/zdalne debugowanie/)).toBeTruthy();
       await vi.advanceTimersByTimeAsync(15_000);
       expect(env.bridge.calls.filter((c) => c.method === 'recheck_site_notifications')).toHaveLength(0);
     } finally {

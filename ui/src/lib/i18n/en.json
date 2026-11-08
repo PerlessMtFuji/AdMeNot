@@ -35,7 +35,7 @@
     "title": "Phone state",
     "site_notifications": "Site notifications",
     "intro": "Sites someone allowed to send notifications. Such “ads” look like they come from an app, but they come from the browser.",
-    "to_fix": { "one": "{count} to silence", "few": "{count} to silence", "many": "{count} to silence", "other": "{count} to silence" },
+    "to_check": { "one": "{count} to check", "few": "{count} to check", "many": "{count} to check", "other": "{count} to check" },
     "picked": { "one": "{count} selected", "few": "{count} selected", "many": "{count} selected", "other": "{count} selected" },
     "ok_sub": "no site can send notifications",
     "active": "notification on screen", "can_send": "can send notifications", "none": "No sites with notifications.",
@@ -49,6 +49,8 @@
     "unsupported": "The program cannot check this browser’s notifications. Check on the phone: Settings → Apps → {browser} → Notifications.",
     "howto": "how to check",
     "howto_hide": "hide",
+    "details": "details",
+    "rdp_short": "Turn on remote debugging in Firefox to silence each site separately.",
     "unsupported_pill": "check manually",
     "rdp": "Without debugging only sites with a notification on screen are visible. To see and silence each one, turn this on on the phone: Firefox → Settings → Remote debugging via USB. I will read them as soon as you do."
   },

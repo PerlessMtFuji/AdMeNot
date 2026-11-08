@@ -35,7 +35,7 @@
     "title": "Stan telefonu",
     "site_notifications": "Powiadomienia z witryn",
     "intro": "Strony, którym ktoś pozwolił wysyłać powiadomienia. Takie „reklamy” wyglądają jak z aplikacji, ale przychodzą z przeglądarki.",
-    "to_fix": { "one": "{count} do wyciszenia", "few": "{count} do wyciszenia", "many": "{count} do wyciszenia", "other": "{count} do wyciszenia" },
+    "to_check": { "one": "{count} do sprawdzenia", "few": "{count} do sprawdzenia", "many": "{count} do sprawdzenia", "other": "{count} do sprawdzenia" },
     "picked": { "one": "{count} zaznaczona", "few": "{count} zaznaczone", "many": "{count} zaznaczonych", "other": "{count} zaznaczonej" },
     "ok_sub": "żadna strona nie może wysyłać powiadomień",
     "active": "powiadomienie na ekranie", "can_send": "może wysyłać powiadomienia", "none": "Brak witryn z powiadomieniami.",
@@ -50,6 +50,8 @@
     "unsupported_pill": "sprawdź ręcznie",
     "howto": "jak sprawdzić",
     "howto_hide": "ukryj",
+    "details": "szczegóły",
+    "rdp_short": "Włącz w Firefoksie zdalne debugowanie, żeby wyciszać każdą stronę osobno.",
     "rdp": "Bez debugowania widać tylko strony z powiadomieniem na ekranie. Żeby zobaczyć i wyciszać każdą osobno, włącz na telefonie: Firefox → Ustawienia → Zdalne debugowanie przez USB. Odczytam je sam, gdy tylko to zrobisz."
   },
   "choice": { "silence": "Wycisz", "disable": "Wyłącz", "remove": "Usuń", "fix": "Ustawienia witryn" },

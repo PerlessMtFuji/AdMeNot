@@ -29,7 +29,7 @@ export const LEVEL_KEYS = ['silence', 'disable', 'remove', 'review', 'none'] as 
 // Rodziny kluczy z formami liczby mnogiej (one/few/many/other w obu słownikach).
 export const PLURAL_KEYS = ['results.title', 'results.safe', 'expert.days', 'panel.apps',
   'exec.apps', 'exec.steps', 'history.did.remove', 'history.did.disable', 'history.did.silence',
-  'shot.count', 'apk_cache.estimate', 'checks.to_fix', 'checks.picked', 'history.sites_restored',
+  'shot.count', 'apk_cache.estimate', 'checks.to_check', 'checks.picked', 'history.sites_restored',
   'undo.done_collapsed', 'transfer.apps_skipped', 'transfer.apps_suspicious', 'transfer.files', 'transfer.messages',
   'transfer.folders', 'transfer.categories', 'transfer.progress_files', 'transfer.expires', 'transfer.days_left',
   'transfer.unreadable_files', 'transfer.restore.missing', 'transfer.restore.apk_skipped', 'transfer.restore.tel.synced',
