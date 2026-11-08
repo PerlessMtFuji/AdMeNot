@@ -838,8 +838,8 @@
     "unreadable": "Telefon nie pozwolił odczytać tych danych.",
     "xiaomi_hint": "Na telefonach Xiaomi, Redmi i POCO włącz w Opcjach programisty „Debugowanie USB (ustawienia zabezpieczeń)”, a potem wybierz „Kopiuj dane” jeszcze raz. Jeśli kopia jest już zrobiona, zaznacz tylko brakujące dane, np. SMS i kontakty — reszty nie trzeba kopiować od nowa.",
     "unreadable_files": {
-      "one": "{count} pliku lub folderu nie dało się odczytać — nie trafi do kopii",
-      "few": "{count} plików lub folderów nie dało się odczytać — nie trafią do kopii",
+      "one": "{count} plik lub folder nie dał się odczytać — nie trafi do kopii",
+      "few": "{count} pliki lub foldery nie dały się odczytać — nie trafią do kopii",
       "many": "{count} plików lub folderów nie dało się odczytać — nie trafią do kopii",
       "other": "{count} pliku lub folderu nie dało się odczytać — nie trafią do kopii"
     },
@@ -918,7 +918,7 @@
     "done_heading": "Kopia starego telefonu",
     "done_ok": "Kopia gotowa i sprawdzona — możesz odłączyć stary telefon",
     "done_warn": "Kopia gotowa, ale nie wszystko udało się skopiować",
-    "done_warn_text": "To, co się nie skopiowało, jest oznaczone na żółto.",
+    "done_warn_text": "Szczegóły są przy liczbach poniżej.",
     "done_took": "{size} w {time}.",
     "took_min": "{n} min",
     "took_sec": "{n} s",
@@ -940,6 +940,7 @@
       "apps": "Aplikacje",
       "size": "Rozmiar",
       "failed": "nieudane: {count}",
+      "unreadable": "nieczytelne: {count}",
       "tel_failed": "nie udało się",
       "addresses_missing": "bez adresów: {count}",
       "attachments_missing": "bez załączników: {count}",

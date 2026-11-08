@@ -764,6 +764,8 @@ export class Controller {
       s.transfer.waiting = false;
       s.stopping = false;
       s.phase = 'transfer_done';
+      // nowy telefon podłączony już w czasie kopii: karta „Podłącz nowy telefon” obiecuje przejście od razu
+      this.offerRestoreToNewPhone(s.devices.filter((e) => e.state === 'device').map((e) => e.serial));
     });
     on('transfer:restore_plan', (d) => {
       if (s.phase !== 'transfer_restore_plan') return; // serwisant już wyszedł z ekranu wgrywania

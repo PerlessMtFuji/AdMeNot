@@ -369,7 +369,7 @@ test('unticking the row sends no export file', async () => {
 
   test('files the scan could not read are announced before the copy', async () => {
     await show({ unreadable: 3 });
-    expect(screen.getByText('3 plików lub folderów nie dało się odczytać — nie trafią do kopii')).toBeTruthy();
+    expect(screen.getByText('3 pliki lub foldery nie dały się odczytać — nie trafią do kopii')).toBeTruthy();
   });
 
   test('no unreadable notice when the scan read everything', async () => {

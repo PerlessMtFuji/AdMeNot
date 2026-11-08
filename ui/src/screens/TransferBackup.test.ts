@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import type { BackupResultView, CopyView } from '../lib/types';
 import { setupCtl } from '../test-utils';
 import TransferBackup from './TransferBackup.svelte';
@@ -127,7 +127,9 @@ describe('TransferBackup', () => {
     await tick();
     expect(screen.queryByText('Kopia gotowa i sprawdzona — możesz odłączyć stary telefon')).toBeNull();
     expect(screen.getByText('Kopia gotowa, ale nie wszystko udało się skopiować')).toBeTruthy();
-    expect(screen.getByText('1 pliku lub folderu nie dało się odczytać — nie trafi do kopii')).toBeTruthy();
+    const files = screen.getByTestId('copy-numbers').querySelector('li[title]');
+    expect(files?.textContent).toBe('Pliki 5 · nieczytelne: 1');
+    expect(files?.getAttribute('title')).toContain('1 plik lub folder nie dał się odczytać');
   });
 
   test('the Xiaomi hint does not send the technician to copy everything again', async () => {
@@ -203,5 +205,45 @@ describe('TransferBackup', () => {
     expect(panel.textContent).toContain('ZS/2026/1108/01');
     expect(panel.textContent).toContain('Anna K.');
     expect(panel.textContent).toMatch(/Kopia zostanie usunięta z komputera .*2026/);
+  });
+
+  test('a yellow done screen has one result card and no stacked banners', async () => {
+    const { s, container } = await show('transfer_done');
+    s.device = { manufacturer: 'Xiaomi' } as never;
+    s.transfer.result = result({ files_failed: 1, telephony: { sms: { status: 'unavailable', count: 0 } } });
+    s.transfer.copy = { ...COPY, counts: { unreadable: 2 } };
+    await tick();
+    expect(container.querySelectorAll('[role="status"]')).toHaveLength(1);
+  });
+
+  test('a telephony item keeps its count next to the missing note', async () => {
+    const { s } = await show('transfer_done');
+    s.transfer.result = result({ telephony: { sms: { status: 'failed', count: 340, error: 'attachments_missing:12' },
+      mms: { status: 'failed', count: 0, error: 'export_invalid' } } });
+    s.transfer.copy = COPY;
+    await tick();
+    const items = Array.from(screen.getByTestId('copy-numbers').querySelectorAll('li')).map((li) => li.textContent);
+    expect(items).toContain('SMS 340 · bez załączników: 12');
+    expect(items).toContain('MMS nie udało się · plik eksportu jest uszkodzony');
+  });
+
+  test('time left is measured from the reconnect, not from the time spent waiting', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date('2026-11-08T10:00:00'));
+      const { bridge } = await show();
+      const at = (sec: number, done_bytes: number) => bridge.emit('transfer:progress', { stage: 'files', done_files: 1, total_files: 10, done_bytes, total_bytes: 100, current: '' });
+      at(0, 10);
+      await tick();
+      bridge.emit('transfer:waiting', {});
+      await tick();
+      vi.setSystemTime(new Date('2026-11-08T10:10:00'));
+      at(0, 10);
+      await tick();
+      vi.setSystemTime(new Date('2026-11-08T10:10:10'));
+      at(0, 20);
+      await tick();
+      expect(screen.getByText('Zostało ~1 min')).toBeTruthy();
+    } finally { vi.useRealTimers(); }
   });
 });

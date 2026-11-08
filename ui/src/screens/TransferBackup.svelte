@@ -37,11 +37,14 @@
   // --- postęp: czas do końca z tempa dotychczasowej kopii (most go nie liczy) ---
   let startedAt: number | null = null;
   let startValue = 0;
+  let resumed = false;  // po rozłączeniu tempo liczymy od powrotu telefonu: czas czekania go nie zaniża
   let etaS = $state<number | null>(null);
   $effect(() => {
     const v = value;
     if (!p) { startedAt = null; etaS = null; return; }
     const now = Date.now();
+    if (tr.waiting) { resumed = true; return; }
+    if (resumed) { resumed = false; startedAt = now; startValue = v; return; }
     if (startedAt === null) { startedAt = now; startValue = v; return; }
     const gained = v - startValue;
     const elapsed = (now - startedAt) / 1000;
@@ -90,16 +93,20 @@
   function telephonyText(r: TelephonyResult): string {
     if (r.status === 'ok') return r.source === 'export' ? `${num(r.count)} · ${t('transfer.export.from_file')}` : num(r.count);
     if (r.status === 'unavailable') return t('transfer.unavailable');
-    return [t('transfer.sum.tel_failed'), ...problems(r)].join(' · ');
+    // coś się skopiowało: liczba i braki; „nie udało się” tylko gdy nie ma nic
+    return [r.count > 0 ? num(r.count) : t('transfer.sum.tel_failed'), ...problems(r)].join(' · ');
   }
 
   const failed = (n: number) => (n > 0 ? ` · ${t('transfer.sum.failed', { count: num(n) })}` : '');
 
   /** Liczby wyniku w jednej linii: „Kontakty 412”, w żółtym to, co się nie udało. */
   const numbers = $derived(!done ? [] : [
-    ...telephony.map(([key, r]) => ({ key, label: t(`transfer.sum.${key}`), text: telephonyText(r), warn: r.status !== 'ok' })),
-    { key: 'files', label: t('transfer.sum.files'), text: `${num(done.files_done)}${failed(done.files_failed)}`, warn: done.files_failed > 0 },
-    { key: 'apps', label: t('transfer.sum.apps'), text: `${num(done.apps_done)}${failed(done.apps_failed)}`, warn: done.apps_failed > 0 },
+    ...telephony.map(([key, r]) => ({ key, label: t(`transfer.sum.${key}`), text: telephonyText(r), warn: r.status !== 'ok', title: undefined as string | undefined })),
+    { key: 'files', label: t('transfer.sum.files'),
+      text: `${num(done.files_done)}${failed(done.files_failed)}${unreadableFiles > 0 ? ` · ${t('transfer.sum.unreadable', { count: num(unreadableFiles) })}` : ''}`,
+      warn: done.files_failed > 0 || unreadableFiles > 0,
+      title: unreadableFiles > 0 ? `${tp('transfer.unreadable_files', unreadableFiles, { count: num(unreadableFiles) })}. ${t('transfer.unreadable_files_text')}` : undefined },
+    { key: 'apps', label: t('transfer.sum.apps'), text: `${num(done.apps_done)}${failed(done.apps_failed)}`, warn: done.apps_failed > 0, title: undefined },
   ]);
 </script>
 
@@ -160,19 +167,13 @@
 
       <ul data-testid="copy-numbers" class="flex flex-wrap gap-x-5 gap-y-1 text-sm text-mut">
         {#each numbers as n (n.key)}
-          <li>{n.label} <b class={n.warn ? 'text-warn' : 'text-ink'}>{n.text}</b></li>
+          <li title={n.title}>{n.label} <b class={n.warn ? 'text-warn' : 'text-ink'}>{n.text}</b></li>
         {/each}
       </ul>
 
-      {#if unavailable && isXiaomi(s.device)}
-        <Banner tone="warn" icon="info" title={t('transfer.unreadable')}>{t('transfer.xiaomi_hint')}</Banner>
-      {:else if unavailable}
-        <Banner tone="warn" icon="info" title={t('transfer.unreadable')} />
-      {/if}
-      {#if unreadableFiles > 0}
-        <Banner tone="warn" icon="info" title={tp('transfer.unreadable_files', unreadableFiles, { count: num(unreadableFiles) })}>
-          {t('transfer.unreadable_files_text')}
-        </Banner>
+      {#if unavailable}
+        <!-- jedna krótka linia pod liczbami, nie osobna karta -->
+        <p class="text-sm text-mut">{t('transfer.unreadable')}{#if isXiaomi(s.device)} {t('transfer.xiaomi_hint')}{/if}</p>
       {/if}
 
       {#if usable}

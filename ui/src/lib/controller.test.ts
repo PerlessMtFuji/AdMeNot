@@ -1769,7 +1769,7 @@ describe('data transfer — after a copy', () => {
   const NEW = 'R58W20NEW01';
   const dev = (serial: string) => ({ serial, state: 'device' as const, model: 'M', name: null, imei: null });
   const copy = { id: `${OLD}-90fae0b8e3f0/20261108-100000`, serial: OLD, model: 'SM-A145R', manufacturer: 'samsung', client: 'Anna K.',
-    created: '2026-11-08T10:00:00', expires: '2026-11-15T10:00:00', days_left: 7, status: 'complete' as 'complete' | 'in_progress', bytes: 10, counts: {} };
+    created: '2026-11-08T10:00:00', expires: '2026-11-15T10:00:00', days_left: 7, status: 'complete' as 'complete' | 'in_progress' | 'incomplete', bytes: 10, counts: {} };
   const result = { status: 'complete' as const, copy_id: copy.id, files_done: 1, files_failed: 0, apps_done: 0, apps_failed: 0, bytes: 10,
     seconds: 3, telephony: {} };
   const restorePlans = (bridge: { calls: { method: string; args: unknown[] }[] }) => bridge.calls.filter((c) => c.method === 'restore_plan');
@@ -1821,5 +1821,21 @@ describe('data transfer — after a copy', () => {
     bridge.emit('devices', { devices: [dev(NEW)], error: null });
     await flush();
     expect(restorePlans(bridge)).toHaveLength(1);
+  });
+
+  test('plans restore right away when the other phone was already connected at the end of the copy', async () => {
+    const env = setup('transfer');
+    await env.ctl.init();
+    env.bridge.emit('devices', { devices: [dev(OLD), dev(NEW)], error: null });
+    env.ctl.selectDevice(OLD);
+    env.bridge.emit('transfer:done', { result, copy });
+    await vi.waitFor(() => expect(restorePlans(env.bridge)).toHaveLength(1));
+    expect(restorePlans(env.bridge)[0].args).toEqual([copy.id, NEW]);
+  });
+
+  test('an incomplete copy also leads to the new phone', async () => {
+    const { bridge } = await finished({ status: 'incomplete' });
+    bridge.emit('devices', { devices: [dev(OLD), dev(NEW)], error: null });
+    await vi.waitFor(() => expect(restorePlans(bridge)).toHaveLength(1));
   });
 });
