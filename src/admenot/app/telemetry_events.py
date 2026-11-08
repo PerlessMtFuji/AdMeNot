@@ -9,6 +9,7 @@ from __future__ import annotations
 import platform
 import re
 import statistics
+import typing
 from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime
 from typing import Any
@@ -19,6 +20,7 @@ from admenot.engine.apk.timing import Eta
 from admenot.engine.device.info import DeviceInfo
 from admenot.engine.journal.db import Action
 from admenot.engine.session import ScanReport
+from admenot.engine.transfer.apps import AppError, AppsResult
 from admenot.engine.transfer.backup import BackupResult, Selection
 from admenot.engine.transfer.phonesetup import CleanupResult
 from admenot.engine.transfer.restore import RestoreResult, UploadChoice
@@ -211,9 +213,35 @@ def _tel_part(tel: TelResult) -> dict[str, Any]:
     }
 
 
+APP_ERRORS = frozenset(typing.get_args(AppError))  # serwer: dokładnie te klucze `apps_codes`
+
+
+def _apps_part(apps: AppsResult) -> dict[str, Any]:
+    """Aplikacje przy wgrywaniu: same liczby, klucze błędów `AppError` i instalator. Bez nazw, pakietów
+    (wiersze `rows`) i surowych kodów `INSTALL_FAILED_*` — `codes` zostaje w dzienniku i protokole."""
+    codes = {k: _count(v) for k, v in apps.failed.items() if k in APP_ERRORS and v > 0}
+    return {
+        "apps": {"selected": _count(apps.selected), "installed": _count(apps.installed),
+                 "exists": _count(apps.exists), "skipped": _count(sum(apps.skipped.values())),
+                 "failed": _count(sum(apps.failed.values()))},
+        "apps_codes": dict(sorted(codes.items())[:len(APP_ERRORS)]),
+        "installer": "play" if apps.play_installer else "none", "apps_blocked": bool(apps.blocked),
+    }
+
+
+def transfer_apps_event(device: DeviceInfo, apps: AppsResult) -> dict[str, Any]:
+    """Doinstalowanie aplikacji po odblokowaniu telefonu: te same liczby co w `transfer_restore`."""
+    return {"device": device_of(device), **_apps_part(apps)}
+
+
+def transfer_report_event(status: str, whatsapp_restored: bool) -> dict[str, Any]:
+    """Protokół przeniesienia: ton podsumowania (`ok`/`warn`/`bad`) i czy WhatsApp potwierdzono."""
+    return {"status": status, "whatsapp_restored": bool(whatsapp_restored)}
+
+
 def transfer_restore_event(device: DeviceInfo, result: RestoreResult, choice: UploadChoice,
                            streams: int, tel: TelResult | None = None,
-                           tel_failed: bool = False) -> dict[str, Any]:
+                           tel_failed: bool = False, apps: AppsResult | None = None) -> dict[str, Any]:
     """Wgrywanie kopii na nowy telefon (`device` = telefon docelowy): same liczby i wybrane grupy.
     Bez nazw plików, folderów i pakietów z plików APK — „Inne foldery” to tylko `others`: coś
     wybrano. Serial telefonu docelowego (`result.target_serial`) też nie wychodzi. Z telefonią (`tel`)
@@ -233,6 +261,7 @@ def transfer_restore_event(device: DeviceInfo, result: RestoreResult, choice: Up
         "streams": min(max(1, int(streams)), MAX_STREAMS), "hashed": result.hashed,
         "media_scan": result.media_scan, "groups": groups,
         **(_tel_part(tel) if tel is not None else {}),
+        **(_apps_part(apps) if apps is not None else {}),
     }
 
 
@@ -308,6 +337,8 @@ def sample() -> dict[str, list[dict[str, Any]]]:
     explorer = explorer_event(_SAMPLE_DEVICE, 612, 148, 1_920_000_000, 6, 41_000_000,
                               {"image": 23, "video": 2, "audio": 1, "text": 1}, {"folder": 1, "text": 0},
                               {"explorer_denied": 1}, [31_000_000, 28_000_000, 35_000_000])
+    apps = AppsResult(selected=14, installed=10, exists=2, skipped={"too_old": 1}, failed={"user_restricted": 1},
+                      codes={}, blocked=False, stopped=False, rows=[], play_installer=True)
     out: dict[str, list[dict[str, Any]]] = {}
     for name, packages in (("basic", False), ("packages", True)):
         bodies = [("start", start_body("simple")), ("scan", _sample_scan(packages)),
@@ -316,7 +347,9 @@ def sample() -> dict[str, list[dict[str, Any]]]:
                   ("undo", undo_event(_SAMPLE_DEVICE, ["com.wlive.forecast"], [], 2, packages,
                                     sites=2, sites_restored=1)),
                   ("transfer_backup", transfer_backup_event(_SAMPLE_DEVICE, backup, chosen)),
-                  ("transfer_restore", transfer_restore_event(_SAMPLE_DEVICE, restore, upload, 4, tel)),
+                  ("transfer_restore", transfer_restore_event(_SAMPLE_DEVICE, restore, upload, 4, tel, apps=apps)),
+                  ("transfer_apps", transfer_apps_event(_SAMPLE_DEVICE, apps)),
+                  ("transfer_report", transfer_report_event("ok", True)),
                   ("explorer", explorer)]
         out[name] = [{**common(SAMPLE_INSTALL, t, now, "pl"), **body} for t, body in bodies]
     return out

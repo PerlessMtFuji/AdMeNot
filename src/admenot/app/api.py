@@ -58,7 +58,9 @@ from admenot.app.telemetry_events import (
     repair_event,
     sample,
     scan_event,
+    transfer_apps_event,
     transfer_backup_event,
+    transfer_report_event,
     transfer_restore_event,
     undo_event,
     undo_targets,
@@ -2212,7 +2214,7 @@ class Api(ExplorerMixin):
                 "order": order_number, "whatsapp": whatsapp})
             failed = tel_error is not None
             telemetry.record("transfer_restore", lambda _packages: transfer_restore_event(
-                device, result, chosen, STREAMS, tel, tel_failed=failed))
+                device, result, chosen, STREAMS, tel, tel_failed=failed, apps=apps))
 
         return {"job_id": self._jobs.start("restore", run)}
 
@@ -2343,6 +2345,7 @@ class Api(ExplorerMixin):
             finally:
                 self._restore_copy_id = None
             self._emit("transfer:apps_done", {"order": found.number, "apps": view})
+            telemetry.record("transfer_apps", lambda _packages: transfer_apps_event(device, apps))
 
         return {"job_id": self._jobs.start("restore_apps", run)}
 
@@ -2597,6 +2600,9 @@ class Api(ExplorerMixin):
             raise AppError("unknown_order", number) from None
         finally:
             self._report_lock.release()
+        if files.tone is not None:  # protokół przeniesienia: sam ton i flaga WhatsApp
+            telemetry.record("transfer_report", lambda _packages: transfer_report_event(
+                files.tone or "bad", files.whatsapp_restored))
         target = files.pdf or files.html
         opened: str | None = None
         # „Otwieraj protokół po utworzeniu” wyłączone: UI pokazuje samą ścieżkę, nie błąd otwarcia

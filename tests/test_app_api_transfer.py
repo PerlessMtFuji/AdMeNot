@@ -1666,6 +1666,23 @@ def test_install_remaining_after_unblock(tmp_path, monkeypatch):
     assert "com.whatsapp" in new.installed
 
 
+def test_install_remaining_records_apps_event_with_counts_only(tmp_path, monkeypatch):
+    api, rec, _host, copy_id, new = _xiaomi_copied(tmp_path, monkeypatch)
+    api.set_telemetry(True, True)
+    _planned(api, rec, copy_id)
+    api.start_restore(APPS_CHOICE)
+    restore = [json.loads(x) for x in telemetry_path().read_text("utf-8").splitlines()]
+    first = next(e for e in restore if e["type"] == "transfer_restore")
+    assert first["apps_blocked"] is True and first["apps"]["skipped"] == 1 and first["apps_codes"] == {}
+    number = rec.of("transfer:restore_done")[0]["order"]
+    new.props["persist.security.adbinstall"] = "1"
+    api.install_remaining_apps(number)
+    events = [json.loads(x) for x in telemetry_path().read_text("utf-8").splitlines()]
+    event = next(e for e in events if e["type"] == "transfer_apps")
+    assert event["apps"]["installed"] == 1 and event["installer"] in ("play", "none")
+    assert "whatsapp" not in json.dumps(event) and NEW not in json.dumps(event)
+
+
 def test_install_remaining_needs_phone(tmp_path, monkeypatch):
     api, rec, host, copy_id, _new = _xiaomi_copied(tmp_path, monkeypatch)
     _planned(api, rec, copy_id)

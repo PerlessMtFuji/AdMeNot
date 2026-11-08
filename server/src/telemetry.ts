@@ -80,7 +80,15 @@ const MAX_MB = 10_000_000; // 10 TB w MB (telemetry_events.MAX_MB)
 // („Inne foldery” to tylko `others`) i pakietów z plików APK.
 const RESTORE_FIELDS = ["device", "status", "seconds", "bytes_mb", "files", "exists", "renamed", "denied",
   "failed", "unselected", "missing", "apk_skipped", "apk_suspicious_skipped", "streams", "hashed", "media_scan",
-  "groups", "tel", "safety", "cleanup_ok"] as const;
+  "groups", "tel", "safety", "cleanup_ok", "apps", "apps_codes", "installer", "apps_blocked"] as const;
+// Aplikacje przy wgrywaniu (Etap 4): liczby, klucze błędów instalacji (engine/transfer/apps.AppError) i
+// instalator — bez nazw, pakietów i surowych kodów INSTALL_FAILED_*.
+const APPS_COUNTS = ["selected", "installed", "exists", "skipped", "failed"] as const;
+const APP_ERRORS = ["user_restricted", "no_consent", "too_old", "no_abi", "no_space", "version_downgrade",
+  "conflict", "invalid_apk", "disconnected", "failed"] as const;
+const INSTALLERS = ["play", "none"] as const;
+const APPS_EVENT_FIELDS = ["device", "apps", "apps_codes", "installer", "apps_blocked"] as const;
+const REPORT_FIELDS = ["status", "whatsapp_restored"] as const;
 // Telefonia przy wgrywaniu (Etap 3): liczby per kategoria, droga zapisu i flagi — bez nazw kont
 // (adresów e-mail), numerów, treści i nazw plików.
 const TEL_CATEGORIES = ["contacts", "sms", "mms", "calls"] as const;
@@ -150,6 +158,27 @@ function restoreTel(e: Obj): Obj {
   if (e.tel === undefined && e.safety === undefined && e.cleanup_ok === undefined) return {};
   return { tel: some(e.tel, TEL_CATEGORIES, telKind), safety: some(e.safety, TEL_CATEGORIES, bool),
     cleanup_ok: bool(e.cleanup_ok) };
+}
+
+function appsCodes(v: unknown): Obj {
+  return some(v, APP_ERRORS, (n) => {
+    need(int(n));
+    return n;
+  });
+}
+
+// Liczby aplikacji + kody + instalator + flaga blokady (wszystkie cztery pola naraz).
+function appsPart(e: Obj): Obj {
+  need(isObj(e.apps) && isObj(e.apps_codes));
+  need(oneOf(e.installer, INSTALLERS) && typeof e.apps_blocked === "boolean");
+  return { apps: counts(e.apps, APPS_COUNTS), apps_codes: appsCodes(e.apps_codes), installer: e.installer,
+    apps_blocked: e.apps_blocked };
+}
+
+function restoreApps(e: Obj): Obj {
+  if (e.apps === undefined && e.apps_codes === undefined && e.installer === undefined
+    && e.apps_blocked === undefined) return {};
+  return appsPart(e);
 }
 
 function checks(v: unknown): Obj {
@@ -235,8 +264,17 @@ function body(e: Obj): Obj {
       const out: Obj = { device: device(e.device), status: e.status, seconds: e.seconds, bytes_mb: e.bytes_mb };
       for (const k of RESTORE_COUNTS) out[k] = e[k];
       return { ...out, streams: e.streams, hashed: e.hashed, media_scan: e.media_scan,
-        groups: flags(e.groups, RESTORE_GROUPS), ...restoreTel(e) };
+        groups: flags(e.groups, RESTORE_GROUPS), ...restoreTel(e), ...restoreApps(e) };
     }
+    case "transfer_apps":
+      need(Object.keys(e).every((k) => (COMMON as readonly string[]).includes(k)
+        || (APPS_EVENT_FIELDS as readonly string[]).includes(k)));
+      return { device: device(e.device), ...appsPart(e) };
+    case "transfer_report":
+      need(Object.keys(e).every((k) => (COMMON as readonly string[]).includes(k)
+        || (REPORT_FIELDS as readonly string[]).includes(k)));
+      need(oneOf(e.status, ["ok", "warn", "bad"]) && typeof e.whatsapp_restored === "boolean");
+      return { status: e.status, whatsapp_restored: e.whatsapp_restored };
     case "explorer":
       need(Object.keys(e).every((k) => (COMMON as readonly string[]).includes(k)
         || (EXPLORER_FIELDS as readonly string[]).includes(k)));

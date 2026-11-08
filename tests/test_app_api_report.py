@@ -211,3 +211,37 @@ def test_report_for_transfer_order(edge, tmp_path):
     assert r["pdf"] == str(reports / f"{stem}.pdf") and r["error"] is None and len(edge) == 1
     html = (reports / f"{stem}.html").read_text("utf-8")
     assert "Protokół przeniesienia danych" in html and "Marta" in html
+
+
+def test_transfer_report_records_tone_and_whatsapp_flag_only(edge):
+    import json
+    from datetime import datetime
+
+    from admenot.engine.paths import journal_path, telemetry_path
+
+    api, _ = make_api(make_cli_phone())
+    api.set_telemetry(True, True)
+    with Journal(journal_path()) as j:
+        order = j.create_transfer_order(
+            "SRC", "SM-A525F", "Marta Kowalska", None, copy_id="SRC/c1",
+            source={"manufacturer": "samsung", "model": "SM-A525F", "counts": {"contacts": 3},
+                    "selection_groups": ["contacts_messages"]},
+            received_at=datetime(2026, 11, 1, 10, 0), copy_expires=datetime(2026, 11, 15, 10, 0))
+    api.report(order.number)
+    events = [json.loads(x) for x in telemetry_path().read_text("utf-8").splitlines()]
+    event = next(e for e in events if e["type"] == "transfer_report")
+    assert event["status"] == "bad" and event["whatsapp_restored"] is False  # bez wyniku wgrywania
+    assert {k for k in event} - {"install", "type", "t", "app", "os", "lang"} == {"status", "whatsapp_restored"}
+    assert "Marta" not in json.dumps(event) and order.number not in json.dumps(event)
+
+
+def test_repair_report_records_no_transfer_event(edge):
+    import json
+
+    from admenot.engine.paths import telemetry_path
+
+    api, _, number, _opened = _executed()
+    api.set_telemetry(True, True)
+    api.report(number)
+    events = [json.loads(x) for x in telemetry_path().read_text("utf-8").splitlines()]
+    assert not [e for e in events if e["type"] == "transfer_report"]

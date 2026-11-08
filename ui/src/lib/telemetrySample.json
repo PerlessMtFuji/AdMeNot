@@ -194,7 +194,54 @@
         "sms": true,
         "calls": true
       },
-      "cleanup_ok": true
+      "cleanup_ok": true,
+      "apps": {
+        "selected": 14,
+        "installed": 10,
+        "exists": 2,
+        "skipped": 1,
+        "failed": 1
+      },
+      "apps_codes": {
+        "user_restricted": 1
+      },
+      "installer": "play",
+      "apps_blocked": false
+    },
+    {
+      "install": "00000000-0000-4000-8000-000000000000",
+      "type": "transfer_apps",
+      "t": "2026-10-10T14:00:00Z",
+      "app": "0.9.5",
+      "os": "Windows 10.0.26100",
+      "lang": "pl",
+      "device": {
+        "manufacturer": "OPPO",
+        "model": "CPH2483",
+        "android": "14"
+      },
+      "apps": {
+        "selected": 14,
+        "installed": 10,
+        "exists": 2,
+        "skipped": 1,
+        "failed": 1
+      },
+      "apps_codes": {
+        "user_restricted": 1
+      },
+      "installer": "play",
+      "apps_blocked": false
+    },
+    {
+      "install": "00000000-0000-4000-8000-000000000000",
+      "type": "transfer_report",
+      "t": "2026-10-10T14:00:00Z",
+      "app": "0.9.5",
+      "os": "Windows 10.0.26100",
+      "lang": "pl",
+      "status": "ok",
+      "whatsapp_restored": true
     },
     {
       "install": "00000000-0000-4000-8000-000000000000",
@@ -457,7 +504,54 @@
         "sms": true,
         "calls": true
       },
-      "cleanup_ok": true
+      "cleanup_ok": true,
+      "apps": {
+        "selected": 14,
+        "installed": 10,
+        "exists": 2,
+        "skipped": 1,
+        "failed": 1
+      },
+      "apps_codes": {
+        "user_restricted": 1
+      },
+      "installer": "play",
+      "apps_blocked": false
+    },
+    {
+      "install": "00000000-0000-4000-8000-000000000000",
+      "type": "transfer_apps",
+      "t": "2026-10-10T14:00:00Z",
+      "app": "0.9.5",
+      "os": "Windows 10.0.26100",
+      "lang": "pl",
+      "device": {
+        "manufacturer": "OPPO",
+        "model": "CPH2483",
+        "android": "14"
+      },
+      "apps": {
+        "selected": 14,
+        "installed": 10,
+        "exists": 2,
+        "skipped": 1,
+        "failed": 1
+      },
+      "apps_codes": {
+        "user_restricted": 1
+      },
+      "installer": "play",
+      "apps_blocked": false
+    },
+    {
+      "install": "00000000-0000-4000-8000-000000000000",
+      "type": "transfer_report",
+      "t": "2026-10-10T14:00:00Z",
+      "app": "0.9.5",
+      "os": "Windows 10.0.26100",
+      "lang": "pl",
+      "status": "ok",
+      "whatsapp_restored": true
     },
     {
       "install": "00000000-0000-4000-8000-000000000000",

@@ -9,6 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from admenot.engine.journal.db import Journal
 from admenot.engine.paths import journal_path, reports_dir
@@ -26,6 +27,8 @@ class ReportFiles:
     pdf: Path | None  # None: tylko HTML (na życzenie albo po błędzie PDF)
     pdf_error: str | None = None  # PdfError.key: no_browser | timeout | failed | locked | folder
     pdf_target: Path | None = None  # gdzie miał trafić PDF (także po błędzie: „locked”, „folder”)
+    tone: str | None = None  # protokół przeniesienia: ok | warn | bad (statystyki); naprawa: None
+    whatsapp_restored: bool = False  # protokół przeniesienia: WhatsApp potwierdzony jako przywrócony
 
 
 class UnknownOrder(LookupError):
@@ -42,11 +45,14 @@ def write_report(number: str, lang: str, *, out: Path | None = None, pdf: bool =
         order = journal.order_by_number(number)
         if order is None:
             raise UnknownOrder(number)
+        meta: dict[str, Any]
         if order.kind == "transfer":
             moment = now()
-            html = render_transfer_html(build_transfer_protocol(journal, order.id, lang, moment),
-                                        load_service(), moment)
+            protocol = build_transfer_protocol(journal, order.id, lang, moment)
+            meta = {"tone": protocol.tone, "whatsapp_restored": protocol.whatsapp == "restored"}
+            html = render_transfer_html(protocol, load_service(), moment)
         else:
+            meta = {}
             html = render_html(build_protocol(journal, order.id, lang), load_service(), now())
     stem = report_stem(order.number)
     if out:
@@ -58,13 +64,13 @@ def write_report(number: str, lang: str, *, out: Path | None = None, pdf: bool =
     html_path.parent.mkdir(parents=True, exist_ok=True)
     html_path.write_text(html, "utf-8")  # OSError leci do wołającego
     if not pdf:
-        return ReportFiles(html_path, None)
+        return ReportFiles(html_path, None, **meta)
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
     except OSError:  # wybrany folder niedostępny (dysk sieciowy, odłączony pendrive, brak praw)
-        return ReportFiles(html_path, None, "folder", target)
+        return ReportFiles(html_path, None, "folder", target, **meta)
     try:
         html_to_pdf(html_path, target)
     except PdfError as exc:
-        return ReportFiles(html_path, None, exc.key, target)
-    return ReportFiles(html_path, target, None, target)
+        return ReportFiles(html_path, None, exc.key, target, **meta)
+    return ReportFiles(html_path, target, None, target, **meta)
