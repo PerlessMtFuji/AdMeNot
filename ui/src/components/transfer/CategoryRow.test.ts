@@ -71,7 +71,22 @@ describe('CategoryRow', () => {
   });
 });
 
+describe('CategoryRow custom fold text', () => {
+  test('foldText replaces Pokaż and the arrow flips', async () => {
+    render(CategoryRow, { ...base, fold: snippet('instrukcja'), foldText: 'jak skopiować?', foldLabel: 'Kontakty' });
+    const btn = screen.getByRole('button', { name: 'Kontakty: jak skopiować? ▾' });
+    await fireEvent.click(btn);
+    expect(btn.textContent).toBe('jak skopiować? ▴');
+    expect(screen.getByText('instrukcja')).toBeTruthy();
+  });
+});
+
 describe('CategoryGroup', () => {
+  test('missingKey changes the prefix of the empty line', () => {
+    render(CategoryGroup, { title: 'Pliki', children: snippet('wiersz'), empty: 'muzyka', missingKey: 'transfer.row.missing_phone' });
+    expect(screen.getByText('Brak na telefonie: muzyka')).toBeTruthy();
+  });
+
   test('renders title, rows and the grey empty line', () => {
     render(CategoryGroup, { title: 'Pliki', children: snippet('wiersz'), empty: 'muzyka' });
     expect(screen.getByText('Pliki')).toBeTruthy();

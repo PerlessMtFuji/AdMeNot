@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { defaultTransferSelection } from '../lib/logic';
+import { RECHECK_MS } from '../lib/recheck';
 import type { InventoryView } from '../lib/types';
 import { setupCtl } from '../test-utils';
 import TransferChoose from './TransferChoose.svelte';
@@ -51,25 +52,58 @@ describe('TransferChoose', () => {
       { package: 'pl.bank', label: 'Bank', verdict: 'safe', default_on: true, bytes: 80 * MB },
       { package: 'com.sus.app', label: 'Latarka Pro', verdict: 'suspicious', default_on: false, bytes: 15 * MB },
     ] });
-    const card = screen.getByRole('checkbox', { name: /^Aplikacje/ }).closest('.card') as HTMLElement;
-    expect(within(card).getByText('80 MB')).toBeTruthy();
-    await fireEvent.click(screen.getByRole('button', { name: 'Pokaż listę' }));
-    expect(within(card).getByText('15 MB')).toBeTruthy();  // rozmiar przy aplikacji na liście
+    const group = screen.getByRole('checkbox', { name: /^Aplikacje/ }).closest('section') as HTMLElement;
+    expect(within(group).getByText('80 MB')).toBeTruthy();
+    await fireEvent.click(screen.getByRole('button', { name: /^Aplikacje: Pokaż/ }));
+    expect(within(group).getByText('15 MB')).toBeTruthy();  // rozmiar przy aplikacji na liście
     await fireEvent.click(screen.getByRole('checkbox', { name: /Latarka Pro/ }));
-    expect(within(card).getByText('95 MB')).toBeTruthy();  // suma panelu: test transferTotals w logic.test
+    expect(within(group).getByText('95 MB')).toBeTruthy();  // suma panelu: test transferTotals w logic.test
   });
 
   test('suspicious apps are listed but unticked, harmful ones skipped', async () => {
     await show();
-    expect(screen.getByText('1 podejrzana — odznaczona')).toBeTruthy();
-    expect(screen.getByText('1 pominięta: szkodliwa')).toBeTruthy();
-    await fireEvent.click(screen.getByRole('button', { name: 'Pokaż listę' }));
+    expect(screen.getByText('1 podejrzana odznaczona')).toBeTruthy();
+    expect(screen.getByText('1 szkodliwa — pominę')).toBeTruthy();
+    expect(screen.getByText('same aplikacje, bez danych i logowań')).toBeTruthy();
+    expect(screen.queryByRole('checkbox', { name: /Latarka Pro/ })).toBeNull();  // lista zwinięta
+    await fireEvent.click(screen.getByRole('button', { name: /^Aplikacje: Pokaż/ }));
     expect((screen.getByRole('checkbox', { name: /Latarka Pro/ }) as HTMLInputElement).checked).toBe(false);
     expect((screen.getByRole('checkbox', { name: /Bank/ }) as HTMLInputElement).checked).toBe(true);
   });
 
+  test('the rows sit in three groups in the agreed order', async () => {
+    await show();
+    const groups = screen.getAllByRole('region').map((g) => g.getAttribute('aria-label'));
+    expect(groups).toEqual(['Kontakty i wiadomości', 'Pliki', 'Aplikacje']);
+    const names = screen.getAllByRole('checkbox').map((c) => c.getAttribute('aria-label'));
+    expect(names.slice(0, 8)).toEqual(['Kontakty', 'SMS i MMS', 'Historia połączeń', 'Zdjęcia i filmy', 'Pobrane i dokumenty',
+      'WhatsApp', 'Inne foldery', 'Aplikacje']);
+  });
+
+  test('other folders are folded and unticked until opened', async () => {
+    await show({ others: [{ name: 'Music', files: 20, bytes: 500 * MB }] });
+    expect(screen.queryByRole('checkbox', { name: /Music/ })).toBeNull();
+    await fireEvent.click(screen.getByRole('button', { name: /^Inne foldery: Pokaż/ }));
+    expect(screen.getByRole('checkbox', { name: /Music/ })).toBeTruthy();
+  });
+
+  test('an empty category gets a grey line, not a row', async () => {
+    await show({ calls: 0, categories: { media: { files: 14210, bytes: 2000 * MB }, downloads: { files: 0, bytes: 0 },
+      whatsapp: { files: 0, bytes: 0 } }, others: [] });
+    expect(screen.queryByRole('checkbox', { name: /Historia połączeń/ })).toBeNull();
+    expect(screen.queryByRole('checkbox', { name: /WhatsApp/ })).toBeNull();
+    expect(screen.getByText('Brak na telefonie: Historia połączeń')).toBeTruthy();
+    expect(screen.getByText('Brak na telefonie: Pobrane i dokumenty, WhatsApp, Inne foldery')).toBeTruthy();
+  });
+
+  test('the non-category key apps_malicious is never rendered as a category', async () => {
+    await show({ counts: { apps_malicious: 3 } } as never);
+    expect(screen.queryByText(/apps_malicious/)).toBeNull();
+  });
+
   test('loose files in the main folder get a name', async () => {
     await show();
+    await fireEvent.click(screen.getByRole('button', { name: /^Inne foldery: Pokaż/ }));
     expect(screen.getByRole('checkbox', { name: /Pliki w folderze głównym/ })).toBeTruthy();
   });
 
@@ -81,36 +115,72 @@ describe('TransferChoose', () => {
     expect((screen.getByRole('button', { name: /Rozpocznij kopię/ }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  test('an old WhatsApp chat backup shows the warning with a re-check', async () => {
+test('an old WhatsApp chat backup is a short label; the instructions open only on click', async () => {
     await show({ whatsapp_backup: '2020-01-01T02:00:00' });
-    const card = screen.getByRole('checkbox', { name: /WhatsApp/ }).closest('.card') as HTMLElement;
-    const note = within(card).getByTestId('whatsapp-note');
+    expect(screen.getByText('brak świeżej kopii czatów')).toBeTruthy();
+    expect(screen.queryByTestId('whatsapp-note')).toBeNull();
+    expect(screen.queryByText(/Utwórz kopię/)).toBeNull();
+    await fireEvent.click(screen.getByRole('button', { name: /^WhatsApp: jak zrobić\?/ }));
+    const note = screen.getByTestId('whatsapp-note');
     expect(within(note).getByText(/^Kopia czatów z .* — starsza niż godzina$/)).toBeTruthy();
     expect(within(note).getByText(/Utwórz kopię/)).toBeTruthy();
-    expect(within(note).getByRole('button', { name: 'Sprawdź ponownie' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Sprawdź ponownie/ })).toBeNull();
     expect(screen.queryByRole('status')).toBeNull();  // już nie osobny baner
   });
 
-  test('no WhatsApp chat backup: the re-check asks the bridge and clears the warning', async () => {
-    const { bridge } = await show({ whatsapp_backup: null });
-    const note = screen.getByTestId('whatsapp-note');
-    expect(within(note).getByText('Na telefonie nie ma kopii czatów')).toBeTruthy();
-    // instrukcja i przycisk w osobnych liniach, bez wiszącego „·”
-    expect(within(note).getByText(/^Na telefonie: WhatsApp → .* → Utwórz kopię$/)).toBeTruthy();
-    const btn = within(note).getByRole('button', { name: 'Sprawdź ponownie' }) as HTMLButtonElement;
-    await fireEvent.click(btn);
-    expect(bridge.calls.some((c) => c.method === 'transfer_whatsapp')).toBe(true);
+  test('no WhatsApp chat backup: same label, instruction on click only', async () => {
+    await show({ whatsapp_backup: null });
+    expect(screen.getByText('brak świeżej kopii czatów')).toBeTruthy();
+    expect(screen.queryByTestId('whatsapp-note')).toBeNull();
+    await fireEvent.click(screen.getByRole('button', { name: /^WhatsApp: jak zrobić\?/ }));
+    expect(within(screen.getByTestId('whatsapp-note')).getByText(/^Na telefonie: WhatsApp → .* → Utwórz kopię$/)).toBeTruthy();
   });
 
-  test('the WhatsApp re-check is off while the phone is being read', async () => {
-    const { s } = await show({ whatsapp_backup: null });
-    s.job = { id: 'job-9', kind: 'transfer_scan' } as never;
-    await tick();
-    const note = screen.getByTestId('whatsapp-note');
-    expect((within(note).getByRole('button', { name: 'Sprawdź ponownie' }) as HTMLButtonElement).disabled).toBe(true);
+  test('a fresh WhatsApp chat backup shows no label and no fold', async () => {
+    const d = new Date();  // czas lokalny, jak w moście
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 19);
+    await show({ whatsapp_backup: local });
+    expect(screen.queryByText('brak świeżej kopii czatów')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^WhatsApp:/ })).toBeNull();
   });
 
-  const XIAOMI = { serial: 'R58T00TEST', manufacturer: 'Xiaomi', brand: 'Redmi' } as never;
+  describe('automatic re-check', () => {
+    afterEach(() => { vi.useRealTimers(); });
+    const rescans = (b: { calls: { method: string }[] }) => b.calls.filter((c) => c.method === 'transfer_rescan').length;
+    const waChecks = (b: { calls: { method: string }[] }) => b.calls.filter((c) => c.method === 'transfer_whatsapp').length;
+
+    test('with the WhatsApp fold open the bridge is asked every RECHECK_MS; with it closed, never', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const { bridge } = await show({ whatsapp_backup: null });
+      await vi.advanceTimersByTimeAsync(RECHECK_MS + 100);
+      expect(waChecks(bridge)).toBe(0);  // rozwinięcie zamknięte
+      await fireEvent.click(screen.getByRole('button', { name: /^WhatsApp: jak zrobić\?/ }));
+      await vi.advanceTimersByTimeAsync(RECHECK_MS + 100);
+      expect(waChecks(bridge)).toBeGreaterThan(0);
+    });
+
+    test('with an export fold open the phone is re-read after RECHECK_MS; with it closed, never', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const { bridge } = await show({ contacts: null, denied: ['contacts'] });
+      await vi.advanceTimersByTimeAsync(RECHECK_MS * 2 + 100);
+      expect(rescans(bridge)).toBe(0);
+      await fireEvent.click(screen.getByRole('button', { name: /^Kontakty: jak skopiować\?/ }));
+      await vi.advanceTimersByTimeAsync(RECHECK_MS + 100);
+      expect(rescans(bridge)).toBeGreaterThan(0);
+    });
+
+    test('no re-check while another phone read is in progress', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const { s, bridge } = await show({ contacts: null, denied: ['contacts'] });
+      await fireEvent.click(screen.getByRole('button', { name: /^Kontakty: jak skopiować\?/ }));
+      s.job = { id: 'job-9', kind: 'transfer_scan' } as never;
+      await tick();
+      await vi.advanceTimersByTimeAsync(RECHECK_MS * 2 + 100);
+      expect(rescans(bridge)).toBe(0);
+    });
+  });
+
+const XIAOMI = { serial: 'R58T00TEST', manufacturer: 'Xiaomi', brand: 'Redmi' } as never;
   const vcf = (name: string, count: number | null, mtime: string, size = 2000) =>
     ({ remote: `/sdcard/Kopia/${name}`, name, size, mtime, count });
   const THREE = [vcf('kontakty_2026-10-27.vcf', 3, '2026-10-27T20:41:00'), vcf('contacts.vcf', 214, '2025-03-12T10:00:00'),
@@ -122,7 +192,20 @@ describe('TransferChoose', () => {
     await tick();
     return env;
   }
-  const meta = (name: RegExp) => screen.getByRole('checkbox', { name }).closest('label')!.textContent!;
+  const meta = (name: RegExp) => screen.getByRole('checkbox', { name }).parentElement!.textContent!;
+  const openFold = (row: string) => fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${row}: `) }));
+
+  test('unreadable export data: a short label, no instructions and no re-check button until clicked', async () => {
+    await show({ contacts: null, denied: ['contacts'] });
+    expect(screen.getByText('telefon nie pozwala odczytać')).toBeTruthy();
+    expect(screen.queryByTestId('export-note-contacts')).toBeNull();
+    expect(screen.queryByText(/Wyeksportuj kontakty/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Sprawdź ponownie/ })).toBeNull();
+    await openFold('Kontakty');
+    expect(screen.getByText(/^Wyeksportuj kontakty do pliku \.vcf w aplikacji Kontakty/)).toBeTruthy();
+    expect(screen.getByText(/Sprawdzam sam co kilka sekund/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Sprawdź ponownie/ })).toBeNull();
+  });
 
   test('denied contacts on a Xiaomi use the newest export file; picking another changes the count', async () => {
     const { s } = await onXiaomi({ contacts: null, denied: ['contacts'], exports: { contacts: THREE } });
@@ -130,12 +213,10 @@ describe('TransferChoose', () => {
     expect(box.checked).toBe(true);
     expect(box.disabled).toBe(false);
     expect(meta(/Kontakty/)).toContain('3 z pliku eksportu');
-    // komunikat, lista plików i „Sprawdź ponownie” siedzą w karcie wiersza Kontakty, nie w osobnym banerze
-    const card = screen.getByRole('checkbox', { name: /Kontakty/ }).closest('.card') as HTMLElement;
-    const note = within(card).getByTestId('export-note-contacts');
-    expect(within(note).getByText('Telefon nie pozwolił odczytać kontaktów — użyto pliku eksportu.')).toBeTruthy();
+    expect(screen.queryByText('telefon nie pozwala odczytać')).toBeNull();  // plik jest, wiersz nie jest już problemem
+    await openFold('Kontakty');
+    const note = screen.getByTestId('export-note-contacts');
     expect(within(note).getByRole('radiogroup', { name: 'Pliki eksportu na telefonie · Kontakty' })).toBeTruthy();
-    expect(within(note).getByRole('button', { name: 'Sprawdź ponownie' })).toBeTruthy();
     // instrukcja (z dopiskiem o Xiaomi) zwinięta, gdy jest z czego wybierać
     const howto = within(note).getByText('Brak aktualnego pliku? Jak go zrobić').closest('details')!;
     expect(howto.open).toBe(false);
@@ -157,52 +238,45 @@ describe('TransferChoose', () => {
       exports: { contacts: [vcf('duzy.vcf', null, '2026-10-27T20:41:00', 2.4 * MB)] } });
     expect(meta(/Kontakty/)).toContain('z pliku eksportu');
     expect(meta(/Kontakty/)).not.toMatch(/\d+ z pliku eksportu/);
+    await openFold('Kontakty');
     expect(within(screen.getByRole('radiogroup')).getByText('2 MB')).toBeTruthy();
   });
 
   test('an export file without a usable date is listed without one', async () => {
     await onXiaomi({ contacts: null, denied: ['contacts'],
       exports: { contacts: [{ ...vcf('stary.vcf', 5, ''), mtime: null }] } });
+    await openFold('Kontakty');
     const radio = within(screen.getByRole('radiogroup')).getByRole('radio');
     expect(radio.closest('label')!.textContent).toContain('stary.vcf');
     expect(radio.closest('label')!.textContent).not.toMatch(/1970|Invalid/);  // nie data z null (epoka)
   });
 
-  test('no export file: the row stays unavailable and the notice says how to make one', async () => {
+  test('no export file: the row stays unavailable and the fold says how to make one', async () => {
     await onXiaomi({ contacts: null, denied: ['contacts'] });
     const box = screen.getByRole('checkbox', { name: /Kontakty/ }) as HTMLInputElement;
     expect(box.disabled).toBe(true);
-    expect(meta(/Kontakty/)).toContain('niedostępne');
-    expect(screen.getByText('Telefon nie pozwolił odczytać kontaktów.')).toBeTruthy();
+    expect(meta(/Kontakty/)).toContain('telefon nie pozwala odczytać');
+    await openFold('Kontakty');
     expect(screen.getByText(/^Bez niej wyeksportuj kontakty do pliku \.vcf w aplikacji Kontakty/)).toBeTruthy();
     expect(screen.queryByRole('radiogroup')).toBeNull();
-    expect(within(screen.getByTestId('export-note-contacts')).getByRole('button', { name: 'Sprawdź ponownie' })).toBeTruthy();
   });
 
-  test('rescanning asks the bridge and is disabled while the phone is read', async () => {
-    const { s, bridge } = await onXiaomi({ contacts: null, denied: ['contacts'] });
-    const note = () => within(screen.getByTestId('export-note-contacts'));
-    await fireEvent.click(note().getByRole('button', { name: 'Sprawdź ponownie' }));
-    expect(bridge.calls.some((c) => c.method === 'transfer_rescan')).toBe(true);
-    expect(bridge.calls.some((c) => c.method === 'transfer_whatsapp')).toBe(false);
-    s.job = { id: 'job-9', kind: 'transfer_scan' } as never;
-    await tick();
-    expect((note().getByRole('button', { name: /Sprawdź ponownie/ }) as HTMLButtonElement).disabled).toBe(true);
-  });
-
-  test('denied contacts and messages get a section each', async () => {
+  test('denied contacts and messages get a row label each', async () => {
     await onXiaomi({ contacts: null, sms: null, mms: null, denied: ['contacts', 'sms'],
       exports: { contacts: THREE, sms: [{ remote: '/sdcard/Backup/sms.xml', name: 'sms.xml', size: 147, mtime: '2026-10-27T20:00:00', count: 60 }] } });
-    expect(within(screen.getByTestId('export-note-contacts')).getByText('Telefon nie pozwolił odczytać kontaktów — użyto pliku eksportu.')).toBeTruthy();
-    expect(within(screen.getByTestId('export-note-sms')).getByText('Telefon nie pozwolił odczytać wiadomości — użyto pliku eksportu.')).toBeTruthy();
+    await openFold('Kontakty');
+    await openFold('SMS i MMS');
+    expect(within(screen.getByTestId('export-note-contacts')).getByRole('radiogroup')).toBeTruthy();
+    expect(within(screen.getByTestId('export-note-sms')).getByRole('radiogroup')).toBeTruthy();
     expect(screen.getAllByRole('radiogroup')).toHaveLength(2);
     expect(meta(/SMS i MMS/)).toContain('60 z pliku eksportu');
   });
 
-  test('a read error that is not a refusal gets no Xiaomi sentence', async () => {
+  test('a read error that is not a refusal gets its own label and no Xiaomi sentence', async () => {
     await onXiaomi({ sms: null, mms: null });
     expect((screen.getByRole('checkbox', { name: /SMS i MMS/ }) as HTMLInputElement).disabled).toBe(true);
-    expect(screen.getByText('Nie udało się odczytać wiadomości.')).toBeTruthy();
+    expect(screen.getByText('nie udało się odczytać')).toBeTruthy();
+    await openFold('SMS i MMS');
     expect(screen.queryByText(/Xiaomi wpuszcza/)).toBeNull();
   });
 
@@ -210,7 +284,7 @@ describe('TransferChoose', () => {
     const { s } = await show({ contacts: null, denied: ['contacts'] });
     s.device = { serial: 'R58T00TEST', manufacturer: 'samsung', brand: 'samsung' } as never;
     await tick();
-    expect(screen.getByText('Telefon nie pozwolił odczytać kontaktów.')).toBeTruthy();
+    await openFold('Kontakty');
     expect(screen.queryByText(/Xiaomi wpuszcza/)).toBeNull();
     expect(screen.getByText(/^Wyeksportuj kontakty do pliku \.vcf/)).toBeTruthy();
     expect(screen.queryByText(/Bez niej/)).toBeNull();
@@ -218,22 +292,24 @@ describe('TransferChoose', () => {
 
   test('a read error that is not a refusal explains the export without "Bez niej", even on a Xiaomi', async () => {
     await onXiaomi({ contacts: null });
+    await openFold('Kontakty');
     expect(screen.getByText(/^Wyeksportuj kontakty do pliku \.vcf/)).toBeTruthy();
     expect(screen.queryByText(/Bez niej/)).toBeNull();
   });
 
   test('each row explains only its own export: contacts from Contacts, messages and calls from SMS Backup & Restore', async () => {
     await show({ contacts: null, sms: null, mms: null, calls: null, denied: ['contacts', 'sms', 'calls'] });
+    for (const r of ['Kontakty', 'SMS i MMS', 'Historia połączeń']) await openFold(r);
     const howto = (k: string) => within(screen.getByTestId(`export-note-${k}`)).getByText(/^Wyeksportuj/).textContent!;
     expect(howto('contacts')).toMatch(/^Wyeksportuj kontakty do pliku \.vcf w aplikacji Kontakty/);
     expect(howto('contacts')).not.toContain('SMS Backup');
     expect(howto('sms')).toMatch(/^Wyeksportuj wiadomości do pliku aplikacją typu SMS Backup & Restore/);
     expect(howto('sms')).not.toContain('Kontakty');
     expect(howto('calls')).toMatch(/^Wyeksportuj historię połączeń do pliku aplikacją typu SMS Backup & Restore/);
-    for (const k of ['contacts', 'sms', 'calls']) expect(howto(k)).toContain('kliknij „Sprawdź ponownie”');
+    for (const k of ['contacts', 'sms', 'calls']) expect(howto(k)).not.toContain('Sprawdź ponownie');
   });
 
-  test('unticking the row sends no export file', async () => {
+test('unticking the row sends no export file', async () => {
     const { bridge } = await onXiaomi({ contacts: null, denied: ['contacts'], exports: { contacts: THREE } });
     await fireEvent.click(screen.getByRole('checkbox', { name: /Kontakty/ }));
     await fireEvent.click(screen.getByRole('button', { name: /Rozpocznij kopię/ }));

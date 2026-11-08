@@ -766,37 +766,38 @@
     "title": "What should be copied from the old phone?",
     "sub": "The selected data goes to this computer, then to the new phone. Nothing is changed on this phone.",
     "group": {
-      "phone": "Phone",
+      "messages": "Contacts and messages",
       "files": "Files",
       "apps": "Apps"
     },
     "row": {
       "contacts": "Contacts",
-      "contacts_note": "The new phone opens an import — you pick the Google account.",
       "sms": "SMS and MMS",
-      "sms_note": "Including MMS attachments. RCS chats (“chat” in Google Messages) can't be copied over USB.",
       "calls": "Call history",
       "media": "Photos and videos",
-      "media_note": "Camera, screenshots, Pictures, Movies",
       "downloads": "Downloads and documents",
-      "downloads_note": "Download, Documents",
       "whatsapp": "WhatsApp",
-      "whatsapp_note": "chats and media",
       "others": "Other folders",
       "root": "Files in the main folder",
       "apps": "Apps",
-      "apps_note": "Only the apps, without their data and sign-ins.",
+      "apps_note": "apps only, without their data and sign-ins",
       "show": "Show ▾",
       "hide": "Hide ▴",
-      "missing": "Not in the copy: {what}"
+      "missing": "Not in the copy: {what}",
+      "missing_phone": "Not on the phone: {what}",
+      "unreadable": "the phone does not allow reading",
+      "read_failed": "could not read",
+      "how_copy": "how to copy?",
+      "how_make": "how to do it?",
+      "export_files": "export files",
+      "no_wa_backup": "no recent chat backup"
     },
+    "auto_check_file": "I check on my own every few seconds — the file will appear here.",
+    "auto_check_wa": "I check on my own every few seconds — once the backup is ready, this tag disappears.",
     "export": {
-      "title_denied": "The phone did not allow reading {what}.",
-      "title_denied_file": "The phone did not allow reading {what} — an export file is used.",
-      "title_failed": "Could not read {what}.",
       "xiaomi": "Xiaomi allows access to this data only with “USB debugging (Security settings)” in Developer options, which requires a Mi account.",
-      "howto": "Without it, export {steps}, save the file in the phone’s storage, e.g. in Downloads or a new folder, and click “Check again”.",
-      "howto_plain": "Export {steps}, save the file in the phone’s storage, e.g. in Downloads or a new folder, and click “Check again”.",
+      "howto": "Without it, export {steps}, save the file in the phone’s storage, e.g. in Downloads or a new folder.",
+      "howto_plain": "Export {steps}, save the file in the phone’s storage, e.g. in Downloads or a new folder.",
       "steps": {
         "contacts": "the contacts to a .vcf file in the Contacts app (Import/export → Export)",
         "sms": "the messages to a file with an app such as SMS Backup & Restore",
@@ -851,25 +852,20 @@
     },
     "unreadable_files_text": "The phone did not allow reading them (e.g. a damaged name or no access). The rest of the data is copied as usual.",
     "whatsapp_old_title": "Chat backup from {when} — older than an hour",
-    "whatsapp_none_title": "There is no chat backup on the phone",
     "whatsapp_howto": "On the phone: WhatsApp → Settings → Chats → Chat backup → Back up",
-    "recheck": "Check again",
-    "apps_copy": "{count} to copy",
     "apps_skipped": {
-      "one": "{count} skipped: harmful",
-      "few": "{count} skipped: harmful",
-      "many": "{count} skipped: harmful",
-      "other": "{count} skipped: harmful"
+      "one": "{count} harmful — skipped",
+      "few": "{count} harmful — skipped",
+      "many": "{count} harmful — skipped",
+      "other": "{count} harmful — skipped"
     },
     "apps_suspicious": {
-      "one": "{count} suspicious — unticked",
-      "few": "{count} suspicious — unticked",
-      "many": "{count} suspicious — unticked",
-      "other": "{count} suspicious — unticked"
+      "one": "{count} suspicious, unticked",
+      "few": "{count} suspicious, unticked",
+      "many": "{count} suspicious, unticked",
+      "other": "{count} suspicious, unticked"
     },
     "suspicious": "suspicious",
-    "show_list": "Show list",
-    "hide_list": "Hide list",
     "files": {
       "one": "{count} file",
       "few": "{count} files",
@@ -1038,7 +1034,7 @@
       "apks_note": "App installers from the copy, assessed on this computer. Harmful ones are never uploaded.",
       "apk": {
         "clean": "checked",
-        "suspicious_off": "suspicious — unticked",
+        "suspicious_off": "suspicious, unticked",
         "suspicious_on": "suspicious — ticked",
         "malicious": "skipped as harmful",
         "unknown": "can't be assessed"

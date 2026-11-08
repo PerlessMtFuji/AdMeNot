@@ -5,7 +5,7 @@
   // Jeden wiersz = jedna kategoria: [pole wyboru] ikona, nazwa + liczba, linia pod spodem, etykiety,
   // „Pokaż ▾” (zwinięte szczegóły), rozmiar albo wynik po prawej. Problem to etykieta w wierszu, a opis
   // „jak …?” siedzi w zwinięciu i otwiera się dopiero po kliknięciu.
-  let { icon: Glyph, name, count, size, sub, checked, disabled = false, ontoggle, tone = null, pills, fold, foldLabel,
+  let { icon: Glyph, name, count, size, sub, checked, disabled = false, ontoggle, tone = null, pills, fold, foldLabel, foldText,
     foldOpen, onfold, result }: {
     icon: Component<{ size?: number; strokeWidth?: number; 'aria-hidden'?: 'true' }>;
     name: string;
@@ -19,6 +19,8 @@
     pills?: Snippet;
     fold?: Snippet;
     foldLabel?: string;
+    /** Własny podpis przycisku zamiast „Pokaż”, np. „jak skopiować?” (strzałka ▾/▴ dochodzi sama). */
+    foldText?: string;
     /** Tryb sterowany: stan trzyma rodzic (`onfold`). Bez niego wiersz sam pamięta, zwinięty na starcie. */
     foldOpen?: boolean;
     onfold?: (open: boolean) => void;
@@ -28,6 +30,7 @@
   const uid = $props.id();
   let ownOpen = $state(false);
   const open = $derived(foldOpen ?? ownOpen);
+  const toggleText = $derived(foldText ? `${foldText} ${open ? '▴' : '▾'}` : open ? t('transfer.row.hide') : t('transfer.row.show'));
   const foldId = `fold-${uid}`;
   const hasBox = $derived(ontoggle !== undefined || checked !== undefined);
   const TINT = { warn: 'bg-warn-soft/50', block: 'bg-gradient-to-r from-warn-soft to-transparent to-70%' };
@@ -55,8 +58,8 @@
     {#if pills}<span class="flex flex-none flex-wrap items-center justify-end gap-1.5">{@render pills()}</span>{/if}
     {#if fold}
       <button type="button" class="flex-none cursor-pointer text-[13px] font-semibold whitespace-nowrap text-accent hover:underline"
-        aria-expanded={open} aria-controls={foldId} aria-label={foldLabel ? `${foldLabel}: ${open ? t('transfer.row.hide') : t('transfer.row.show')}` : undefined}
-        onclick={toggleFold}>{open ? t('transfer.row.hide') : t('transfer.row.show')}</button>
+        aria-expanded={open} aria-controls={foldId} aria-label={foldLabel ? `${foldLabel}: ${toggleText}` : undefined}
+        onclick={toggleFold}>{toggleText}</button>
     {/if}
     {#if size}<span class="mono flex-none text-[12.5px] whitespace-nowrap text-mut">{size}</span>{/if}
     {#if result}

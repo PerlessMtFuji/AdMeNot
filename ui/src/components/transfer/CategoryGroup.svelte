@@ -3,8 +3,8 @@
   import { t } from '../../lib/i18n/index.svelte';
 
   // Karta z nagłówkiem grupy i wierszami `CategoryRow` rozdzielonymi cienką linią.
-  // `empty`: kategorie, których nie ma w kopii — jedna szara linia na dole.
-  let { title, children, empty }: { title: string; children: Snippet; empty?: string } = $props();
+  // `empty`: kategorie (`missingKey` — przedrostek, domyślnie „Brak w kopii”), których nie ma w kopii — jedna szara linia na dole.
+  let { title, children, empty, missingKey = 'transfer.row.missing' }: { title: string; children: Snippet; empty?: string; missingKey?: string } = $props();
 </script>
 
 <section class="card overflow-hidden rounded-2xl border border-line shadow-sm" aria-label={title}>
@@ -13,6 +13,6 @@
     {@render children()}
   </div>
   {#if empty}
-    <p class="border-t border-line px-4 py-2 text-xs text-soft">{t('transfer.row.missing', { what: empty })}</p>
+    <p class="border-t border-line px-4 py-2 text-xs text-soft">{t(missingKey, { what: empty })}</p>
   {/if}
 </section>
