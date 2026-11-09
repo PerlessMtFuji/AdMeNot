@@ -24,7 +24,7 @@ from admenot.engine.device.info import DeviceInfo
 from admenot.engine.device_checks import DeviceCheck, fix_steps
 from admenot.engine.evidence import ladders
 from admenot.engine.facts import AppFacts
-from admenot.engine.journal.db import Action, Journal, Order
+from admenot.engine.journal.db import Action, Journal, Order, TransferRecord
 from admenot.engine.paths import transfers_dir
 from admenot.engine.phones.provider import SILHOUETTE, PhoneMatch
 from admenot.engine.report.model import device_block
@@ -49,6 +49,7 @@ from admenot.engine.texts import (
     verdict_label,
     warning_text,
 )
+from admenot.engine.transfer.apps import AppsPlan, AppsResult
 from admenot.engine.transfer.backup import BackupResult
 from admenot.engine.transfer.inventory import FILE_CATEGORIES, Inventory
 from admenot.engine.transfer.restore import RestoreResult
@@ -498,7 +499,7 @@ def copy_view(meta: CopyMeta, now: datetime, restoring: str | None = None) -> di
             "expires": meta.expires.isoformat(timespec="seconds"),
             "days_left": max(0, math.ceil(left / 86_400)), "status": meta.status,
             "bytes": meta.bytes, "counts": dict(meta.counts), "selection": dict(meta.selection),
-            "note": copy.read_note(),
+            "note": copy.read_note(), "order": meta.order,
             "restores": [{"serial": r.serial, "imei": r.imei,
                           "status": "stopped" if r.status == "running" and restoring != meta.id else r.status,
                           "updated": r.updated, "resumable": r.resumable} for r in restores]}
@@ -563,6 +564,24 @@ def tel_plan_view(p: TelPlan) -> dict[str, Any]:
             "readable": dict(p.readable)}
 
 
+def restore_choice_view(groups: frozenset[str], tel_kinds: frozenset[str], apps: int,
+                        plan: TelPlan) -> dict[str, Any]:
+    """Wybór serwisanta przy starcie wgrywania do wyniku w dzienniku (protokół: kategoria odznaczona to nie
+    porażka). `tel` w kategoriach silnika (`sms` z MMS); `tel_plan` — co plan wiedział o każdej kategorii
+    kopii: ile do zapisu, ile już na telefonie, ile przyjdzie z synchronizacją konta / z komunikatora."""
+    src, c = plan.sources, plan.contacts
+    known: dict[str, dict[str, int]] = {}
+    if src.contacts is not None and c is not None:
+        known["contacts"] = {"write": len(c.write), "existing": plan.existing.get("contacts", 0),
+                             "synced": sum(c.skipped_synced.values()), "messenger": c.skipped_messenger}
+    for name, present, records in (("sms", src.sms, plan.sms), ("mms", src.mms, plan.mms),
+                                   ("calls", src.calls, plan.calls)):
+        if present is not None:
+            known[name] = {"write": len(records), "existing": plan.existing.get(name, 0), "synced": 0,
+                           "messenger": 0}
+    return {"groups": sorted(groups), "tel": sorted(tel_kinds), "apps": apps, "tel_plan": known}
+
+
 def tel_result_view(r: TelResult) -> dict[str, Any]:
     """Wynik telefonii: liczby per kategoria, kopia bezpieczeństwa, pliki do ręcznego importu (sama nazwa
     pliku w `Pobranych`), przywrócenie telefonu (`cleanup.ok`) i konta pominiętych kontaktów (tylko UI)."""
@@ -571,3 +590,95 @@ def tel_result_view(r: TelResult) -> dict[str, Any]:
             "cleanup": {**asdict(r.cleanup), "ok": r.cleanup.ok},
             "synced_accounts": _accounts(r.synced_accounts), "seconds": r.seconds, "stopped": r.stopped,
             "status": r.status}
+
+
+def apps_plan_view(plan: AppsPlan) -> dict[str, Any]:
+    """Aplikacje z kopii na ekranie wgrywania. `name` = etykieta ze starego telefonu (albo pakiet);
+    `skip` = powód, dla którego aplikacji nie da się zainstalować (`installed`, `too_old`, …) albo `None`.
+    `bytes` = suma rozmiarów wszystkich instalowalnych pozycji (`skip` pusty) — UI dolicza do „Do wgrania”
+    tylko zaznaczone. `block`: `xiaomi`, gdy telefon blokuje instalację przez USB."""
+    return {"items": [{"package": c.package, "name": c.label, "bytes": c.bytes, "verdict": c.verdict,
+                       "default_on": c.default_on, "skip": c.skip} for c in plan.apps],
+            "block": plan.block,
+            "bytes": sum(c.bytes for c in plan.apps if c.skip is None)}
+
+
+def apps_result_view(r: AppsResult) -> dict[str, Any]:
+    """Wynik instalacji: liczby, kody błędów (`INSTALL_FAILED_…`), wiersze `{package, label, status,
+    reason}` (etykiety tylko do UI) i flagi `blocked` / `stopped` / `play_installer`."""
+    return asdict(r)
+
+
+# pominięcia aplikacji, które protokół pokazuje na żółto (inaczej niż „już jest”)
+_NOTED_APP_SKIPS = ("user_restricted", "too_old", "too_new", "no_abi")
+
+
+def result_notes(result: dict[str, Any] | None) -> int:
+    """Liczba uwag do wyniku wgrywania — to, co protokół pokazuje na żółto: aplikacje z błędem albo pominięte
+    z powodu blokady / za stare / za nowe / bez wersji dla procesora + grupy plików z błędami + kategorie
+    telefonii z błędami albo do ręcznego importu + błąd całej telefonii. „Już jest” uwagą nie jest, a kategorie
+    niewybrane przy wgrywaniu nie mają wyniku, więc też nie."""
+    if not result:
+        return 0
+    notes = 0
+    files = result.get("files") or {}
+    notes += sum(1 for g in (files.get("groups") or {}).values() if g.get("failed"))
+    tel = result.get("tel") or {}
+    kinds = tel.get("kinds") or {}
+    notes += sum(1 for k in kinds.values() if k.get("failed"))
+    manual = {m.get("kind") for m in tel.get("manual") or ()} | {n for n, k in kinds.items() if k.get("manual")}
+    notes += len({n for n in manual if not (kinds.get(n) or {}).get("failed")})
+    notes += 1 if result.get("tel_error") else 0
+    apps = result.get("apps") or {}
+    notes += sum((apps.get("failed") or {}).values())
+    notes += sum((apps.get("skipped") or {}).get(r, 0) for r in _NOTED_APP_SKIPS)
+    return notes
+
+
+def _apps_waiting(apps: dict[str, Any]) -> bool:
+    """Aplikacje do doinstalowania po blokadzie Xiaomi (wynik etapu „Aplikacje” zlecenia)."""
+    return bool(apps.get("blocked") or (apps.get("skipped") or {}).get("user_restricted"))
+
+
+def transfer_order_view(order: Order, rec: TransferRecord, meta: CopyMeta | None,
+                        now: datetime, running: bool = False) -> dict[str, Any]:
+    """Zlecenie ZS przeniesienia danych w Historii. `state`: `expired`/`failed` ze statusu zlecenia;
+    bez telefonu docelowego albo z wgrywaniem w toku — `copy_ready`; po wgraniu `restored` albo
+    `restored_notes` (`notes` > 0, patrz `result_notes`). Zlecenie `running` z celem i zapisanym wynikiem,
+    którego wgrywanie nie trwa (`running` — zadanie dla tego zlecenia), to przerwane (program zamknięty):
+    `failed`; `partial` — czy przed przerwaniem coś wgrano. `copy`: kopia, która jeszcze jest (dni do
+    usunięcia) albo `deleted_at` po jej usunięciu; `None` — brak kopii i brak daty."""
+    notes = result_notes(rec.result)
+    if order.status == "expired":
+        state = "expired"
+    elif order.status == "failed" or (order.status == "running" and rec.target_serial is not None
+                                      and rec.result is not None and not running):
+        state = "failed"
+    elif rec.target_serial is None or rec.result is None or rec.result.get("status") != "done":
+        state = "copy_ready"
+    else:
+        state = "restored_notes" if notes else "restored"
+    copy: dict[str, Any] | None = None
+    if meta is not None:
+        left = (meta.expires - now).total_seconds()
+        copy = {"id": meta.id, "days_left": max(0, math.ceil(left / 86_400)), "deleted_at": None}
+    elif rec.copy_deleted_at is not None:
+        copy = {"id": rec.copy_id, "days_left": 0, "deleted_at": rec.copy_deleted_at.isoformat(timespec="seconds")}
+
+    def phone(d: dict[str, Any] | None) -> dict[str, Any] | None:
+        if not d:
+            return None
+        name = d.get("market_name") or " ".join(x for x in (d.get("manufacturer"), d.get("model")) if x)
+        return {"name": name or None, "imei": d.get("imei")}
+
+    return {"number": order.number, "client": order.client_name,
+            "created_at": order.created_at.isoformat(timespec="seconds"),
+            "source": phone(rec.source) or {"name": None, "imei": None}, "target": phone(rec.target),
+            "state": state, "notes": notes, "copy": copy, "whatsapp_restored": rec.whatsapp_restored,
+            # przerwane po części: coś już wgrano (Historia: „przerwane” zamiast „nie wgrano”)
+            "partial": any((rec.result or {}).get(k) for k in ("files", "tel", "apps")),
+            "target_serial": rec.target_serial,
+            # czeka na doinstalowanie: blokada albo pominięte przez nią aplikacje, które zostały po
+            # zatrzymanym dokończeniu (zamknięcie programu w trakcie zapisuje `blocked: false`)
+            "apps_blocked": _apps_waiting((rec.result or {}).get("apps") or {}),
+            "counts": dict(rec.source.get("counts") or {})}

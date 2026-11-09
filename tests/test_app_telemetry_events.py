@@ -123,8 +123,8 @@ def test_undo_targets_do_not_fail_an_app_for_skipped_or_timed_out_sites():
 def test_sample_uses_the_same_shapes():
     s = ev.sample()
     assert [e["type"] for e in s["basic"]] == ["start", "scan", "repair", "undo", "transfer_backup",
-                                              "transfer_restore", "explorer"]
-    no_packages = ("start", "transfer_backup", "transfer_restore", "explorer")  # zdarzenia bez listy pakietów
+                                              "transfer_restore", "transfer_apps", "transfer_report", "explorer"]
+    no_packages = ("start", "transfer_backup", "transfer_restore", "transfer_apps", "transfer_report", "explorer")  # zdarzenia bez listy pakietów
     assert all(e["packages"] is None for e in s["basic"] if e["type"] not in no_packages)
     assert all(e["packages"] for e in s["packages"] if e["type"] not in no_packages)
     assert all("packages" not in e for e in s["basic"] + s["packages"] if e["type"] in no_packages)
@@ -398,3 +398,43 @@ def test_explorer_event_numbers_limits_and_error_keys():
         "created": {"folder": 1, "text": 0}, "errors": {"explorer_denied": 2, "file_size": 1}, "mb_s": 30}
     idle = ev.explorer_event(ev._SAMPLE_DEVICE, 5, 0, 0, 0, 0, {}, {}, {}, [])
     assert idle["mb_s"] is None and idle["errors"] == {}
+
+
+def _apps_result(**kw):
+    from admenot.engine.transfer.apps import AppsResult
+
+    opts = {"selected": 12, "installed": 7, "exists": 2, "skipped": {"too_old": 1, "no_abi": 1},
+            "failed": {"user_restricted": 1, "no_space": 1}, "codes": {"INSTALL_FAILED_USER_RESTRICTED": 1},
+            "blocked": True, "stopped": False,
+            "rows": [{"package": "com.secret.app", "label": "Tajna Aplikacja", "status": "failed",
+                      "reason": "user_restricted"}], "play_installer": True}
+    opts.update(kw)
+    return AppsResult(**opts)
+
+
+def test_restore_event_apps_counts_only():
+    body = ev.transfer_restore_event(ev._SAMPLE_DEVICE, _restore_result(), _upload_choice(), 4,
+                                     apps=_apps_result())
+    assert body["apps"] == {"selected": 12, "installed": 7, "exists": 2, "skipped": 2, "failed": 2}
+    assert body["apps_codes"] == {"user_restricted": 1, "no_space": 1}
+    assert body["installer"] == "play" and body["apps_blocked"] is True
+    text = json.dumps(body)
+    for name in ("com.secret.app", "Tajna", "INSTALL_FAILED", "R58NEW00001"):
+        assert name not in text, name
+    plain = ev.transfer_restore_event(ev._SAMPLE_DEVICE, _restore_result(), _upload_choice(), 4)
+    assert not {"apps", "apps_codes", "installer", "apps_blocked"} & set(plain)
+
+
+def test_apps_event_shape_limits_and_error_keys_only():
+    body = ev.transfer_apps_event(ev._SAMPLE_DEVICE, _apps_result(
+        installed=10**9, play_installer=False, failed={"failed": 3, "zly klucz": 2, "INSTALL_FAILED_X": 1}))
+    assert set(body) == {"device", "apps", "apps_codes", "installer", "apps_blocked"}
+    assert body["apps"]["installed"] == ev.MAX_COUNT and body["installer"] == "none"
+    assert body["apps_codes"] == {"failed": 3}
+    many = ev.transfer_apps_event(ev._SAMPLE_DEVICE, _apps_result(failed={f"k{i}": 1 for i in range(30)}))
+    assert many["apps_codes"] == {}
+
+
+def test_transfer_report_event_shape():
+    assert ev.transfer_report_event("warn", True) == {"status": "warn", "whatsapp_restored": True}
+    assert ev.transfer_report_event("ok", False) == {"status": "ok", "whatsapp_restored": False}

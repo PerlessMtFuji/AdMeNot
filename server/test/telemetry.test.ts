@@ -227,6 +227,70 @@ describe("POST /api/v1/telemetry", () => {
     expect(await rows()).toEqual([]);
   });
 
+  const APPS = { selected: 12, installed: 7, exists: 2, skipped: 2, failed: 2 };
+  const withApps = (extra: Record<string, unknown> = {}) => restore({
+    apps: APPS, apps_codes: { user_restricted: 1, no_space: 1 }, installer: "play", apps_blocked: true, ...extra });
+
+  it("transfer_restore z aplikacjami: przyjęte i zapisane same liczby", async () => {
+    const res = await post([withApps(), withApps({ apps_codes: {}, installer: "none", apps_blocked: false })]);
+    expect(res.status).toBe(200);
+    const [first, second] = (await rows()).map((r) => JSON.parse(r.body));
+    expect(first).toMatchObject({ apps: APPS, apps_codes: { user_restricted: 1, no_space: 1 }, installer: "play",
+      apps_blocked: true });
+    expect(second).toMatchObject({ apps_codes: {}, installer: "none", apps_blocked: false });
+  });
+
+  it("transfer_restore bez aplikacji nadal przechodzi", async () => {
+    expect((await post([restore()])).status).toBe(200);
+    const body = JSON.parse((await rows())[0].body);
+    expect(body.apps).toBeUndefined();
+    expect(body.installer).toBeUndefined();
+  });
+
+  it.each([
+    ["surowy kod INSTALL_FAILED", withApps({ apps_codes: { INSTALL_FAILED_USER_RESTRICTED: 1 } })],
+    ["nieznany kod", withApps({ apps_codes: { weird: 1 } })],
+    ["kod z nazwą pakietu", withApps({ apps_codes: { "com.secret.app": 1 } })],
+    ["kod nie liczba", withApps({ apps_codes: { failed: "1" } })],
+    ["nieznany instalator", withApps({ installer: "com.android.vending" })],
+    ["apps jako lista", withApps({ apps: ["com.a"] })],
+    ["apps z dodatkowym polem", withApps({ apps: { ...APPS, label: "Tajna" } })],
+    ["apps bez failed", withApps({ apps: { ...APPS, failed: undefined } })],
+    ["apps_blocked nie logiczne", withApps({ apps_blocked: "yes" })],
+    ["brak apps_codes", withApps({ apps_codes: undefined })],
+  ])("transfer_restore z aplikacjami 400: %s", async (_name, event) => {
+    expect((await post([event])).status).toBe(400);
+    expect(await rows()).toEqual([]);
+  });
+
+  const appsEvent = (extra: Record<string, unknown> = {}) => common("transfer_apps", {
+    device: DEVICE, apps: APPS, apps_codes: { failed: 2 }, installer: "play", apps_blocked: false, ...extra });
+  const protocol = (extra: Record<string, unknown> = {}) => common("transfer_report", {
+    status: "warn", whatsapp_restored: true, ...extra });
+
+  it("transfer_apps i transfer_report: przyjęte i zapisane", async () => {
+    expect((await post([appsEvent(), protocol(), protocol({ status: "bad", whatsapp_restored: false })])).status)
+      .toBe(200);
+    const [a, r1, r2] = (await rows()).map((r) => JSON.parse(r.body));
+    expect(a).toMatchObject({ type: "transfer_apps", apps: APPS, apps_codes: { failed: 2 }, installer: "play" });
+    expect(r1).toMatchObject({ type: "transfer_report", status: "warn", whatsapp_restored: true });
+    expect(r2).toMatchObject({ status: "bad", whatsapp_restored: false });
+  });
+
+  it.each([
+    ["transfer_apps: dodatkowe pole", appsEvent({ package: "com.a" })],
+    ["transfer_apps: brak urządzenia", appsEvent({ device: undefined })],
+    ["transfer_apps: surowy kod", appsEvent({ apps_codes: { INSTALL_FAILED_X: 1 } })],
+    ["transfer_apps: brak installer", appsEvent({ installer: undefined })],
+    ["transfer_report: nieznany status", protocol({ status: "done" })],
+    ["transfer_report: whatsapp nie logiczne", protocol({ whatsapp_restored: 1 })],
+    ["transfer_report: dodatkowe pole numer", protocol({ order: "ZS/2026/1108/01" })],
+    ["transfer_report: brak statusu", protocol({ status: undefined })],
+  ])("400: %s", async (_name, event) => {
+    expect((await post([event])).status).toBe(400);
+    expect(await rows()).toEqual([]);
+  });
+
   it("undo: liczby witryn opcjonalne, domyślnie 0", async () => {
     await post([undo()]);
     expect(JSON.parse((await rows())[0].body)).toMatchObject({ sites: 0, sites_restored: 0 });

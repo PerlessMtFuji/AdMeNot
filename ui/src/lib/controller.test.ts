@@ -1276,6 +1276,43 @@ describe('data transfer', () => {
     expect(s.transfer.copies).toEqual([]);
   });
 
+  test('transfer orders: loaded with the copies, the copy stays in its row after deleting, WhatsApp saves optimistically', async () => {
+    const { ctl, s, bridge } = setup('empty');
+    await ctl.init();
+    const order = { number: 'ZS/1', client: null, created_at: '2026-10-25T10:00:00', source: { name: 'A', imei: null },
+      target: { name: 'B', imei: null }, state: 'restored' as const, notes: 0, copy: { id: 'S/1', days_left: 7, deleted_at: null },
+      whatsapp_restored: false, apps_blocked: false, counts: {} };
+    bridge.setOrders([order]);
+    bridge.setCopies([{ id: 'S/1', serial: 'S', model: 'M', manufacturer: 'm', client: null, created: '2026-10-25T10:00:00',
+      expires: '2026-11-01T10:00:00', days_left: 7, status: 'complete', bytes: 10, counts: {}, order: 'ZS/1' }]);
+    await ctl.loadTransfers();
+    expect(s.transfer.orders.map((o) => o.number)).toEqual(['ZS/1']);
+    await ctl.extendTransfer('S/1');
+    expect(s.transfer.orders[0].copy?.days_left).toBe(14);
+    const pending = ctl.setOrderWhatsapp('ZS/1', true);
+    expect(s.transfer.orders[0].whatsapp_restored).toBe(true);
+    await pending;
+    expect(bridge.calls.at(-1)).toEqual({ method: 'set_whatsapp_restored', args: ['ZS/1', true] });
+    bridge.failNext('set_whatsapp_restored', 'unknown_order', 'ZS/1');
+    await ctl.setOrderWhatsapp('ZS/1', false);
+    expect(s.transfer.orders[0].whatsapp_restored).toBe(true);  // odmowa cofa pole
+    await ctl.deleteTransfer('S/1');
+    expect(s.transfer.orders[0].copy).toMatchObject({ id: 'S/1', deleted_at: expect.any(String) });
+  });
+
+  test('reinstall from the history: a refusal is a note on the order (no banner); success marks the order busy', async () => {
+    const { ctl, s, bridge } = setup('empty');
+    await ctl.init();
+    bridge.failNext('install_remaining_apps', 'transfer_no_phone', 'X');
+    await ctl.reinstallFromHistory('ZS/1');
+    expect(s.error).toBeNull();
+    expect(s.transfer.appsNotes).toEqual({ 'ZS/1': 'transfer_no_phone' });
+    await ctl.reinstallFromHistory('ZS/1');
+    expect(s.transfer.appsNotes).toEqual({});
+    expect(s.transfer.appsBusy).toBe('ZS/1');
+    expect(s.job?.kind).toBe('restore_apps');
+  });
+
   test('a refused delete (copy in use) keeps the copy and shows the error', async () => {
     const { ctl, s, bridge } = setup('transfer');
     await ctl.init();
@@ -1347,6 +1384,39 @@ describe('data transfer — export files', () => {
     const sent = bridge.calls.find((c) => c.method === 'start_backup')?.args[0] as Record<string, unknown>;
     expect(sent.contacts).toBe(false);
     expect(sent.exports).toEqual({ sms: SMS });
+  });
+
+  test('background checks are silent: a failing bridge raises no error card (spec §7.1)', async () => {
+    const { ctl, s, bridge } = await chosen();
+    const before = s.transfer.inventory;
+    bridge.failNext('transfer_exports_check', 'internal', 'boom');
+    await ctl.checkExports();
+    expect(s.error).toBeNull();
+    expect(s.transfer.inventory).toBe(before);
+    bridge.failNext('transfer_whatsapp', 'device_lost');
+    await ctl.recheckWhatsapp();
+    expect(s.error).toBeNull();
+    expect(s.transfer.inventory?.whatsapp_backup).toBeNull();
+    s.phase = 'transfer_restore_plan';
+    s.transfer.restore.apps = { block: 'xiaomi', bytes: 0, items: [] };
+    bridge.failNext('install_check', 'internal', 'boom');
+    await ctl.checkInstall();
+    expect(s.error).toBeNull();
+    expect(s.transfer.restore.apps?.block).toBe('xiaomi');
+  });
+
+  test('checkExports is a cheap read without a job: merges the parts and keeps the choices', async () => {
+    const { ctl, s, bridge } = await chosen();
+    ctl.chooseExport('contacts', OLDER);
+    ctl.toggleTransfer('downloads');
+    const before = s.transfer.selection;
+    await ctl.checkExports();
+    expect(bridge.calls.at(-1)?.method).toBe('transfer_exports_check');
+    expect(bridge.calls.some((c) => c.method === 'transfer_rescan')).toBe(false);
+    expect(s.job).toBeNull();
+    expect(s.transfer.inventory?.exports.contacts?.length).toBeGreaterThan(0);
+    expect(s.transfer.inventory?.apps.length).toBeGreaterThan(0);  // reszta inwentarza zostaje
+    expect(s.transfer.selection).toEqual(before);
   });
 
   test('rescan asks the bridge, keeps an older picked file and the other choices', async () => {
@@ -1429,7 +1499,7 @@ describe('data transfer — uploading a copy', () => {
     expect(s.transfer.restore.sameRecent).toBe(false);
     expect(s.transfer.restore.resumable).toBe(false);
     expect(s.transfer.restore.choice).toEqual({ groups: ['photos', 'downloads', 'whatsapp', 'other:Music'], apks_on: [],
-      verify_hash: false, tel: ['contacts', 'sms', 'calls'] });
+      verify_hash: false, tel: ['contacts', 'sms', 'calls'], apps: ['com.whatsapp', 'pl.example.native'] });
     expect(s.transfer.restore.tel?.contacts?.write).toBe(2);
     await vi.waitFor(() => expect(s.job).toBeNull());
   });
@@ -1461,7 +1531,7 @@ describe('data transfer — uploading a copy', () => {
     expect(s.phase).toBe('transfer_restore');
     expect(bridge.calls.find((c) => c.method === 'start_restore')?.args[0]).toEqual({
       groups: ['photos', 'videos', 'downloads', 'whatsapp', 'other:Music'], apks_on: [], verify_hash: false,
-      tel: ['contacts', 'sms', 'calls'] });
+      tel: ['contacts', 'sms', 'calls'], apps: ['com.whatsapp', 'pl.example.native'] });
     await vi.waitFor(() => expect(s.phase).toBe('transfer_restored'));
     expect(s.transfer.restore.result?.files_renamed).toBe(1);
     expect(s.transfer.restore.progress?.stage).toBe('scan');
@@ -1479,6 +1549,39 @@ describe('data transfer — uploading a copy', () => {
     s.transfer.restore.tel = { ...s.transfer.restore.tel!, calls: null };
     ctl.toggleTel('calls');
     expect(s.transfer.restore.choice.tel).toEqual(['contacts', 'sms']);
+  });
+
+  test('restore_done carries apps, order and WhatsApp; old recordings without them leave nulls; apps events update in place', async () => {
+    const { ctl, s, bridge } = setup('transfer_restore');
+    await ctl.init();
+    const done = (extra: object) => bridge.emit('transfer:restore_done', { result: { status: 'complete', target_serial: NEW } as never,
+      copy: { id: COPY_ID } as never, ...extra } as never);
+    done({});
+    expect(s.transfer.restore).toMatchObject({ appsResult: null, appsError: null, order: null, whatsapp: null, whatsappRestored: false });
+    const apps = { selected: 1, installed: 0, exists: 0, skipped: { user_restricted: 1 }, failed: {}, codes: {}, blocked: true, stopped: false,
+      rows: [], play_installer: true };
+    done({ apps, order: 'ZS/1', whatsapp: { files: true, app: 'missing' }, apps_error: null });
+    expect(s.transfer.restore).toMatchObject({ appsResult: apps, order: 'ZS/1', whatsapp: { files: true, app: 'missing' } });
+    bridge.emit('transfer:apps_progress', { stage: 'apps', done: 1, total: 2, current: 'x' });
+    expect(s.transfer.restore.appsProgress?.done).toBe(1);
+    bridge.emit('transfer:apps_done', { order: 'ZS/other', apps: { ...apps, blocked: false } });
+    expect(s.transfer.restore.appsResult?.blocked).toBe(true);
+    bridge.emit('transfer:apps_done', { order: 'ZS/1', apps: { ...apps, blocked: false, installed: 1, skipped: {} } });
+    expect(s.transfer.restore.appsResult).toMatchObject({ blocked: false, installed: 1 });
+    expect(s.transfer.restore.appsProgress).toBeNull();
+  });
+
+  test('WhatsApp tick: saved through the bridge, rolled back when the bridge refuses', async () => {
+    const { ctl, s, bridge } = setup('transfer_restore');
+    await ctl.init();
+    s.transfer.restore.order = 'ZS/1';
+    await ctl.setWhatsappRestored(true);
+    expect(bridge.calls.at(-1)).toEqual({ method: 'set_whatsapp_restored', args: ['ZS/1', true] });
+    expect(s.transfer.restore.whatsappRestored).toBe(true);
+    bridge.failNext('set_whatsapp_restored', 'unknown_order', 'ZS/1');
+    await ctl.setWhatsappRestored(false);
+    expect(s.transfer.restore.whatsappRestored).toBe(true);
+    expect(s.error?.key).toBe('unknown_order');
   });
 
   test('telephony run: progress, the on-phone prompt, skipping it and the result with the files', async () => {
@@ -1518,7 +1621,8 @@ describe('data transfer — uploading a copy', () => {
     const done = { status: 'complete', target_serial: NEW, files_done: 1, files_exists: 0, files_renamed: 0, files_denied: 0,
       files_failed: 0, files_unselected: 0, apk_skipped: 0, apk_suspicious_skipped: 0, bytes: 1, seconds: 1, hashed: false,
       media_scan: 'done', files_missing: 0 } as const;
-    bridge.emit('transfer:restore_done', { result: done, copy: JSON.parse(JSON.stringify(s.transfer.restore.copy)), tel: null, tel_error: 'disconnected' });
+    bridge.emit('transfer:restore_done', { result: done, copy: JSON.parse(JSON.stringify(s.transfer.restore.copy)), tel: null, tel_error: 'disconnected',
+      apps: null, order: 'ZS/2026/0926/01', whatsapp: null });
     expect(s.phase).toBe('transfer_restored');
     expect(s.transfer.restore.result?.files_done).toBe(1);
     expect(s.transfer.restore.telError).toBe('disconnected');
@@ -1746,5 +1850,96 @@ describe('data transfer — resuming', () => {
     bridge.emit('job:error', { job_id: 'job-2', kind: 'backup', key: 'transfer_disk_full', message: '' });
     await vi.waitFor(() => expect(s.transfer.resumable?.id).toBe(RESUMABLE.id));
     expect(s.phase).toBe('transfer_choose');
+  });
+});
+
+describe('data transfer — after a copy', () => {
+  const OLD = 'R58T00TEST';
+  const NEW = 'R58W20NEW01';
+  const dev = (serial: string) => ({ serial, state: 'device' as const, model: 'M', name: null, imei: null });
+  const copy = { id: `${OLD}-90fae0b8e3f0/20261108-100000`, serial: OLD, model: 'SM-A145R', manufacturer: 'samsung', client: 'Anna K.',
+    created: '2026-11-08T10:00:00', expires: '2026-11-15T10:00:00', days_left: 7, status: 'complete' as 'complete' | 'in_progress' | 'incomplete', bytes: 10, counts: {} };
+  const result = { status: 'complete' as const, copy_id: copy.id, files_done: 1, files_failed: 0, apps_done: 0, apps_failed: 0, bytes: 10,
+    seconds: 3, telephony: {} };
+  const restorePlans = (bridge: { calls: { method: string; args: unknown[] }[] }) => bridge.calls.filter((c) => c.method === 'restore_plan');
+
+  async function finished(copyOver: Partial<typeof copy> = {}) {
+    const env = setup('transfer');
+    await env.ctl.init();
+    env.bridge.emit('devices', { devices: [dev(OLD)], error: null });
+    env.ctl.selectDevice(OLD);
+    env.bridge.emit('transfer:done', { result, copy: { ...copy, ...copyOver } });
+    expect(env.s.phase).toBe('transfer_done');
+    return env;
+  }
+
+  test('auto plans restore when another phone connects after a copy', async () => {
+    const { s, bridge } = await finished();
+    bridge.emit('devices', { devices: [dev(OLD), dev(NEW)], error: null });
+    await vi.waitFor(() => expect(restorePlans(bridge)).toHaveLength(1));
+    expect(restorePlans(bridge)[0].args).toEqual([copy.id, NEW]);
+    expect(s.serial).toBe(NEW);
+    expect(s.phase).toBe('transfer_restore_plan');
+  });
+
+  test('does nothing when the same phone reconnects', async () => {
+    const { s, bridge } = await finished();
+    bridge.emit('devices', { devices: [], error: null });
+    bridge.emit('devices', { devices: [dev(OLD)], error: null });
+    await flush();
+    expect(restorePlans(bridge)).toHaveLength(0);
+    expect(s.phase).toBe('transfer_done');
+  });
+
+  test('does nothing when two new phones appear at once, or when the copy was stopped', async () => {
+    const a = await finished();
+    a.bridge.emit('devices', { devices: [dev(OLD), dev(NEW), dev('OTHER')], error: null });
+    await flush();
+    expect(restorePlans(a.bridge)).toHaveLength(0);
+    const b = await finished({ status: 'in_progress' });
+    b.bridge.emit('devices', { devices: [dev(OLD), dev(NEW)], error: null });
+    await flush();
+    expect(restorePlans(b.bridge)).toHaveLength(0);
+  });
+
+  test('plans once per appearance, not on every device refresh', async () => {
+    const { s, bridge } = await finished();
+    bridge.emit('devices', { devices: [dev(NEW)], error: null });
+    await vi.waitFor(() => expect(restorePlans(bridge)).toHaveLength(1));
+    s.phase = 'transfer_done';
+    bridge.emit('devices', { devices: [dev(NEW)], error: null });
+    await flush();
+    expect(restorePlans(bridge)).toHaveLength(1);
+  });
+
+  test('plans restore right away when the other phone was already connected at the end of the copy', async () => {
+    const env = setup('transfer');
+    await env.ctl.init();
+    env.bridge.emit('devices', { devices: [dev(OLD), dev(NEW)], error: null });
+    env.ctl.selectDevice(OLD);
+    env.bridge.emit('transfer:done', { result, copy });
+    await vi.waitFor(() => expect(restorePlans(env.bridge)).toHaveLength(1));
+    expect(restorePlans(env.bridge)[0].args).toEqual([copy.id, NEW]);
+  });
+
+  test('waits for the backup job to end before planning (the plan would get busy)', async () => {
+    const env = setup('transfer');
+    await env.ctl.init();
+    env.bridge.emit('devices', { devices: [dev(OLD), dev(NEW)], error: null });
+    env.ctl.selectDevice(OLD);
+    env.s.job = { id: 'j-backup', kind: 'backup' };
+    env.bridge.emit('transfer:done', { result, copy });
+    await flush();
+    expect(restorePlans(env.bridge)).toHaveLength(0);
+    expect(env.s.phase).toBe('transfer_done');
+    env.bridge.emit('job:end', { job_id: 'j-backup', kind: 'backup' });
+    await vi.waitFor(() => expect(restorePlans(env.bridge)).toHaveLength(1));
+    expect(restorePlans(env.bridge)[0].args).toEqual([copy.id, NEW]);
+  });
+
+  test('an incomplete copy also leads to the new phone', async () => {
+    const { bridge } = await finished({ status: 'incomplete' });
+    bridge.emit('devices', { devices: [dev(OLD), dev(NEW)], error: null });
+    await vi.waitFor(() => expect(restorePlans(bridge)).toHaveLength(1));
   });
 });

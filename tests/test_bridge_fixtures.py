@@ -17,7 +17,7 @@ def _module():
 def test_bridge_fixtures_are_up_to_date():
     fresh = _module().record_all()
     assert set(fresh) == {"adware", "adware-en", "clean", "manual", "disconnect", "report",
-                          "transfer", "transfer_export", "transfer_restore", "transfer_restore_tel",
+                          "transfer", "transfer_export", "transfer_restore", "transfer_restore_tel", "transfer_restore_xiaomi",
                           "explorer", "unauthorized", "many", "empty"}
     for name, data in fresh.items():
         path = OUT / f"{name}.json"

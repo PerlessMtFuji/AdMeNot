@@ -489,7 +489,9 @@
       "repair": "Po naprawie: ile aplikacji wyciszono, wyłączono i usunięto, ile z nich oznaczył program, ile się nie udało i kody błędów.",
       "undo": "Po cofnięciu: ile aplikacji cofnięto i ile dni minęło od naprawy.",
       "transfer_backup": "Po kopii danych starego telefonu: producent, model i wersja Androida telefonu, wynik, czas, rozmiar w MB, liczba skopiowanych i nieudanych plików oraz aplikacji, które rodzaje danych wybrano — bez nazw folderów, plików i aplikacji.",
-      "transfer_restore": "Po wgraniu kopii na nowy telefon: producent, model i wersja Androida nowego telefonu, wynik, czas, rozmiar w MB, liczby plików wgranych, już obecnych, zapisanych obok, odrzuconych przez Androida, nieudanych, pominiętych i brakujących w kopii, liczba pominiętych plików APK (szkodliwych i podejrzanych), liczba równoczesnych przesyłań, sposób sprawdzenia plików, wynik odświeżenia galerii, które rodzaje plików wybrano — bez nazw folderów, plików i aplikacji.",
+      "transfer_restore": "Po wgraniu kopii na nowy telefon: producent, model i wersja Androida nowego telefonu, wynik, czas, rozmiar w MB, liczby plików wgranych, już obecnych, zapisanych obok, odrzuconych przez Androida, nieudanych, pominiętych i brakujących w kopii, liczba pominiętych plików APK (szkodliwych i podejrzanych), liczba równoczesnych przesyłań, sposób sprawdzenia plików, wynik odświeżenia galerii, które rodzaje plików wybrano. Gdy instalowano też aplikacje: te same liczby i kody błędów co w zdarzeniu instalacji aplikacji poniżej — bez nazw folderów, plików i aplikacji.",
+      "transfer_apps": "Po instalacji aplikacji z kopii na nowym telefonie (także przy dokończeniu później): producent, model i wersja Androida nowego telefonu, liczby aplikacji wybranych, zainstalowanych, już obecnych, pominiętych i nieudanych, liczby błędów instalacji wyłącznie według kodu błędu, czy zainstalowano jak ze Sklepu Play i czy telefon zablokował instalację przez USB — bez nazw aplikacji i pakietów.",
+      "transfer_report": "Przy tworzeniu protokołu przekazania: ogólny wynik (wszystko w porządku, uwagi albo problemy) i czy WhatsApp oznaczono jako przywrócony — bez danych klienta i numeru zlecenia.",
       "explorer": "Po zamknięciu eksploratora plików: producent, model i wersja Androida telefonu, czas, liczba i rozmiar w MB plików skopiowanych na komputer i wgranych na telefon, mediana prędkości, liczba podglądów (zdjęcia, filmy, dźwięk, tekst), liczba utworzonych folderów i plików tekstowych, liczba błędów według kodu — bez nazw folderów, plików i ścieżek.",
       "packages": "Z drugą zgodą: nazwy pakietów oznaczonych przez program i zaznaczonych przez Ciebie, z oceną i Twoją decyzją.",
       "never": "Nigdy: numer seryjny, IMEI, nazwa klienta, numer zlecenia, dane serwisu, zrzuty ekranu, nazwy aplikacji uznanych za bezpieczne i nieruszanych."
@@ -516,7 +518,7 @@
   "history": {
     "manual": "tryb ręczny",
     "title": "Historia zleceń", "phone": "Telefon",
-    "tabs": "Widok historii", "tab_orders": "Naprawy", "tab_copies": "Kopie danych ({n})", "empty": "Brak zleceń dla tego telefonu.", "none": "Brak zapisanych zleceń.",
+    "tabs": "Widok historii", "tab_orders": "Naprawy", "tab_transfers": "Przeniesienia ({n})", "empty": "Brak zleceń dla tego telefonu.", "none": "Brak zapisanych zleceń.",
     "restore": "Przywróć", "undo_all": "Cofnij całe zlecenie", "resume": "Dokończ",
     "delete": "Usuń zlecenie", "delete_title": "Usunąć zlecenie {number}?", "delete_text": "Znikną kroki, zrzuty ekranu, protokół i kopie APK tego zlecenia. Zmian na telefonie nie będzie już można cofnąć w AdMeNot.", "delete_pdf_kept": "PDF protokołu w folderze {dir} zostaje — usuń go sam, jeśli trzeba.", "delete_confirm": "Usuń",
     "admin_note": "Cofnięcie nie przywraca uprawnień administratora urządzenia.", "undo_errors": "Nie wszystko udało się cofnąć:",
@@ -764,34 +766,38 @@
     "title": "Co skopiować ze starego telefonu?",
     "sub": "Zaznaczone dane trafią na komputer, a potem na nowy telefon. Na tym telefonie niczego nie zmieniam.",
     "group": {
-      "phone": "Telefon",
+      "messages": "Kontakty i wiadomości",
       "files": "Pliki",
       "apps": "Aplikacje"
     },
     "row": {
       "contacts": "Kontakty",
-      "contacts_note": "Na nowym telefonie otworzy się import — wybierzesz konto Google.",
       "sms": "SMS i MMS",
-      "sms_note": "Razem z załącznikami MMS. Czatów RCS („czat” w Wiadomościach Google) nie da się skopiować przez USB.",
       "calls": "Historia połączeń",
       "media": "Zdjęcia i filmy",
-      "media_note": "Aparat, zrzuty ekranu, Pictures, Movies",
       "downloads": "Pobrane i dokumenty",
-      "downloads_note": "Download, Documents",
       "whatsapp": "WhatsApp",
-      "whatsapp_note": "czaty i media",
       "others": "Inne foldery",
       "root": "Pliki w folderze głównym",
       "apps": "Aplikacje",
-      "apps_note": "Same aplikacje, bez ich danych i logowań."
+      "apps_note": "same aplikacje, bez danych i logowań",
+      "show": "Pokaż ▾",
+      "hide": "Zwiń ▴",
+      "missing": "Brak w kopii: {what}",
+      "missing_phone": "Brak na telefonie: {what}",
+      "unreadable": "telefon nie pozwala odczytać",
+      "read_failed": "nie udało się odczytać",
+      "how_copy": "jak skopiować?",
+      "how_make": "jak zrobić?",
+      "export_files": "pliki eksportu",
+      "no_wa_backup": "brak świeżej kopii czatów"
     },
+    "auto_check_file": "Sprawdzam sam co kilka sekund — plik pojawi się tutaj.",
+    "auto_check_wa": "Sprawdzam sam co kilka sekund — gdy kopia będzie gotowa, ten znacznik zniknie.",
     "export": {
-      "title_denied": "Telefon nie pozwolił odczytać {what}.",
-      "title_denied_file": "Telefon nie pozwolił odczytać {what} — użyto pliku eksportu.",
-      "title_failed": "Nie udało się odczytać {what}.",
       "xiaomi": "Xiaomi wpuszcza do tych danych tylko z opcją „Debugowanie USB (ustawienia zabezpieczeń)” w Opcjach programisty, a ta wymaga konta Mi.",
-      "howto": "Bez niej wyeksportuj {steps}, zapisz plik w pamięci telefonu, np. w Pobranych albo w nowym folderze, i kliknij „Sprawdź ponownie”.",
-      "howto_plain": "Wyeksportuj {steps}, zapisz plik w pamięci telefonu, np. w Pobranych albo w nowym folderze, i kliknij „Sprawdź ponownie”.",
+      "howto": "Bez niej wyeksportuj {steps} i zapisz plik w pamięci telefonu, np. w Pobranych albo w nowym folderze.",
+      "howto_plain": "Wyeksportuj {steps} i zapisz plik w pamięci telefonu, np. w Pobranych albo w nowym folderze.",
       "steps": {
         "contacts": "kontakty do pliku .vcf w aplikacji Kontakty (Importuj/eksportuj → Eksportuj)",
         "sms": "wiadomości do pliku aplikacją typu SMS Backup & Restore",
@@ -806,13 +812,6 @@
         "few": "{count} z pliku eksportu",
         "many": "{count} z pliku eksportu",
         "other": "{count} z pliku eksportu"
-      },
-      "what": {
-        "contacts": "kontaktów",
-        "sms": "wiadomości",
-        "calls": "historii połączeń",
-        "and": " i ",
-        "sep": ", "
       },
       "items": {
         "contacts": {
@@ -839,32 +838,27 @@
     "unreadable": "Telefon nie pozwolił odczytać tych danych.",
     "xiaomi_hint": "Na telefonach Xiaomi, Redmi i POCO włącz w Opcjach programisty „Debugowanie USB (ustawienia zabezpieczeń)”, a potem wybierz „Kopiuj dane” jeszcze raz. Jeśli kopia jest już zrobiona, zaznacz tylko brakujące dane, np. SMS i kontakty — reszty nie trzeba kopiować od nowa.",
     "unreadable_files": {
-      "one": "{count} pliku lub folderu nie dało się odczytać — nie trafi do kopii",
-      "few": "{count} plików lub folderów nie dało się odczytać — nie trafią do kopii",
+      "one": "{count} plik lub folder nie dał się odczytać — nie trafi do kopii",
+      "few": "{count} pliki lub foldery nie dały się odczytać — nie trafią do kopii",
       "many": "{count} plików lub folderów nie dało się odczytać — nie trafią do kopii",
       "other": "{count} pliku lub folderu nie dało się odczytać — nie trafią do kopii"
     },
     "unreadable_files_text": "Telefon nie pozwolił ich odczytać (np. uszkodzona nazwa albo brak dostępu). Pozostałe dane kopiują się normalnie.",
     "whatsapp_old_title": "Kopia czatów z {when} — starsza niż godzina",
-    "whatsapp_none_title": "Na telefonie nie ma kopii czatów",
     "whatsapp_howto": "Na telefonie: WhatsApp → Ustawienia → Czaty → Kopia zapasowa → Utwórz kopię",
-    "recheck": "Sprawdź ponownie",
-    "apps_copy": "{count} do skopiowania",
     "apps_skipped": {
-      "one": "{count} pominięta: szkodliwa",
-      "few": "{count} pominięte: szkodliwe",
-      "many": "{count} pominiętych: szkodliwych",
-      "other": "{count} pominiętej: szkodliwej"
+      "one": "{count} szkodliwa — pominę",
+      "few": "{count} szkodliwe — pominę",
+      "many": "{count} szkodliwych — pominę",
+      "other": "{count} szkodliwej — pominę"
     },
     "apps_suspicious": {
-      "one": "{count} podejrzana — odznaczona",
-      "few": "{count} podejrzane — odznaczone",
-      "many": "{count} podejrzanych — odznaczonych",
-      "other": "{count} podejrzanej — odznaczonej"
+      "one": "{count} podejrzana odznaczona",
+      "few": "{count} podejrzane odznaczone",
+      "many": "{count} podejrzanych odznaczonych",
+      "other": "{count} podejrzanej odznaczonej"
     },
     "suspicious": "podejrzana",
-    "show_list": "Pokaż listę",
-    "hide_list": "Zwiń listę",
     "files": {
       "one": "{count} plik",
       "few": "{count} pliki",
@@ -876,12 +870,6 @@
       "few": "{count} wiadomości",
       "many": "{count} wiadomości",
       "other": "{count} wiadomości"
-    },
-    "folders": {
-      "one": "{count} folder",
-      "few": "{count} foldery",
-      "many": "{count} folderów",
-      "other": "{count} folderu"
     },
     "categories": {
       "one": "{count} kategoria",
@@ -927,10 +915,21 @@
     "waiting": "Telefon odłączony — podłącz ponownie, kopia będzie kontynuowana",
     "stop": "Przerwij",
     "stopping": "Przerywam…",
-    "done_heading": "Kopia starego telefonu",
+    "done_heading": "Kopia gotowa",
+    "done_heading_stopped": "Kopia starego telefonu",
     "done_ok": "Kopia gotowa i sprawdzona — możesz odłączyć stary telefon",
     "done_warn": "Kopia gotowa, ale nie wszystko udało się skopiować",
-    "done_warn_text": "Dane oznaczone poniżej nie trafiły do kopii.",
+    "done_warn_text": "Szczegóły są przy liczbach poniżej.",
+    "done_took": "{size} w {time}.",
+    "took_min": "{n} min",
+    "took_sec": "{n} s",
+    "next_title": "Podłącz nowy telefon",
+    "next_text": "Gdy go podłączysz, od razu pokażę, co na niego wgrać.",
+    "finish_later": "Zakończ — wgram później",
+    "expires_on": "Kopia zostanie usunięta z komputera {date} — zmienisz to w Historii.",
+    "stages_label": "Etapy kopii",
+    "stage_done": "gotowe",
+    "time_left": "Zostało {time}",
     "done_stopped": "Kopia przerwana",
     "done_stopped_text": "Skopiowane pliki zostają na komputerze. Żeby dokończyć, podłącz ten telefon i wybierz „Kopiuj dane”.",
     "sum": {
@@ -942,6 +941,7 @@
       "apps": "Aplikacje",
       "size": "Rozmiar",
       "failed": "nieudane: {count}",
+      "unreadable": "nieczytelne: {count}",
       "tel_failed": "nie udało się",
       "addresses_missing": "bez adresów: {count}",
       "attachments_missing": "bez załączników: {count}",
@@ -955,30 +955,52 @@
       "other": "Kopia zostanie usunięta z komputera za {count} dnia — zmienisz to w Historii."
     },
     "finish": "Zakończ",
-    "copies_title": "Kopie danych na komputerze",
-    "copies_sub": "Ze wszystkich telefonów. Każda kopia znika po {days} dniach, chyba że ją przedłużysz.",
-    "note": { "label": "Notatka serwisanta", "add": "Dodaj notatkę", "edit": "Edytuj", "placeholder": "Np. czego klient potrzebuje, co sprawdzić przy wgrywaniu…" },
+    "hist": {
+      "title": "Przeniesienia danych",
+      "sub": "Zlecenia ze wszystkich telefonów. Kopia znika z komputera po czasie z Ustawień, chyba że ją przedłużysz — protokół zostaje.",
+      "old_phone": "stary telefon",
+      "new_phone": "nowy telefon",
+      "old_label": "Stary telefon",
+      "new_label": "Nowy telefon",
+      "imei": "IMEI {imei}",
+      "state": { "copy_ready": "kopia gotowa", "restored": "wgrano", "failed": "nie wgrano", "expired": "kopia wygasła",
+        "interrupted": "przerwane", "incomplete": "kopia niepełna" },
+      "notes": {
+        "one": "wgrano · {count} uwaga",
+        "few": "wgrano · {count} uwagi",
+        "many": "wgrano · {count} uwag",
+        "other": "wgrano · {count} uwagi"
+      },
+      "left": {
+        "one": "kopia jeszcze {count} dzień",
+        "few": "kopia jeszcze {count} dni",
+        "many": "kopia jeszcze {count} dni",
+        "other": "kopia jeszcze {count} dnia"
+      },
+      "deleted": "kopia usunięta {date}",
+      "interrupted": "kopia przerwana — wznów przy podłączeniu",
+      "apps_waiting": "aplikacje czekają na odblokowanie instalacji",
+      "installing": "doinstalowuję aplikacje…",
+      "apps_note": { "transfer_no_phone": "telefon nie jest podłączony", "transfer_copy_missing": "kopii już nie ma na komputerze",
+        "other": "nie udało się doinstalować aplikacji" },
+      "details": "Pokaż szczegóły",
+      "hide": "Ukryj szczegóły",
+      "empty_counts": "Brak zapisanych liczb.",
+      "report": "Protokół",
+      "to_phone": "Wgraj na podłączony",
+      "more": "Więcej działań — {name}",
+      "menu": { "extend": "Przedłuż", "delete": "Usuń kopię", "note": "Notatka", "whatsapp": "Czaty WhatsApp przywrócone",
+        "reinstall": "Doinstaluj aplikacje", "report": "Protokół" }
+    },
+    "note": { "label": "Notatka serwisanta", "add": "Dodaj notatkę", "add_to_copy": "Dodaj notatkę do kopii", "edit": "Edytuj", "placeholder": "Np. czego klient potrzebuje, co sprawdzić przy wgrywaniu…" },
     "contents": {
       "contacts": "Kontakty", "sms": "SMS", "mms": "MMS", "calls": "Połączenia", "files": "Pliki",
       "files_photos": "Zdjęcia", "files_videos": "Filmy", "files_downloads": "Pobrane",
       "files_whatsapp": "WhatsApp", "files_others": "Inne foldery", "apps": "Aplikacje"
     },
-    "days_left": {
-      "one": "został {count} dzień",
-      "few": "zostały {count} dni",
-      "many": "zostało {count} dni",
-      "other": "zostało {count} dnia"
-    },
-    "extend": "Przedłuż",
-    "delete": "Usuń teraz",
     "delete_title": "Usunąć kopię {name}?",
     "delete_text": "Dane klienta z tej kopii znikną z komputera. Tego nie da się cofnąć.",
     "delete_confirm": "Usuń",
-    "status": {
-      "in_progress": "niedokończona",
-      "incomplete": "niepełna",
-      "complete": "pełna"
-    },
     "restore": {
       "offer_title": "Wgrać kopię z {phone} ({details})?",
       "offer_text": "Pliki z kopii trafią na ten telefon. Niczego na nim nie nadpiszę.",
@@ -994,7 +1016,7 @@
       "planning": "Sprawdzam nowy telefon…",
       "planning_sub": "Liczę wolne miejsce i sprawdzam, które pliki już na nim są. Jeszcze niczego nie wgrywam.",
       "title": "Co wgrać na nowy telefon?",
-      "sub": "Kopia z {phone} ({details}). Niczego nie nadpiszę — inny plik o tej samej nazwie zapiszę obok jako „(z kopii)”.",
+      "sub": "Kopia z {phone} ({details}). Niczego nie nadpiszę ani nie usunę.",
       "same_title": "To ten sam telefon, z którego jest kopia",
       "same_text": "Kopia ma mniej niż 24 godziny, więc te pliki najpewniej już są na tym telefonie. Wgrać mimo to?",
       "same_no": "Nie",
@@ -1028,8 +1050,6 @@
       },
       "exists": "już na telefonie: {count}",
       "rename": "zapisane obok: {count}",
-      "section_files": "Pliki",
-      "section_apks": "Pliki APK",
       "apks_note": "Instalatory aplikacji z kopii, ocenione na komputerze. Szkodliwych nie wgrywam.",
       "apk": {
         "clean": "sprawdzony",
@@ -1038,12 +1058,6 @@
         "malicious": "pominięty jako szkodliwy",
         "unknown": "nie do oceny"
       },
-      "later_title": "Później w programie",
-      "later": {
-        "apps": "Aplikacje",
-        "whatsapp": "Przywracanie czatów WhatsApp"
-      },
-      "section_tel": "Kontakty i wiadomości",
       "tel": {
         "contacts": "Kontakty",
         "sms": "SMS i MMS",
@@ -1061,20 +1075,7 @@
           "many": "pominięto {count} kontaktów z komunikatorów",
           "other": "pominięto {count} kontaktu z komunikatorów"
         },
-        "duplicates": "Na telefonie są już kontakty — możliwe duplikaty",
-        "done_ok": "Kontakty i wiadomości wgrane",
-        "done_warn": "Kontakty i wiadomości wgrane, ale nie wszystko się udało",
-        "done_warn_text": "Szczegóły w tabeli poniżej.",
-        "error_title": "Nie udało się wgrać kontaktów i wiadomości",
-        "col": {
-          "kind": "Kategoria",
-          "written": "Wgrano",
-          "existed": "Już były",
-          "skipped": "Pominięte",
-          "failed": "Błędy",
-          "manual": "Do importu",
-          "path": "Sposób"
-        },
+        "duplicates": "na telefonie są już kontakty — możliwe duplikaty",
         "kind": {
           "contacts": "Kontakty",
           "sms": "SMS",
@@ -1088,7 +1089,6 @@
           "none": "—"
         },
         "visible": "sprawdź w aplikacji Wiadomości",
-        "todo_title": "Do zrobienia na telefonie",
         "todo_file": "zainstaluj SMS Backup & Restore, Przywróć, wybierz plik {name} z Pobranych",
         "todo_contacts": "otwórz Kontakty → Importuj, wybierz plik {name} z Pobranych"
       },
@@ -1098,7 +1098,8 @@
         "contacts": "Kontakty",
         "messages": "Wiadomości",
         "calls": "Połączenia",
-        "safety": "Kopia bezpieczeństwa nowego telefonu"
+        "safety": "Kopia bezpieczeństwa nowego telefonu",
+        "apps": "Aplikacje"
       },
       "tel_progress": "{done} z {total}",
       "tap": {
@@ -1121,7 +1122,34 @@
         "failed": "Telefon nie wrócił do swoich ustawień",
         "failed_text": "Na telefonie otwórz Ustawienia → Aplikacje → Aplikacje domyślne → Aplikacja SMS i wybierz {app}. Potem odinstaluj AdMeNot Helper (Ustawienia → Aplikacje)."
       },
-      "next_version": "w kolejnej wersji",
+      "apk_malicious": {
+        "one": "{count} APK szkodliwy — pominę",
+        "few": "{count} APK szkodliwe — pominę",
+        "many": "{count} APK szkodliwych — pominę",
+        "other": "{count} APK szkodliwego — pominę"
+      },
+      "apk_suspicious": {
+        "one": "{count} APK podejrzany — odznaczony",
+        "few": "{count} APK podejrzane — odznaczone",
+        "many": "{count} APK podejrzanych — odznaczonych",
+        "other": "{count} APK podejrzanego — odznaczonego"
+      },
+      "apps_count": "{n} z {m}",
+      "apps_note": "bez danych — w każdej trzeba się zalogować ponownie",
+      "xiaomi_label": "Xiaomi blokuje instalację · jak włączyć?",
+      "xiaomi_how": "Jak włączyć: Ustawienia → Dodatkowe ustawienia → Opcje programisty → „Instaluj przez USB” (Xiaomi może poprosić o zalogowanie do konta Mi). Sprawdzę sam, gdy to zrobisz. Bez tego wgram resztę, a aplikacje pominę.",
+      "apps_skip": "Nie zainstaluję: {list}",
+      "apps_skip_more": "… i {count} innych",
+      "apps_skip_item": "{name} — {reason}",
+      "apps_reason": {
+        "installed": "już jest",
+        "too_old": "za stara dla Androida {version}",
+        "too_old_unknown": "za stara dla tego Androida",
+        "too_new": "wymaga nowszego Androida",
+        "no_abi": "brak wersji dla tego procesora",
+        "incomplete": "niepełna kopia"
+      },
+      "safety": "Przed wgraniem zrobię kopię bezpieczeństwa nowego telefonu.",
       "panel": "Miejsce na nowym telefonie",
       "space_label": "Zajęte miejsce i pliki do wgrania",
       "to_upload": "Do wgrania",
@@ -1140,16 +1168,100 @@
       "progress_label": "Postęp wgrywania",
       "starting": "Przygotowuję wgrywanie…",
       "waiting": "Telefon odłączony — podłącz ponownie, wgrywanie będzie kontynuowane",
-      "done_heading": "Wgrywanie na nowy telefon",
-      "done_ok": "Pliki wgrane",
-      "done_warn": "Pliki wgrane, ale nie wszystko się udało",
-      "done_warn_text": "Szczegóły poniżej. Pliki, których nie udało się wgrać, zostają w kopii na komputerze.",
+      "done_heading": "Dane przeniesione",
+      "done_heading_stopped": "Wgrywanie na nowy telefon",
+      "done_all": "Wszystko wgrane",
+      "done_almost": "Prawie wszystko gotowe",
+      "done_took": "{size} w {time}.",
       "done_stopped": "Wgrywanie przerwane",
       "done_stopped_text": "Wgrane pliki zostają na telefonie. Żeby dokończyć, podłącz ten telefon i wybierz „Wznów” przy kopii.",
-      "restart": "Uruchom ponownie telefon, żeby galeria zobaczyła pliki",
-      "restart_text": "Ten Android nie odświeża galerii sam. Pliki są już na telefonie.",
-      "scan_failed": "Pliki wgrane, ale galeria może ich nie widzieć do restartu telefonu",
-      "scan_failed_text": "Telefon nie odświeżył galerii. Pliki są na miejscu — jeśli galeria ich nie pokazuje, uruchom telefon ponownie.",
+      "restart": "uruchom ponownie telefon, żeby galeria zobaczyła pliki",
+      "issue": {
+        "import": "do zaimportowania na telefonie: {list}",
+        "tel_failed": "nie wszystko udało się wgrać w kontaktach i wiadomościach",
+        "tel_error": "nie udało się wgrać kontaktów i wiadomości",
+        "files": {
+          "one": "{count} plik nie został wgrany",
+          "few": "{count} pliki nie zostały wgrane",
+          "many": "{count} plików nie zostało wgranych",
+          "other": "{count} pliku nie zostało wgranych"
+        },
+        "scan": "galeria może nie widzieć plików do restartu telefonu",
+        "apps": {
+          "one": "{count} aplikacja się nie zainstalowała",
+          "few": "{count} aplikacje się nie zainstalowały",
+          "many": "{count} aplikacji się nie zainstalowało",
+          "other": "{count} aplikacji się nie zainstalowało"
+        },
+        "blocked": "aplikacje czekają, aż Xiaomi pozwoli na instalację przez USB",
+        "installing": "trwa instalacja pominiętych aplikacji",
+        "files_incomplete": "nie wszystkie pliki zostały wgrane",
+        "safety": "kopia bezpieczeństwa nowego telefonu się nie udała",
+        "apps_error": "nie udało się zainstalować aplikacji"
+      },
+      "res": {
+        "card": "Wynik wgrywania",
+        "files": "Pliki",
+        "details": "Szczegóły",
+        "list": "Lista",
+        "to_import": "do importu",
+        "import_sub": "telefon nie pozwolił zapisać — przygotowałem plik do importu",
+        "not_written": "nie wgrano",
+        "on_phone": "Na telefonie:",
+        "path": "sposób: {path}",
+        "apps_running": "instaluję aplikacje pominięte przez blokadę Xiaomi…",
+        "import_kind": {
+          "contacts": "kontakty",
+          "sms": "SMS i MMS",
+          "calls": "historia połączeń"
+        },
+        "stages": "Etapy",
+        "stage_warn": "wymaga uwagi",
+        "stage_note": {
+          "import": "plik do importu",
+          "failed": "nieudane: {count}",
+          "error": "błąd",
+          "gallery": "restart galerii",
+          "incomplete": "niepełne",
+          "safety": "nieudana",
+          "check": "sprawdź w Wiadomościach",
+          "installing": "instaluję",
+          "blocked": "czeka na Xiaomi",
+          "stopped": "przerwane"
+        },
+        "protocol": "Protokół",
+        "protocol_hint": "PDF do podpisu",
+        "finish_no_report": "Zakończ bez protokołu"
+      },
+      "wa": {
+        "title": "WhatsApp",
+        "optional": "opcjonalnie, z klientem",
+        "installed": "Kopia czatów jest na telefonie. Otwórz WhatsApp, zaloguj numerem klienta i wybierz „Przywróć” (może być potrzebne hasło do kopii).",
+        "missing": "Kopia czatów jest na telefonie. Zainstaluj WhatsApp ze Sklepu Play, zaloguj numerem klienta i wybierz „Przywróć” (może być potrzebne hasło do kopii).",
+        "pre_installed": "WhatsApp był już na telefonie — jeśli był uruchomiony, przywrócenie może wymagać jego ponownej instalacji.",
+        "check": "Czaty przywrócone — wpisz to do protokołu"
+      },
+      "apps_consent": "Jeśli telefon pyta o zgodę — potwierdź",
+      "apps_why": {
+        "user_restricted": "Xiaomi blokuje instalację przez USB",
+        "no_consent": "nie potwierdzono na telefonie",
+        "too_old": "za stara dla tego Androida",
+        "too_new": "wymaga nowszego Androida",
+        "no_abi": "brak wersji dla tego procesora",
+        "no_space": "brak miejsca na telefonie",
+        "version_downgrade": "na telefonie jest nowsza wersja",
+        "conflict": "koliduje z zainstalowaną wersją",
+        "invalid_apk": "uszkodzony instalator",
+        "disconnected": "telefon się rozłączył",
+        "incomplete": "niepełna kopia",
+        "pending": "nie zdążyłem",
+        "failed": "telefon odrzucił instalację"
+      },
+      "apps_state": {
+        "installed": "zainstalowana",
+        "exists": "już była na telefonie"
+      },
+      "xiaomi_how_done": "Jak włączyć: Ustawienia → Dodatkowe ustawienia → Opcje programisty → „Instaluj przez USB” (Xiaomi może poprosić o zalogowanie do konta Mi). Sprawdzę sam, gdy to zrobisz, i doinstaluję pominięte aplikacje.",
       "sum": {
         "done": "Wgrane",
         "exists": "Już były na telefonie",

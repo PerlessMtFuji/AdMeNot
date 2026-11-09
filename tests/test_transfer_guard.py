@@ -564,3 +564,86 @@ def test_tel_plan_read_adb_allows_reads_and_dumpsys_account_only():
     assert len(inner.calls) == 3
     other = adb.with_serial("B")
     assert isinstance(other, TelPlanReadAdb) and other.serial == "B"
+
+
+def test_app_install_guard(tmp_path):
+    from admenot.engine.transfer.guard import AppInstallAdb
+
+    root = tmp_path / "apps"
+    (root / "com.a.b" / "1").mkdir(parents=True)
+    base, split = root / "com.a.b" / "1" / "base.apk", root / "com.a.b" / "1" / "split.apk"
+    base.write_bytes(b"x")
+    split.write_bytes(b"y")
+    outside = tmp_path / "evil.apk"
+    outside.write_bytes(b"z")
+    notapk = root / "com.a.b" / "1" / "base.txt"
+    notapk.write_bytes(b"x")
+    rec = Recorder()
+    adb = AppInstallAdb(rec, root)
+    vend = ["-i", "com.android.vending"]
+    ok = [
+        ["install", str(base)], ["install", *vend, str(base)],
+        ["install-multiple", str(base), str(split)], ["install-multiple", *vend, str(base), str(split)],
+        ["shell", "-T", "pm list packages"], ["shell", "-T", "pm list packages com.a.b"],
+        ["shell", "-T", "getprop ro.product.cpu.abilist"], ["shell", "-T", "getprop persist.security.adbinstall"],
+        ["get-state"],
+    ]
+    for args in ok:
+        adb.run(args)
+    assert len(rec.calls) == len(ok)
+    adb.shell("pm list packages")
+    bad = [
+        ["install", str(outside)], ["install", str(root / ".." / "evil.apk")],
+        ["install", str(root / "com.a.b" / "1" / ".." / ".." / ".." / "evil.apk")],
+        ["install", "-r", str(base)], ["install", "-d", str(base)], ["install", "-g", str(base)],
+        ["install", "-i", "other.store", str(base)], ["install", "-i", "com.android.vending", "-r", str(base)],
+        ["install", str(notapk)], ["install", str(root / "com.a.b" / "1" / "missing.apk")],
+        ["install"], ["install-multiple"], ["install-multiple", str(base), str(outside)],
+        ["uninstall", "com.a.b"], ["shell", "-T", "pm uninstall com.a.b"],
+        ["shell", "-T", "pm list packages x; rm -rf /sdcard"], ["shell", "-T", "pm list packages com.a.b com.c.d"],
+        ["shell", "-T", "pm list packages -f"], ["shell", "-T", "rm -rf /sdcard/x"], ["push", str(base), "/sdcard/x"],
+    ]
+    for args in bad:
+        with pytest.raises(UnsafeCommand):
+            adb.run(args)
+    with pytest.raises(UnsafeCommand):
+        adb.shell("pm uninstall com.a.b")
+    assert len(rec.calls) == len(ok) + 1
+
+
+def test_app_install_guard_one_app_version_per_command(tmp_path):
+    """Jedno `install`/`install-multiple` = pliki jednego katalogu `apps/<pakiet>/<wersja>/`."""
+    from admenot.engine.transfer.guard import AppInstallAdb
+
+    root = tmp_path / "apps"
+    for d in ("com.a.b/1", "com.a.b/2", "com.c.d/1"):
+        (root / d).mkdir(parents=True)
+        (root / d / "base.apk").write_bytes(b"x")
+    (root / "com.a.b" / "1" / "split.apk").write_bytes(b"y")
+    (root / "loose.apk").write_bytes(b"z")
+    (root / "com.a.b" / "flat.apk").write_bytes(b"z")
+    rec = Recorder()
+    adb = AppInstallAdb(rec, root)
+    adb.run(["install-multiple", str(root / "com.a.b/1/base.apk"), str(root / "com.a.b/1/split.apk")])
+    for args in (
+        ["install-multiple", str(root / "com.a.b/1/base.apk"), str(root / "com.c.d/1/base.apk")],
+        ["install-multiple", str(root / "com.a.b/1/base.apk"), str(root / "com.a.b/2/base.apk")],
+        ["install", str(root / "loose.apk")], ["install", str(root / "com.a.b/flat.apk")],
+    ):
+        with pytest.raises(UnsafeCommand):
+            adb.run(args)
+    assert len(rec.calls) == 1
+
+
+def test_app_install_guard_rejects_relative_paths(tmp_path, monkeypatch):
+    from admenot.engine.transfer.guard import AppInstallAdb
+
+    root = tmp_path / "apps"
+    (root / "com.a.b" / "1").mkdir(parents=True)
+    (root / "com.a.b" / "1" / "base.apk").write_bytes(b"x")
+    monkeypatch.chdir(tmp_path)
+    adb = AppInstallAdb(Recorder(), root)
+    with pytest.raises(UnsafeCommand):
+        adb.run(["install", "apps/com.a.b/1/base.apk"])
+    with pytest.raises(UnsafeCommand):
+        adb.run(["install-multiple", str(root / "com.a.b" / "1" / "base.apk"), "apps/com.a.b/1/base.apk"])

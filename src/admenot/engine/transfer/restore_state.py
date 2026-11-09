@@ -50,6 +50,13 @@ CREATE TABLE IF NOT EXISTS tel (
     error  TEXT,
     PRIMARY KEY(kind, rid)
 );
+CREATE TABLE IF NOT EXISTS apps (
+    package  TEXT PRIMARY KEY,
+    status   TEXT NOT NULL,
+    reason   TEXT,
+    code     TEXT,
+    attempts INTEGER NOT NULL DEFAULT 0
+);
 """
 
 
@@ -142,6 +149,26 @@ class RestoreState:
         """Status rekordów (droga zapisu `path`), z commitem — wznowienie nie zapisze ich drugi raz."""
         self.db.executemany("INSERT OR REPLACE INTO tel(kind, rid, status, path, error) VALUES(?,?,?,?,?)",
                             [(kind, rid, status, path, error) for rid in rids])
+        self.db.commit()
+
+    # ---- aplikacje ----------------------------------------------------------------------
+    def apps_status(self) -> dict[str, tuple[str, str | None, str | None]]:
+        """Pakiet -> (status, powód, surowy kod błędu); status: `pending` | `installed` | `exists` |
+        `skipped` | `failed`. `pending` = instalacja wysłana, wynik nieznany (rozłączenie)."""
+        return {p: (st, rs, cd) for p, st, rs, cd in self.db.execute("SELECT package, status, reason, code FROM apps")}
+
+    def app_set(self, package: str, status: str, reason: str | None = None, code: str | None = None) -> None:
+        """Status aplikacji, z commitem; liczba prób zostaje."""
+        self.db.execute(
+            "INSERT INTO apps(package, status, reason, code) VALUES(?,?,?,?) ON CONFLICT(package) DO UPDATE SET "
+            "status=excluded.status, reason=excluded.reason, code=excluded.code", (package, status, reason, code))
+        self.db.commit()
+
+    def app_attempt(self, package: str) -> None:
+        """Instalacja wysłana: `pending` i próba więcej — wznowienie wie, że pakiet mógł już wejść."""
+        self.db.execute(
+            "INSERT INTO apps(package, status, attempts) VALUES(?, 'pending', 1) ON CONFLICT(package) DO UPDATE SET "
+            "status='pending', reason=NULL, code=NULL, attempts=attempts+1", (package,))
         self.db.commit()
 
 
@@ -296,9 +323,19 @@ def _summary(path: Path) -> RestoreSummary | None:
     return RestoreSummary(serial, status, updated if isinstance(updated, str) else None,
                           # `complete` z `tel_left`: pliki skończone, a wybranej telefonii jeszcze nie
                           # było (program zamknięty między etapami; most zapisuje `tel_left` przed plikami)
-                          (status != "complete" and left > 0) or _tel_left(meta) > 0,
+                          (status != "complete" and left > 0) or _tel_left(meta) > 0 or apps_left(meta) > 0,
                           changes_pending(meta.get("device_changes")),
                           meta["imei"] if isinstance(meta.get("imei"), str) else None)
+
+
+def apps_left(meta: dict[str, Any]) -> int:
+    """Aplikacje wybrane do instalacji, a jeszcze nierozstrzygnięte (meta `apps_left`: most ustawia je przed
+    plikami, a po etapie aplikacji na liczbę bez wyniku). Stan bez aplikacji w wyborze ich nie liczy."""
+    left = meta.get("apps_left")
+    choice = meta.get("choice")
+    if not isinstance(left, int) or (isinstance(choice, dict) and not choice.get("apps")):
+        return 0
+    return left
 
 
 def _tel_left(meta: dict[str, Any]) -> int:

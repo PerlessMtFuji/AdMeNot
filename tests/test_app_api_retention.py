@@ -65,3 +65,17 @@ def test_never_delete_keeps_old_orders():
     save_settings({"retention_days": None})
     fresh, _ = make_api(make_cli_phone())
     assert [o["number"] for o in fresh.history(SERIAL)["orders"]] == [number]
+
+
+def test_purge_removes_transfer_row_with_order():
+    from admenot.engine.retention import purge
+    with Journal(journal_path()) as j:
+        order = j.create_transfer_order(
+            "SRC", "M", None, None, copy_id="c1", source={"model": "M"},
+            received_at=NOW - timedelta(days=70), copy_expires=NOW - timedelta(days=63))
+        j._db.execute("UPDATE orders SET created_at = ? WHERE id = ?",
+                      ((NOW - timedelta(days=70)).isoformat(timespec="seconds"), order.id))
+        j._db.commit()
+        assert purge(j, NOW, 60) == [order.number]
+        assert j._db.execute("SELECT count(*) FROM transfers").fetchone()[0] == 0
+        assert j._db.execute("SELECT count(*) FROM orders").fetchone()[0] == 0

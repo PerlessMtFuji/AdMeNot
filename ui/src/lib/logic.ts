@@ -1,5 +1,5 @@
 import { CATEGORY_ORDER } from './categories';
-import type { CheckBrowser, CheckSite, AppView, BackupResultView, Category, CopyView, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferProgress, TransferSelection, InventoryView, ExportFileView, ExportKind, StoredSelection, RestorePlanView, RestoreResultView, TelKind, TelPlanView, TelResultView, UndoSite, UploadChoiceView, UploadGroup, UpdateView, UserWait, Verdict } from './types';
+import type { CheckBrowser, CheckSite, AppView, BackupResultView, Category, CopyView, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferOrderView, TransferProgress, TransferSelection, InventoryView, ExportFileView, ExportKind, StoredSelection, RestorePlanView, RestoreResultView, AppsPlanView, AppsPlanItem, TelKind, TelPlanView, TelResultView, UndoSite, UploadChoiceView, UploadGroup, UpdateView, UserWait, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done'
   | 'transfer_choose' | 'transfer_backup' | 'transfer_done'
@@ -775,6 +775,48 @@ export function resumableCopy(copies: CopyView[], serial: string | null): CopyVi
   return (serial && copies.find((c) => c.status === 'in_progress' && c.serial === serial)) || null;
 }
 
+/** Wiersz Historii → Przeniesienia: zlecenie ZS albo kopia bez zlecenia (w toku / przerwana / starsza, sprzed zleceń). */
+export interface TransferRow {
+  key: string;
+  /** Numer ZS; null — kopia bez zlecenia. */
+  number: string | null;
+  client: string | null;
+  at: string;
+  source: { name: string | null; imei: string | null };
+  target: { name: string | null; imei: string | null } | null;
+  state: TransferOrderView['state'] | 'interrupted' | 'incomplete';
+  notes: number;
+  /** `failed` po części wgrane (patrz `TransferOrderView.partial`). */
+  partial: boolean;
+  /** Kopia, która jest albo była (dni do usunięcia / data usunięcia); null — brak kopii i daty. */
+  copy: TransferOrderView['copy'];
+  /** Widok kopii na dysku (notatka, przedłużanie, wznawianie); null — kopii już nie ma. */
+  disk: CopyView | null;
+  whatsappRestored: boolean;
+  appsBlocked: boolean;
+  /** Numery seryjne tylko do dopasowania z podłączonym telefonem (gdy brak IMEI); nigdy do wyświetlania. */
+  sourceSerial: string | null;
+  targetSerial: string | null;
+  counts: Record<string, number>;
+}
+
+/** Zlecenia przeniesień i kopie bez zlecenia (`order` pusty) w jednej liście, najnowsze pierwsze. Kopia ze zleceniem
+ *  jest już jego wierszem, więc osobnego nie dostaje. */
+export function transferRows(orders: TransferOrderView[], copies: CopyView[]): TransferRow[] {
+  const byId = new Map(copies.map((c) => [c.id, c]));
+  const fromOrders = orders.map((o): TransferRow => ({ key: o.number, number: o.number, client: o.client, at: o.created_at,
+    source: o.source, target: o.target, state: o.state, notes: o.notes, partial: !!o.partial, copy: o.copy,
+    disk: o.copy && !o.copy.deleted_at ? byId.get(o.copy.id) ?? null : null,
+    whatsappRestored: o.whatsapp_restored, appsBlocked: !!o.apps_blocked, targetSerial: o.target_serial ?? null,
+    sourceSerial: o.copy && !o.copy.deleted_at ? byId.get(o.copy.id)?.serial ?? null : null, counts: o.counts }));
+  const fromCopies = copies.filter((c) => !c.order).map((c): TransferRow => ({ key: c.id, number: null, client: c.client, at: c.created,
+    source: { name: `${c.manufacturer} ${c.model}`.trim() || null, imei: null }, target: null,
+    state: c.status === 'in_progress' ? 'interrupted' : c.status === 'incomplete' ? 'incomplete' : 'copy_ready',
+    notes: 0, partial: false, copy: { id: c.id, days_left: c.days_left, deleted_at: null }, disk: c,
+    whatsappRestored: false, appsBlocked: false, sourceSerial: c.serial, targetSerial: null, counts: c.counts }));
+  return [...fromOrders, ...fromCopies].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+}
+
 /** Ile miejsca potrzeba jeszcze na kopię: przy wznowieniu tylko reszta (skopiowane już leży na dysku,
  *  a wolne miejsce zmalało właśnie o nie). Prawdziwą strażą jest sprawdzanie przed każdą paczką w silniku. */
 export function transferNeed(selectedBytes: number, resumable: { bytes: number } | null): number {
@@ -817,25 +859,41 @@ export function telWrite(tel: TelPlanView | null, kind: TelKind): number | null 
   return tel[kind]?.write ?? null;
 }
 
+/** Aplikacje z kopii zaznaczone domyślnie: `default_on` (podejrzane nie) i bez powodu pominięcia; szkodliwe nigdy. */
+export function defaultApps(apps: AppsPlanView | null): string[] {
+  return installableApps(apps).filter((a) => a.default_on).map((a) => a.package);
+}
+
+/** Pozycje planu aplikacji, które da się zainstalować: bez powodu pominięcia i nie szkodliwe (szkodliwych nie ma
+ *  w kopii, a silnik ich nie planuje — tu na wszelki wypadek). */
+export function installableApps(apps: AppsPlanView | null): AppsPlanItem[] {
+  return (apps?.items ?? []).filter((a) => !a.skip && a.verdict !== 'malicious');
+}
+
 /** Wszystkie grupy z plikami i wszystkie inne foldery kopii (każdy był w niej wybrany); podejrzane APK odznaczone;
- *  każda kategoria telefonii, w której jest co wgrać. */
-export function defaultUploadChoice(plan: RestorePlanView, tel: TelPlanView | null = null, verify = false): UploadChoiceView {
+ *  każda kategoria telefonii, w której jest co wgrać; aplikacje domyślnie zaznaczone (`defaultApps`). */
+export function defaultUploadChoice(plan: RestorePlanView, tel: TelPlanView | null = null, verify = false,
+  apps: AppsPlanView | null = null): UploadChoiceView {
   return {
     groups: [...UPLOAD_GROUPS.filter((g) => (plan.groups[g]?.files ?? 0) > 0),
       ...plan.others.filter((o) => o.files > 0).map((o) => otherGroup(o.name))],
     apks_on: [],
     verify_hash: verify,
     tel: TEL_KINDS.filter((k) => (telWrite(tel, k) ?? 0) > 0),
+    apps: defaultApps(apps),
   };
 }
 
 /** Wybór serwisanta przeniesiony na nowy plan (np. po braku miejsca): tylko grupy, podejrzane APK i telefonia,
  *  które nowy plan jeszcze ma. */
-export function keptUploadChoice(plan: RestorePlanView, prev: UploadChoiceView, tel: TelPlanView | null = null): UploadChoiceView {
+export function keptUploadChoice(plan: RestorePlanView, prev: UploadChoiceView, tel: TelPlanView | null = null,
+  apps: AppsPlanView | null = null): UploadChoiceView {
+  const installable = new Set(installableApps(apps).map((a) => a.package));
   const groups = new Set([...UPLOAD_GROUPS.filter((g) => g in plan.groups), ...plan.others.map((o) => otherGroup(o.name))]);
   const apks = new Set(plan.apks.filter((a) => a.outcome !== 'malicious' && !a.default_on).map((a) => a.remote));
   return { groups: prev.groups.filter((g) => groups.has(g)), apks_on: prev.apks_on.filter((a) => apks.has(a)),
-    verify_hash: prev.verify_hash, tel: prev.tel.filter((k) => (telWrite(tel, k) ?? 0) > 0) };
+    verify_hash: prev.verify_hash, tel: prev.tel.filter((k) => (telWrite(tel, k) ?? 0) > 0),
+    apps: prev.apps.filter((p) => installable.has(p)) };
 }
 
 /** Baner przywracania ustawień telefonu (`phone_cleanup`): `failed` — ostatnia próba się nie udała (zostaje
@@ -870,16 +928,24 @@ export function smsAppKey(pkg: string | null): string | null {
 /** Ta sama reguła co `RestorePlan.need/fits` w silniku. Sumy grup mają już APK według domyślnego wyboru
  *  (czyste i „nie do oceny”), bez szkodliwych i bez podejrzanych — dokładamy tylko zaznaczone podejrzane
  *  (`default_on` fałsz, nie szkodliwe), których jeszcze nie ma na telefonie. `missing`: ile brakuje do zapasu. */
-export function uploadNeed(plan: RestorePlanView, choice: UploadChoiceView): { need: number; fits: boolean; missing: number } {
+export function uploadNeed(plan: RestorePlanView, choice: UploadChoiceView,
+  apps: AppsPlanView | null = null): { need: number; fits: boolean; missing: number } {
   const groups = new Set(choice.groups);
   const on = new Set(choice.apks_on);
   const base = UPLOAD_GROUPS.filter((g) => groups.has(g)).reduce((n, g) => n + (plan.groups[g]?.bytes ?? 0), 0)
     + plan.others.filter((o) => groups.has(otherGroup(o.name))).reduce((n, o) => n + o.bytes, 0);
   const ticked = plan.apks.filter((a) => groups.has(a.group) && a.action !== 'exists' && a.outcome !== 'malicious'
     && !a.default_on && on.has(a.remote)).reduce((n, a) => n + a.bytes, 0);
-  const need = base + ticked;
+  const chosen = new Set(choice.apps);
+  const installed = installableApps(apps).filter((a) => chosen.has(a.package)).reduce((n, a) => n + a.bytes, 0);
+  const need = base + ticked + installed;
   const missing = Math.max(0, need + plan.reserve - plan.space.free);
   return { need, fits: missing === 0, missing };
+}
+
+/** Zgrubny czas wgrywania w minutach: pliki jak kopia (przez USB), każda aplikacja dochodzi z instalacją. */
+export function restoreEtaMin(bytes: number, apps: number): number {
+  return Math.max(1, Math.round((bytes / TRANSFER_RATE + apps * 8) / 60));
 }
 
 /** Zielone „Pliki wgrane”, gdy wszystkie pliki weszły — także na Androidzie < 10 (`restart`: osobny baner

@@ -28,7 +28,7 @@ describe('fake bridge', () => {
 
   test('knows the recorded scenarios', () => {
     expect(scenarioNames().sort()).toEqual(
-      ['adware', 'adware-en', 'clean', 'disconnect', 'empty', 'explorer', 'manual', 'many', 'report', 'transfer', 'transfer_export', 'transfer_restore', 'transfer_restore_tel', 'unauthorized'].sort());
+      ['adware', 'adware-en', 'clean', 'disconnect', 'empty', 'explorer', 'manual', 'many', 'report', 'transfer', 'transfer_export', 'transfer_restore', 'transfer_restore_tel', 'transfer_restore_xiaomi', 'unauthorized'].sort());
   });
 
   test('replays results and events of the adware scenario', async () => {

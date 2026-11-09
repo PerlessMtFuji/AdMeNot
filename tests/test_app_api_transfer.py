@@ -514,7 +514,9 @@ def _new_phone(tmp_path: Path, files: dict[str, bytes] | None = None) -> Transfe
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
         os.utime(path, (MTIME, MTIME))
-    return TransferPhone(make_cli_phone(), FakeStoragePhone(root, serial=NEW))
+    storage = FakeStoragePhone(root, serial=NEW)
+    storage.props["ro.product.cpu.abilist"] = "arm64-v8a,armeabi-v7a"
+    return TransferPhone(make_cli_phone(), storage)
 
 
 def _copied(tmp_path, extra: dict[str, bytes] | None = None, **kw):
@@ -539,6 +541,7 @@ def _copied(tmp_path, extra: dict[str, bytes] | None = None, **kw):
 def _planned(api, rec, copy_id: str, serial: str = NEW) -> dict:
     assert "job_id" in api.restore_plan(copy_id, serial)
     assert api._jobs.wait(5)
+    assert not rec.of("job:error"), rec.of("job:error")
     return rec.of("transfer:restore_plan")[-1]
 
 
@@ -1447,3 +1450,490 @@ def test_bridge_uses_transfer_keep_days(tmp_path):
     copy = store.create_copy(SERIAL, _device(), None, NOW)
     view = api.extend_transfer(copy.read_meta().id)["copy"]
     assert view["expires"] == (NOW + timedelta(days=37)).isoformat(timespec="seconds")
+
+
+# --- zlecenie ZS dla kopii (Etap 4–5, zadanie 3) --------------------------------------------------
+
+def _transfer_orders():
+    from admenot.engine.journal.db import Journal
+    from admenot.engine.paths import journal_path
+    with Journal(journal_path()) as journal:
+        return journal.transfer_orders()
+
+
+def test_backup_done_opens_order(tmp_path):
+    api, rec, _ = _inventoried(tmp_path)
+    api.start_backup(SELECTION)
+    done = rec.of("transfer:done")[0]
+    found = _transfer_orders()
+    assert len(found) == 1
+    order, record = found[0]
+    assert order.kind == "transfer" and order.client_name == "Anna K."
+    assert done["copy"]["order"] == order.number
+    assert record.copy_id == done["copy"]["id"]
+
+
+def test_stopped_backup_opens_no_order(tmp_path):
+    api, rec, release = _held_backup(tmp_path)
+    job_id = api._jobs.current().id
+    api.stop(job_id)
+    release.set()
+    assert rec.wait_for("transfer:done")["result"]["status"] == "stopped"
+    assert api._jobs.wait(5)
+    assert _transfer_orders() == []
+
+
+def test_delete_copy_marks_journal(tmp_path):
+    api, rec, _ = _inventoried(tmp_path)
+    api.start_backup(SELECTION)
+    copy_id = rec.of("transfer:done")[0]["copy"]["id"]
+    assert api.delete_transfer(copy_id) == {"deleted": copy_id}
+    (order, record), = _transfer_orders()
+    assert record.copy_deleted_at == NOW and order.status == "expired"
+
+
+def test_extend_updates_journal_expiry(tmp_path):
+    api, rec, _ = _inventoried(tmp_path)
+    api.start_backup(SELECTION)
+    copy_id = rec.of("transfer:done")[0]["copy"]["id"]
+    view = api.extend_transfer(copy_id)["copy"]
+    (_, record), = _transfer_orders()
+    assert record.copy_expires.isoformat(timespec="seconds") == view["expires"]
+
+
+def test_purge_marks_journal(tmp_path):
+    api, rec, _ = _inventoried(tmp_path)
+    api.start_backup(SELECTION)
+    copy_id = rec.of("transfer:done")[0]["copy"]["id"]
+    meta = store.resolve(copy_id).read_meta()
+    meta.expires = NOW - timedelta(days=1)
+    store.resolve(copy_id).write_meta(meta)
+    api._purge_transfers()
+    (_, record), = _transfer_orders()
+    assert record.copy_deleted_at == NOW
+
+
+def test_backup_survives_journal_failure_when_opening_order(tmp_path, monkeypatch):
+    from admenot.engine.transfer import orders as orders_mod
+
+    def boom(*a, **k):
+        raise RuntimeError("journal down")
+
+    monkeypatch.setattr(orders_mod, "open_for_copy", boom)
+    api, rec, _ = _inventoried(tmp_path)
+    api.start_backup(SELECTION)
+    done = rec.of("transfer:done")[0]
+    assert done["result"]["status"] == "complete" and done["copy"]["order"] is None
+
+
+# --- Etap 4: aplikacje w wgrywaniu i wynik w dzienniku ---------------------------------------------
+
+APPS_CHOICE = {**CHOICE, "apps": ["com.whatsapp"]}
+
+
+def _add_app(copy_id: str, package: str, label: str, verdict: str, version: int = 5) -> None:
+    import hashlib
+
+    from admenot.engine.actions.backup import COMPLETE
+
+    copy = store.CopyDir(store.transfers_dir() / copy_id)
+    d = copy.apps_dir / package / str(version)
+    d.mkdir(parents=True)
+    data = package.encode()
+    (d / "base.apk").write_bytes(data)
+    (d / COMPLETE).write_text(json.dumps({"package": package, "version_code": version,
+                                          "files": {"base.apk": hashlib.sha256(data).hexdigest()}}),
+                              encoding="utf-8")
+    rows = json.loads(copy.verdicts_path.read_text(encoding="utf-8")) if copy.verdicts_path.is_file() else []
+    rows.append({"package": package, "version_code": version, "verdict": verdict, "label": label})
+    copy.verdicts_path.write_text(json.dumps(rows), encoding="utf-8")
+
+
+def _order(api, number: str):
+    with api._journal() as journal:
+        order = journal.order_by_number(number)
+        return order, journal.transfer(order.id)
+
+
+def test_restore_plan_lists_apps_with_skip(tmp_path):
+    api, rec, host, copy_id = _copied(tmp_path)
+    _add_app(copy_id, "com.bad", "Zły", "suspicious")
+    host.phone(NEW).storage.installed.add("com.whatsapp")
+    event = _planned(api, rec, copy_id)
+    items = {i["package"]: i for i in event["apps"]["items"]}
+    assert items["com.whatsapp"]["skip"] == "installed"
+    assert items["com.bad"]["default_on"] is False and items["com.bad"]["skip"] is None
+    assert items["com.bad"]["name"] == "Zły" and items["com.bad"]["verdict"] == "suspicious"
+    assert event["apps"]["block"] is None
+    assert event["apps"]["bytes"] == items["com.bad"]["bytes"] > 0  # tylko instalowalne
+    assert event["order"] is not None and event["order"].startswith("ZS/")
+
+
+def test_restore_runs_apps_last_and_saves_result(tmp_path, no_tap_wait):
+    api, rec, host, copy_id = _tel_copied(tmp_path)
+    _planned(api, rec, copy_id)
+    assert "job_id" in api.start_restore({**TEL_CHOICE, "apps": ["com.whatsapp"]})
+    names = [n for n in rec.names() if n in ("transfer:restore_progress", "transfer:tel_progress",
+                                             "transfer:apps_progress")]
+    assert names.index("transfer:restore_progress") < names.index("transfer:tel_progress") \
+        < names.index("transfer:apps_progress")
+    done = rec.of("transfer:restore_done")[0]
+    assert done["apps"]["installed"] == 1 and done["order"].startswith("ZS/")
+    assert done["whatsapp"] is None  # grupa WhatsApp nie miała plików w kopii
+    assert "com.whatsapp" in host.phone(NEW).storage.installed
+    order, record = _order(api, done["order"])
+    assert record.result["apps"]["installed"] == 1 and record.result["files"]["status"] == "complete"
+    assert record.result["tel"]["status"] == "complete" and record.result["status"] == "done"
+    assert record.result["finished_at"] and order.status == "done"
+    assert record.target_serial == NEW
+
+
+def test_restore_without_apps_has_null_apps(tmp_path):
+    api, rec, _host, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+    api.start_restore(CHOICE)
+    done = rec.of("transfer:restore_done")[0]
+    assert done["apps"] is None
+    assert done["whatsapp"] is None
+    _, record = _order(api, done["order"])
+    assert record.result["apps"] is None
+
+
+def test_result_saved_after_files_when_tel_crashes(tmp_path, no_tap_wait, monkeypatch):
+    api, rec, _host, copy_id = _tel_copied(tmp_path)
+    _planned(api, rec, copy_id)
+
+    def boom(*a, **kw):
+        raise RuntimeError("tel down")
+
+    monkeypatch.setattr(type(api), "_run_tel", boom)
+    api.start_restore({**TEL_CHOICE, "apps": ["com.whatsapp"]})
+    done = rec.of("transfer:restore_done")[0]
+    assert done["tel_error"] == "transfer_failed"
+    order, record = _order(api, done["order"])
+    assert record.result["files"]["files_done"] == 5 and record.result["tel_error"] == "transfer_failed"
+    assert record.result["apps"]["installed"] == 1  # aplikacje nie zależą od telefonii
+    assert order.status == "failed" and record.result["status"] == "failed"
+
+
+def test_files_saved_when_job_raises_after_files(tmp_path, monkeypatch):
+    api, rec, _host, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+
+    def boom(*a, **kw):
+        raise RuntimeError("apps down")
+
+    monkeypatch.setattr("admenot.app.api.run_install", boom)
+    api.start_restore(APPS_CHOICE)
+    done = rec.of("transfer:restore_done")[0]  # aplikacje degradują jak telefonia: zdarzenie końca idzie
+    assert done["apps"] is None and done["apps_error"] == "transfer_failed" and done["result"]["files_done"] == 5
+    with api._journal() as journal:
+        ((order, record),) = journal.transfer_orders()[:1]
+    assert record.result["files"]["files_done"] == 5 and order.status == "failed"
+    assert record.result["status"] == "failed" and record.result["apps_error"] == "transfer_failed"
+    # aplikacje bez wyniku: wgrywanie do wznowienia (Banner), a ponowny plan go nie zamyka
+    (entry,) = api.transfers()["copies"][0]["restores"]
+    assert entry["resumable"] is True
+    assert _planned(api, rec, copy_id)["resumable"] is True
+
+
+def _xiaomi_copied(tmp_path, monkeypatch):
+    from admenot.engine.transfer import apps as A
+
+    monkeypatch.setattr(A, "_XIAOMI", A._XIAOMI | {"samsung", "oppo"})
+    api, rec, host, copy_id = _copied(tmp_path)
+    new = host.phone(NEW).storage
+    new.props["persist.security.adbinstall"] = "0"
+    return api, rec, host, copy_id, new
+
+
+def test_install_remaining_after_unblock(tmp_path, monkeypatch):
+    api, rec, _host, copy_id, new = _xiaomi_copied(tmp_path, monkeypatch)
+    event = _planned(api, rec, copy_id)
+    assert event["apps"]["block"] == "xiaomi"
+    assert api.install_check() == {"blocked": True}
+    api.start_restore(APPS_CHOICE)
+    done = rec.of("transfer:restore_done")[0]
+    assert done["apps"]["blocked"] is True and done["apps"]["skipped"] == {"user_restricted": 1}
+    number = done["order"]
+    new.props["persist.security.adbinstall"] = "1"
+    assert api.install_check() == {"blocked": False}
+    assert "job_id" in api.install_remaining_apps(number)
+    again = rec.of("transfer:apps_done")[-1]
+    assert again["order"] == number and again["apps"]["installed"] == 1
+    _, record = _order(api, number)
+    assert record.result["apps"]["installed"] == 1 and record.result["files"]["status"] == "complete"
+    assert "com.whatsapp" in new.installed
+
+
+def test_install_remaining_records_apps_event_with_counts_only(tmp_path, monkeypatch):
+    api, rec, _host, copy_id, new = _xiaomi_copied(tmp_path, monkeypatch)
+    api.set_telemetry(True, True)
+    _planned(api, rec, copy_id)
+    api.start_restore(APPS_CHOICE)
+    restore = [json.loads(x) for x in telemetry_path().read_text("utf-8").splitlines()]
+    first = next(e for e in restore if e["type"] == "transfer_restore")
+    assert first["apps_blocked"] is True and first["apps"]["skipped"] == 1 and first["apps_codes"] == {}
+    number = rec.of("transfer:restore_done")[0]["order"]
+    new.props["persist.security.adbinstall"] = "1"
+    api.install_remaining_apps(number)
+    events = [json.loads(x) for x in telemetry_path().read_text("utf-8").splitlines()]
+    event = next(e for e in events if e["type"] == "transfer_apps")
+    assert event["apps"]["installed"] == 1 and event["installer"] in ("play", "none")
+    assert "whatsapp" not in json.dumps(event) and NEW not in json.dumps(event)
+
+
+def test_install_remaining_needs_phone(tmp_path, monkeypatch):
+    api, rec, host, copy_id, _new = _xiaomi_copied(tmp_path, monkeypatch)
+    _planned(api, rec, copy_id)
+    api.start_restore(APPS_CHOICE)
+    number = rec.of("transfer:restore_done")[0]["order"]
+    host.connected.discard(NEW)
+    assert api.install_remaining_apps(number)["error"]["key"] == "transfer_no_phone"
+    assert api.install_remaining_apps("ZS/none")["error"]["key"] == "bad_request"
+
+
+def test_install_check_reads_prop_only(tmp_path, monkeypatch):
+    api, rec, _host, copy_id, _new = _xiaomi_copied(tmp_path, monkeypatch)
+    _planned(api, rec, copy_id)
+    seen = len(rec.of("adb:command"))
+    api.install_check()
+    fresh = rec.of("adb:command")[seen:]
+    assert fresh and all("getprop persist.security.adbinstall" in c["command"] for c in fresh)
+
+
+def test_install_check_for_an_order_reads_the_target_phone_only(tmp_path, monkeypatch):
+    api, rec, host, copy_id, new = _xiaomi_copied(tmp_path, monkeypatch)
+    _planned(api, rec, copy_id)
+    api.start_restore(APPS_CHOICE)
+    number = rec.of("transfer:restore_done")[0]["order"]
+    api._restore = None  # jak w Historii: żadnego planu wgrywania
+    seen = len(rec.of("adb:command"))
+    assert api.install_check(number) == {"blocked": True}
+    fresh = rec.of("adb:command")[seen:]
+    assert fresh and all("getprop persist.security.adbinstall" in c["command"] for c in fresh)
+    new.props["persist.security.adbinstall"] = "1"
+    assert api.install_check(number) == {"blocked": False}
+    host.connected.discard(NEW)
+    assert api.install_check(number) == {"blocked": None}
+    assert api.install_check("ZS/none")["error"]["key"] == "bad_request"
+
+
+def test_install_check_without_plan(tmp_path):
+    api, _rec = _api(_phone(tmp_path))
+    assert api.install_check() == {"blocked": None}
+
+
+def test_set_whatsapp_restored_roundtrip(tmp_path):
+    api, rec, _host, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+    api.start_restore(CHOICE)
+    number = rec.of("transfer:restore_done")[0]["order"]
+    assert api.set_whatsapp_restored(number, True) == {"order": number, "whatsapp_restored": True}
+    assert _order(api, number)[1].whatsapp_restored is True
+    assert api.set_whatsapp_restored(number, False)["whatsapp_restored"] is False
+    assert api.set_whatsapp_restored(number, "yes")["error"]["key"] == "bad_request"
+    assert api.set_whatsapp_restored("ZS/none", True)["error"]["key"] == "bad_request"
+
+
+def test_transfers_lists_orders_and_running_copies(tmp_path):
+    api, rec, _host, copy_id = _copied(tmp_path)
+    (waiting,) = api.transfers()["orders"]
+    assert waiting["state"] == "copy_ready" and waiting["target"] is None
+    assert waiting["copy"]["id"] == copy_id and waiting["client"] == "Anna K."
+    _planned(api, rec, copy_id)
+    api.start_restore(CHOICE)
+    (done,) = api.transfers()["orders"]
+    assert done["state"] == "restored" and done["notes"] == 0 and done["target"] is not None
+    assert done["whatsapp_restored"] is False and done["counts"]
+    # kopia przerwana: bez zlecenia, trafia do `copies`
+    store.create_copy("OLD2", _device(), "Jan", NOW)
+    listed = api.transfers()
+    assert len(listed["orders"]) == 1
+    assert any(c["status"] == "in_progress" for c in listed["copies"])
+    assert copy_id in {c["id"] for c in listed["copies"]}  # stary kształt zostaje do przejścia UI
+
+
+def test_transfer_order_view_states(tmp_path):
+    from admenot.app.present import transfer_order_view
+
+    api, rec, _host, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+    api.start_restore(CHOICE)
+    with api._journal() as journal:
+        ((order, record),) = journal.transfer_orders()
+        journal.save_transfer_result(order.id, {**record.result, "apps": {"failed": {"no_space": 2}}})
+        record = journal.transfer(order.id)
+        view = transfer_order_view(order, record, None, NOW)
+        assert (view["state"], view["notes"]) == ("restored_notes", 2)
+        assert view["apps_blocked"] is False
+        assert view["target_serial"] == record.target_serial == NEW
+        blocked = {**record.result, "apps": {"blocked": True, "failed": {}}}
+        journal.save_transfer_result(order.id, blocked)
+        assert transfer_order_view(order, journal.transfer(order.id), None, NOW)["apps_blocked"] is True
+        # dokończenie zatrzymane zamknięciem programu: `blocked: false`, ale pominięte przez blokadę zostały
+        stopped = {**record.result, "apps": {"blocked": False, "stopped": True, "skipped": {"user_restricted": 2}}}
+        journal.save_transfer_result(order.id, stopped)
+        assert transfer_order_view(order, journal.transfer(order.id), None, NOW)["apps_blocked"] is True
+        journal.save_transfer_result(order.id, {**record.result, "apps": {"failed": {"no_space": 2}}})
+        journal.set_order_status(order.id, "failed")
+        assert transfer_order_view(journal.order(order.id), record, None, NOW)["state"] == "failed"
+        journal.set_order_status(order.id, "expired")
+        assert transfer_order_view(journal.order(order.id), record, None, NOW)["state"] == "expired"
+
+
+def test_whatsapp_view_rules(tmp_path):
+    from admenot.app.api import _whatsapp_view
+    from admenot.engine.transfer.apps import AppCandidate, AppsPlan, AppsResult
+    from admenot.engine.transfer.restore import RestoreResult, UploadChoice
+
+    copy = store.create_copy("OLD", _device(), None, NOW)
+    base = RestoreResult("complete", NEW, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, False, "done",
+                         groups={"whatsapp": {"done": 1, "exists": 0, "skipped": 0, "failed": 0}})
+    chosen = UploadChoice(frozenset({"whatsapp"}), frozenset())
+
+    def apps(status):
+        return AppsResult(1, 0, 0, {}, {}, {}, False, False,
+                          [{"package": "com.whatsapp", "label": "WhatsApp", "status": status, "reason": None}], True)
+
+    assert _whatsapp_view(chosen, base, None, None, copy, NEW) == {"files": True, "app": "missing"}
+    assert _whatsapp_view(chosen, base, apps("installed"), None, copy, NEW) == {"files": True, "app": "installed"}
+    assert _whatsapp_view(chosen, base, apps("exists"), None, copy, NEW) == {"files": True, "app": "pre_installed"}
+    plan = AppsPlan([AppCandidate("com.whatsapp", "WhatsApp", 1, 1, "clean", True, "installed", ())], None)
+    assert _whatsapp_view(chosen, base, None, plan, copy, NEW) == {"files": True, "app": "pre_installed"}
+    assert _whatsapp_view(UploadChoice(frozenset({"photos"}), frozenset()), base, None, None, copy, NEW) is None
+
+
+def test_restore_result_keeps_choice_for_protocol(tmp_path):
+    """Wybór ze startu wgrywania trafia do wyniku w dzienniku: protokół nie nazywa porażką odznaczonej
+    telefonii ani aplikacji (domyślna ścieżka: np. kontakty w całości z synchronizacji konta)."""
+    from admenot.engine.report.transfer_model import build_transfer_protocol
+
+    api, rec, _host, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+    api.start_restore(CHOICE)
+    assert api._jobs.wait(5)
+    with api._journal() as journal:
+        ((order, record),) = journal.transfer_orders()
+        choice = record.result["choice"]
+        assert choice["groups"] == sorted(CHOICE["groups"]) and choice["tel"] == [] and choice["apps"] == 0
+        assert set(choice["tel_plan"]) <= {"contacts", "sms", "mms", "calls"}
+        p = build_transfer_protocol(journal, order.id, "pl", NOW)
+    assert p.tone == "ok" and not any(t.tone == "bad" for t in p.tiles)
+    assert {t.key: t.tone for t in p.tiles}["contacts"] == "mut"  # telefonia nie wybrana: bez oceny
+    assert p.apps_total == 0
+
+
+def test_upload_choice_rejects_malicious_apps():
+    from types import SimpleNamespace
+
+    from admenot.app.api import AppError, _upload_choice
+    from admenot.engine.transfer.apps import AppCandidate, AppsPlan
+
+    plan = SimpleNamespace(groups={}, files=[])
+    apps = AppsPlan([AppCandidate("com.ok", "Ok", 1, 1, "clean", True, None, ()),
+                     AppCandidate("com.mal", "Mal", 1, 1, "malicious", False, None, ())], None)
+    base = {"groups": [], "apks_on": [], "verify_hash": False}
+    assert _upload_choice({**base, "apps": ["com.ok"]}, plan, apps).apps == frozenset({"com.ok"})
+    with pytest.raises(AppError):
+        _upload_choice({**base, "apps": ["com.mal"]}, plan, apps)
+
+
+def test_interrupted_running_order_is_failed_in_view(tmp_path):
+    from admenot.app.present import transfer_order_view
+
+    api, rec, _host, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+    api.start_restore(CHOICE)
+    with api._journal() as journal:
+        ((order, record),) = journal.transfer_orders()
+        journal.set_order_status(order.id, "running")  # program zabity w trakcie
+        order = journal.order(order.id)
+        assert transfer_order_view(order, record, None, NOW)["state"] == "failed"
+        assert transfer_order_view(order, record, None, NOW, running=True)["state"] == "restored"
+    assert api.transfers()["orders"][0]["state"] == "failed"
+    assert record.result["files"]["files_done"] == 5  # dane protokołu zostają
+
+
+def test_stopped_files_do_not_run_apps(tmp_path):
+    api, rec, host, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+    _on_event(rec, lambda n, d: api.stop(api._jobs.current().id) if n == "transfer:restore_progress" else None)
+    api.start_restore(APPS_CHOICE)
+    done = rec.of("transfer:restore_done")[0]
+    assert done["result"]["status"] == "stopped" and done["apps"] is None
+    assert not rec.of("transfer:apps_progress") and "com.whatsapp" not in host.phone(NEW).storage.installed
+    order, record = _order(api, done["order"])
+    assert order.status == "failed" and record.result["apps"] is None
+    (entry,) = api.transfers()["copies"][0]["restores"]
+    assert entry["resumable"] is True
+
+
+def test_resume_keeps_earlier_results_and_order_goes_running_then_done(tmp_path, no_tap_wait):
+    api, rec, _host, copy_id = _tel_copied(tmp_path)
+    _planned(api, rec, copy_id)
+    seen = []
+    first = {"stop": True}
+
+    def hook(name, detail):
+        if name == "transfer:restore_progress" and first["stop"]:
+            api.stop(api._jobs.current().id)
+            first["stop"] = False
+
+    _on_event(rec, hook)
+    api.start_restore({**TEL_CHOICE, "apps": ["com.whatsapp"]})
+    number = rec.of("transfer:restore_done")[0]["order"]
+    order, record = _order(api, number)
+    assert order.status == "failed" and record.result["files"]["status"] == "stopped"
+    _planned(api, rec, copy_id)
+    _on_event(rec, lambda n, d: seen.append(_order(api, number)[0].status) if n == "transfer:restore_progress" else None)
+    api.start_restore({**TEL_CHOICE, "apps": ["com.whatsapp"]})
+    assert "running" in seen
+    order, record = _order(api, number)
+    assert order.status == "done" and record.result["status"] == "done"
+    assert record.result["files"]["status"] == "complete" and record.result["tel"]["status"] == "complete"
+    assert record.result["apps"]["installed"] == 1
+    assert api.transfers()["copies"][0]["restores"][0]["resumable"] is False
+
+
+def test_install_remaining_without_apps_is_refused(tmp_path):
+    api, rec, _host, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+    api.start_restore(CHOICE)
+    number = rec.of("transfer:restore_done")[0]["order"]
+    assert api.install_remaining_apps(number)["error"]["key"] == "bad_request"
+    assert _order(api, number)[1].result["apps"] is None
+
+
+def test_apps_left_makes_restore_resumable(tmp_path):
+    from admenot.engine.transfer.restore_state import apps_left
+
+    assert apps_left({"apps_left": 2, "choice": {"apps": ["a"]}}) == 2
+    assert apps_left({"apps_left": 2, "choice": {"apps": []}}) == 0
+    assert apps_left({"choice": {"apps": ["a"]}}) == 0
+
+
+def test_transfer_exports_check_without_inventory_is_refused(tmp_path):
+    api, _ = _api(_phone(tmp_path))
+    assert api.transfer_exports_check()["error"]["key"] == "transfer_no_inventory"
+
+
+def test_transfer_exports_check_is_cheap_read_only_and_updates_inventory(tmp_path):
+    api, rec, phone, *_ = _denied(tmp_path)
+    _put(phone, "Pobrane/jeszcze-nowsze.vcf", VCF_NEW, MTIME + 50)
+    before = len(rec.of("transfer:inventory"))
+    start = len(phone.storage.commands)
+    result = api.transfer_exports_check()
+    assert set(result) == {"contacts", "sms", "mms", "mms_bytes", "calls", "denied", "exports"}
+    assert result["denied"] == ["contacts", "sms"]
+    assert [e["name"] for e in result["exports"]["contacts"]][0] == "jeszcze-nowsze.vcf"
+    assert len(result["exports"]["contacts"]) == 3
+    # bez zadania i bez nowego zdarzenia inwentarza; bieżący inwentarz (dla start_backup) jest odświeżony
+    assert len(rec.of("transfer:inventory")) == before
+    assert api._transfer[1].exports["contacts"][0].remote.endswith("jeszcze-nowsze.vcf")
+    assert api._transfer[1].files  # pliki z poprzedniego skanu zostają
+    session = phone.storage.commands[start:]
+    # tylko odczyt: żadnego skanu całej pamięci (stat całego /sdcard bez filtra rozszerzeń), zapisu ani usuwania
+    assert not any(c.split()[0] in {"rm", "mv", "cp", "touch", "mkdir", "am", "pm", "settings"} for c in session)
+    finds = [c for c in session if c.startswith("find")]
+    assert finds and all("-iname" in c for c in finds)

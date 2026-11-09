@@ -206,20 +206,60 @@ test('phone state in English', async ({ page }) => {
   await expect(page.getByRole('switch', { name: 'All sites in Samsung Internet' })).toBeVisible();
 });
 
-test('upload a copy: the new phone is offered the copy, the plan shows APK labels, the result is green', async ({ page }) => {
+const NEW_PHONE = /IMEI 861485069821024/;  // radio nowego telefonu: IMEI zamiast numeru seryjnego
+const NOW_AFTER_COPY = new Date('2026-09-26T15:00:00');  // nagrana kopia jest świeża (< 24 h)
+
+test('copy, then the other phone connects: plan with apps, upload, data transferred, protocol', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.clock.setFixedTime(new Date('2026-09-26T15:00:00'));  // nagrana kopia jest świeża (< 24 h)
+  await page.clock.setFixedTime(NOW_AFTER_COPY);
   await page.goto('/?scenario=transfer_restore');
-  await page.getByRole('radio', { name: /R58W20NEW01/ }).dispatchEvent('click');  // radio jest sr-only pod kartą
-  await expect(page.getByText(/Wgrać kopię z samsung SM-A145R \(Anna K\./)).toBeVisible();
+  await page.waitForFunction(() => (window as any).__admenot?.ctl.state.devices.length === 2);
+  // Podłączony jest tylko stary telefon; nowy pojawi się dopiero po kopii.
+  await page.evaluate(() => {
+    const { ctl, bridge } = (window as any).__admenot;
+    (window as any).__both = JSON.parse(JSON.stringify(ctl.state.devices));
+    bridge.emit('devices', { devices: [(window as any).__both[0]], error: null });
+  });
+  await page.getByRole('button', { name: 'Kopiuj dane' }).click();
+  await expect(page.getByRole('heading', { name: 'Co skopiować ze starego telefonu?' })).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('button', { name: /^Rozpocznij kopię/ }).click();
+  await expect(page.getByRole('heading', { name: 'Kopia gotowa' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Podłącz nowy telefon')).toBeVisible();
+  // Nowy telefon sam dostaje plan wgrywania.
+  await page.evaluate(() => (window as any).__admenot.bridge.emit('devices', { devices: (window as any).__both, error: null }));
+  await expect(page.getByRole('heading', { name: 'Co wgrać na nowy telefon?' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('1 APK szkodliwy — pominę')).toBeVisible();
+  await expect(page.getByText('1 APK podejrzany — odznaczony')).toBeVisible();
+  await page.getByRole('button', { name: /^Pobrane i dokumenty: Pokaż/ }).click();  // lista APK jest zwinięta
+  await expect(page.getByText('pominięty jako szkodliwy')).toBeVisible();
+  await page.getByRole('complementary', { name: 'Miejsce na nowym telefonie' }).getByRole('button', { name: /^Wgraj/ }).click();
+  await expect(page.getByRole('heading', { name: 'Dane przeniesione' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Prawie wszystko gotowe')).toBeVisible();  // jedna aplikacja bez wersji dla procesora
+  await page.getByRole('button', { name: /^Pliki: Szczegóły/ }).click();  // szczegóły plików są zwinięte
+  await expect(page.getByText('pominięto 1 plik oceniony jako szkodliwy')).toBeVisible();
+  await page.getByRole('button', { name: /^Protokół/ }).click();
+  await expect(page.getByText(/Otwarto protokół/)).toBeVisible();
+  expect(await page.evaluate(() => (window as any).__admenot.bridge.calls.filter((c: any) => c.method === 'report').length)).toBe(1);
+  expect(errors).toEqual([]);
+});
+
+test('Xiaomi: the block is a label in the apps row, the instruction opens only on click', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.clock.setFixedTime(NOW_AFTER_COPY);
+  await page.goto('/?scenario=transfer_restore_xiaomi');
+  await page.getByRole('radio', { name: NEW_PHONE }).dispatchEvent('click');  // radio jest sr-only pod kartą
   await page.getByRole('button', { name: 'Wgraj', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Co wgrać na nowy telefon?' })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('pominięty jako szkodliwy')).toBeVisible();
-  await expect(page.getByText('podejrzany — odznaczony')).toBeVisible();
+  const how = page.getByText(/Jak włączyć: Ustawienia → Dodatkowe ustawienia/);
+  await expect(page.getByText('Xiaomi blokuje instalację')).toBeVisible();
+  await expect(how).toBeHidden();
+  await page.getByRole('button', { name: /Xiaomi blokuje instalację/ }).click();
+  await expect(how).toBeVisible();
   await page.getByRole('complementary', { name: 'Miejsce na nowym telefonie' }).getByRole('button', { name: /^Wgraj/ }).click();
-  await expect(page.getByText('Pliki wgrane', { exact: true })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('pominięto 1 plik oceniony jako szkodliwy')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Dane przeniesione' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('aplikacje czekają, aż Xiaomi pozwoli na instalację przez USB')).toBeVisible();
   expect(errors).toEqual([]);
 });
 

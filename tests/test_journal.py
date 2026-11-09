@@ -133,6 +133,8 @@ def test_journal_from_plan_2_gets_the_scan_table(tmp_path):
         order = j.create_order("S1", "M")
         j._db.execute("DROP TABLE order_scans")  # stan bazy sprzed Planu 6
         j._db.execute("ALTER TABLE orders DROP COLUMN device_identity")  # i sprzed schematu v2
+        j._db.execute("ALTER TABLE orders DROP COLUMN kind")  # i sprzed schematu v4
+        j._db.execute("DROP TABLE transfers")
         j._db.execute("PRAGMA user_version = 0")  # i sprzed wersjonowania schematu
     with Journal(path) as j:
         assert j.order(order.id).number == order.number
@@ -364,3 +366,88 @@ def test_deleted_rows_are_overwritten_on_disk(tmp_path):
         order = j.create_order("S1", "M", "Klientka-Unikalna-Nazwa")
         j.delete_order(order.id)
     assert b"Klientka-Unikalna-Nazwa" not in (tmp_path / "j.db").read_bytes()
+
+
+# --- zlecenia przeniesienia (v4) ----------------------------------------------------------------
+
+def _transfer(j, copy_id="c1", serial="SRC", expires=None):
+    return j.create_transfer_order(
+        serial, "SM-A525F", "Anna", {"imei": "1"}, copy_id=copy_id,
+        source={"model": "SM-A525F", "counts": {"contacts": 412}},
+        received_at=datetime(2026, 11, 8, 9, 0), copy_expires=expires or datetime(2026, 11, 15, 9, 0))
+
+
+def test_v3_journal_migrates_to_v4_with_repair_kind(tmp_path):
+    path = tmp_path / "j.db"
+    with closing(sqlite3.connect(path)) as db:
+        for script in MIGRATIONS[:3]:
+            db.executescript(script)
+        db.execute("INSERT INTO orders(number, device_serial, device_model, created_at, status)"
+                   " VALUES ('ZS/2026/1001/01', 'S1', 'M', '2026-10-01T10:00:00', 'done')")
+        db.execute("PRAGMA user_version = 3")
+        db.commit()
+    with Journal(path) as j:
+        assert j.order_by_number("ZS/2026/1001/01").kind == "repair"
+    assert _version(path) == 4
+
+
+def test_transfer_order_shares_zs_counter(tmp_path):
+    clock = Clock(datetime(2026, 11, 8, 10, 0))
+    with Journal(tmp_path / "j.db", now=clock) as j:
+        first = j.create_order("S1", "M")
+        second = _transfer(j)
+    assert first.number == "ZS/2026/1108/01"
+    assert second.number == "ZS/2026/1108/02"
+    assert first.kind == "repair"
+    assert second.kind == "transfer"
+    assert second.status == "running"
+
+
+def test_transfer_record_roundtrip(tmp_path):
+    expires = datetime(2026, 11, 15, 9, 0)
+    with Journal(tmp_path / "j.db") as j:
+        order = _transfer(j, expires=expires)
+        j.set_transfer_target(order.id, "DST", {"model": "CPH2271", "name": "Zażółć"})
+        j.save_transfer_result(order.id, {"contacts": {"done": 412}})
+        j.set_whatsapp_restored(order.id, True)
+        rec = j.transfer(order.id)
+    assert rec.order_id == order.id
+    assert rec.copy_id == "c1"
+    assert rec.source == {"model": "SM-A525F", "counts": {"contacts": 412}}
+    assert rec.received_at == datetime(2026, 11, 8, 9, 0)
+    assert rec.target_serial == "DST"
+    assert rec.target == {"model": "CPH2271", "name": "Zażółć"}
+    assert rec.result == {"contacts": {"done": 412}}
+    assert rec.whatsapp_restored is True
+    assert rec.copy_expires == expires
+    assert rec.copy_deleted_at is None
+
+
+def test_transfer_orders_hidden_from_repair_lists(tmp_path):
+    with Journal(tmp_path / "j.db") as j:
+        order = _transfer(j)
+        j.add_action(order.id, "pkg", "L", _step("pkg"), "cmd")
+        assert j.interrupted_orders("SRC") == []
+        assert j.orders_for("SRC") == []
+        assert "SRC" not in j.recent_serials()
+
+
+def test_mark_copy_deleted_expires_orders_without_target(tmp_path):
+    when = datetime(2026, 11, 16, 8, 0)
+    with Journal(tmp_path / "j.db") as j:
+        with_target = _transfer(j)
+        j.set_transfer_target(with_target.id, "DST", {"model": "M"})
+        j.set_order_status(with_target.id, "done")
+        without = _transfer(j)
+        other = _transfer(j, copy_id="c2")
+        j.mark_copy_deleted("c1", when)
+        assert j.transfer(with_target.id).copy_deleted_at == when
+        assert j.transfer(without.id).copy_deleted_at == when
+        assert j.transfer(other.id).copy_deleted_at is None
+        assert j.order(with_target.id).status == "done"
+        assert j.order(without.id).status == "expired"
+        assert j.order(other.id).status == "running"
+        assert [o.id for o in j.transfers_for_copy("c1")] == [with_target.id, without.id]
+        j.set_copy_expires("c2", datetime(2026, 12, 1))
+        assert j.transfer(other.id).copy_expires == datetime(2026, 12, 1)
+        assert [o.id for o, _ in j.transfer_orders()] == [other.id, without.id, with_target.id]

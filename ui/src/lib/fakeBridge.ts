@@ -1,7 +1,7 @@
 // Atrapa mostu: odtwarza scenariusze nagrane z prawdziwego Api (scripts/record_bridge_fixtures.py).
 import type { Bridge } from './bridge';
 import { live } from './fakeBridgeLive';
-import type { Api, ApiError, EntryView, ExplorerListView, CopyView, CrashSummary, DeviceCheck, EventMap, EventName, Lang, PlanView, ScanView, ServiceInfo, Settings, ShotView, TaskView, TelemetrySample, UpdateView } from './types';
+import type { Api, ApiError, EntryView, ExplorerListView, CopyView, CrashSummary, DeviceCheck, EventMap, EventName, Lang, PlanView, ScanView, ServiceInfo, Settings, ShotView, TaskView, TelemetrySample, TransferOrderView, UpdateView } from './types';
 // Wynik `telemetry_events.sample()` z Pythona (Task 7 planu kroku H) — ten sam kształt co prawdziwe zdarzenia.
 import SAMPLE from './telemetrySample.json';
 
@@ -36,6 +36,9 @@ export type FakeBridge = Bridge & {
   failNext(method: string, key: string, message?: string): void;  // następne wywołanie `method` zwraca błąd `key`
   answerNext(method: string, result: unknown): void;  // następne wywołanie `method` zwraca `result` (np. problemy planu)
   setChecks(checks: DeviceCheck[]): void;  // co zwróci następny `recheck_site_notifications` (i kolejne skany)
+  /** Kolejne odczyty `install_check` (blokada Xiaomi): ostatnia wartość powtarza się; domyślnie `false` (odblokowane). */
+  setInstallChecks(values: (boolean | null)[]): void;
+  setOrders(orders: TransferOrderView[]): void;  // zlecenia ZS przeniesień (`transfers` bez nagrania w scenariuszu)
   setCopies(copies: CopyView[]): void;  // kopie danych na komputerze (`transfers` bez nagrania w scenariuszu)
   calls: { method: string; args: unknown[] }[];
   emit<K extends EventName>(name: K, detail: EventMap[K]): void;
@@ -119,6 +122,8 @@ export function createFakeBridge(name: string,
   let checks: DeviceCheck[] | null = options.checks ? structuredClone(options.checks) : null;
   let checksChanged = false; // odpytywanie w tle (`whenDebugging`) dostaje odczyt tylko po zmianie
   let copies: CopyView[] = [];
+  let orders: TransferOrderView[] = [];
+  let installChecks: (boolean | null)[] = [];
   let planCode = 'K7F3'; // kod ostatniego podglądu planu: udostępnienie liczy ten sam plan
   let taskSeq = 0;
   const tasks: TaskView[] = [];
@@ -166,7 +171,14 @@ export function createFakeBridge(name: string,
   const fallback = (method: string, args: unknown[]): unknown => {
     switch (method) {
       case 'transfers':
-        return { copies: structuredClone(copies) };
+        return { orders: structuredClone(orders), copies: structuredClone(copies) };
+      case 'install_check':
+        return { blocked: installChecks.length > 1 ? installChecks.shift() : (installChecks.length ? installChecks[0] : false) };
+      case 'install_remaining_apps':
+        return { job_id: 'job-apps' };
+      case 'set_whatsapp_restored':
+        for (const o of orders) if (o.number === args[0]) o.whatsapp_restored = args[1] === true;
+        return { order: String(args[0]), whatsapp_restored: args[1] === true };
       case 'extend_transfer': {
         const copy = copies.find((c) => c.id === args[0]);
         if (!copy) return { error: { key: 'bad_request', message: 'copy_id' } };
@@ -177,6 +189,7 @@ export function createFakeBridge(name: string,
         const p = (n: number) => String(n).padStart(2, '0');
         const expires = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
         Object.assign(copy, { expires, days_left: copy.days_left + days });
+        for (const o of orders) if (o.copy?.id === copy.id) o.copy.days_left = copy.days_left;
         return { copy: structuredClone(copy) };
       }
       case 'set_transfer_note': {
@@ -187,11 +200,20 @@ export function createFakeBridge(name: string,
       }
       case 'delete_transfer':
         copies = copies.filter((c) => c.id !== args[0]);
+        for (const o of orders) if (o.copy?.id === args[0]) o.copy = { id: String(args[0]), days_left: 0, deleted_at: '2026-11-09T10:00:00' };
         return { deleted: String(args[0]) };
       case 'skip_tap':
         return {};
       case 'transfer_whatsapp':
         return { whatsapp_backup: '2026-09-26T14:29:00' };
+      case 'transfer_exports_check': {
+        // Bez nagrania: te same liczby i pliki eksportu co w `transfer:inventory`.
+        const events = data.calls.find((c) => c.method === 'transfer_inventory')?.events ?? [];
+        const inv = (events.find(([event]) => event === 'transfer:inventory')?.[1] as { inventory?: Record<string, unknown> } | undefined)?.inventory;
+        if (!inv) return { error: { key: 'transfer_no_inventory', message: '' } };
+        const { contacts, sms, mms, mms_bytes, calls, denied, exports } = inv;
+        return { contacts, sms, mms, mms_bytes, calls, denied, exports };
+      }
       case 'transfer_rescan': {
         // Scenariusz bez nagranego ponownego skanu: ten sam odczyt co `transfer_inventory`.
         const events = data.calls.find((c) => c.method === 'transfer_inventory')?.events ?? [];
@@ -557,6 +579,8 @@ export function createFakeBridge(name: string,
     failNext: (method, key, message = '') => { failures.set(method, { key, message }); },
     answerNext: (method, result) => { answers.set(method, result); },
     setChecks: (next) => { checks = structuredClone(next); checksChanged = true; },
+    setInstallChecks: (values) => { installChecks = [...values]; },
+    setOrders: (next) => { orders = structuredClone(next); },
     setCopies: (next) => { copies = structuredClone(next); },
     dispose,
   };

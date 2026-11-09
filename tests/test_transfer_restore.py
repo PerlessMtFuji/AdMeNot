@@ -804,3 +804,23 @@ def test_settle_leaves_a_non_resumable_state_untouched(tmp_path):
                  status="complete", updated="2026-10-01T10:00:00+00:00")
     assert _settle(new, copy) is False
     assert new.scans == 0 and _meta(copy, "updated") == "2026-10-01T10:00:00+00:00"
+
+
+def test_result_groups_counts(tmp_path):
+    copy = _copy(tmp_path)
+    new = _new(tmp_path)
+    res = _run(new, copy, _plan(new, copy))
+    assert set(res.groups) == {"photos", "videos", "downloads", "whatsapp", "others"}
+    assert res.groups["photos"] == {"done": 3, "exists": 0, "skipped": 0, "failed": 0}
+    assert res.groups["videos"] == {"done": 1, "exists": 0, "skipped": 0, "failed": 0}
+    assert res.groups["downloads"]["done"] == 1
+    assert sum(g["done"] for g in res.groups.values()) == res.files_done == 5
+    assert res.groups["others"] == {"done": 0, "exists": 0, "skipped": 0, "failed": 0}
+
+
+def test_upload_choice_apps_roundtrip():
+    choice = UploadChoice(frozenset({"photos"}), frozenset(), apps=frozenset({"b", "a"}))
+    assert choice.to_json()["apps"] == ["a", "b"]
+    assert UploadChoice.from_json(choice.to_json()) == choice
+    old = {"groups": ["photos"], "apks_on": []}
+    assert UploadChoice.from_json(old).apps == frozenset()

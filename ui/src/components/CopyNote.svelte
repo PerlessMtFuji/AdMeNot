@@ -9,8 +9,8 @@
 
   // Notatka serwisanta do kopii danych: w Historii i w czasie kopiowania. Zapis od razu w kopii
   // (`set_transfer_note`); pusta notatka ją usuwa.
-  type Props = { copy: CopyView };
-  let { copy }: Props = $props();
+  type Props = { copy: CopyView; /** Podpis przycisku dodawania (domyślnie „Dodaj notatkę”). */ addLabel?: string };
+  let { copy, addLabel }: Props = $props();
   const ctl = getContext<Controller>('ctl');
   const MAX = 2000;
   let editing = $state(false);
@@ -18,7 +18,8 @@
   let saving = $state(false);
   let area = $state<HTMLTextAreaElement | null>(null);
 
-  async function edit(): Promise<void> {
+  /** Otwiera pole edycji (menu wiersza Historii: „Notatka”). */
+  export async function edit(): Promise<void> {
     draft = copy.note ?? '';
     editing = true;
     await tick();
@@ -57,5 +58,5 @@
   </div>
 {:else}
   <button type="button" class="mt-1 flex items-center gap-1 text-sm font-semibold text-accent hover:underline"
-    onclick={edit}><StickyNote size={14} />{t('transfer.note.add')}</button>
+    onclick={edit}><StickyNote size={14} />{addLabel ?? t('transfer.note.add')}</button>
 {/if}

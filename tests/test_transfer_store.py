@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta
 
 import pytest
@@ -520,3 +521,24 @@ def test_purge_never_deletes_through_a_junction(tmp_path, level):
     assert store.purge_expired(NOW, lambda serial: False, lambda copy_id: False) == []
     assert (target / "meta.json").is_file() and (target / "files").is_dir()
     assert store.list_copies() == []
+
+
+def test_verdicts_keep_label():
+    from admenot.engine.transfer.inventory import AppEntry
+    copy = _copy()
+    copy.write_verdicts([AppEntry("com.a", "Aplikacja A", 3, "ok", True),
+                         AppEntry("com.b", "", 4, "ok", True)])
+    assert copy.read_verdicts() == {"com.a": (3, "ok"), "com.b": (4, "ok")}
+    assert copy.read_app_labels() == {"com.a": "Aplikacja A"}
+
+
+def test_meta_without_order_key_reads_none():
+    copy = _copy()
+    data = json.loads(copy.meta_path.read_text(encoding="utf-8"))
+    data.pop("order", None)
+    copy.meta_path.write_text(json.dumps(data), encoding="utf-8")
+    assert copy.read_meta().order is None
+    meta = copy.read_meta()
+    meta.order = "ZS/2026/1108/01"
+    copy.write_meta(meta)
+    assert copy.read_meta().order == "ZS/2026/1108/01"

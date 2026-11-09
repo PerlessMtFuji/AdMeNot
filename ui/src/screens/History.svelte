@@ -4,10 +4,10 @@
   import PhoneThumb from '../components/PhoneThumb.svelte';
   import SiteQueue from '../components/SiteQueue.svelte';
   import StepTimeline from '../components/StepTimeline.svelte';
-  import TransferCopies from '../components/TransferCopies.svelte';
+  import TransferOrders from '../components/TransferOrders.svelte';
   import type { Controller } from '../lib/controller';
   import { i18n, t, tp } from '../lib/i18n/index.svelte';
-  import { dayKey, groupHistory, historyApp, modelName } from '../lib/logic';
+  import { dayKey, groupHistory, historyApp, modelName, transferRows } from '../lib/logic';
   import { enter, stagger } from '../lib/motion';
   import type { HistoryOrder } from '../lib/types';
   import Banner from '../ui/Banner.svelte';
@@ -23,10 +23,11 @@
   const scanned = $derived(s.scan?.apps ?? []);
   const interrupted = $derived(h?.orders.filter((o) => o.interrupted) ?? []);
   let other = $state('');
-  // Kopie danych dotyczą wszystkich telefonów, więc mają własną zakładkę — bez panelu wyboru telefonu.
-  const tab = $derived(s.transfer.copies.length ? s.historyTab : 'orders');
+  // Przeniesienia dotyczą wszystkich telefonów, więc mają własną zakładkę — bez panelu wyboru telefonu.
+  const transfers = $derived(transferRows(s.transfer.orders, s.transfer.copies).length);
+  const tab = $derived(transfers ? s.historyTab : 'orders');
   const tabs = $derived([{ value: 'orders' as const, label: t('history.tab_orders') },
-    { value: 'copies' as const, label: t('history.tab_copies', { n: s.transfer.copies.length }) }]);
+    { value: 'transfers' as const, label: t('history.tab_transfers', { n: transfers }) }]);
 
   function day(iso: string): string {
     const key = dayKey(iso, new Date());
@@ -52,12 +53,12 @@
 <div class="flex min-h-0 min-w-0 flex-1">
   <main class="flex min-w-0 flex-1 flex-col gap-3 scroll-fade overflow-auto px-7 py-7">
     <h1 class="text-2xl font-extrabold">{t('history.title')}</h1>
-    {#if s.transfer.copies.length}
+    {#if transfers}
       <div><Segmented label={t('history.tabs')} value={tab} options={tabs} onchange={(v) => (s.historyTab = v)} /></div>
     {/if}
 
-    {#if tab === 'copies'}
-      <TransferCopies />
+    {#if tab === 'transfers'}
+      <TransferOrders />
     {:else}
       {#if s.orderRunning}
         <Card>

@@ -157,6 +157,13 @@ class FakeStoragePhone:
         self.install_blocked = False
         self.host_commands: list[list[str]] = []  # polecenia hosta (`install`)
         self.accounts: list[tuple[str, str]] = []
+        # instalacja aplikacji z kopii (Etap 4)
+        self.props: dict[str, str] = {}  # `getprop <nazwa>`; brak = pusta linia
+        self.install_fail: dict[str, str] = {}  # pakiet -> wyjście błędu `adb install` (kod 1)
+        self.install_timeout: set[str] = set()  # pakiety, dla których instalacja czeka na zgodę do limitu
+        self.disconnect_after_install: set[str] = set()  # pakiet wchodzi, a telefon się odłącza (raz)
+        self.install_fail_lands: set[str] = set()  # `install_fail`, a pakiet i tak wchodzi (stara sesja zgody)
+        self.installer_rejected = False  # `-i <sklep>` kończy się `Security exception`
         # eksplorator plików
         self.deny_list_prefixes: set[str] = set()  # listowanie (`find`, `ls`) pod takim prefiksem -> Permission denied
         self.du_without_b = False  # `du -sb` jak w starym toyboxie: nieznana opcja
@@ -208,6 +215,8 @@ class FakeStoragePhone:
             return self._pull_apk(args[1], Path(args[2]))
         if len(args) == 3 and args[:2] == ["install", "-g"]:
             return self._install(args)
+        if args and args[0] in ("install", "install-multiple"):
+            return self._install_apps(args)
         raise AdbError("command_failed", f"fake: unsupported {args}")
 
     def run_bytes(self, args: list[str], timeout: float = 20.0) -> bytes:
@@ -296,9 +305,11 @@ class FakeStoragePhone:
             maxdepth = int(expr[1])
             j = 2
         match_name: str | None = None
-        while j < len(expr) and expr[j] in ("-path", "-name"):
-            if expr[j] == "-name" and expr[j + 2] == "-type":  # filtr nazwy, bez -prune
-                match_name = expr[j + 1]
+        match_ci = False
+        while j < len(expr) and expr[j] in ("-path", "-name", "-iname"):
+            if expr[j] in ("-name", "-iname") and expr[j + 2] == "-type":  # filtr nazwy, bez -prune
+                match_name = expr[j + 1].lower() if expr[j] == "-iname" else expr[j + 1]
+                match_ci = expr[j] == "-iname"
                 j += 2
                 break
             (prune_paths if expr[j] == "-path" else prune_names).add(expr[j + 1])
@@ -330,7 +341,7 @@ class FakeStoragePhone:
                 dirnames[:] = [d for d in dirnames
                                if d not in prune_names and f"{rdir}/{d}" not in prune_paths]
                 for name in filenames:
-                    if name in prune_names or (match_name and not fnmatch.fnmatchcase(name, match_name)):
+                    if name in prune_names or (match_name and not fnmatch.fnmatchcase(name.lower() if match_ci else name, match_name)):
                         continue
                     st = os.stat(os.path.join(dirpath, name))
                     out.append(f"{st.st_size}|{int(st.st_mtime)}|{rdir}/{name}")
@@ -577,8 +588,11 @@ class FakeStoragePhone:
             return (f"User UserInfo{{0:Właściciel:c13}}:\n  Accounts: {len(lines)}\n" + "".join(lines)
                     + "\n  Active Sessions: 0\n").encode()
         if head == ["pm", "list"]:
-            assert argv[2] == "packages" and len(argv) == 4, argv
-            return "".join(f"package:{p}\n" for p in sorted(self.installed) if p.startswith(argv[3])).encode()
+            assert argv[2] == "packages" and len(argv) in (3, 4), argv
+            prefix = argv[3] if len(argv) == 4 else ""
+            return "".join(f"package:{p}\n" for p in sorted(self.installed) if p.startswith(prefix)).encode()
+        if argv[0] == "getprop" and len(argv) == 2:
+            return f"{self.props.get(argv[1], '')}\n".encode()
         if head == ["pm", "uninstall"]:
             return self._uninstall(argv[2])
         if head == ["pm", "grant"]:
@@ -601,6 +615,44 @@ class FakeStoragePhone:
                                              f"[INSTALL_FAILED_ALREADY_EXISTS: Attempt to re-install "
                                              f"{helper.PACKAGE} without first uninstalling.]")
         self.installed.add(helper.PACKAGE)  # `Android/data/<pakiet>` nie istnieje do pierwszego `mkdir -p`
+        return "Performing Streamed Install\nSuccess\n"
+
+    def _install_apps(self, args: list[str]) -> str:
+        """`install`/`install-multiple` plików z kopii (`…/apps/<pakiet>/<wersja>/*.apk`): pakiet to nazwa
+        katalogu dwa poziomy nad plikiem. Zgoda/odmowa/limit/rozłączenie wg haków `install_*`."""
+        if not self.online:
+            raise AdbError("offline", "device offline")
+        self.host_commands.append(list(args))
+        rest = args[1:]
+        with_installer = rest[:1] == ["-i"]
+        if with_installer:
+            rest = rest[2:]
+        files = [Path(f) for f in rest]
+        assert files and all(f.is_file() for f in files), args
+        package = files[0].parent.parent.name
+        if with_installer and self.installer_rejected:
+            raise AdbError("command_failed", "Performing Streamed Install\nException occurred while executing "
+                                             "'install':\njava.lang.SecurityException: Caller is not allowed "
+                                             "to set the installer package")
+        if package in self.install_timeout:
+            raise AdbError("timeout", f"adb {args[0]} timed out")
+        if package in self.install_fail:
+            if package in self.install_fail_lands:
+                self.installed.add(package)
+            raise AdbError("command_failed", f"Performing Streamed Install\nadb: failed to install "
+                                             f"{files[0]}: {self.install_fail[package]}")
+        if self.install_blocked:
+            raise AdbError("command_failed", f"Performing Streamed Install\nadb: failed to install {files[0]}: "
+                                             "Failure [INSTALL_FAILED_USER_RESTRICTED: Install canceled by user]")
+        if package in self.installed:
+            raise AdbError("command_failed", f"adb: failed to install {files[0]}: Failure "
+                                             f"[INSTALL_FAILED_ALREADY_EXISTS: Attempt to re-install {package} "
+                                             "without first uninstalling.]")
+        self.installed.add(package)
+        if package in self.disconnect_after_install:
+            self.disconnect_after_install.discard(package)
+            self.online = False
+            raise AdbError("offline", "device offline")
         return "Performing Streamed Install\nSuccess\n"
 
     def _uninstall(self, package: str) -> bytes:
@@ -873,6 +925,9 @@ def _telephony_cmd(argv: list[str]) -> bool:
     return argv[0] == "pm" and argv[1:2] in (["list"], ["uninstall"], ["grant"]) and helper.PACKAGE in argv
 
 
+_APP_PROPS = ("ro.product.cpu.abilist", "persist.security.adbinstall")  # odczyty planu aplikacji
+
+
 class TransferPhone:
     """Telefon do testów mostu kopii: skan aplikacji z `FakePhone` (pakiety, ustawienia), pamięć,
     providery, APK i `pull` z `FakeStoragePhone`. Jest też `Puller` (puller_factory → ta atrapa).
@@ -898,6 +953,10 @@ class TransferPhone:
             return argv[2] in self.storage.apps
         if argv[:2] == ["rm", "-f"]:  # eksplorator: nasz plik tymczasowy pod `/sdcard/`
             return True
+        if argv[:3] == ["pm", "list", "packages"] and len(argv) in (3, 4):  # instalacja aplikacji z kopii
+            return True
+        if len(argv) == 2 and argv[0] == "getprop" and (argv[1] in self.storage.props or argv[1] in _APP_PROPS):
+            return True
         return (bool(argv) and argv[0] in _STORAGE_TOOLS) or _telephony_cmd(argv)
 
     def shell(self, command: str, timeout: float = 20.0) -> str:
@@ -906,7 +965,7 @@ class TransferPhone:
         return self.cli.shell(command, timeout)
 
     def run(self, args: list[str], timeout: float = 20.0) -> str:
-        if args == ["get-state"] or args[:2] == ["install", "-g"]:
+        if args == ["get-state"] or args[:2] == ["install", "-g"] or args[:1] in (["install"], ["install-multiple"]):
             return self.storage.run(args, timeout)
         if len(args) == 3 and args[:2] == ["shell", "-T"] and self._storage_cmd(args[2]):
             return self.storage.run(args, timeout)

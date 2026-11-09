@@ -9,6 +9,7 @@ pilnuje, że są aktualne. Po zmianie `Api`, `present.py` albo zdarzeń uruchom:
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
 import re
@@ -224,7 +225,22 @@ TRANSFER_FILES = {
 }
 TRANSFER_SELECTION = {"contacts": True, "sms": True, "mms": False, "calls": True,
                       "categories": ["media", "downloads", "whatsapp"], "others": ["Music"],
-                      "apps": ["com.whatsapp"]}
+                      "apps": ["com.whatsapp", "com.wlive.forecast"]}
+
+
+OLD_IMEI = "499001200000004"  # Luhn OK; telefony w nagraniach mają IMEI, więc ekrany pokazują IMEI, nie serial
+NEW_IMEI = "861485069821024"
+IMEI_COMMAND = "service call iphonesubinfo 1 s16 com.android.shell"
+
+
+def _imei_parcel(imei: str) -> str:
+    """Odpowiedź `service call iphonesubinfo`: status 0, długość, znaki UTF-16 po dwa w słowie."""
+    words = ["00000000", f"{len(imei):08x}"]
+    padded = imei + "\0" * (len(imei) % 2)
+    words += [f"{ord(padded[i + 1]):04x}{ord(padded[i]):04x}" for i in range(0, len(padded), 2)]
+    rows = [f"  0x{16 * n:08x}: " + " ".join(words[4 * n:4 * n + 4]) + " '................'"
+            for n in range((len(words) + 3) // 4)]
+    return "Result: Parcel(\n" + "\n".join(rows) + ")\n"
 
 
 def _transfer_phone(tmp: Path) -> TransferPhone:
@@ -236,8 +252,11 @@ def _transfer_phone(tmp: Path) -> TransferPhone:
         os.utime(path, (TRANSFER_MTIME, TRANSFER_MTIME))
     install_telephony(root, mms=False)
     storage = FakeStoragePhone(root, serial=SERIAL)
-    storage.apps = {"com.whatsapp": {"base.apk": b"PK-whatsapp"}}
-    return TransferPhone(make_cli_phone(), storage)
+    storage.apps = {"com.whatsapp": {"base.apk": b"PK-whatsapp"},
+                    "com.wlive.forecast": {"base.apk": b"PK-forecast"}}
+    cli = make_cli_phone()
+    cli.static[IMEI_COMMAND] = _imei_parcel(OLD_IMEI)
+    return TransferPhone(cli, storage)
 
 
 def _transfer(r: Recorder, phone: Any) -> None:
@@ -305,7 +324,11 @@ def _restore_phones(tmp: Path) -> PhoneHost:
     cli = make_cli_phone()
     cli.static[GETPROP] = (GETPROP_OUT.replace("SM-A145R", "SM-A546B").replace("[a14]", "[a54x]")
                            .replace(SERIAL, RESTORE_SERIAL).replace("Telefon Anny", "Nowy telefon Anny"))
-    return PhoneHost(old, TransferPhone(cli, FakeStoragePhone(root, serial=RESTORE_SERIAL)))
+    cli.static[IMEI_COMMAND] = _imei_parcel(NEW_IMEI)
+    new = FakeStoragePhone(root, serial=RESTORE_SERIAL)
+    new.props["ro.product.cpu.abilist"] = "arm64-v8a,armeabi-v7a"
+    new.props["persist.security.adbinstall"] = "1"
+    return PhoneHost(old, TransferPhone(cli, new))
 
 
 def _apk_checks(copy: Any, files: list[tuple[str, Path]]) -> list[ApkCheck]:
@@ -313,19 +336,69 @@ def _apk_checks(copy: Any, files: list[tuple[str, Path]]) -> list[ApkCheck]:
     return [ApkCheck(remote, None, *checks[remote]) for remote, _ in files]
 
 
-def _transfer_restore(r: Recorder, phone: Any) -> None:
+def _add_app(copy_id: str, package: str, label: str, verdict: str, version: int = 5) -> None:
+    """Dodatkowa aplikacja w kopii (APK + oznaczenie kompletności + werdykt), jak po kopii z takiego telefonu."""
+    from admenot.engine.actions.backup import COMPLETE
+    from admenot.engine.transfer import store
+
+    copy = store.CopyDir(store.transfers_dir() / copy_id)
+    directory = copy.apps_dir / package / str(version)
+    directory.mkdir(parents=True)
+    data = b"PK-" + package.encode()
+    (directory / "base.apk").write_bytes(data)
+    (directory / COMPLETE).write_text(json.dumps(
+        {"package": package, "version_code": version, "files": {"base.apk": hashlib.sha256(data).hexdigest()}}),
+        encoding="utf-8")
+    rows = json.loads(copy.verdicts_path.read_text(encoding="utf-8")) if copy.verdicts_path.is_file() else []
+    rows.append({"package": package, "version_code": version, "verdict": verdict, "label": label})
+    copy.verdicts_path.write_text(json.dumps(rows), encoding="utf-8")
+
+
+def _copy_with_apps(r: Recorder) -> str:
+    """Kopia ze starego telefonu: WhatsApp i Prognoza z telefonu, do tego aplikacja bez wersji natywnej
+    dla nowego telefonu i podejrzana (domyślnie niewybrana)."""
     r.call("list_devices")
     r.call("transfer_inventory", SERIAL, CLIENT)
     r.call("start_backup", TRANSFER_SELECTION)
     copy_id = r.events("transfer:done")[0]["copy"]["id"]
+    _add_app(copy_id, "pl.example.native", "Mapa Offline", "clean")
+    _add_app(copy_id, "pl.example.game", "Super Gra", "suspicious")
+    return copy_id
+
+
+def _transfer_restore(r: Recorder, phone: Any) -> None:
+    copy_id = _copy_with_apps(r)
     r.call("transfers")  # Historia: kopia bez wgrywań
+    new = phone.phone(RESTORE_SERIAL).storage
+    new.installed.add("com.wlive.forecast")  # już jest na nowym telefonie
+    new.install_fail["pl.example.native"] = "Failure [INSTALL_FAILED_NO_MATCHING_ABIS: no abi]"
     with mock.patch("admenot.engine.transfer.restore_plan.load_or_check", _apk_checks):
         r.call("restore_plan", copy_id, RESTORE_SERIAL)
-    r.call("start_restore", RESTORE_CHOICE)
+    r.call("start_restore", {**RESTORE_CHOICE, "apps": ["com.whatsapp", "pl.example.native"]})
     r.call("transfers")  # Historia: „wgrano na …”
 
 
-RESTORE_TEL_CHOICE = {**RESTORE_CHOICE, "tel": ["contacts", "sms", "calls"]}
+def _xiaomi_phones(tmp: Path) -> PhoneHost:
+    """Jak `transfer_restore`, ale nowy telefon to Xiaomi z wyłączonym „Instaluj przez USB”."""
+    host = _restore_phones(tmp)
+    new = host.phone(RESTORE_SERIAL)
+    new.cli.static[GETPROP] = (new.cli.static[GETPROP].replace("[samsung]", "[xiaomi]")
+                               .replace("SM-A546B", "Redmi Note 12").replace("[a54x]", "[sunstone]"))
+    new.storage.props["persist.security.adbinstall"] = "0"
+    return host
+
+
+def _transfer_restore_xiaomi(r: Recorder, phone: Any) -> None:
+    copy_id = _copy_with_apps(r)
+    r.call("transfers")  # Historia: kopia bez wgrywań (z niej nowy telefon dostaje ofertę „Wgraj”)
+    with mock.patch("admenot.engine.transfer.restore_plan.load_or_check", _apk_checks):
+        r.call("restore_plan", copy_id, RESTORE_SERIAL)
+    r.call("install_check")
+    r.call("start_restore", {**RESTORE_CHOICE, "apps": ["com.whatsapp", "com.wlive.forecast"]})
+    r.call("transfers")  # Historia: „wgrano na …”
+
+
+RESTORE_TEL_CHOICE = {**RESTORE_CHOICE, "tel": ["contacts", "sms", "calls"], "apps": ["com.whatsapp"]}
 SMS_APP = "com.google.android.apps.messaging"
 
 
@@ -520,6 +593,8 @@ def record_all() -> dict[str, dict[str, Any]]:
                                                       phone_factory=_export_phone)),
         "transfer_restore": _stable_transfer(_scenario("transfer_restore", _transfer_restore,
                                                        phone_factory=_restore_phones)),
+        "transfer_restore_xiaomi": _stable_transfer(_scenario("transfer_restore_xiaomi", _transfer_restore_xiaomi,
+                                                              phone_factory=_xiaomi_phones)),
         "transfer_restore_tel": _stable_transfer(_scenario("transfer_restore_tel", _transfer_restore_tel,
                                                            phone_factory=_restore_tel_phones)),
         "explorer": _scenario("explorer", _explorer, phone_factory=_explorer_phone),

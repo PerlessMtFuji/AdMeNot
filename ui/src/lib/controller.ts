@@ -1,7 +1,7 @@
 import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
-import { actedAfter, changedVerdicts, defaultSelection, defaultUploadChoice, keptUploadChoice, otherGroup, TEL_KINDS, telWrite, resumableCopy, UPLOAD_GROUPS, resumeSelection, rescanSelection, TRANSFER_CATEGORIES, transferNeed, transferTotals, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
-import { EMPTY_TRANSFER_SELECTION, emptyRestore, type AppState, type RepairTab, type SettingsCategory } from './state.svelte';
+import { actedAfter, changedVerdicts, defaultApps, installableApps, defaultSelection, defaultUploadChoice, keptUploadChoice, otherGroup, TEL_KINDS, telWrite, resumableCopy, UPLOAD_GROUPS, resumeSelection, rescanSelection, TRANSFER_CATEGORIES, transferNeed, transferTotals, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
+import { EMPTY_TRANSFER_SELECTION, emptyRestore, type AppState, type HistoryTab, type RepairTab, type SettingsCategory } from './state.svelte';
 import { ExplorerController } from './explorer/controller';
 import { applyTheme } from './theme';
 import type {
@@ -11,8 +11,14 @@ import type {
 const CONSOLE_LIMIT = 500;
 const FLASH_MS = 2000;  // czas animacji `.flash` z app.css
 
+/** Błędy dokończenia aplikacji, po których warto spróbować przy następnym odblokowaniu (kabel, zajęty telefon). */
+const REINSTALL_TRANSIENT = ['disconnected', 'offline', 'timeout', 'adb_error', 'busy', 'device_busy', 'transfer_no_phone',
+  'transfer_too_many_disconnects'];
+
 export class Controller {
   private ended = new Set<string>();
+  /** Telefony do przejścia „Kopia gotowa → plan wgrywania”, odłożone do końca zadania kopii. */
+  private offerAfterBackup: string[] | null = null;
   private knownLoaded = false;
   private autoMirrored = new Set<string>();
   /** Wybór serwisanta sprzed ponownego planu po `transfer_phone_full` — nowy plan go zachowuje (przycięty). */
@@ -53,6 +59,17 @@ export class Controller {
     }
   }
 
+  /** Odczyt w tle (auto-sprawdzanie co `RECHECK_MS`): błąd mostu nie podnosi karty błędu (`s.error`) — następna
+   *  próba za chwilę; jawne akcje serwisanta idą przez `call`. */
+  private async quiet<T>(promise: Promise<T | ApiError>): Promise<T | null> {
+    try {
+      const result = await promise;
+      return isApiError(result) ? null : result;
+    } catch {
+      return null;
+    }
+  }
+
   setJob(id: string, kind: string): void {
     if (!this.ended.has(id)) this.state.job = { id, kind };
   }
@@ -88,6 +105,9 @@ export class Controller {
     this.state.settingsLoaded = true;
   }
 
+  /** Telefony gotowe (`state: device`) w poprzedniej liście — do wykrycia „pojawił się nowy”. */
+  private readySerials = new Set<string>();
+
   private onDevices(d: DevicesPayload): void {
     const s = this.state;
     s.devices = d.devices;
@@ -107,6 +127,26 @@ export class Controller {
       this.autoMirrored.add(picked.serial);  // raz na uruchomienie: zamknięte okno nie wraca samo
       void this.mirrorStart(picked.serial, picked.model?.replaceAll('_', ' ') ?? picked.serial);
     }
+    const before = this.readySerials;
+    this.readySerials = new Set(ready.map((e) => e.serial));
+    this.offerRestoreToNewPhone(ready.map((e) => e.serial).filter((x) => !before.has(x)));
+  }
+
+  /** Po gotowej kopii („Kopia gotowa”) podłączony nowy telefon (inny niż źródło kopii) od razu dostaje plan wgrywania.
+   *  Raz na pojawienie się telefonu; ten sam stary telefon albo kilka telefonów naraz — nic (wybór zostaje na ekranie Połącz). */
+  private offerRestoreToNewPhone(fresh: string[]): void {
+    const s = this.state;
+    const copy = s.transfer.copy;
+    if (fresh.length === 0 || s.phase !== 'transfer_done' || !copy || copy.status === 'in_progress' || s.transfer.result?.status === 'stopped') return;
+    // `transfer:done` przychodzi jeszcze z wnętrza zadania kopii: plan teraz dostałby „busy” — czekamy na `job:end`.
+    if (s.job?.kind === 'backup') {
+      this.offerAfterBackup = [...(this.offerAfterBackup ?? []), ...fresh];
+      return;
+    }
+    const others = s.devices.filter((e) => e.state === 'device' && e.serial !== copy.serial);
+    if (others.length !== 1 || !fresh.includes(others[0].serial)) return;
+    this.selectDevice(others[0].serial);
+    void this.planRestore(copy.id);
   }
 
   private subscribe(): void {
@@ -297,6 +337,13 @@ export class Controller {
         s.transfer.cleanup = { ...s.transfer.cleanup, running: false, ok: false };
         return;
       }
+      if (d.kind === 'restore_apps') { // dokończenie aplikacji w tle: powód w wierszu „Aplikacje”, nie karta błędu
+        if (s.transfer.appsBusy) s.transfer.appsNotes = { ...s.transfer.appsNotes, [s.transfer.appsBusy]: d.key };
+        const r = s.transfer.restore;
+        const transient = REINSTALL_TRANSIENT.includes(d.key);
+        Object.assign(r, { appsError: d.key, appsProgress: null, reinstallDone: !transient, reinstallGaveUp: !transient });
+        return;
+      }
       if (d.kind === 'update') { // błędy aktualizacji pokazuje okno instalacji, nie karta błędu
         s.updateError = d;
         s.updateProgress = null;
@@ -356,8 +403,17 @@ export class Controller {
       this.ended.add(d.job_id);
       if (d.kind === 'update') s.updateProgress = null;
       if (d.kind === 'phone_cleanup') s.transfer.cleanup = { ...s.transfer.cleanup, running: false };
+      if (d.kind === 'restore_apps' && s.transfer.appsBusy) {  // doinstalowanie z Historii skończone: nowy wynik w wierszu
+        s.transfer.appsBusy = null;
+        void this.loadTransfers();
+      }
       if (s.job?.id === d.job_id) s.job = null;
       if (d.kind === 'transfer_scan') this.continueResume();
+      if (d.kind === 'backup' && this.offerAfterBackup) {
+        const fresh = this.offerAfterBackup;
+        this.offerAfterBackup = null;
+        this.offerRestoreToNewPhone(fresh);
+      }
     });
     on('update:state', (d) => { s.update = d; });
     // Wątek telemetrii usunął dane z serwera po cofnięciu zgody — baner „czeka na połączenie” znika.
@@ -746,14 +802,17 @@ export class Controller {
       s.transfer.waiting = false;
       s.stopping = false;
       s.phase = 'transfer_done';
+      // nowy telefon podłączony już w czasie kopii: karta „Podłącz nowy telefon” obiecuje przejście od razu
+      this.offerRestoreToNewPhone(s.devices.filter((e) => e.state === 'device').map((e) => e.serial));
     });
     on('transfer:restore_plan', (d) => {
       if (s.phase !== 'transfer_restore_plan') return; // serwisant już wyszedł z ekranu wgrywania
       const kept = this.replanChoice;
       this.replanChoice = null;
       const tel = d.tel ?? null;
-      Object.assign(s.transfer.restore, { plan: d.plan, copy: d.copy, tel,
-        choice: kept ? keptUploadChoice(d.plan, kept, tel) : defaultUploadChoice(d.plan, tel, s.settings.verify_copies),
+      const apps = d.apps ?? null;  // starsze nagrania mostu nie mają aplikacji
+      Object.assign(s.transfer.restore, { plan: d.plan, copy: d.copy, tel, apps,
+        choice: kept ? keptUploadChoice(d.plan, kept, tel, apps) : defaultUploadChoice(d.plan, tel, s.settings.verify_copies, apps),
         resumable: d.resumable, sameRecent: d.same_phone_recent });
     });
     on('transfer:restore_progress', (d) => {
@@ -779,9 +838,21 @@ export class Controller {
       s.transfer.cleanup = { serial: d.serial, running: false, ok: d.ok };
       s.transfer.restore.tap = null;
     });
+    on('transfer:apps_progress', (d) => {
+      s.transfer.restore.appsProgress = d;
+      s.transfer.waiting = false;
+    });
+    // Dokończenie aplikacji po odblokowaniu Xiaomi: nowy wynik zastępuje stary w tym samym zleceniu.
+    on('transfer:apps_done', (d) => {
+      const r = s.transfer.restore;
+      if (r.order !== d.order) return;
+      // nadal zablokowane: kolejne odblokowanie uruchomi dokończenie jeszcze raz
+      Object.assign(r, { appsResult: d.apps, appsProgress: null, appsError: null, reinstallGaveUp: false, reinstallDone: !d.apps.blocked, awaitBlock: d.apps.blocked });
+    });
     on('transfer:restore_done', (d) => {
       Object.assign(s.transfer.restore, { result: d.result, copy: d.copy, telResult: d.tel ?? null,
-        telError: d.tel_error ?? null, tap: null });
+        telError: d.tel_error ?? null, tap: null, appsResult: d.apps ?? null, appsError: d.apps_error ?? null, reinstallGaveUp: false,
+        appsProgress: null, order: d.order ?? null, whatsapp: d.whatsapp ?? null, whatsappRestored: false, reinstallDone: false, awaitBlock: false });
       s.transfer.copies = s.transfer.copies.map((c) => (c.id === d.copy.id ? d.copy : c));
       s.transfer.waiting = false;
       s.stopping = false;
@@ -880,9 +951,22 @@ export class Controller {
     if (r) this.setJob(r.job_id, 'transfer_scan');
   }
 
-  /** „Sprawdź ponownie”: serwisant właśnie zrobił kopię czatów WhatsApp na telefonie. */
+  /** Automatyczne sprawdzanie pod otwartą instrukcją eksportu: tani odczyt (bez zadania), wynik wchodzi do
+   *  bieżącego inwentarza, a wybór serwisanta zostaje (`rescanSelection`). */
+  async checkExports(): Promise<void> {
+    const s = this.state;
+    if (s.phase !== 'transfer_choose' || !s.transfer.inventory || s.job) return;
+    const r = await this.quiet(this.api.transfer_exports_check());
+    const prev = s.transfer.inventory;
+    if (!r || !prev || s.phase !== 'transfer_choose') return;
+    const next = { ...prev, ...r };
+    s.transfer.selection = rescanSelection(s.transfer.selection, prev, next);
+    s.transfer.inventory = next;
+  }
+
+  /** Auto-sprawdzanie w tle (co `RECHECK_MS`): czy serwisant zrobił już kopię czatów WhatsApp na telefonie. Cichy. */
   async recheckWhatsapp(): Promise<void> {
-    const r = await this.call(this.api.transfer_whatsapp());
+    const r = await this.quiet(this.api.transfer_whatsapp());
     const inv = this.state.transfer.inventory;
     if (r && inv) this.state.transfer.inventory = { ...inv, whatsapp_backup: r.whatsapp_backup };
   }
@@ -991,6 +1075,75 @@ export class Controller {
     r.choice = { ...r.choice, apks_on: on.includes(remote) ? on.filter((x) => x !== remote) : [...on, remote] };
   }
 
+  /** Aplikacja z kopii; tej z powodem pominięcia (`skip`) nie da się zaznaczyć. */
+  toggleRestoreApp(pkg: string): void {
+    const r = this.state.transfer.restore;
+    if (!installableApps(r.apps).some((a) => a.package === pkg)) return;
+    const on = r.choice.apps;
+    r.choice = { ...r.choice, apps: on.includes(pkg) ? on.filter((p) => p !== pkg) : [...on, pkg] };
+  }
+
+  /** Wiersz „Aplikacje”: odznacza wszystkie albo wraca do domyślnych (gdy żadna nie jest domyślna — wszystkie do wgrania). */
+  toggleRestoreApps(): void {
+    const r = this.state.transfer.restore;
+    const all = installableApps(r.apps).map((a) => a.package);
+    const defaults = defaultApps(r.apps);
+    r.choice = { ...r.choice, apps: r.choice.apps.length ? [] : (defaults.length ? defaults : all) };
+  }
+
+  /** Automatyczne sprawdzanie blokady instalacji przez USB (Xiaomi): tani odczyt bez zadania; gdy blokady już nie
+   *  ma, etykieta znika z planu. Nieznany wynik (`null`) nie zmienia niczego. */
+  async checkInstall(): Promise<void> {
+    const s = this.state;
+    if (s.phase !== 'transfer_restore_plan' || !s.transfer.restore.apps?.block || s.job) return;
+    const res = await this.quiet(this.api.install_check());
+    const apps = s.transfer.restore.apps;
+    if (res && res.blocked === false && s.phase === 'transfer_restore_plan' && apps?.block) {
+      s.transfer.restore.apps = { ...apps, block: null };
+    }
+  }
+
+  /** Ekran „Dane przeniesione”, blokada Xiaomi w wyniku: póki telefon jest podłączony, tani odczyt `install_check` w tle
+   *  (wywoływany co `RECHECK_MS`). Gdy blokada zniknęła, raz uruchamia dokończenie samych pominiętych aplikacji.
+   *  Cichy: żadnego błędu na ekran, nieznany wynik nic nie zmienia, zwykłych błędów instalacji nie ponawia. */
+  async reinstallWhenUnblocked(): Promise<void> {
+    const s = this.state;
+    const r = s.transfer.restore;
+    const order = r.order;
+    const target = r.result?.target_serial;
+    if (s.phase !== 'transfer_restored' || !order || !target || !r.appsResult?.blocked || r.reinstallDone || s.job) return;
+    if (!s.devices.some((e) => e.serial === target && e.state === 'device')) return;
+    try {
+      const check = await this.api.install_check();
+      if (isApiError(check)) return;
+      if (check.blocked === true) r.awaitBlock = false;  // zobaczyliśmy blokadę: następne „odblokowane” to nowe przejście
+      if (check.blocked !== false || r.awaitBlock) return;
+      if (r.reinstallDone || s.phase !== 'transfer_restored' || s.job) return;
+      r.reinstallDone = true;
+      const res = await this.api.install_remaining_apps(order);
+      if (!isApiError(res)) {
+        r.appsError = null;
+        this.setJob(res.job_id, 'restore_apps');
+      } else if (REINSTALL_TRANSIENT.includes(res.error.key)) r.reinstallDone = false;
+      else Object.assign(r, { appsError: res.error.key, reinstallGaveUp: true });  // np. kopia usunięta: bez obietnicy, powód w wierszu
+    } catch {
+      // następna próba za RECHECK_MS (jeśli zadanie jeszcze nie ruszyło)
+    }
+  }
+
+  /** Pole „Czaty przywrócone” na ekranie wyniku: zapis w zleceniu (trafia do protokołu). */
+  private whatsappSeq = 0;
+  async setWhatsappRestored(on: boolean): Promise<void> {
+    const r = this.state.transfer.restore;
+    if (!r.order) return;
+    const before = r.whatsappRestored;
+    const seq = ++this.whatsappSeq;
+    r.whatsappRestored = on;
+    const res = await this.call(this.api.set_whatsapp_restored(r.order, on));
+    if (seq !== this.whatsappSeq) return;  // późniejsze kliknięcie rozstrzyga o polu
+    r.whatsappRestored = res ? res.whatsapp_restored : before;
+  }
+
   /** Wiersz telefonii (kontakty, SMS z MMS, połączenia); bez rekordów do wgrania nie da się go zaznaczyć. */
   toggleTel(kind: TelKind): void {
     const r = this.state.transfer.restore;
@@ -1022,10 +1175,11 @@ export class Controller {
     const choice = s.transfer.restore.choice;
     s.error = null;
     const r = await this.call(this.api.start_restore({ groups: [...choice.groups], apks_on: [...choice.apks_on],
-      verify_hash: choice.verify_hash, tel: [...choice.tel] }));
+      verify_hash: choice.verify_hash, tel: [...choice.tel], apps: [...choice.apps] }));
     if (!r) return;
     Object.assign(s.transfer.restore, { progress: null, result: null, telProgress: null, telResult: null, telError: null,
-      tap: null });
+      tap: null, appsProgress: null, appsResult: null, appsError: null, order: null, whatsapp: null, whatsappRestored: false,
+      reinstallDone: false, reinstallGaveUp: false, awaitBlock: false });
     s.transfer.waiting = false;
     s.stopping = false;
     s.phase = 'transfer_restore';
@@ -1042,12 +1196,53 @@ export class Controller {
 
   async loadTransfers(): Promise<void> {
     const r = await this.call(this.api.transfers());
-    if (r) this.state.transfer.copies = r.copies;
+    if (!r) return;
+    this.state.transfer.copies = r.copies;
+    this.state.transfer.orders = r.orders ?? [];
   }
 
   async extendTransfer(id: string): Promise<void> {
     const r = await this.call(this.api.extend_transfer(id));
-    if (r) this.state.transfer.copies = this.state.transfer.copies.map((c) => (c.id === id ? r.copy : c));
+    if (!r) return;
+    this.state.transfer.copies = this.state.transfer.copies.map((c) => (c.id === id ? r.copy : c));
+    this.state.transfer.orders = this.state.transfer.orders.map((o) => (o.copy?.id === id && !o.copy.deleted_at
+      ? { ...o, copy: { ...o.copy, days_left: r.copy.days_left } } : o));
+  }
+
+  /** „Czaty WhatsApp przywrócone” z menu wiersza w Historii: zapis w zleceniu (trafia do protokołu). */
+  private historyWhatsappSeq = 0;
+  async setOrderWhatsapp(number: string, on: boolean): Promise<void> {
+    const apply = (value: boolean) => {
+      this.state.transfer.orders = this.state.transfer.orders.map((o) => (o.number === number ? { ...o, whatsapp_restored: value } : o));
+    };
+    const before = this.state.transfer.orders.find((o) => o.number === number)?.whatsapp_restored ?? false;
+    const seq = ++this.historyWhatsappSeq;
+    apply(on);
+    const res = await this.call(this.api.set_whatsapp_restored(number, on));
+    if (seq !== this.historyWhatsappSeq) return;  // późniejsze kliknięcie rozstrzyga o polu
+    apply(res ? res.whatsapp_restored : before);
+  }
+
+  /** „Doinstaluj aplikacje” z menu wiersza w Historii: tylko aplikacje pominięte z powodu blokady, na telefonie celu.
+   *  Cicho: odmowa to krótka uwaga w wierszu (`transfer.appsNotes`), nie baner; wynik odświeża listę (`job:end`). */
+  async reinstallFromHistory(number: string): Promise<string | null> {
+    const tr = this.state.transfer;
+    if (this.state.job) return null;
+    tr.appsNotes = Object.fromEntries(Object.entries(tr.appsNotes).filter(([k]) => k !== number));
+    let res;
+    try {
+      res = await this.api.install_remaining_apps(number);
+    } catch {
+      res = null;
+    }
+    if (!res || isApiError(res)) {
+      const key = res ? res.error.key : 'internal';
+      tr.appsNotes = { ...tr.appsNotes, [number]: key };
+      return key;
+    }
+    tr.appsBusy = number;
+    this.setJob(res.job_id, 'restore_apps');
+    return null;
   }
 
   /** Zapis notatki do kopii; `true` po udanym zapisie (pole edycji się zamyka). */
@@ -1062,7 +1257,9 @@ export class Controller {
 
   async deleteTransfer(id: string): Promise<void> {
     const r = await this.call(this.api.delete_transfer(id));
-    if (r) this.state.transfer.copies = this.state.transfer.copies.filter((c) => c.id !== id);
+    if (!r) return;
+    this.state.transfer.copies = this.state.transfer.copies.filter((c) => c.id !== id);
+    await this.loadTransfers();  // wiersz zlecenia zostaje („kopia usunięta DD.MM”), znika tylko kopia bez zlecenia
   }
 
   // --- aktualizacje ------------------------------------------------------------------------------
@@ -1205,7 +1402,7 @@ export class Controller {
 
   // --- historia, ustawienia, konsola -------------------------------------------------------------
 
-  async openHistory(serial: string | null = null, tab: 'orders' | 'copies' = 'orders'): Promise<void> {
+  async openHistory(serial: string | null = null, tab: HistoryTab = 'orders'): Promise<void> {
     const s = this.state;
     s.screen = 'history';
     s.historyTab = tab;

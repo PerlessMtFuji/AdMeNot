@@ -1,12 +1,14 @@
 import { SvelteSet } from 'svelte/reactivity';
 import { actedLevels, type ActedLog, type OpenGroups, type Phase } from './logic';
 import type {
-  ApiErrorBody, ApkEstimate, BackupResultView, CopyView, InventoryView, RestorePlanView, RestoreProgressView, RestoreResultView, TapRequest, TelPlanView, TelProgressView, TelResultView, TransferProgress, TransferSelection, UploadChoiceView, ApkQuestion, Category, ConsoleEntry, DeviceEntry, EtaView, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
+  ApiErrorBody, ApkEstimate, AppsPlanView, AppsProgressView, AppsResultView, WhatsappView, BackupResultView, CopyView, InventoryView, RestorePlanView, RestoreProgressView, RestoreResultView, TapRequest, TelPlanView, TelProgressView, TelResultView, TransferOrderView, TransferProgress, TransferSelection, UploadChoiceView, ApkQuestion, Category, ConsoleEntry, DeviceEntry, EtaView, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
   PlanView, Question, ReportResult, ScanView, Settings, ShareState, ShotsView, ShotView, StepEvent, UndoDone, UndoSite, UpdateView, UserWait, Verdict, WhoView,
 } from './types';
 
 /** Zakładka kroku Naprawa: lista aplikacji albo stan telefonu. */
 export type RepairTab = 'apps' | 'phone';
+/** Zakładki Historii: naprawy telefonu / przeniesienia danych (zlecenia ZS wszystkich telefonów). */
+export type HistoryTab = 'orders' | 'transfers';
 export type Screen = 'main' | 'history' | 'settings' | 'explorer';
 /** Kategorie ekranu Ustawienia w kolejności kolumny (spec ustawień §4). */
 export type SettingsCategory = 'general' | 'repair' | 'transfer' | 'explorer' | 'service' | 'privacy' | 'program';
@@ -17,8 +19,9 @@ export const EMPTY_TRANSFER_SELECTION: TransferSelection = {
 };
 
 export const emptyRestore = (): RestoreState => ({ plan: null, copy: null,
-  choice: { groups: [], apks_on: [], verify_hash: false, tel: [] }, progress: null, result: null, sameRecent: false,
-  resumable: false, tel: null, telProgress: null, telResult: null, telError: null, tap: null, tapPackage: null });
+  choice: { groups: [], apks_on: [], verify_hash: false, tel: [], apps: [] }, apps: null, progress: null, result: null, sameRecent: false,
+  resumable: false, tel: null, telProgress: null, telResult: null, telError: null, tap: null, tapPackage: null,
+  appsProgress: null, appsResult: null, appsError: null, order: null, whatsapp: null, whatsappRestored: false, reinstallDone: false, reinstallGaveUp: false, awaitBlock: false });
 
 /** Wgrywanie kopii na nowy telefon: plan z mostu, wybór serwisanta, postęp i wynik. */
 export interface RestoreState {
@@ -26,6 +29,8 @@ export interface RestoreState {
   /** Wgrywana kopia (zanim przyjdzie plan — z listy kopii). */
   copy: CopyView | null;
   choice: UploadChoiceView;
+  /** Aplikacje z kopii (null — plan jeszcze nie przyszedł albo most bez aplikacji). */
+  apps: AppsPlanView | null;
   progress: RestoreProgressView | null;
   result: RestoreResultView | null;
   /** Ten sam telefon co w kopii i kopia młodsza niż 24 h — ostrzeżenie, domyślnie „Nie”. */
@@ -42,6 +47,24 @@ export interface RestoreState {
   tap: TapRequest | null;
   /** Poprzednia domyślna aplikacja SMS (pakiet), której oddajemy rolę. */
   tapPackage: string | null;
+  /** Postęp etapu „Aplikacje” (także dokończenia po blokadzie Xiaomi). */
+  appsProgress: AppsProgressView | null;
+  /** Wynik instalacji aplikacji (null — bez aplikacji albo błąd `appsError`); `transfer:apps_done` zastępuje go w miejscu. */
+  appsResult: AppsResultView | null;
+  /** Klucz błędu etapu „Aplikacje” (`apps_error`): reszta wyniku zostaje. */
+  appsError: string | null;
+  /** Numer ZS zlecenia przeniesienia (null — most bez zlecenia: bez protokołu). */
+  order: string | null;
+  /** Ramka WhatsApp wyniku (null — WhatsApp nie wybrany albo pliki niewgrane). */
+  whatsapp: WhatsappView | null;
+  /** Pole „Czaty przywrócone” — to, co zapisano w zleceniu. */
+  whatsappRestored: boolean;
+  /** Dokończenie aplikacji po odblokowaniu Xiaomi już uruchomiono (raz na wynik). */
+  reinstallDone: boolean;
+  /** Dokończenie aplikacji nie może się udać (błąd trwały): bez obietnicy „sprawdzę sam”, powód w wierszu. */
+  reinstallGaveUp: boolean;
+  /** Dokończenie wróciło z nadal zablokowanymi aplikacjami: następne ruszy dopiero po nowym przejściu zablokowane → odblokowane. */
+  awaitBlock: boolean;
 }
 
 /** Przywracanie ustawień telefonu po przerwanym wgrywaniu (`phone_cleanup`): `ok` — wynik ostatniej próby. */
@@ -65,6 +88,12 @@ export interface TransferState {
   /** Kopia z `transfer:done` (ile dni do usunięcia). */
   copy: CopyView | null;
   copies: CopyView[];
+  /** Zlecenia ZS przeniesień (Historia → Przeniesienia), najnowsze pierwsze. */
+  orders: TransferOrderView[];
+  /** Zlecenie, któremu Historia doinstalowuje aplikacje (zadanie `restore_apps` trwa). */
+  appsBusy: string | null;
+  /** Krótka uwaga w wierszu zlecenia po nieudanym doinstalowaniu (klucz błędu) — bez banera. */
+  appsNotes: Record<string, string>;
   restore: RestoreState;
   cleanup: CleanupState;
 }
@@ -157,8 +186,8 @@ export class AppState {
   }
   disconnectedOrder = $state<string | null>(null);
   history = $state<HistoryView | null>(null);
-  /** Zakładka Historii: naprawy wybranego telefonu albo kopie danych wszystkich telefonów. */
-  historyTab = $state<'orders' | 'copies'>('orders');
+  /** Zakładka Historii: naprawy wybranego telefonu albo przeniesienia danych wszystkich telefonów. */
+  historyTab = $state<HistoryTab>('orders');
   undoSteps = $state<StepEvent[]>([]);
   undoResult = $state<UndoDone | null>(null);
   /** Kolejka witryn bieżącego cofania (`undo:sites`); null — cofanie nie ma ekranów witryn. */
@@ -198,7 +227,7 @@ export class AppState {
   crashError = $state<ApiErrorBody | null>(null);
   fatalCrash = $state<string | null>(null);
   transfer = $state<TransferState>({ inventory: null, resumable: null, selection: { ...EMPTY_TRANSFER_SELECTION },
-    progress: null, waiting: false, result: null, copy: null, copies: [], restore: emptyRestore(),
+    progress: null, waiting: false, result: null, copy: null, copies: [], orders: [], appsBusy: null, appsNotes: {}, restore: emptyRestore(),
     cleanup: { serial: null, running: false, ok: null } });
 
   get orderRunning(): boolean {

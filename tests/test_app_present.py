@@ -528,3 +528,63 @@ def test_inventory_view_export_mtime_out_of_range_is_none(stamp):
     inv = Inventory(None, 5, 0, 0, 7, [], {}, [], [], None, None, 0,
                     exports={"sms": [ExportFile("/sdcard/sms.xml", 10, stamp, "sms", 1)]})
     assert inventory_view(inv, "pl")["exports"]["sms"][0]["mtime"] is None
+
+
+def test_apps_plan_and_result_views():
+    from admenot.app.present import apps_plan_view, apps_result_view
+    from admenot.engine.transfer.apps import AppCandidate, AppsPlan, AppsResult
+
+    plan = AppsPlan([AppCandidate("a", "Alfa", 3, 100, "clean", True, None, ()),
+                     AppCandidate("b", "Beta", 4, 50, "suspicious", False, "installed", ())], "xiaomi")
+    assert apps_plan_view(plan) == {
+        "items": [{"package": "a", "name": "Alfa", "bytes": 100, "verdict": "clean", "default_on": True,
+                   "skip": None},
+                  {"package": "b", "name": "Beta", "bytes": 50, "verdict": "suspicious", "default_on": False,
+                   "skip": "installed"}],
+        "block": "xiaomi", "bytes": 100}
+    res = AppsResult(1, 1, 0, {}, {}, {}, False, False,
+                     [{"package": "a", "label": "Alfa", "status": "installed", "reason": None}], True)
+    assert apps_result_view(res)["installed"] == 1
+
+
+def test_result_notes_counts_failures_only():
+    from admenot.app.present import result_notes
+
+    assert result_notes(None) == 0
+    result = {"files": {"groups": {"photos": {"failed": 3}, "videos": {"failed": 0}}},
+              "tel": {"kinds": {"sms": {"failed": 1}, "calls": {"failed": 0}}},
+              "apps": {"failed": {"no_space": 1, "failed": 1}, "skipped": {"installed": 4}}}
+    assert result_notes(result) == 1 + 1 + 2
+
+
+def test_result_notes_count_what_the_protocol_shows_yellow():
+    """Pominięcia przez blokadę / za stara / za nowa / brak ABI i pliki do ręcznego importu to uwagi jak
+    w protokole; „już jest” i kategorie niewybrane (bez wyniku) — nie."""
+    from admenot.app.present import result_notes
+
+    result = {"tel": {"kinds": {"contacts": {"failed": 0, "manual": 412}, "sms": {"failed": 0, "manual": 0}},
+                      "manual": [{"kind": "contacts", "name": "kontakty.vcf"}, {"kind": "calls", "name": "c.xml"}]},
+              "apps": {"failed": {}, "skipped": {"installed": 4, "user_restricted": 2, "too_old": 1, "too_new": 1,
+                                                 "no_abi": 1}},
+              "choice": {"groups": [], "tel": ["contacts"], "apps": 9}}
+    assert result_notes(result) == 2 + 5
+    assert result_notes({"files": None, "tel": None, "apps": None, "choice": {"groups": [], "tel": [], "apps": 0}}) == 0
+
+
+def test_failed_order_view_tells_partial_from_nothing(tmp_path):
+    from admenot.app.present import transfer_order_view
+    from admenot.engine.journal.db import Journal
+
+    now = datetime(2026, 11, 8, 12, 0)
+    with Journal(tmp_path / "j.db") as journal:
+        order = journal.create_transfer_order("S", "M", None, {}, copy_id="S/1", source={"counts": {}},
+                                              received_at=now, copy_expires=now)
+        journal.set_transfer_target(order.id, "T", {"model": "X"})
+        journal.save_transfer_result(order.id, {"files": None, "tel": None, "apps": None, "status": "failed"})
+        journal.set_order_status(order.id, "failed")
+        view = transfer_order_view(journal.order(order.id), journal.transfer(order.id), None, now)
+        assert view["state"] == "failed" and view["partial"] is False
+        journal.save_transfer_result(order.id, {"files": {"files_done": 3}, "tel": None, "apps": None,
+                                                "status": "failed"})
+        view = transfer_order_view(journal.order(order.id), journal.transfer(order.id), None, now)
+        assert view["partial"] is True
