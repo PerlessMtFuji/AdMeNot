@@ -11,7 +11,7 @@
       "state": "device",
       "model": "SM_A145R",
       "name": "samsung SM-A145R",
-      "imei": null,
+      "imei": "499001200000004",
       "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9Ii0xNiAtMTYgMTU2IDI3MiIgd2lkdGg9IjE1NiIgaGVpZ2h0PSIyNzIiPgogIDx0aXRsZT5UZWxlZm9uPC90aXRsZT4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iYm9keSIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMzYTQ1NTgiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIuNTUiIHN0b3AtY29sb3I9IiMxZjI5MzciLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMTExODI3Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJlZGdlIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzk0YTNiOCIgc3RvcC1vcGFjaXR5PSIuOSIvPgogICAgICA8c3RvcCBvZmZzZXQ9Ii41IiBzdG9wLWNvbG9yPSIjNDc1NTY5IiBzdG9wLW9wYWNpdHk9Ii41Ii8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBiMTIyMCIgc3RvcC1vcGFjaXR5PSIuOSIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ic2NyZWVuIiB4MT0iMCIgeTE9IjAiIHgyPSIuMzUiIHkyPSIxIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNjM2NmYxIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iLjUiIHN0b3AtY29sb3I9IiMzNzMwYTMiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMGYxNzJhIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPHJhZGlhbEdyYWRpZW50IGlkPSJnbG93QSIgY3g9Ii4yIiBjeT0iLjIyIiByPSIuNiI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2E1YjRmYyIgc3RvcC1vcGFjaXR5PSIuNzUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjYTViNGZjIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgIDwvcmFkaWFsR3JhZGllbnQ+CiAgICA8cmFkaWFsR3JhZGllbnQgaWQ9Imdsb3dCIiBjeD0iLjkiIGN5PSIuNzgiIHI9Ii41NSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzIyZDNlZSIgc3RvcC1vcGFjaXR5PSIuNDUiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMjJkM2VlIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgIDwvcmFkaWFsR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImdsYXJlIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMCI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iI2ZmZiIgc3RvcC1vcGFjaXR5PSIuMTYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjZmZmIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8Y2xpcFBhdGggaWQ9ImNsaXAiPjxyZWN0IHg9IjkiIHk9IjkiIHdpZHRoPSIxMDIiIGhlaWdodD0iMjIyIiByeD0iMTMiLz48L2NsaXBQYXRoPgogIDwvZGVmcz4KICA8IS0tIHByenljaXNraSBib2N6bmUgLS0+CiAgPHJlY3QgeD0iMTE3IiB5PSI1OCIgd2lkdGg9IjQiIGhlaWdodD0iMjIiIHJ4PSIxLjUiIGZpbGw9IiMzMzQxNTUiLz4KICA8cmVjdCB4PSIxMTciIHk9IjkwIiB3aWR0aD0iNCIgaGVpZ2h0PSI0MCIgcng9IjEuNSIgZmlsbD0iIzMzNDE1NSIvPgogIDwhLS0gb2J1ZG93YSAtLT4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iMTE2IiBoZWlnaHQ9IjIzNiIgcng9IjE5IiBmaWxsPSJ1cmwoI2JvZHkpIi8+CiAgPHJlY3QgeD0iMi43NSIgeT0iMi43NSIgd2lkdGg9IjExNC41IiBoZWlnaHQ9IjIzNC41IiByeD0iMTguMjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0idXJsKCNlZGdlKSIgc3Ryb2tlLXdpZHRoPSIxLjUiLz4KICA8IS0tIGVrcmFuIC0tPgogIDxnIGNsaXAtcGF0aD0idXJsKCNjbGlwKSI+CiAgICA8cmVjdCB4PSI5IiB5PSI5IiB3aWR0aD0iMTAyIiBoZWlnaHQ9IjIyMiIgZmlsbD0idXJsKCNzY3JlZW4pIi8+CiAgICA8cmVjdCB4PSI5IiB5PSI5IiB3aWR0aD0iMTAyIiBoZWlnaHQ9IjIyMiIgZmlsbD0idXJsKCNnbG93QSkiLz4KICAgIDxyZWN0IHg9IjkiIHk9IjkiIHdpZHRoPSIxMDIiIGhlaWdodD0iMjIyIiBmaWxsPSJ1cmwoI2dsb3dCKSIvPgogICAgPHBhdGggZD0iTTkgOWg2Mkw5IDE1MHoiIGZpbGw9InVybCgjZ2xhcmUpIi8+CiAgPC9nPgogIDxyZWN0IHg9IjkuNSIgeT0iOS41IiB3aWR0aD0iMTAxIiBoZWlnaHQ9IjIyMSIgcng9IjEyLjUiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzAwMCIgc3Ryb2tlLW9wYWNpdHk9Ii4zNSIvPgogIDwhLS0gYXBhcmF0IHByemVkbmkgaSBwYXNlayBnZXN0w7N3IC0tPgogIDxjaXJjbGUgY3g9IjYwIiBjeT0iMjAiIHI9IjMuNCIgZmlsbD0iIzBiMTAyMCIvPgogIDxjaXJjbGUgY3g9IjYxIiBjeT0iMTkiIHI9IjEiIGZpbGw9IiM0NzU1NjkiLz4KICA8cmVjdCB4PSI0NCIgeT0iMjIyIiB3aWR0aD0iMzIiIGhlaWdodD0iMi42IiByeD0iMS4zIiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii41NSIvPgo8L3N2Zz4K",
       "android": "14"
      }
@@ -61,45 +61,9 @@
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
       "command": "service call iphonesubinfo 1 s16 com.android.shell",
-      "status": "error:command_failed",
+      "status": "ok",
       "duration": 0.0,
-      "output": "FakePhone: no response for 'service call iphonesubinfo 1 s16 com.android.shell'",
-      "tag": null
-     }
-    ],
-    [
-     "adb:command",
-     {
-      "time": "2026-09-26T14:30:00",
-      "serial": "R58T00TEST",
-      "command": "service call iphonesubinfo 2 s16 com.android.shell",
-      "status": "error:command_failed",
-      "duration": 0.0,
-      "output": "FakePhone: no response for 'service call iphonesubinfo 2 s16 com.android.shell'",
-      "tag": null
-     }
-    ],
-    [
-     "adb:command",
-     {
-      "time": "2026-09-26T14:30:00",
-      "serial": "R58T00TEST",
-      "command": "service call iphonesubinfo 3 s16 com.android.shell",
-      "status": "error:command_failed",
-      "duration": 0.0,
-      "output": "FakePhone: no response for 'service call iphonesubinfo 3 s16 com.android.shell'",
-      "tag": null
-     }
-    ],
-    [
-     "adb:command",
-     {
-      "time": "2026-09-26T14:30:00",
-      "serial": "R58T00TEST",
-      "command": "service call iphonesubinfo 4 s16 com.android.shell",
-      "status": "error:command_failed",
-      "duration": 0.0,
-      "output": "FakePhone: no response for 'service call iphonesubinfo 4 s16 com.android.shell'",
+      "output": "Result: Parcel(\n  0x00000000: 00000000 0000000f 00390034 00300039 '................'\n  0x00000010: 00310030 00300032 00300030 00300030 '................'\n  0x00000020: 00300030 00000034 '................')\n",
       "tag": null
      }
     ],
@@ -178,45 +142,9 @@
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
       "command": "service call iphonesubinfo 1 s16 com.android.shell",
-      "status": "error:command_failed",
+      "status": "ok",
       "duration": 0.0,
-      "output": "FakePhone: no response for 'service call iphonesubinfo 1 s16 com.android.shell'",
-      "tag": null
-     }
-    ],
-    [
-     "adb:command",
-     {
-      "time": "2026-09-26T14:30:00",
-      "serial": "R58T00TEST",
-      "command": "service call iphonesubinfo 2 s16 com.android.shell",
-      "status": "error:command_failed",
-      "duration": 0.0,
-      "output": "FakePhone: no response for 'service call iphonesubinfo 2 s16 com.android.shell'",
-      "tag": null
-     }
-    ],
-    [
-     "adb:command",
-     {
-      "time": "2026-09-26T14:30:00",
-      "serial": "R58T00TEST",
-      "command": "service call iphonesubinfo 3 s16 com.android.shell",
-      "status": "error:command_failed",
-      "duration": 0.0,
-      "output": "FakePhone: no response for 'service call iphonesubinfo 3 s16 com.android.shell'",
-      "tag": null
-     }
-    ],
-    [
-     "adb:command",
-     {
-      "time": "2026-09-26T14:30:00",
-      "serial": "R58T00TEST",
-      "command": "service call iphonesubinfo 4 s16 com.android.shell",
-      "status": "error:command_failed",
-      "duration": 0.0,
-      "output": "FakePhone: no response for 'service call iphonesubinfo 4 s16 com.android.shell'",
+      "output": "Result: Parcel(\n  0x00000000: 00000000 0000000f 00390034 00300039 '................'\n  0x00000010: 00310030 00300032 00300030 00300030 '................'\n  0x00000020: 00300030 00000034 '................')\n",
       "tag": null
      }
     ],
@@ -246,7 +174,7 @@
        "sdk": 34,
        "patch": "2026-07-01",
        "uptime_s": 280000.12,
-       "imei": null,
+       "imei": "499001200000004",
        "match": {
         "confidence": "none",
         "step": "no_db",
@@ -785,7 +713,8 @@
       "Music"
      ],
      "apps": [
-      "com.whatsapp"
+      "com.whatsapp",
+      "com.wlive.forecast"
      ]
     }
    ],
@@ -825,7 +754,7 @@
       "total_bytes": 0,
       "current": "",
       "done_apps": 0,
-      "total_apps": 1
+      "total_apps": 2
      }
     ],
     [
@@ -910,7 +839,7 @@
       "total_bytes": 6704,
       "current": "",
       "done_apps": 0,
-      "total_apps": 1
+      "total_apps": 2
      }
     ],
     [
@@ -923,7 +852,7 @@
       "total_bytes": 6704,
       "current": "com.whatsapp",
       "done_apps": 0,
-      "total_apps": 1
+      "total_apps": 2
      }
     ],
     [
@@ -943,6 +872,18 @@
      {
       "time": "2026-09-26T14:30:00",
       "serial": "R58T00TEST",
+      "command": "host:pull /data/app/~~fake==/com.wlive.forecast-1/base.apk <tmp>\\data\\AdMeNot\\transfers\\R58T00TEST-90fae0b8e3f0\\20260926-143000\\.apk-tmp\\com.wlive.forecast\\.part-X\\base.apk",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "/data/app/~~fake==/com.wlive.forecast-1/base.apk: 1 file pulled\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
       "command": "pm path com.whatsapp",
       "status": "ok",
       "duration": 0.0,
@@ -959,6 +900,30 @@
       "status": "ok",
       "duration": 0.0,
       "output": "package:/data/app/~~fake==/com.whatsapp-1/base.apk\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm path com.wlive.forecast",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "package:/data/app/~~fake==/com.wlive.forecast-1/base.apk\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "pm path com.wlive.forecast",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "package:/data/app/~~fake==/com.wlive.forecast-1/base.apk\n",
       "tag": null
      }
     ],
@@ -983,6 +948,30 @@
       "status": "ok",
       "duration": 0.0,
       "output": "5674c333cf98b7428fc89244006e6358a921d6c476c41e5474efd0d81dcfbc4c  /data/app/~~fake==/com.whatsapp-1/base.apk\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "sha256sum '/data/app/~~fake==/com.wlive.forecast-1/base.apk'",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "43c829cbf4a00d86ccd3e1cbe8add2481267285ace961183d4483b57013d0be4  /data/app/~~fake==/com.wlive.forecast-1/base.apk\n",
+      "tag": null
+     }
+    ],
+    [
+     "adb:command",
+     {
+      "time": "2026-09-26T14:30:00",
+      "serial": "R58T00TEST",
+      "command": "sha256sum '/data/app/~~fake==/com.wlive.forecast-1/base.apk'",
+      "status": "ok",
+      "duration": 0.0,
+      "output": "43c829cbf4a00d86ccd3e1cbe8add2481267285ace961183d4483b57013d0be4  /data/app/~~fake==/com.wlive.forecast-1/base.apk\n",
       "tag": null
      }
     ],
@@ -994,9 +983,9 @@
        "copy_id": "R58T00TEST-90fae0b8e3f0/20260926-143000",
        "files_done": 5,
        "files_failed": 0,
-       "apps_done": 1,
+       "apps_done": 2,
        "apps_failed": 0,
-       "bytes": 6715,
+       "bytes": 6726,
        "seconds": 0,
        "telephony": {
         "contacts": {
@@ -1029,12 +1018,12 @@
        "expires": "2026-10-03T14:30:00",
        "days_left": 7,
        "status": "complete",
-       "bytes": 6715,
+       "bytes": 6726,
        "counts": {
         "files": 5,
         "files_failed": 0,
         "files_skipped": 0,
-        "apps": 1,
+        "apps": 2,
         "apps_failed": 0,
         "apps_skipped": 0,
         "apps_malicious": 1,
@@ -1061,7 +1050,8 @@
          "Music"
         ],
         "apps": [
-         "com.whatsapp"
+         "com.whatsapp",
+         "com.wlive.forecast"
         ],
         "verify_hash": false,
         "exports": []
@@ -1092,7 +1082,7 @@
       "created_at": "2026-09-26T14:30:00",
       "source": {
        "name": "samsung SM-A145R",
-       "imei": null
+       "imei": "499001200000004"
       },
       "target": null,
       "state": "copy_ready",
@@ -1106,7 +1096,7 @@
       "target_serial": null,
       "apps_blocked": false,
       "counts": {
-       "apps": 1,
+       "apps": 2,
        "apps_failed": 0,
        "apps_malicious": 1,
        "apps_skipped": 0,
@@ -1135,12 +1125,12 @@
       "expires": "2026-10-03T14:30:00",
       "days_left": 7,
       "status": "complete",
-      "bytes": 6715,
+      "bytes": 6726,
       "counts": {
        "files": 5,
        "files_failed": 0,
        "files_skipped": 0,
-       "apps": 1,
+       "apps": 2,
        "apps_failed": 0,
        "apps_skipped": 0,
        "apps_malicious": 1,
@@ -1167,7 +1157,8 @@
         "Music"
        ],
        "apps": [
-        "com.whatsapp"
+        "com.whatsapp",
+        "com.wlive.forecast"
        ],
        "verify_hash": false,
        "exports": []

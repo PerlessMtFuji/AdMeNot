@@ -156,6 +156,72 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
+// Ekrany przenoszenia danych (spec §7.2–§7.6): jasny i ciemny motyw, 1280 i 1200 px (wiersze nie mogą się łamać).
+const NEW_PHONE = /IMEI 861485069821024/;  // IMEI zamiast numeru seryjnego
+
+async function planRestore(page: Page, scenario: string) {
+  await page.goto(`/?scenario=${scenario}`);
+  await page.getByRole('radio', { name: NEW_PHONE }).dispatchEvent('click');  // radio jest sr-only pod kartą
+  await page.getByRole('button', { name: 'Wgraj', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Co wgrać na nowy telefon?' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('complementary', { name: 'Miejsce na nowym telefonie' })).toBeVisible();
+}
+
+async function restoreDone(page: Page, scenario = 'transfer_restore') {
+  await planRestore(page, scenario);
+  await page.getByRole('complementary', { name: 'Miejsce na nowym telefonie' }).getByRole('button', { name: /^Wgraj/ }).click();
+  await expect(page.getByRole('heading', { name: 'Dane przeniesione' })).toBeVisible({ timeout: 15_000 });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const width of [1280, 1200]) {
+    test.describe(`transfer screens (PL, ${width}×900, ${theme})`, () => {
+      test.use({ colorScheme: theme, viewport: { width, height: 900 } });
+      test.beforeEach(async ({ page }) => {
+        await page.clock.setFixedTime(new Date('2026-09-26T15:00:00'));  // nagrana kopia jest świeża (< 24 h)
+      });
+      const shot = (name: string) => `transfer-${name}-${width}-${theme}.png`;
+
+      test('7.2 copy: choose, and 7.5 copy done', async ({ page }) => {
+        await page.goto('/?scenario=transfer');
+        await page.getByRole('button', { name: 'Kopiuj dane' }).click();
+        await expect(page.getByRole('heading', { name: 'Co skopiować ze starego telefonu?' })).toBeVisible({ timeout: 15_000 });
+        await expect(page.getByRole('button', { name: /^Rozpocznij kopię/ })).toBeVisible();
+        await expect(page).toHaveScreenshot(shot('choose'));
+        await page.getByRole('button', { name: /^Rozpocznij kopię/ }).click();
+        await expect(page.getByRole('heading', { name: 'Kopia starego telefonu' })).toBeVisible({ timeout: 15_000 });
+        await expect(page.getByText('Podłącz nowy telefon')).toBeVisible();
+        await expect(page).toHaveScreenshot(shot('copy-done'));
+      });
+
+      test('7.3 restore plan with apps, and the Xiaomi block opened', async ({ page }) => {
+        await planRestore(page, 'transfer_restore');
+        await expect(page).toHaveScreenshot(shot('restore-plan'));
+        await planRestore(page, 'transfer_restore_xiaomi');
+        await page.getByRole('button', { name: /Xiaomi blokuje instalację/ }).click();
+        await expect(page.getByText(/Jak włączyć: Ustawienia → Dodatkowe ustawienia/)).toBeVisible();
+        await page.getByRole('main').evaluate((el) => { el.scrollTop = el.scrollHeight; });  // lista aplikacji pod instrukcją
+        await expect(page).toHaveScreenshot(shot('restore-plan-xiaomi'));
+      });
+
+      test('7.5 data transferred, and 7.6 history of transfers', async ({ page }) => {
+        await restoreDone(page);
+        await expect(page).toHaveScreenshot(shot('restore-done'));
+        await page.getByRole('button', { name: 'Historia' }).click();
+        await page.getByRole('button', { name: /^Przeniesienia \(/ }).click();
+        await expect(page.getByText('ZS/2026/0926/01').first()).toBeVisible();
+        await expect(page).toHaveScreenshot(shot('history'));
+      });
+
+      test('7.5 data transferred with contacts, messages and the call log import file', async ({ page }) => {
+        await restoreDone(page, 'transfer_restore_tel');
+        await expect(page.getByText('Kontakty', { exact: true }).first()).toBeVisible();
+        await expect(page).toHaveScreenshot(shot('restore-done-tel'));
+      });
+    });
+  }
+}
+
 test.describe('motion', () => {
   test('animations run normally', async ({ browser }) => {
     const page = await browser.newPage({ reducedMotion: 'no-preference' });
