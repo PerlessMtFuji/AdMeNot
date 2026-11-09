@@ -273,12 +273,12 @@ describe('TransferOrders', () => {
     expect(document.activeElement).toBe(dots);
   });
 
-  describe('automatic reinstall of blocked apps', () => {
+  describe('blocked apps: finishing only from the menu', () => {
     const blocked = { ...RESTORED, apps_blocked: true };
-    async function armed(checks: (boolean | null)[]) {
+    async function armed() {
       vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
       const env = await setupCtl('clean');
-      env.bridge.setInstallChecks(checks);
+      env.bridge.setInstallChecks([false]);
       env.s.transfer.orders = [blocked];
       env.s.transfer.copies = [COPY];
       env.s.devices = [{ serial: 'NEW9', state: 'device', model: 'M', name: null, imei: NEW_IMEI }];
@@ -289,57 +289,24 @@ describe('TransferOrders', () => {
     }
     const step = async () => { await vi.advanceTimersByTimeAsync(RECHECK_MS + 10); };
 
-    test('checks the order silently and installs once when the block is gone', async () => {
-      const { env, calls } = await armed([true, false]);
-      await step();
-      expect(calls('install_check')[0].args).toEqual([RESTORED.number]);
-      expect(calls('install_remaining_apps')).toHaveLength(0);  // jeszcze zablokowane
-      await step();
-      expect(calls('install_remaining_apps')).toHaveLength(1);
-      expect(calls('install_remaining_apps')[0].args).toEqual([RESTORED.number]);
-      expect(env.s.error).toBeNull();
-    });
-
-    test('not repeated while the reading stays unblocked and the job runs', async () => {
-      const { env, calls } = await armed([false]);
-      await step();
-      expect(calls('install_remaining_apps')).toHaveLength(1);
-      expect(env.s.job?.kind).toBe('restore_apps');
+    test('nothing starts on its own, even when the phone reads unblocked', async () => {
+      const { calls } = await armed();
       await step();
       await step();
-      expect(calls('install_remaining_apps')).toHaveLength(1);
-    });
-
-    test('an unknown reading does nothing; unmounting stops the checking', async () => {
-      const { view, calls } = await armed([null]);
-      await step();
-      expect(calls('install_check')).toHaveLength(1);
+      expect(calls('install_check')).toHaveLength(0);
       expect(calls('install_remaining_apps')).toHaveLength(0);
-      view.unmount();
-      await step();
-      await step();
-      expect(calls('install_check')).toHaveLength(1);
+      await fireEvent.click(within(row(RESTORED.number)).getByRole('button', { name: /^Więcej działań/ }));
+      expect(within(row(RESTORED.number)).getByRole('menuitem', { name: 'Doinstaluj aplikacje' })).toBeTruthy();
     });
 
-    test('a deleted copy: no reinstall in the menu and no checking (nothing to install from)', async () => {
-      const { env, calls } = await armed([false]);
+    test('a deleted copy: no reinstall in the menu (nothing to install from)', async () => {
+      const { env } = await armed();
       env.s.transfer.orders = [{ ...blocked, copy: { id: 'OLD/1', days_left: 0, deleted_at: '2026-10-30T08:00:00' } }];
       env.s.transfer.copies = [];
       await tick();
-      await step();
-      await step();
-      expect(calls('install_check')).toHaveLength(0);
-      expect(calls('install_remaining_apps')).toHaveLength(0);
       // jedyną pozycją menu byłoby doinstalowanie: bez kopii menu ⋯ w ogóle nie ma
       expect(within(row(RESTORED.number)).queryByRole('button', { name: /^Więcej działań/ })).toBeNull();
       expect(within(row(RESTORED.number)).queryByRole('menuitem', { name: 'Doinstaluj aplikacje' })).toBeNull();
-    });
-
-    test('no checking while the target phone is not connected', async () => {
-      const { env, calls } = await armed([false]);
-      env.s.devices = [];
-      await step();
-      expect(calls('install_check')).toHaveLength(0);
     });
   });
 

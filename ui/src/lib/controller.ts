@@ -404,13 +404,8 @@ export class Controller {
       if (d.kind === 'update') s.updateProgress = null;
       if (d.kind === 'phone_cleanup') s.transfer.cleanup = { ...s.transfer.cleanup, running: false };
       if (d.kind === 'restore_apps' && s.transfer.appsBusy) {  // doinstalowanie z Historii skończone: nowy wynik w wierszu
-        const done = s.transfer.appsBusy;
         s.transfer.appsBusy = null;
-        void this.loadTransfers().then(() => {
-          // blokada została: kolejne dokończenie dopiero po nowym odczycie „zablokowane”
-          const st = this.historyReinstall.get(done);
-          if (st) Object.assign(st, { done: false, awaitBlock: s.transfer.orders.some((o) => o.number === done && o.apps_blocked) });
-        });
+        void this.loadTransfers();
       }
       if (s.job?.id === d.job_id) s.job = null;
       if (d.kind === 'transfer_scan') this.continueResume();
@@ -1248,28 +1243,6 @@ export class Controller {
     tr.appsBusy = number;
     this.setJob(res.job_id, 'restore_apps');
     return null;
-  }
-
-  /** Historia → Przeniesienia, blokada Xiaomi: tani odczyt `install_check(zlecenie)` w tle (co `RECHECK_MS`, z komponentu).
-   *  Gdy blokady już nie ma, raz uruchamia dokończenie aplikacji. Cichy: żadnego błędu na ekran; po dokończeniu, które
-   *  zostawiło blokadę, kolejna próba dopiero po nowym odczycie „zablokowane” (jak na ekranie wyniku). */
-  private historyReinstall = new Map<string, { done: boolean; awaitBlock: boolean }>();
-  async reinstallWhenUnblockedFromHistory(number: string): Promise<void> {
-    const s = this.state;
-    const st = this.historyReinstall.get(number) ?? { done: false, awaitBlock: false };
-    this.historyReinstall.set(number, st);
-    if (st.done || s.job) return;
-    try {
-      const check = await this.api.install_check(number);
-      if (isApiError(check)) return;
-      if (check.blocked === true) st.awaitBlock = false;
-      if (check.blocked !== false || st.awaitBlock || st.done || s.job) return;
-      st.done = true;
-      const key = await this.reinstallFromHistory(number);
-      if (key && REINSTALL_TRANSIENT.includes(key)) st.done = false;
-    } catch {
-      // następna próba za RECHECK_MS
-    }
   }
 
   /** Zapis notatki do kopii; `true` po udanym zapisie (pole edycji się zamyka). */

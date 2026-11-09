@@ -1,10 +1,9 @@
 <script lang="ts">
-  import { getContext, onMount, tick } from 'svelte';
+  import { getContext, tick } from 'svelte';
   import type { Controller } from '../lib/controller';
   import { i18n, t, tp } from '../lib/i18n/index.svelte';
   import { transferRows, type TransferRow } from '../lib/logic';
   import { enter, stagger } from '../lib/motion';
-  import { recheck } from '../lib/recheck';
   import Button from '../ui/Button.svelte';
   import Dialog from '../ui/Dialog.svelte';
   import Icon from '../ui/Icon.svelte';
@@ -123,12 +122,8 @@
     void action();
   }
 
-  // Blokada Xiaomi: dopóki zakładka jest na ekranie, program sam sprawdza telefon celu i gdy blokady już nie ma,
-  // doinstaluje pominięte aplikacje (cicho: bez błędu na ekran).
-  const reinstallable = () => rows.filter(showReinstall);
-  onMount(() => recheck(async () => {
-    for (const r of reinstallable()) await ctl.reinstallWhenUnblockedFromHistory(r.number!);
-  }, () => s.job === null && reinstallable().length > 0));
+  // Blokada Xiaomi: w Historii dokończenie tylko z menu („Doinstaluj aplikacje”) — samo nie rusza (decyzja autora
+  // po teście na telefonie: start bez kliknięcia zaskakiwał).
 </script>
 
 <!-- Klik poza menu zamyka je; własny przycisk ⋯ i menu mają `data-menu`. -->
