@@ -12,6 +12,7 @@ import {
   defaultUploadChoice,
   keptUploadChoice,
   defaultApps,
+  installableApps,
   restoreEtaMin,
   restoreOffer,
   restoreOutcome,
@@ -906,6 +907,17 @@ describe('uploading a copy to the new phone', () => {
         { package: 'a.skipped', name: 'B', bytes: 1, verdict: 'safe', default_on: true, skip: 'installed' }] }))
       .toEqual({ groups: ['photos', 'other:Music', 'videos'], apks_on: ['/sdcard/Download/gra.apk'], verify_hash: true,
         tel: ['contacts'], apps: ['a.ok'] });
+  });
+
+  test('apps: a malicious app is never default nor installable, even with default_on', () => {
+    const item = (package_: string, over = {}) => ({ package: package_, name: package_, bytes: 100, verdict: 'safe' as const,
+      default_on: true, skip: null, ...over });
+    const apps = { block: null, bytes: 200, items: [item('a'), item('m', { verdict: 'malicious' })] };
+    expect(defaultApps(apps)).toEqual(['a']);
+    expect(installableApps(apps).map((a) => a.package)).toEqual(['a']);
+    const plan: RestorePlanView = { groups: {}, others: [], apks: [], space: { free: 1000, total: 2000 }, reserve: 0, missing: 0 };
+    expect(keptUploadChoice(plan, { groups: [], apks_on: [], verify_hash: false, tel: [], apps: ['a', 'm'] }, null, apps).apps)
+      .toEqual(['a']);
   });
 
   test('apps: default on without skipped and suspicious; only the chosen installable apps count toward the need', () => {

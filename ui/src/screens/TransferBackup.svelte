@@ -114,7 +114,7 @@
   <main class="flex min-w-0 flex-1 flex-col gap-4 scroll-fade overflow-auto px-7 py-7">
     <div>
       <div class="text-sm font-semibold text-soft">{crumb}</div>
-      <h1 class="text-2xl font-extrabold">{done ? t('transfer.done_heading') : t('transfer.copying')}</h1>
+      <h1 class="text-2xl font-extrabold">{done ? t(outcome === 'stopped' ? 'transfer.done_heading_stopped' : 'transfer.done_heading') : t('transfer.copying')}</h1>
       {#if !done}<p class="text-mut">{t('transfer.copying_sub')}</p>{/if}
     </div>
 

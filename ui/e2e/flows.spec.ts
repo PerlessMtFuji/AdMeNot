@@ -224,7 +224,7 @@ test('copy, then the other phone connects: plan with apps, upload, data transfer
   await page.getByRole('button', { name: 'Kopiuj dane' }).click();
   await expect(page.getByRole('heading', { name: 'Co skopiować ze starego telefonu?' })).toBeVisible({ timeout: 15_000 });
   await page.getByRole('button', { name: /^Rozpocznij kopię/ }).click();
-  await expect(page.getByRole('heading', { name: 'Kopia starego telefonu' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('heading', { name: 'Kopia gotowa' })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('Podłącz nowy telefon')).toBeVisible();
   // Nowy telefon sam dostaje plan wgrywania.
   await page.evaluate(() => (window as any).__admenot.bridge.emit('devices', { devices: (window as any).__both, error: null }));

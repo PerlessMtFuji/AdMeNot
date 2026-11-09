@@ -271,9 +271,12 @@
       {:else}
         <Banner tone="warn" icon="triangle-alert" title={t('transfer.restore.no_space', { size: size(need.missing) })} />
       {/if}
-      <div class="flex items-start gap-2.5 rounded-xl bg-neutral-soft p-3 text-sm text-mut">
-        <span class="mt-0.5 flex-none text-soft"><Icon name="lock" size={15} /></span><span>{t('transfer.restore.safety')}</span>
-      </div>
+      {#if r.choice.tel.length > 0}
+        <!-- kopia bezpieczeństwa nowego telefonu powstaje tylko przed telefonią -->
+        <div class="flex items-start gap-2.5 rounded-xl bg-neutral-soft p-3 text-sm text-mut">
+          <span class="mt-0.5 flex-none text-soft"><Icon name="lock" size={15} /></span><span>{t('transfer.restore.safety')}</span>
+        </div>
+      {/if}
       <Button variant="primary" size="lg" class="flex-col !gap-0" disabled={blocked} onclick={() => ctl.startRestore()}>
         {t('transfer.restore.begin')}
         <small class="text-xs font-semibold opacity-85">{size(need.need)} · {t('transfer.eta_value', { min: etaMin })}</small>

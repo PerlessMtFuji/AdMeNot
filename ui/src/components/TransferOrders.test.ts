@@ -321,6 +321,20 @@ describe('TransferOrders', () => {
       expect(calls('install_check')).toHaveLength(1);
     });
 
+    test('a deleted copy: no reinstall in the menu and no checking (nothing to install from)', async () => {
+      const { env, calls } = await armed([false]);
+      env.s.transfer.orders = [{ ...blocked, copy: { id: 'OLD/1', days_left: 0, deleted_at: '2026-10-30T08:00:00' } }];
+      env.s.transfer.copies = [];
+      await tick();
+      await step();
+      await step();
+      expect(calls('install_check')).toHaveLength(0);
+      expect(calls('install_remaining_apps')).toHaveLength(0);
+      // jedyną pozycją menu byłoby doinstalowanie: bez kopii menu ⋯ w ogóle nie ma
+      expect(within(row(RESTORED.number)).queryByRole('button', { name: /^Więcej działań/ })).toBeNull();
+      expect(within(row(RESTORED.number)).queryByRole('menuitem', { name: 'Doinstaluj aplikacje' })).toBeNull();
+    });
+
     test('no checking while the target phone is not connected', async () => {
       const { env, calls } = await armed([false]);
       env.s.devices = [];
@@ -333,5 +347,11 @@ describe('TransferOrders', () => {
     await show([{ ...DELETED, state: 'failed', number: 'ZS/F/1' }, { ...DELETED, state: 'expired', number: 'ZS/E/1', created_at: '2026-10-01T09:00:00' }], []);
     expect(row('ZS/F/1').textContent).toContain('nie wgrano');
     expect(row('ZS/E/1').textContent).toContain('kopia wygasła');
+  });
+
+  test('a failed order that restored a part says "przerwane", not "nie wgrano"', async () => {
+    await show([{ ...DELETED, state: 'failed', number: 'ZS/P/1', partial: true }], []);
+    expect(row('ZS/P/1').textContent).toContain('przerwane');
+    expect(row('ZS/P/1').textContent).not.toContain('nie wgrano');
   });
 });

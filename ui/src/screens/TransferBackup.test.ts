@@ -75,6 +75,17 @@ describe('TransferBackup', () => {
     s.transfer.copy = COPY;
     await tick();
     expect(screen.getByText('Kopia gotowa i sprawdzona — możesz odłączyć stary telefon')).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Kopia gotowa');
+  });
+
+  test('the heading is the progress one during the copy and not "ready" after a stop', async () => {
+    const { s } = await show();
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Kopiuję dane ze starego telefonu');
+    s.phase = 'transfer_done';
+    s.transfer.result = result({ status: 'stopped' });
+    s.transfer.copy = { ...COPY, status: 'in_progress' };
+    await tick();
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Kopia starego telefonu');
   });
 
   test('missing phone data is a warning with the Xiaomi hint, never the green banner', async () => {

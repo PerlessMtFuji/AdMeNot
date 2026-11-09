@@ -1386,6 +1386,25 @@ describe('data transfer — export files', () => {
     expect(sent.exports).toEqual({ sms: SMS });
   });
 
+  test('background checks are silent: a failing bridge raises no error card (spec §7.1)', async () => {
+    const { ctl, s, bridge } = await chosen();
+    const before = s.transfer.inventory;
+    bridge.failNext('transfer_exports_check', 'internal', 'boom');
+    await ctl.checkExports();
+    expect(s.error).toBeNull();
+    expect(s.transfer.inventory).toBe(before);
+    bridge.failNext('transfer_whatsapp', 'device_lost');
+    await ctl.recheckWhatsapp();
+    expect(s.error).toBeNull();
+    expect(s.transfer.inventory?.whatsapp_backup).toBeNull();
+    s.phase = 'transfer_restore_plan';
+    s.transfer.restore.apps = { block: 'xiaomi', bytes: 0, items: [] };
+    bridge.failNext('install_check', 'internal', 'boom');
+    await ctl.checkInstall();
+    expect(s.error).toBeNull();
+    expect(s.transfer.restore.apps?.block).toBe('xiaomi');
+  });
+
   test('checkExports is a cheap read without a job: merges the parts and keeps the choices', async () => {
     const { ctl, s, bridge } = await chosen();
     ctl.chooseExport('contacts', OLDER);

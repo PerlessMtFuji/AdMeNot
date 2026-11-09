@@ -45,7 +45,8 @@
   const hasCopy = (r: TransferRow) => !!r.disk && !r.copy?.deleted_at;
   const topReport = (r: TransferRow) => !!r.number && restored(r);
   const showWhatsapp = (r: TransferRow) => !!r.number && restored(r) && ((r.counts.files_whatsapp ?? 0) > 0 || r.whatsappRestored);
-  const showReinstall = (r: TransferRow) => !!r.number && r.appsBlocked && targetConnected(r);
+  // Doinstalowanie potrzebuje plików aplikacji z kopii: po usunięciu kopii nie ma z czego.
+  const showReinstall = (r: TransferRow) => !!r.number && r.appsBlocked && hasCopy(r) && targetConnected(r);
   const menuReport = (r: TransferRow) => !!r.number && !topReport(r);
   const hasMenu = (r: TransferRow) => hasCopy(r) || menuUpload(r) || showWhatsapp(r) || showReinstall(r) || menuReport(r);
 
@@ -55,7 +56,8 @@
     switch (r.state) {
       case 'restored': return { tone: 'ok', text: t('transfer.hist.state.restored') };
       case 'restored_notes': return { tone: 'warn', text: tp('transfer.hist.notes', r.notes) };
-      case 'failed': return { tone: 'bad', text: t('transfer.hist.state.failed') };
+      // przerwane po części: „przerwane”; nic nie wgrano — „nie wgrano”
+      case 'failed': return { tone: 'bad', text: t(`transfer.hist.state.${r.partial ? 'interrupted' : 'failed'}`) };
       case 'interrupted': return { tone: 'warn', text: t('transfer.hist.state.interrupted') };
       case 'incomplete': return { tone: 'warn', text: t('transfer.hist.state.incomplete') };
       default: return { tone: 'neutral', text: t(`transfer.hist.state.${r.state}`) };
@@ -123,7 +125,7 @@
 
   // Blokada Xiaomi: dopóki zakładka jest na ekranie, program sam sprawdza telefon celu i gdy blokady już nie ma,
   // doinstaluje pominięte aplikacje (cicho: bez błędu na ekran).
-  const reinstallable = () => rows.filter((r) => !!r.number && r.appsBlocked && targetConnected(r));
+  const reinstallable = () => rows.filter(showReinstall);
   onMount(() => recheck(async () => {
     for (const r of reinstallable()) await ctl.reinstallWhenUnblockedFromHistory(r.number!);
   }, () => s.job === null && reinstallable().length > 0));

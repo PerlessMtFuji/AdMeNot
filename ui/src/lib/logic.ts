@@ -786,6 +786,8 @@ export interface TransferRow {
   target: { name: string | null; imei: string | null } | null;
   state: TransferOrderView['state'] | 'interrupted' | 'incomplete';
   notes: number;
+  /** `failed` po części wgrane (patrz `TransferOrderView.partial`). */
+  partial: boolean;
   /** Kopia, która jest albo była (dni do usunięcia / data usunięcia); null — brak kopii i daty. */
   copy: TransferOrderView['copy'];
   /** Widok kopii na dysku (notatka, przedłużanie, wznawianie); null — kopii już nie ma. */
@@ -803,14 +805,14 @@ export interface TransferRow {
 export function transferRows(orders: TransferOrderView[], copies: CopyView[]): TransferRow[] {
   const byId = new Map(copies.map((c) => [c.id, c]));
   const fromOrders = orders.map((o): TransferRow => ({ key: o.number, number: o.number, client: o.client, at: o.created_at,
-    source: o.source, target: o.target, state: o.state, notes: o.notes, copy: o.copy,
+    source: o.source, target: o.target, state: o.state, notes: o.notes, partial: !!o.partial, copy: o.copy,
     disk: o.copy && !o.copy.deleted_at ? byId.get(o.copy.id) ?? null : null,
     whatsappRestored: o.whatsapp_restored, appsBlocked: !!o.apps_blocked, targetSerial: o.target_serial ?? null,
     sourceSerial: o.copy && !o.copy.deleted_at ? byId.get(o.copy.id)?.serial ?? null : null, counts: o.counts }));
   const fromCopies = copies.filter((c) => !c.order).map((c): TransferRow => ({ key: c.id, number: null, client: c.client, at: c.created,
     source: { name: `${c.manufacturer} ${c.model}`.trim() || null, imei: null }, target: null,
     state: c.status === 'in_progress' ? 'interrupted' : c.status === 'incomplete' ? 'incomplete' : 'copy_ready',
-    notes: 0, copy: { id: c.id, days_left: c.days_left, deleted_at: null }, disk: c,
+    notes: 0, partial: false, copy: { id: c.id, days_left: c.days_left, deleted_at: null }, disk: c,
     whatsappRestored: false, appsBlocked: false, sourceSerial: c.serial, targetSerial: null, counts: c.counts }));
   return [...fromOrders, ...fromCopies].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
 }
@@ -857,14 +859,15 @@ export function telWrite(tel: TelPlanView | null, kind: TelKind): number | null 
   return tel[kind]?.write ?? null;
 }
 
-/** Aplikacje z kopii zaznaczone domyślnie: `default_on` (podejrzane nie) i bez powodu pominięcia. */
+/** Aplikacje z kopii zaznaczone domyślnie: `default_on` (podejrzane nie) i bez powodu pominięcia; szkodliwe nigdy. */
 export function defaultApps(apps: AppsPlanView | null): string[] {
-  return (apps?.items ?? []).filter((a) => a.default_on && !a.skip).map((a) => a.package);
+  return installableApps(apps).filter((a) => a.default_on).map((a) => a.package);
 }
 
-/** Pozycje planu aplikacji, które da się zainstalować (bez powodu pominięcia). */
+/** Pozycje planu aplikacji, które da się zainstalować: bez powodu pominięcia i nie szkodliwe (szkodliwych nie ma
+ *  w kopii, a silnik ich nie planuje — tu na wszelki wypadek). */
 export function installableApps(apps: AppsPlanView | null): AppsPlanItem[] {
-  return (apps?.items ?? []).filter((a) => !a.skip);
+  return (apps?.items ?? []).filter((a) => !a.skip && a.verdict !== 'malicious');
 }
 
 /** Wszystkie grupy z plikami i wszystkie inne foldery kopii (każdy był w niej wybrany); podejrzane APK odznaczone;

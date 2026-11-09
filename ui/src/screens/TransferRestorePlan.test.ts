@@ -270,5 +270,19 @@ describe('TransferRestorePlan', () => {
       expect(screen.getByRole('button', { name: /^Wgraj/ }).textContent).toMatch(/0,2 GB · ok\. \d+ min/);
       expect(screen.getByText(/kopię bezpieczeństwa/)).toBeTruthy();
     });
+
+    test('no telephony chosen: no promise of a safety copy', async () => {
+      const { s } = await show({ apps: APPS, plan: ONE_PHOTO, tel: null });
+      expect(s.transfer.restore.choice.tel).toEqual([]);
+      expect(screen.queryByText(/kopię bezpieczeństwa/)).toBeNull();
+    });
+
+    test('unticking every telephony kind hides the safety copy line', async () => {
+      await show({ apps: APPS, plan: ONE_PHOTO });
+      expect(screen.getByText(/kopię bezpieczeństwa/)).toBeTruthy();
+      await fireEvent.click(screen.getByRole('checkbox', { name: 'Kontakty' }));
+      await fireEvent.click(screen.getByRole('checkbox', { name: /SMS i MMS/ }));
+      expect(screen.queryByText(/kopię bezpieczeństwa/)).toBeNull();
+    });
   });
 });

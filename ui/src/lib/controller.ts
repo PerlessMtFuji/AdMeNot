@@ -57,6 +57,17 @@ export class Controller {
     }
   }
 
+  /** Odczyt w tle (auto-sprawdzanie co `RECHECK_MS`): błąd mostu nie podnosi karty błędu (`s.error`) — następna
+   *  próba za chwilę; jawne akcje serwisanta idą przez `call`. */
+  private async quiet<T>(promise: Promise<T | ApiError>): Promise<T | null> {
+    try {
+      const result = await promise;
+      return isApiError(result) ? null : result;
+    } catch {
+      return null;
+    }
+  }
+
   setJob(id: string, kind: string): void {
     if (!this.ended.has(id)) this.state.job = { id, kind };
   }
@@ -938,7 +949,7 @@ export class Controller {
   async checkExports(): Promise<void> {
     const s = this.state;
     if (s.phase !== 'transfer_choose' || !s.transfer.inventory || s.job) return;
-    const r = await this.call(this.api.transfer_exports_check());
+    const r = await this.quiet(this.api.transfer_exports_check());
     const prev = s.transfer.inventory;
     if (!r || !prev || s.phase !== 'transfer_choose') return;
     const next = { ...prev, ...r };
@@ -946,9 +957,9 @@ export class Controller {
     s.transfer.inventory = next;
   }
 
-  /** „Sprawdź ponownie”: serwisant właśnie zrobił kopię czatów WhatsApp na telefonie. */
+  /** Auto-sprawdzanie w tle (co `RECHECK_MS`): czy serwisant zrobił już kopię czatów WhatsApp na telefonie. Cichy. */
   async recheckWhatsapp(): Promise<void> {
-    const r = await this.call(this.api.transfer_whatsapp());
+    const r = await this.quiet(this.api.transfer_whatsapp());
     const inv = this.state.transfer.inventory;
     if (r && inv) this.state.transfer.inventory = { ...inv, whatsapp_backup: r.whatsapp_backup };
   }
@@ -1078,7 +1089,7 @@ export class Controller {
   async checkInstall(): Promise<void> {
     const s = this.state;
     if (s.phase !== 'transfer_restore_plan' || !s.transfer.restore.apps?.block || s.job) return;
-    const res = await this.call(this.api.install_check());
+    const res = await this.quiet(this.api.install_check());
     const apps = s.transfer.restore.apps;
     if (res && res.blocked === false && s.phase === 'transfer_restore_plan' && apps?.block) {
       s.transfer.restore.apps = { ...apps, block: null };

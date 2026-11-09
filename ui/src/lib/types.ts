@@ -775,6 +775,8 @@ export interface TransferOrderView {
   target: { name: string | null; imei: string | null } | null;
   state: 'copy_ready' | 'restored' | 'restored_notes' | 'failed' | 'expired';
   notes: number;
+  /** `failed`: przed przerwaniem coś już wgrano (Historia: „przerwane”, nie „nie wgrano”). */
+  partial?: boolean;
   /** Kopia, która jeszcze jest (dni do usunięcia) albo `deleted_at` po jej usunięciu; null — brak kopii i daty. */
   copy: { id: string; days_left: number; deleted_at: string | null } | null;
   whatsapp_restored: boolean;

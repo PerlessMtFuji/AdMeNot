@@ -189,7 +189,7 @@ for (const theme of ['light', 'dark'] as const) {
         await expect(page.getByRole('button', { name: /^Rozpocznij kopię/ })).toBeVisible();
         await expect(page).toHaveScreenshot(shot('choose'));
         await page.getByRole('button', { name: /^Rozpocznij kopię/ }).click();
-        await expect(page.getByRole('heading', { name: 'Kopia starego telefonu' })).toBeVisible({ timeout: 15_000 });
+        await expect(page.getByRole('heading', { name: 'Kopia gotowa' })).toBeVisible({ timeout: 15_000 });
         await expect(page.getByText('Podłącz nowy telefon')).toBeVisible();
         await expect(page).toHaveScreenshot(shot('copy-done'));
       });
