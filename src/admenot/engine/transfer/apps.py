@@ -360,9 +360,11 @@ class _Installer:
         for c in self.chosen:
             old = prior.get(c.package)
             if self.only_blocked:
-                if old is None or old[:2] != ("skipped", "user_restricted"):
-                    continue
-                todo.append((c, False))
+                # dokończenie: pominięte przez blokadę i odrzucone okna zgody MIUI (np. zamknięte restartem programu)
+                if old is not None and old[:2] == ("skipped", "user_restricted"):
+                    todo.append((c, False))
+                elif old is not None and old[:2] == ("failed", "no_consent"):
+                    todo.append((c, True))  # najpierw `pm list`: zgoda mogła przyjść po limicie
             elif old is None:
                 todo.append((c, False))
             elif old[0] == "pending" or old[:2] == ("failed", "disconnected"):

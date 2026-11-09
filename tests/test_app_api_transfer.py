@@ -1771,6 +1771,10 @@ def test_transfer_order_view_states(tmp_path):
         blocked = {**record.result, "apps": {"blocked": True, "failed": {}}}
         journal.save_transfer_result(order.id, blocked)
         assert transfer_order_view(order, journal.transfer(order.id), None, NOW)["apps_blocked"] is True
+        # dokończenie zatrzymane zamknięciem programu: `blocked: false`, ale pominięte przez blokadę zostały
+        stopped = {**record.result, "apps": {"blocked": False, "stopped": True, "skipped": {"user_restricted": 2}}}
+        journal.save_transfer_result(order.id, stopped)
+        assert transfer_order_view(order, journal.transfer(order.id), None, NOW)["apps_blocked"] is True
         journal.save_transfer_result(order.id, {**record.result, "apps": {"failed": {"no_space": 2}}})
         journal.set_order_status(order.id, "failed")
         assert transfer_order_view(journal.order(order.id), record, None, NOW)["state"] == "failed"

@@ -246,6 +246,26 @@ def test_only_blocked_installs_remaining(env):
     assert second.installed == 2 and second.exists == 1 and not second.blocked
 
 
+def test_only_blocked_retries_declined_miui_dialog(env):
+    # Okno zgody zamknięte restartem programu: `failed/no_consent`; dokończenie próbuje jeszcze raz,
+    # a aplikacji z innym błędem (brak miejsca) nie rusza.
+    env.add("com.a.one", "Alpha")
+    env.add("com.b.two", "Beta")
+    env.add("com.c.three", "Gamma")
+    env.run(env.plan())
+    env.state.app_set("com.a.one", "failed", "no_consent", "INSTALL_FAILED_USER_RESTRICTED")
+    env.state.app_set("com.b.two", "skipped", "user_restricted", None)
+    env.state.app_set("com.c.three", "failed", "no_space", "INSTALL_FAILED_INSUFFICIENT_STORAGE")
+    for p in ("com.a.one", "com.b.two", "com.c.three"):
+        env.phone.installed.discard(p)
+    env.phone.host_commands.clear()
+    res = env.run(env.plan(), only_blocked=True)
+    assert sorted(Path(c[-1]).parent.parent.name for c in env.phone.host_commands) == ["com.a.one", "com.b.two"]
+    by = {r["package"]: (r["status"], r.get("reason")) for r in res.rows}
+    assert by["com.a.one"] == ("installed", None) and by["com.b.two"] == ("installed", None)
+    assert by["com.c.three"] == ("failed", "no_space")
+
+
 def test_disconnect_mid_install_resumes_without_double(env):
     env.add("com.a.one", "Alpha")
     env.add("com.b.two", "Beta")

@@ -635,6 +635,11 @@ def result_notes(result: dict[str, Any] | None) -> int:
     return notes
 
 
+def _apps_waiting(apps: dict[str, Any]) -> bool:
+    """Aplikacje do doinstalowania po blokadzie Xiaomi (wynik etapu „Aplikacje” zlecenia)."""
+    return bool(apps.get("blocked") or (apps.get("skipped") or {}).get("user_restricted"))
+
+
 def transfer_order_view(order: Order, rec: TransferRecord, meta: CopyMeta | None,
                         now: datetime, running: bool = False) -> dict[str, Any]:
     """Zlecenie ZS przeniesienia danych w Historii. `state`: `expired`/`failed` ze statusu zlecenia;
@@ -673,5 +678,7 @@ def transfer_order_view(order: Order, rec: TransferRecord, meta: CopyMeta | None
             # przerwane po części: coś już wgrano (Historia: „przerwane” zamiast „nie wgrano”)
             "partial": any((rec.result or {}).get(k) for k in ("files", "tel", "apps")),
             "target_serial": rec.target_serial,
-            "apps_blocked": bool(((rec.result or {}).get("apps") or {}).get("blocked")),
+            # czeka na doinstalowanie: blokada albo pominięte przez nią aplikacje, które zostały po
+            # zatrzymanym dokończeniu (zamknięcie programu w trakcie zapisuje `blocked: false`)
+            "apps_blocked": _apps_waiting((rec.result or {}).get("apps") or {}),
             "counts": dict(rec.source.get("counts") or {})}
