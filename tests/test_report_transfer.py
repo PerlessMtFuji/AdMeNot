@@ -285,7 +285,8 @@ def test_deselected_synced_contacts_are_ok_with_sync_wording(journal):
                      tel_plan={"contacts": {"write": 0, "existing": 12, "synced": 400, "messenger": 0}})
     p = build_transfer_protocol(journal, _order(journal, _result(tel=tel, choice=choice)).id, "pl", NOW)
     contacts = next(t for t in p.tiles if t.key == "contacts")
-    assert contacts.tone == "ok" and "synchronizacją" in contacts.state
+    # całość na górze, podział pod spodem — nie „12 z 412”, które wygląda na zgubione kontakty
+    assert contacts.tone == "ok" and contacts.count == "412" and contacts.state == "✓ 12 wgrano, 400 z konta"
     assert p.tone == "ok" and p.headline == "Dane przeniesione."
     assert "nie wgrano" not in _html(p) and "przerwane" not in _html(p)
 

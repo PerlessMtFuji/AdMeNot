@@ -116,8 +116,9 @@ def _tel_tile(t: dict[str, Any], key: str, kinds: tuple[str, ...], counts: dict[
         return Tile(key, count, st["not_chosen"], "mut")
     if done + synced < total:
         return Tile(key, count, st["remaining"].format(n=total - done - synced), "warn")
-    if synced:
-        return Tile(key, count, st["synced"].format(n=synced), "ok")
+    if synced:  # całość na górze („412”), nie „12 z 412” — reszta nie zginęła, wróci z konta (decyzja autora)
+        state = st["synced"] if done else st["synced_only"]
+        return Tile(key, num(total), state.format(n=num(synced), done=num(done)), "ok")
     if done and not sum(r["written"] for r in results):
         return Tile(key, count, st["existed"], "ok")
     return Tile(key, count, st["all"], "ok")
