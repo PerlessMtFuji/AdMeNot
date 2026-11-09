@@ -10,7 +10,8 @@ najpierw sprawdzamy `pm list packages`.
 Zgoda na ekranie telefonu: `install` czeka do `INSTALL_TIMEOUT`; odmowa albo limit czasu to
 `failed/no_consent`, kolejne aplikacje lecą dalej. `INSTALL_FAILED_USER_RESTRICTED` (Xiaomi „Instaluj
 przez USB”) blokuje resztę: reszta wybranych kończy jako `skipped/user_restricted`, a `only_blocked`
-doinstaluje później tylko je.
+doinstaluje później tylko je. Wyjątek: ustawienie odczytane jako włączone — wtedy ten kod to odrzucone
+okno zgody MIUI przy tej jednej aplikacji (`failed/no_consent`).
 """
 
 from __future__ import annotations
@@ -135,10 +136,17 @@ def _int(value: object) -> int | None:
         return None
 
 
+_MIUI_PROPS = ("ro.miui.ui.version.name", "ro.mi.os.version.name")
+
+
 def xiaomi_install_blocked(adb: AppInstallAdb) -> bool | None:
-    """`persist.security.adbinstall`: `0` -> zablokowane, `1` -> dozwolone, inaczej nieznane (nie blokujemy)."""
+    """`persist.security.adbinstall`: `0` -> zablokowane, `1` -> dozwolone. Brak wartości na MIUI/HyperOS też
+    znaczy zablokowane: telefon dopisuje ją dopiero po pierwszym włączeniu „Instaluj przez USB” (test na
+    Redmi Note 11, MIUI 13). Poza tym — nieznane (nie blokujemy)."""
     try:
         value = adb.shell("getprop persist.security.adbinstall").strip()
+        if value == "" and any(adb.shell(f"getprop {p}").strip() for p in _MIUI_PROPS):
+            return True
     except AdbError:
         return None
     return {"0": True, "1": False}.get(value)
@@ -310,6 +318,11 @@ class _Installer:
                 self.installer = None  # telefon nie przyjmuje `-i`: ta aplikacja jeszcze raz, reszta też bez
                 continue
             if error == "user_restricted":
+                # MIUI daje ten sam kod, gdy serwisant odrzuci (albo przegapi) okno zgody przy jednej aplikacji.
+                # Ustawienie wciąż włączone (`1`) -> to odmowa dla tej aplikacji, reszta idzie dalej.
+                if xiaomi_install_blocked(self.adb) is False:
+                    self._set(c.package, "failed", "no_consent", code)
+                    return False
                 self._set(c.package, "skipped", error, code)
                 return True
             if self._present(c.package):  # wcześniejsza sesja instalacji (stare okno zgody) mogła ją dokończyć

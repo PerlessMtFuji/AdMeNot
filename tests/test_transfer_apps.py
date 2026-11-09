@@ -131,6 +131,27 @@ def test_xiaomi_blocked_from_prop(env, value, expected):
     assert env.plan(_device(manufacturer="Xiaomi")).block == expected
 
 
+@pytest.mark.parametrize("miui_prop", ["ro.miui.ui.version.name", "ro.mi.os.version.name"])
+def test_missing_prop_on_miui_means_blocked(env, miui_prop):
+    # Redmi Note 11 (MIUI 13): bez wartości, dopóki serwisant ani razu nie włączy „Instaluj przez USB”
+    env.phone.props[miui_prop] = "V130"
+    assert A.xiaomi_install_blocked(env.adb) is True
+    env.phone.props["persist.security.adbinstall"] = "1"
+    assert A.xiaomi_install_blocked(env.adb) is False
+
+
+def test_declined_miui_dialog_fails_one_app_not_the_rest(env):
+    # Ustawienie włączone, a instalacja i tak `USER_RESTRICTED`: odrzucone/przegapione okno zgody MIUI.
+    env.add("com.a.one", "Alpha")
+    env.add("com.b.two", "Beta")
+    env.phone.props["persist.security.adbinstall"] = "1"
+    env.phone.install_blocked = True
+    res = env.run(env.plan(_device(manufacturer="Xiaomi")))
+    assert not res.blocked and res.skipped == {}
+    assert len(env.phone.host_commands) == 2
+    assert {(r["status"], r["reason"]) for r in res.rows} == {("failed", "no_consent")}
+
+
 def test_xiaomi_prop_ignored_on_other_makers_and_helper(env):
     env.phone.props["persist.security.adbinstall"] = "0"
     assert A.xiaomi_install_blocked(env.adb) is True
