@@ -1922,6 +1922,21 @@ describe('data transfer — after a copy', () => {
     expect(restorePlans(env.bridge)[0].args).toEqual([copy.id, NEW]);
   });
 
+  test('waits for the backup job to end before planning (the plan would get busy)', async () => {
+    const env = setup('transfer');
+    await env.ctl.init();
+    env.bridge.emit('devices', { devices: [dev(OLD), dev(NEW)], error: null });
+    env.ctl.selectDevice(OLD);
+    env.s.job = { id: 'j-backup', kind: 'backup' };
+    env.bridge.emit('transfer:done', { result, copy });
+    await flush();
+    expect(restorePlans(env.bridge)).toHaveLength(0);
+    expect(env.s.phase).toBe('transfer_done');
+    env.bridge.emit('job:end', { job_id: 'j-backup', kind: 'backup' });
+    await vi.waitFor(() => expect(restorePlans(env.bridge)).toHaveLength(1));
+    expect(restorePlans(env.bridge)[0].args).toEqual([copy.id, NEW]);
+  });
+
   test('an incomplete copy also leads to the new phone', async () => {
     const { bridge } = await finished({ status: 'incomplete' });
     bridge.emit('devices', { devices: [dev(OLD), dev(NEW)], error: null });

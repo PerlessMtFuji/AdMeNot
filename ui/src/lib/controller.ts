@@ -17,6 +17,8 @@ const REINSTALL_TRANSIENT = ['disconnected', 'offline', 'timeout', 'adb_error', 
 
 export class Controller {
   private ended = new Set<string>();
+  /** Telefony do przejścia „Kopia gotowa → plan wgrywania”, odłożone do końca zadania kopii. */
+  private offerAfterBackup: string[] | null = null;
   private knownLoaded = false;
   private autoMirrored = new Set<string>();
   /** Wybór serwisanta sprzed ponownego planu po `transfer_phone_full` — nowy plan go zachowuje (przycięty). */
@@ -136,6 +138,11 @@ export class Controller {
     const s = this.state;
     const copy = s.transfer.copy;
     if (fresh.length === 0 || s.phase !== 'transfer_done' || !copy || copy.status === 'in_progress' || s.transfer.result?.status === 'stopped') return;
+    // `transfer:done` przychodzi jeszcze z wnętrza zadania kopii: plan teraz dostałby „busy” — czekamy na `job:end`.
+    if (s.job?.kind === 'backup') {
+      this.offerAfterBackup = [...(this.offerAfterBackup ?? []), ...fresh];
+      return;
+    }
     const others = s.devices.filter((e) => e.state === 'device' && e.serial !== copy.serial);
     if (others.length !== 1 || !fresh.includes(others[0].serial)) return;
     this.selectDevice(others[0].serial);
@@ -407,6 +414,11 @@ export class Controller {
       }
       if (s.job?.id === d.job_id) s.job = null;
       if (d.kind === 'transfer_scan') this.continueResume();
+      if (d.kind === 'backup' && this.offerAfterBackup) {
+        const fresh = this.offerAfterBackup;
+        this.offerAfterBackup = null;
+        this.offerRestoreToNewPhone(fresh);
+      }
     });
     on('update:state', (d) => { s.update = d; });
     // Wątek telemetrii usunął dane z serwera po cofnięciu zgody — baner „czeka na połączenie” znika.
