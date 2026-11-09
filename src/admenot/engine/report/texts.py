@@ -239,7 +239,7 @@ TRANSFER_TEXTS: dict[str, dict[str, Any]] = {
             "malicious": "pominięto jako szkodliwe: {n}",
             "suspicious": "pominięto jako podejrzane: {n}",
             "wa_restored": "✓ Czaty przywrócone",
-            "wa_pending": "✓ Kopia czatów wgrana — przywraca się po zalogowaniu",
+            "wa_pending": "Kopia czatów na telefonie — czaty jeszcze nieprzywrócone",
         },
         "headline": {
             "done": "Dane przeniesione.",
@@ -314,7 +314,7 @@ TRANSFER_TEXTS: dict[str, dict[str, Any]] = {
             "malicious": "skipped as harmful: {n}",
             "suspicious": "skipped as suspicious: {n}",
             "wa_restored": "✓ Chats restored",
-            "wa_pending": "✓ Chat backup restored to the phone — restores after login",
+            "wa_pending": "Chat backup on the phone — chats not restored yet",
         },
         "headline": {
             "done": "Data transferred.",

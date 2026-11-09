@@ -176,9 +176,9 @@
               </div>
             </div>
             <div class="flex flex-none justify-end min-[900px]:w-[136px]"><Pill tone={p.tone}>{p.text}</Pill></div>
-            <div class="flex flex-none justify-end min-[900px]:w-[190px]">
+            <div class="flex min-w-0 max-w-[190px] flex-none justify-end min-[900px]:w-[190px]">
               {#if topReport(r)}
-                <ReportButton order={r.number!} variant="secondary" size="sm" label={t('transfer.hist.report')} />
+                <ReportButton order={r.number!} variant="secondary" size="sm" label={t('transfer.hist.report')} compact />
               {:else if canUpload(r)}
                 <Button variant="secondary" size="sm" onclick={() => ctl.planRestore(r.disk!.id)}>
                   <Icon name="smartphone" size={14} />{t('transfer.hist.to_phone')}

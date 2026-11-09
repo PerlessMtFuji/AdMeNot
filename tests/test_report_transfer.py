@@ -95,7 +95,10 @@ def test_green_protocol_all_ok(journal):
     p = build_transfer_protocol(journal, order.id, "pl", NOW)
     assert p.tone == "ok"
     assert [t.key for t in p.tiles] == ["contacts", "sms", "calls", "photos", "downloads", "whatsapp"]
-    assert len(p.tiles) == 6 and all(t.tone == "ok" and "✓" in t.state for t in p.tiles)
+    assert len(p.tiles) == 6 and all(t.tone == "ok" for t in p.tiles)
+    # ✓ tylko przy tym, co naprawdę wróciło; WhatsApp bez potwierdzenia serwisanta go nie ma
+    assert all("✓" in t.state for t in p.tiles if t.key != "whatsapp")
+    assert "✓" not in next(t for t in p.tiles if t.key == "whatsapp").state
     assert p.apps_installed == p.apps_total == 2
     assert p.copy_until.isoformat() == "2026-11-15"
     assert "Serwis GSM" in _html(p) and "Anna K." in _html(p)
@@ -158,6 +161,7 @@ def test_partial_category_is_warn(journal):
 def test_whatsapp_restored_drops_client_hint(journal):
     pending = build_transfer_protocol(journal, _order(journal, _result()).id, "pl", NOW)
     assert pending.whatsapp == "on_phone" and "Przywróć" in _html(pending)
+    assert "Czaty przywrócone" not in _html(pending) and "jeszcze nieprzywrócone" in _html(pending)
     done = build_transfer_protocol(journal, _order(journal, _result(), whatsapp=True).id, "pl", NOW)
     assert done.whatsapp == "restored"
     html = _html(done)
