@@ -261,3 +261,82 @@ def test_unselected_category_has_no_tile(journal):
     src2 = {**SOURCE, "counts": {k: v for k, v in SOURCE["counts"].items() if k != "calls"}}
     p2 = build_transfer_protocol(journal, _order(journal, _result(), source=src2).id, "pl", NOW)
     assert "calls" not in [t.key for t in p2.tiles]
+
+
+# --- wybór przy wgrywaniu (`choice`): odznaczone kategorie to nie porażka ---------------------------
+def _choice(groups=("photos", "videos", "downloads", "whatsapp"), tel=("contacts", "sms", "mms", "calls"), apps=2,
+            tel_plan=None):
+    plan = {"contacts": {"write": 412, "existing": 0, "synced": 0, "messenger": 0},
+            "sms": {"write": 8000, "existing": 0, "synced": 0, "messenger": 0},
+            "mms": {"write": 230, "existing": 0, "synced": 0, "messenger": 0},
+            "calls": {"write": 980, "existing": 0, "synced": 0, "messenger": 0}}
+    plan.update(tel_plan or {})
+    return {"groups": list(groups), "tel": list(tel), "apps": apps, "tel_plan": plan}
+
+
+def test_deselected_synced_contacts_are_ok_with_sync_wording(journal):
+    tel = _tel()
+    del tel["kinds"]["contacts"]
+    choice = _choice(tel=("sms", "mms", "calls"),
+                     tel_plan={"contacts": {"write": 0, "existing": 12, "synced": 400, "messenger": 0}})
+    p = build_transfer_protocol(journal, _order(journal, _result(tel=tel, choice=choice)).id, "pl", NOW)
+    contacts = next(t for t in p.tiles if t.key == "contacts")
+    assert contacts.tone == "ok" and "synchronizacją" in contacts.state
+    assert p.tone == "ok" and p.headline == "Dane przeniesione."
+    assert "nie wgrano" not in _html(p) and "przerwane" not in _html(p)
+
+
+def test_deselected_tel_kind_with_records_is_neutral(journal):
+    tel = _tel()
+    del tel["kinds"]["calls"]
+    choice = _choice(tel=("contacts", "sms", "mms"))
+    p = build_transfer_protocol(journal, _order(journal, _result(tel=tel, choice=choice)).id, "pl", NOW)
+    calls = next(t for t in p.tiles if t.key == "calls")
+    assert calls.tone == "mut" and calls.state == "nie wybrano do wgrania"
+    assert p.tone == "ok" and "nie wgrano" not in _html(p)
+
+
+def test_deselected_file_group_is_no_failure(journal):
+    files = _files(groups={g: v for g, v in _files()["groups"].items() if g != "downloads"})
+    files["groups"]["downloads"] = {"done": 0, "exists": 0, "skipped": 312, "failed": 0}
+    choice = _choice(groups=("photos", "videos", "whatsapp"))
+    p = build_transfer_protocol(journal, _order(journal, _result(files=files, choice=choice)).id, "pl", NOW)
+    assert "downloads" not in [t.key for t in p.tiles]
+    assert p.tone == "ok" and all(t.tone == "ok" for t in p.tiles)
+
+
+def test_deselected_member_of_tile_not_counted(journal):
+    files = _files()
+    files["groups"]["videos"] = {"done": 0, "exists": 0, "skipped": 210, "failed": 0}
+    choice = _choice(groups=("photos", "downloads", "whatsapp"))
+    p = build_transfer_protocol(journal, _order(journal, _result(files=files, choice=choice)).id, "pl", NOW)
+    photos = next(t for t in p.tiles if t.key == "photos")
+    assert photos.tone == "ok" and photos.count == "14 000 z 14 000"
+
+
+def test_no_files_chosen_has_no_file_tiles(journal):
+    choice = _choice(groups=())
+    p = build_transfer_protocol(journal, _order(journal, _result(files=None, choice=choice)).id, "pl", NOW)
+    assert [t.key for t in p.tiles] == ["contacts", "sms", "calls"] and p.tone == "ok"
+
+
+def test_zero_apps_chosen_has_no_apps_failure(journal):
+    choice = _choice(apps=0)
+    src = {**SOURCE, "counts": {**SOURCE["counts"], "apps": 5}}
+    order = _order(journal, _result(apps=None, choice=choice), source=src)
+    p = build_transfer_protocol(journal, order.id, "pl", NOW)
+    assert p.tone == "ok" and p.apps_total == 0
+    html = _html(p)
+    assert "Aplikacje nie zostały wgrane" not in html and p.headline == "Dane przeniesione."
+
+
+def test_interrupted_chosen_stage_still_bad(journal):
+    choice = _choice()
+    result = _result(tel=None, apps=None, status="failed", choice=choice)
+    p = build_transfer_protocol(journal, _order(journal, result, status="failed").id, "pl", NOW)
+    assert p.tone == "bad" and p.headline.startswith("Wgrywanie przerwane")
+    assert next(t for t in p.tiles if t.key == "contacts").tone == "bad"
+    assert p.apps_total == 2 and p.apps_installed == 0
+    done = _result(apps=None, choice=choice)  # zapisany jako done, ale wybranych aplikacji nie ma
+    q = build_transfer_protocol(journal, _order(journal, done).id, "pl", NOW)
+    assert q.tone == "warn" and "Aplikacje nie zostały wgrane" in q.headline

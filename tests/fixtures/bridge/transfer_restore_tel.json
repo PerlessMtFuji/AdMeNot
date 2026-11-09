@@ -2658,14 +2658,15 @@
        "name": "samsung SM-A546B",
        "imei": "861485069821024"
       },
-      "state": "restored",
-      "notes": 0,
+      "state": "restored_notes",
+      "notes": 1,
       "copy": {
        "id": "R58T00TEST-90fae0b8e3f0/20260926-143000",
        "days_left": 7,
        "deleted_at": null
       },
       "whatsapp_restored": false,
+      "partial": true,
       "target_serial": "R58W20NEW01",
       "apps_blocked": false,
       "counts": {

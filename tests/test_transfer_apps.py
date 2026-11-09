@@ -102,6 +102,18 @@ def test_plan_marks_installed_too_old_no_abi(env):
     assert plan.block is None
 
 
+def test_plan_never_offers_malicious_apps(env):
+    """Szkodliwe nie trafiają do kopii (Etap 1); gdyby jednak tam były — plan ich nie zawiera, więc
+    `run_install` ich nie zainstaluje nawet wskazanych z nazwy."""
+    env.add("com.a.ok", "Ok")
+    env.add("com.b.mal", "Mal", verdict="malicious")
+    plan = env.plan()
+    assert [c.package for c in plan.apps] == ["com.a.ok"]
+    res = env.run(plan, packages={"com.a.ok", "com.b.mal"})
+    assert "com.b.mal" not in env.phone.installed
+    assert [r["package"] for r in res.rows] == ["com.a.ok"]
+
+
 def test_plan_too_new_and_old_only_on_sdk_34(env):
     env.add("com.a.x", "X")
     env.sdk["com.a.x"] = (30, 30)

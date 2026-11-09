@@ -45,6 +45,7 @@ from admenot.app.present import (
     history_view,
     inventory_view,
     plan_view,
+    restore_choice_view,
     restore_plan_view,
     restore_result_view,
     result_view,
@@ -357,7 +358,8 @@ def _upload_choice(value: Any, plan: RestorePlan, apps_plan: AppsPlan | None = N
         raise AppError("bad_request", "choice")
     known = set(UPLOAD_GROUPS) | {g for g in plan.groups if g.startswith("other:")}
     apks = {f.remote for f in plan.files if f.apk is not None}
-    packages = {c.package for c in apps_plan.apps} if apps_plan is not None else set()
+    packages = ({c.package for c in apps_plan.apps if c.verdict != "malicious"}  # szkodliwych nigdy nie instalujemy
+                if apps_plan is not None else set())
     if (not lists["groups"] <= known or not lists["apks_on"] <= apks or not lists["tel"] <= TEL_KINDS
             or not lists["apps"] <= packages):
         raise AppError("bad_request", "choice")
@@ -2132,6 +2134,8 @@ class Api(ExplorerMixin):
         raw = self._host.with_serial(serial)  # odpytywanie `get-state` bez wpisu w logu co sekundę
 
         apps_plan = self._restore_apps
+        # wybór do wyniku w dzienniku: protokół nie nazywa porażką kategorii, których serwisant nie wybrał
+        choice_view = restore_choice_view(chosen.groups, engine_tel_kinds(chosen.tel), len(chosen.apps), tel_plan)
 
         def run(job: Job) -> None:
             self._restore_copy_id = copy_id
@@ -2168,7 +2172,7 @@ class Api(ExplorerMixin):
                         for stage in ("files", "tel", "apps"):
                             saved.setdefault(stage, None)
                         save(status="running", started_at=self._now().isoformat(timespec="seconds"),
-                             finished_at=None, tel_error=None, apps_error=None)
+                             finished_at=None, tel_error=None, apps_error=None, choice=choice_view)
                     if chosen.tel:
                         self._note_tel_pending(copy, serial, tel_plan, chosen.tel)
                     if chosen.apps:

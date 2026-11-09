@@ -564,6 +564,24 @@ def tel_plan_view(p: TelPlan) -> dict[str, Any]:
             "readable": dict(p.readable)}
 
 
+def restore_choice_view(groups: frozenset[str], tel_kinds: frozenset[str], apps: int,
+                        plan: TelPlan) -> dict[str, Any]:
+    """Wybór serwisanta przy starcie wgrywania do wyniku w dzienniku (protokół: kategoria odznaczona to nie
+    porażka). `tel` w kategoriach silnika (`sms` z MMS); `tel_plan` — co plan wiedział o każdej kategorii
+    kopii: ile do zapisu, ile już na telefonie, ile przyjdzie z synchronizacją konta / z komunikatora."""
+    src, c = plan.sources, plan.contacts
+    known: dict[str, dict[str, int]] = {}
+    if src.contacts is not None and c is not None:
+        known["contacts"] = {"write": len(c.write), "existing": plan.existing.get("contacts", 0),
+                             "synced": sum(c.skipped_synced.values()), "messenger": c.skipped_messenger}
+    for name, present, records in (("sms", src.sms, plan.sms), ("mms", src.mms, plan.mms),
+                                   ("calls", src.calls, plan.calls)):
+        if present is not None:
+            known[name] = {"write": len(records), "existing": plan.existing.get(name, 0), "synced": 0,
+                           "messenger": 0}
+    return {"groups": sorted(groups), "tel": sorted(tel_kinds), "apps": apps, "tel_plan": known}
+
+
 def tel_result_view(r: TelResult) -> dict[str, Any]:
     """Wynik telefonii: liczby per kategoria, kopia bezpieczeństwa, pliki do ręcznego importu (sama nazwa
     pliku w `Pobranych`), przywrócenie telefonu (`cleanup.ok`) i konta pominiętych kontaktów (tylko UI)."""
@@ -591,19 +609,29 @@ def apps_result_view(r: AppsResult) -> dict[str, Any]:
     return asdict(r)
 
 
+# pominięcia aplikacji, które protokół pokazuje na żółto (inaczej niż „już jest”)
+_NOTED_APP_SKIPS = ("user_restricted", "too_old", "too_new", "no_abi")
+
+
 def result_notes(result: dict[str, Any] | None) -> int:
-    """Liczba uwag do wyniku wgrywania: aplikacje z błędem + grupy plików z błędami + kategorie telefonii
-    z błędami + błąd całej telefonii. Pominięcia (np. aplikacja już jest) uwagą nie są."""
+    """Liczba uwag do wyniku wgrywania — to, co protokół pokazuje na żółto: aplikacje z błędem albo pominięte
+    z powodu blokady / za stare / za nowe / bez wersji dla procesora + grupy plików z błędami + kategorie
+    telefonii z błędami albo do ręcznego importu + błąd całej telefonii. „Już jest” uwagą nie jest, a kategorie
+    niewybrane przy wgrywaniu nie mają wyniku, więc też nie."""
     if not result:
         return 0
     notes = 0
     files = result.get("files") or {}
     notes += sum(1 for g in (files.get("groups") or {}).values() if g.get("failed"))
     tel = result.get("tel") or {}
-    notes += sum(1 for k in (tel.get("kinds") or {}).values() if k.get("failed"))
+    kinds = tel.get("kinds") or {}
+    notes += sum(1 for k in kinds.values() if k.get("failed"))
+    manual = {m.get("kind") for m in tel.get("manual") or ()} | {n for n, k in kinds.items() if k.get("manual")}
+    notes += len({n for n in manual if not (kinds.get(n) or {}).get("failed")})
     notes += 1 if result.get("tel_error") else 0
     apps = result.get("apps") or {}
     notes += sum((apps.get("failed") or {}).values())
+    notes += sum((apps.get("skipped") or {}).get(r, 0) for r in _NOTED_APP_SKIPS)
     return notes
 
 
@@ -612,7 +640,8 @@ def transfer_order_view(order: Order, rec: TransferRecord, meta: CopyMeta | None
     """Zlecenie ZS przeniesienia danych w Historii. `state`: `expired`/`failed` ze statusu zlecenia;
     bez telefonu docelowego albo z wgrywaniem w toku — `copy_ready`; po wgraniu `restored` albo
     `restored_notes` (`notes` > 0, patrz `result_notes`). Zlecenie `running` z celem i zapisanym wynikiem,
-    którego wgrywanie nie trwa (`running` — zadanie dla tego zlecenia), to przerwane (program zamknięty): `failed`. `copy`: kopia, która jeszcze jest (dni do
+    którego wgrywanie nie trwa (`running` — zadanie dla tego zlecenia), to przerwane (program zamknięty):
+    `failed`; `partial` — czy przed przerwaniem coś wgrano. `copy`: kopia, która jeszcze jest (dni do
     usunięcia) albo `deleted_at` po jej usunięciu; `None` — brak kopii i brak daty."""
     notes = result_notes(rec.result)
     if order.status == "expired":
@@ -641,6 +670,8 @@ def transfer_order_view(order: Order, rec: TransferRecord, meta: CopyMeta | None
             "created_at": order.created_at.isoformat(timespec="seconds"),
             "source": phone(rec.source) or {"name": None, "imei": None}, "target": phone(rec.target),
             "state": state, "notes": notes, "copy": copy, "whatsapp_restored": rec.whatsapp_restored,
+            # przerwane po części: coś już wgrano (Historia: „przerwane” zamiast „nie wgrano”)
+            "partial": any((rec.result or {}).get(k) for k in ("files", "tel", "apps")),
             "target_serial": rec.target_serial,
             "apps_blocked": bool(((rec.result or {}).get("apps") or {}).get("blocked")),
             "counts": dict(rec.source.get("counts") or {})}

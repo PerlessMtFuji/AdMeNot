@@ -611,6 +611,30 @@ def test_app_install_guard(tmp_path):
     assert len(rec.calls) == len(ok) + 1
 
 
+def test_app_install_guard_one_app_version_per_command(tmp_path):
+    """Jedno `install`/`install-multiple` = pliki jednego katalogu `apps/<pakiet>/<wersja>/`."""
+    from admenot.engine.transfer.guard import AppInstallAdb
+
+    root = tmp_path / "apps"
+    for d in ("com.a.b/1", "com.a.b/2", "com.c.d/1"):
+        (root / d).mkdir(parents=True)
+        (root / d / "base.apk").write_bytes(b"x")
+    (root / "com.a.b" / "1" / "split.apk").write_bytes(b"y")
+    (root / "loose.apk").write_bytes(b"z")
+    (root / "com.a.b" / "flat.apk").write_bytes(b"z")
+    rec = Recorder()
+    adb = AppInstallAdb(rec, root)
+    adb.run(["install-multiple", str(root / "com.a.b/1/base.apk"), str(root / "com.a.b/1/split.apk")])
+    for args in (
+        ["install-multiple", str(root / "com.a.b/1/base.apk"), str(root / "com.c.d/1/base.apk")],
+        ["install-multiple", str(root / "com.a.b/1/base.apk"), str(root / "com.a.b/2/base.apk")],
+        ["install", str(root / "loose.apk")], ["install", str(root / "com.a.b/flat.apk")],
+    ):
+        with pytest.raises(UnsafeCommand):
+            adb.run(args)
+    assert len(rec.calls) == 1
+
+
 def test_app_install_guard_rejects_relative_paths(tmp_path, monkeypatch):
     from admenot.engine.transfer.guard import AppInstallAdb
 

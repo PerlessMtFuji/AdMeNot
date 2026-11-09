@@ -1153,6 +1153,7 @@
        "deleted_at": null
       },
       "whatsapp_restored": false,
+      "partial": false,
       "target_serial": null,
       "apps_blocked": false,
       "counts": {
@@ -2118,14 +2119,15 @@
        "name": "xiaomi Redmi Note 12",
        "imei": "861485069821024"
       },
-      "state": "restored",
-      "notes": 0,
+      "state": "restored_notes",
+      "notes": 2,
       "copy": {
        "id": "R58T00TEST-90fae0b8e3f0/20260926-143000",
        "days_left": 7,
        "deleted_at": null
       },
       "whatsapp_restored": false,
+      "partial": true,
       "target_serial": "R58W20NEW01",
       "apps_blocked": true,
       "counts": {

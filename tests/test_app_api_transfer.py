@@ -1800,6 +1800,41 @@ def test_whatsapp_view_rules(tmp_path):
     assert _whatsapp_view(UploadChoice(frozenset({"photos"}), frozenset()), base, None, None, copy, NEW) is None
 
 
+def test_restore_result_keeps_choice_for_protocol(tmp_path):
+    """Wybór ze startu wgrywania trafia do wyniku w dzienniku: protokół nie nazywa porażką odznaczonej
+    telefonii ani aplikacji (domyślna ścieżka: np. kontakty w całości z synchronizacji konta)."""
+    from admenot.engine.report.transfer_model import build_transfer_protocol
+
+    api, rec, _host, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+    api.start_restore(CHOICE)
+    assert api._jobs.wait(5)
+    with api._journal() as journal:
+        ((order, record),) = journal.transfer_orders()
+        choice = record.result["choice"]
+        assert choice["groups"] == sorted(CHOICE["groups"]) and choice["tel"] == [] and choice["apps"] == 0
+        assert set(choice["tel_plan"]) <= {"contacts", "sms", "mms", "calls"}
+        p = build_transfer_protocol(journal, order.id, "pl", NOW)
+    assert p.tone == "ok" and not any(t.tone == "bad" for t in p.tiles)
+    assert {t.key: t.tone for t in p.tiles}["contacts"] == "mut"  # telefonia nie wybrana: bez oceny
+    assert p.apps_total == 0
+
+
+def test_upload_choice_rejects_malicious_apps():
+    from types import SimpleNamespace
+
+    from admenot.app.api import AppError, _upload_choice
+    from admenot.engine.transfer.apps import AppCandidate, AppsPlan
+
+    plan = SimpleNamespace(groups={}, files=[])
+    apps = AppsPlan([AppCandidate("com.ok", "Ok", 1, 1, "clean", True, None, ()),
+                     AppCandidate("com.mal", "Mal", 1, 1, "malicious", False, None, ())], None)
+    base = {"groups": [], "apks_on": [], "verify_hash": False}
+    assert _upload_choice({**base, "apps": ["com.ok"]}, plan, apps).apps == frozenset({"com.ok"})
+    with pytest.raises(AppError):
+        _upload_choice({**base, "apps": ["com.mal"]}, plan, apps)
+
+
 def test_interrupted_running_order_is_failed_in_view(tmp_path):
     from admenot.app.present import transfer_order_view
 

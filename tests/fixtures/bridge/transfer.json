@@ -1093,6 +1093,7 @@
        "deleted_at": null
       },
       "whatsapp_restored": false,
+      "partial": false,
       "target_serial": null,
       "apps_blocked": false,
       "counts": {

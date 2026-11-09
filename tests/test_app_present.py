@@ -555,3 +555,36 @@ def test_result_notes_counts_failures_only():
               "tel": {"kinds": {"sms": {"failed": 1}, "calls": {"failed": 0}}},
               "apps": {"failed": {"no_space": 1, "failed": 1}, "skipped": {"installed": 4}}}
     assert result_notes(result) == 1 + 1 + 2
+
+
+def test_result_notes_count_what_the_protocol_shows_yellow():
+    """Pominięcia przez blokadę / za stara / za nowa / brak ABI i pliki do ręcznego importu to uwagi jak
+    w protokole; „już jest” i kategorie niewybrane (bez wyniku) — nie."""
+    from admenot.app.present import result_notes
+
+    result = {"tel": {"kinds": {"contacts": {"failed": 0, "manual": 412}, "sms": {"failed": 0, "manual": 0}},
+                      "manual": [{"kind": "contacts", "name": "kontakty.vcf"}, {"kind": "calls", "name": "c.xml"}]},
+              "apps": {"failed": {}, "skipped": {"installed": 4, "user_restricted": 2, "too_old": 1, "too_new": 1,
+                                                 "no_abi": 1}},
+              "choice": {"groups": [], "tel": ["contacts"], "apps": 9}}
+    assert result_notes(result) == 2 + 5
+    assert result_notes({"files": None, "tel": None, "apps": None, "choice": {"groups": [], "tel": [], "apps": 0}}) == 0
+
+
+def test_failed_order_view_tells_partial_from_nothing(tmp_path):
+    from admenot.app.present import transfer_order_view
+    from admenot.engine.journal.db import Journal
+
+    now = datetime(2026, 11, 8, 12, 0)
+    with Journal(tmp_path / "j.db") as journal:
+        order = journal.create_transfer_order("S", "M", None, {}, copy_id="S/1", source={"counts": {}},
+                                              received_at=now, copy_expires=now)
+        journal.set_transfer_target(order.id, "T", {"model": "X"})
+        journal.save_transfer_result(order.id, {"files": None, "tel": None, "apps": None, "status": "failed"})
+        journal.set_order_status(order.id, "failed")
+        view = transfer_order_view(journal.order(order.id), journal.transfer(order.id), None, now)
+        assert view["state"] == "failed" and view["partial"] is False
+        journal.save_transfer_result(order.id, {"files": {"files_done": 3}, "tel": None, "apps": None,
+                                                "status": "failed"})
+        view = transfer_order_view(journal.order(order.id), journal.transfer(order.id), None, now)
+        assert view["partial"] is True

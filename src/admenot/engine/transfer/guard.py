@@ -306,15 +306,21 @@ class AppInstallAdb:
         if not rest or (args[0] == "install" and len(rest) != 1):
             raise UnsafeCommand(f"Niepoprawna instalacja: {' '.join(args)[:120]}")
         root = self.apps_root.resolve()
+        dirs: set[Path] = set()
         for name in rest:
             path = Path(name)
             try:
+                resolved = path.resolve()
                 inside = (path.is_absolute() and path.suffix == ".apk" and path.is_file()
-                          and path.resolve().is_relative_to(root))
+                          and resolved.is_relative_to(root))
             except OSError:
                 inside = False
-            if not inside:
+            # dokładnie `apps_root/<pakiet>/<wersja>/<plik>.apk`
+            if not inside or len(resolved.relative_to(root).parts) != 3:
                 raise UnsafeCommand(f"Instalacja dozwolona tylko z plików .apk kopii: {name[:120]}")
+            dirs.add(resolved.parent)
+        if len(dirs) != 1:  # jedno polecenie = jedna aplikacja w jednej wersji
+            raise UnsafeCommand(f"Instalacja z plików różnych aplikacji: {' '.join(args)[:120]}")
 
     def _check_run(self, args: list[str]) -> None:
         cmd = _shell_T_command(args)

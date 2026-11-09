@@ -16,7 +16,7 @@ from admenot.engine.report.model import DeviceBlock
 from admenot.engine.report.texts import TRANSFER_TEXTS
 
 APPS_NAMED = 8  # tyle nazw zainstalowanych aplikacji w akapicie; reszta jako „i K innych”
-Tone = Literal["ok", "warn", "bad"]
+Tone = Literal["ok", "warn", "bad", "mut"]  # `mut`: kategoria odznaczona przy wgrywaniu — bez oceny
 _DONE_ROWS = frozenset({"installed", "exists"})
 
 
@@ -74,33 +74,61 @@ def _missing(t: dict[str, Any], key: str, total: int) -> Tile:
     return Tile(key, _of(t, 0, total), t["state"]["missing"], "bad")
 
 
+def _unchosen_kind(choice: dict[str, Any], kind: str, total: int) -> dict[str, int]:
+    """Kategoria telefonii odznaczona przy wgrywaniu: to, co plan wiedział (już na telefonie, przyjdzie
+    z synchronizacją konta); `left` — rekordy, które dałoby się wgrać, a serwisant ich nie wybrał."""
+    planned = (choice.get("tel_plan") or {}).get(kind)
+    if planned is None:
+        return {"written": 0, "existed": 0, "skipped_synced": 0, "skipped_messenger": 0, "failed": 0, "manual": 0,
+                "left": total}
+    return {"written": 0, "existed": planned.get("existing", 0), "skipped_synced": planned.get("synced", 0),
+            "skipped_messenger": planned.get("messenger", 0), "failed": 0, "manual": 0,
+            "left": planned.get("write", 0)}
+
+
 def _tel_tile(t: dict[str, Any], key: str, kinds: tuple[str, ...], counts: dict[str, int],
-              tel: dict[str, Any] | None) -> Tile | None:
+              tel: dict[str, Any] | None, choice: dict[str, Any] | None) -> Tile | None:
     total = sum(counts.get(k, 0) for k in kinds)
     if not any(k in counts for k in kinds):
         return None
-    results = [(tel or {}).get("kinds", {}).get(k) for k in kinds if counts.get(k, 0)]
-    if tel is None or any(r is None for r in results):
+    results = []
+    for k in kinds:
+        if not counts.get(k, 0):
+            continue
+        r = (tel or {}).get("kinds", {}).get(k)
+        if r is None and choice is not None and k not in (choice.get("tel") or ()):
+            r = _unchosen_kind(choice, k, counts[k])  # nie wybrano: wiemy tylko to, co wiedział plan
+        results.append(r)
+    if any(r is None for r in results):
         return _missing(t, key, total)
     done = sum(r["written"] + r["existed"] for r in results)
     synced = sum(r["skipped_synced"] + r["skipped_messenger"] for r in results)
     failed = sum(r["failed"] for r in results)
     manual = sum(r["manual"] for r in results)
+    left = sum(r.get("left", 0) for r in results)
     count = _of(t, done, total)
     st = t["state"]
     if manual:
         return Tile(key, count, st["manual"], "warn")
     if failed:
         return Tile(key, count, st["failed"].format(n=failed), "warn")
+    if left:
+        return Tile(key, count, st["not_chosen"], "mut")
     if done + synced < total:
         return Tile(key, count, st["remaining"].format(n=total - done - synced), "warn")
     if synced:
         return Tile(key, count, st["synced"].format(n=synced), "ok")
+    if done and not sum(r["written"] for r in results):
+        return Tile(key, count, st["existed"], "ok")
     return Tile(key, count, st["all"], "ok")
 
 
 def _file_tile(t: dict[str, Any], key: str, groups: tuple[str, ...], counts: dict[str, int],
-               files: dict[str, Any] | None, whatsapp_restored: bool) -> Tile | None:
+               files: dict[str, Any] | None, whatsapp_restored: bool, chosen: set[str] | None) -> Tile | None:
+    if chosen is not None:  # tylko grupy wybrane przy wgrywaniu (albo wgrane wcześniej, przy innym wyborze)
+        got = (files or {}).get("groups") or {}
+        groups = tuple(g for g in groups if g in chosen
+                       or (got.get(g) or {}).get("done", 0) + (got.get(g) or {}).get("exists", 0) > 0)
     total = sum(counts.get(f"files_{g}", 0) for g in groups)
     if not total:
         return None
@@ -127,19 +155,28 @@ def _file_tile(t: dict[str, Any], key: str, groups: tuple[str, ...], counts: dic
     return Tile(key, count, st["all_checked"] if files.get("hashed") else st["all"], "ok")
 
 
+def _choice(result: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Wybór serwisanta z ostatniego startu wgrywania; wyniki sprzed zapisywania wyboru go nie mają (`None`)."""
+    choice = (result or {}).get("choice")
+    return choice if isinstance(choice, dict) else None
+
+
 def _tiles(t: dict[str, Any], source: dict[str, Any], result: dict[str, Any] | None,
            whatsapp_restored: bool) -> list[Tile]:
     counts = source.get("counts") or {}
     groups = set(source.get("selection_groups") or ())
     files = (result or {}).get("files")
     tel = (result or {}).get("tel")
+    choice = _choice(result)
+    chosen = ({"others" if g.startswith("other:") else g for g in choice.get("groups") or ()}
+              if choice is not None else None)
     tiles: list[Tile | None] = []
     if "contacts_messages" in groups:
-        tiles += [_tel_tile(t, "contacts", ("contacts",), counts, tel),
-                  _tel_tile(t, "sms", ("sms", "mms"), counts, tel),
-                  _tel_tile(t, "calls", ("calls",), counts, tel)]
+        tiles += [_tel_tile(t, "contacts", ("contacts",), counts, tel, choice),
+                  _tel_tile(t, "sms", ("sms", "mms"), counts, tel, choice),
+                  _tel_tile(t, "calls", ("calls",), counts, tel, choice)]
     if "files" in groups:
-        tiles += [_file_tile(t, key, members, counts, files, whatsapp_restored)
+        tiles += [_file_tile(t, key, members, counts, files, whatsapp_restored, chosen)
                   for key, members in (("photos", ("photos", "videos")), ("downloads", ("downloads",)),
                                        ("whatsapp", ("whatsapp",)), ("others", ("others",)))]
     return [x for x in tiles if x is not None]
@@ -158,7 +195,12 @@ def _apps(t: dict[str, Any], source: dict[str, Any], result: dict[str, Any] | No
     """(zainstalowane, wybrane, nazwy, ile jeszcze nazw, problemy, wgrywanie nie dotarło do aplikacji)."""
     apps = (result or {}).get("apps")
     if apps is None:
-        total = (source.get("counts") or {}).get("apps", 0) if "apps" in (source.get("selection_groups") or ()) else 0
+        choice = _choice(result)
+        if choice is not None:  # wybrane przy wgrywaniu; bez wybranych nie ma czego zgłaszać
+            total = int(choice.get("apps") or 0)
+        else:
+            total = ((source.get("counts") or {}).get("apps", 0)
+                     if "apps" in (source.get("selection_groups") or ()) else 0)
         return 0, total, [], 0, [], total > 0
     rows = apps.get("rows") or []
     ok_rows, problems = [], []
@@ -200,7 +242,7 @@ def build_transfer_protocol(journal: Journal, order_id: int, lang: str, now: dat
 
     finished = (order.status == "done" and result is not None and result.get("status") == "done"
                 and not result.get("tel_error") and not result.get("apps_error"))
-    data_warn = any(x.tone != "ok" for x in tiles)
+    data_warn = any(x.tone in ("warn", "bad") for x in tiles)
     if not finished or any(x.tone == "bad" for x in tiles):
         tone: Tone = "bad"
     else:

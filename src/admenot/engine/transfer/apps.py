@@ -191,6 +191,8 @@ def build_apps_plan(adb: AppInstallAdb, copy: CopyDir, device: DeviceInfo) -> Ap
             continue
         package = pkg_dir.name
         verdict = verdicts.get(package, (None, "unknown"))[1]
+        if verdict == "malicious":  # szkodliwych nie ma w kopii (Etap 1); gdyby jednak były — nigdy ich nie instalujemy
+            continue
         label = labels.get(package) or package
         found = _best_version(pkg_dir, package)
         if found is None:
