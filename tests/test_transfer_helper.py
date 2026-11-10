@@ -261,6 +261,21 @@ def test_writer_bulk_inserts_sms_and_verifies_what_was_stored():
     assert "errId(ids.get(i), nullCode)" in one and "rejected(u)) throw new Denied()" in one
 
 
+def test_writer_gives_sms_their_thread_once_per_address():
+    """Bez `thread_id` SmsProvider szuka wątku przy każdym wierszu: na OPPO (~24 tys. SMS) połowa czasu
+    zapisu (56 s → 31 s na 1500 SMS). Pomocnik pyta raz na numer, tym samym URI co platforma; adresy
+    e-mail i nieudane odczyty zostawia dostawcy (bez `thread_id`), a odmowę wykrywa sam zapis."""
+    sms = _writer_method("flushSms")
+    assert sms.index("withThreads(vals);") < sms.index("maxSmsId()")
+    threads = _writer_method("withThreads")
+    assert "smsThreads.get(addr)" in threads and "smsThreads.put(addr, tid)" in threads
+    assert "addr.indexOf('@') >= 0" in threads and 'v.containsKey("thread_id")' in threads
+    assert 'if (tid > 0) v.put("thread_id", tid);' in threads
+    one = _writer_method("smsThread")
+    assert '"content://mms-sms/threadID"' in one and '"recipient", addr' in one
+    assert "catch (Exception ignored)" in one and "return 0;" in one and "Denied" not in one
+
+
 def test_writer_bulk_calls_keep_the_transactional_fallback():
     flush = _writer_method("flushBulk")
     assert 'oneByOne(uri, ids, vals, "insert_null")' in flush

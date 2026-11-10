@@ -46,6 +46,8 @@ final class Writer {
     private final Out out;
     private final String accountType, accountName;
     private int ok, err;
+    /** address -> thread_id for SMS (0: leave it to the provider), for the whole run. */
+    private final Map<String, Long> smsThreads = new HashMap<>();
 
     Writer(Target target, Out out, String accountType, String accountName) {
         this.t = target;
@@ -141,6 +143,7 @@ final class Writer {
      * run (FAIL) rather than guess what was stored.
      */
     private void flushSms(List<String> ids, List<ContentValues> vals) throws Exception {
+        withThreads(vals);
         long maxId = maxSmsId();
         int n = -1;
         boolean threw = false;
@@ -176,6 +179,41 @@ final class Writer {
         boolean notStored = n < 0 || missIds.size() <= ids.size() - n; // n < 0: bulkInsert threw, no count
         if (gapExplained && notStored) oneByOne(SMS, missIds, missVals, "null_uri");
         else for (String id : missIds) errId(id, UNVERIFIED);
+    }
+
+    /**
+     * Without thread_id SmsProvider looks the thread up for every row (Threads.getOrCreateThreadId):
+     * on an OPPO with ~24k SMS that was about half of the insert time (56 s -> 31 s per 1500 SMS).
+     * The same lookup (content://mms-sms/threadID?recipient=address) is done here once per address
+     * and cached for the whole run. Addresses with '@' (the platform rewrites e-mail addresses first)
+     * and failed lookups keep no thread_id: the provider then chooses the thread as before.
+     */
+    private void withThreads(List<ContentValues> vals) {
+        for (ContentValues v : vals) {
+            String addr = v.getAsString("address");
+            if (addr == null || addr.isEmpty() || addr.indexOf('@') >= 0 || v.containsKey("thread_id")) continue;
+            Long tid = smsThreads.get(addr);
+            if (tid == null) {
+                tid = smsThread(addr);
+                smsThreads.put(addr, tid);
+            }
+            if (tid > 0) v.put("thread_id", tid);
+        }
+    }
+
+    /** Thread of one address, 0 when it cannot be read (any error: the insert itself detects denial). */
+    private long smsThread(String addr) {
+        Cursor c = null;
+        try {
+            Uri u = Uri.parse("content://mms-sms/threadID").buildUpon().appendQueryParameter("recipient", addr).build();
+            c = t.query(u, new String[]{"_id"}, null, null, null);
+            if (c != null && c.moveToFirst()) return c.getLong(0);
+        } catch (Exception ignored) {
+            // the provider looks the thread up itself
+        } finally {
+            if (c != null) c.close();
+        }
+        return 0;
     }
 
     /** The highest _id in content://sms, 0 for an empty table. */

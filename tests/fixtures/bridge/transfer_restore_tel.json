@@ -1923,7 +1923,7 @@
       "command": "sha256sum /data/local/tmp/admenot/admenot-helper.dex",
       "status": "ok",
       "duration": 0.0,
-      "output": "cd1cdfac1ea1026f77ccfee354593b6b837f5f767f4f2af4de117f639626b823  /data/local/tmp/admenot/admenot-helper.dex\n",
+      "output": "8117a4b9441635323ff92dc80079250ddc6365850759e00741c9bb7fa02b3f3c  /data/local/tmp/admenot/admenot-helper.dex\n",
       "tag": null
      }
     ],
