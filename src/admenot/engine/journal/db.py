@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime
@@ -179,23 +179,47 @@ def _load(text: str | None) -> dict[str, Any] | None:
     return None if text is None else json.loads(text)
 
 
+def _statements(script: str) -> Iterator[str]:
+    """Polecenia skryptu migracji po jednym: `executescript` zatwierdza otwartą transakcję,
+    więc pod blokadą zapisu nie da się go użyć."""
+    pending = ""
+    for part in script.split(";"):
+        pending += part + ";"
+        if sqlite3.complete_statement(pending):
+            if pending.strip().strip(";").strip():
+                yield pending
+            pending = ""
+
+
 def _migrate(db: sqlite3.Connection, path: Path | str, migrations: Sequence[str]) -> None:
-    current = db.execute("PRAGMA user_version").fetchone()[0]
-    if current > len(migrations):
-        raise JournalTooNew(current, len(migrations))
-    if current == len(migrations):
+    """Podnosi schemat do najnowszej wersji. Dziennik otwiera kilka wątków okna i CLI naraz,
+    dlatego wersję czytamy drugi raz już pod blokadą zapisu — kto czekał na cudzą migrację,
+    nie powtarza jej (raporty R-6V6BWW i R-AEW0J4: „duplicate column name”)."""
+    def version() -> int:
+        return db.execute("PRAGMA user_version").fetchone()[0]
+
+    if version() == len(migrations):
         return
-    if current >= 1 and str(path) != ":memory:":
-        with closing(sqlite3.connect(f"{path}.bak-v{current}")) as backup:
-            db.backup(backup)
-    for version in range(current + 1, len(migrations) + 1):
-        try:
-            db.executescript(f"BEGIN;\n{migrations[version - 1]}\n"
-                             f"PRAGMA user_version = {version};\nCOMMIT;")
-        except sqlite3.Error:
-            if db.in_transaction:
-                db.rollback()
-            raise
+    db.commit()
+    db.execute("BEGIN IMMEDIATE")
+    try:
+        current = version()
+        if current > len(migrations):
+            raise JournalTooNew(current, len(migrations))
+        if current < len(migrations) and current >= 1 and str(path) != ":memory:":
+            # osobne połączenie do odczytu: kopia z `db`, które trzyma blokadę zapisu, czeka sama na siebie
+            with (closing(sqlite3.connect(str(path))) as source,
+                  closing(sqlite3.connect(f"{path}.bak-v{current}")) as backup):
+                source.backup(backup)
+        for target in range(current + 1, len(migrations) + 1):
+            for statement in _statements(migrations[target - 1]):
+                db.execute(statement)
+            db.execute(f"PRAGMA user_version = {target}")
+        db.execute("COMMIT")
+    except BaseException:
+        if db.in_transaction:
+            db.rollback()
+        raise
 
 
 def _order(row: sqlite3.Row) -> Order:
