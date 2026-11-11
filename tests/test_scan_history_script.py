@@ -134,3 +134,14 @@ def test_main_masks_values_and_sets_exit_code(tmp_path, capsys):
     assert "*" * 11 + "7518" in out
     assert IMEI not in out
     assert "b.txt" in out
+
+
+def test_find_skips_values_allowed_by_their_sha256():
+    import hashlib
+
+    m = _module()
+
+    text = f"imei {IMEI}"
+    assert m.find(text, frozenset()) == [("imei", IMEI)]
+    digest = hashlib.sha256(IMEI.encode()).hexdigest()
+    assert m.find(text, frozenset({f"sha256:{digest}"})) == []

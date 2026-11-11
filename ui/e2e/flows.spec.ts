@@ -206,7 +206,7 @@ test('phone state in English', async ({ page }) => {
   await expect(page.getByRole('switch', { name: 'All sites in Samsung Internet' })).toBeVisible();
 });
 
-const NEW_PHONE = /IMEI 861485069821024/;  // radio nowego telefonu: IMEI zamiast numeru seryjnego
+const NEW_PHONE = /IMEI 499001200000020/;  // radio nowego telefonu: IMEI zamiast numeru seryjnego
 const NOW_AFTER_COPY = new Date('2026-09-26T15:00:00');  // nagrana kopia jest świeża (< 24 h)
 
 test('copy, then the other phone connects: plan with apps, upload, data transferred, protocol', async ({ page }) => {

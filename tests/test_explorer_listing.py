@@ -211,7 +211,8 @@ def test_scan_place_cut_short_counts_with_plain_find(adb):
 
     class Cut:
         """Toybox przerywa `-exec … +`: urwany wynik i błąd na stdout (`STAT_TAIL`)."""
-        calls: list[str] = []
+        def __init__(self):
+            self.calls: list[str] = []
 
         def shell(self, command, timeout=20.0):
             self.calls.append(command)
@@ -219,8 +220,9 @@ def test_scan_place_cut_short_counts_with_plain_find(adb):
                 return "5|/sdcard/a.jpg\nfind: exec stat: Argument list too long\n"
             return "/sdcard/a.jpg\n/sdcard/b.jpg\n/sdcard/.ukryty\nfind: /sdcard/x: Permission denied\n"
 
-    assert scan_place(Cut(), place) == (2, 5)
-    assert len(Cut.calls) == 2
+    cut = Cut()
+    assert scan_place(cut, place) == (2, 5)
+    assert len(cut.calls) == 2
 
 
 def test_count_place_survives_a_denied_folder_on_the_way():
