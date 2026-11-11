@@ -5,6 +5,7 @@ import { expect, type Page, test } from '@playwright/test';
 // Zrzuty ekranów do README.md (en) i README.pl.md (pl) na atrapie mostka. Uruchom po zmianach UI:
 //   cd ui && npm run readme-shots
 // Pliki: docs/img/<lang>/<ekran>.png (jasny motyw) i hero-dark.png (ciemny, dla <picture>).
+// Wyjątek: docs/img/<lang>/explorer.png to ręczny zrzut z telefonu (nagrania nie mają miniatur).
 
 const out = (lang: string, name: string) => `../docs/img/${lang}/${name}.png`;
 const site = new URL('../../server/public/', import.meta.url);
@@ -14,12 +15,15 @@ const T = {
     simple: 'Prosty', why: 'Dlaczego?', technical: 'Szczegóły techniczne', source: 'Znajdź źródło reklamy',
     back: 'Wróć', console: 'Konsola ADB', summary: /Podsumowanie/, plan: 'Plan naprawy', share: 'Pokaż klientowi',
     run: /^Wykonaj/, done: 'Telefon naprawiony', history: 'Historia', historyTitle: 'Historia zleceń',
-    ready: 'Połączono', phone: 'Samsung Galaxy A14' },
+    ready: 'Połączono', phone: 'Samsung Galaxy A14',
+    upload: 'Wgraj',
+    uploadTitle: 'Co wgrać na nowy telefon?', space: 'Miejsce na nowym telefonie', moved: 'Dane przeniesione' },
   en: { scenario: 'adware-en', client: 'e.g. Anna K.', scan: 'Scan', apk: /APK analysis in the background/,
     expert: 'Expert', simple: 'Simple', why: 'Why?', technical: 'Technical details', source: 'Find the ad source',
     back: 'Back', console: 'ADB console', summary: /Summary/, plan: 'Repair plan', share: 'Show the client',
     run: /^Run/, done: 'Phone fixed', history: 'History', historyTitle: 'Order history', ready: 'Connected',
-    phone: 'Samsung Galaxy A14' },
+    phone: 'Samsung Galaxy A14', upload: 'Upload',
+    uploadTitle: 'What to upload to the new phone?', space: 'Space on the new phone', moved: 'Data transferred' },
 } as const;
 
 type Lang = keyof typeof T;
@@ -80,6 +84,21 @@ for (const lang of ['pl', 'en'] as const) {
       await page.getByRole('button', { name: t.history, exact: true }).click();
       await expect(page.getByRole('heading', { name: t.historyTitle })).toBeVisible();
       await shot(page, lang, 'history');
+    });
+
+    test('data transfer: upload plan, result', async ({ page }) => {
+      await page.clock.setFixedTime(new Date('2026-09-26T15:00:00')); // nagrana kopia jest świeża
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.goto(`/?scenario=transfer_restore&lang=${lang}`);
+      await page.getByRole('radio', { name: /IMEI 499001200000020/ }).dispatchEvent('click');
+      await page.getByRole('button', { name: t.upload, exact: true }).click();
+      await expect(page.getByRole('heading', { name: t.uploadTitle })).toBeVisible({ timeout: 15_000 });
+      const panel = page.getByRole('complementary', { name: t.space });
+      await expect(panel).toBeVisible();
+      await shot(page, lang, 'transfer-plan');
+      await panel.getByRole('button', { name: new RegExp(`^${t.upload}`) }).click();
+      await expect(page.getByRole('heading', { name: t.moved })).toBeVisible({ timeout: 15_000 });
+      await shot(page, lang, 'transfer-done');
     });
 
     test('client plan page on the phone', async ({ page }) => {

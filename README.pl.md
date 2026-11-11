@@ -61,6 +61,31 @@ AdMeNot wykonuje kroki i sprawdza każdy z nich. Administrator urządzenia wymag
 
 Każdą zmianę cofniesz w **Historii**: wyłączona lub wyciszona aplikacja wraca do poprzedniego stanu, usunięta jest instalowana z kopii. Usunięcie kasuje dane aplikacji (konta, ustawienia, pliki) — cofnięcie przywraca samą aplikację, bez danych.
 
+### Stan telefonu: powiadomienia ze stron
+
+Reklamy w pasku powiadomień często nie pochodzą z aplikacji, tylko ze stron, którym ktoś kiedyś kliknął „Zezwól”. Zakładka **Telefon** w wynikach skanu pokazuje dla każdej przeglądarki (Chrome, Samsung Internet, Edge, Brave, Opera, Vivaldi, a po włączeniu debugowania także Firefox) strony z prawem do powiadomień i pozwala je wyłączyć — pojedynczo albo wszystkie. To też da się cofnąć z Historii.
+
+### Przenoszenie danych na nowy telefon
+
+**Kopiuj dane** kopiuje stary telefon na komputer: zdjęcia i filmy, pobrane pliki i dokumenty, pliki WhatsAppa, inne foldery, kontakty, SMS-y i MMS-y, historię połączeń oraz aplikacje. Potem podłączasz nowy telefon i wybierasz, co wgrać. Jednocześnie wystarcza jeden telefon i jeden kabel.
+
+<img src="docs/img/pl/transfer-plan.png" alt="Wybór danych do wgrania na nowy telefon" width="49%"> <img src="docs/img/pl/transfer-done.png" alt="Dane przeniesione: wynik i protokół" width="49%">
+
+- Na nowym telefonie nic nie jest nadpisywane ani usuwane: plik o tej samej nazwie, ale innej treści, trafia obok, a wpisy, które telefon już ma, są pomijane. Przed wgraniem wiadomości program robi kopię bezpieczeństwa wpisów nowego telefonu.
+- Pliki APK z folderu pobranych są sprawdzane tak jak przy skanie: szkodliwe nie są wgrywane, podejrzane są domyślnie odznaczone.
+- Aplikacje instalują się z kopii, bez danych — w każdej trzeba zalogować się ponownie. Czaty WhatsAppa przywraca sam WhatsApp ze swojej kopii.
+- Gdy telefon nie pozwala odczytać albo zapisać kontaktów lub wiadomości przez USB (np. część telefonów Xiaomi), AdMeNot korzysta z pliku eksportu i mówi, gdzie go znaleźć.
+- Wypięty kabel albo zamknięty program nie psują kopii ani wgrywania — po ponownym podłączeniu program kończy od miejsca przerwania.
+- Kopia leży na komputerze 7 dni (termin i folder zmienisz w Ustawieniach), a przeniesienie kończy się protokołem przekazania w PDF.
+
+Sprawdzone na telefonach OPPO (ColorOS, Android 12), Xiaomi (MIUI 13, Android 11 i 13) i Samsung (kopiowanie). Na innych nakładkach przenoszenie kontaktów i wiadomości może pójść przez plik eksportu.
+
+### Eksplorator plików
+
+**Pliki** to przeglądarka pamięci telefonu przez ADB — bez MTP, które przy dużych folderach potrafi się zawiesić. Miniatury zdjęć i filmów, podgląd zdjęć, wideo, muzyki, tekstu, PDF-ów i arkuszy (XLSX, XLS, CSV), liczba plików i rozmiar każdego folderu. Zaznaczone pliki i foldery skopiujesz na komputer, a z komputera wgrasz przyciskiem, przeciągnięciem albo Ctrl+V; możesz też utworzyć folder lub plik tekstowy. Eksplorator niczego nie usuwa, nie przenosi i nie zmienia nazw.
+
+<img src="docs/img/pl/explorer.png" alt="Eksplorator plików: folder Pobrane z miniaturami zdjęć i filmów oraz powiększonym podglądem zdjęcia" width="100%">
+
 ### Poza tym
 
 - Polski i angielski, jasny i ciemny motyw (zgodnie z Windows).
@@ -69,7 +94,7 @@ Każdą zmianę cofniesz w **Historii**: wyłączona lub wyciszona aplikacja wra
 
 ## Jak oceniane są aplikacje
 
-Każda aplikacja dostaje **wynik od 0 do 100** i **pewność wniosku** (niska / średnia / wysoka). Werdykt zależy od obu. Reguły są w [`rules.yaml`](src/admenot/engine/rules/data/rules.yaml) i [`python_rules.py`](src/admenot/engine/rules/python_rules.py), arytmetyka w [`scoring.py`](src/admenot/engine/scoring.py). Liczby poniżej dotyczą wersji 0.9.2.
+Każda aplikacja dostaje **wynik od 0 do 100** i **pewność wniosku** (niska / średnia / wysoka). Werdykt zależy od obu. Reguły są w [`rules.yaml`](src/admenot/engine/rules/data/rules.yaml) i [`python_rules.py`](src/admenot/engine/rules/python_rules.py), arytmetyka w [`scoring.py`](src/admenot/engine/scoring.py). Liczby poniżej dotyczą wersji 0.10.0.
 
 ### 1. Sygnały
 
@@ -256,7 +281,7 @@ Zrzuty ekranu w tym README powstają z tych nagrań: `cd ui; npm run readme-shot
 
 ### Dane użytkownika
 
-`%LOCALAPPDATA%\AdMeNot\`: `settings.json`, `journal.db`, `backups\`, `logs\` (log sesji ADB i `app-*.log` z błędami okna), `phone_overrides.json`.
+`%LOCALAPPDATA%\AdMeNot\`: `settings.json`, `journal.db`, `backups\`, `transfers\` (kopie danych telefonów), `logs\` (log sesji ADB i `app-*.log` z błędami okna), `phone_overrides.json`.
 
 ### Znane ograniczenia
 

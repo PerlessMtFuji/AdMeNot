@@ -229,7 +229,7 @@ TRANSFER_SELECTION = {"contacts": True, "sms": True, "mms": False, "calls": True
 
 
 OLD_IMEI = "499001200000004"  # Luhn OK; telefony w nagraniach mają IMEI, więc ekrany pokazują IMEI, nie serial
-NEW_IMEI = "861485069821024"
+NEW_IMEI = "499001200000020"
 IMEI_COMMAND = "service call iphonesubinfo 1 s16 com.android.shell"
 
 

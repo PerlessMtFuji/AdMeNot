@@ -37,7 +37,7 @@ from admenot.engine.transfer.store import CopyDir
 PREV = "com.google.android.apps.messaging"
 PKG = helper.PACKAGE
 
-# `adb -s 79SSSW6PDMEMCI6S shell dumpsys role` (OPPO CPH2271, Android 12), fragment, końce linii CRLF
+# `adb -s TESTSERIAL000001 shell dumpsys role` (OPPO CPH2271, Android 12), fragment, końce linii CRLF
 OPPO_DUMPSYS_ROLE = (
     "ROLE STATE (dumpsys role):\r\n{\r\n  user_states={\r\n    user_id=0\r\n    version=-1\r\n"
     "    packages_hash=4EDB71C99ABF66F502320077BDBD69BF1D46493D296C78F48E7C09F4B84FF405\r\n"
@@ -52,7 +52,7 @@ OPPO_DUMPSYS_ROLE = (
     "        holders=com.google.android.dialer\r\n      }\r\n"
     "    ]\r\n  }\r\n}\r\n"
 )
-# `adb -s nz7pukyxcu8t4d6l shell dumpsys role` (Xiaomi Redmi Note 12 Pro, MIUI/Android 13): bez `fallback_enabled`
+# `adb -s testserial000002 shell dumpsys role` (Xiaomi Redmi Note 12 Pro, MIUI/Android 13): bez `fallback_enabled`
 XIAOMI_DUMPSYS_ROLE = (
     "      {\r\n        name=android.app.role.SMS\r\n        holders=com.google.android.apps.messaging\r\n"
     "      }\r\n      {\r\n        name=android.app.role.SYSTEM_UI_INTELLIGENCE\r\n      }\r\n"

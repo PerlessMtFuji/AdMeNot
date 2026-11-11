@@ -10,6 +10,7 @@ Kod wyjścia: 0 — brak nierozstrzygniętych trafień, 1 — są trafienia.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import re
 import subprocess
 import sys
@@ -70,12 +71,18 @@ class Hit:
     commit: str
 
 
+def allowed(value: str, allow: frozenset[str]) -> bool:
+    """Wartość wprost albo jej skrót `sha256:<hex>` — dla prawdziwej wartości, która trafiła do
+    historii i nie powinna być powtarzana na liście."""
+    return value in allow or f"sha256:{hashlib.sha256(value.encode()).hexdigest()}" in allow
+
+
 def find(text: str, allow: frozenset[str]) -> list[tuple[str, str]]:
     found = []
     for rule in RULES:
         for match in rule.pattern.finditer(text):
             value = match.group("v").strip()
-            if value and value not in allow and not PLACEHOLDER.match(value) and rule.keep(value):
+            if value and not allowed(value, allow) and not PLACEHOLDER.match(value) and rule.keep(value):
                 found.append((rule.name, value))
     return list(dict.fromkeys(found))
 

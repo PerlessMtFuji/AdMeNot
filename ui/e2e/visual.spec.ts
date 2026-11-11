@@ -157,7 +157,7 @@ for (const theme of ['light', 'dark'] as const) {
 }
 
 // Ekrany przenoszenia danych (spec §7.2–§7.6): jasny i ciemny motyw, 1280 i 1200 px (wiersze nie mogą się łamać).
-const NEW_PHONE = /IMEI 861485069821024/;  // IMEI zamiast numeru seryjnego
+const NEW_PHONE = /IMEI 499001200000020/;  // IMEI zamiast numeru seryjnego
 
 async function planRestore(page: Page, scenario: string) {
   await page.goto(`/?scenario=${scenario}`);

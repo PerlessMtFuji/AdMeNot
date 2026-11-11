@@ -608,13 +608,13 @@ def test_start_restore_completes(tmp_path):
 
 def test_restore_records_the_new_phone_imei(tmp_path, monkeypatch):
     # „wgrano na …” w Historii pokazuje IMEI nowego telefonu (zapisany w stanie wgrywania), nie numer seryjny
-    monkeypatch.setattr("admenot.engine.device.info.read_imei", lambda adb: "861485069821024")
+    monkeypatch.setattr("admenot.engine.device.info.read_imei", lambda adb: "499001200000020")
     api, rec, _, copy_id = _copied(tmp_path)
     _planned(api, rec, copy_id)
     assert "job_id" in api.start_restore(CHOICE)
     api._identities.clear()  # po ponownym uruchomieniu programu: IMEI tylko ze stanu wgrywania
     (entry,) = api.transfers()["copies"][0]["restores"]
-    assert (entry["serial"], entry["imei"]) == (NEW, "861485069821024")
+    assert (entry["serial"], entry["imei"]) == (NEW, "499001200000020")
 
 
 def test_older_restore_without_imei_takes_it_from_the_connected_phone(tmp_path):
@@ -626,8 +626,8 @@ def test_older_restore_without_imei_takes_it_from_the_connected_phone(tmp_path):
     state.set_meta("status", "complete")
     state.close()
     assert api.transfers()["copies"][0]["restores"][0]["imei"] is None
-    api._identities[NEW] = ("Oppo A16s", "861580056585051", None, "12")
-    assert api.transfers()["copies"][0]["restores"][0]["imei"] == "861580056585051"
+    api._identities[NEW] = ("Oppo A16s", "499001200000012", None, "12")
+    assert api.transfers()["copies"][0]["restores"][0]["imei"] == "499001200000012"
 
 
 def test_restore_resume_offered(tmp_path):
@@ -1926,7 +1926,7 @@ def test_transfer_exports_check_is_cheap_read_only_and_updates_inventory(tmp_pat
     result = api.transfer_exports_check()
     assert set(result) == {"contacts", "sms", "mms", "mms_bytes", "calls", "denied", "exports"}
     assert result["denied"] == ["contacts", "sms"]
-    assert [e["name"] for e in result["exports"]["contacts"]][0] == "jeszcze-nowsze.vcf"
+    assert result["exports"]["contacts"][0]["name"] == "jeszcze-nowsze.vcf"
     assert len(result["exports"]["contacts"]) == 3
     # bez zadania i bez nowego zdarzenia inwentarza; bieżący inwentarz (dla start_backup) jest odświeżony
     assert len(rec.of("transfer:inventory")) == before

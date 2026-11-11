@@ -238,7 +238,7 @@ def test_stat_batches_fit_the_windows_command_line(tmp_path):
     _plan(new, copy)
     adb_path = r"C:\Program Files\AdMeNot\assets\tools\scrcpy\adb.exe"
     for c in (c for c in new.commands if c.startswith("stat ")):
-        line = subprocess.list2cmdline([adb_path, "-s", "79SSSW6PDMEMCI6S", "shell", c])
+        line = subprocess.list2cmdline([adb_path, "-s", "TESTSERIAL000001", "shell", c])
         assert len(line.encode("utf-16-le")) // 2 < 32_767
 
 

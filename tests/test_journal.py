@@ -451,3 +451,43 @@ def test_mark_copy_deleted_expires_orders_without_target(tmp_path):
         j.set_copy_expires("c2", datetime(2026, 12, 1))
         assert j.transfer(other.id).copy_expires == datetime(2026, 12, 1)
         assert [o.id for o, _ in j.transfer_orders()] == [other.id, without.id, with_target.id]
+
+
+def test_two_openers_migrate_the_same_journal_once(tmp_path):
+    """Raporty R-6V6BWW i R-AEW0J4: dwa wątki okna otwierały dziennik naraz, oba czytały starą
+    wersję i drugi kończył na „duplicate column name”."""
+    import threading
+    import time
+
+    from admenot.engine.journal.db import _migrate
+
+    path = tmp_path / "j.db"
+    with closing(sqlite3.connect(path)) as db:
+        db.executescript(MIGRATIONS[0])
+        db.execute("PRAGMA user_version = 1")
+    first = sqlite3.connect(path, isolation_level=None)
+    first.execute("BEGIN IMMEDIATE")  # pierwszy otwierający jest w trakcie migracji
+    errors: list[BaseException] = []
+
+    def second() -> None:
+        with closing(sqlite3.connect(path)) as db:
+            try:
+                _migrate(db, path, MIGRATIONS)
+            except BaseException as exc:  # noqa: BLE001
+                errors.append(exc)
+
+    thread = threading.Thread(target=second)
+    thread.start()
+    time.sleep(0.3)  # drugi zdążył przeczytać wersję 1 i czeka na blokadę
+    for version, script in enumerate(MIGRATIONS[1:], start=2):
+        for statement in filter(str.strip, script.split(";")):
+            first.execute(statement)
+        first.execute(f"PRAGMA user_version = {version}")
+    first.execute("COMMIT")
+    first.close()
+    thread.join(10)
+    assert not thread.is_alive()
+    assert errors == []
+    assert _version(path) == len(MIGRATIONS)
+    with Journal(path) as j:
+        assert j.orders_for("S1") == []
