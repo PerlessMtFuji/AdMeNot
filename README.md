@@ -61,6 +61,29 @@ AdMeNot runs the steps and verifies each one. Device administrators need one tap
 
 Every change can be undone from **History**: a disabled or silenced app returns to its previous state, a removed app is reinstalled from the backup. Removing an app deletes its data (accounts, settings, files) — undo brings back the app itself, not its data.
 
+### Phone state: notifications from websites
+
+Ads in the notification shade often come not from an app but from websites someone once allowed. The **Phone** tab of the scan results lists, for each browser (Chrome, Samsung Internet, Edge, Brave, Opera, Vivaldi, and Firefox once its debugging is on), the sites allowed to send notifications and lets you turn them off — one by one or all at once. This, too, can be undone from History.
+
+### Moving data to a new phone
+
+**Copy data** copies the old phone to the computer: photos and videos, downloads and documents, WhatsApp files, other folders, contacts, SMS and MMS, call history and apps. Then you plug in the new phone and choose what to upload. One phone and one cable at a time is enough.
+
+<img src="docs/img/en/transfer-plan.png" alt="Choosing what to upload to the new phone" width="49%"> <img src="docs/img/en/transfer-done.png" alt="Data transferred: result and report" width="49%">
+
+- Nothing on the new phone is overwritten or deleted: a file with the same name but different content is saved beside it, and entries the phone already has are skipped. Before uploading messages the program makes a safety backup of the new phone's own entries.
+- APK files from the downloads folder are checked as in a scan: harmful ones are not uploaded, suspicious ones are unticked by default.
+- Apps are installed from the copy, without their data — each one needs signing in again. WhatsApp chats are restored by WhatsApp itself from its own backup.
+- When a phone does not let contacts or messages be read or written over USB (some Xiaomi phones, for example), AdMeNot uses an export file and says where to find it.
+- A pulled cable or a closed program does not break a copy or an upload — after reconnecting, the program continues where it stopped.
+- The copy stays on the computer for 7 days (the period and the folder can be changed in Settings), and a transfer ends with a handover report in PDF.
+
+Tested on OPPO (ColorOS, Android 12), Xiaomi (MIUI 13, Android 11 and 13) and Samsung (copying) phones. On other Android skins, contacts and messages may go through an export file.
+
+### File explorer
+
+**Files** browses the phone's storage over ADB — without MTP, which tends to hang on large folders. Thumbnails of photos and videos, previews of photos, video, music, text, PDFs and spreadsheets (XLSX, XLS, CSV), the file count and size of every folder. Selected files and folders can be copied to the computer, and files from the computer uploaded with a button, by dragging or with Ctrl+V; you can also create a folder or a text file. The explorer never deletes, moves or renames anything.
+
 ### Also
 
 - Polish and English, light and dark theme (following Windows).
@@ -69,7 +92,7 @@ Every change can be undone from **History**: a disabled or silenced app returns 
 
 ## How apps are rated
 
-Each app gets a **score from 0 to 100** and a **confidence** (low / medium / high). Both together decide the verdict. The rules live in [`rules.yaml`](src/admenot/engine/rules/data/rules.yaml) and [`python_rules.py`](src/admenot/engine/rules/python_rules.py), the arithmetic in [`scoring.py`](src/admenot/engine/scoring.py). Numbers below are from version 0.9.2.
+Each app gets a **score from 0 to 100** and a **confidence** (low / medium / high). Both together decide the verdict. The rules live in [`rules.yaml`](src/admenot/engine/rules/data/rules.yaml) and [`python_rules.py`](src/admenot/engine/rules/python_rules.py), the arithmetic in [`scoring.py`](src/admenot/engine/scoring.py). Numbers below are from version 0.10.0.
 
 ### 1. Signals
 
