@@ -5,7 +5,7 @@ import { expect, type Page, test } from '@playwright/test';
 // Zrzuty ekranów do README.md (en) i README.pl.md (pl) na atrapie mostka. Uruchom po zmianach UI:
 //   cd ui && npm run readme-shots
 // Pliki: docs/img/<lang>/<ekran>.png (jasny motyw) i hero-dark.png (ciemny, dla <picture>).
-// Wyjątek: docs/img/pl/explorer.png to ręczny zrzut z telefonu (nagrania nie mają miniatur).
+// Wyjątek: docs/img/<lang>/explorer.png to ręczny zrzut z telefonu (nagrania nie mają miniatur).
 
 const out = (lang: string, name: string) => `../docs/img/${lang}/${name}.png`;
 const site = new URL('../../server/public/', import.meta.url);

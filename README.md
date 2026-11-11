@@ -84,6 +84,8 @@ Tested on OPPO (ColorOS, Android 12), Xiaomi (MIUI 13, Android 11 and 13) and Sa
 
 **Files** browses the phone's storage over ADB — without MTP, which tends to hang on large folders. Thumbnails of photos and videos, previews of photos, video, music, text, PDFs and spreadsheets (XLSX, XLS, CSV), the file count and size of every folder. Selected files and folders can be copied to the computer, and files from the computer uploaded with a button, by dragging or with Ctrl+V; you can also create a folder or a text file. The explorer never deletes, moves or renames anything.
 
+<img src="docs/img/en/explorer.png" alt="File explorer: the Downloads folder with photo and video thumbnails and an enlarged photo preview" width="100%">
+
 ### Also
 
 - Polish and English, light and dark theme (following Windows).
