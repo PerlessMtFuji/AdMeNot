@@ -26,5 +26,8 @@ interface Target {
     /** Only ever called with a URI this process has just inserted (rollback of a partial MMS). */
     int delete(Uri uri) throws Exception;
 
+    /** The APK of the provider behind `authority` (ApplicationInfo.sourceDir), null when unknown. */
+    String providerSourceDir(String authority) throws Exception;
+
     void close();
 }

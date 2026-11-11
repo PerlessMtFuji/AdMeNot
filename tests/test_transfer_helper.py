@@ -276,6 +276,33 @@ def test_writer_gives_sms_their_thread_once_per_address():
     assert "catch (Exception ignored)" in one and "return 0;" in one and "Denied" not in one
 
 
+def test_writer_uses_miui_batch_mode_only_when_the_provider_has_it():
+    """MIUI liczy wątek po każdym wierszu `bulkInsert`, a w `applyBatch` raz na końcu (Redmi: 166 s →
+    67 s na 1500 SMS); na OPPO `applyBatch` był 4× wolniejszy. Tryb wsadowy tylko, gdy APK dostawcy SMS
+    zawiera `BatchModeHelper`; brak klasy, nieznany APK albo błąd odczytu — dalej `bulkInsert`, a błąd
+    `applyBatch` (nie odmowa) przełącza resztę przebiegu na `bulkInsert`."""
+    src = _writer_source()
+    assert 'MIUI_BATCH = "Lcom/android/providers/telephony/BatchModeHelper;"' in src
+    sms = _writer_method("flushSms")
+    assert "boolean batch = smsBatchMode();" in sms
+    assert "n = batch ? smsApplyBatch(vals) : t.bulkInsert(SMS, vals.toArray(new ContentValues[0]));" in sms
+    assert "if (batch) smsBatch = Boolean.FALSE;" in sms
+    assert sms.index("if (isDenial(e)) throw new Denied();") < sms.index("if (batch) smsBatch = Boolean.FALSE;")
+    mode = _writer_method("smsBatchMode")
+    assert "t.providerSourceDir(SMS.getAuthority())" in mode and "dexContains(new File(apk), MIUI_BATCH)" in mode
+    assert "catch (Throwable ignored)" in mode and "boolean found = false;" in mode
+    batch = _writer_method("smsApplyBatch")
+    assert "ContentProviderOperation.newInsert(SMS).withValues(v)" in batch
+    assert "if (anyRejected(res)) throw new Denied();" in batch
+    dex = _writer_method("dexContains")
+    assert 'matches("classes\\\\d*\\\\.dex")' in dex
+    helper_src = ROOT / "android" / "helper"
+    assert "String providerSourceDir(String authority)" in (helper_src / "src/pl/admenot/helper/Target.java").read_text("utf-8")
+    assert 'getField("info")' in (helper_src / "src/pl/admenot/helper/Main.java").read_text("utf-8")
+    assert "resolveContentProvider(authority, 0)" in (helper_src / "src/pl/admenot/helper/Runner.java").read_text("utf-8")
+    assert '<provider android:authorities="sms" />' in (helper_src / "AndroidManifest.xml").read_text("utf-8")
+
+
 def test_writer_bulk_calls_keep_the_transactional_fallback():
     flush = _writer_method("flushBulk")
     assert 'oneByOne(uri, ids, vals, "insert_null")' in flush

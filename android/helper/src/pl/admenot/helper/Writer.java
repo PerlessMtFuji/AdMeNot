@@ -8,16 +8,20 @@ import android.net.Uri;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 /**
  * Writes one input file through a Target and reports per line:
@@ -48,6 +52,8 @@ final class Writer {
     private int ok, err;
     /** address -> thread_id for SMS (0: leave it to the provider), for the whole run. */
     private final Map<String, Long> smsThreads = new HashMap<>();
+    /** SMS through applyBatch (MIUI batch mode): null until checked, then fixed for the run. */
+    private Boolean smsBatch;
 
     Writer(Target target, Out out, String accountType, String accountName) {
         this.t = target;
@@ -125,7 +131,7 @@ final class Writer {
      * still counted. One insert per row is safe but about 4x slower (66 s instead of 13-17 s per 500
      * SMS on an OPPO with ~23k SMS), so the batch goes through bulkInsert and is then verified:
      * 1. maxId = the highest _id in content://sms before the batch (empty table: 0);
-     * 2. bulkInsert the batch;
+     * 2. bulkInsert the batch (applyBatch on MIUI, see smsBatchMode);
      * 3. newCount = the number of rows with _id > maxId. newCount == batch size and bulkInsert did not
      *    throw: OK for every row, no key matching (a provider that rewrites a stored value, e.g. the
      *    address, cannot make good rows look missing);
@@ -147,11 +153,13 @@ final class Writer {
         long maxId = maxSmsId();
         int n = -1;
         boolean threw = false;
+        boolean batch = smsBatchMode();
         try {
-            n = t.bulkInsert(SMS, vals.toArray(new ContentValues[0]));
+            n = batch ? smsApplyBatch(vals) : t.bulkInsert(SMS, vals.toArray(new ContentValues[0]));
         } catch (Exception e) {
             if (isDenial(e)) throw new Denied();
             threw = true; // not a denial: part of the batch may be stored, the verification below decides
+            if (batch) smsBatch = Boolean.FALSE; // the rest of the run goes through bulkInsert
         }
         Map<String, Integer> found = storedSince(maxId);
         int newCount = 0;
@@ -179,6 +187,79 @@ final class Writer {
         boolean notStored = n < 0 || missIds.size() <= ids.size() - n; // n < 0: bulkInsert threw, no count
         if (gapExplained && notStored) oneByOne(SMS, missIds, missVals, "null_uri");
         else for (String id : missIds) errId(id, UNVERIFIED);
+    }
+
+    /** Dex descriptor of MIUI's batch mode in the SMS provider (com.android.providers.telephony). */
+    static final String MIUI_BATCH = "Lcom/android/providers/telephony/BatchModeHelper;";
+
+    /**
+     * MIUI's SmsProvider recomputes the whole thread (counts, snippet, SIM, errors) after every insert,
+     * including every row of bulkInsert; only applyBatch enters its BatchModeHelper: one transaction and
+     * each touched thread recomputed once at the end (Redmi 2201117TY, ~48k rows: 166 s -> 67 s per
+     * 1500 SMS). Elsewhere applyBatch is no help and can be much slower (OPPO CPH2271: 33 s -> 132 s),
+     * so it is used only when the provider's own APK contains that class. Anything else - provider APK
+     * unknown or unreadable, dex not in the APK (odex only), a newer MIUI/HyperOS without the class -
+     * keeps bulkInsert. A non-denial applyBatch failure also switches the rest of the run to bulkInsert.
+     */
+    private boolean smsBatchMode() {
+        if (smsBatch == null) {
+            boolean found = false;
+            try {
+                String apk = t.providerSourceDir(SMS.getAuthority());
+                found = apk != null && dexContains(new File(apk), MIUI_BATCH);
+            } catch (Throwable ignored) {
+                // unknown: bulkInsert
+            }
+            smsBatch = found;
+        }
+        return smsBatch;
+    }
+
+    /** applyBatch of one insert per row; returns how many results came back (rows the provider stored). */
+    private int smsApplyBatch(List<ContentValues> vals) throws Exception {
+        ArrayList<ContentProviderOperation> ops = new ArrayList<>();
+        for (ContentValues v : vals) ops.add(ContentProviderOperation.newInsert(SMS).withValues(v).build());
+        android.content.ContentProviderResult[] res = t.applyBatch(SMS.getAuthority(), ops);
+        if (anyRejected(res)) throw new Denied();
+        return res == null ? 0 : res.length;
+    }
+
+    /** True when any classes*.dex of the APK contains the string (dex files of a few MB at most). */
+    static boolean dexContains(File apk, String text) throws Exception {
+        byte[] want = text.getBytes("UTF-8");
+        ZipFile zip = new ZipFile(apk);
+        try {
+            Enumeration<? extends ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry e = entries.nextElement();
+                if (!e.getName().matches("classes\\d*\\.dex")) continue;
+                InputStream is = zip.getInputStream(e);
+                try {
+                    ByteArrayOutputStream buf = new ByteArrayOutputStream();
+                    byte[] chunk = new byte[65536];
+                    int r;
+                    while ((r = is.read(chunk)) > 0) {
+                        buf.write(chunk, 0, r);
+                        if (buf.size() > 64 << 20) throw new IllegalStateException("dex_too_big");
+                    }
+                    if (indexOf(buf.toByteArray(), want) >= 0) return true;
+                } finally {
+                    is.close();
+                }
+            }
+            return false;
+        } finally {
+            zip.close();
+        }
+    }
+
+    static int indexOf(byte[] hay, byte[] needle) {
+        outer:
+        for (int i = 0; i + needle.length <= hay.length; i++) {
+            for (int j = 0; j < needle.length; j++) if (hay[i + j] != needle[j]) continue outer;
+            return i;
+        }
+        return -1;
     }
 
     /**

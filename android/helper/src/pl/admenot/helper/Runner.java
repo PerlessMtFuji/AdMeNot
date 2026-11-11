@@ -7,6 +7,7 @@ import android.content.ContentProviderResult;
 import android.content.ContentResolver;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.pm.ProviderInfo;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
@@ -41,7 +42,7 @@ public final class Runner extends Instrumentation {
                 out.line("FAIL usage");
             } else {
                 Context ctx = getTargetContext();
-                new Writer(new ResolverTarget(ctx.getContentResolver()), out,
+                new Writer(new ResolverTarget(ctx), out,
                         args.getString("account_type"), args.getString("account_name"))
                         .run(resolve(ctx, args.getString("input", "")));
             }
@@ -60,9 +61,10 @@ public final class Runner extends Instrumentation {
     }
 
     static final class ResolverTarget implements Target {
+        final Context ctx;
         final ContentResolver cr;
 
-        ResolverTarget(ContentResolver cr) { this.cr = cr; }
+        ResolverTarget(Context ctx) { this.ctx = ctx; this.cr = ctx.getContentResolver(); }
 
         @Override public int bulkInsert(Uri uri, ContentValues[] values) { return cr.bulkInsert(uri, values); }
 
@@ -81,6 +83,11 @@ public final class Runner extends Instrumentation {
         @Override public OutputStream openOutput(Uri uri) throws Exception { return cr.openOutputStream(uri); }
 
         @Override public int delete(Uri uri) { return cr.delete(uri, null, null); }
+
+        @Override public String providerSourceDir(String authority) {
+            ProviderInfo p = ctx.getPackageManager().resolveContentProvider(authority, 0);
+            return p == null || p.applicationInfo == null ? null : p.applicationInfo.sourceDir;
+        }
 
         @Override public void close() { }
     }

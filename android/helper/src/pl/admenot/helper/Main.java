@@ -3,6 +3,7 @@ package pl.admenot.helper;
 import android.content.ContentProviderOperation;
 import android.content.ContentProviderResult;
 import android.content.ContentValues;
+import android.content.pm.ProviderInfo;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Binder;
@@ -58,6 +59,7 @@ public final class Main {
         final IBinder token = new Binder();
         final Object attribution;
         final Map<String, Object> providers = new HashMap<>();
+        final Map<String, ProviderInfo> infos = new HashMap<>();
 
         ShellTarget() throws Exception {
             am = Class.forName("android.app.ActivityManager").getMethod("getService").invoke(null);
@@ -83,7 +85,19 @@ public final class Main {
             if (h == null) throw new IllegalStateException("no provider " + authority);
             p = h.getClass().getField("provider").get(h);
             providers.put(authority, p);
+            try {
+                Object info = h.getClass().getField("info").get(h);
+                if (info instanceof ProviderInfo) infos.put(authority, (ProviderInfo) info);
+            } catch (Throwable ignored) {
+                // no info: providerSourceDir() says unknown
+            }
             return p;
+        }
+
+        @Override public String providerSourceDir(String authority) throws Exception {
+            provider(authority);
+            ProviderInfo i = infos.get(authority);
+            return i == null || i.applicationInfo == null ? null : i.applicationInfo.sourceDir;
         }
 
         @Override public void close() {
@@ -101,6 +115,7 @@ public final class Main {
                 } catch (Throwable ignored) { }
             }
             providers.clear();
+            infos.clear();
         }
 
         static Class<?> box(Class<?> c) {
