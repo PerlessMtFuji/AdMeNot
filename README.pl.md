@@ -84,6 +84,8 @@ Sprawdzone na telefonach OPPO (ColorOS, Android 12), Xiaomi (MIUI 13, Android 11
 
 **Pliki** to przeglądarka pamięci telefonu przez ADB — bez MTP, które przy dużych folderach potrafi się zawiesić. Miniatury zdjęć i filmów, podgląd zdjęć, wideo, muzyki, tekstu, PDF-ów i arkuszy (XLSX, XLS, CSV), liczba plików i rozmiar każdego folderu. Zaznaczone pliki i foldery skopiujesz na komputer, a z komputera wgrasz przyciskiem, przeciągnięciem albo Ctrl+V; możesz też utworzyć folder lub plik tekstowy. Eksplorator niczego nie usuwa, nie przenosi i nie zmienia nazw.
 
+<img src="docs/img/pl/explorer.png" alt="Eksplorator plików: folder Pobrane z miniaturami zdjęć i filmów oraz powiększonym podglądem zdjęcia" width="100%">
+
 ### Poza tym
 
 - Polski i angielski, jasny i ciemny motyw (zgodnie z Windows).
