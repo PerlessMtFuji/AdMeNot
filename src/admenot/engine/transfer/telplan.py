@@ -13,7 +13,7 @@ from __future__ import annotations
 import hashlib
 import re
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from ..adb.transport import AdbError, AdbTransport
@@ -237,6 +237,9 @@ class TelPlan:
     phone_has_contacts: bool
     readable: dict[str, bool]
     local_account: tuple[str, str] | None
+    # ile wpisów kategorii telefon ma teraz (tylko odczytane kategorie): mniej niż stan wgrywania
+    # pamięta jako zapisane = telefon wyczyszczono po poprzedniej próbie
+    on_phone: dict[str, int] = field(default_factory=dict)
 
 
 def _synced_accounts(adb: AdbTransport, raws: list[dict]) -> set[tuple[str, str]]:
@@ -252,8 +255,8 @@ def _synced_accounts(adb: AdbTransport, raws: list[dict]) -> set[tuple[str, str]
 
 
 def _plan_contacts(adb: AdbTransport, copy: CopyDir, src: TelSources
-                   ) -> tuple[ContactSelection, int, bool, bool, tuple[str, str] | None]:
-    """(wybór, liczba pominiętych jako obecne, czy telefon ma kontakty, czy dało się odczytać, konto lokalne)."""
+                   ) -> tuple[ContactSelection, int, int, bool, tuple[str, str] | None]:
+    """(wybór, liczba pominiętych jako obecne, ile kontaktów ma telefon, czy dało się odczytać, konto lokalne)."""
     records = (read_raw_contacts(copy.phone_dir) if src.contacts == "raw"
                else read_vcards(copy.phone_dir / "contacts.vcf"))
     try:
@@ -261,7 +264,7 @@ def _plan_contacts(adb: AdbTransport, copy: CopyDir, src: TelSources
         rows_r = tel.content_query(adb, RAW_URI, tel.RAW_COLS)
         rows_d = tel.content_query(adb, DATA_URI, tel.DATA_COLS)
     except tel.ContentQueryError:
-        return select_contacts(records, set()), 0, False, False, None
+        return select_contacts(records, set()), 0, 0, False, None
     deleted = {r["_id"] for r in rows_r if r.get("deleted") == "1"}
     live_d = [d for d in rows_d if d.get("raw_contact_id") not in deleted]
     sel = select_contacts(records, _synced_accounts(adb, rows_r))
@@ -269,7 +272,7 @@ def _plan_contacts(adb: AdbTransport, copy: CopyDir, src: TelSources
     fresh = [c for c in sel.write if not index.has(c)]
     present = len(sel.write) - len(fresh)
     sel = ContactSelection(fresh, sel.skipped_synced, sel.skipped_messenger)
-    return sel, present, bool(rows_c), True, local_account(rows_r)
+    return sel, present, len(rows_c), True, local_account(rows_r)
 
 
 def _keys_from_phone(adb: AdbTransport, uri: str, col_sets: list[list[str]], key_row: Any) -> set[tuple] | None:
@@ -330,6 +333,7 @@ def build_tel_plan(adb: AdbTransport, copy: CopyDir, meta: CopyMeta, kinds: set[
     src = copy_sources(copy, meta)
     readable: dict[str, bool] = {}
     existing: dict[str, int] = {}
+    on_phone: dict[str, int] = {}
     selection: ContactSelection | None = None
     has_contacts = False
     local: tuple[str, str] | None = None
@@ -338,13 +342,17 @@ def build_tel_plan(adb: AdbTransport, copy: CopyDir, meta: CopyMeta, kinds: set[
     calls: list[CallRecord] = []
 
     if "contacts" in kinds and src.contacts is not None:
-        selection, skipped, has_contacts, readable["contacts"], local = _plan_contacts(adb, copy, src)
+        selection, skipped, count, readable["contacts"], local = _plan_contacts(adb, copy, src)
+        has_contacts = bool(count)
         if readable["contacts"]:
             existing["contacts"] = skipped
+            on_phone["contacts"] = count
     if "sms" in kinds and src.sms is not None:
         sms = read_sms_xml(src.sms)
         have = _keys_from_phone(adb, "content://sms", tel.SMS_COLS, sms_key_row)
         readable["sms"] = have is not None
+        if have is not None:
+            on_phone["sms"] = len(have)
         if have:
             kept = [r for r in sms if sms_key(r) not in have]
             existing["sms"] = len(sms) - len(kept)
@@ -353,6 +361,8 @@ def build_tel_plan(adb: AdbTransport, copy: CopyDir, meta: CopyMeta, kinds: set[
         calls = read_calls_xml(src.calls)
         have = _keys_from_phone(adb, "content://call_log/calls", tel.CALL_COLS, call_key_row)
         readable["calls"] = have is not None
+        if have is not None:
+            on_phone["calls"] = len(have)
         if have:
             kept = [r for r in calls if call_key(r) not in have]
             existing["calls"] = len(calls) - len(kept)
@@ -362,8 +372,10 @@ def build_tel_plan(adb: AdbTransport, copy: CopyDir, meta: CopyMeta, kinds: set[
         mms = read_mms_xml(src.mms, None if src.mms == src.sms else copy.phone_dir / "mms_parts")
         have = _mms_keys_from_phone(adb, bool(mms))
         readable["mms"] = have is not None
+        if have is not None:
+            on_phone["mms"] = len(have)
         if have:
             kept = [r for r in mms if mms_key(r) not in have]
             existing["mms"] = len(mms) - len(kept)
             mms = kept
-    return TelPlan(src, selection, sms, mms, calls, existing, has_contacts, readable, local)
+    return TelPlan(src, selection, sms, mms, calls, existing, has_contacts, readable, local, on_phone)

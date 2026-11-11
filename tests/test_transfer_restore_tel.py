@@ -782,3 +782,17 @@ def test_manual_messages_file_streams_attachment_base64(tmp_path, monkeypatch):
 
 def test_manual_step_shape():
     assert ManualStep("sms", "/sdcard/Download/x.xml").kind == "sms"
+
+
+def test_rerun_after_phone_was_cleared_writes_again(tmp_path):
+    """Nieudana próba, czyszczenie telefonu i ponowne wgranie tej samej kopii: stan pamiętał
+    rekordy jako zapisane, plan pokazywał je „do wgrania”, a przebieg nie zapisywał nic."""
+    copy, phone = _copy(tmp_path), _new(tmp_path)
+    run = Run(phone, copy)
+    run()
+    for kind in ("contacts", "raw_contacts", "data", "sms", "mms", "calls"):
+        phone.providers[kind].clear()
+    r = run()
+    assert _counts(phone) == EXPECTED
+    assert {k: v.written for k, v in r.kinds.items()} == EXPECTED
+    assert r.status == "complete"

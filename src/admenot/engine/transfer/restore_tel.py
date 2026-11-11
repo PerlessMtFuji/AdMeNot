@@ -226,6 +226,7 @@ class _TelRestore:
         _mark(st, "running")
         todo: dict[str, list[Rec]] = {}
         for k in self.kinds:
+            self._forget_cleared(k)
             known = st.tel_status(k)
             todo[k] = [r for r in self.records[k] if known.get(r[0]) not in ("done", "manual")]
             self.stats[k].total = len(todo[k])
@@ -251,6 +252,21 @@ class _TelRestore:
         result = self._result(clean, stopped, t0)
         _mark(st, "stopped" if stopped else self._final_status(result))
         return result
+
+    def _forget_cleared(self, kind: str) -> None:
+        """Telefon wyczyszczony po poprzedniej próbie: plan (świeży odczyt telefonu) nie znalazł na nim
+        rekordów, które stan pamięta jako zapisane, a telefon ma mniej wpisów, niż ich zapisaliśmy.
+        Takie rekordy idą jeszcze raz. Bez drugiego warunku telefon, który zmienia zapisane dane
+        (klucz z planu przestaje pasować), dostawałby duplikaty przy każdym wznowieniu."""
+        count = self.plan.on_phone.get(kind)
+        if count is None:
+            return
+        known = self.state.tel_status(kind)
+        if count >= sum(status == "done" for status in known.values()):
+            return
+        gone = [rid for rid, _ in self.records[kind] if known.get(rid) == "done"]
+        if gone:
+            self.state.tel_forget(kind, gone)
 
     def _final_status(self, result: TelResult) -> str:
         """Stan całego wgrywania (pliki z Etapu 2 + telefonia) dla widoku kopii."""

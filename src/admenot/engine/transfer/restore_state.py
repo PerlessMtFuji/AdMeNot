@@ -151,6 +151,11 @@ class RestoreState:
                             [(kind, rid, status, path, error) for rid in rids])
         self.db.commit()
 
+    def tel_forget(self, kind: str, rids: Iterable[str]) -> None:
+        """Zapomina status rekordów (z commitem): telefon ich już nie ma, więc pójdą jeszcze raz."""
+        self.db.executemany("DELETE FROM tel WHERE kind=? AND rid=?", [(kind, rid) for rid in rids])
+        self.db.commit()
+
     # ---- aplikacje ----------------------------------------------------------------------
     def apps_status(self) -> dict[str, tuple[str, str | None, str | None]]:
         """Pakiet -> (status, powód, surowy kod błędu); status: `pending` | `installed` | `exists` |
