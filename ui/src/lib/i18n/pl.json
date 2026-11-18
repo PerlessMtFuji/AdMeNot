@@ -932,6 +932,23 @@
     "time_left": "Zostało {time}",
     "done_stopped": "Kopia przerwana",
     "done_stopped_text": "Skopiowane pliki zostają na komputerze. Żeby dokończyć, podłącz ten telefon i wybierz „Kopiuj dane”.",
+    "fail": {
+      "title": "Nieudane",
+      "reason": {
+        "no_space": "brak miejsca",
+        "denied": "telefon odmówił dostępu",
+        "disconnected": "telefon odłączony",
+        "vanished": "plik zniknął z telefonu",
+        "changed": "plik zmienił się w trakcie kopiowania",
+        "rejected": "telefon odrzucił instalację",
+        "verify": "kopia nie zgadza się z oryginałem",
+        "other": "inny błąd"
+      },
+      "show_all": "Pokaż wszystkie ({count})",
+      "retry": "Ponów nieudane",
+      "not_retryable": "nie da się ponowić",
+      "tel_records": { "one": "{count} rekord", "few": "{count} rekordy", "many": "{count} rekordów", "other": "{count} rekordu" }
+    },
     "sum": {
       "contacts": "Kontakty",
       "sms": "SMS",
@@ -1307,6 +1324,9 @@
     "unknown_order": "Nie znaleziono zlecenia.",
     "nothing_to_resume": "To zlecenie nie ma kroków do dokończenia.",
     "nothing_to_do": "Nic do wykonania — zaznaczone aplikacje są zablokowane.",
+    "nothing_to_retry": "Nie ma nic do ponowienia.",
+    "copy_resume_other": "Na ten telefon trwa już inna kopia. Dokończ ją albo usuń, potem ponów.",
+    "copy_in_progress": "Ta kopia jeszcze trwa. Poczekaj na jej koniec, potem ponów nieudane.",
     "plan_changed": "Plan zmienił się od pokazania klientowi. Pokaż klientowi nowy kod.",
     "no_target": "Nie ma takiej aplikacji ani kroku w zleceniu.",
     "bad_request": "Nieprawidłowe dane.",

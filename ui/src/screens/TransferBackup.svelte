@@ -3,6 +3,7 @@
   import { getContext, untrack } from 'svelte';
   import CopyNote from '../components/CopyNote.svelte';
   import DeviceCard from '../components/DeviceCard.svelte';
+  import FailureGroups from '../components/transfer/FailureGroups.svelte';
   import { formatEta } from '../lib/eta';
   import type { Controller } from '../lib/controller';
   import { i18n, t, tp } from '../lib/i18n/index.svelte';
@@ -78,6 +79,10 @@
   const size = (bytes: number) => formatSize(bytes, i18n.lang);
   const took = (sec: number) => (sec < 60 ? t('transfer.took_sec', { n: Math.max(1, Math.round(sec)) }) : t('transfer.took_min', { n: Math.round(sec / 60) }));
   const expiresOn = $derived(tr.copy ? new Date(tr.copy.expires).toLocaleDateString(i18n.lang === 'pl' ? 'pl-PL' : 'en-GB') : '');
+
+  // „Ponów nieudane”: tylko gdy jest co ponowić i podłączony jest stary telefon, z którego jest kopia
+  const canRetry = $derived(!!done && !!tr.copy && tr.failuresRetryable > 0 && s.job === null && s.serial === tr.copy.serial
+    && s.devices.some((d) => d.state === 'device' && d.serial === tr.copy!.serial));
 
   const KNOWN_ERRORS = ['addresses_missing', 'attachments_missing', 'export_changed', 'export_invalid'];
 
@@ -174,6 +179,11 @@
       {#if unavailable}
         <!-- jedna krótka linia pod liczbami, nie osobna karta -->
         <p class="text-sm text-mut">{t('transfer.unreadable')}{#if isXiaomi(s.device)} {t('transfer.xiaomi_hint')}{/if}</p>
+      {/if}
+
+      {#if tr.failures?.length}<FailureGroups failures={tr.failures} />{/if}
+      {#if canRetry}
+        <div><Button variant="primary" onclick={() => ctl.retryFailedBackup(tr.copy!.id)}>{t('transfer.fail.retry')}</Button></div>
       {/if}
 
       {#if usable}

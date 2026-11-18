@@ -407,3 +407,30 @@ test('without transfers the history has no tabs', async () => {
   expect(s.transfer.orders).toEqual([]);
   expect(screen.queryByRole('group', { name: 'Widok historii' })).toBeNull();
 });
+
+test('expanding a transfer shows its failed items; "Ponów nieudane" only with the target phone connected', async () => {
+  const COPY = { id: 'OLD/1', serial: 'S1', model: 'SM-A525F', manufacturer: 'samsung', client: 'Anna K.', created: '2026-10-25T14:20:00',
+    expires: '2026-11-01T14:20:00', days_left: 6, status: 'complete' as const, bytes: 10, counts: {} };
+  const failure = { kind: 'file' as const, group: 'photos', name: 'IMG_7.jpg', folder: 'DCIM/Camera', reason: 'denied' as const, count: 1, retryable: true };
+  const env = await setupCtl('adware');
+  env.bridge.setOrders([{ ...TRANSFER, target_serial: 'NEW1' } as never]);
+  env.bridge.setCopies([COPY]);
+  env.bridge.answerNext('transfer_failures', { failures: [failure], retryable: 1 });
+  render(App, { props: { ctl: env.ctl } });
+  await env.ctl.openHistory(null, 'transfers');
+  await vi.waitFor(() => expect(env.s.transfer.orders).toHaveLength(1));
+  await tick();
+  expect(screen.queryByRole('button', { name: 'Ponów nieudane' })).toBeNull();
+  await fireEvent.click(within(screen.getByRole('article', { name: /Samsung A52 → OPPO A54/ })).getByRole('button', { name: 'Pokaż szczegóły' }));
+  await vi.waitFor(() => expect(screen.getByText('IMG_7.jpg')).toBeTruthy());
+  expect(env.bridge.calls.find((c) => c.method === 'transfer_failures')?.args).toEqual(['OLD/1', 'NEW1']);
+  expect(screen.getByText(/telefon odmówił dostępu/)).toBeTruthy();
+  // lista jest, ale nowego telefonu nie ma przy komputerze: bez przycisku
+  expect(screen.queryByRole('button', { name: 'Ponów nieudane' })).toBeNull();
+  env.bridge.emit('devices', { devices: [{ serial: 'NEW1', state: 'device', model: 'A54', name: null, imei: '862222222222222' }], error: null });
+  env.ctl.selectDevice('NEW1');
+  await tick();
+  const retry = vi.spyOn(env.ctl, 'retryFailedRestore').mockResolvedValue();
+  await fireEvent.click(await screen.findByRole('button', { name: 'Ponów nieudane' }));
+  expect(retry).toHaveBeenCalledWith('OLD/1', 'NEW1');
+});

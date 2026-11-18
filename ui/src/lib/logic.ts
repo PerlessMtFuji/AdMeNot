@@ -1,5 +1,5 @@
 import { CATEGORY_ORDER } from './categories';
-import type { CheckBrowser, CheckSite, AppView, BackupResultView, Category, CopyView, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferOrderView, TransferProgress, TransferSelection, InventoryView, ExportFileView, ExportKind, StoredSelection, RestorePlanView, RestoreResultView, AppsPlanView, AppsPlanItem, TelKind, TelPlanView, TelResultView, UndoSite, UploadChoiceView, UploadGroup, UpdateView, UserWait, Verdict } from './types';
+import type { CheckBrowser, CheckSite, AppView, BackupResultView, Category, CopyView, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferOrderView, TransferProgress, TransferSelection, InventoryView, ExportFileView, ExportKind, StoredSelection, RestorePlanView, RestoreResultView, AppsResultView, AppsPlanView, AppsPlanItem, TelKind, TelPlanView, TelResultView, UndoSite, UploadChoiceView, UploadGroup, UpdateView, UserWait, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done'
   | 'transfer_choose' | 'transfer_backup' | 'transfer_done'
@@ -767,6 +767,18 @@ export function backupOutcome(r: BackupResultView, unreadable = 0): 'ok' | 'warn
   if (r.status === 'stopped') return 'stopped';
   if (r.status !== 'complete' || unreadable > 0 || Object.values(r.telephony).some((c) => c.status !== 'ok')) return 'warn';
   return 'ok';
+}
+
+/** Czy wynik kopii ma jakąkolwiek nieudaną pozycję (pliki, aplikacje, telefonia ze statusem „failed”) — wtedy ekran
+ *  końca wczytuje listę (`transfer_failures`). „Niedostępne” (telefon nie dał danych) to nie błąd pozycji. */
+export function backupHasFailures(r: BackupResultView): boolean {
+  return r.files_failed > 0 || r.apps_failed > 0 || Object.values(r.telephony).some((c) => c.status === 'failed');
+}
+
+/** To samo dla wyniku wgrywania: pliki (odmowa/błąd), aplikacje `failed`, rekordy telefonii z błędem. */
+export function restoreHasFailures(d: { result: RestoreResultView; apps?: AppsResultView | null; tel?: TelResultView | null }): boolean {
+  return d.result.files_denied + d.result.files_failed > 0 || (d.apps?.rows ?? []).some((x) => x.status === 'failed')
+    || Object.values(d.tel?.kinds ?? {}).some((k) => k.failed > 0);
 }
 
 /** Kopia do wznowienia: najnowsza niedokończona tego egzemplarza (numer seryjny, nie model), jak `find_resumable`

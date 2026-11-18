@@ -1,7 +1,7 @@
 import { SvelteSet } from 'svelte/reactivity';
 import { actedLevels, type ActedLog, type OpenGroups, type Phase } from './logic';
 import type {
-  ApiErrorBody, ApkEstimate, AppsPlanView, AppsProgressView, AppsResultView, WhatsappView, BackupResultView, CopyView, InventoryView, RestorePlanView, RestoreProgressView, RestoreResultView, TapRequest, TelPlanView, TelProgressView, TelResultView, TransferOrderView, TransferProgress, TransferSelection, UploadChoiceView, ApkQuestion, Category, ConsoleEntry, DeviceEntry, EtaView, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
+  ApiErrorBody, ApkEstimate, AppsPlanView, AppsProgressView, AppsResultView, WhatsappView, BackupResultView, CopyView, FailureView, InventoryView, RestorePlanView, RestoreProgressView, RestoreResultView, TapRequest, TelPlanView, TelProgressView, TelResultView, TransferOrderView, TransferProgress, TransferSelection, UploadChoiceView, ApkQuestion, Category, ConsoleEntry, DeviceEntry, EtaView, HistoryView, IncidentDone, Level, MirrorState, OrderResult, PhoneCard,
   PlanView, Question, ReportResult, ScanView, Settings, ShareState, ShotsView, ShotView, StepEvent, UndoDone, UndoSite, UpdateView, UserWait, Verdict, WhoView,
 } from './types';
 
@@ -94,6 +94,11 @@ export interface TransferState {
   appsBusy: string | null;
   /** Krótka uwaga w wierszu zlecenia po nieudanym doinstalowaniu (klucz błędu) — bez banera. */
   appsNotes: Record<string, string>;
+  /** Nieudane pozycje kopii albo wgrywania z ekranu końca (null — jeszcze nie wczytane); `failuresRetryable` — ile z nich ma sens ponowić. */
+  failures: FailureView[] | null;
+  failuresRetryable: number;
+  /** Nieudane pozycje kopii rozwiniętych w Historii: klucz `<id kopii>|<numer seryjny wgrywania albo pusty>`. */
+  copyFailures: Record<string, { failures: FailureView[]; retryable: number }>;
   restore: RestoreState;
   cleanup: CleanupState;
 }
@@ -227,7 +232,7 @@ export class AppState {
   crashError = $state<ApiErrorBody | null>(null);
   fatalCrash = $state<string | null>(null);
   transfer = $state<TransferState>({ inventory: null, resumable: null, selection: { ...EMPTY_TRANSFER_SELECTION },
-    progress: null, waiting: false, result: null, copy: null, copies: [], orders: [], appsBusy: null, appsNotes: {}, restore: emptyRestore(),
+    progress: null, waiting: false, result: null, copy: null, copies: [], orders: [], appsBusy: null, appsNotes: {}, failures: null, failuresRetryable: 0, copyFailures: {}, restore: emptyRestore(),
     cleanup: { serial: null, running: false, ok: null } });
 
   get orderRunning(): boolean {
