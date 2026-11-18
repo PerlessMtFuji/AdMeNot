@@ -13,6 +13,7 @@ import contextlib
 import os
 import re
 import secrets
+import sqlite3
 import sys
 import threading
 import time
@@ -41,6 +42,7 @@ from admenot.app.present import (
     device_identity,
     estimate_view,
     eta_view,
+    failure_view,
     fix_texts,
     history_view,
     inventory_view,
@@ -172,6 +174,7 @@ from admenot.engine.transfer.backup import (
     run_backup,
 )
 from admenot.engine.transfer.exports import EXPORT_KINDS
+from admenot.engine.transfer.failures import backup_failures, restore_failures
 from admenot.engine.transfer.guard import AppendOnlyAdb, AppInstallAdb, ReadOnlyAdb, TelPlanReadAdb
 from admenot.engine.transfer.inventory import (
     FILE_CATEGORIES,
@@ -207,6 +210,7 @@ from admenot.engine.transfer.restore_plan import UPLOAD_GROUPS, RestorePlan, bui
 from admenot.engine.transfer.restore_state import (
     RestoreState,
     read_restores,
+    reopen_restore_for_retry,
     restore_state_path,
 )
 from admenot.engine.transfer.restore_tel import TelProgress, TelResult, run_tel_restore
@@ -2435,6 +2439,70 @@ class Api(ExplorerMixin):
         return {"orders": [transfer_order_view(o, r, by_id.get(r.copy_id), now, o.number == running)
                            for o, r in pairs],
                 "copies": [self._copy_view(m, now, restoring) for m in metas]}
+
+    def _failures_copy(self, copy_id: str, serial: str | None) -> tuple[store.CopyDir, str | None]:
+        """Katalog kopii i oczyszczony serial (None — kopia, nie wgrywanie); zły kształt to `bad_request`."""
+        if not isinstance(copy_id, str):
+            raise AppError("bad_request", "copy_id")
+        if serial is not None and (not isinstance(serial, str) or not serial.strip()):
+            raise AppError("bad_request", "serial")
+        try:
+            copy = store.copy_dir(copy_id)
+            copy.read_meta()
+        except (OSError, ValueError, KeyError, TypeError):  # ścieżka nie idzie do raportu
+            raise AppError("bad_request", "copy_id") from None
+        return copy, serial.strip() if serial is not None else None
+
+    @_api
+    def transfer_failures(self, copy_id: str, serial: str | None = None) -> dict[str, Any]:
+        """Nieudane pozycje kopii (`serial` puste) albo wgrywania tej kopii na telefon `serial`.
+        Same odczyty stanów — telefon nie musi być podłączony. Do UI idą tylko powody z `REASONS`."""
+        copy, phone = self._failures_copy(copy_id, serial)
+        try:
+            found = backup_failures(copy) if phone is None else restore_failures(copy, phone)
+        except (OSError, sqlite3.Error):  # stan zablokowany przez inny program albo uszkodzony
+            raise AppError("transfer_in_use") from None
+        return {"failures": [failure_view(f) for f in found], "retryable": sum(f.retryable for f in found)}
+
+    def _require_retry_ready(self, serial: str) -> None:
+        """Ponawianie zmienia stan kopii: nie przy trwającym zadaniu przenoszenia (kopia, plan, wgrywanie,
+        sprzątanie) i tylko przy telefonie, którego dotyczy, podłączonym jako `device`."""
+        job = self._jobs.current()
+        if job is not None and job.kind in TRANSFER_KINDS:
+            raise AppError("busy", job.kind)
+        if serial not in {e.serial for e in list_devices(self._host) if e.state == "device"}:
+            with self._journal() as journal:
+                name, imei = device_identity(journal, serial)
+            raise AppError("wrong_device", serial, serial=serial, device=name, imei=imei)
+        self._require_cleaned(serial)
+
+    def _retry(self, copy_id: str, serial: str, reopen: Callable[[], int]) -> dict[str, Any]:
+        try:
+            with device_lock(journal_path(), serial):
+                return {"count": reopen()}
+        except store.RetryError as exc:  # nothing_to_retry | copy_resume_other | copy_in_progress
+            raise AppError(exc.key, copy_id) from None
+        except (OSError, sqlite3.Error):  # stan zablokowany przez inny program
+            raise AppError("transfer_in_use") from None
+
+    @_api
+    def retry_failed_backup(self, copy_id: str) -> dict[str, Any]:
+        """Zakończona kopia wraca do `in_progress`: kolejny `start_backup` (wznowienie, baner na ekranie
+        Połącz) ponowi nieudane pliki, aplikacje i telefonię."""
+        copy, _ = self._failures_copy(copy_id, None)
+        serial = copy.read_meta().serial
+        self._require_retry_ready(serial)
+        return self._retry(copy_id, serial, lambda: store.reopen_copy_for_retry(copy))
+
+    @_api
+    def retry_failed_restore(self, copy_id: str, serial: str) -> dict[str, Any]:
+        """Wgrywanie na `serial` wraca do wznowienia (`restore_plan` zgłasza `resumable`); aplikacje
+        wracają do `pending`, więc zwykłe wznowienie (nie `only_blocked`) je zainstaluje."""
+        copy, phone = self._failures_copy(copy_id, serial)
+        if phone is None:
+            raise AppError("bad_request", "serial")
+        self._require_retry_ready(phone)
+        return self._retry(copy_id, phone, lambda: reopen_restore_for_retry(copy, phone))
 
     @_api
     def extend_transfer(self, copy_id: str) -> dict[str, Any]:

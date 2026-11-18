@@ -53,19 +53,24 @@ def test_manual_scenario_goes_manual_then_partial():
 def test_transfer_scenario_inventories_copies_and_lists():
     data = _module().record_all()["transfer"]
     assert [c["method"] for c in data["calls"]] == ["list_devices", "transfers", "transfer_inventory",
-                                                    "start_backup", "transfers"]
+                                                    "start_backup", "transfers", "transfer_failures",
+                                                    "retry_failed_backup"]
     events = [name for c in data["calls"] for name, _ in c["events"]]
     for name in ("scan:device", "transfer:inventory", "transfer:progress", "transfer:done"):
         assert name in events, name
     done = next(d for c in data["calls"] for n, d in c["events"] if n == "transfer:done")
     assert done["result"]["status"] == "complete"
-    assert data["calls"][-1]["result"]["copies"][0]["id"] == done["copy"]["id"]
+    listed = next(c for c in data["calls"][::-1] if c["method"] == "transfers")
+    assert listed["result"]["copies"][0]["id"] == done["copy"]["id"]
+    assert data["calls"][-2]["result"] == {"failures": [], "retryable": 0}
+    assert data["calls"][-1]["result"]["error"]["key"] == "nothing_to_retry"
 
 
 def test_transfer_restore_scenario_plans_uploads_and_lists():
     data = _module().record_all()["transfer_restore"]
     assert [c["method"] for c in data["calls"]] == ["list_devices", "transfer_inventory", "start_backup",
-                                                    "transfers", "restore_plan", "start_restore", "transfers"]
+                                                    "transfers", "restore_plan", "start_restore", "transfers",
+                                                    "transfer_failures", "retry_failed_restore"]
     events = {name: d for c in data["calls"] for name, d in c["events"]}
     for name in ("transfer:restore_plan", "transfer:restore_progress", "transfer:restore_done"):
         assert name in events, name
@@ -74,7 +79,7 @@ def test_transfer_restore_scenario_plans_uploads_and_lists():
     assert {a["outcome"] for a in plan["apks"]} == {"suspicious", "malicious"}
     result = events["transfer:restore_done"]["result"]
     assert (result["status"], result["files_renamed"], result["apk_skipped"]) == ("complete", 1, 1)
-    listed = data["calls"][-1]["result"]["copies"][0]["restores"]
+    listed = next(c for c in data["calls"][::-1] if c["method"] == "transfers")["result"]["copies"][0]["restores"]
     assert [(r["serial"], r["status"]) for r in listed] == [(result["target_serial"], "complete")]
 
 

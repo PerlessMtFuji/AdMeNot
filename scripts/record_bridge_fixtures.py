@@ -265,6 +265,9 @@ def _transfer(r: Recorder, phone: Any) -> None:
     r.call("transfer_inventory", SERIAL, CLIENT)
     r.call("start_backup", TRANSFER_SELECTION)
     r.call("transfers")
+    copy_id = r.events("transfer:done")[0]["copy"]["id"]
+    r.call("transfer_failures", copy_id)  # kopia bez nieudanych pozycji
+    r.call("retry_failed_backup", copy_id)  # nic do ponowienia: nothing_to_retry
 
 
 EXPORT_VCF = "".join(f"BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Osoba {i}\r\nEND:VCARD\r\n" for i in range(3))
@@ -376,6 +379,8 @@ def _transfer_restore(r: Recorder, phone: Any) -> None:
         r.call("restore_plan", copy_id, RESTORE_SERIAL)
     r.call("start_restore", {**RESTORE_CHOICE, "apps": ["com.whatsapp", "pl.example.native"]})
     r.call("transfers")  # Historia: „wgrano na …”
+    r.call("transfer_failures", copy_id, RESTORE_SERIAL)  # aplikacja odrzucona z przyczyny trwałej
+    r.call("retry_failed_restore", copy_id, RESTORE_SERIAL)  # nic do ponowienia
 
 
 def _xiaomi_phones(tmp: Path) -> PhoneHost:

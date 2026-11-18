@@ -588,3 +588,14 @@ def test_failed_order_view_tells_partial_from_nothing(tmp_path):
                                                 "status": "failed"})
         view = transfer_order_view(journal.order(order.id), journal.transfer(order.id), None, now)
         assert view["partial"] is True
+
+
+def test_failure_view_fields():
+    from admenot.app.present import failure_view
+    from admenot.engine.transfer.failures import Failure
+
+    f = Failure("file", "media", "IMG_1.jpg", "DCIM/Camera", "denied", count=1, retryable=False)
+    assert failure_view(f) == {"kind": "file", "group": "media", "name": "IMG_1.jpg", "folder": "DCIM/Camera",
+                               "reason": "denied", "count": 1, "retryable": False}
+    tel = failure_view(Failure("tel", "sms", "sms", "", "other", count=7))
+    assert tel["count"] == 7 and tel["retryable"] is True

@@ -51,6 +51,7 @@ from admenot.engine.texts import (
 )
 from admenot.engine.transfer.apps import AppsPlan, AppsResult
 from admenot.engine.transfer.backup import BackupResult
+from admenot.engine.transfer.failures import Failure
 from admenot.engine.transfer.inventory import FILE_CATEGORIES, Inventory
 from admenot.engine.transfer.restore import RestoreResult
 from admenot.engine.transfer.restore_plan import UPLOAD_GROUPS, GroupTotals, RestorePlan
@@ -503,6 +504,13 @@ def copy_view(meta: CopyMeta, now: datetime, restoring: str | None = None) -> di
             "restores": [{"serial": r.serial, "imei": r.imei,
                           "status": "stopped" if r.status == "running" and restoring != meta.id else r.status,
                           "updated": r.updated, "resumable": r.resumable} for r in restores]}
+
+
+def failure_view(f: Failure) -> dict[str, Any]:
+    """Nieudana pozycja kopii albo wgrywania. `reason` to klucz z `REASONS` — surowy kod błędu
+    zostaje w logu i nie wychodzi do UI."""
+    return {"kind": f.kind, "group": f.group, "name": f.name, "folder": f.folder,
+            "reason": f.reason, "count": f.count, "retryable": f.retryable}
 
 
 def backup_result_view(r: BackupResult) -> dict[str, Any]:

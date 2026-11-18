@@ -8,6 +8,7 @@ import threading
 import time
 from datetime import timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from apphelpers import NOW, Disk, make_api
@@ -1937,3 +1938,122 @@ def test_transfer_exports_check_is_cheap_read_only_and_updates_inventory(tmp_pat
     assert not any(c.split()[0] in {"rm", "mv", "cp", "touch", "mkdir", "am", "pm", "settings"} for c in session)
     finds = [c for c in session if c.startswith("find")]
     assert finds and all("-iname" in c for c in finds)
+
+
+# --- lista nieudanych i ponawianie ----------------------------------------------------------------
+
+def _break_backup_file(copy_id: str, remote: str = "/sdcard/Download/c.pdf") -> store.CopyDir:
+    """Jak po kopii, w której jeden plik nie przeszedł: wiersz `error` w stanie kopii, kopia zakończona."""
+    from admenot.engine.transfer.state import State
+
+    copy = store.copy_dir(copy_id)
+    state = State(copy.state_path)
+    try:
+        state.db.execute("UPDATE files SET status='error', attempts=3, error='pull_failed' WHERE remote=?",
+                         (remote,))
+        state.db.commit()
+    finally:
+        state.close()
+    return copy
+
+
+def test_transfer_failures_after_backup_with_failed_file(tmp_path):
+    from admenot.engine.transfer.failures import REASONS
+
+    api, rec, _ = _inventoried(tmp_path)
+    api.start_backup(SELECTION)
+    copy_id = rec.wait_for("transfer:done")["copy"]["id"]
+    assert api.transfer_failures(copy_id) == {"failures": [], "retryable": 0}
+    _break_backup_file(copy_id)
+    resp = api.transfer_failures(copy_id)
+    failure = resp["failures"][0]
+    assert failure["kind"] == "file" and failure["name"] == "c.pdf" and failure["folder"] == "Download"
+    assert failure["reason"] in REASONS and failure["retryable"] is True
+    assert resp["retryable"] == 1
+    assert "pull_failed" not in json.dumps(resp)  # surowy kod zostaje w logu
+    assert api.transfer_failures("../x")["error"]["key"] == "bad_request"
+    assert api.transfer_failures(copy_id, "")["error"]["key"] == "bad_request"
+
+
+def test_retry_failed_backup_reopens_and_offers_resume(tmp_path):
+    api, rec, _ = _inventoried(tmp_path)
+    api.start_backup(SELECTION)
+    copy_id = rec.wait_for("transfer:done")["copy"]["id"]
+    copy = _break_backup_file(copy_id)
+    assert api.retry_failed_backup(copy_id) == {"count": 1}
+    assert copy.read_meta().status == "in_progress"
+    api.transfer_inventory(SERIAL, "Anna K.")
+    assert api._jobs.wait(5)
+    assert rec.of("transfer:inventory")[-1]["resumable"]["id"] == copy_id
+    # wznowienie ponawia plik i kończy kopię
+    api.start_backup(SELECTION)
+    assert api._jobs.wait(5)
+    assert rec.of("transfer:done")[-1]["copy"]["status"] == "complete"
+    assert api.transfer_failures(copy_id)["failures"] == []
+
+
+def test_retry_failed_backup_wrong_device(tmp_path):
+    api, rec, _ = _inventoried(tmp_path)
+    api.start_backup(SELECTION)
+    copy_id = rec.wait_for("transfer:done")["copy"]["id"]
+    copy = _break_backup_file(copy_id)
+    meta = copy.read_meta()
+    meta.serial = "OTHER-PHONE"  # kopia innego telefonu niż podłączony
+    copy.write_meta(meta)
+    assert api.retry_failed_backup(copy_id)["error"]["key"] == "wrong_device"
+    assert copy.read_meta().status == "complete"  # stan bez zmian
+
+
+def test_retry_refused_while_a_transfer_job_runs(tmp_path, monkeypatch):
+    api, rec, _ = _inventoried(tmp_path)
+    api.start_backup(SELECTION)
+    copy_id = rec.wait_for("transfer:done")["copy"]["id"]
+    copy = _break_backup_file(copy_id)
+    for kind in ("backup", "restore"):  # zadania w testach idą synchronicznie: trwające podstawiamy
+        monkeypatch.setattr(api._jobs, "current", lambda kind=kind: SimpleNamespace(kind=kind))
+        assert api.retry_failed_backup(copy_id)["error"]["key"] == "busy"
+        assert api.retry_failed_restore(copy_id, SERIAL)["error"]["key"] == "busy"
+    assert copy.read_meta().status == "complete"
+
+
+def _break_restore_file(host, copy_id: str) -> None:
+    """Wgrywanie zakończone z jednym plikiem `error` (którego na telefonie nie ma)."""
+    from admenot.engine.transfer.restore_state import RestoreState, restore_state_path
+
+    copy = store.copy_dir(copy_id)
+    host.phone(NEW).storage.local("/sdcard/Download/c.pdf").unlink()
+    state = RestoreState(restore_state_path(copy, NEW))
+    try:
+        state.db.execute("UPDATE files SET status='error', attempts=3, error='push_failed' "
+                         "WHERE remote LIKE '%c.pdf'")
+        state.db.commit()
+    finally:
+        state.close()
+
+
+def test_retry_failed_restore_makes_plan_resumable(tmp_path):
+    api, rec, host, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+    api.start_restore(CHOICE)
+    rec.wait_for("transfer:restore_done")
+    assert api.transfer_failures(copy_id, NEW) == {"failures": [], "retryable": 0}
+    _break_restore_file(host, copy_id)
+    resp = api.transfer_failures(copy_id, NEW)
+    assert [f["name"] for f in resp["failures"]] == ["c.pdf"] and resp["retryable"] == 1
+    assert "push_failed" not in json.dumps(resp)
+    assert api.retry_failed_restore(copy_id, NEW) == {"count": 1}
+    assert _planned(api, rec, copy_id)["resumable"] is True
+
+
+def test_retry_maps_retry_error_keys(tmp_path):
+    api, rec, _host, copy_id = _copied(tmp_path)
+    assert api.retry_failed_backup(copy_id)["error"]["key"] == "nothing_to_retry"
+    _planned(api, rec, copy_id)
+    api.start_restore(CHOICE)
+    rec.wait_for("transfer:restore_done")
+    assert api.retry_failed_restore(copy_id, NEW)["error"]["key"] == "nothing_to_retry"
+    # druga, niedokończona kopia tego telefonu blokuje ponowienie
+    copy = _break_backup_file(copy_id)
+    store.create_copy(SERIAL, _device(), None, NOW)
+    assert api.retry_failed_backup(copy_id)["error"]["key"] == "copy_resume_other"
+    assert copy.read_meta().status == "complete"
