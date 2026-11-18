@@ -105,9 +105,11 @@ class RestoreState:
         self.db.commit()
         self.db.close()
 
-    def set_meta(self, key: str, value: Any) -> None:
+    def set_meta(self, key: str, value: Any, *, commit: bool = True) -> None:
+        """`commit=False` — zapis w cudzej transakcji (`with state.db:`), np. razem z wierszami."""
         self.db.execute("INSERT OR REPLACE INTO meta(key, value) VALUES(?, ?)", (key, json.dumps(value)))
-        self.db.commit()
+        if commit:
+            self.db.commit()
 
     def get_meta(self, key: str, default: Any = None) -> Any:
         row = self.db.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
@@ -387,16 +389,16 @@ def reopen_restore_for_retry(copy: CopyDir, serial: str) -> int:
                 if st == "failed" and (rs or "").strip().lower() not in PERMANENT_APP_REASONS
                 and reason_key(rs) != "vanished"]
         tel = sum(1 for f in failures if f.kind == "tel")
-        with state.db:  # jedna transakcja: albo wszystko, albo nic
+        with state.db:  # jedna transakcja (wiersze i meta): albo wszystko, albo nic
             state.db.executemany("UPDATE files SET status='pending', attempts=0, error=NULL WHERE remote=?",
                                  [(r,) for r in files])
             state.db.executemany(
                 "UPDATE apps SET status='pending', reason=NULL, code=NULL WHERE package=?", [(p,) for p in apps])
-        state.set_meta("status", "incomplete")
-        if apps:
-            state.set_meta("apps_left", apps_left_now(state))
-        if tel:
-            state.set_meta("tel_left", tel)
+            state.set_meta("status", "incomplete", commit=False)
+            if apps:
+                state.set_meta("apps_left", apps_left_now(state), commit=False)
+            if tel:
+                state.set_meta("tel_left", tel, commit=False)
     finally:
         state.close()
     return len(files) + len(apps) + tel

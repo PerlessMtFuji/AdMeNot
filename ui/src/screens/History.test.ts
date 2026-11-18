@@ -434,3 +434,22 @@ test('expanding a transfer shows its failed items; "Ponów nieudane" only with t
   await fireEvent.click(await screen.findByRole('button', { name: 'Ponów nieudane' }));
   expect(retry).toHaveBeenCalledWith('OLD/1', 'NEW1');
 });
+
+test('an interrupted (in progress) copy lists its failed items but does not offer "Ponów nieudane"', async () => {
+  const COPY = { id: 'OLD/2', serial: 'S1', model: 'SM-A525F', manufacturer: 'samsung', client: 'Anna K.', created: '2026-10-25T14:20:00',
+    expires: '2026-11-01T14:20:00', days_left: 6, status: 'in_progress' as const, bytes: 10, counts: {} };
+  const failure = { kind: 'file' as const, group: 'photos', name: 'IMG_8.jpg', folder: 'DCIM/Camera', reason: 'denied' as const, count: 1, retryable: true };
+  const env = await setupCtl('adware');
+  env.bridge.setOrders([{ ...TRANSFER, state: 'backed_up', target: null, copy: { id: 'OLD/2', days_left: 6, deleted_at: null } } as never]);
+  env.bridge.setCopies([COPY]);
+  env.bridge.answerNext('transfer_failures', { failures: [failure], retryable: 1 });
+  env.bridge.emit('devices', { devices: [{ serial: 'S1', state: 'device', model: 'SM-A525F', name: null, imei: '351111111111111' }], error: null });
+  env.ctl.selectDevice('S1');
+  render(App, { props: { ctl: env.ctl } });
+  await env.ctl.openHistory(null, 'transfers');
+  await vi.waitFor(() => expect(env.s.transfer.orders).toHaveLength(1));
+  await tick();
+  await fireEvent.click(screen.getAllByRole('button', { name: 'Pokaż szczegóły' })[0]);  // dwa wiersze: zlecenie i kopia bez zlecenia
+  await vi.waitFor(() => expect(screen.getAllByText('IMG_8.jpg').length).toBeGreaterThan(0));
+  expect(screen.queryByRole('button', { name: 'Ponów nieudane' })).toBeNull();
+});

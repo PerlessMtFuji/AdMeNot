@@ -298,6 +298,12 @@ describe('TransferBackup — failed items', () => {
     expect(screen.queryByRole('button', { name: 'Ponów nieudane' })).toBeNull();
   });
 
+  test('a stopped copy with failed files: no "Ponów nieudane" (it is resumed, not reopened)', async () => {
+    await finished(result({ status: 'stopped', files_failed: 1 }), [fail('a.jpg')], 1);
+    expect(screen.getByText('a.jpg')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Ponów nieudane' })).toBeNull();
+  });
+
   test('the old phone is not connected: no retry button', async () => {
     await finished(result({ files_failed: 1 }), [fail('a.jpg')], 1, false);
     expect(screen.getByText('a.jpg')).toBeTruthy();

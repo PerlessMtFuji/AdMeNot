@@ -652,6 +652,12 @@ def settle_finished(copy: CopyDir, serial: str, plan: RestorePlan, tel_plan: Tel
                 state.update(row.remote, status="skipped", error=_skip_reason(f, groups, apks_on),
                              own=int(own and row.target == f.target))
         state.commit()
+        # rekordy telefonii z `error`, których telefon już ma (plan nie ma ich do zapisu), są rozstrzygnięte —
+        # inaczej lista nieudanych ponawiałaby je bez końca (`sms` obejmuje MMS)
+        tel_kinds = sorted(kinds | ({"mms"} if "sms" in kinds else set()))
+        with state.db:
+            state.db.executemany("UPDATE tel SET status='done', error=NULL WHERE kind=? AND status='error'",
+                                 [(k,) for k in tel_kinds])
         state.set_meta("tel_left", 0)
         rows = state.all_files().values()
         done = sum(1 for r in rows if r.status == "done")

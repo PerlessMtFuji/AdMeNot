@@ -80,8 +80,9 @@
   const took = (sec: number) => (sec < 60 ? t('transfer.took_sec', { n: Math.max(1, Math.round(sec)) }) : t('transfer.took_min', { n: Math.round(sec / 60) }));
   const expiresOn = $derived(tr.copy ? new Date(tr.copy.expires).toLocaleDateString(i18n.lang === 'pl' ? 'pl-PL' : 'en-GB') : '');
 
-  // „Ponów nieudane”: tylko gdy jest co ponowić i podłączony jest stary telefon, z którego jest kopia
-  const canRetry = $derived(!!done && !!tr.copy && tr.failuresRetryable > 0 && s.job === null && s.serial === tr.copy.serial
+  // „Ponów nieudane”: tylko gdy jest co ponowić i podłączony jest stary telefon, z którego jest kopia;
+  // przerwana kopia zostaje w toku — ją wznawia „Dokończ”, a pliki z błędem wracają same
+  const canRetry = $derived(!!done && outcome !== 'stopped' && !!tr.copy && tr.failuresRetryable > 0 && s.job === null && s.serial === tr.copy.serial
     && s.devices.some((d) => d.state === 'device' && d.serial === tr.copy!.serial));
 
   const KNOWN_ERRORS = ['addresses_missing', 'attachments_missing', 'export_changed', 'export_invalid'];

@@ -2045,6 +2045,29 @@ def test_retry_failed_restore_makes_plan_resumable(tmp_path):
     assert _planned(api, rec, copy_id)["resumable"] is True
 
 
+def test_retry_failed_restore_wrong_device(tmp_path):
+    """Stan wgrywania jest na telefonie, którego nie ma podłączonego: `wrong_device`, stan nietknięty."""
+    import shutil
+
+    from admenot.engine.transfer.restore_state import RestoreState, restore_state_path
+
+    api, rec, host, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+    api.start_restore(CHOICE)
+    rec.wait_for("transfer:restore_done")
+    _break_restore_file(host, copy_id)
+    copy = store.copy_dir(copy_id)
+    other = "OTHER-PHONE"  # wgrywanie na telefon, który nie jest podłączony (podłączone są stary i nowy)
+    shutil.copy(restore_state_path(copy, NEW), restore_state_path(copy, other))
+    assert api.retry_failed_restore(copy_id, other)["error"]["key"] == "wrong_device"
+    state = RestoreState(restore_state_path(copy, other))
+    try:
+        assert {r.status for r in state.all_files().values()} >= {"error"}
+        assert state.get_meta("status") == "complete"
+    finally:
+        state.close()
+
+
 def test_retry_maps_retry_error_keys(tmp_path):
     api, rec, _host, copy_id = _copied(tmp_path)
     assert api.retry_failed_backup(copy_id)["error"]["key"] == "nothing_to_retry"

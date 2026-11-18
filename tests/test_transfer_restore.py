@@ -699,6 +699,30 @@ def test_settle_rows_like_reconcile_and_scans_the_gallery(tmp_path):
     assert _meta(copy, "status") == "complete" and _meta(copy, "tel_left") == 0
 
 
+def test_settle_resolves_error_tel_rows_when_nothing_is_left_to_write(tmp_path):
+    """Ponowione wgrywanie, w którym rekordy telefonii już są na telefonie (świeży plan nie ma ich do zapisu):
+    wiersze `tel` ze statusem `error` dostają `done`, inaczej lista nieudanych ponawiałaby je bez końca."""
+    from admenot.engine.transfer.failures import restore_failures
+
+    copy = _copy(tmp_path)
+    new = _new(tmp_path, OLD)
+    _interrupted(copy, [], choice=UploadChoice(frozenset(), frozenset(), tel=frozenset({"sms"})),
+                 status="incomplete", tel_left=2)
+    state = RestoreState(restore_state_path(copy, "NEW"))
+    try:
+        state.tel_set("sms", ["1", "2"], "error", "file", "write_failed")
+    finally:
+        state.close()
+    assert any(f.kind == "tel" for f in restore_failures(copy, "NEW"))
+    assert _settle(new, copy) is True
+    assert [f for f in restore_failures(copy, "NEW") if f.kind == "tel"] == []
+    state = RestoreState(restore_state_path(copy, "NEW"))
+    try:
+        assert set(state.tel_status("sms").values()) == {"done"}
+    finally:
+        state.close()
+
+
 def test_settle_skips_scan_when_one_ran_after_the_done_files(tmp_path):
     copy = _copy(tmp_path)
     new = _new(tmp_path, OLD)

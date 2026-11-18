@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from datetime import datetime, timedelta
 
 import pytest
@@ -251,6 +252,34 @@ def test_reopen_restore_repends_files_and_transient_apps(copy):
         state.close()
     (summary,) = read_restores(copy)
     assert summary.resumable is True
+
+
+def test_reopen_restore_is_atomic_when_a_meta_write_fails(copy, monkeypatch):
+    """Błąd przy ostatnim zapisie meta cofa też wiersze: stan zostaje `complete` z błędami do ponowienia."""
+    path = restore_state_path(copy, "NEW")
+    state = RestoreState(path)
+    state.insert(RestoreRow("/sdcard/a.txt", "/sdcard/a.txt", "docs", 1, 1, "error", 3, "push_failed"))
+    state.tel_set("sms", ["1"], "error", "file", "write_failed")
+    state.set_meta("serial", "NEW")
+    state.set_meta("status", "complete")
+    state.close()
+    real = RestoreState.set_meta
+
+    def failing(self, key, value, **kw):
+        if key == "tel_left":
+            raise sqlite3.OperationalError("disk full")
+        real(self, key, value, **kw)
+
+    monkeypatch.setattr(RestoreState, "set_meta", failing)
+    with pytest.raises(sqlite3.OperationalError):
+        reopen_restore_for_retry(copy, "NEW")
+    monkeypatch.undo()
+    state = RestoreState(path)
+    try:
+        assert state.all_files()["/sdcard/a.txt"].status == "error"
+        assert state.get_meta("status") == "complete"
+    finally:
+        state.close()
 
 
 def test_reopen_restore_only_tel_failed_is_resumable(copy):
