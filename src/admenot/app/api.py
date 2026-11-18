@@ -344,6 +344,16 @@ def _selection(value: Any, inventory: Inventory) -> Selection:
     return Selection(**flags, **lists, verify_hash=verify, exports=exports)
 
 
+def _failures_for_report(copy: store.CopyDir, serial: str) -> list[dict[str, Any]]:
+    """Nieudane pozycje wgrywania do wyniku w dzienniku (raport przenoszenia działa bez kopii).
+    Błąd odczytu stanu nie zatrzymuje zapisu wyniku — wtedy raport nie ma listy, jak dawniej."""
+    try:
+        return [failure_view(f) for f in restore_failures(copy, serial)]
+    except Exception as exc:  # noqa: BLE001
+        log_exception(exc)
+        return []
+
+
 def _upload_choice(value: Any, plan: RestorePlan, apps_plan: AppsPlan | None = None) -> UploadChoice:
     """Wybór z ekranu wgrywania: grupy (`UPLOAD_GROUPS` albo `other:<folder>` z planu), zaznaczone
     podejrzane APK (tylko pliki APK z planu), sumy SHA-256 i telefonia (`tel` ⊆ `TEL_KINDS`, brak =
@@ -2213,7 +2223,8 @@ class Api(ExplorerMixin):
                 ok = finished and tel_error is None and apps_error is None and not stopped
                 if order_id is not None:
                     save(status="done" if ok else "failed",
-                         finished_at=self._now().isoformat(timespec="seconds"))
+                         finished_at=self._now().isoformat(timespec="seconds"),
+                         failures=_failures_for_report(copy, serial))
                     try:
                         with self._journal() as journal:
                             journal.set_order_status(order_id, "done" if ok else "failed")
@@ -2370,7 +2381,8 @@ class Api(ExplorerMixin):
                     try:
                         with self._journal() as journal:
                             journal.save_transfer_result(
-                                found.id, {**(journal.transfer(found.id).result or {}), "apps": view})
+                                found.id, {**(journal.transfer(found.id).result or {}), "apps": view,
+                                           "failures": _failures_for_report(copy, serial)})
                     except Exception as exc:  # noqa: BLE001 — instalacja już się odbyła
                         log_exception(exc)
             finally:

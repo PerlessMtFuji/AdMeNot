@@ -2057,3 +2057,18 @@ def test_retry_maps_retry_error_keys(tmp_path):
     store.create_copy(SERIAL, _device(), None, NOW)
     assert api.retry_failed_backup(copy_id)["error"]["key"] == "copy_resume_other"
     assert copy.read_meta().status == "complete"
+
+
+def test_restore_result_in_journal_has_failures(tmp_path, monkeypatch):
+    from admenot.engine.transfer.failures import Failure
+    found = [Failure("file", "photos", "a.jpg", "DCIM", "denied", retryable=True)]
+    monkeypatch.setattr("admenot.app.api.restore_failures", lambda copy, serial: found)
+    api, rec, host, copy_id = _copied(tmp_path)
+    _planned(api, rec, copy_id)
+    api.start_restore(CHOICE)
+    number = rec.of("transfer:restore_done")[0]["order"]
+    with api._journal() as journal:
+        order = journal.order_by_number(number)
+        result = journal.transfer(order.id).result
+    assert result["failures"] == [{"kind": "file", "group": "photos", "name": "a.jpg", "folder": "DCIM",
+                                   "reason": "denied", "count": 1, "retryable": True}]
