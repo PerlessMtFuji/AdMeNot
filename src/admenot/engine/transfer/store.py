@@ -371,6 +371,35 @@ def find_resumable(serial: str) -> CopyDir | None:
     return None
 
 
+class RetryError(Exception):
+    """Ponowienie nieudanych pozycji niemożliwe. `key`: `nothing_to_retry` | `copy_resume_other` |
+    `copy_in_progress`. Zdefiniowany tu, nie w `failures`: ten moduł importuje `store`."""
+
+    def __init__(self, key: str) -> None:
+        super().__init__(key)
+        self.key = key
+
+
+def reopen_copy_for_retry(copy: CopyDir) -> int:
+    """Zakończona kopia wraca do `in_progress`, żeby wznowienie (`run_backup` na tej samej kopii)
+    ponowiło nieudane pozycje: pliki `error` wracają do kolejki w `_reconcile`, aplikacje i telefonia
+    bez wyniku `done`/`ok` idą od nowa. Zwraca liczbę ponawianych pozycji (telefonia: rodzaj = 1)."""
+    from .failures import backup_failures  # `failures` importuje `store`
+
+    meta = copy.read_meta()
+    if meta.status == "in_progress":
+        raise RetryError("copy_in_progress")
+    count = sum(1 for f in backup_failures(copy) if f.retryable)
+    if count == 0:
+        raise RetryError("nothing_to_retry")
+    other = find_resumable(meta.serial)
+    if other is not None and other.path != copy.path:  # `find_resumable` zwraca tylko jedną kopię na telefon
+        raise RetryError("copy_resume_other")
+    meta.status = "in_progress"
+    copy.write_meta(meta)
+    return count
+
+
 def list_copies() -> list[CopyMeta]:
     """Wszystkie kopie, najnowsze pierwsze; uszkodzony `meta.json` pomijamy."""
     return [m for m in (_readable(c) for c in _copy_dirs()) if m is not None]

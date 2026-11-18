@@ -21,7 +21,7 @@ from typing import Any, Literal
 
 from admenot.engine.paths import device_dir_name, phone_changes_dir
 
-from .store import CopyDir
+from .store import CopyDir, RetryError
 
 READ_TIMEOUT = 1.0  # s — odczyt stanu dla widoku kopii
 CHANGES_KEY = "device_changes"
@@ -362,6 +362,49 @@ def read_restores(copy: CopyDir) -> list[RestoreSummary]:
         return []
     found = [s for s in map(_summary, paths) if s is not None]
     return sorted(found, key=lambda s: (s.updated or "", s.serial), reverse=True)
+
+
+def reopen_restore_for_retry(copy: CopyDir, serial: str) -> int:
+    """Zakończone wgrywanie na `serial` wraca do wznowienia: pliki `error`/`denied` (poza `vanished`)
+    i aplikacje `failed` z przyczyną nietrwałą wracają do `pending` w jednej transakcji, meta `status`
+    to `incomplete` (nie `complete`, bo `settle_finished` zamknąłby stan przed startem). Telefonia
+    `error` sama idzie od nowa (`restore_tel` pomija tylko `done`/`manual`) — tu tylko `tel_left`, żeby
+    widok kopii widział wznowienie. Zwraca liczbę ponawianych pozycji (telefonia: rodzaj = 1)."""
+    from .failures import (  # `failures` importuje ten moduł
+        PERMANENT_APP_REASONS,
+        reason_key,
+        restore_failures,
+    )
+
+    failures = restore_failures(copy, serial)
+    if not any(f.retryable for f in failures):
+        raise RetryError("nothing_to_retry")
+    state = RestoreState(restore_state_path(copy, serial))
+    try:
+        files = [r.remote for status in ("denied", "error") for r in state.by_status(status)
+                 if (reason_key(r.error) if status == "error" else "denied") != "vanished"]
+        apps = [p for p, (st, rs, _code) in state.apps_status().items()
+                if st == "failed" and (rs or "").strip().lower() not in PERMANENT_APP_REASONS
+                and reason_key(rs) != "vanished"]
+        tel = sum(1 for f in failures if f.kind == "tel")
+        with state.db:  # jedna transakcja: albo wszystko, albo nic
+            state.db.executemany("UPDATE files SET status='pending', attempts=0, error=NULL WHERE remote=?",
+                                 [(r,) for r in files])
+            state.db.executemany(
+                "UPDATE apps SET status='pending', reason=NULL, code=NULL WHERE package=?", [(p,) for p in apps])
+        state.set_meta("status", "incomplete")
+        if apps:
+            state.set_meta("apps_left", apps_left_now(state))
+        if tel:
+            state.set_meta("tel_left", tel)
+    finally:
+        state.close()
+    return len(files) + len(apps) + tel
+
+
+def apps_left_now(state: RestoreState) -> int:
+    """Aplikacje bez rozstrzygnięcia (`pending`) — jak `apps_left` ustawiane przez most."""
+    return sum(1 for st, _r, _c in state.apps_status().values() if st == "pending")
 
 
 def _row(r: tuple[Any, ...]) -> RestoreRow:

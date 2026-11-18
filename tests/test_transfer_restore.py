@@ -824,3 +824,30 @@ def test_upload_choice_apps_roundtrip():
     assert UploadChoice.from_json(choice.to_json()) == choice
     old = {"groups": ["photos"], "apks_on": []}
     assert UploadChoice.from_json(old).apps == frozenset()
+
+
+def test_retry_after_reopen_pushes_failed_file(tmp_path):
+    from admenot.engine.transfer.restore_state import reopen_restore_for_retry
+
+    copy = _copy(tmp_path)
+    new = _new(tmp_path)
+    plan = _plan(new, copy)
+    bad = "/sdcard/Download/c.pdf"
+    push = new.push
+
+    def flaky(locals_: list[Path], remote: str, should_stop, tick):
+        keep = [p for p in locals_ if p.name != "c.pdf"]
+        if len(keep) != len(locals_):
+            return rs.PullResult(1, ["adb: error: failed to copy: protocol fault"], False)
+        return push(keep, remote, should_stop, tick)
+
+    new.push = flaky  # type: ignore[method-assign]
+    res = _run(new, copy, plan)
+    assert (res.status, _rows(copy)[bad].status) == ("incomplete", "error")
+
+    new.push = push  # type: ignore[method-assign]
+    assert reopen_restore_for_retry(copy, "NEW") == 1
+    res = _run(new, copy, _plan(new, copy, taken=True))
+    assert _rows(copy)[bad].status == "done"
+    assert res.status == "complete" and _meta(copy, "status") == "complete"
+    _assert_uploaded(new, OLD)

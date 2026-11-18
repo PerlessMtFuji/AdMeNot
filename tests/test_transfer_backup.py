@@ -1007,3 +1007,36 @@ def test_backup_counts_malicious_apps_excluded_from_copy(tmp_path):
     copy = _copy()
     _run(phone, copy, inv, _sel(categories=frozenset()))
     assert copy.read_meta().counts["apps_malicious"] == 2
+
+
+def test_retry_after_reopen_copies_failed_file(tmp_path):
+    phone = _phone(tmp_path)
+    copy = _copy()
+    inv = _inventory(phone)
+
+    def corrupt(remotes):  # pull zostawia ucięty plik, telefon online, plik bez zmian
+        if remotes == ["/sdcard/Download/c.pdf"]:
+            phone.fail_after_files = len(phone.pulled)
+
+    original = phone.pull
+
+    def pull(remotes, target, should_stop, tick):
+        res = original(remotes, target, should_stop, tick)
+        phone.fail_after_files = None
+        phone.online = True
+        return res
+
+    phone.before_pull = corrupt
+    phone.pull = pull
+    _run(phone, copy, inv, _sel())
+    assert _rows(copy)["/sdcard/Download/c.pdf"].status == "error"
+    assert copy.read_meta().status == "incomplete"
+
+    del phone.pull  # telefon znów w porządku
+    phone.before_pull = None
+    assert store.reopen_copy_for_retry(copy) == 1
+    res = _run(phone, copy, inv, _sel())
+    row = _rows(copy)["/sdcard/Download/c.pdf"]
+    assert row.status == "done"
+    assert (copy.files_dir / "Download" / "c.pdf").read_bytes() == FILES["Download/c.pdf"]
+    assert res.status == "complete" and copy.read_meta().status == "complete"
