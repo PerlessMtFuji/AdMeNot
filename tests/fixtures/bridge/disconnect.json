@@ -1556,7 +1556,6 @@
       "reason_text": null,
       "steps": [
        "odebranie zgody na powiadomienia",
-       "blokada powiadomień pełnoekranowych",
        "zatrzymanie aplikacji",
        "wyłączenie aplikacji"
       ],
@@ -1765,7 +1764,6 @@
          "reason_text": null,
          "steps": [
           "odebranie zgody na powiadomienia",
-          "blokada powiadomień pełnoekranowych",
           "zatrzymanie aplikacji",
           "wyłączenie aplikacji"
          ],
@@ -1835,58 +1833,6 @@
       "action_id": 2,
       "package": "com.wlive.forecast",
       "name": "com.wlive.forecast",
-      "kind": "appop",
-      "label": "blokada powiadomień pełnoekranowych",
-      "status": "running",
-      "error": null,
-      "error_key": null,
-      "restore_bytes": null
-     }
-    ],
-    [
-     "adb:command",
-     {
-      "time": "2026-09-26T14:30:00",
-      "serial": "R58T00TEST",
-      "command": "appops get --user 0 com.wlive.forecast USE_FULL_SCREEN_INTENT",
-      "status": "ok",
-      "duration": 0.0,
-      "output": "No operations.\nDefault mode: allow\n",
-      "tag": null
-     }
-    ],
-    [
-     "adb:command",
-     {
-      "time": "2026-09-26T14:30:00",
-      "serial": "R58T00TEST",
-      "command": "appops set --user 0 com.wlive.forecast USE_FULL_SCREEN_INTENT deny",
-      "status": "ok",
-      "duration": 0.0,
-      "output": "",
-      "tag": null
-     }
-    ],
-    [
-     "exec:step",
-     {
-      "action_id": 2,
-      "package": "com.wlive.forecast",
-      "name": "com.wlive.forecast",
-      "kind": "appop",
-      "label": "blokada powiadomień pełnoekranowych",
-      "status": "done",
-      "error": null,
-      "error_key": null,
-      "restore_bytes": null
-     }
-    ],
-    [
-     "exec:step",
-     {
-      "action_id": 3,
-      "package": "com.wlive.forecast",
-      "name": "com.wlive.forecast",
       "kind": "force_stop",
       "label": "zatrzymanie aplikacji",
       "status": "running",
@@ -1910,7 +1856,7 @@
     [
      "exec:step",
      {
-      "action_id": 3,
+      "action_id": 2,
       "package": "com.wlive.forecast",
       "name": "com.wlive.forecast",
       "kind": "force_stop",
@@ -1924,7 +1870,7 @@
     [
      "exec:step",
      {
-      "action_id": 4,
+      "action_id": 3,
       "package": "com.wlive.forecast",
       "name": "com.wlive.forecast",
       "kind": "enabled",
@@ -2107,19 +2053,6 @@
         "package": "com.wlive.forecast",
         "level": "disable",
         "level_label": "WYŁĄCZ",
-        "kind": "appop",
-        "step_label": "blokada powiadomień pełnoekranowych",
-        "status": "done",
-        "manual_undo": null,
-        "site_url": null,
-        "status_label": "wykonane",
-        "error": null
-       },
-       {
-        "id": 3,
-        "package": "com.wlive.forecast",
-        "level": "disable",
-        "level_label": "WYŁĄCZ",
         "kind": "force_stop",
         "step_label": "zatrzymanie aplikacji",
         "status": "done",
@@ -2129,7 +2062,7 @@
         "error": null
        },
        {
-        "id": 4,
+        "id": 3,
         "package": "com.wlive.forecast",
         "level": "disable",
         "level_label": "WYŁĄCZ",
@@ -2269,7 +2202,7 @@
     [
      "exec:step",
      {
-      "action_id": 4,
+      "action_id": 3,
       "package": "com.wlive.forecast",
       "name": "com.wlive.forecast",
       "kind": "enabled",
@@ -2307,7 +2240,7 @@
     [
      "exec:step",
      {
-      "action_id": 4,
+      "action_id": 3,
       "package": "com.wlive.forecast",
       "name": "com.wlive.forecast",
       "kind": "enabled",
@@ -2321,18 +2254,6 @@
     [
      "exec:verify",
      {}
-    ],
-    [
-     "adb:command",
-     {
-      "time": "2026-09-26T14:30:00",
-      "serial": "R58T00TEST",
-      "command": "appops get --user 0 com.wlive.forecast USE_FULL_SCREEN_INTENT",
-      "status": "ok",
-      "duration": 0.0,
-      "output": "USE_FULL_SCREEN_INTENT: deny\n",
-      "tag": null
-     }
     ],
     [
      "adb:command",
