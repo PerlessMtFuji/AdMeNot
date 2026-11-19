@@ -1,5 +1,5 @@
 import { CATEGORY_ORDER } from './categories';
-import type { CheckBrowser, CheckSite, AppView, BackupResultView, Category, CopyView, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferOrderView, TransferProgress, TransferSelection, InventoryView, ExportFileView, ExportKind, StoredSelection, RestorePlanView, RestoreResultView, AppsPlanView, AppsPlanItem, TelKind, TelPlanView, TelResultView, UndoSite, UploadChoiceView, UploadGroup, UpdateView, UserWait, Verdict } from './types';
+import type { CheckBrowser, CheckSite, AppView, BackupResultView, Category, CopyView, DeviceCheck, DeviceEntry, EtaView, Finding, HistoryAction, HistoryOrder, Level, Mode, OrderResult, PlanApp, PlanLevel, PlanView, ScanView, Settings, StepEvent, TransferCategory, TransferOrderView, TransferProgress, TransferSelection, InventoryView, ExportFileView, ExportKind, StoredSelection, RestorePlanView, RestoreResultView, AppsResultView, AppsPlanView, AppsPlanItem, TelKind, TelPlanView, TelResultView, UndoSite, UploadChoiceView, UploadGroup, UpdateView, UserWait, Verdict } from './types';
 
 export type Phase = 'connect' | 'scanning' | 'results' | 'executing' | 'done'
   | 'transfer_choose' | 'transfer_backup' | 'transfer_done'
@@ -769,6 +769,18 @@ export function backupOutcome(r: BackupResultView, unreadable = 0): 'ok' | 'warn
   return 'ok';
 }
 
+/** Czy wynik kopii ma jakąkolwiek nieudaną pozycję (pliki, aplikacje, telefonia ze statusem „failed”) — wtedy ekran
+ *  końca wczytuje listę (`transfer_failures`). „Niedostępne” (telefon nie dał danych) to nie błąd pozycji. */
+export function backupHasFailures(r: BackupResultView): boolean {
+  return r.files_failed > 0 || r.apps_failed > 0 || Object.values(r.telephony).some((c) => c.status === 'failed');
+}
+
+/** To samo dla wyniku wgrywania: pliki (odmowa/błąd), aplikacje `failed`, rekordy telefonii z błędem. */
+export function restoreHasFailures(d: { result: RestoreResultView; apps?: AppsResultView | null; tel?: TelResultView | null }): boolean {
+  return d.result.files_denied + d.result.files_failed > 0 || (d.apps?.rows ?? []).some((x) => x.status === 'failed')
+    || Object.values(d.tel?.kinds ?? {}).some((k) => k.failed > 0);
+}
+
 /** Kopia do wznowienia: najnowsza niedokończona tego egzemplarza (numer seryjny, nie model), jak `find_resumable`
  *  w mostku. `copies` przychodzą najnowsze pierwsze. */
 export function resumableCopy(copies: CopyView[], serial: string | null): CopyView | null {
@@ -804,14 +816,22 @@ export interface TransferRow {
  *  jest już jego wierszem, więc osobnego nie dostaje. */
 export function transferRows(orders: TransferOrderView[], copies: CopyView[]): TransferRow[] {
   const byId = new Map(copies.map((c) => [c.id, c]));
+  const copyState = (c: CopyView) => (c.status === 'in_progress' ? 'interrupted' : c.status === 'incomplete' ? 'incomplete' : 'copy_ready');
+  const diskOf = (o: TransferOrderView) => (o.copy && !o.copy.deleted_at ? byId.get(o.copy.id) ?? null : null);
+  // „kopia gotowa” zlecenia mówi tylko, że nic jeszcze nie wgrano — sama kopia może być niepełna albo w toku
+  // (np. „Ponów nieudane” czeka na dokończenie), więc wtedy wiersz pokazuje stan kopii
+  const orderState = (o: TransferOrderView): TransferRow['state'] => {
+    const disk = diskOf(o);
+    return o.state === 'copy_ready' && disk ? copyState(disk) : o.state;
+  };
   const fromOrders = orders.map((o): TransferRow => ({ key: o.number, number: o.number, client: o.client, at: o.created_at,
-    source: o.source, target: o.target, state: o.state, notes: o.notes, partial: !!o.partial, copy: o.copy,
-    disk: o.copy && !o.copy.deleted_at ? byId.get(o.copy.id) ?? null : null,
+    source: o.source, target: o.target, state: orderState(o), notes: o.notes, partial: !!o.partial, copy: o.copy,
+    disk: diskOf(o),
     whatsappRestored: o.whatsapp_restored, appsBlocked: !!o.apps_blocked, targetSerial: o.target_serial ?? null,
     sourceSerial: o.copy && !o.copy.deleted_at ? byId.get(o.copy.id)?.serial ?? null : null, counts: o.counts }));
   const fromCopies = copies.filter((c) => !c.order).map((c): TransferRow => ({ key: c.id, number: null, client: c.client, at: c.created,
     source: { name: `${c.manufacturer} ${c.model}`.trim() || null, imei: null }, target: null,
-    state: c.status === 'in_progress' ? 'interrupted' : c.status === 'incomplete' ? 'incomplete' : 'copy_ready',
+    state: copyState(c),
     notes: 0, partial: false, copy: { id: c.id, days_left: c.days_left, deleted_at: null }, disk: c,
     whatsappRestored: false, appsBlocked: false, sourceSerial: c.serial, targetSerial: null, counts: c.counts }));
   return [...fromOrders, ...fromCopies].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));

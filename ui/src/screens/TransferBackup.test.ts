@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { describe, expect, test, vi } from 'vitest';
-import type { BackupResultView, CopyView } from '../lib/types';
+import type { BackupResultView, CopyView, FailureView } from '../lib/types';
 import { setupCtl } from '../test-utils';
 import TransferBackup from './TransferBackup.svelte';
 
@@ -256,5 +256,67 @@ describe('TransferBackup', () => {
       await tick();
       expect(screen.getByText('Zostało ~1 min')).toBeTruthy();
     } finally { vi.useRealTimers(); }
+  });
+});
+
+describe('TransferBackup — failed items', () => {
+  const fail = (name: string, over: Partial<FailureView> = {}): FailureView => ({ kind: 'file', group: 'photos', name, folder: 'DCIM/Camera',
+    reason: 'denied', count: 1, retryable: true, ...over });
+
+  async function finished(res: BackupResultView, failures: FailureView[] | null, retryable: number, connected = true,
+    copy: CopyView = COPY) {
+    const env = await show('transfer_done');
+    env.s.serial = COPY.serial;
+    env.s.transfer.result = res;
+    env.s.transfer.copy = copy;
+    env.s.transfer.failures = failures;
+    env.s.transfer.failuresRetryable = retryable;
+    env.bridge.emit('devices', { devices: connected ? [{ serial: COPY.serial, state: 'device', model: 'SM_A145R', name: null, imei: null }] : [], error: null });
+    await tick();
+    return env;
+  }
+
+  test('failed files are listed with names and plain reasons, and "Ponów nieudane" is offered', async () => {
+    const { ctl } = await finished(result({ files_failed: 2 }), [fail('a.jpg'), fail('b.jpg', { reason: 'no_space' })], 2);
+    expect(screen.getByText('a.jpg')).toBeTruthy();
+    expect(screen.getByText('b.jpg')).toBeTruthy();
+    expect(screen.getByText(/telefon odmówił dostępu/)).toBeTruthy();
+    expect(screen.getByText(/brak miejsca/)).toBeTruthy();
+    const retry = vi.spyOn(ctl, 'retryFailedBackup').mockResolvedValue();
+    await fireEvent.click(screen.getByRole('button', { name: 'Ponów nieudane' }));
+    expect(retry).toHaveBeenCalledWith(COPY.id);
+  });
+
+  test('nothing failed: no list and no retry button', async () => {
+    await finished(result(), [], 0);
+    expect(screen.queryByRole('button', { name: 'Ponów nieudane' })).toBeNull();
+    expect(screen.queryByText('Nieudane')).toBeNull();
+  });
+
+  test('only items that cannot be retried: the list stays, the button does not', async () => {
+    await finished(result({ files_failed: 1 }), [fail('gone.jpg', { reason: 'vanished', retryable: false })], 0);
+    expect(screen.getByText('gone.jpg')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Ponów nieudane' })).toBeNull();
+  });
+
+  test('a stopped copy with failed files: no "Ponów nieudane" (it is resumed, not reopened)', async () => {
+    await finished(result({ status: 'stopped', files_failed: 1 }), [fail('a.jpg')], 1, true, { ...COPY, status: 'in_progress' });
+    expect(screen.getByText('a.jpg')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Ponów nieudane' })).toBeNull();
+    expect(screen.getByText(/wybierz „Kopiuj dane”/)).toBeTruthy();
+    expect(screen.queryByText('Podłącz nowy telefon')).toBeNull();
+  });
+
+  test('a stopped retry: the copy is back to before it, so it can be uploaded and retried again', async () => {
+    await finished(result({ status: 'stopped', files_failed: 1 }), [fail('a.jpg')], 1, true, { ...COPY, status: 'incomplete' });
+    expect(screen.getByText(/Kopia wróciła do stanu sprzed ponowienia/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Ponów nieudane' })).toBeTruthy();
+    expect(screen.getByText('Podłącz nowy telefon')).toBeTruthy();
+  });
+
+  test('the old phone is not connected: no retry button', async () => {
+    await finished(result({ files_failed: 1 }), [fail('a.jpg')], 1, false);
+    expect(screen.getByText('a.jpg')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Ponów nieudane' })).toBeNull();
   });
 });

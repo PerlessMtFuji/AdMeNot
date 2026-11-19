@@ -45,6 +45,7 @@ class TransferProtocol:
     apps_named: list[str]
     apps_more: int
     apps_problems: list[tuple[str, str]]
+    data_problems: list[tuple[str, str]]  # nieudane pliki i telefonia: (ścieżka albo rodzaj, powód)
     apps_malicious_skipped: int
     whatsapp: Literal["restored", "on_phone", "none"]
     copy_until: date | None
@@ -215,6 +216,21 @@ def _apps(t: dict[str, Any], source: dict[str, Any], result: dict[str, Any] | No
     return len(ok_rows), len(rows), names[:APPS_NAMED], max(0, len(names) - APPS_NAMED), problems, False
 
 
+def _data_problems(t: dict[str, Any], result: dict[str, Any] | None) -> list[tuple[str, str]]:
+    """Nieudane pliki i telefonia z `failures` wyniku wgrywania (aplikacje opisują wiersze `apps`).
+    Tylko powody z listy — surowych kodów raport nie pokazuje. Wynik sprzed listy: pusto."""
+    out: list[tuple[str, str]] = []
+    for f in (result or {}).get("failures") or []:
+        reason = t["fail_reasons"].get(f.get("reason")) or t["fail_reasons"]["other"]
+        if f.get("kind") == "file":
+            folder = f.get("folder") or ""
+            out.append((f"{folder}/{f.get('name')}" if folder else str(f.get("name")), reason))
+        elif f.get("kind") == "tel":
+            name = t["tel_kinds"].get(f.get("name")) or str(f.get("name"))
+            out.append((name, f"{reason} ({f.get('count', 1)})"))
+    return out
+
+
 def _headline(t: dict[str, Any], tone: Tone, has_result: bool, app_problems: int, data_warn: bool,
               apps_missing: bool) -> str:
     h = t["headline"]
@@ -240,14 +256,15 @@ def build_transfer_protocol(journal: Journal, order_id: int, lang: str, now: dat
     result = rec.result
     tiles = _tiles(t, rec.source, result, rec.whatsapp_restored)
     installed, total, named, more, problems, apps_missing = _apps(t, rec.source, result)
+    data_problems = _data_problems(t, result)
 
     finished = (order.status == "done" and result is not None and result.get("status") == "done"
                 and not result.get("tel_error") and not result.get("apps_error"))
-    data_warn = any(x.tone in ("warn", "bad") for x in tiles)
+    data_warn = any(x.tone in ("warn", "bad") for x in tiles) or bool(data_problems)
     if not finished or any(x.tone == "bad" for x in tiles):
         tone: Tone = "bad"
     else:
-        tone = "warn" if data_warn or apps_missing or problems else "ok"
+        tone = "warn" if data_warn or apps_missing or problems or data_problems else "ok"
     headline = _headline(t, tone, result is not None, len(problems), data_warn, apps_missing)
 
     wa_selected = (rec.source.get("counts") or {}).get("files_whatsapp", 0) > 0
@@ -265,6 +282,7 @@ def build_transfer_protocol(journal: Journal, order_id: int, lang: str, now: dat
         target=_device(rec.target, rec.target_serial) if rec.target else None,
         tone=tone, headline=headline, tiles=tiles, apps_installed=installed, apps_total=total,
         apps_named=named, apps_more=more, apps_problems=problems,
+        data_problems=data_problems,
         apps_malicious_skipped=int((rec.source.get("counts") or {}).get("apps_malicious", 0)),
         whatsapp=whatsapp,
         copy_until=None if rec.copy_deleted_at or rec.copy_expires is None else rec.copy_expires.date(),

@@ -10,6 +10,8 @@
   const ctl = getContext<Controller>('ctl');
   const s = ctl.state;
   const known: readonly string[] = ERROR_KEYS;
+  // Klucze, których `message` to tylko identyfikator (zlecenie, kopia) — bez szczegółów pod tekstem.
+  const NO_DETAIL = ['wrong_device', 'device_mismatch', 'nothing_to_retry', 'copy_resume_other', 'copy_in_progress'];
   const key = $derived(s.error && known.includes(s.error.key) ? s.error.key : 'internal');
   // Wspólne z kopią klucze („rozpocznij kopię jeszcze raz”) przy wgrywaniu mają własny tekst.
   const restoreKeys: readonly string[] = RESTORE_ERROR_KEYS;
@@ -40,7 +42,7 @@
     <span class="mt-0.5 text-bad"><Icon name="triangle-alert" size={16} /></span>
     <div class="min-w-0 flex-1">
       <b class="text-ink">{t(text, { device })}</b>
-      {#if s.error.message && key !== 'wrong_device' && key !== 'device_mismatch'}
+      {#if s.error.message && !NO_DETAIL.includes(key)}
         <div class="mono mt-1 text-xs break-words text-mut">{s.error.message}</div>
       {/if}
       {#if s.error.log}<div class="mt-1 text-xs text-mut">{t('error.log', { path: s.error.log })}</div>{/if}

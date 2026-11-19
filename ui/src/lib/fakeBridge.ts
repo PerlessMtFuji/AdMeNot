@@ -204,6 +204,11 @@ export function createFakeBridge(name: string,
         return { deleted: String(args[0]) };
       case 'skip_tap':
         return {};
+      case 'transfer_failures':
+        return { failures: [], retryable: 0 };
+      case 'retry_failed_backup':
+      case 'retry_failed_restore':
+        return { count: 1 };
       case 'transfer_whatsapp':
         return { whatsapp_backup: '2026-09-26T14:29:00' };
       case 'transfer_exports_check': {

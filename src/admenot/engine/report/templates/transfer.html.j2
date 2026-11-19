@@ -56,6 +56,15 @@
 </div>
 {% endif %}
 
+{% if p.data_problems %}
+<h2>{{ t.fail_title }}</h2>
+<ul class="prob">
+{% for name, reason in p.data_problems %}
+  <li><b>{{ name }}</b><span class="r">{{ reason }}</span></li>
+{% endfor %}
+</ul>
+{% endif %}
+
 {% if p.apps_total %}
 <h2>{{ t.apps_title }}</h2>
 <div class="appsA">

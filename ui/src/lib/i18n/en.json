@@ -932,6 +932,24 @@
     "time_left": "{time} left",
     "done_stopped": "Copy stopped",
     "done_stopped_text": "Copied files stay on this computer. To finish, connect this phone and choose “Copy data”.",
+    "done_stopped_retry_text": "The copy is back to how it was before the retry and can be uploaded to the new phone. To try again, choose “Retry failed”.",
+    "fail": {
+      "title": "Failed",
+      "reason": {
+        "no_space": "not enough space",
+        "denied": "the phone denied access",
+        "disconnected": "phone disconnected",
+        "vanished": "the file disappeared from the phone",
+        "changed": "the file changed while copying",
+        "rejected": "the phone rejected the installation",
+        "verify": "the copy does not match the original",
+        "other": "other error"
+      },
+      "show_all": "Show all ({count})",
+      "retry": "Retry failed",
+      "not_retryable": "cannot be retried",
+      "tel_records": { "one": "{count} record", "few": "{count} records", "many": "{count} records", "other": "{count} records" }
+    },
     "sum": {
       "contacts": "Contacts",
       "sms": "SMS",
@@ -1307,6 +1325,9 @@
     "unknown_order": "Order not found.",
     "nothing_to_resume": "This order has no steps left to finish.",
     "nothing_to_do": "Nothing to run — the selected apps are blocked.",
+    "nothing_to_retry": "There is nothing to retry.",
+    "copy_resume_other": "Another copy for this phone is already in progress. Finish or delete it, then retry.",
+    "copy_in_progress": "This copy is still in progress. Wait for it to finish, then retry the failed items.",
     "plan_changed": "The plan has changed since it was shown to the client. Show the client the new code.",
     "no_target": "No such app or step in the order.",
     "bad_request": "Invalid data.",

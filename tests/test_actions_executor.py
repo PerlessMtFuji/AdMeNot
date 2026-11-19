@@ -22,6 +22,7 @@ from admenot.engine.journal.db import Journal
 
 AD_LISTENER = "com.ad/com.ad.Listener"
 SAW = "android.permission.SYSTEM_ALERT_WINDOW"  # aplikacje w tych testach mogą rysować nad innymi
+FSI = "android.permission.USE_FULL_SCREEN_INTENT"  # ...i deklarują pełnoekranowe powiadomienia
 WRITES = ("appops set", "pm ", "settings put", "am force-stop", "cmd package set-home",
           "cmd notification")
 
@@ -49,7 +50,7 @@ def journal(tmp_path):
 
 def _order(phone, journal, tmp_path, requests):
     ctx = read_phone_context(phone)
-    plans = [plan_app(package, level, AppFacts(package, version_code=1, requested_permissions={SAW}), ctx,
+    plans = [plan_app(package, level, AppFacts(package, version_code=1, requested_permissions={SAW, FSI}), ctx,
                       load_protected_list(), tmp_path / "backups")
              for package, level in requests.items()]
     return start_order(journal, phone.serial, "Test", plans)

@@ -17,6 +17,7 @@ LEVELS = ("silence", "disable", "remove")
 FIX_LEVEL = "fix"  # poprawki „Stanu telefonu”: poza LEVELS, bo nie są poziomem aplikacji
 POST_NOTIFICATIONS = "android.permission.POST_NOTIFICATIONS"
 SYSTEM_ALERT_WINDOW = "android.permission.SYSTEM_ALERT_WINDOW"
+USE_FULL_SCREEN_INTENT = "android.permission.USE_FULL_SCREEN_INTENT"
 NOTIF_PERMISSION_MIN_SDK = 33  # od Androida 13 powiadomienia to uprawnienie wykonawcze
 FSI_OP_MIN_SDK = 34  # appop USE_FULL_SCREEN_INTENT istnieje od Androida 14
 
@@ -96,7 +97,9 @@ def _silence_steps(package: str, facts: AppFacts, ctx: PhoneContext,
         # Bez tego uprawnienia aplikacja i tak nie rysuje nad innymi, a Android 12 (OPPO)
         # przyjmuje `appops set` z kodem 0, nie zmieniając trybu — weryfikacja by go zgłosiła.
         steps.append(Step("appop", package, {"op": "SYSTEM_ALERT_WINDOW", "mode": "deny"}))
-    if ctx.sdk >= FSI_OP_MIN_SDK:
+    # Android 17 (Samsung A57): `appops set … USE_FULL_SCREEN_INTENT deny` dla aplikacji bez
+    # tego uprawnienia kończy się kodem 0, ale tryb zostaje „default” — krok tylko przy deklaracji.
+    if ctx.sdk >= FSI_OP_MIN_SDK and USE_FULL_SCREEN_INTENT in facts.requested_permissions:
         steps.append(Step("appop", package, {"op": "USE_FULL_SCREEN_INTENT", "mode": "deny"}))
     steps.append(Step("force_stop", package))  # na końcu: wcześniejsze kroki mogą ją wybudzić
     return steps

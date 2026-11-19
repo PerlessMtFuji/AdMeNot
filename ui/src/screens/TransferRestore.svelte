@@ -10,6 +10,7 @@
   import CategoryGroup from '../components/transfer/CategoryGroup.svelte';
   import CategoryRow from '../components/transfer/CategoryRow.svelte';
   import DeviceCard from '../components/DeviceCard.svelte';
+  import FailureGroups from '../components/transfer/FailureGroups.svelte';
   import ReportButton from '../components/ReportButton.svelte';
   import TapPrompt, { smsAppName } from '../components/TapPrompt.svelte';
   import type { Controller } from '../lib/controller';
@@ -260,6 +261,10 @@
     return { tone: 'warn', icon: 'triangle-alert', title: t('transfer.restore.done_almost'), text: `${line.charAt(0).toLocaleUpperCase()}${line.slice(1)}.`, sub };
   });
 
+  // „Ponów nieudane”: tylko gdy jest co ponowić i podłączony jest ten telefon, na który wgrywano
+  const canRetry = $derived(!!done && !!r.copy && s.transfer.failuresRetryable > 0 && s.job === null && s.serial === done.target_serial
+    && s.devices.some((d) => d.state === 'device' && d.serial === done.target_serial));
+
   // Prawy panel
   const orderLine = $derived([r.order, s.client.trim() || r.copy?.client].filter(Boolean).join(' · '));
   const reported = $derived(r.order ? !!s.reports[r.order] : false);
@@ -392,6 +397,11 @@
           </CategoryRow>
         {/if}
       </CategoryGroup>
+
+      {#if s.transfer.failures?.length}<FailureGroups failures={s.transfer.failures} />{/if}
+      {#if canRetry}
+        <div><Button variant="primary" onclick={() => ctl.retryFailedRestore(r.copy!.id, done!.target_serial)}>{t('transfer.fail.retry')}</Button></div>
+      {/if}
 
       {#if wa}
         <!-- opcjonalnie, z klientem: ramka przerywana, żeby nie wyglądała na wymóg -->

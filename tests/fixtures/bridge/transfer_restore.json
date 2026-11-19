@@ -2266,6 +2266,42 @@
     ]
    },
    "events": []
+  },
+  {
+   "method": "transfer_failures",
+   "args": [
+    "R58T00TEST-90fae0b8e3f0/20260926-143000",
+    "R58W20NEW01"
+   ],
+   "result": {
+    "failures": [
+     {
+      "kind": "app",
+      "group": "apps",
+      "name": "Mapa Offline",
+      "folder": "pl.example.native",
+      "reason": "rejected",
+      "count": 1,
+      "retryable": false
+     }
+    ],
+    "retryable": 0
+   },
+   "events": []
+  },
+  {
+   "method": "retry_failed_restore",
+   "args": [
+    "R58T00TEST-90fae0b8e3f0/20260926-143000",
+    "R58W20NEW01"
+   ],
+   "result": {
+    "error": {
+     "key": "nothing_to_retry",
+     "message": "R58T00TEST-90fae0b8e3f0/20260926-143000"
+    }
+   },
+   "events": []
   }
  ]
 }

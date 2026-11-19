@@ -699,6 +699,30 @@ def test_settle_rows_like_reconcile_and_scans_the_gallery(tmp_path):
     assert _meta(copy, "status") == "complete" and _meta(copy, "tel_left") == 0
 
 
+def test_settle_resolves_error_tel_rows_when_nothing_is_left_to_write(tmp_path):
+    """Ponowione wgrywanie, w którym rekordy telefonii już są na telefonie (świeży plan nie ma ich do zapisu):
+    wiersze `tel` ze statusem `error` dostają `done`, inaczej lista nieudanych ponawiałaby je bez końca."""
+    from admenot.engine.transfer.failures import restore_failures
+
+    copy = _copy(tmp_path)
+    new = _new(tmp_path, OLD)
+    _interrupted(copy, [], choice=UploadChoice(frozenset(), frozenset(), tel=frozenset({"sms"})),
+                 status="incomplete", tel_left=2)
+    state = RestoreState(restore_state_path(copy, "NEW"))
+    try:
+        state.tel_set("sms", ["1", "2"], "error", "file", "write_failed")
+    finally:
+        state.close()
+    assert any(f.kind == "tel" for f in restore_failures(copy, "NEW"))
+    assert _settle(new, copy) is True
+    assert [f for f in restore_failures(copy, "NEW") if f.kind == "tel"] == []
+    state = RestoreState(restore_state_path(copy, "NEW"))
+    try:
+        assert set(state.tel_status("sms").values()) == {"done"}
+    finally:
+        state.close()
+
+
 def test_settle_skips_scan_when_one_ran_after_the_done_files(tmp_path):
     copy = _copy(tmp_path)
     new = _new(tmp_path, OLD)
@@ -824,3 +848,30 @@ def test_upload_choice_apps_roundtrip():
     assert UploadChoice.from_json(choice.to_json()) == choice
     old = {"groups": ["photos"], "apks_on": []}
     assert UploadChoice.from_json(old).apps == frozenset()
+
+
+def test_retry_after_reopen_pushes_failed_file(tmp_path):
+    from admenot.engine.transfer.restore_state import reopen_restore_for_retry
+
+    copy = _copy(tmp_path)
+    new = _new(tmp_path)
+    plan = _plan(new, copy)
+    bad = "/sdcard/Download/c.pdf"
+    push = new.push
+
+    def flaky(locals_: list[Path], remote: str, should_stop, tick):
+        keep = [p for p in locals_ if p.name != "c.pdf"]
+        if len(keep) != len(locals_):
+            return rs.PullResult(1, ["adb: error: failed to copy: protocol fault"], False)
+        return push(keep, remote, should_stop, tick)
+
+    new.push = flaky  # type: ignore[method-assign]
+    res = _run(new, copy, plan)
+    assert (res.status, _rows(copy)[bad].status) == ("incomplete", "error")
+
+    new.push = push  # type: ignore[method-assign]
+    assert reopen_restore_for_retry(copy, "NEW") == 1
+    res = _run(new, copy, _plan(new, copy, taken=True))
+    assert _rows(copy)[bad].status == "done"
+    assert res.status == "complete" and _meta(copy, "status") == "complete"
+    _assert_uploaded(new, OLD)

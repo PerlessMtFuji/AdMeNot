@@ -14,7 +14,8 @@ export const ERROR_KEYS = ['adb_missing', 'unauthorized', 'offline', 'disconnect
   'transfer_no_inventory', 'transfer_disk_full', 'transfer_wrong_device', 'transfer_too_many_disconnects', 'transfer_failed',
   'transfer_in_use', 'transfer_phone_full', 'transfer_copy_missing', 'transfer_no_plan',
   'explorer_busy', 'explorer_offline', 'explorer_denied', 'explorer_missing', 'explorer_exists', 'explorer_bad_name',
-  'explorer_not_open', 'explorer_no_dest', 'explorer_not_folder'] as const;
+  'explorer_not_open', 'explorer_no_dest', 'explorer_not_folder',
+  'nothing_to_retry', 'copy_resume_other', 'copy_in_progress'] as const;
 // Błędy wgrywania kopii, których wspólny z kopią tekst mówi o kopii — dla zadań wgrywania `transfer.restore.error.*`.
 export const RESTORE_ERROR_KEYS = ['transfer_wrong_device', 'transfer_too_many_disconnects', 'transfer_failed'] as const;
 export const RESTORE_JOB_KINDS = ['restore_plan', 'restore'] as const;
@@ -37,7 +38,7 @@ export const PLURAL_KEYS = ['results.title', 'results.safe', 'expert.days', 'pan
   'explorer.selection.count', 'explorer.preview.lines', 'explorer.task.copied', 'explorer.task.uploaded', 'explorer.task.failed_pc',
   'explorer.task.failed_phone', 'explorer.task.skipped', 'explorer.task.renamed', 'explorer.task.damaged',
   'explorer.task.more', 'explorer.problems.path_too_long_pc', 'explorer.problems.path_too_long_phone',
-  'explorer.drop.items', 'explorer.leave.message', 'settings.recents_phones'] as const;
+  'explorer.drop.items', 'explorer.leave.message', 'settings.recents_phones', 'transfer.fail.tel_records'] as const;
 
 
 class I18n {

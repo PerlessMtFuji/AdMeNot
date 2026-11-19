@@ -10,6 +10,7 @@
   import Pill from '../ui/Pill.svelte';
   import Spinner from '../ui/Spinner.svelte';
   import CopyNote from './CopyNote.svelte';
+  import FailureGroups from './transfer/FailureGroups.svelte';
   import ReportButton from './ReportButton.svelte';
 
   // Historia → Przeniesienia: jeden wiersz = jedno zlecenie ZS (albo kopia, która zlecenia jeszcze nie ma).
@@ -78,8 +79,21 @@
     return keys.filter((k) => (counts[k] ?? 0) > 0).map((k) => ({ key: k, n: counts[k] }));
   }
 
+  // Nieudane pozycje: wgrane zlecenie pokazuje wgrywanie na telefon docelowy, reszta — kopię starego telefonu.
+  const failSerial = (r: TransferRow) => (restored(r) ? r.targetSerial : null);
+  const failures = (r: TransferRow) => (r.disk ? s.transfer.copyFailures[`${r.disk.id}|${failSerial(r) ?? ''}`] : undefined);
+  // „Ponów nieudane”: tylko gdy jest co ponowić i wybrany, podłączony telefon jest tym właściwym (stary — kopia, nowy — wgrywanie)
+  const canRetry = (r: TransferRow) => {
+    const f = failures(r);
+    if (!f || f.retryable <= 0 || !r.disk || r.disk.status === 'in_progress' || !phoneReady) return false;
+    return restored(r) ? !!r.targetSerial && same(selected!, r.target?.imei, r.targetSerial)
+      : same(selected!, r.source.imei, r.sourceSerial) && r.state !== 'interrupted';
+  };
+  const retry = (r: TransferRow) => (restored(r) ? ctl.retryFailedRestore(r.disk!.id, selected!.serial) : ctl.retryFailedBackup(r.disk!.id));
+
   function toggle(r: TransferRow): void {
     expanded = { ...expanded, [r.key]: !expanded[r.key] };
+    if (expanded[r.key] && hasCopy(r) && (!restored(r) || r.targetSerial)) void ctl.loadCopyFailures(r.disk!.id, failSerial(r) ?? undefined);
   }
 
   async function editNote(r: TransferRow): Promise<void> {
@@ -252,6 +266,8 @@
               {:else}
                 <div class="text-soft">{t('transfer.hist.empty_counts')}</div>
               {/if}
+              {#if failures(r)?.failures.length}<FailureGroups failures={failures(r)!.failures} />{/if}
+              {#if canRetry(r)}<div><Button variant="primary" size="sm" onclick={() => retry(r)}>{t('transfer.fail.retry')}</Button></div>{/if}
               {#if r.disk}<CopyNote bind:this={noteRefs[r.key]} copy={r.disk} />{/if}
             </div>
           {/if}

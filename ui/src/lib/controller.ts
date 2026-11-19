@@ -1,6 +1,6 @@
 import { type Bridge, isApiError } from './bridge';
 import { i18n } from './i18n/index.svelte';
-import { actedAfter, changedVerdicts, defaultApps, installableApps, defaultSelection, defaultUploadChoice, keptUploadChoice, otherGroup, TEL_KINDS, telWrite, resumableCopy, UPLOAD_GROUPS, resumeSelection, rescanSelection, TRANSFER_CATEGORIES, transferNeed, transferTotals, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
+import { backupHasFailures, restoreHasFailures, actedAfter, changedVerdicts, defaultApps, installableApps, defaultSelection, defaultUploadChoice, keptUploadChoice, otherGroup, TEL_KINDS, telWrite, resumableCopy, UPLOAD_GROUPS, resumeSelection, rescanSelection, TRANSFER_CATEGORIES, transferNeed, transferTotals, isManual, mergeSelection, offeredFixes, stableEta, notificationsManual, upsertStep, withoutUndone } from './logic';
 import { EMPTY_TRANSFER_SELECTION, emptyRestore, type AppState, type HistoryTab, type RepairTab, type SettingsCategory } from './state.svelte';
 import { ExplorerController } from './explorer/controller';
 import { applyTheme } from './theme';
@@ -23,6 +23,8 @@ export class Controller {
   private autoMirrored = new Set<string>();
   /** Wybór serwisanta sprzed ponownego planu po `transfer_phone_full` — nowy plan go zachowuje (przycięty). */
   private replanChoice: UploadChoiceView | null = null;
+  /** Aplikacje z nieudanych pozycji wgrywania: po ponowieniu plan ma je zaznaczyć, także gdy nie są domyślne. */
+  private retryApps: string[] = [];
   private resumeAfterScan = false;  // „Wznów” z ekranu Połącz: po odczycie telefonu kopia rusza sama
   private uiErrorSent = false;
   private rechecking = false;  // odczyt kontroli w tle: następny nie startuje, póki poprzedni trwa
@@ -137,7 +139,8 @@ export class Controller {
   private offerRestoreToNewPhone(fresh: string[]): void {
     const s = this.state;
     const copy = s.transfer.copy;
-    if (fresh.length === 0 || s.phase !== 'transfer_done' || !copy || copy.status === 'in_progress' || s.transfer.result?.status === 'stopped') return;
+    // zatrzymana kopia zostaje `in_progress`; zatrzymane „Ponów nieudane” wraca do stanu sprzed niego i da się ją wgrać
+    if (fresh.length === 0 || s.phase !== 'transfer_done' || !copy || copy.status === 'in_progress') return;
     // `transfer:done` przychodzi jeszcze z wnętrza zadania kopii: plan teraz dostałby „busy” — czekamy na `job:end`.
     if (s.job?.kind === 'backup') {
       this.offerAfterBackup = [...(this.offerAfterBackup ?? []), ...fresh];
@@ -802,6 +805,7 @@ export class Controller {
       s.transfer.waiting = false;
       s.stopping = false;
       s.phase = 'transfer_done';
+      if (backupHasFailures(d.result)) void this.loadFailures(d.copy.id);
       // nowy telefon podłączony już w czasie kopii: karta „Podłącz nowy telefon” obiecuje przejście od razu
       this.offerRestoreToNewPhone(s.devices.filter((e) => e.state === 'device').map((e) => e.serial));
     });
@@ -811,8 +815,15 @@ export class Controller {
       this.replanChoice = null;
       const tel = d.tel ?? null;
       const apps = d.apps ?? null;  // starsze nagrania mostu nie mają aplikacji
-      Object.assign(s.transfer.restore, { plan: d.plan, copy: d.copy, tel, apps,
-        choice: kept ? keptUploadChoice(d.plan, kept, tel, apps) : defaultUploadChoice(d.plan, tel, s.settings.verify_copies, apps),
+      const choice = kept ? keptUploadChoice(d.plan, kept, tel, apps) : defaultUploadChoice(d.plan, tel, s.settings.verify_copies, apps);
+      // „Ponów nieudane”: aplikacje, które się nie udały, wracają do wyboru (most instaluje tylko zaznaczone), także te niedomyślne
+      const again = this.retryApps;
+      this.retryApps = [];
+      if (again.length) {
+        const installable = new Set(installableApps(apps).map((a) => a.package));
+        choice.apps = [...new Set([...choice.apps, ...again.filter((p) => installable.has(p))])];
+      }
+      Object.assign(s.transfer.restore, { plan: d.plan, copy: d.copy, tel, apps, choice,
         resumable: d.resumable, sameRecent: d.same_phone_recent });
     });
     on('transfer:restore_progress', (d) => {
@@ -857,13 +868,58 @@ export class Controller {
       s.transfer.waiting = false;
       s.stopping = false;
       s.phase = 'transfer_restored';
+      if (restoreHasFailures(d)) void this.loadFailures(d.copy.id, d.result.target_serial);
     });
   }
 
   private resetTransfer(): void {
     const tr = this.state.transfer;
     Object.assign(tr, { inventory: null, resumable: null, selection: { ...EMPTY_TRANSFER_SELECTION }, progress: null,
-      waiting: false, result: null, copy: null, restore: emptyRestore() });
+      waiting: false, result: null, copy: null, failures: null, failuresRetryable: 0, restore: emptyRestore() });
+  }
+
+  // --- przenoszenie danych: nieudane pozycje i „Ponów nieudane” ----------------------------------------
+
+  /** Nieudane pozycje kopii (`serial` pusty) albo wgrywania na `serial` — pod wynikiem na ekranie końca. Cichy odczyt:
+   *  bez listy wynik i tak jest czytelny. Spóźniona odpowiedź o innej kopii niż bieżąca jest odrzucana. */
+  async loadFailures(copyId: string, serial?: string): Promise<void> {
+    const tr = this.state.transfer;
+    tr.failures = null;
+    tr.failuresRetryable = 0;
+    const r = await this.quiet(this.api.transfer_failures(copyId, serial ?? null));
+    const now = tr.restore.copy?.id ?? tr.copy?.id;
+    if (!r || (now && now !== copyId)) return;
+    tr.failures = r.failures;
+    tr.failuresRetryable = r.retryable;
+  }
+
+  /** To samo dla wiersza Historii (wiele rozwiniętych naraz): wynik w `copyFailures`. */
+  async loadCopyFailures(copyId: string, serial?: string): Promise<void> {
+    const r = await this.quiet(this.api.transfer_failures(copyId, serial ?? null));
+    if (r) this.state.transfer.copyFailures = { ...this.state.transfer.copyFailures, [`${copyId}|${serial ?? ''}`]: r };
+  }
+
+  /** „Ponów nieudane” po kopii: most otwiera kopię na nowo, a dalej idzie zwykłe wznowienie (odczyt telefonu →
+   *  kopia rusza sama). Błąd (np. `copy_resume_other`) zostaje w banerze; ekran się nie zmienia. */
+  async retryFailedBackup(copyId: string): Promise<void> {
+    this.state.error = null;
+    const r = await this.call(this.api.retry_failed_backup(copyId));
+    if (!r) return;
+    await this.startTransfer(true);
+  }
+
+  /** „Ponów nieudane” po wgrywaniu: most wraca do stanu wznowienia (aplikacje znów `pending`), potem zwykły plan
+   *  wgrywania z wznowieniem. Nieudane aplikacje trafiają do wyboru, bo most instaluje tylko zaznaczone. */
+  async retryFailedRestore(copyId: string, serial: string): Promise<void> {
+    const tr = this.state.transfer;
+    const here = (tr.restore.copy?.id ?? tr.copy?.id) === copyId;  // lista z ekranu końca dotyczy tej kopii
+    const known = (here ? tr.failures : null) ?? tr.copyFailures[`${copyId}|${serial}`]?.failures ?? [];
+    const apps = known.filter((f) => f.kind === 'app' && f.retryable).map((f) => f.folder);
+    this.state.error = null;
+    const r = await this.call(this.api.retry_failed_restore(copyId, serial));
+    if (!r) return;
+    await this.planRestore(copyId, apps);
+    if (this.state.phase !== 'transfer_restore_plan') this.retryApps = [];
   }
 
   /** „Kopiuj dane” na ekranie Połącz: inwentarz wybranego telefonu, potem ekran wyboru. `resume` („Wznów”
@@ -1022,13 +1078,14 @@ export class Controller {
   // --- przenoszenie danych: wgrywanie kopii na nowy telefon ------------------------------------------
 
   /** „Wgraj” (Połącz albo Historia): plan wgrywania kopii na wybrany telefon, potem ekran wyboru. */
-  async planRestore(copyId: string): Promise<void> {
+  async planRestore(copyId: string, retryApps: string[] = []): Promise<void> {
     // ekran wychodzi z eksploratora (telefon wolny dla zadania); trwające zadania — najpierw pytanie, „Zostań” przerywa
     if (this.explorer.state.open && !(await this.explorer.close())) return;
     const s = this.state;
     if (!s.serial) return;
     this.resetTransfer();
     this.replanChoice = null;
+    this.retryApps = retryApps;
     s.transfer.restore.copy = s.transfer.copies.find((c) => c.id === copyId) ?? null;
     Object.assign(s, { error: null, device: null, screen: 'main', phase: 'transfer_restore_plan', stopping: false });
     const r = await this.call(this.api.restore_plan(copyId, s.serial));

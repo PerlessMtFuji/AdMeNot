@@ -31,6 +31,8 @@ from admenot.engine.settings import (
     settings_transaction,
 )
 
+from .state import FileRow, State
+
 if TYPE_CHECKING:
     from .inventory import AppEntry
 
@@ -64,6 +66,9 @@ class CopyMeta:
     counts: dict[str, int] = field(default_factory=dict)
     bytes: int = 0
     order: str | None = None  # numer ZS zlecenia przeniesienia (dziennik); None: kopia bez zlecenia
+    # Stan sprzed „Ponów nieudane” (`reopen_copy_for_retry`); przerwane ponowienie wraca do niego,
+    # żeby kopii dało się dalej wgrać bez starego telefonu. None: kopia nie jest ponawiana.
+    reopened_from: Status | None = None
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -71,7 +76,7 @@ class CopyMeta:
             "model": self.model, "android": self.android, "imei": self.imei, "client": self.client,
             "created": self.created.isoformat(), "expires": self.expires.isoformat(),
             "status": self.status, "selection": self.selection, "counts": self.counts,
-            "bytes": self.bytes, "order": self.order,
+            "bytes": self.bytes, "order": self.order, "reopened_from": self.reopened_from,
         }
 
     @classmethod
@@ -79,6 +84,9 @@ class CopyMeta:
         status = data["status"]
         if status not in ("in_progress", "complete", "incomplete"):
             raise ValueError(f"nieznany status kopii: {status!r}")
+        reopened_from = data.get("reopened_from") or None
+        if reopened_from not in (None, "complete", "incomplete"):
+            raise ValueError(f"nieznany status sprzed ponowienia: {reopened_from!r}")
         return cls(
             id=str(data["id"]), serial=str(data["serial"]), manufacturer=str(data["manufacturer"]),
             model=str(data["model"]), android=str(data["android"]), imei=data.get("imei"),
@@ -86,6 +94,7 @@ class CopyMeta:
             expires=datetime.fromisoformat(data["expires"]), status=status,
             selection=dict(data.get("selection") or {}), counts=dict(data.get("counts") or {}),
             bytes=int(data.get("bytes") or 0), order=data.get("order") or None,
+            reopened_from=reopened_from,
         )
 
 
@@ -369,6 +378,84 @@ def find_resumable(serial: str) -> CopyDir | None:
         if meta is not None and meta.serial == serial and meta.status == "in_progress":
             return copy
     return None
+
+
+class RetryError(Exception):
+    """Ponowienie nieudanych pozycji niemożliwe. `key`: `nothing_to_retry` | `copy_resume_other` |
+    `copy_in_progress`. Zdefiniowany tu, nie w `failures`: ten moduł importuje `store`."""
+
+    def __init__(self, key: str) -> None:
+        super().__init__(key)
+        self.key = key
+
+
+def reopen_copy_for_retry(copy: CopyDir) -> int:
+    """Zakończona kopia wraca do `in_progress`, żeby wznowienie (`run_backup` na tej samej kopii)
+    ponowiło nieudane pozycje: pliki `error` wracają do kolejki w `_reconcile`, aplikacje i telefonia
+    bez wyniku `done`/`ok` idą od nowa. Zwraca liczbę ponawianych pozycji (telefonia: rodzaj = 1)."""
+    from .failures import backup_failures  # `failures` importuje `store`
+
+    meta = copy.read_meta()
+    if meta.status == "in_progress":
+        raise RetryError("copy_in_progress")
+    count = sum(1 for f in backup_failures(copy) if f.retryable)
+    if count == 0:
+        raise RetryError("nothing_to_retry")
+    other = find_resumable(meta.serial)
+    if other is not None and other.path != copy.path:  # `find_resumable` zwraca tylko jedną kopię na telefon
+        raise RetryError("copy_resume_other")
+    state = State(copy.state_path)  # migawka przed meta: bez niej przerwane ponowienie nie ma do czego wrócić
+    try:
+        state.snapshot_for_retry()
+    finally:
+        state.close()
+    meta.reopened_from = meta.status
+    meta.status = "in_progress"
+    copy.write_meta(meta)
+    return count
+
+
+def on_disk(copy: CopyDir, row: FileRow) -> bool:
+    """Plik kopii jest na dysku z zapisanym rozmiarem i czasem (`pull -a` ustawia czas dopiero na
+    końcu pliku, jak w `_salvage`): plik zmieniony na telefonie o tym samym rozmiarze, pobrany
+    w przerwanym ponowieniu, nie uchodzi za stary."""
+    try:
+        st = copy.files_dir.joinpath(*row.local_rel.split("/")).stat()
+        return st.st_size == row.size and int(st.st_mtime) == row.mtime
+    except OSError:
+        return False
+
+
+def undo_reopen(copy: CopyDir) -> None:
+    """Ponowienie, które się nie skończyło (zatrzymanie, błąd, zamknięty program), oddaje kopii stan
+    sprzed `reopen_copy_for_retry`: pliki z migawki (`State.abandon_retry`) i status, więc znów da się
+    ją wgrać, a „Ponów nieudane” wraca na listę. To, co ponowienie zdążyło skopiować, zostaje.
+    Liczniki plików w `meta.counts` liczone od nowa ze stanu. Kopia nieponawiana — bez zmian."""
+    meta = copy.read_meta()
+    if meta.status != "in_progress" or meta.reopened_from is None:
+        return
+    if copy.state_path.is_file():
+        state = State(copy.state_path)
+        try:
+            state.abandon_retry(lambda row: on_disk(copy, row))
+            totals = state.totals()
+        finally:
+            state.close()
+        meta.counts["files"] = totals.get("done", (0, 0))[0]
+        meta.counts["files_failed"] = totals.get("error", (0, 0))[0]
+    meta.status, meta.reopened_from = meta.reopened_from, None
+    copy.write_meta(meta)
+
+
+def reopened_copies() -> list[tuple[CopyDir, str]]:
+    """(kopia, serial) kopii z niedokończonym „Ponów nieudane” — do `undo_reopen` przy starcie okna
+    (program zamknięty w trakcie ponowienia). Nieczytelny `meta.json` pomijamy."""
+    found = []
+    for copy in _all_copy_dirs():
+        meta = _readable(copy)
+        if meta is not None and meta.status == "in_progress" and meta.reopened_from is not None:
+            found.append((copy, meta.serial))
+    return found
 
 
 def list_copies() -> list[CopyMeta]:

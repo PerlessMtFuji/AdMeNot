@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from '@testing-library/svelte';
 import { tick } from 'svelte';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { RECHECK_MS } from '../lib/recheck';
-import type { AppsResultView, RestoreResultView, TelKindResultView, TelResultView, WhatsappView } from '../lib/types';
+import type { AppsResultView, FailureView, RestoreResultView, TelKindResultView, TelResultView, WhatsappView } from '../lib/types';
 import { setupCtl } from '../test-utils';
 import TransferRestore from './TransferRestore.svelte';
 
@@ -551,5 +551,39 @@ describe('TransferRestore result', () => {
       await vi.advanceTimersByTimeAsync(RECHECK_MS * 3);
       expect(calls(bridge, 'install_check')).toBe(0);
     });
+  });
+});
+
+describe('TransferRestore — failed items', () => {
+  const fail = (name: string, over: Partial<FailureView> = {}): FailureView => ({ kind: 'file', group: 'photos', name, folder: 'DCIM/Camera',
+    reason: 'denied', count: 1, retryable: true, ...over });
+  const COPY_ID = 'R58T00TEST/20260926-143000';
+
+  async function done(failures: FailureView[], retryable: number, connected = true) {
+    const env = await finished(result({ files_failed: failures.length }), { connected });
+    env.s.transfer.restore.copy = { id: COPY_ID } as never;
+    env.s.transfer.failures = failures;
+    env.s.transfer.failuresRetryable = retryable;
+    await tick();
+    return env;
+  }
+
+  test('failed uploads are listed and "Ponów nieudane" retries them on this phone', async () => {
+    const { ctl } = await done([fail('a.jpg'), fail('b.mp4', { reason: 'disconnected' })], 2);
+    expect(screen.getByText('a.jpg')).toBeTruthy();
+    expect(screen.getByText(/telefon odłączony/)).toBeTruthy();
+    const retry = vi.spyOn(ctl, 'retryFailedRestore').mockResolvedValue();
+    await fireEvent.click(screen.getByRole('button', { name: 'Ponów nieudane' }));
+    expect(retry).toHaveBeenCalledWith(COPY_ID, 'R58W20NEW01');
+  });
+
+  test('nothing failed: no retry button', async () => {
+    await done([], 0);
+    expect(screen.queryByRole('button', { name: 'Ponów nieudane' })).toBeNull();
+  });
+
+  test('the target phone is not connected: no retry button', async () => {
+    await done([fail('a.jpg')], 1, false);
+    expect(screen.queryByRole('button', { name: 'Ponów nieudane' })).toBeNull();
   });
 });

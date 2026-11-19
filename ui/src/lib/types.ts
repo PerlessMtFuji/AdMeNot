@@ -656,6 +656,21 @@ export interface StoredExport {
 /** Wybór zapisany w kopii — pliki eksportu jako lista, nie jak w `start_backup`. */
 export type StoredSelection = Partial<Omit<TransferSelection, 'exports'>> & { verify_hash?: boolean; exports?: StoredExport[] };
 
+/** Powód nieudanej pozycji — klucze `REASONS` silnika; surowych kodów błędów UI nie dostaje. */
+export type FailureReason =
+  | 'no_space' | 'denied' | 'disconnected' | 'vanished' | 'changed' | 'rejected' | 'verify' | 'other';
+
+/** Nieudana pozycja kopii albo wgrywania (`transfer_failures`). `retryable: false` — ponowienie nic nie da. */
+export interface FailureView {
+  kind: 'file' | 'app' | 'tel';
+  group: string;
+  name: string;
+  folder: string;
+  reason: FailureReason;
+  count: number;
+  retryable: boolean;
+}
+
 export interface CopyView {
   id: string;
   serial: string;
@@ -1039,6 +1054,12 @@ export interface Api {
   install_remaining_apps(order: string): R<{ job_id: string }>;
   /** Serwisant potwierdza (albo cofa), że WhatsApp przywrócono z kopii na telefonie klienta. */
   set_whatsapp_restored(order: string, on: boolean): R<{ order: string; whatsapp_restored: boolean }>;
+  /** Nieudane pozycje kopii (`serial` pusty) albo wgrywania tej kopii na telefon `serial`. */
+  transfer_failures(copyId: string, serial?: string | null): R<{ failures: FailureView[]; retryable: number }>;
+  /** Kopia wraca do `in_progress`; dalej wznowienie przez `start_backup`. Błędy: `nothing_to_retry`, `copy_resume_other`, `wrong_device`, `busy`. */
+  retry_failed_backup(copyId: string): R<{ count: number }>;
+  /** Wgrywanie wraca do wznowienia (`restore_plan` zgłasza `resumable`). */
+  retry_failed_restore(copyId: string, serial: string): R<{ count: number }>;
   extend_transfer(copyId: string): R<{ copy: CopyView }>;
   /** Pusta albo null usuwa notatkę; za długa (>2000 znaków): `bad_request`. */
   set_transfer_note(copyId: string, note: string | null): R<{ copy: CopyView }>;

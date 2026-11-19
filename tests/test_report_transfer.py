@@ -345,3 +345,39 @@ def test_interrupted_chosen_stage_still_bad(journal):
     done = _result(apps=None, choice=choice)  # zapisany jako done, ale wybranych aplikacji nie ma
     q = build_transfer_protocol(journal, _order(journal, done).id, "pl", NOW)
     assert q.tone == "warn" and "Aplikacje nie zostały wgrane" in q.headline
+
+
+def _fail(kind, name, reason, folder="", count=1, group="photos"):
+    return {"kind": kind, "group": group, "name": name, "folder": folder, "reason": reason, "count": count,
+            "retryable": True}
+
+
+def test_report_lists_failed_files_and_tel(journal):
+    failures = [_fail("file", "IMG_1.jpg", "denied", "DCIM/Camera"), _fail("file", "a.pdf", "no_space", "Download"),
+                _fail("tel", "sms", "other", count=3, group="sms")]
+    order = _order(journal, _result(failures=failures))
+    p = build_transfer_protocol(journal, order.id, "pl", NOW)
+    html = _html(p)
+    assert "DCIM/Camera/IMG_1.jpg" in html and "Download/a.pdf" in html
+    assert "telefon odmówił dostępu" in html and "brak miejsca" in html
+    assert "SMS" in html and "inny błąd (3)" in html
+    assert "denied" not in html and "no_space" not in html
+    en = _html(build_transfer_protocol(journal, order.id, "en", NOW))
+    assert "the phone denied access" in en and "other error (3)" in en
+
+
+def test_full_report_lists_all_failures(journal):
+    failures = [_fail("file", f"f{i:02}.jpg", "other", "DCIM") for i in range(40)]
+    order = _order(journal, _result(failures=failures))
+    html = _html(build_transfer_protocol(journal, order.id, "pl", NOW))
+    assert all(f"DCIM/f{i:02}.jpg" in html for i in range(40))
+
+
+def test_old_result_without_failures_renders_as_before(journal):
+    p = build_transfer_protocol(journal, _order(journal, _result()).id, "pl", NOW)
+    assert p.data_problems == [] and p.tone == "ok"
+    assert t_title(p) not in _html(p)
+
+
+def t_title(p):
+    return TRANSFER_TEXTS[p.lang]["fail_title"]

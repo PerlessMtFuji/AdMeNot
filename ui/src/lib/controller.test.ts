@@ -1902,6 +1902,16 @@ describe('data transfer — after a copy', () => {
     expect(restorePlans(b.bridge)).toHaveLength(0);
   });
 
+  test('a stopped "Ponów nieudane" (copy back to incomplete) still plans restore on the new phone', async () => {
+    const env = setup('transfer');
+    await env.ctl.init();
+    env.bridge.emit('devices', { devices: [dev(OLD)], error: null });
+    env.ctl.selectDevice(OLD);
+    env.bridge.emit('transfer:done', { result: { ...result, status: 'stopped' }, copy: { ...copy, status: 'incomplete' } });
+    env.bridge.emit('devices', { devices: [dev(OLD), dev(NEW)], error: null });
+    await vi.waitFor(() => expect(restorePlans(env.bridge)).toHaveLength(1));
+  });
+
   test('plans once per appearance, not on every device refresh', async () => {
     const { s, bridge } = await finished();
     bridge.emit('devices', { devices: [dev(NEW)], error: null });
@@ -1941,5 +1951,107 @@ describe('data transfer — after a copy', () => {
     const { bridge } = await finished({ status: 'incomplete' });
     bridge.emit('devices', { devices: [dev(OLD), dev(NEW)], error: null });
     await vi.waitFor(() => expect(restorePlans(bridge)).toHaveLength(1));
+  });
+});
+
+describe('data transfer — failed items', () => {
+  const OLD = 'R58T00TEST';
+  const NEW = 'R58W20NEW01';
+  const COPY_ID = 'R58T00TEST-90fae0b8e3f0/20260926-143000';
+  const dev = (serial: string) => ({ serial, state: 'device' as const, model: 'M', name: null, imei: null });
+  const failed = { kind: 'file' as const, group: 'photos', name: 'a.jpg', folder: 'DCIM', reason: 'denied' as const, count: 1, retryable: true };
+  const copy = { id: COPY_ID, serial: OLD, model: 'SM-A145R', manufacturer: 'samsung', client: null, created: '2026-11-08T10:00:00',
+    expires: '2026-11-15T10:00:00', days_left: 7, status: 'complete' as const, bytes: 10, counts: {} };
+  const backupResult = { status: 'complete' as const, copy_id: COPY_ID, files_done: 1, files_failed: 1, apps_done: 0, apps_failed: 0,
+    bytes: 10, seconds: 3, telephony: {} };
+
+  test('transfer:done with a failed item loads the list; a clean result does not', async () => {
+    const { ctl, s, bridge } = setup('transfer');
+    await ctl.init();
+    bridge.answerNext('transfer_failures', { failures: [failed], retryable: 1 });
+    bridge.emit('transfer:done', { result: backupResult, copy });
+    await vi.waitFor(() => expect(s.transfer.failures).toEqual([failed]));
+    expect(s.transfer.failuresRetryable).toBe(1);
+    expect(bridge.calls.find((c) => c.method === 'transfer_failures')?.args).toEqual([COPY_ID, null]);
+
+    const clean = setup('transfer');
+    await clean.ctl.init();
+    clean.bridge.emit('transfer:done', { result: { ...backupResult, files_failed: 0 }, copy });
+    await flush();
+    expect(clean.bridge.calls.some((c) => c.method === 'transfer_failures')).toBe(false);
+  });
+
+  test('retryFailedBackup reopens the copy and then resumes it through the phone scan', async () => {
+    const { ctl, s, bridge } = setup('transfer');
+    await ctl.init();
+    bridge.emit('devices', { devices: [dev(OLD)], error: null });
+    ctl.selectDevice(OLD);
+    bridge.answerNext('retry_failed_backup', { count: 1 });
+    await ctl.retryFailedBackup(COPY_ID);
+    expect(bridge.calls.find((c) => c.method === 'retry_failed_backup')?.args).toEqual([COPY_ID]);
+    await vi.waitFor(() => expect(bridge.calls.some((c) => c.method === 'transfer_inventory')).toBe(true));
+    expect(s.phase).toBe('transfer_choose');
+    expect(bridge.calls.findIndex((c) => c.method === 'retry_failed_backup'))
+      .toBeLessThan(bridge.calls.findIndex((c) => c.method === 'transfer_inventory'));
+  });
+
+  test('retryFailedBackup: another copy in progress shows the error and does not resume', async () => {
+    const { ctl, s, bridge } = setup('transfer');
+    await ctl.init();
+    bridge.emit('devices', { devices: [dev(OLD)], error: null });
+    ctl.selectDevice(OLD);
+    s.phase = 'transfer_done';
+    bridge.failNext('retry_failed_backup', 'copy_resume_other', COPY_ID);
+    await ctl.retryFailedBackup(COPY_ID);
+    expect(s.error?.key).toBe('copy_resume_other');
+    expect(bridge.calls.some((c) => c.method === 'transfer_inventory')).toBe(false);
+    expect(s.phase).toBe('transfer_done');
+  });
+
+  test('the new retry errors have texts in both languages', async () => {
+    const { t } = await import('./i18n/index.svelte');
+    for (const lang of ['pl', 'en'] as const) {
+      i18n.lang = lang;
+      for (const key of ['nothing_to_retry', 'copy_resume_other', 'copy_in_progress']) {
+        expect(t(`error.${key}`)).not.toBe(`error.${key}`);
+      }
+    }
+    i18n.lang = 'pl';
+    expect(t('error.nothing_to_retry')).toBe('Nie ma nic do ponowienia.');
+    expect(t('error.copy_resume_other')).toBe('Na ten telefon trwa już inna kopia. Dokończ ją albo usuń, potem ponów.');
+  });
+
+  test('retryFailedRestore re-plans the upload and keeps the failed apps ticked (even non-default ones)', async () => {
+    const env = setup('transfer_restore');
+    await env.ctl.init();
+    env.bridge.emit('devices', { devices: [dev(NEW)], error: null });
+    env.ctl.selectDevice(NEW);
+    await env.ctl.loadTransfers();
+    // pl.example.game: aplikacja z kopii, niezaznaczona domyślnie — po ponowieniu musi wejść do wyboru
+    const app = { kind: 'app' as const, group: 'apps', name: 'Super Gra', folder: 'pl.example.game', reason: 'rejected' as const, count: 1, retryable: true };
+    env.bridge.answerNext('transfer_failures', { failures: [app], retryable: 1 });
+    env.s.transfer.restore.copy = { id: COPY_ID } as never;  // ekran końca wgrywania tej kopii
+    await env.ctl.loadFailures(COPY_ID, NEW);
+    expect(env.s.transfer.failures).toEqual([app]);
+    env.bridge.answerNext('retry_failed_restore', { count: 1 });
+    await env.ctl.retryFailedRestore(COPY_ID, NEW);
+    expect(env.bridge.calls.find((c) => c.method === 'retry_failed_restore')?.args).toEqual([COPY_ID, NEW]);
+    await vi.waitFor(() => expect(env.s.transfer.restore.plan).not.toBeNull());
+    expect(env.bridge.calls.find((c) => c.method === 'restore_plan')?.args).toEqual([COPY_ID, NEW]);
+    expect(env.s.phase).toBe('transfer_restore_plan');
+    expect(env.s.transfer.restore.choice.apps).toEqual(['com.whatsapp', 'pl.example.native', 'pl.example.game']);
+  });
+
+  test('retryFailedRestore: a refused retry shows the error and stays put', async () => {
+    const { ctl, s, bridge } = setup('transfer_restore');
+    await ctl.init();
+    bridge.emit('devices', { devices: [dev(NEW)], error: null });
+    ctl.selectDevice(NEW);
+    s.phase = 'transfer_restored';
+    bridge.failNext('retry_failed_restore', 'nothing_to_retry', COPY_ID);
+    await ctl.retryFailedRestore(COPY_ID, NEW);
+    expect(s.error?.key).toBe('nothing_to_retry');
+    expect(bridge.calls.some((c) => c.method === 'restore_plan')).toBe(false);
+    expect(s.phase).toBe('transfer_restored');
   });
 });

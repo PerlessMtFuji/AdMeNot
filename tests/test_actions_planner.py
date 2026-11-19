@@ -16,6 +16,7 @@ LAUNCHER = "com.android.launcher/.Launcher"
 IME = "com.ikeyboard.theme.neon"
 ROOT = Path("backups") / "SERIAL"
 SAW = "android.permission.SYSTEM_ALERT_WINDOW"
+FSI = "android.permission.USE_FULL_SCREEN_INTENT"
 PROTECTED = parse_package_patterns(
     "protected:\n  - com.android.settings\n  - com.android.providers.*\n", "protected")
 
@@ -62,13 +63,22 @@ def test_unknown_android_version_keeps_the_appop():
 
 
 def test_android_14_revokes_permission_and_blocks_full_screen_intents():
-    plan = _plan("com.other", "silence", ctx=replace(CTX, sdk=34))
+    plan = _plan("com.other", "silence", ctx=replace(CTX, sdk=34), requested=(SAW, FSI))
     assert [(s.kind, s.params.get("op") or s.params.get("permission")) for s in plan.steps] == [
         ("permission", "android.permission.POST_NOTIFICATIONS"),
         ("appop", "SYSTEM_ALERT_WINDOW"),
         ("appop", "USE_FULL_SCREEN_INTENT"),
         ("force_stop", None),
     ]
+
+
+def test_full_screen_intent_step_only_when_app_declares_it():
+    # Android 17 (Samsung SM-A576B, 2026-11-18): `appops set … USE_FULL_SCREEN_INTENT deny` dla aplikacji
+    # bez tego uprawnienia kończy się kodem 0, a tryb zostaje „default” — weryfikacja zgłaszała „nadal aktywna”.
+    without = _plan("com.other", "disable", ctx=replace(CTX, sdk=34), requested=())
+    assert "USE_FULL_SCREEN_INTENT" not in [s.params.get("op") for s in without.steps]
+    with_fsi = _plan("com.other", "disable", ctx=replace(CTX, sdk=34), requested=(FSI,))
+    assert ("appop", "USE_FULL_SCREEN_INTENT") in [(s.kind, s.params.get("op")) for s in with_fsi.steps]
 
 
 def test_disable_and_remove_extend_silence():

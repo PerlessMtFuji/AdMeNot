@@ -42,7 +42,7 @@ from .guard import ApkReadAdb, ReadOnlyAdb, UnsafeCommand, q
 from .inventory import Inventory, upload_group
 from .puller import Puller
 from .state import FileRow, State
-from .store import KEEP_DAYS, CopyDir
+from .store import KEEP_DAYS, CopyDir, on_disk, undo_reopen
 from .telephony import _CONNECTION_KINDS, TEL_CATEGORIES, CategoryResult, Stopped, export_telephony
 from .winpath import PathPlanner
 
@@ -175,6 +175,7 @@ class _Backup:
         self.hash_ok = True
         self.total_files = self.total_bytes = self.done_files = self.done_bytes = 0
         self.done_apps, self.total_apps = 0, len(selection.apps)
+        self.retry = False
 
     # ---- przebieg -----------------------------------------------------------------------
     def run(self) -> BackupResult:
@@ -195,6 +196,7 @@ class _Backup:
         meta = self.copy.read_meta()
         if meta.serial != self.device.serial:
             raise BackupError("wrong_device")
+        self.retry = meta.reopened_from is not None  # „Ponów nieudane” (`store.reopen_copy_for_retry`)
         meta.status = "in_progress"  # ponowne uruchomienie, które się urwie, zostaje do wznowienia
         meta.selection = self.sel.to_json()
         if meta.expires < self.now + timedelta(days=1):
@@ -204,6 +206,7 @@ class _Backup:
         self.copy.write_verdicts(self.inventory.apps + self.inventory.skipped_apps)
         t0 = time.monotonic()
         state = State(self.copy.state_path)
+        finished = False
         try:
             tel: dict[str, CategoryResult] = {}
             try:
@@ -212,15 +215,21 @@ class _Backup:
                 self._transfer(state)
                 apps = self._apps(state)
             except _Stop:
+                self._abandon_retry(state)
                 result = self._result(state, "stopped", tel, self._saved_apps(state), t0)
                 self._save_partial(state, t0, result)
                 return result
-            return self._finalize(state, tel, apps, t0)
+            result = self._finalize(state, tel, apps, t0)
+            finished = True
+            return result
         except (BackupError, OSError, sqlite3.Error):
+            self._abandon_retry(state)
             self._save_partial(state, t0)
             raise
         finally:
             state.close()
+            if not finished:
+                self._undo_reopen()
 
     def _progress(self, stage: Stage, current: str = "", inflight: int = 0) -> None:
         self.on_progress(Progress(stage, self.done_files, self.total_files, self.done_bytes + inflight,
@@ -653,6 +662,8 @@ class _Backup:
         result = self._result(state, "complete" if complete else "incomplete", tel, apps, t0)
         meta = self.copy.read_meta()
         meta.status = result.status  # type: ignore[assignment]  # tu tylko complete/incomplete
+        meta.reopened_from = None  # ponowienie doszło do końca
+        state.drop_retry_snapshot()
         meta.counts = self._counts(rows, result, tel, apps)
         meta.bytes = result.bytes
         self.copy.write_meta(meta)
@@ -684,6 +695,27 @@ class _Backup:
     def _saved_tel(self, state: State) -> dict[str, CategoryResult]:
         saved = state.get_meta("telephony", {})
         return {k: CategoryResult(**saved[k]) for k in TELEPHONY if getattr(self.sel, k) and k in saved}
+
+    def _abandon_retry(self, state: State) -> None:
+        """Przerwane ponowienie: pliki, do których nie doszło, wracają do stanu sprzed ponowienia
+        (`State.abandon_retry`) jeszcze przed wynikiem i licznikami — kopia wraca do statusu sprzed
+        niego (`_undo_reopen`), a tam `pending` nie widać na liście nieudanych ani w „Ponów nieudane”.
+        Zwykła przerwana kopia zostaje `in_progress` z `pending` do wznowienia."""
+        if not self.retry:
+            return
+        try:
+            state.abandon_retry(lambda row: on_disk(self.copy, row))
+        except sqlite3.Error:  # najlepsza próba, jak `_save_partial`; resztę zrobi `_undo_reopen`
+            pass
+
+    def _undo_reopen(self) -> None:
+        """Przerwane „Ponów nieudane”: kopia wraca do stanu sprzed ponowienia (`store.undo_reopen`;
+        pliki także przy nieoczekiwanym wyjątku, którego nie łapie `_run`). Najlepsza próba, jak
+        `_save_partial`: błąd zapisu nie zasłania pierwotnej przyczyny."""
+        try:
+            undo_reopen(self.copy)
+        except (OSError, ValueError, KeyError, TypeError, sqlite3.Error):
+            pass
 
     def _save_partial(self, state: State, t0: float, result: BackupResult | None = None) -> None:
         """Przerwana kopia (zatrzymanie, `BackupError`, błąd dysku) zostaje `in_progress`, ale

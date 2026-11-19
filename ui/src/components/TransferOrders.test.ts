@@ -63,6 +63,19 @@ describe('TransferOrders', () => {
     await vi.waitFor(() => expect(env.bridge.calls.some((c) => c.method === 'extend_transfer')).toBe(true));
   });
 
+  test('an order whose copy is incomplete or reopened by "Ponów nieudane" shows the copy state, not "kopia gotowa"', async () => {
+    await show([READY], [{ ...COPY, id: 'OLD/0', order: READY.number, status: 'incomplete' }]);
+    expect(row(READY.number).textContent).toContain('kopia niepełna');
+    expect(row(READY.number).textContent).not.toContain('kopia gotowa');
+  });
+
+  test('an order whose copy waits for the retry to finish reads as interrupted', async () => {
+    await show([READY], [{ ...COPY, id: 'OLD/0', order: READY.number, status: 'in_progress' }]);
+    const r = row(READY.number);
+    expect(r.textContent).toContain('kopia przerwana — wznów przy podłączeniu');
+    expect(r.textContent).not.toContain('kopia gotowa');
+  });
+
   test('the report button asks for the report of that order', async () => {
     const env = await show([RESTORED], [COPY]);
     await fireEvent.click(within(row(RESTORED.number)).getByRole('button', { name: 'Protokół' }));

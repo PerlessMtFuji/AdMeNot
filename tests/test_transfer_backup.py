@@ -1007,3 +1007,194 @@ def test_backup_counts_malicious_apps_excluded_from_copy(tmp_path):
     copy = _copy()
     _run(phone, copy, inv, _sel(categories=frozenset()))
     assert copy.read_meta().counts["apps_malicious"] == 2
+
+
+def test_retry_after_reopen_copies_failed_file(tmp_path):
+    phone = _phone(tmp_path)
+    copy = _copy()
+    inv = _inventory(phone)
+
+    def corrupt(remotes):  # pull zostawia ucięty plik, telefon online, plik bez zmian
+        if remotes == ["/sdcard/Download/c.pdf"]:
+            phone.fail_after_files = len(phone.pulled)
+
+    original = phone.pull
+
+    def pull(remotes, target, should_stop, tick):
+        res = original(remotes, target, should_stop, tick)
+        phone.fail_after_files = None
+        phone.online = True
+        return res
+
+    phone.before_pull = corrupt
+    phone.pull = pull
+    _run(phone, copy, inv, _sel())
+    assert _rows(copy)["/sdcard/Download/c.pdf"].status == "error"
+    assert copy.read_meta().status == "incomplete"
+
+    del phone.pull  # telefon znów w porządku
+    phone.before_pull = None
+    assert store.reopen_copy_for_retry(copy) == 1
+    res = _run(phone, copy, inv, _sel())
+    row = _rows(copy)["/sdcard/Download/c.pdf"]
+    assert row.status == "done"
+    assert (copy.files_dir / "Download" / "c.pdf").read_bytes() == FILES["Download/c.pdf"]
+    assert res.status == "complete" and copy.read_meta().status == "complete"
+
+
+def _incomplete_copy(phone, inv):
+    """Kopia `incomplete` z jednym plikiem `error` (c.pdf ucięty przy pobieraniu)."""
+    copy = _copy()
+
+    def corrupt(remotes):
+        if remotes == ["/sdcard/Download/c.pdf"]:
+            phone.fail_after_files = len(phone.pulled)
+
+    original = phone.pull
+
+    def pull(remotes, target, should_stop, tick):
+        res = original(remotes, target, should_stop, tick)
+        phone.fail_after_files = None
+        phone.online = True
+        return res
+
+    phone.before_pull = corrupt
+    phone.pull = pull
+    _run(phone, copy, inv, _sel())
+    del phone.pull
+    phone.before_pull = None
+    assert copy.read_meta().status == "incomplete"
+    return copy
+
+
+def test_stopped_retry_restores_previous_status(tmp_path):
+    phone = _phone(tmp_path)
+    inv = _inventory(phone)
+    copy = _incomplete_copy(phone, inv)
+    store.reopen_copy_for_retry(copy)
+    assert copy.read_meta().status == "in_progress"
+    res = _run(phone, copy, inv, _sel(), should_stop=lambda: True)
+    assert res.status == "stopped"
+    meta = copy.read_meta()
+    assert meta.status == "incomplete" and meta.reopened_from is None  # da się wgrać jak przed ponowieniem
+
+
+def test_failed_retry_restores_previous_status(tmp_path):
+    phone = _phone(tmp_path)
+    inv = _inventory(phone)
+    copy = _incomplete_copy(phone, inv)
+    store.reopen_copy_for_retry(copy)
+    with pytest.raises(BackupError):
+        _run(phone, copy, inv, _sel(), free_bytes=lambda p: 0)
+    meta = copy.read_meta()
+    assert meta.status == "incomplete" and meta.reopened_from is None
+
+
+def test_finished_retry_clears_reopen_marker(tmp_path):
+    phone = _phone(tmp_path)
+    inv = _inventory(phone)
+    copy = _incomplete_copy(phone, inv)
+    store.reopen_copy_for_retry(copy)
+    assert copy.read_meta().reopened_from == "incomplete"
+    _run(phone, copy, inv, _sel())
+    meta = copy.read_meta()
+    assert meta.status == "complete" and meta.reopened_from is None
+
+
+def test_reopened_copy_meta_roundtrip():
+    meta = store.CopyMeta.from_json({**_copy().read_meta().to_json(), "status": "in_progress",
+                                     "reopened_from": "complete"})
+    assert meta.reopened_from == "complete"
+    assert store.CopyMeta.from_json(meta.to_json()).reopened_from == "complete"
+    with pytest.raises(ValueError):
+        store.CopyMeta.from_json({**meta.to_json(), "reopened_from": "in_progress"})
+
+
+def test_undo_reopen_after_closed_app_restores_files_from_snapshot(tmp_path):
+    """Program zamknięty po `_reconcile`: pliki są `pending`, a przy starcie okna wracają z migawki."""
+    phone = _phone(tmp_path)
+    inv = _inventory(phone)
+    copy = _incomplete_copy(phone, inv)
+    error = _rows(copy)["/sdcard/Download/c.pdf"].error
+    store.reopen_copy_for_retry(copy)
+    state = State(copy.state_path)  # jak po `_reconcile` przerwanym zamknięciem programu
+    for row in state.all_files().values():
+        state.update(row.remote, status="pending", error=None)
+    state.close()
+    assert [c.path for c, _ in store.reopened_copies()] == [copy.path]
+    store.undo_reopen(copy)
+    rows = _rows(copy)
+    assert rows["/sdcard/Download/c.pdf"].status == "error" and rows["/sdcard/Download/c.pdf"].error == error
+    assert rows["/sdcard/DCIM/Camera/a.jpg"].status == "done"
+    meta = copy.read_meta()
+    assert meta.status == "incomplete" and meta.reopened_from is None
+    assert meta.counts["files_failed"] == 1 and meta.counts["files"] == 2
+    assert store.reopened_copies() == []
+    assert store.reopen_copy_for_retry(copy) == 1  # da się ponowić jeszcze raz
+
+
+def test_stopped_retry_keeps_copied_files_changed_on_phone(tmp_path):
+    """Skopiowany plik zmieniony na telefonie i nowy plik: ponowny skan wrzuca je do kolejki, ale
+    przerwane ponowienie oddaje kopii stan sprzed niego — stary plik nadal do wgrania, nowego nie ma."""
+    phone = _phone(tmp_path)
+    inv = _inventory(phone)
+    copy = _incomplete_copy(phone, inv)
+    store.reopen_copy_for_retry(copy)
+    a = tmp_path / "phone" / "sdcard" / "DCIM" / "Camera" / "a.jpg"
+    a.write_bytes(b"Z" * 999)
+    new = tmp_path / "phone" / "sdcard" / "DCIM" / "Camera" / "new.jpg"
+    new.write_bytes(b"N" * 10)
+    stop = []
+
+    def progress(p):
+        if p.stage == "files":
+            stop.append(True)
+
+    _run(phone, copy, _inventory(phone), _sel(), should_stop=lambda: bool(stop), on_progress=progress)
+    rows = _rows(copy)
+    assert rows["/sdcard/DCIM/Camera/a.jpg"].status == "done" and rows["/sdcard/DCIM/Camera/a.jpg"].size == 300
+    assert "/sdcard/DCIM/Camera/new.jpg" not in rows
+    assert rows["/sdcard/Download/c.pdf"].status == "error"
+    assert copy.read_meta().status == "incomplete"
+
+
+def test_retry_stopped_mid_files_keeps_them_retryable(tmp_path):
+    from admenot.engine.transfer.failures import backup_failures
+
+    phone = _phone(tmp_path)
+    inv = _inventory(phone)
+    copy = _incomplete_copy(phone, inv)
+    store.reopen_copy_for_retry(copy)
+    stop = []  # zatrzymanie na etapie plików: c.pdf wrócił już do kolejki, ale nie został pobrany
+
+    def progress(p):
+        if p.stage == "files":
+            stop.append(True)
+
+    res = _run(phone, copy, inv, _sel(), should_stop=lambda: bool(stop), on_progress=progress)
+    assert res.status == "stopped" and stop
+    assert copy.read_meta().status == "incomplete"
+    assert _rows(copy)["/sdcard/Download/c.pdf"].status == "error"
+    assert [f.name for f in backup_failures(copy) if f.retryable] == ["c.pdf"]
+    assert store.reopen_copy_for_retry(copy) == 1  # da się ponowić jeszcze raz
+    assert _run(phone, copy, inv, _sel()).status == "complete"
+
+
+def test_abandon_retry_keeps_skipped_rows_and_checks_mtime(tmp_path):
+    phone = _phone(tmp_path)
+    inv = _inventory(phone)
+    copy = _incomplete_copy(phone, inv)
+    state = State(copy.state_path)
+    state.update("/sdcard/DCIM/Camera/b.jpg", status="skipped", error="vanished")  # zniknął przed ponowieniem
+    state.close()
+    store.reopen_copy_for_retry(copy)
+    a = copy.files_dir / "DCIM" / "Camera" / "a.jpg"  # ten sam rozmiar, inna treść i czas (pobrany w ponowieniu)
+    a.write_bytes(b"Q" * 300)
+    state = State(copy.state_path)
+    for remote in ("/sdcard/DCIM/Camera/a.jpg", "/sdcard/DCIM/Camera/b.jpg"):
+        state.update(remote, status="pending", error=None)
+    state.close()
+    store.undo_reopen(copy)
+    rows = _rows(copy)
+    assert rows["/sdcard/DCIM/Camera/b.jpg"].status == "skipped" and rows["/sdcard/DCIM/Camera/b.jpg"].error == "vanished"
+    assert rows["/sdcard/DCIM/Camera/a.jpg"].status == "error" and rows["/sdcard/DCIM/Camera/a.jpg"].error == "interrupted"

@@ -1171,6 +1171,30 @@
     ]
    },
    "events": []
+  },
+  {
+   "method": "transfer_failures",
+   "args": [
+    "R58T00TEST-90fae0b8e3f0/20260926-143000"
+   ],
+   "result": {
+    "failures": [],
+    "retryable": 0
+   },
+   "events": []
+  },
+  {
+   "method": "retry_failed_backup",
+   "args": [
+    "R58T00TEST-90fae0b8e3f0/20260926-143000"
+   ],
+   "result": {
+    "error": {
+     "key": "nothing_to_retry",
+     "message": "R58T00TEST-90fae0b8e3f0/20260926-143000"
+    }
+   },
+   "events": []
   }
  ]
 }
