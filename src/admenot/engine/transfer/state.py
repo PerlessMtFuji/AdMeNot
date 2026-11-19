@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -108,4 +109,43 @@ class State:
         return {s: (n, b) for s, n, b in cur}
 
     def commit(self) -> None:
+        self.db.commit()
+
+    # ---- „Ponów nieudane” ---------------------------------------------------------------
+    # Ponowienie wznawia kopię, a `_reconcile` po nowym skanie zmienia w `pending` nie tylko pliki
+    # `error`, ale też skopiowane pliki zmienione na telefonie, i dopisuje nowe. Migawka sprzed
+    # ponowienia pozwala przerwanemu ponowieniu oddać kopii dokładnie to, co miała.
+    def snapshot_for_retry(self) -> None:
+        self.db.execute("DROP TABLE IF EXISTS retry_snapshot")
+        self.db.execute("CREATE TABLE retry_snapshot AS SELECT * FROM files")
+        self.db.commit()
+
+    def _has_snapshot(self) -> bool:
+        return self.db.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='retry_snapshot'").fetchone() is not None
+
+    def drop_retry_snapshot(self) -> None:
+        self.db.execute("DROP TABLE IF EXISTS retry_snapshot")
+        self.db.commit()
+
+    def abandon_retry(self, on_disk: Callable[[FileRow], bool]) -> None:
+        """Przerwane ponowienie: każdy plik, do którego nie doszło (`pending`), wraca do stanu
+        z migawki — `error` z pierwotnym powodem, `skipped` jak był, `done`, gdy jego plik na dysku
+        jest nietknięty (`on_disk`); plik spoza migawki (nowy ze skanu) znika ze stanu. Skopiowany plik, którego
+        kopia na dysku zdążyła się zmienić, jest `error` (`interrupted`). Bez migawki — nic
+        (już oddane albo kopia nieponawiana), więc wołanie dwa razy jest bezpieczne."""
+        if not self._has_snapshot():
+            return
+        for row in self.pending():
+            snap = self.db.execute(f"SELECT {self._COLS} FROM retry_snapshot WHERE remote=?",
+                                   (row.remote,)).fetchone()
+            if snap is None:
+                self.db.execute("DELETE FROM files WHERE remote=?", (row.remote,))
+                continue
+            old = self._row(snap)
+            if old.status != "done" or on_disk(old):
+                self.insert(old)
+            else:
+                self.update(row.remote, status="error", error="interrupted")
+        self.db.execute("DROP TABLE retry_snapshot")
         self.db.commit()

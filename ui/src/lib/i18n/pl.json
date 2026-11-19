@@ -932,6 +932,7 @@
     "time_left": "Zostało {time}",
     "done_stopped": "Kopia przerwana",
     "done_stopped_text": "Skopiowane pliki zostają na komputerze. Żeby dokończyć, podłącz ten telefon i wybierz „Kopiuj dane”.",
+    "done_stopped_retry_text": "Kopia wróciła do stanu sprzed ponowienia i można ją wgrać na nowy telefon. Żeby spróbować jeszcze raz, wybierz „Ponów nieudane”.",
     "fail": {
       "title": "Nieudane",
       "reason": {

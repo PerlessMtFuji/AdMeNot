@@ -2086,7 +2086,7 @@ def test_restore_result_in_journal_has_failures(tmp_path, monkeypatch):
     from admenot.engine.transfer.failures import Failure
     found = [Failure("file", "photos", "a.jpg", "DCIM", "denied", retryable=True)]
     monkeypatch.setattr("admenot.app.api.restore_failures", lambda copy, serial: found)
-    api, rec, host, copy_id = _copied(tmp_path)
+    api, rec, _host, copy_id = _copied(tmp_path)
     _planned(api, rec, copy_id)
     api.start_restore(CHOICE)
     number = rec.of("transfer:restore_done")[0]["order"]
@@ -2095,3 +2095,31 @@ def test_restore_result_in_journal_has_failures(tmp_path, monkeypatch):
         result = journal.transfer(order.id).result
     assert result["failures"] == [{"kind": "file", "group": "photos", "name": "a.jpg", "folder": "DCIM",
                                    "reason": "denied", "count": 1, "retryable": True}]
+
+
+def test_retry_reopen_survives_history_but_not_restart(tmp_path):
+    api, rec, phone = _inventoried(tmp_path)
+    api.start_backup(SELECTION)
+    copy_id = rec.wait_for("transfer:done")["copy"]["id"]
+    copy = _break_backup_file(copy_id)
+    before = copy.read_meta().status
+    assert api.retry_failed_backup(copy_id) == {"count": 1}
+    api.transfers()  # Historia (i okresowe sprzątanie) nie cofa ponowienia czekającego na start
+    assert copy.read_meta().status == "in_progress"
+    _api(phone)  # program zamknięty przed końcem ponowienia i otwarty znowu
+    meta = copy.read_meta()
+    assert meta.status == before and meta.reopened_from is None
+
+
+def test_startup_does_not_undo_a_retry_running_in_another_window(tmp_path):
+    from admenot.engine.oplock import device_lock
+    from admenot.engine.paths import journal_path
+
+    api, rec, phone = _inventoried(tmp_path)
+    api.start_backup(SELECTION)
+    copy_id = rec.wait_for("transfer:done")["copy"]["id"]
+    copy = _break_backup_file(copy_id)
+    assert api.retry_failed_backup(copy_id) == {"count": 1}
+    with device_lock(journal_path(), SERIAL):  # ponowienie trwa w innym oknie
+        _api(phone)
+    assert copy.read_meta().status == "in_progress"

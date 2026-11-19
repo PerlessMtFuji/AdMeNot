@@ -139,7 +139,8 @@ export class Controller {
   private offerRestoreToNewPhone(fresh: string[]): void {
     const s = this.state;
     const copy = s.transfer.copy;
-    if (fresh.length === 0 || s.phase !== 'transfer_done' || !copy || copy.status === 'in_progress' || s.transfer.result?.status === 'stopped') return;
+    // zatrzymana kopia zostaje `in_progress`; zatrzymane „Ponów nieudane” wraca do stanu sprzed niego i da się ją wgrać
+    if (fresh.length === 0 || s.phase !== 'transfer_done' || !copy || copy.status === 'in_progress') return;
     // `transfer:done` przychodzi jeszcze z wnętrza zadania kopii: plan teraz dostałby „busy” — czekamy na `job:end`.
     if (s.job?.kind === 'backup') {
       this.offerAfterBackup = [...(this.offerAfterBackup ?? []), ...fresh];

@@ -263,11 +263,12 @@ describe('TransferBackup — failed items', () => {
   const fail = (name: string, over: Partial<FailureView> = {}): FailureView => ({ kind: 'file', group: 'photos', name, folder: 'DCIM/Camera',
     reason: 'denied', count: 1, retryable: true, ...over });
 
-  async function finished(res: BackupResultView, failures: FailureView[] | null, retryable: number, connected = true) {
+  async function finished(res: BackupResultView, failures: FailureView[] | null, retryable: number, connected = true,
+    copy: CopyView = COPY) {
     const env = await show('transfer_done');
     env.s.serial = COPY.serial;
     env.s.transfer.result = res;
-    env.s.transfer.copy = COPY;
+    env.s.transfer.copy = copy;
     env.s.transfer.failures = failures;
     env.s.transfer.failuresRetryable = retryable;
     env.bridge.emit('devices', { devices: connected ? [{ serial: COPY.serial, state: 'device', model: 'SM_A145R', name: null, imei: null }] : [], error: null });
@@ -299,9 +300,18 @@ describe('TransferBackup — failed items', () => {
   });
 
   test('a stopped copy with failed files: no "Ponów nieudane" (it is resumed, not reopened)', async () => {
-    await finished(result({ status: 'stopped', files_failed: 1 }), [fail('a.jpg')], 1);
+    await finished(result({ status: 'stopped', files_failed: 1 }), [fail('a.jpg')], 1, true, { ...COPY, status: 'in_progress' });
     expect(screen.getByText('a.jpg')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Ponów nieudane' })).toBeNull();
+    expect(screen.getByText(/wybierz „Kopiuj dane”/)).toBeTruthy();
+    expect(screen.queryByText('Podłącz nowy telefon')).toBeNull();
+  });
+
+  test('a stopped retry: the copy is back to before it, so it can be uploaded and retried again', async () => {
+    await finished(result({ status: 'stopped', files_failed: 1 }), [fail('a.jpg')], 1, true, { ...COPY, status: 'incomplete' });
+    expect(screen.getByText(/Kopia wróciła do stanu sprzed ponowienia/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Ponów nieudane' })).toBeTruthy();
+    expect(screen.getByText('Podłącz nowy telefon')).toBeTruthy();
   });
 
   test('the old phone is not connected: no retry button', async () => {

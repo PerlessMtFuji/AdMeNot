@@ -604,7 +604,26 @@ class Api(ExplorerMixin):
             retention.prune_logs(logs_dir(), now)
         except Exception as exc:  # noqa: BLE001 — sprzątanie nie może zablokować startu okna
             log_exception(exc)
+        self._undo_stale_reopens()
         self._purge_transfers()
+
+    def _undo_stale_reopens(self) -> None:
+        """„Ponów nieudane” przerwane zamknięciem programu oddaje kopii stan sprzed ponowienia. Tylko przy
+        starcie okna: później ponowienie czeka na start kopii i nie wolno go cofnąć. Blokada telefonu
+        chroni ponowienie trwające w innym oknie programu (zadanie kopii trzyma ją do końca)."""
+        try:
+            reopened = store.reopened_copies()
+        except Exception as exc:  # noqa: BLE001 — sprzątanie nie może zablokować startu okna
+            log_exception(exc)
+            return
+        for copy, serial in reopened:
+            try:
+                with device_lock(journal_path(), serial):
+                    store.undo_reopen(copy)
+            except DeviceBusy:
+                continue
+            except Exception as exc:  # noqa: BLE001 — jedna kopia nie zatrzymuje pozostałych
+                log_exception(exc)
 
     def _purge_transfers(self) -> None:
         """Kopie danych po terminie (z `meta.json` każdej kopii) we wszystkich folderach kopii."""

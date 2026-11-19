@@ -1902,6 +1902,16 @@ describe('data transfer — after a copy', () => {
     expect(restorePlans(b.bridge)).toHaveLength(0);
   });
 
+  test('a stopped "Ponów nieudane" (copy back to incomplete) still plans restore on the new phone', async () => {
+    const env = setup('transfer');
+    await env.ctl.init();
+    env.bridge.emit('devices', { devices: [dev(OLD)], error: null });
+    env.ctl.selectDevice(OLD);
+    env.bridge.emit('transfer:done', { result: { ...result, status: 'stopped' }, copy: { ...copy, status: 'incomplete' } });
+    env.bridge.emit('devices', { devices: [dev(OLD), dev(NEW)], error: null });
+    await vi.waitFor(() => expect(restorePlans(env.bridge)).toHaveLength(1));
+  });
+
   test('plans once per appearance, not on every device refresh', async () => {
     const { s, bridge } = await finished();
     bridge.emit('devices', { devices: [dev(NEW)], error: null });

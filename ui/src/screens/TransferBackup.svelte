@@ -75,14 +75,16 @@
   const TELEPHONY = ['contacts', 'sms', 'mms', 'calls'] as const;
   const telephony = $derived(done ? TELEPHONY.filter((k) => k in done.telephony).map((k) => [k, done.telephony[k]] as const) : []);
   const unavailable = $derived(telephony.some(([, r]) => r.status === 'unavailable' && r.source !== 'export'));
-  const usable = $derived(outcome !== null && outcome !== 'stopped');
   const size = (bytes: number) => formatSize(bytes, i18n.lang);
   const took = (sec: number) => (sec < 60 ? t('transfer.took_sec', { n: Math.max(1, Math.round(sec)) }) : t('transfer.took_min', { n: Math.round(sec / 60) }));
   const expiresOn = $derived(tr.copy ? new Date(tr.copy.expires).toLocaleDateString(i18n.lang === 'pl' ? 'pl-PL' : 'en-GB') : '');
 
   // „Ponów nieudane”: tylko gdy jest co ponowić i podłączony jest stary telefon, z którego jest kopia;
-  // przerwana kopia zostaje w toku — ją wznawia „Dokończ”, a pliki z błędem wracają same
-  const canRetry = $derived(!!done && outcome !== 'stopped' && !!tr.copy && tr.failuresRetryable > 0 && s.job === null && s.serial === tr.copy.serial
+  // przerwana kopia zostaje w toku — ją wznawia „Dokończ”, a pliki z błędem wracają same. Przerwane
+  // ponowienie oddaje kopii stan sprzed niego (nie `in_progress`), więc przycisk wraca.
+  const retryUndone = $derived(outcome === 'stopped' && !!tr.copy && tr.copy.status !== 'in_progress');
+  const usable = $derived(outcome !== null && (outcome !== 'stopped' || retryUndone));  // kopię da się wgrać
+  const canRetry = $derived(!!done && !!tr.copy && tr.copy.status !== 'in_progress' && tr.failuresRetryable > 0 && s.job === null && s.serial === tr.copy.serial
     && s.devices.some((d) => d.state === 'device' && d.serial === tr.copy!.serial));
 
   const KNOWN_ERRORS = ['addresses_missing', 'attachments_missing', 'export_changed', 'export_invalid'];
@@ -160,7 +162,7 @@
             <b class="block text-ink">{t('transfer.done_ok')}</b>
           {:else if outcome === 'stopped'}
             <b class="block text-ink">{t('transfer.done_stopped')}</b>
-            <span class="text-warn">{t('transfer.done_stopped_text')}</span>
+            <span class="text-warn">{t(retryUndone ? 'transfer.done_stopped_retry_text' : 'transfer.done_stopped_text')}</span>
           {:else}
             <b class="block text-ink">{t('transfer.done_warn')}</b>
             <span class="text-warn">{t('transfer.done_warn_text')}</span>

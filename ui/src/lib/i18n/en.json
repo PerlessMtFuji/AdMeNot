@@ -932,6 +932,7 @@
     "time_left": "{time} left",
     "done_stopped": "Copy stopped",
     "done_stopped_text": "Copied files stay on this computer. To finish, connect this phone and choose “Copy data”.",
+    "done_stopped_retry_text": "The copy is back to how it was before the retry and can be uploaded to the new phone. To try again, choose “Retry failed”.",
     "fail": {
       "title": "Failed",
       "reason": {
