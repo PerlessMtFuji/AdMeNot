@@ -243,7 +243,7 @@ def test_site_all_and_site_perm_steps():
 
 def test_scan_report_carries_device_checks_and_serializes():
     report = run_scan(_phone())
-    assert [c.id for c in report.device_checks] == ["site_notifications"]
+    assert [c.id for c in report.device_checks] == ["site_notifications", "home_screen"]
     data = report_to_dict(report)["device_checks"]
     assert data[0]["state"] == "review" and data[0]["browsers"][0]["package"] == CHROME
 
@@ -253,3 +253,28 @@ def test_scan_survives_missing_notification_data():
     phone.fail[DUMP] = AdbError("command_failed", "boom")
     report = run_scan(phone)
     assert report.device_checks[0].state == "unrecognized"
+
+
+def _home(report):
+    return next(c for c in report.device_checks if c.id == "home_screen")
+
+
+def test_system_launcher_as_home_screen_is_ok():
+    check = _home(run_scan(_phone()))
+    assert check.state == "ok"
+    assert [(h.package, h.system) for h in check.home] == [("com.sec.android.app.launcher", True)]
+
+
+def test_user_app_as_home_screen_is_review():
+    """Zgłoszenie 2026-11-20: ekran główny podmieniony przez aplikację użytkownika (reklamy)."""
+    phone = _phone()
+    phone.apps["com.wlive.forecast"].home_activity = "com.wlive.forecast.Home"
+    phone.home = "com.wlive.forecast/com.wlive.forecast.Home"
+    check = _home(run_scan(phone))
+    assert check.state == "review"
+    assert [(h.package, h.system) for h in check.home] == [("com.wlive.forecast", False)]
+
+
+def test_unknown_home_screen_adds_no_check():
+    phone = _phone(home=None)
+    assert all(c.id != "home_screen" for c in run_scan(phone).device_checks)

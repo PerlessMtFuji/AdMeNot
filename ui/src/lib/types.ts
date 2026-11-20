@@ -161,6 +161,8 @@ export interface AppView {
   first_install: string | null;
   installer: string | null;
   is_admin: boolean;
+  /** Ustawiona jako ekran główny (rola HOME). Starsze migawki: brak. */
+  is_home?: boolean;
   default_level: Level | null;
   problems: string[];
   findings: Finding[];
@@ -202,11 +204,20 @@ export interface CheckBrowser {
 }
 
 /** Kontrola „Stan telefonu” (etap 1: powiadomienia witryn w przeglądarkach). */
+export interface CheckHome {
+  package: string;
+  name: string;
+  /** Launcher producenta; false — aplikacja spoza systemu (karta „do sprawdzenia”). */
+  system: boolean;
+}
+
 export interface DeviceCheck {
   id: string;
   state: CheckState;
   state_label: string;
   browsers: CheckBrowser[];
+  /** Tylko `home_screen`: kto jest ekranem głównym (starsze migawki: brak). */
+  home?: CheckHome[];
 }
 
 export interface ScanCounts {

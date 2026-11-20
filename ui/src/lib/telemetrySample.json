@@ -35,7 +35,8 @@
       "apk_mode": "pending",
       "eta": null,
       "checks": {
-        "site_notifications": "review"
+        "site_notifications": "review",
+        "home_screen": "ok"
       },
       "sites": {
         "per_site": 2,
@@ -312,7 +313,8 @@
       "apk_mode": "pending",
       "eta": null,
       "checks": {
-        "site_notifications": "review"
+        "site_notifications": "review",
+        "home_screen": "ok"
       },
       "sites": {
         "per_site": 2,

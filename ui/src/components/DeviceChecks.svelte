@@ -3,6 +3,7 @@
   import type { Controller } from '../lib/controller';
   import { t } from '../lib/i18n/index.svelte';
   import { shownChecks } from '../lib/logic';
+  import HomeScreen from './HomeScreen.svelte';
   import SiteNotifications from './SiteNotifications.svelte';
 
   // Ponawianie odczytu Firefoxa żyje w ekranie Naprawa (Results), bo licznik zakładki „Telefon” ma się
@@ -16,7 +17,7 @@
   <!-- Każda kontrola to własna karta (zawsze rozwinięta); sekcja tylko je grupuje. -->
   <section aria-label={t('checks.title')} class="flex flex-col gap-2.5">
     {#each checks as c (c.id)}
-      {#if c.id === 'site_notifications'}<SiteNotifications check={c} />{/if}
+      {#if c.id === 'site_notifications'}<SiteNotifications check={c} />{:else if c.id === 'home_screen'}<HomeScreen check={c} />{/if}
     {/each}
   </section>
 {/if}

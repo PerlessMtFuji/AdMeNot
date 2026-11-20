@@ -21,7 +21,7 @@ from admenot.engine.adb.transport import AdbError
 from admenot.engine.collectors.components import HOME_QUERY
 from admenot.engine.collectors.packages import PM_DISABLED, PM_SYSTEM
 from admenot.engine.collectors.profiles import PM_USERS
-from admenot.engine.collectors.system import DEVICE_POLICY, NOTIF_MANAGER, RESOLVE_HOME
+from admenot.engine.collectors.system import DEVICE_POLICY, NOTIF_MANAGER, RESOLVE_HOME, ROLE_HOME
 from admenot.engine.device_checks import (
     APP_BROWSER_QUERY,
     APP_BROWSER_QUERY_PLAIN,
@@ -204,6 +204,8 @@ class FakePhone:
             return self._list(a for a in self._present() if a.system)
         if command == PM_DISABLED:
             return self._list(a for a in self._present() if not a.enabled)
+        if command == ROLE_HOME:  # posiadacz roli HOME = pakiet domyślnego launchera
+            return f"{self.home.split('/', 1)[0]}\n" if self.home else ""
         if command == RESOLVE_HOME:
             return _HOME_HEADER + (self.home or "android/com.android.internal.app.ResolverActivity") + "\n"
         if command in (BROWSER_QUERY, BROWSER_QUERY_PLAIN):
@@ -615,7 +617,7 @@ def make_cli_phone() -> FakePhone:
         secure={LISTENERS: "com.whatsapp/com.whatsapp.NotificationListener"},
         # Współczesny telefon odpowiada na `pm list users` (jeden profil) — nagrania mostu
         # nie pokazują więc ostrzeżenia o nieznanym zakresie profili (Plan 4b, przegląd M2).
-        static={**make_synthetic_adb().responses,
+        static={**{k: v for k, v in make_synthetic_adb().responses.items() if k != ROLE_HOME},
                 PM_USERS: "Users:\n\tUserInfo{0:Owner:c13} running\n"},
         host={"devices -l": SYNTHETIC_DEVICES},
     )

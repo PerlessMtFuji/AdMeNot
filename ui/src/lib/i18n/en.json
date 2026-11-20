@@ -33,6 +33,11 @@
   "category": { "ads": "Ads", "notif": "Notification spam", "removal": "Hard to remove", "data": "Access to data", "disguise": "Impersonation", "background": "Runs in background", "origin": "Origin", "combo": "Signal combination" },
   "checks": {
     "title": "Phone state",
+    "home_screen": "Home screen",
+    "home_intro": "The app that opens when you press the Home button.",
+    "home_system": "manufacturer launcher",
+    "home_foreign": "not a system app",
+    "home_hint": "If the customer didn't set it themselves, choose “Disable” or “Remove” for it in the Apps tab (also when it's on the list without remarks). The program will then switch the home screen back to the manufacturer launcher.",
     "site_notifications": "Site notifications",
     "intro": "Sites someone allowed to send notifications. Such “ads” look like they come from an app, but they come from the browser.",
     "to_check": { "one": "{count} to check", "few": "{count} to check", "many": "{count} to check", "other": "{count} to check" },
@@ -56,6 +61,8 @@
   },
   "choice": { "silence": "Silence", "disable": "Disable", "remove": "Remove", "fix": "Site settings" },
   "results": {
+    "home": "home screen",
+    "home_title": "This app is set as the phone's home screen and is not the manufacturer launcher.",
     "title": { "one": "{count} app needs attention", "few": "{count} apps need attention", "many": "{count} apps need attention", "other": "{count} apps need attention" },
     "safe": { "one": "{count} app without issues", "few": "{count} apps without issues", "many": "{count} apps without issues", "other": "{count} apps without issues" },
     "mode": "View mode", "action_for": "Action for {name}",

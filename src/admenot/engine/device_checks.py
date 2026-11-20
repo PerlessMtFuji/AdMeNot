@@ -30,6 +30,7 @@ from admenot.engine.browsers.known import (
     known_browsers,
     without_site_notifications,
 )
+from admenot.engine.facts import AppFacts
 from admenot.engine.parsers.common import UnrecognizedOutput, query_packages
 from admenot.engine.parsers.site_notifications import (
     Channel,
@@ -41,6 +42,7 @@ from admenot.engine.parsers.site_notifications import (
 
 CHECK_STATES = ("ok", "review", "unrecognized")  # etap 2 doda "fix"
 SITE_NOTIFICATIONS = "site_notifications"
+HOME_SCREEN = "home_screen"
 CHROME = "com.android.chrome"
 # Przeglądarki na telefonie: aplikacje, które otwierają dowolny link http (aplikacje z linkami tylko do
 # swojej domeny go nie obsługują). Bez MATCH_ALL (0x20000) system przy ustawionej przeglądarce domyślnej
@@ -80,11 +82,19 @@ class BrowserSites:
     rdp_hint: bool = False  # Firefox bez zdalnego debugowania
 
 
+@dataclass(frozen=True)
+class HomeApp:
+    package: str
+    name: str
+    system: bool
+
+
 @dataclass
 class DeviceCheck:
     id: str
     state: str
     browsers: list[BrowserSites] = field(default_factory=list)
+    home: list[HomeApp] = field(default_factory=list)  # tylko `home_screen`
 
 
 def _host(origin: str) -> str:
@@ -285,6 +295,18 @@ def read_device_checks(adb: AdbTransport, labels: Mapping[str, str | None] | Non
         return [read_site_notifications(adb, labels)]
     except Exception:  # noqa: BLE001 — też AdbError: kolektory notują ją jako brak danych
         return [DeviceCheck(SITE_NOTIFICATIONS, "unrecognized")]
+
+
+def home_screen_check(facts: Mapping[str, AppFacts], roles_read: bool) -> DeviceCheck | None:
+    """Kto jest ekranem głównym — z roli HOME odczytanej przy skanie, bez nowych komend. Aplikacja spoza
+    systemu dostaje „review” niezależnie od punktów (zgłoszenie 2026-11-20: launcher bez ikony podmienił
+    ekran główny i miał werdykt „bezpieczna”). Brak odczytu albo brak posiadacza roli: kontroli nie ma,
+    bo „nie wiadomo” nie jest tu niczym, co serwisant może sprawdzić inaczej niż na telefonie."""
+    holders = sorted((f for f in facts.values() if f.is_home_holder), key=lambda f: f.package)
+    if not roles_read or not holders:
+        return None
+    home = [HomeApp(f.package, f.label or f.package, f.is_system) for f in holders]
+    return DeviceCheck(HOME_SCREEN, "ok" if all(h.system for h in home) else "review", home=home)
 
 
 def offered_fixes(checks: list[DeviceCheck]) -> set[str]:

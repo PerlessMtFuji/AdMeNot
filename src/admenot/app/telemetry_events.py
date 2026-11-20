@@ -305,7 +305,7 @@ def _sample_scan(packages: bool) -> dict[str, Any]:
             "verdicts": {"malicious": 1, "suspicious": 0, "review": 1}, "low_behavior_data": False,
             # Szybki skan (apk_stage False): APK jeszcze nie przeanalizowane, tryb dopiero do wyboru.
             "apk": None, "seconds": 41, "apk_stage": False, "apk_mode": "pending", "eta": None,
-            "checks": {"site_notifications": "review"}, "sites": {"per_site": 2, "shared": 1, "rdp": 0},
+            "checks": {"site_notifications": "review", "home_screen": "ok"}, "sites": {"per_site": 2, "shared": 1, "rdp": 0},
             "packages": flagged if packages else None}
 
 

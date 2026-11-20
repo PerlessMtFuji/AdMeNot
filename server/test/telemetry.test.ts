@@ -82,10 +82,19 @@ describe("POST /api/v1/telemetry", () => {
     expect([oldScan.checks, oldScan.sites, oldRepair.fixes]).toEqual([null, null, null]);
   });
 
+  it("zapisuje stan ekranu głównego obok powiadomień witryn", async () => {
+    const both = scan({ checks: { site_notifications: "ok", home_screen: "review" } });
+    expect((await post([both])).status).toBe(200);
+    const [s] = (await rows()).map((x) => JSON.parse(x.body));
+    expect(s.checks).toEqual({ site_notifications: "ok", home_screen: "review" });
+  });
+
   it.each([
     ["nieznany stan", scan({ checks: { site_notifications: "fix" } })],
     ["dodatkowy klucz w checks", scan({ checks: { site_notifications: "ok", other: "ok" } })],
     ["pusty checks", scan({ checks: {} })],
+    ["nieznany stan ekranu głównego", scan({ checks: { site_notifications: "ok", home_screen: "fix" } })],
+    ["sam ekran główny bez witryn", scan({ checks: { home_screen: "ok" } })],
     ["domena w sites", scan({ sites: { per_site: 1, shared: 0, rdp: 0, "example.com": 1 } })],
     ["napis zamiast liczby w sites", scan({ sites: { per_site: "example.com", shared: 0, rdp: 0 } })],
     ["brak klucza w sites", scan({ sites: { per_site: 1, shared: 0 } })],

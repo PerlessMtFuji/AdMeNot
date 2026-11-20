@@ -63,6 +63,7 @@
   import Wrench from '@lucide/svelte/icons/wrench';
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import StickyNote from '@lucide/svelte/icons/sticky-note';
+  import House from '@lucide/svelte/icons/house';
 
   export const ICONS = {
     ellipsis: Ellipsis, 'sticky-note': StickyNote,
@@ -77,7 +78,7 @@
     'folder-lock': FolderLock, 'folder-open': FolderOpen, 'hard-drive': HardDrive, image: ImageIcon,
     'layout-grid': LayoutGrid, list: List, 'message-circle': MessageCircle, music: Music, package: Package, play: Play,
     'scan-line': ScanLine, 'chevron-left': ChevronLeft, 'map-pin': MapPin, 'rotate-cw': RotateCw, 'skip-forward': SkipForward, upload: Upload, 'wifi-off': WifiOff,
-    'arrow-left-right': ArrowLeftRight, 'sliders-horizontal': SlidersHorizontal, wrench: Wrench,
+    'arrow-left-right': ArrowLeftRight, 'sliders-horizontal': SlidersHorizontal, wrench: Wrench, house: House,
   } as const;
   export type IconName = keyof typeof ICONS;
 </script>

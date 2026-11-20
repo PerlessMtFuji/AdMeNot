@@ -217,6 +217,28 @@ def test_app_view_says_whether_the_app_is_disabled_on_the_phone():
     assert app_view(AppResult(off, [], 0, "safe", False, False), "pl")["enabled"] is False
 
 
+def test_app_view_marks_the_home_screen_app():
+    from admenot.engine.scoring import AppResult
+
+    assert app_view(AppResult(AppFacts("com.x"), [], 0, "safe", False, False), "pl")["is_home"] is False
+    home = AppFacts("com.x", is_home_holder=True)
+    assert app_view(AppResult(home, [], 0, "safe", False, False), "pl")["is_home"] is True
+
+
+def test_app_view_lists_one_signal_of_a_group_once():
+    """Zgłoszenie 2026-11-20: „Niewidoczne znaki w nazwie” dwa razy (z APK i z ekranu telefonu), choć
+    wynik liczy grupę raz."""
+    from admenot.engine.rules.engine import load_default_ruleset
+    from admenot.engine.scoring import score_app
+
+    facts = AppFacts("com.x", label="\u200bQR Scanner", label_padded=True, phone_label_padded=True,
+                     installer="com.android.vending", installed_days=200.0)
+    result = score_app(facts, load_default_ruleset().evaluate(facts), trusted=False, low_behavior_data=False)
+    assert {"DM-LABEL-01", "DM-LABEL-02"} <= {f.rule_id for f in result.findings}
+    shown = [f for f in app_view(result, "pl")["findings"] if f["label"] == "Niewidoczne znaki w nazwie"]
+    assert len(shown) == 1
+
+
 def test_app_view_shows_confidence_gaps_and_scoped_safe_label(synthetic_adb):
     synthetic_adb.responses[DEVICE_POLICY] = AdbError("timeout", "slow")
     report = run_scan(synthetic_adb)
@@ -334,7 +356,11 @@ def _site_phone():
 def test_scan_view_lists_device_checks_with_labels():
     view = scan_view(run_scan(_site_phone()), "pl")
     json.dumps(view)
-    (check,) = view["device_checks"]
+    check, home = view["device_checks"]
+    assert (home["id"], home["state"], home["browsers"]) == ("home_screen", "ok", [])
+    assert home["home"] == [{"package": "com.sec.android.app.launcher", "system": True,
+                             "name": "com.sec.android.app.launcher"}]  # atrapa nie zna nazwy launchera
+    assert check["home"] == []
     assert (check["id"], check["state"], check["state_label"]) == (
         "site_notifications", "review", "Do sprawdzenia")
     chrome, sbrowser = check["browsers"]
