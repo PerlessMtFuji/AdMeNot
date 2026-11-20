@@ -785,7 +785,9 @@ describe('Results: phone state', () => {
   test('an unreadable phone state is a notice, not an empty or “all clear” section', async () => {
     await scanned();
     await openPhone();
-    expect(screen.queryByRole('region', { name: 'Stan telefonu' })).toBeNull();
+    // Karta ekranu głównego zostaje (rola HOME odczytana), ale nieodczytanych witryn nie ma jako „w porządku”.
+    expect(screen.queryByRole('heading', { name: 'Powiadomienia z witryn' })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Ekran główny' })).toBeTruthy();
     await fireEvent.click(within(screen.getByRole('region', { name: 'Uwagi do skanu' })).getByRole('button', { name: 'Więcej' }));
     expect(screen.getByText(/Nie dało się odczytać stanu telefonu/)).toBeTruthy();
   });

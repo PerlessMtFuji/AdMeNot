@@ -19,7 +19,7 @@ from admenot.engine.collectors.packages import collect_packages
 from admenot.engine.collectors.profiles import ProfileScope, read_profiles
 from admenot.engine.collectors.registry import default_collectors
 from admenot.engine.device.info import DeviceInfo, read_device_info
-from admenot.engine.device_checks import DeviceCheck, read_device_checks
+from admenot.engine.device_checks import DeviceCheck, home_screen_check, read_device_checks
 from admenot.engine.facts import AppFacts
 from admenot.engine.rules.engine import RuleSet, load_default_ruleset
 from admenot.engine.scoring import AppResult, score_app
@@ -94,6 +94,9 @@ def run_scan(
     stage("collectors")
     statuses = run_collectors(adb, facts, default_collectors(device.local_now, device.uptime_s))
     device_checks = read_device_checks(adb, {p: f.label for p, f in facts.items()})
+    roles = statuses.get("roles")
+    if home := home_screen_check(facts, roles is not None and roles.ok):
+        device_checks.append(home)
 
     if incidents is not None:  # nagranie incydentu (ocena §7.4): brak wpisu = 0 trafień
         for package, f in facts.items():

@@ -8,6 +8,7 @@
   import Pill from '../ui/Pill.svelte';
   import Segmented from '../ui/Segmented.svelte';
   import AppIcon from './AppIcon.svelte';
+  import HomeBadge from './HomeBadge.svelte';
   import ReasonTiles from './ReasonTiles.svelte';
   import SymptomList from './SymptomList.svelte';
 
@@ -36,6 +37,7 @@
     <div class="min-w-0 flex-1">
       <div class="flex min-w-0 items-center gap-2">
         <b class="truncate text-md" title={app.package}>{app.name}</b>
+        <HomeBadge {app} />
         {#if !app.enabled}<Pill tone="neutral">{t('results.disabled')}</Pill>{/if}
         {#if app.incomplete}<Pill tone="neutral">{t('results.incomplete')}</Pill>{/if}
         {#if done}<Pill tone="ok">{t(`history.level_done.${done}`)}</Pill>

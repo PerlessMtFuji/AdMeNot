@@ -67,6 +67,21 @@ COMBOS = (
         {"pl": "Biblioteki reklamowe + wyświetlanie", "en": "Ad libraries + shows content"},
         rule_class="apk",
     ),
+    # Zgłoszenie 2026-11-20: aplikacja bez ikony podmieniła ekran główny (Realme, Android 15),
+    # a same DM-HOME-01 + DM-HIDDEN-01 dawały 18 pkt — „bezpieczna”, więc niewidoczna w wynikach.
+    Combo(
+        "DM-COMBO-04",
+        frozenset({"DM-HOME-01", "DM-HIDDEN-01"}),
+        frozenset(),
+        10,
+        {"pl": "Jest ustawiona jako ekran główny, a nie ma własnej ikony na liście aplikacji — "
+               "trudno ją znaleźć i usunąć z telefonu.",
+         "en": "Is set as the home screen but has no icon of its own in the app drawer — "
+               "hard to find and remove on the phone."},
+        {"pl": "kombinacja: DM-HOME-01 + DM-HIDDEN-01",
+         "en": "combination: DM-HOME-01 + DM-HIDDEN-01"},
+        {"pl": "Ekran główny bez ikony", "en": "Home screen without an icon"},
+    ),
 )
 
 

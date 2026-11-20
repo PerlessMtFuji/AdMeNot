@@ -574,6 +574,7 @@
          "from_play": false,
          "installer": "com.android.chrome",
          "is_admin": true,
+         "is_home": false,
          "default_level": "disable",
          "problems": [
           "Jest aktywnym administratorem urządzenia — przed wyłączeniem lub usunięciem trzeba odebrać te uprawnienia.",
@@ -828,6 +829,7 @@
          "from_play": true,
          "installer": "com.android.vending",
          "is_admin": false,
+         "is_home": false,
          "default_level": null,
          "problems": [
           "Bardzo często wyświetla powiadomienia z dźwiękiem lub wyskakujące — średnio 21 na godzinę w ciągu doby."
@@ -889,6 +891,7 @@
          "from_play": true,
          "installer": "com.android.vending",
          "is_admin": false,
+         "is_home": false,
          "default_level": null,
          "problems": [
           "Czyta powiadomienia z innych aplikacji."
@@ -947,6 +950,7 @@
          "from_play": false,
          "installer": null,
          "is_admin": false,
+         "is_home": true,
          "default_level": null,
          "problems": [
           "Jest ustawiona jako ekran główny telefonu."
@@ -999,7 +1003,21 @@
          "id": "site_notifications",
          "state": "unrecognized",
          "state_label": "Nie udało się odczytać",
-         "browsers": []
+         "browsers": [],
+         "home": []
+        },
+        {
+         "id": "home_screen",
+         "state": "ok",
+         "state_label": "W porządku",
+         "browsers": [],
+         "home": [
+          {
+           "package": "com.sec.android.app.launcher",
+           "system": true,
+           "name": "com.sec.android.app.launcher"
+          }
+         ]
         }
        ],
        "profiles": {
@@ -1090,6 +1108,7 @@
          "from_play": false,
          "installer": "com.android.chrome",
          "is_admin": true,
+         "is_home": false,
          "default_level": "disable",
          "problems": [
           "Jest aktywnym administratorem urządzenia — przed wyłączeniem lub usunięciem trzeba odebrać te uprawnienia.",
@@ -1339,6 +1358,7 @@
          "from_play": true,
          "installer": "com.android.vending",
          "is_admin": false,
+         "is_home": false,
          "default_level": null,
          "problems": [
           "Bardzo często wyświetla powiadomienia z dźwiękiem lub wyskakujące — średnio 21 na godzinę w ciągu doby."
@@ -1395,6 +1415,7 @@
          "from_play": true,
          "installer": "com.android.vending",
          "is_admin": false,
+         "is_home": false,
          "default_level": null,
          "problems": [
           "Czyta powiadomienia z innych aplikacji."
@@ -1453,6 +1474,7 @@
          "from_play": false,
          "installer": null,
          "is_admin": false,
+         "is_home": true,
          "default_level": null,
          "problems": [
           "Jest ustawiona jako ekran główny telefonu."
@@ -1505,7 +1527,21 @@
          "id": "site_notifications",
          "state": "unrecognized",
          "state_label": "Nie udało się odczytać",
-         "browsers": []
+         "browsers": [],
+         "home": []
+        },
+        {
+         "id": "home_screen",
+         "state": "ok",
+         "state_label": "W porządku",
+         "browsers": [],
+         "home": [
+          {
+           "package": "com.sec.android.app.launcher",
+           "system": true,
+           "name": "com.sec.android.app.launcher"
+          }
+         ]
         }
        ],
        "profiles": {

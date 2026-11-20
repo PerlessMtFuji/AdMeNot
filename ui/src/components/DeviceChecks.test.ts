@@ -223,4 +223,29 @@ describe('DeviceChecks', () => {
       vi.useRealTimers();
     }
   });
+
+  test('home screen: a non-system app is to check, with a hint and +1 on the Phone tab counter', async () => {
+    const home: DeviceCheck = {
+      id: 'home_screen', state: 'review', state_label: 'Do sprawdzenia', browsers: [],
+      home: [{ package: 'com.qr.scanner.free', name: 'Barcode Scanner', system: false }],
+    };
+    await mounted([check([{ ...CHROME, sites: [CHROME.sites[2]] }], 'ok'), home]);
+    const head = screen.getByRole('heading', { level: 2, name: 'Ekran główny' });
+    expect(head.parentElement!.textContent).toContain('Do sprawdzenia');
+    expect(screen.getByText('Barcode Scanner')).toBeTruthy();
+    expect(screen.getByText('spoza systemu')).toBeTruthy();
+    expect(screen.getByText(/przełączy wtedy ekran główny/)).toBeTruthy();
+    expect(phoneBadge([home])).toEqual({ kind: 'count', count: 1 });
+  });
+
+  test('home screen: the manufacturer launcher is ok and adds nothing to the counter', async () => {
+    const home: DeviceCheck = {
+      id: 'home_screen', state: 'ok', state_label: 'W porządku', browsers: [],
+      home: [{ package: 'com.sec.android.app.launcher', name: 'One UI Home', system: true }],
+    };
+    await mounted([home]);
+    expect(screen.getByText('launcher producenta')).toBeTruthy();
+    expect(screen.queryByText(/przełączy wtedy ekran główny/)).toBeNull();
+    expect(phoneBadge([home])).toEqual({ kind: 'ok' });
+  });
 });

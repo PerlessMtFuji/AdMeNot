@@ -595,6 +595,7 @@ export type PhoneBadge = { kind: 'count'; count: number } | { kind: 'unknown' } 
 export function phoneBadge(checks: DeviceCheck[] | null | undefined): PhoneBadge {
   const all = checks ?? [];
   const count = all.filter((c) => c.state !== 'unrecognized').reduce((n, c) => {
+    if (c.id === 'home_screen') return n + (c.home ?? []).filter((h) => !h.system).length;
     const r = siteRows(c);
     return n + r.todo.length + r.shared.length + r.unsupported.length;
   }, 0);

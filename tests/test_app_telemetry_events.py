@@ -198,9 +198,10 @@ def _site_phone():
 
 def test_scan_event_reports_check_state_and_site_counts_without_domains():
     e = ev.scan_event(run_scan(_site_phone()), "ab12cd34", 5, packages=True)
-    assert e["checks"] == {"site_notifications": "review"}
+    assert e["checks"] == {"site_notifications": "review", "home_screen": "ok"}
     assert e["sites"] == {"per_site": 2, "shared": 1, "rdp": 0}
     assert "example" not in json.dumps(e) and "sbrowser" not in json.dumps(e)
+    assert "launcher" not in json.dumps(e)  # stan ekranu głównego bez pakietu launchera
 
 
 def _action(aid, package, level, kind, status):

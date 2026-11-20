@@ -63,7 +63,7 @@ function packages(v: unknown, item: (p: Obj) => Obj): Obj[] | null {
 
 const VERDICTS = ["malicious", "suspicious", "review"] as const;
 const LEVELS = ["silence", "disable", "remove"] as const;
-// Sprawdzenia stanu telefonu: dokładnie jeden znany identyfikator, bez domen i pakietów przeglądarek.
+// Sprawdzenia stanu telefonu: tylko znane identyfikatory i stany, bez domen i pakietów.
 const CHECK_STATES = ["ok", "review", "unrecognized"] as const;
 const SITE_MODES = ["per_site", "shared", "rdp"] as const;
 const FIX_KINDS = ["channel", "site_permission"] as const;
@@ -182,8 +182,13 @@ function restoreApps(e: Obj): Obj {
 }
 
 function checks(v: unknown): Obj {
-  need(isObj(v) && Object.keys(v as Obj).length === 1 && oneOf((v as Obj).site_notifications, CHECK_STATES));
-  return { site_notifications: (v as Obj).site_notifications };
+  need(isObj(v) && oneOf((v as Obj).site_notifications, CHECK_STATES));
+  const o = v as Obj;
+  // `home_screen` (od 0.11.1): opcjonalny — bez odczytu roli HOME klient go nie wysyła.
+  need(Object.keys(o).every((k) => k === "site_notifications" || k === "home_screen"));
+  if (o.home_screen === undefined) return { site_notifications: o.site_notifications };
+  need(oneOf(o.home_screen, CHECK_STATES));
+  return { site_notifications: o.site_notifications, home_screen: o.home_screen };
 }
 
 function body(e: Obj): Obj {

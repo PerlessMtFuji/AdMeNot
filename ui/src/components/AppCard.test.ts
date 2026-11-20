@@ -88,3 +88,12 @@ test('app card: an app disabled on the phone says so, an enabled one does not', 
   await rerender({ ...props, app: { ...evil, enabled: false } });
   expect(screen.getByText('Wyłączona na telefonie')).toBeTruthy();
 });
+
+test('app card: a non-system home screen app has a visible “ekran główny” badge; the system launcher does not', () => {
+  const props = { level: null, onlevel: vi.fn(), ontoggle: vi.fn() };
+  const { unmount } = render(AppCard, { props: { ...props, app: { ...evil, is_home: true } } });
+  expect(screen.getByText('ekran główny')).toBeTruthy();
+  unmount();
+  render(AppCard, { props: { ...props, app: { ...evil, is_home: true, is_system: true } } });
+  expect(screen.queryByText('ekran główny')).toBeNull();
+});

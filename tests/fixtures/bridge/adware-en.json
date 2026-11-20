@@ -574,6 +574,7 @@
          "from_play": false,
          "installer": "com.android.chrome",
          "is_admin": true,
+         "is_home": false,
          "default_level": "disable",
          "problems": [
           "Is an active device administrator — these rights must be revoked before disabling or removing it.",
@@ -828,6 +829,7 @@
          "from_play": true,
          "installer": "com.android.vending",
          "is_admin": false,
+         "is_home": false,
          "default_level": null,
          "problems": [
           "Very often shows notifications that sound or pop up — 21 per hour on average over a day."
@@ -889,6 +891,7 @@
          "from_play": true,
          "installer": "com.android.vending",
          "is_admin": false,
+         "is_home": false,
          "default_level": null,
          "problems": [
           "Reads notifications from other apps."
@@ -947,6 +950,7 @@
          "from_play": false,
          "installer": null,
          "is_admin": false,
+         "is_home": true,
          "default_level": null,
          "problems": [
           "Is set as the phone's home screen."
@@ -999,7 +1003,21 @@
          "id": "site_notifications",
          "state": "unrecognized",
          "state_label": "Could not be read",
-         "browsers": []
+         "browsers": [],
+         "home": []
+        },
+        {
+         "id": "home_screen",
+         "state": "ok",
+         "state_label": "OK",
+         "browsers": [],
+         "home": [
+          {
+           "package": "com.sec.android.app.launcher",
+           "system": true,
+           "name": "com.sec.android.app.launcher"
+          }
+         ]
         }
        ],
        "profiles": {
@@ -1090,6 +1108,7 @@
          "from_play": false,
          "installer": "com.android.chrome",
          "is_admin": true,
+         "is_home": false,
          "default_level": "disable",
          "problems": [
           "Is an active device administrator — these rights must be revoked before disabling or removing it.",
@@ -1339,6 +1358,7 @@
          "from_play": true,
          "installer": "com.android.vending",
          "is_admin": false,
+         "is_home": false,
          "default_level": null,
          "problems": [
           "Very often shows notifications that sound or pop up — 21 per hour on average over a day."
@@ -1395,6 +1415,7 @@
          "from_play": true,
          "installer": "com.android.vending",
          "is_admin": false,
+         "is_home": false,
          "default_level": null,
          "problems": [
           "Reads notifications from other apps."
@@ -1453,6 +1474,7 @@
          "from_play": false,
          "installer": null,
          "is_admin": false,
+         "is_home": true,
          "default_level": null,
          "problems": [
           "Is set as the phone's home screen."
@@ -1505,7 +1527,21 @@
          "id": "site_notifications",
          "state": "unrecognized",
          "state_label": "Could not be read",
-         "browsers": []
+         "browsers": [],
+         "home": []
+        },
+        {
+         "id": "home_screen",
+         "state": "ok",
+         "state_label": "OK",
+         "browsers": [],
+         "home": [
+          {
+           "package": "com.sec.android.app.launcher",
+           "system": true,
+           "name": "com.sec.android.app.launcher"
+          }
+         ]
         }
        ],
        "profiles": {

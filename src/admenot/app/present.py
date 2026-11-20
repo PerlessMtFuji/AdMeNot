@@ -168,13 +168,27 @@ def device_card(info: DeviceInfo, match: PhoneMatch | None) -> dict[str, Any]:
     }
 
 
+def _shown_findings(findings: list[Finding]) -> list[Finding]:
+    """Reguły jednej grupy o tej samej nazwie (np. niewidoczne znaki z APK i z ekranu telefonu) to jeden
+    sygnał: wynik liczy z grupy najsilniejszą, więc i lista punktów pokazuje ją raz."""
+    seen: set[tuple[str, str]] = set()
+    shown = []
+    for f in sorted(findings, key=lambda f: -f.weight):
+        key = (f.group, f.label_text("pl"))
+        if f.group and key in seen:
+            continue
+        seen.add(key)
+        shown.append(f)
+    return shown
+
+
 def app_view(r: AppResult, lang: str, sdk: int = 0) -> dict[str, Any]:
     findings = [
         {"rule_id": f.rule_id, "class": f.rule_class, "weight": f.weight,
          "text": f.text(lang), "text_expert": f.text(lang, expert=True),
          "evidence": plain(f.evidence), "category": f.category, "label": f.label_text(lang),
          "basis": f.basis, "source": f.source, "locations": list(f.locations)}
-        for f in r.findings
+        for f in _shown_findings(r.findings)
     ]
     facts = r.facts
     label_key = "safe_incomplete" if r.verdict == "safe" and r.incomplete else r.verdict
@@ -189,7 +203,8 @@ def app_view(r: AppResult, lang: str, sdk: int = 0) -> dict[str, Any]:
         "first_install": (facts.first_install.isoformat(timespec="seconds")
                           if facts.first_install else None),
         "from_play": facts.from_play, "installer": facts.installer,
-        "is_admin": facts.is_device_admin, "default_level": default_level(r, sdk),
+        "is_admin": facts.is_device_admin, "is_home": bool(facts.is_home_holder),
+        "default_level": default_level(r, sdk),
         "problems": list(dict.fromkeys(f["text"] for f in findings))[:MAX_PROBLEMS],
         "findings": findings, "apk_error": facts.apk_error, "icon": facts.icon,
         "ad_sdks": sorted(facts.ad_sdks) if facts.ad_sdks is not None else None,
@@ -233,6 +248,9 @@ def device_checks_view(checks: list[DeviceCheck], lang: str,
                        "fix": s.fix, "fix_label": _fix_label(s.fix, checks, lang)}
                       for s in b.sites],
         } for b in c.browsers],
+        "home": [{"package": h.package, "system": h.system,
+                  "name": (labels.get(h.package) or h.name) if h.name == h.package else h.name}
+                 for h in c.home],
     } for c in checks]
 
 

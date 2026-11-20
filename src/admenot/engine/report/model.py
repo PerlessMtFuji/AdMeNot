@@ -13,6 +13,7 @@ from typing import Any
 
 from admenot.engine import paths
 from admenot.engine.actions.planner import FIX_LEVEL
+from admenot.engine.device_checks import SITE_NOTIFICATIONS
 from admenot.engine.journal.db import MAX_REPORT_SCREENSHOTS, Action, Journal, Order, unresolved
 
 PATCH_MAX_AGE_DAYS = 365
@@ -266,11 +267,12 @@ def _browser_rows(b: dict[str, Any], outcomes: dict[tuple[str, str], str]) -> li
 
 def _phone_checks(snap: dict[str, Any] | None, actions: list[Action]) -> list[PhoneCheck]:
     """Kontrole „Stanu telefonu” z migawki + wynik poprawek z dziennika. Stara migawka bez klucza
-    daje pustą listę (sekcji nie ma)."""
+    daje pustą listę (sekcji nie ma). Sekcja protokołu to tabela przeglądarek, więc kontrola bez nich
+    (ekran główny) do niej nie trafia."""
     outcomes = _fix_outcomes(actions)
     return [PhoneCheck(raw.get("id") or "", raw.get("state") or "unrecognized",
                        [row for b in raw.get("browsers") or [] for row in _browser_rows(b, outcomes)])
-            for raw in (snap or {}).get("device_checks") or []]
+            for raw in (snap or {}).get("device_checks") or [] if raw.get("id") == SITE_NOTIFICATIONS]
 
 
 def _screenshots(journal: Journal, order_id: int) -> list[ProtocolShot]:

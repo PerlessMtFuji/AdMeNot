@@ -33,6 +33,11 @@
   "category": { "ads": "Reklamy", "notif": "Spam powiadomień", "removal": "Utrudnia usunięcie", "data": "Dostęp do danych", "disguise": "Podszywa się", "background": "Działa w tle", "origin": "Pochodzenie", "combo": "Połączenie sygnałów" },
   "checks": {
     "title": "Stan telefonu",
+    "home_screen": "Ekran główny",
+    "home_intro": "Aplikacja, która otwiera się po naciśnięciu przycisku Home.",
+    "home_system": "launcher producenta",
+    "home_foreign": "spoza systemu",
+    "home_hint": "Jeśli klient jej sam nie ustawiał, wybierz dla niej „Wyłącz” albo „Usuń” w zakładce Aplikacje (także gdy jest na liście bez uwag). Program przełączy wtedy ekran główny na launcher producenta.",
     "site_notifications": "Powiadomienia z witryn",
     "intro": "Strony, którym ktoś pozwolił wysyłać powiadomienia. Takie „reklamy” wyglądają jak z aplikacji, ale przychodzą z przeglądarki.",
     "to_check": { "one": "{count} do sprawdzenia", "few": "{count} do sprawdzenia", "many": "{count} do sprawdzenia", "other": "{count} do sprawdzenia" },
@@ -56,6 +61,8 @@
   },
   "choice": { "silence": "Wycisz", "disable": "Wyłącz", "remove": "Usuń", "fix": "Ustawienia witryn" },
   "results": {
+    "home": "ekran główny",
+    "home_title": "Ta aplikacja jest ustawiona jako ekran główny telefonu, a nie jest launcherem producenta.",
     "title": { "one": "{count} aplikacja wymaga uwagi", "few": "{count} aplikacje wymagają uwagi", "many": "{count} aplikacji wymaga uwagi", "other": "{count} aplikacji wymaga uwagi" },
     "safe": { "one": "{count} aplikacja bez uwag", "few": "{count} aplikacje bez uwag", "many": "{count} aplikacji bez uwag", "other": "{count} aplikacji bez uwag" },
     "mode": "Tryb widoku", "action_for": "Akcja dla {name}",
