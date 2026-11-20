@@ -238,3 +238,34 @@ def test_declarations_alone_stop_at_review():
     granted = declared + [FG("DM-NLS-01", "position", 10, "granted", category="data")]
     result = score_app(AppFacts("com.x"), granted, trusted=False, low_behavior_data=False)
     assert (result.score, result.verdict) == (64, "suspicious")
+
+
+def _home_launcher(**kw):
+    base = {"installer": "com.android.vending", "installed_days": 200.0, "is_home_holder": True,
+            "has_launcher_icon": False}
+    return AppFacts("com.x.scanner", **{**base, **kw})
+
+
+def test_hidden_app_set_as_home_screen_is_review():
+    """Zgłoszenie 2026-11-20: aplikacja bez ikony podmieniła ekran główny i wyświetlała reklamy,
+    a dostała 18 pkt (DM-HOME-01 + DM-HIDDEN-01) i werdykt „bezpieczna”."""
+    facts = _home_launcher()
+    result = score_app(facts, load_default_ruleset().evaluate(facts), trusted=False,
+                       low_behavior_data=False)
+    assert "DM-COMBO-04" in {f.rule_id for f in result.findings}
+    assert (result.score, result.verdict) == (28, "review")
+
+
+def test_home_screen_app_with_icon_gets_no_combo():
+    facts = _home_launcher(has_launcher_icon=True)
+    result = score_app(facts, load_default_ruleset().evaluate(facts), trusted=False,
+                       low_behavior_data=False)
+    assert "DM-COMBO-04" not in {f.rule_id for f in result.findings}
+    assert result.verdict == "safe"
+
+
+def test_trusted_launcher_without_icon_stays_safe():
+    facts = _home_launcher()
+    result = score_app(facts, load_default_ruleset().evaluate(facts), trusted=True,
+                       low_behavior_data=False)
+    assert (result.score, result.verdict) == (0, "safe")
